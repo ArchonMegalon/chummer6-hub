@@ -2919,6 +2919,75 @@ def test_runtime_proof_binds_exact_independently_pinned_release_receipt(
     assert fabricated_receipt["checks"]["releaseChannelProjectionMatches"] is False
 
 
+def test_runtime_proof_binds_portable_registry_artifact_authority(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    valid_proof_text = write_valid_runtime_proof(proof_path)
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    write_release_channel_receipt_for_proof(release_receipt, valid_proof_text)
+    registry_commit = "a" * 40
+    release_payload = json.loads(release_receipt.read_text(encoding="utf-8"))
+    release_payload["registryCommit"] = registry_commit
+    release_payload["registry_commit"] = registry_commit
+    release_bytes = (
+        json.dumps(release_payload, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    release_receipt.write_bytes(release_bytes)
+    release_receipt_sha256 = hashlib.sha256(release_bytes).hexdigest()
+
+    proof_payload = json.loads(valid_proof_text)
+    proof_payload["release_channel"]["path"] = (
+        "artifact://ArchonMegalon/chummer6-hub-registry"
+        f"@{registry_commit}/sha256/{release_receipt_sha256}"
+    )
+    proof_bytes = (
+        json.dumps(proof_payload, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    proof_path.write_bytes(proof_bytes)
+
+    passing_receipt = module.runtime_proof_bind_source_check(
+        proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(proof_bytes).hexdigest(),
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert passing_receipt["status"] == "pass"
+    assert passing_receipt["checks"]["releaseChannelProjectionMatches"] is True
+
+    proof_payload["release_channel"]["path"] = (
+        "artifact://ArchonMegalon/chummer6-hub-registry"
+        f"@{registry_commit}/sha256/{'0' * 64}"
+    )
+    tampered_proof_bytes = (
+        json.dumps(proof_payload, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    proof_path.write_bytes(tampered_proof_bytes)
+    tampered_receipt = module.runtime_proof_bind_source_check(
+        proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(
+            tampered_proof_bytes
+        ).hexdigest(),
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert tampered_receipt["status"] == "fail"
+    assert tampered_receipt["checks"]["releaseChannelReceiptDigestMatches"] is True
+    assert tampered_receipt["checks"]["releaseChannelProjectionMatches"] is False
+
+    release_payload["registry_commit"] = "b" * 40
+    assert (
+        module._expected_release_channel_projection(
+            release_payload,
+            receipt_sha256=release_receipt_sha256,
+        )
+        is None
+    )
+
+
 def test_full_preflight_cli_requires_independent_release_receipt_binding(
     tmp_path: Path,
 ) -> None:

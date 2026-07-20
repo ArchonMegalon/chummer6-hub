@@ -65,6 +65,22 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("Release notes and known issues", downloadsView, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WindowsLegacyProofDispatchUsesCurrentCompatibilityRoute()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains(
+            "/downloads/proof/windows/current/installers/{Uri.EscapeDataString(artifactId)}",
+            controller,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "/downloads/install/{Uri.EscapeDataString(artifactId)}/supplemental",
+            controller,
+            StringComparison.Ordinal);
+    }
+
     private static int CountOccurrences(string text, string needle)
     {
         int count = 0;

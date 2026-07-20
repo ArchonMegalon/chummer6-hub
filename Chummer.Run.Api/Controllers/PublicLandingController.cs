@@ -1891,7 +1891,10 @@ public sealed class PublicLandingController : Controller
         CancellationToken cancellationToken)
     {
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        string primaryDownloadHref = proofInstaller.DownloadUrl;
+        bool generationBoundProof = proofInstaller.LegacyFilePath is null;
+        string primaryDownloadHref = generationBoundProof
+            ? proofInstaller.DownloadUrl
+            : $"/downloads/proof/windows/current/installers/{Uri.EscapeDataString(artifactId)}";
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "Supplemental Windows installer",
             "Direct Windows installer for support outside the main downloads page.",
@@ -1923,8 +1926,8 @@ public sealed class PublicLandingController : Controller
             AutoStartDownload: releaseTruth.AvailabilityClaimsAllowed,
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
-            SecondaryDownloadHref: null,
-            SecondaryDownloadLabel: null,
+            SecondaryDownloadHref: generationBoundProof ? null : proofInstaller.DownloadUrl,
+            SecondaryDownloadLabel: generationBoundProof ? null : "Direct file mirror",
             AccountHref: "/downloads",
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,
@@ -14906,7 +14909,7 @@ Boundary:
             segments.Add(string.Equals(proofStatus, "passed", StringComparison.OrdinalIgnoreCase)
                 ? "Current release is ready."
                 : string.Equals(proofStatus, "review_required", StringComparison.OrdinalIgnoreCase)
-                    ? "Current release status is posted."
+                    ? "Current release status still needs review."
                     : $"Current release status is {HumanizeToken(proofStatus, "unknown").ToLowerInvariant()}.");
         }
 
@@ -15178,7 +15181,7 @@ Boundary:
         CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
-        var card = _landing.FindCardByDetailRoute(surface, currentPath);
+        var card = _landing.FindCardForDetailPage(surface, currentPath);
         if (card is null)
         {
             return NotFound();
@@ -15196,8 +15199,20 @@ Boundary:
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var primaryAction = _actions.ResolveDetailPrimaryAction(card, authenticated, currentPath);
+        var artifactRoadmapBridgeDetailRoute = _landing.ResolveArtifactRoadmapBridgeDetailRoute(card, currentPath);
+        if (primaryAction.Current && artifactRoadmapBridgeDetailRoute is not null)
+        {
+            primaryAction = new ResolvedPublicActionViewModel(
+                string.IsNullOrWhiteSpace(card.ActionLabel) ? "Open the artifact page" : card.ActionLabel!,
+                artifactRoadmapBridgeDetailRoute,
+                primaryAction.Tone,
+                External: false,
+                Current: false);
+        }
+
         TrustPageActionViewModel? secondaryAction = null;
-        if (!string.IsNullOrWhiteSpace(card.FallbackRoute)
+        if (artifactRoadmapBridgeDetailRoute is null
+            && !string.IsNullOrWhiteSpace(card.FallbackRoute)
             && !string.Equals(
                 PublicRouteCatalog.NormalizeRoute(card.FallbackRoute),
                 PublicRouteCatalog.NormalizeRoute(primaryAction.Href),

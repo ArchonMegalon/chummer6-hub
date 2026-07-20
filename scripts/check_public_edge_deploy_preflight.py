@@ -89,6 +89,9 @@ MAX_RUNTIME_PROOF_DETAIL_CHARS = 320
 RUNTIME_PROOF_RELEASE_CHANNEL_PATH = (
     "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
 )
+RUNTIME_PROOF_RELEASE_CHANNEL_REPOSITORY = (
+    "ArchonMegalon/chummer6-hub-registry"
+)
 RELEASE_CHANNEL_BINDING_FIELDS = (
     "channelId",
     "channel",
@@ -3814,6 +3817,8 @@ def _stable_bounded_file_capture(path: Path, *, max_bytes: int) -> dict[str, Any
 
 def _expected_release_channel_projection(
     receipt: dict[str, Any],
+    *,
+    receipt_sha256: str = "",
 ) -> dict[str, str] | None:
     if receipt.get("status") != "published":
         return None
@@ -3825,9 +3830,35 @@ def _expected_release_channel_projection(
         or values["releaseVersion"] != values["version"]
     ):
         return None
+    registry_commit_aliases = [
+        receipt[field]
+        for field in ("registryCommit", "registry_commit")
+        if field in receipt
+    ]
+    if registry_commit_aliases:
+        if (
+            len(registry_commit_aliases) != 2
+            or any(not isinstance(value, str) for value in registry_commit_aliases)
+        ):
+            return None
+        normalized_registry_commits = [
+            value.strip().lower() for value in registry_commit_aliases
+        ]
+        if (
+            len(set(normalized_registry_commits)) != 1
+            or re.fullmatch(r"[0-9a-f]{40}", normalized_registry_commits[0]) is None
+            or re.fullmatch(r"[0-9a-f]{64}", receipt_sha256) is None
+        ):
+            return None
+        release_channel_path = (
+            f"artifact://{RUNTIME_PROOF_RELEASE_CHANNEL_REPOSITORY}"
+            f"@{normalized_registry_commits[0]}/sha256/{receipt_sha256}"
+        )
+    else:
+        release_channel_path = RUNTIME_PROOF_RELEASE_CHANNEL_PATH
     return {
         "status": "available",
-        "path": RUNTIME_PROOF_RELEASE_CHANNEL_PATH,
+        "path": release_channel_path,
         **values,
     }
 
@@ -4068,7 +4099,8 @@ def runtime_proof_bind_source_check(
                         failures.append(_bounded_runtime_detail(exc))
                     else:
                         expected_projection = _expected_release_channel_projection(
-                            release_receipt
+                            release_receipt,
+                            receipt_sha256=actual_receipt_sha256,
                         )
                         if expected_projection is None:
                             failures.append(

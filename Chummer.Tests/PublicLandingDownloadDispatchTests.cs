@@ -56,6 +56,64 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task RoadmapRunsiteAliasUsesCanonicalArtifactActionWithoutSelfLinkOrDuplicate()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RoadmapDetailPage("runsite", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/artifacts/runsite-pack", model.PrimaryAction.Href);
+        Assert.Equal("Open the runsite pack", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.External);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
+    public async Task CanonicalRunsiteArtifactRouteKeepsItsExistingRoadmapAction()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.ArtifactDetailPage("runsite-pack", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/roadmap/runsite", model.PrimaryAction.Href);
+        Assert.Equal("See related roadmap item", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
+    public async Task NonBridgeArtifactDetailKeepsItsExistingPrimaryAction()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.ArtifactDetailPage("current-preview-build", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/downloads", model.PrimaryAction.Href);
+        Assert.Equal("Open downloads", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
     public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
     {
         var method = typeof(PublicLandingController).GetMethod(nameof(PublicLandingController.DownloadDispatchPage));
@@ -4550,7 +4608,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 releases: ManifestService,
                 campaignOsProof: null!,
                 releaseSelection: ReleaseSelection,
-                actions: null!,
+                actions: new PublicActionResolver(),
                 accounts: Accounts,
                 identity: identity,
                 links: null!,
