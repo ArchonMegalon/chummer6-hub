@@ -4,8 +4,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import yaml
 
@@ -63,6 +64,9 @@ STARTUP_SMOKE_ROOT = Path(
         str(ROOT / "Chummer.Portal/downloads/startup-smoke"),
     )
 )
+
+CANONICAL_PROOF_MAX_AGE_SECONDS = 7 * 24 * 3600
+CANONICAL_PROOF_FRESHNESS_STATUSES = {"fresh", "stale", "missing"}
 
 SOURCE_MARKERS = {
     "Chummer.Run.Api/Services/PublicReleaseManifestService.cs": [
@@ -182,6 +186,204 @@ def int_value(value: Any) -> int:
         return 0
 
 
+def parse_utc_timestamp(value: Any) -> Optional[datetime]:
+    raw = normalize(value)
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def projection_age_seconds(projection_generated_at: datetime, evidence_generated_at: datetime) -> int:
+    return int((projection_generated_at - evidence_generated_at).total_seconds())
+
+
+def exact_non_negative_int(
+    payload: dict[str, Any],
+    key: str,
+    *,
+    errors: list[str],
+) -> Optional[int]:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        errors.append(f"publicTrustMetrics.proofFreshness.{key} must be a non-negative integer")
+        return None
+    return value
+
+
+def verify_unique_tuple_ids(
+    rows: list[Any],
+    *,
+    label: str,
+    errors: list[str],
+) -> bool:
+    valid = True
+    first_index_by_tuple: dict[str, int] = {}
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            errors.append(f"{label}[{index}] must be an object before tuple aggregation")
+            valid = False
+            continue
+        tuple_id = normalize(row.get("tupleId"))
+        if not tuple_id:
+            errors.append(f"{label}[{index}] is missing tupleId before tuple aggregation")
+            valid = False
+            continue
+        first_index = first_index_by_tuple.get(tuple_id)
+        if first_index is not None:
+            errors.append(
+                f"{label} contains duplicate tupleId {tuple_id!r} at indexes "
+                f"{first_index} and {index}"
+            )
+            valid = False
+            continue
+        first_index_by_tuple[tuple_id] = index
+    return valid
+
+
+def derive_proof_freshness_status(
+    payload: dict[str, Any],
+    proof_freshness: dict[str, Any],
+    errors: list[str],
+) -> str:
+    """Derive freshness from authority-bound evidence; metrics.status is assertion-only."""
+
+    declared_status = normalized_token(proof_freshness.get("status"))
+    if not declared_status:
+        errors.append("publicTrustMetrics.proofFreshness.status is missing")
+    elif declared_status not in CANONICAL_PROOF_FRESHNESS_STATUSES:
+        errors.append("publicTrustMetrics.proofFreshness.status is not canonical")
+
+    projection_generated_at = parse_utc_timestamp(
+        payload.get("generatedAt") or payload.get("generated_at")
+    )
+    if projection_generated_at is None:
+        errors.append("release channel generatedAt is missing or is not an offset-aware ISO-8601 timestamp")
+
+    release_proof = payload.get("releaseProof")
+    if not isinstance(release_proof, dict):
+        errors.append("release channel is missing releaseProof for independent freshness derivation")
+        release_proof = {}
+    ui_localization = release_proof.get("uiLocalizationReleaseGate")
+    if not isinstance(ui_localization, dict):
+        errors.append("releaseProof is missing uiLocalizationReleaseGate for independent freshness derivation")
+        ui_localization = {}
+    flagship_readiness = release_proof.get("flagshipReadiness")
+    if not isinstance(flagship_readiness, dict):
+        errors.append("releaseProof is missing flagshipReadiness for independent freshness derivation")
+        flagship_readiness = {}
+
+    evidence_fields = (
+        (
+            "releaseProof",
+            release_proof.get("generatedAt") or release_proof.get("generated_at"),
+            "releaseProofGeneratedAt",
+            "releaseProofAgeSeconds",
+            "releaseProofMaxAgeSeconds",
+        ),
+        (
+            "releaseProof.uiLocalizationReleaseGate",
+            ui_localization.get("generatedAt") or ui_localization.get("generated_at"),
+            "uiLocalizationGeneratedAt",
+            "uiLocalizationAgeSeconds",
+            "uiLocalizationMaxAgeSeconds",
+        ),
+        (
+            "releaseProof.flagshipReadiness",
+            flagship_readiness.get("generatedAt") or flagship_readiness.get("generated_at"),
+            "flagshipReadinessGeneratedAt",
+            "flagshipReadinessAgeSeconds",
+            "flagshipReadinessMaxAgeSeconds",
+        ),
+    )
+
+    derived_ages: list[int] = []
+    evidence_missing = projection_generated_at is None
+    for source_path, source_timestamp_value, timestamp_key, age_key, max_age_key in evidence_fields:
+        source_timestamp = parse_utc_timestamp(source_timestamp_value)
+        projected_timestamp = parse_utc_timestamp(proof_freshness.get(timestamp_key))
+        if source_timestamp is None:
+            errors.append(f"{source_path}.generatedAt is missing or invalid")
+            evidence_missing = True
+        if projected_timestamp is None:
+            errors.append(
+                f"publicTrustMetrics.proofFreshness.{timestamp_key} is missing or invalid"
+            )
+        elif source_timestamp is not None and projected_timestamp != source_timestamp:
+            errors.append(
+                f"publicTrustMetrics.proofFreshness.{timestamp_key} drifted from canonical "
+                f"{source_path}.generatedAt"
+            )
+
+        declared_age = exact_non_negative_int(proof_freshness, age_key, errors=errors)
+        declared_max_age = exact_non_negative_int(proof_freshness, max_age_key, errors=errors)
+        if declared_max_age is not None and declared_max_age != CANONICAL_PROOF_MAX_AGE_SECONDS:
+            errors.append(
+                f"publicTrustMetrics.proofFreshness.{max_age_key} must equal canonical "
+                f"{CANONICAL_PROOF_MAX_AGE_SECONDS}"
+            )
+
+        if projection_generated_at is None or source_timestamp is None:
+            continue
+        if source_timestamp > projection_generated_at:
+            errors.append(
+                f"{source_path}.generatedAt must not be later than release channel generatedAt"
+            )
+            evidence_missing = True
+            continue
+        derived_age = projection_age_seconds(projection_generated_at, source_timestamp)
+        derived_ages.append(derived_age)
+        if declared_age is not None and declared_age != derived_age:
+            errors.append(
+                f"publicTrustMetrics.proofFreshness.{age_key} is inconsistent with canonical timestamps: "
+                f"expected {derived_age}, got {declared_age}"
+            )
+
+    embedded_desktop_ready = flagship_readiness.get("desktopClientReady")
+    if flagship_readiness and not isinstance(embedded_desktop_ready, bool):
+        errors.append("releaseProof.flagshipReadiness.desktopClientReady must be boolean")
+    projected_desktop_ready = proof_freshness.get("flagshipDesktopClientReady")
+    if not isinstance(projected_desktop_ready, bool):
+        errors.append("publicTrustMetrics.proofFreshness.flagshipDesktopClientReady must be boolean")
+    elif isinstance(embedded_desktop_ready, bool) and projected_desktop_ready != embedded_desktop_ready:
+        errors.append(
+            "publicTrustMetrics.proofFreshness.flagshipDesktopClientReady drifted from "
+            "releaseProof.flagshipReadiness.desktopClientReady"
+        )
+
+    embedded_readiness_status = normalized_token(flagship_readiness.get("status"))
+    projected_readiness_status = normalized_token(proof_freshness.get("flagshipReadinessStatus"))
+    if not projected_readiness_status:
+        errors.append("publicTrustMetrics.proofFreshness.flagshipReadinessStatus is missing")
+    elif embedded_readiness_status and projected_readiness_status != embedded_readiness_status:
+        errors.append(
+            "publicTrustMetrics.proofFreshness.flagshipReadinessStatus drifted from "
+            "releaseProof.flagshipReadiness.status"
+        )
+
+    if evidence_missing or len(derived_ages) != len(evidence_fields):
+        derived_status = "missing"
+    elif any(age > CANONICAL_PROOF_MAX_AGE_SECONDS for age in derived_ages):
+        derived_status = "stale"
+    elif embedded_desktop_ready is not True:
+        derived_status = "stale"
+    else:
+        derived_status = "fresh"
+
+    if declared_status in CANONICAL_PROOF_FRESHNESS_STATUSES and declared_status != derived_status:
+        errors.append(
+            "publicTrustMetrics.proofFreshness.status is inconsistent with canonical "
+            f"timestamps, age budgets, and flagship readiness: expected {derived_status!r}, "
+            f"got {declared_status!r}"
+        )
+    return derived_status
+
+
 def route_truth_is_revoked(row: dict[str, Any]) -> bool:
     return normalized_token(row.get("revokeState")) == "revoked" or normalized_token(row.get("promotionState")) == "revoked"
 
@@ -213,6 +415,46 @@ def route_truth_is_blocked(row: dict[str, Any]) -> bool:
     )
 
 
+def output_readiness_publication_state(
+    publication_state: str,
+    *,
+    proof_freshness_status: str,
+) -> str:
+    normalized_state = normalized_token(publication_state)
+    if (
+        normalized_token(proof_freshness_status) in {"stale", "missing"}
+        and normalized_state in {"published", "retained"}
+    ):
+        return "preview"
+    return normalized_state
+
+
+def route_truth_publication_state(
+    row: dict[str, Any],
+    *,
+    proof_freshness_status: str,
+) -> str:
+    explicit_state = normalized_token(row.get("publicationState") or row.get("publication_state"))
+    if explicit_state in {"preview", "published", "revoked", "retained"}:
+        return output_readiness_publication_state(
+            explicit_state,
+            proof_freshness_status=proof_freshness_status,
+        )
+    if normalized_token(row.get("revokeState")) == "revoked":
+        return "revoked"
+    if normalized_token(row.get("promotionState")) == "promoted":
+        return output_readiness_publication_state(
+            "published",
+            proof_freshness_status=proof_freshness_status,
+        )
+    if normalized_token(row.get("routeRole")) == "fallback":
+        return output_readiness_publication_state(
+            "retained",
+            proof_freshness_status=proof_freshness_status,
+        )
+    return "preview"
+
+
 def summary_requires(summary: str, marker: str, errors: list[str], label: str) -> None:
     if marker not in normalize(summary):
         errors.append(f"{label} summary is missing {marker!r}")
@@ -220,10 +462,17 @@ def summary_requires(summary: str, marker: str, errors: list[str], label: str) -
 
 def verify_public_trust_metrics(
     payload: dict[str, Any],
-    route_truth: list[dict[str, Any]],
+    route_truth: list[Any],
     artifact_by_id: dict[str, dict[str, Any]],
     errors: list[str],
 ) -> None:
+    if not verify_unique_tuple_ids(
+        route_truth,
+        label="desktopTupleCoverage.desktopRouteTruth",
+        errors=errors,
+    ):
+        return
+
     metrics = payload.get("publicTrustMetrics")
     if not isinstance(metrics, dict):
         errors.append("release channel is missing publicTrustMetrics")
@@ -231,6 +480,7 @@ def verify_public_trust_metrics(
 
     release_channel = metrics.get("releaseChannel")
     adoption_health = metrics.get("adoptionHealth")
+    proof_freshness = metrics.get("proofFreshness")
     revocation_facts = metrics.get("revocationFacts")
     if not isinstance(release_channel, dict):
         errors.append("publicTrustMetrics is missing releaseChannel")
@@ -238,13 +488,38 @@ def verify_public_trust_metrics(
     if not isinstance(adoption_health, dict):
         errors.append("publicTrustMetrics is missing adoptionHealth")
         return
+    if not isinstance(proof_freshness, dict):
+        errors.append("publicTrustMetrics is missing proofFreshness")
+        return
     if not isinstance(revocation_facts, dict):
         errors.append("publicTrustMetrics is missing revocationFacts")
         return
 
-    recommended_routes = [row for row in route_truth if route_truth_is_recommended_primary(row)]
-    fallback_routes = [row for row in route_truth if route_truth_is_fallback_recovery(row)]
+    proof_freshness_status = derive_proof_freshness_status(payload, proof_freshness, errors)
+    promoted_primary_routes = [row for row in route_truth if route_truth_is_recommended_primary(row)]
+    promoted_fallback_routes = [row for row in route_truth if route_truth_is_fallback_recovery(row)]
+    recommended_routes = [
+        row
+        for row in promoted_primary_routes
+        if route_truth_publication_state(
+            row,
+            proof_freshness_status=proof_freshness_status,
+        )
+        == "published"
+    ]
+    fallback_routes = [
+        row
+        for row in promoted_fallback_routes
+        if route_truth_publication_state(
+            row,
+            proof_freshness_status=proof_freshness_status,
+        )
+        == "retained"
+    ]
     blocked_routes = [row for row in route_truth if route_truth_is_blocked(row)]
+    for row in [*promoted_primary_routes, *promoted_fallback_routes]:
+        if row not in recommended_routes and row not in fallback_routes:
+            blocked_routes.append(row)
     revoked_routes = [row for row in route_truth if route_truth_is_revoked(row)]
 
     expected_primary = len(recommended_routes)
@@ -524,6 +799,22 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
     if not install_registry:
         errors.append("installAwareArtifactRegistry must contain tuple rows")
 
+    tuple_registries_are_unique = verify_unique_tuple_ids(
+        identity_registry,
+        label="artifactIdentityRegistry",
+        errors=errors,
+    )
+    tuple_registries_are_unique = (
+        verify_unique_tuple_ids(
+            install_registry,
+            label="installAwareArtifactRegistry",
+            errors=errors,
+        )
+        and tuple_registries_are_unique
+    )
+    if not tuple_registries_are_unique:
+        return
+
     identity_by_tuple = {
         normalize(item.get("tupleId")): item
         for item in identity_registry
@@ -543,7 +834,7 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
 
     verify_public_trust_metrics(
         payload,
-        [row for row in route_truth if isinstance(row, dict)],
+        route_truth,
         artifact_by_id,
         errors,
     )

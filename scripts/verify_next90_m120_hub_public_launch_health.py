@@ -40,6 +40,16 @@ PACKAGE_PROOF = [
     "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
     "bash scripts/ai/verify.sh",
 ]
+PORTABLE_HUB_REPO_PREFIX = "repo://ArchonMegalon/chummer6-hub"
+MACHINE_LOCAL_HUB_REPO_PREFIX = "/docker/chummercomplete/chummer6-hub"
+PORTABLE_PACKAGE_PROOF = [
+    (
+        f"{PORTABLE_HUB_REPO_PREFIX}{proof_ref[len(MACHINE_LOCAL_HUB_REPO_PREFIX):]}"
+        if proof_ref.startswith(f"{MACHINE_LOCAL_HUB_REPO_PREFIX}/")
+        else proof_ref
+    )
+    for proof_ref in PACKAGE_PROOF
+]
 OWNED_SURFACES = [
     "public_trust_surface:v3",
     "launch_health:public",
@@ -71,7 +81,7 @@ LOCAL_RELEASE_PROOF_PACKAGE = {
     "allowed_paths": ALLOWED_PATHS,
     "owned_surfaces": OWNED_SURFACES,
     "exit_criterion": PACKAGE_TASK,
-    "proof": PACKAGE_PROOF,
+    "proof": PORTABLE_PACKAGE_PROOF,
 }
 LOCAL_RELEASE_PROOF_SURFACE = {
     "statusRoute": "/status",
@@ -167,7 +177,8 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/ViewModels/SiteViewModels.cs": [
         "public sealed record StatusPageViewModel(",
-        "string CautionSummary);",
+        "string CautionSummary,",
+        "PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Status",
@@ -288,6 +299,22 @@ def _normalize_queue_task(payload: dict) -> dict:
     if "proof recency" in exit_criterion.casefold() and "release checks" not in exit_criterion.casefold():
         normalized["exit_criterion"] = exit_criterion.replace("proof recency", "release checks")
 
+    return normalized
+
+
+def _normalize_release_proof_package(payload: dict) -> dict:
+    normalized = _normalize_queue_task(payload)
+    proof_refs = normalized.get("proof")
+    if isinstance(proof_refs, list):
+        normalized["proof"] = [
+            (
+                f"{PORTABLE_HUB_REPO_PREFIX}{proof_ref[len(MACHINE_LOCAL_HUB_REPO_PREFIX):]}"
+                if isinstance(proof_ref, str)
+                and proof_ref.startswith(f"{MACHINE_LOCAL_HUB_REPO_PREFIX}/")
+                else proof_ref
+            )
+            for proof_ref in proof_refs
+        ]
     return normalized
 
 
@@ -476,12 +503,14 @@ def verify_release_proof(errors: list[str], path: Path, *, label: str) -> None:
         ]
         if len(package_rows) != 1:
             errors.append(f"{label} successor_queue_packages must contain exactly one {PACKAGE_ID} row")
-        elif _normalize_queue_task(package_rows[0]) != _normalize_queue_task(LOCAL_RELEASE_PROOF_PACKAGE):
+        elif _normalize_release_proof_package(package_rows[0]) != _normalize_release_proof_package(
+            LOCAL_RELEASE_PROOF_PACKAGE
+        ):
             errors.append(f"{label} successor_queue_packages row for {PACKAGE_ID} drifted")
 
     package = payload.get("successor_queue_packages_by_id", {}).get(PACKAGE_ID)
     if package is not None:
-        package = _normalize_queue_task(package)
+        package = _normalize_release_proof_package(package)
 
     if package != LOCAL_RELEASE_PROOF_PACKAGE:
         errors.append(f"{label} package payload for {PACKAGE_ID} drifted")

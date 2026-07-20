@@ -69,13 +69,10 @@ def load_queue_payload(path: Path) -> dict:
 
 class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_public_launch_health(self) -> None:
-        result = subprocess.run(
-            ["python3", str(SCRIPT)],
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        with tempfile.TemporaryDirectory(prefix="next90-m120-repo-local-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            result = self.run_verifier(temp_root)
 
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("next90 m120 hub public launch health proof passed", result.stdout)
@@ -187,6 +184,39 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing publicTrustSurface block", result.stderr)
+
+    def test_verifier_accepts_portable_release_proof_package_refs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-portable-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            for relative_path in (
+                ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+                "Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
+            ):
+                proof_path = temp_root / relative_path
+                payload = json.loads(proof_path.read_text(encoding="utf-8"))
+                package_id = "next90-m120-hub-public-launch-health"
+                packages = [
+                    package
+                    for package in payload["successor_queue_packages"]
+                    if package.get("package_id") == package_id
+                ]
+                packages.append(payload["successor_queue_packages_by_id"][package_id])
+                for package in packages:
+                    package["proof"] = [
+                        str(proof_ref).replace(
+                            "/docker/chummercomplete/chummer6-hub/",
+                            "repo://ArchonMegalon/chummer6-hub/",
+                            1,
+                        )
+                        for proof_ref in package["proof"]
+                    ]
+                proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            result = self.run_verifier(temp_root)
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
+        self.assertIn("next90 m120 hub public launch health proof passed", result.stdout)
 
     def test_verifier_fails_when_release_proof_drops_launch_health_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-receipt-") as temp_dir:
@@ -318,6 +348,12 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:
             source = REPO_ROOT / relative_path
+            if (
+                not source.is_file()
+                and relative_path
+                == "Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+            ):
+                source = REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)

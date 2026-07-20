@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import importlib.util
 import json
 import os
 import shutil
@@ -24,6 +26,15 @@ STATIC_SOURCE_FILES = [
 ]
 
 
+def load_verifier_module():
+    spec = importlib.util.spec_from_file_location("m144_hub_release_truth_verifier", SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("unable to load M144 Hub release-truth verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def source_files() -> list[str]:
     files = list(STATIC_SOURCE_FILES)
     startup_smoke_root = REPO_ROOT / "Chummer.Portal/downloads/startup-smoke"
@@ -32,7 +43,187 @@ def source_files() -> list[str]:
     return files
 
 
+def public_trust_fixture(
+    *,
+    declared_status: str = "stale",
+    desktop_ready: bool = False,
+) -> tuple[dict, list[dict], dict[str, dict]]:
+    generated_at = "2026-07-20T00:00:00Z"
+    route_truth = [
+        {
+            "tupleId": "avalonia:linux:linux-x64",
+            "artifactId": "linux-installer",
+            "routeRole": "primary",
+            "promotionState": "promoted",
+            "revokeState": "not_revoked",
+        },
+        {
+            "tupleId": "avalonia:windows:win-x64",
+            "artifactId": "windows-installer",
+            "routeRole": "primary",
+            "promotionState": "promoted",
+            "revokeState": "not_revoked",
+        },
+        {
+            "tupleId": "avalonia:macos:osx-arm64",
+            "artifactId": "",
+            "routeRole": "primary",
+            "promotionState": "proof_required",
+            "revokeState": "not_revoked",
+        },
+        {
+            "tupleId": "blazor-desktop:macos:osx-arm64",
+            "artifactId": "",
+            "routeRole": "fallback",
+            "promotionState": "proof_required",
+            "parityPosture": "explicit_fallback",
+            "revokeState": "not_revoked",
+        },
+    ]
+    recommended_count = 2 if desktop_ready else 0
+    blocked_count = 1 if desktop_ready else 3
+    readiness_status = "pass" if desktop_ready else "fail"
+    payload = {
+        "generatedAt": generated_at,
+        "releaseProof": {
+            "generatedAt": generated_at,
+            "uiLocalizationReleaseGate": {"generatedAt": generated_at},
+            "flagshipReadiness": {
+                "generatedAt": generated_at,
+                "status": readiness_status,
+                "desktopClientReady": desktop_ready,
+            },
+        },
+        "publicTrustMetrics": {
+            "releaseChannel": {
+                "recommendedRouteCount": recommended_count,
+                "fallbackRecoveryRouteCount": 0,
+                "blockedRouteCount": blocked_count,
+                "revokedRouteCount": 0,
+                "summary": (
+                    f"Channel preview is blocked with {recommended_count} recommended primary routes, "
+                    f"0 promoted fallback recovery routes, {blocked_count} blocked routes, and 0 active revocations."
+                ),
+            },
+            "adoptionHealth": {
+                "primaryPromotedCount": recommended_count,
+                "fallbackRecoveryCount": 0,
+                "blockedRouteCount": blocked_count,
+                "revokedRouteCount": 0,
+                "publicInstallCount": recommended_count,
+                "accountLinkedInstallCount": 0,
+                "summary": (
+                    f"{recommended_count} primary routes are promoted; {recommended_count} are guest-readable, "
+                    f"0 require account-linked install handoff, 0 fallback recovery routes are promoted, "
+                    f"and {blocked_count} routes are still blocked on proof."
+                ),
+            },
+            "proofFreshness": {
+                "status": declared_status,
+                "releaseProofGeneratedAt": generated_at,
+                "releaseProofAgeSeconds": 0,
+                "releaseProofMaxAgeSeconds": 604800,
+                "uiLocalizationGeneratedAt": generated_at,
+                "uiLocalizationAgeSeconds": 0,
+                "uiLocalizationMaxAgeSeconds": 604800,
+                "flagshipReadinessGeneratedAt": generated_at,
+                "flagshipReadinessAgeSeconds": 0,
+                "flagshipReadinessMaxAgeSeconds": 604800,
+                "flagshipReadinessStatus": readiness_status,
+                "flagshipDesktopClientReady": desktop_ready,
+            },
+            "revocationFacts": {
+                "activeRevocationCount": 0,
+                "activeRevocations": [],
+            },
+        },
+    }
+    artifacts = {
+        "linux-installer": {"installAccessClass": "open_public"},
+        "windows-installer": {"installAccessClass": "open_public"},
+    }
+    return payload, route_truth, artifacts
+
+
 class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
+    def test_public_trust_metrics_demote_promoted_routes_when_proof_is_stale(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture()
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertEqual([], errors)
+
+    def test_public_trust_metrics_reject_missing_freshness_status(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture()
+        payload["publicTrustMetrics"]["proofFreshness"].pop("status")
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertIn("publicTrustMetrics.proofFreshness.status is missing", errors)
+
+    def test_public_trust_metrics_reject_invalid_freshness_status(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture(declared_status="unknown")
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertIn("publicTrustMetrics.proofFreshness.status is not canonical", errors)
+
+    def test_public_trust_metrics_reject_stale_status_with_fresh_zero_age_evidence(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture(
+            declared_status="stale",
+            desktop_ready=True,
+        )
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertIn(
+            "publicTrustMetrics.proofFreshness.status is inconsistent with canonical "
+            "timestamps, age budgets, and flagship readiness: expected 'fresh', got 'stale'",
+            errors,
+        )
+
+    def test_public_trust_metrics_reject_future_evidence_with_zero_age_and_fresh_status(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture(
+            declared_status="fresh",
+            desktop_ready=True,
+        )
+        future_generated_at = "2026-07-20T00:00:00.001Z"
+        payload["releaseProof"]["generatedAt"] = future_generated_at
+        payload["publicTrustMetrics"]["proofFreshness"][
+            "releaseProofGeneratedAt"
+        ] = future_generated_at
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertIn(
+            "releaseProof.generatedAt must not be later than release channel generatedAt",
+            errors,
+        )
+
+    def test_public_trust_metrics_reject_duplicate_tuple_before_aggregation(self) -> None:
+        verifier = load_verifier_module()
+        payload, route_truth, artifacts = public_trust_fixture()
+        route_truth.append(copy.deepcopy(route_truth[0]))
+        errors: list[str] = []
+
+        verifier.verify_public_trust_metrics(payload, route_truth, artifacts, errors)
+
+        self.assertIn(
+            "desktopTupleCoverage.desktopRouteTruth contains duplicate tupleId "
+            "'avalonia:linux:linux-x64' at indexes 0 and 4",
+            errors,
+        )
+
     def test_verifier_accepts_repo_local_release_truth_alignment(self) -> None:
         result = subprocess.run(
             ["python3", str(SCRIPT)],

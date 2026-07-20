@@ -4,6 +4,7 @@ import base64
 import json
 import importlib.util
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -3305,6 +3306,54 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "scripts/ai/verify.sh missing marker: python3 scripts/verify_desktop_native_trust_receipts.py",
                 errors,
             )
+
+    def test_current_sources_satisfy_authority_aware_desktop_native_markers(self) -> None:
+        verifier = load_verifier_module()
+        errors: list[str] = []
+
+        verifier._verify_required_source_markers(errors, REPO_ROOT)
+
+        self.assertEqual([], errors)
+
+    def test_verifier_fail_closes_review_required_primary_action_tamper(self) -> None:
+        verifier = load_verifier_module()
+        controller_path = Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs")
+        required_marker = (
+            "NativePrimaryActionHref: releaseAvailabilityAllowed ? "
+            "BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase) "
+            ": NativeContinuationHref"
+        )
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path in verifier.REQUIRED_SOURCE_MARKERS:
+                source = REPO_ROOT / relative_path
+                target = repo_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller = repo_root / controller_path
+            source = controller.read_text(encoding="utf-8")
+            bounded_false_branch = (
+                "NativePrimaryActionHref: releaseAvailabilityAllowed\n"
+                "                ? BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase)\n"
+                "                : NativeContinuationHref,"
+            )
+            normal_primary_action = (
+                "NativePrimaryActionHref: releaseAvailabilityAllowed\n"
+                "                ? BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase)\n"
+                "                : BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase),"
+            )
+            self.assertIn(bounded_false_branch, source)
+            controller.write_text(
+                source.replace(bounded_false_branch, normal_primary_action, 1),
+                encoding="utf-8",
+            )
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+        self.assertIn(f"{controller_path} missing marker: {required_marker}", errors)
 
     def test_verifier_fail_closes_account_continuation_copy_drift(self) -> None:
         verifier = load_verifier_module()
