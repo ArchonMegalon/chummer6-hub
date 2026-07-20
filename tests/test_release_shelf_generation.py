@@ -19,6 +19,88 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def test_project_manifest_pair_binds_exact_generation_without_copying_artifacts(
+    tmp_path: Path,
+) -> None:
+    canonical_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    compatibility_path = tmp_path / "releases.json"
+    source = {
+        "version": "run-20260720-nightly",
+        "channel": "preview",
+        "publishedAt": "2026-07-20T20:00:00Z",
+        "downloads": [
+            {
+                "id": "avalonia-osx-arm64",
+                "fileName": "chummer.dmg",
+                "url": "/downloads/files/chummer.dmg",
+                "installAccessClass": "open_public",
+            }
+        ],
+    }
+    canonical_path.write_text(json.dumps(source), encoding="utf-8")
+    compatibility_path.write_text(json.dumps(source), encoding="utf-8")
+
+    receipt = MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "gen-run-20260720-nightly-abcdef0123456789",
+    )
+
+    expected_route = (
+        "/downloads/g/gen-run-20260720-nightly-abcdef0123456789/"
+        "files/chummer.dmg"
+    )
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    assert canonical == compatibility
+    assert canonical["generationId"] == receipt["generationId"]
+    assert canonical["downloads"][0]["url"] == expected_route
+    assert receipt["canonicalManifestSha256"] == MODULE.sha256_file(canonical_path)
+    assert receipt["compatibilityManifestSha256"] == MODULE.sha256_file(
+        compatibility_path
+    )
+    assert not list(tmp_path.glob(".*.generation-*"))
+
+
+def test_project_manifest_pair_rejects_release_identity_drift_without_mutation(
+    tmp_path: Path,
+) -> None:
+    canonical_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    compatibility_path = tmp_path / "releases.json"
+    canonical_path.write_text(
+        json.dumps(
+            {
+                "version": "run-one",
+                "channel": "preview",
+                "publishedAt": "2026-07-20T20:00:00Z",
+                "downloads": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    compatibility_path.write_text(
+        json.dumps(
+            {
+                "version": "run-two",
+                "channel": "preview",
+                "publishedAt": "2026-07-20T20:00:00Z",
+                "downloads": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = (canonical_path.read_bytes(), compatibility_path.read_bytes())
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="same release identity"):
+        MODULE.project_manifest_pair(
+            canonical_path,
+            compatibility_path,
+            "gen-release-identity-drift",
+        )
+
+    assert (canonical_path.read_bytes(), compatibility_path.read_bytes()) == before
+
+
 def install_fake_conditional_s3_cli(
     tmp_path: Path,
 ) -> tuple[Path, Path, Path, Path, Path]:

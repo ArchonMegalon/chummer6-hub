@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime, timezone
 import html
 import json
 import re
@@ -80,10 +81,114 @@ METADATA_PATTERN = re.compile(
     r"<metadata\b[^>]*\bid=[\"']chummer-release-truth[\"'][^>]*>(.*?)</metadata>",
     re.IGNORECASE | re.DOTALL,
 )
+SCRIPT_BLOCK_PATTERN = re.compile(
+    r"<script\b[^>]*>.*?</script>",
+    re.IGNORECASE | re.DOTALL,
+)
+STYLE_BLOCK_PATTERN = re.compile(
+    r"<style\b[^>]*>.*?</style>",
+    re.IGNORECASE | re.DOTALL,
+)
+TEMPLATE_BLOCK_PATTERN = re.compile(
+    r"<template\b[^>]*>.*?</template>",
+    re.IGNORECASE | re.DOTALL,
+)
+HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+HTML_TAG_PATTERN = re.compile(r"<[^>]+>", re.DOTALL)
+RENDERED_AVAILABLE_PATTERNS = (
+    re.compile(
+        r"\bcurrent\s+builds?\s+(?:is|are)\s+"
+        r"(?:published\s+and\s+)?(?:ready|available|live)"
+        r"(?:\s+to\s+download)?\b"
+    ),
+    re.compile(
+        r"\b(?:downloads?|installers?)\s+(?:is|are)\s+"
+        r"(?:published|ready|available|live)\b"
+    ),
+    re.compile(
+        r"\b(?:a|the)\s+(?:current\s+)?(?:public\s+)?"
+        r"(?:build|installer)\s+(?:is\s+)?(?:ready|available|live)\b"
+    ),
+)
+RENDERED_WITHHELD_PATTERNS = (
+    re.compile(
+        r"\bno\s+(?:(?:current|public)\s+){0,2}"
+        r"(?:builds?|installers?|downloads?)\s+"
+        r"(?:(?:is|are)\s+)?(?:ready|available|live)"
+        r"(?:\s+right\s+now)?\b"
+    ),
+    re.compile(
+        r"\bno\s+(?:(?:current|public)\s+){0,2}installer"
+        r"(?:\s+right\s+now)?(?=[.!?,;]|$)"
+    ),
+    re.compile(
+        r"\bdownloads?\s+(?:(?:is|are)\s+)?(?:paused|unavailable|withheld)\b"
+    ),
+    re.compile(r"\bno\s+current\s+build\s+has\s+passed\s+release\s+verification\b"),
+)
+PLATFORM_TOKEN_PATTERN = re.compile(r"\b(?:windows|linux|mac(?:os|\s+os)?)\b")
+PLATFORM_CLAIM_PATTERN = re.compile(
+    r"\b(?P<negated>no\s+)?"
+    r"(?P<platforms>(?:windows|linux|mac(?:os|\s+os)?)"
+    r"(?:\s*(?:,|and|&)\s*(?:windows|linux|mac(?:os|\s+os)?))*)\s+"
+    r"(?:downloads?|installers?|builds?)\s+"
+    r"(?:(?:is|are)\s+)?"
+    r"(?P<state>published\s+and\s+ready|live|available|ready|paused|unavailable|withheld|blocked)\b"
+)
+RENDERED_SCALAR_FIELD_PATTERNS = {
+    "releaseVersion": re.compile(
+        r"\b(?:current\s+)?release\s+version\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "channel": re.compile(
+        r"\b(?:current\s+)?release\s+channel\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "releaseStatus": re.compile(
+        r"\brelease\s+status\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "rolloutState": re.compile(
+        r"\brollout\s+state\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "supportabilityState": re.compile(
+        r"\bsupportability\s+state\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "downloadAccessPosture": re.compile(
+        r"\bdownload\s+access(?:\s+posture)?\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "releaseDecisionStatus": re.compile(
+        r"\brelease\s+decision(?:\s+status)?\s*(?::|is)\s*"
+        r"(?P<value>[a-z0-9][a-z0-9._-]{0,127})\b"
+    ),
+    "manifestSha256": re.compile(
+        r"\bmanifest\s+sha(?:-?256)?\s*(?::|is)\s*"
+        r"(?P<value>[0-9a-f]{64})\b"
+    ),
+    "releaseDecisionSha256": re.compile(
+        r"\brelease\s+decision\s+sha(?:-?256)?\s*(?::|is)\s*"
+        r"(?P<value>[0-9a-f]{64})\b"
+    ),
+}
+RENDERED_ARTIFACT_COUNT_PATTERN = re.compile(
+    r"\bartifact\s+count\s*(?::|is)\s*(?P<value>[0-9]{1,3})\b"
+)
+EXPECTED_RELEASE_FIELDS = (
+    "releaseVersion",
+    "manifestSha256",
+    "releaseDecisionSha256",
+)
 
 
 class ConvergenceError(RuntimeError):
     pass
+
+
+def now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 class SameOriginRedirectHandler(HTTPRedirectHandler):
@@ -304,6 +409,8 @@ def _body_projection(
         return None
 
     projection = canonicalize_projection(candidate, source=f"{source} body")
+    if "html" in content_type:
+        _validate_rendered_release_fields(text, projection, source=source)
     if (
         native_payload is not None
         and native_payload is not candidate
@@ -311,6 +418,153 @@ def _body_projection(
     ):
         _validate_native_manifest_claims(native_payload, projection, source=source)
     return projection
+
+
+def _visible_document_text(document: str) -> str:
+    visible = SCRIPT_BLOCK_PATTERN.sub(" ", document)
+    visible = STYLE_BLOCK_PATTERN.sub(" ", visible)
+    visible = TEMPLATE_BLOCK_PATTERN.sub(" ", visible)
+    visible = HTML_COMMENT_PATTERN.sub(" ", visible)
+    visible = HTML_TAG_PATTERN.sub(" ", visible)
+    return " ".join(html.unescape(visible).casefold().split())
+
+
+def _matching_spans(
+    patterns: Sequence[re.Pattern[str]],
+    text: str,
+) -> list[tuple[int, int]]:
+    return [match.span() for pattern in patterns for match in pattern.finditer(text)]
+
+
+def _mask_spans(text: str, spans: Sequence[tuple[int, int]]) -> str:
+    masked = list(text)
+    for start, end in spans:
+        masked[start:end] = " " * (end - start)
+    return "".join(masked)
+
+
+def _spans_overlap(left: tuple[int, int], right: tuple[int, int]) -> bool:
+    return left[0] < right[1] and right[0] < left[1]
+
+
+def _platform_family(value: str) -> str | None:
+    normalized = value.casefold().replace(" ", "").replace("_", "").replace("-", "")
+    if "windows" in normalized or normalized.startswith("win"):
+        return "windows"
+    if "linux" in normalized:
+        return "linux"
+    if normalized == "mac" or any(
+        marker in normalized for marker in ("macos", "osx", "darwin")
+    ):
+        return "macos"
+    return None
+
+
+def _canonical_rendered_scalar(field: str, value: Any) -> Any:
+    if field == "artifactCount":
+        return int(value)
+    rendered = str(value).casefold()
+    if field in {
+        "channel",
+        "releaseStatus",
+        "rolloutState",
+        "supportabilityState",
+        "downloadAccessPosture",
+        "releaseDecisionStatus",
+    }:
+        return re.sub(r"[^a-z0-9]+", "_", rendered).strip("_")
+    return rendered
+
+
+def _platform_claim_is_negative(match: re.Match[str]) -> bool:
+    return bool(match.group("negated")) or match.group("state") in {
+        "paused",
+        "unavailable",
+        "withheld",
+        "blocked",
+    }
+
+
+def _validate_rendered_release_fields(
+    document: str,
+    projection: Mapping[str, Any],
+    *,
+    source: str,
+) -> None:
+    visible = _visible_document_text(document)
+    contradictions: list[str] = []
+
+    platform_matches = list(PLATFORM_CLAIM_PATTERN.finditer(visible))
+    platform_spans = [match.span() for match in platform_matches]
+    withheld_spans = [
+        span
+        for span in _matching_spans(RENDERED_WITHHELD_PATTERNS, visible)
+        if not any(_spans_overlap(span, platform_span) for platform_span in platform_spans)
+    ]
+    availability_claims = [False] * len(withheld_spans)
+    negated_platform_spans = [
+        match.span() for match in platform_matches if _platform_claim_is_negative(match)
+    ]
+    visible_without_withheld_claims = _mask_spans(
+        visible,
+        [*withheld_spans, *negated_platform_spans],
+    )
+    availability_claims.extend(
+        True
+        for pattern in RENDERED_AVAILABLE_PATTERNS
+        for _ in pattern.finditer(visible_without_withheld_claims)
+    )
+    expected_availability = _availability_claims_allowed(projection)
+    if any(claim != expected_availability for claim in availability_claims):
+        rendered_states = sorted(
+            {"available" if claim else "withheld" for claim in availability_claims}
+        )
+        contradictions.append(
+            "availability=" + "/".join(rendered_states)
+            + f" (expected {'available' if expected_availability else 'withheld'})"
+        )
+
+    available_families = {
+        family
+        for platform in projection["availablePlatforms"]
+        if (family := _platform_family(platform)) is not None
+    }
+    for match in platform_matches:
+        negative_state = _platform_claim_is_negative(match)
+        claimed_families = {
+            family
+            for token in PLATFORM_TOKEN_PATTERN.findall(match.group("platforms"))
+            if (family := _platform_family(token)) is not None
+        }
+        for family in sorted(claimed_families):
+            observed_available = not negative_state
+            if observed_available != (family in available_families):
+                contradictions.append(
+                    f"availablePlatforms:{family}="
+                    f"{'available' if observed_available else 'withheld'}"
+                )
+
+    for field, pattern in RENDERED_SCALAR_FIELD_PATTERNS.items():
+        expected_value = _canonical_rendered_scalar(field, projection[field])
+        for match in pattern.finditer(visible):
+            rendered_value = _canonical_rendered_scalar(field, match.group("value"))
+            if rendered_value != expected_value:
+                contradictions.append(
+                    f"{field}={match.group('value')} (expected {projection[field]})"
+                )
+
+    for match in RENDERED_ARTIFACT_COUNT_PATTERN.finditer(visible):
+        rendered_count = int(match.group("value"))
+        if rendered_count != projection["artifactCount"]:
+            contradictions.append(
+                f"artifactCount={rendered_count} (expected {projection['artifactCount']})"
+            )
+
+    if contradictions:
+        raise ConvergenceError(
+            f"{source}: rendered release fields contradict embedded release truth: "
+            + ", ".join(sorted(set(contradictions)))
+        )
 
 
 def _is_release_manifest_route(route: str) -> bool:
@@ -525,6 +779,7 @@ def verify_route_projections(
     authority_snapshot_sha256: str,
     route_authority_snapshot_sha256: Mapping[str, str],
     authority_route: str = "/api/v1/public/release-truth",
+    generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
     expected = canonicalize_projection(dict(authority), source="authority")
     if not SHA256_PATTERN.fullmatch(authority_snapshot_sha256):
@@ -560,6 +815,7 @@ def verify_route_projections(
     return {
         "contractName": RECEIPT_CONTRACT,
         "contractVersion": 1,
+        "generatedAtUtc": generated_at_utc or now_utc_iso(),
         "status": "pass",
         "mismatchCount": 0,
         "failureCount": 0,
@@ -647,29 +903,37 @@ def _requires_header_only_head(route: str) -> bool:
     )
 
 
+def _state_tokens(value: Any) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", str(value).casefold()))
+
+
 def _availability_claims_allowed(projection: Mapping[str, Any]) -> bool:
-    rollout_state = projection["rolloutState"]
-    supportability_state = projection["supportabilityState"]
-    blocking_rollout = (
-        rollout_state in {"missing", "unknown", "invalid"}
-        or any(
-            marker in rollout_state
-            for marker in (
-                "review",
-                "revoked",
-                "blocked",
-                "withdrawn",
-                "unpublished",
-                "coverage_incomplete",
-            )
-        )
-    )
-    blocking_supportability = (
-        supportability_state in {"missing", "unknown", "invalid"}
-        or any(
-            marker in supportability_state
-            for marker in ("review", "unsupported", "unavailable", "blocked")
-        )
+    rollout_tokens = _state_tokens(projection["rolloutState"])
+    supportability_tokens = _state_tokens(projection["supportabilityState"])
+    blocking_rollout = bool(
+        rollout_tokens
+        & {
+            "missing",
+            "unknown",
+            "invalid",
+            "review",
+            "revoked",
+            "blocked",
+            "withdrawn",
+            "unpublished",
+        }
+    ) or {"coverage", "incomplete"}.issubset(rollout_tokens)
+    blocking_supportability = bool(
+        supportability_tokens
+        & {
+            "missing",
+            "unknown",
+            "invalid",
+            "review",
+            "unsupported",
+            "unavailable",
+            "blocked",
+        }
     )
     return (
         projection["releaseDecisionStatus"] in {"preview_ready", "stable_ready"}
@@ -695,6 +959,70 @@ def _validate_generation_id(value: str | None) -> str | None:
     if not GENERATION_ID_PATTERN.fullmatch(value):
         raise ConvergenceError("generation ID is not a traversal-safe opaque token")
     return value
+
+
+def validate_expected_release_truth(
+    projection: Mapping[str, Any],
+    expected_release_truth: Mapping[str, str] | None,
+) -> None:
+    if expected_release_truth is None:
+        return
+    if set(expected_release_truth) != set(EXPECTED_RELEASE_FIELDS):
+        raise ConvergenceError(
+            "expected release binding must provide releaseVersion, manifestSha256, "
+            "and releaseDecisionSha256 together"
+        )
+
+    expected_version = expected_release_truth["releaseVersion"]
+    if (
+        not isinstance(expected_version, str)
+        or not expected_version
+        or expected_version != expected_version.strip()
+        or len(expected_version) > 128
+    ):
+        raise ConvergenceError(
+            "expected release binding releaseVersion must be a canonical non-empty string"
+        )
+    for field in ("manifestSha256", "releaseDecisionSha256"):
+        value = expected_release_truth[field]
+        if not isinstance(value, str) or not SHA256_PATTERN.fullmatch(value):
+            raise ConvergenceError(
+                f"expected release binding {field} must be a lower-case SHA-256"
+            )
+
+    mismatches = [
+        field
+        for field in EXPECTED_RELEASE_FIELDS
+        if projection.get(field) != expected_release_truth[field]
+    ]
+    if mismatches:
+        detail = ", ".join(
+            f"{field}: expected={expected_release_truth[field]!r} "
+            f"actual={projection.get(field)!r}"
+            for field in mismatches
+        )
+        raise ConvergenceError(f"candidate release truth mismatch: {detail}")
+
+
+def _expected_release_truth_from_args(
+    args: argparse.Namespace,
+) -> dict[str, str] | None:
+    values = {
+        "releaseVersion": args.expected_release_version,
+        "manifestSha256": args.expected_manifest_sha256,
+        "releaseDecisionSha256": args.expected_release_decision_sha256,
+    }
+    provided = {field for field, value in values.items() if value is not None}
+    if not provided:
+        return None
+    if provided != set(EXPECTED_RELEASE_FIELDS):
+        missing = sorted(set(EXPECTED_RELEASE_FIELDS) - provided)
+        raise ConvergenceError(
+            "expected release binding is incomplete; missing: " + ", ".join(missing)
+        )
+    expected = {field: str(value) for field, value in values.items()}
+    validate_expected_release_truth(expected, expected)
+    return expected
 
 
 def generation_routes(generation_id: str) -> tuple[str, ...]:
@@ -743,11 +1071,13 @@ def build_failure_receipt(
     detail: str,
     *,
     authority_route: str = "/api/v1/public/release-truth",
+    generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
-    mismatch = "contradict" in detail or "drift" in detail
+    mismatch = any(marker in detail for marker in ("contradict", "drift", "mismatch"))
     return {
         "contractName": RECEIPT_CONTRACT,
         "contractVersion": 1,
+        "generatedAtUtc": generated_at_utc or now_utc_iso(),
         "status": "fail",
         "mismatchCount": 1 if mismatch else 0,
         "failureCount": 1,
@@ -770,6 +1100,7 @@ def verify_live(
     routes: Sequence[str],
     timeout: float,
     generation_id: str | None = None,
+    expected_release_truth: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     normalized_base = _validate_base_url(base_url)
     generation_id = _validate_generation_id(generation_id)
@@ -792,6 +1123,7 @@ def verify_live(
         body=authority_body,
         content_type=authority_content_type,
     )
+    validate_expected_release_truth(expected, expected_release_truth)
     authority_snapshot_sha256 = extract_authority_snapshot_sha256(
         route=authority_route,
         headers=authority_headers,
@@ -872,6 +1204,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--generation-id",
         help="Verify one committed explicit/retained generation independently of CURRENT.",
     )
+    parser.add_argument(
+        "--expected-release-version",
+        help="Require the live authority to match this local candidate releaseVersion.",
+    )
+    parser.add_argument(
+        "--expected-manifest-sha256",
+        help="Require the live authority to match this local candidate manifestSha256.",
+    )
+    parser.add_argument(
+        "--expected-release-decision-sha256",
+        help="Require the live authority to match this local candidate releaseDecisionSha256.",
+    )
     return parser.parse_args(argv)
 
 
@@ -882,6 +1226,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         generation_id = _validate_generation_id(args.generation_id)
         if generation_id:
             authority_route = f"/api/v1/public/release-truth/g/{generation_id}"
+        expected_release_truth = _expected_release_truth_from_args(args)
         routes = tuple(
             args.routes
             or (generation_routes(generation_id) if generation_id else DEFAULT_ROUTES)
@@ -891,6 +1236,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             routes,
             args.timeout,
             generation_id=generation_id,
+            expected_release_truth=expected_release_truth,
         )
     except ConvergenceError as error:
         detail = str(error)

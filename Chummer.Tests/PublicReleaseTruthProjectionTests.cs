@@ -342,6 +342,36 @@ public sealed class PublicReleaseTruthProjectionTests
     }
 
     [Fact]
+    public void AuthorityArtifactRoutesMustMatchTheirAccessClass()
+    {
+        PublicReleaseManifestDto openManifest = BuildManifest(
+            BuildArtifact("windows-open", "windows", "avalonia", 'd', "open_public"));
+        AuthorityEnvelope openRoutesCollapsed = MutateSnapshot(
+            BuildAuthorityEnvelope(openManifest, "review_required"),
+            static snapshot =>
+            {
+                JsonObject artifact = snapshot["artifacts"]!.AsArray()[0]!.AsObject();
+                artifact["publicInstallRoute"] = artifact["downloadUrl"]!.GetValue<string>();
+            });
+
+        PublicReleaseManifestDto protectedManifest = BuildManifest(
+            BuildArtifact("linux-protected", "linux", "avalonia", 'e', "account_required"));
+        AuthorityEnvelope protectedAuthority = BuildAuthorityEnvelope(
+            protectedManifest,
+            "review_required");
+        AuthorityEnvelope protectedRoutesSplit = MutateSnapshot(
+            protectedAuthority,
+            static snapshot => snapshot["artifacts"]!.AsArray()[0]!.AsObject()["publicInstallRoute"] =
+                "/downloads/get/different-artifact");
+
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(openManifest, openRoutesCollapsed));
+        Assert.Equal(
+            "account_required",
+            ProjectAuthority(protectedManifest, protectedAuthority).DownloadAccessPosture);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(protectedManifest, protectedRoutesSplit));
+    }
+
+    [Fact]
     public void NextActionsAreRequiredForReviewButMayBeEmptyWhenReady()
     {
         PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
@@ -1067,7 +1097,9 @@ public sealed class PublicReleaseTruthProjectionTests
         => new(
             Id: id,
             Platform: platform,
-            Url: $"/downloads/{id}",
+            Url: installAccessClass == "open_public"
+                ? $"/downloads/{id}"
+                : $"/downloads/get/{id}",
             Sha256: new string(shaCharacter, 64),
             Head: head,
             PlatformId: platform,

@@ -1207,13 +1207,41 @@ public sealed class VerificationEntryPointTests
         int manifestMaterialization = bootstrap.IndexOf(
             "log \"generating release manifests\"",
             StringComparison.Ordinal);
+        int horizonReadiness = bootstrap.IndexOf(
+            "materializing catalog-driven horizon readiness after candidate and proof validation",
+            StringComparison.Ordinal);
         Assert.True(candidateSealed >= 0, "bootstrap must identify the sealed candidate boundary");
         Assert.True(
             candidateSealed < proofResolution,
             "bootstrap must resolve release proof only after candidate bytes are sealed");
         Assert.True(
-            proofResolution < manifestMaterialization,
-            "bootstrap must validate release proof before manifest materialization and upload");
+            proofResolution < horizonReadiness,
+            "bootstrap must materialize horizon readiness only after candidate and proof validation");
+        Assert.True(
+            horizonReadiness < manifestMaterialization,
+            "bootstrap must verify horizon readiness before manifest materialization and upload");
+        Assert.Contains("scripts/materialize_horizon_readiness.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify_horizon_readiness.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("--require-source-working", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("HORIZON_READINESS.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("$bundle_root/release-evidence/HORIZON_READINESS.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify_live_release_convergence.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("LIVE_RELEASE_GENERATION_CONVERGENCE.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("LIVE_RELEASE_CONVERGENCE.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("--generation-id \"$release_generation_id\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("--expected-release-decision-sha256", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CURRENT release-facing routes did not converge after upload", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("release_shelf_generation.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("project-manifests", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("GENERATION_PROJECTION.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("materialize_release_authority_snapshot.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("verify_release_authority_snapshot.py", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("$bundle_root/release-evidence/CURRENT.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("$bundle_root/release-evidence/SNAPSHOT.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("$bundle_root/release-evidence/RELEASE_DECISION.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("--decision-status review_required", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("resolve_https_release_origin", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHUMMER_LIVE_RELEASE_CONVERGENCE_BASE_URL", bootstrap, StringComparison.Ordinal);
         Assert.Contains("bootstrap synthetic hub local release-proof fallback is disabled", bootstrap, StringComparison.Ordinal);
         Assert.Contains("regenerated release proof validated against the current ui localization release gate", bootstrap, StringComparison.Ordinal);
         Assert.Contains("retrying regenerated release proof against a freshly generated ui localization release gate", bootstrap, StringComparison.Ordinal);

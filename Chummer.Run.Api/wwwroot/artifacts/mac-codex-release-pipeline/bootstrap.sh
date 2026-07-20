@@ -731,6 +731,24 @@ create_minimal_promotion_bundle() {
   cp "$source_root/releases.json" "$bundle_root/releases.json"
   cp "$source_root/RELEASE_CHANNEL.generated.json" "$bundle_root/RELEASE_CHANNEL.generated.json"
   cp "$source_root/release-evidence/public-promotion.json" "$bundle_root/release-evidence/public-promotion.json"
+  if [[ -f "$source_root/release-evidence/HORIZON_READINESS.generated.json" ]]; then
+    cp \
+      "$source_root/release-evidence/HORIZON_READINESS.generated.json" \
+      "$bundle_root/release-evidence/HORIZON_READINESS.generated.json"
+  fi
+  if [[ -f "$source_root/release-evidence/GENERATION_PROJECTION.generated.json" ]]; then
+    cp \
+      "$source_root/release-evidence/GENERATION_PROJECTION.generated.json" \
+      "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json"
+  fi
+  local authority_file
+  for authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    [[ -f "$source_root/release-evidence/$authority_file" ]] \
+      || die "release authority envelope is incomplete: missing release-evidence/$authority_file"
+    cp \
+      "$source_root/release-evidence/$authority_file" \
+      "$bundle_root/release-evidence/$authority_file"
+  done
 
   if compgen -G "$source_root/files/*" >/dev/null; then
     cp -aL "$source_root/files/"* "$bundle_root/files/"
@@ -1179,6 +1197,63 @@ resolve_live_release_verify_urls() {
   fi
   local base="${requested%/}"
   printf '%s|%s\n' "$base/releases.json" "$base/RELEASE_CHANNEL.generated.json"
+}
+
+resolve_release_generation_id() {
+  local release_version="$1"
+  local requested="${2:-}"
+  python3 - "$release_version" "$requested" <<'PY'
+from __future__ import annotations
+
+import re
+import secrets
+import sys
+
+release_version = str(sys.argv[1]).strip()
+requested = str(sys.argv[2]).strip()
+safe = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+if requested:
+    generation_id = requested
+else:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", release_version).strip("._-").lower()
+    slug = (slug or "nightly")[:88].rstrip("._-") or "nightly"
+    generation_id = f"gen-{slug}-{secrets.token_hex(8)}"
+if (
+    safe.fullmatch(generation_id) is None
+    or generation_id in {".", ".."}
+    or ".." in generation_id
+):
+    raise SystemExit("release generationId must be a traversal-safe opaque token of at most 128 characters")
+print(generation_id)
+PY
+}
+
+resolve_https_release_origin() {
+  local canonical_manifest_url="$1"
+  python3 - "$canonical_manifest_url" <<'PY'
+from __future__ import annotations
+
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+value = str(sys.argv[1]).strip()
+parsed = urlsplit(value)
+if (
+    parsed.scheme.lower() != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.query
+    or parsed.fragment
+    or not parsed.path.endswith("/RELEASE_CHANNEL.generated.json")
+):
+    raise SystemExit("canonical release verification URL must be an HTTPS manifest URL without credentials, query, or fragment")
+try:
+    _ = parsed.port
+except ValueError as error:
+    raise SystemExit("canonical release verification URL has an invalid port") from error
+print(urlunsplit(("https", parsed.netloc, "", "", "")))
+PY
 }
 
 resolve_head_build_metadata() {
@@ -4194,7 +4269,10 @@ scalar_fields = (
     "contractName", "sessionId", "SessionId", "session_id", "id",
     "expiresAtUtc", "ExpiresAtUtc", "expires_at_utc", "expiresAt",
     *sorted(endpoint_fields), "status", "state", "version", "channel",
-    "publishedAt", "supportabilityState", "compatibilityState",
+    "releaseVersion", "publishedAt", "supportabilityState", "compatibilityState",
+    "generationId", "activationReceiptId", "activatedAt", "inventoryDigest",
+    "canonicalManifestSha256", "compatibilityManifestSha256",
+    "exactIncomingDesktopScope", "downloadsUrl",
     "traceId", "requestId", "success", "fileCount", "totalBytes",
 )
 
@@ -4355,6 +4433,11 @@ try:
         "releaseVersion",
         "channel",
         "generationId",
+        "activationReceiptId",
+        "activatedAt",
+        "inventoryDigest",
+        "canonicalManifestSha256",
+        "compatibilityManifestSha256",
         "publishedAt",
         "type",
         "traceId",
@@ -4633,6 +4716,11 @@ PY
     [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
     [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
     [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
+    [[ -f "$bundle_root/release-evidence/HORIZON_READINESS.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/HORIZON_READINESS.generated.json"
+    [[ -f "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json"
+    [[ -f "$bundle_root/release-evidence/CURRENT.json" ]] && printf '%s\n' "$bundle_root/release-evidence/CURRENT.json"
+    [[ -f "$bundle_root/release-evidence/SNAPSHOT.json" ]] && printf '%s\n' "$bundle_root/release-evidence/SNAPSHOT.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_DECISION.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_DECISION.json"
     if [[ -d "$bundle_root/files" ]]; then
       find "$bundle_root/files" -type f | sort
     fi
@@ -5108,6 +5196,12 @@ main() {
   local rid="${CHUMMER_RELEASE_RID:-osx-arm64}"
   local release_channel="${CHUMMER_RELEASE_CHANNEL:-preview}"
   local release_version="${CHUMMER_RELEASE_VERSION:-run-$(date -u +%Y%m%d-%H%M%S)}"
+  local release_generation_id
+  release_generation_id="$(resolve_release_generation_id \
+    "$release_version" \
+    "${CHUMMER_RELEASE_GENERATION_ID:-}")" \
+    || die "CHUMMER_RELEASE_GENERATION_ID is invalid"
+  log "candidate immutable generation identity: $release_generation_id"
   local allow_unsigned_preview="${CHUMMER_ALLOW_UNSIGNED_PREVIEW:-0}"
   local minimum_free_gib="${CHUMMER_MAC_RELEASE_MIN_FREE_GIB:-20}"
   local packaging_minimum_free_gib="${CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB:-8}"
@@ -5621,6 +5715,23 @@ main() {
   ui_gate_status="$(jq -r '.status // "missing"' "$ui_localization_release_gate_path" 2>/dev/null || true)"
   log "proof provenance: release proof status=${release_proof_status}, ui gate status=${ui_gate_status}"
 
+  local horizon_readiness_materializer="$hub_alias/scripts/materialize_horizon_readiness.py"
+  local horizon_readiness_verifier="$hub_alias/scripts/verify_horizon_readiness.py"
+  local horizon_readiness_path="$release_evidence_dir/HORIZON_READINESS.generated.json"
+  [[ -f "$horizon_readiness_materializer" ]] \
+    || die "catalog-driven horizon readiness materializer is missing: $horizon_readiness_materializer"
+  [[ -f "$horizon_readiness_verifier" ]] \
+    || die "catalog-driven horizon readiness verifier is missing: $horizon_readiness_verifier"
+  log "materializing catalog-driven horizon readiness after candidate and proof validation"
+  command "$RELEASE_PYTHON_BIN" "$horizon_readiness_materializer" \
+    --repo-root "$hub_alias" \
+    --output "$horizon_readiness_path"
+  command "$RELEASE_PYTHON_BIN" "$horizon_readiness_verifier" \
+    --repo-root "$hub_alias" \
+    --artifact "$horizon_readiness_path" \
+    --max-age-seconds 86400 \
+    --require-source-working
+
   log "generating release manifests"
   write_release_manifests \
     "$registry_alias" \
@@ -5777,6 +5888,111 @@ main() {
     fi
   fi
 
+  local generation_projection_path="$release_evidence_dir/GENERATION_PROJECTION.generated.json"
+  log "projecting both release manifests to immutable generation $release_generation_id"
+  command "$RELEASE_PYTHON_BIN" "$hub_alias/scripts/release_shelf_generation.py" \
+    project-manifests \
+    --canonical-manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --compatibility-manifest "$dist_dir/releases.json" \
+    --generation-id "$release_generation_id" \
+    > "$generation_projection_path"
+  command "$RELEASE_PYTHON_BIN" - \
+    "$generation_projection_path" \
+    "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$dist_dir/releases.json" \
+    "$release_generation_id" \
+    "$release_version" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+receipt_path, canonical_path, compatibility_path = map(Path, sys.argv[1:4])
+expected_generation_id, expected_version = sys.argv[4:6]
+receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+canonical_bytes = canonical_path.read_bytes()
+compatibility_bytes = compatibility_path.read_bytes()
+canonical = json.loads(canonical_bytes)
+compatibility = json.loads(compatibility_bytes)
+expected_fields = {
+    "generationId",
+    "releaseVersion",
+    "channel",
+    "publishedAt",
+    "canonicalManifestSha256",
+    "compatibilityManifestSha256",
+}
+if not isinstance(receipt, dict) or set(receipt) != expected_fields:
+    raise SystemExit("generation projection receipt has an unexpected schema")
+if receipt["generationId"] != expected_generation_id:
+    raise SystemExit("generation projection receipt does not bind the planned generationId")
+if receipt["releaseVersion"] != expected_version:
+    raise SystemExit("generation projection receipt does not bind the planned release version")
+if canonical.get("generationId") != expected_generation_id or compatibility.get("generationId") != expected_generation_id:
+    raise SystemExit("generation-projected manifests disagree with the planned generationId")
+for label, observed, body in (
+    ("canonical", receipt["canonicalManifestSha256"], canonical_bytes),
+    ("compatibility", receipt["compatibilityManifestSha256"], compatibility_bytes),
+):
+    if not isinstance(observed, str) or re.fullmatch(r"[0-9a-f]{64}", observed) is None:
+        raise SystemExit(f"{label} generation projection digest is not canonical SHA-256")
+    if not hmac.compare_digest(observed, hashlib.sha256(body).hexdigest()):
+        raise SystemExit(f"{label} generation projection digest does not bind exact bytes")
+PY
+  validate_release_payload_contracts "$dist_dir/RELEASE_CHANNEL.generated.json"
+
+  local release_authority_materializer="$registry_alias/scripts/materialize_release_authority_snapshot.py"
+  local release_authority_verifier="$registry_alias/scripts/verify_release_authority_snapshot.py"
+  local release_authority_support_owner="${CHUMMER_RELEASE_SUPPORT_OWNER:-Chummer release operations}"
+  local release_authority_registry_commit
+  local release_authority_envelope_dir="$release_evidence_dir/.authority-envelope-$release_generation_id"
+  release_authority_registry_commit="$(git -C "$registry_repo" rev-parse HEAD)"
+  [[ -f "$release_authority_materializer" && ! -L "$release_authority_materializer" ]] \
+    || die "Registry release authority materializer is missing or unsafe: $release_authority_materializer"
+  [[ -f "$release_authority_verifier" && ! -L "$release_authority_verifier" ]] \
+    || die "Registry release authority verifier is missing or unsafe: $release_authority_verifier"
+  [[ "$release_authority_registry_commit" == "$registry_expected_commit" ]] \
+    || die "Registry release authority commit drifted after reviewed checkout validation"
+  [[ ! -e "$release_authority_envelope_dir" && ! -L "$release_authority_envelope_dir" ]] \
+    || die "temporary release authority envelope destination already exists"
+  local release_authority_file
+  for release_authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    [[ ! -e "$release_evidence_dir/$release_authority_file" \
+       && ! -L "$release_evidence_dir/$release_authority_file" ]] \
+      || die "release authority evidence destination already exists: $release_authority_file"
+  done
+  log "materializing review-required Registry authority for the exact generation-projected nightly"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_materializer" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --output-dir "$release_authority_envelope_dir" \
+    --registry-commit "$release_authority_registry_commit" \
+    --decision-status review_required \
+    --support-owner "$release_authority_support_owner" \
+    --generated-at "$published_at" \
+    --next-action "Run exact immutable-generation and CURRENT convergence after activation, then close preview readiness from those receipts." \
+    --blocking-finding "Postdeploy convergence proof is pending for this newly built nightly generation." \
+    --blocking-finding "Runtime horizon readiness remains unverified; this nightly must not be promoted as stable or gold." \
+    > "$release_evidence_dir/AUTHORITY_MATERIALIZATION.generated.json"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_verifier" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$release_authority_envelope_dir/CURRENT.json" \
+    --snapshot "$release_authority_envelope_dir/SNAPSHOT.json" \
+    --decision "$release_authority_envelope_dir/RELEASE_DECISION.json" \
+    > "$release_evidence_dir/AUTHORITY_VERIFICATION.generated.json"
+  for release_authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    cp \
+      "$release_authority_envelope_dir/$release_authority_file" \
+      "$release_evidence_dir/$release_authority_file"
+  done
+  rm -f \
+    "$release_authority_envelope_dir/CURRENT.json" \
+    "$release_authority_envelope_dir/SNAPSHOT.json" \
+    "$release_authority_envelope_dir/RELEASE_DECISION.json"
+  rmdir "$release_authority_envelope_dir"
+
   log "validating governed build provenance against final release bytes"
   python3 "$hub_alias/scripts/release/verify_release_build_provenance_bundle.py" "$ui_repo/$dist_dir"
   validate_bundle_directory_integrity "$dist_dir"
@@ -5842,10 +6058,23 @@ main() {
       ;;
   esac
 
+  local upload_response_truth_receipt="$release_evidence_dir/RELEASE_UPLOAD_RESPONSE_TRUTH.generated.json"
   python3 "$hub_alias/scripts/verify_release_upload_response_truth.py" \
     --local-manifest "$dist_dir/releases.json" \
     --local-canonical-manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --upload-response "$response_path"
+    --upload-response "$response_path" \
+    --output "$upload_response_truth_receipt" \
+    >/dev/null
+
+  local response_generation_id
+  local response_canonical_manifest_sha256
+  response_generation_id="$(jq -r '.generationId // empty' "$response_path")"
+  response_canonical_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$response_path")"
+  response_canonical_manifest_sha256="${response_canonical_manifest_sha256#sha256:}"
+  [[ "$response_generation_id" == "$release_generation_id" ]] \
+    || die "release upload response generationId does not match the planned immutable generation"
+  [[ "$response_canonical_manifest_sha256" == "$(jq -r '.canonicalManifestSha256' "$generation_projection_path")" ]] \
+    || die "release upload response canonical manifest digest does not match the generation-projected bytes"
 
   log "verifying local bundle manifest"
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
@@ -5857,6 +6086,77 @@ main() {
 
   log "verifying live release projection at $canonical_verify_url"
   verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path" "$require_compatibility_projection"
+
+  local live_convergence_verifier="$hub_alias/scripts/verify_live_release_convergence.py"
+  local generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_GENERATION_CONVERGENCE.generated.json"
+  local live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_CONVERGENCE.generated.json"
+  local live_convergence_base_url
+  live_convergence_base_url="$(resolve_https_release_origin "$canonical_verify_url")" \
+    || die "could not derive a safe HTTPS release origin from the canonical verification URL"
+  local live_convergence_timeout="${CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS:-15}"
+  local live_convergence_attempts="${CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS:-6}"
+  local live_convergence_retry_seconds="${CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS:-5}"
+  [[ "$live_convergence_attempts" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_attempts >= 1 && live_convergence_attempts <= 12 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS must be an integer from 1 through 12"
+  [[ "$live_convergence_retry_seconds" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_retry_seconds >= 1 && live_convergence_retry_seconds <= 10 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS must be an integer from 1 through 10"
+  [[ -f "$live_convergence_verifier" ]] \
+    || die "live release convergence verifier is missing: $live_convergence_verifier"
+  local expected_manifest_sha256
+  local expected_release_decision_sha256
+  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
+  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "generation projection does not expose a canonical manifest SHA-256"
+  [[ "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "release authority CURRENT.json does not expose a canonical decision SHA-256"
+
+  log "verifying immutable generation $release_generation_id before accepting CURRENT"
+  local convergence_attempt
+  local generation_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --generation-id "$release_generation_id" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$generation_convergence_receipt"; then
+      generation_converged=1
+      break
+    fi
+    if (( convergence_attempt < live_convergence_attempts )); then
+      log "immutable generation convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
+      sleep "$live_convergence_retry_seconds"
+    fi
+  done
+  (( generation_converged == 1 )) \
+    || die "immutable release generation did not converge after upload. Receipt: $generation_convergence_receipt"
+
+  log "verifying all CURRENT release-facing routes converge at $live_convergence_base_url"
+  local current_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$live_convergence_receipt"; then
+      current_converged=1
+      break
+    fi
+    if (( convergence_attempt < live_convergence_attempts )); then
+      log "CURRENT release convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
+      sleep "$live_convergence_retry_seconds"
+    fi
+  done
+  (( current_converged == 1 )) \
+    || die "CURRENT release-facing routes did not converge after upload. Receipt: $live_convergence_receipt"
+  log "live release-facing route convergence passed: $live_convergence_receipt"
 
   if [[ -f "$response_path" ]]; then
     chmod 600 "$response_path" 2>/dev/null || true

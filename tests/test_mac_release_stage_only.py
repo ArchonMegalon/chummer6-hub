@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +36,35 @@ EXPECTED_COMMIT_SETTINGS = (
     "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT",
     "CHUMMER_LEGACY_EXPECTED_COMMIT",
 )
+
+
+def test_release_generation_id_is_safe_and_operator_override_is_exact() -> None:
+    generated = run_sourced('resolve_release_generation_id "run-20260720 nightly" ""')
+    exact = run_sourced(
+        'resolve_release_generation_id "ignored" "gen-reviewed-abcdef0123456789"'
+    )
+    unsafe = run_sourced('resolve_release_generation_id "ignored" "../escape"')
+
+    assert generated.returncode == 0, generated.stderr
+    assert re.fullmatch(
+        r"gen-run-20260720-nightly-[0-9a-f]{16}", generated.stdout.strip()
+    )
+    assert exact.returncode == 0, exact.stderr
+    assert exact.stdout.strip() == "gen-reviewed-abcdef0123456789"
+    assert unsafe.returncode != 0
+
+
+def test_live_convergence_origin_is_derived_from_canonical_https_manifest() -> None:
+    valid = run_sourced(
+        'resolve_https_release_origin "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"'
+    )
+    unsafe = run_sourced(
+        'resolve_https_release_origin "https://operator:secret@chummer.run/downloads/RELEASE_CHANNEL.generated.json"'
+    )
+
+    assert valid.returncode == 0, valid.stderr
+    assert valid.stdout.strip() == "https://chummer.run"
+    assert unsafe.returncode != 0
 
 
 def test_hosted_bootstrap_http_publication_is_session_only() -> None:
@@ -966,6 +996,10 @@ def test_hosted_upload_sanitizes_response_before_persistence(tmp_path: Path) -> 
         json.dumps(
             {
                 "status": "accepted",
+                "generationId": "gen-run-20260720-abcdef0123456789",
+                "activationReceiptId": "activation-abcdef0123456789",
+                "canonicalManifestSha256": "sha256:" + "a" * 64,
+                "compatibilityManifestSha256": "sha256:" + "b" * 64,
                 "installDispatchUrls": [
                     "https://chummer.run/downloads/install/proof-artifact",
                     f"https://chummer.run/downloads/install/proof-artifact?claim={secret}",
@@ -990,6 +1024,10 @@ def test_hosted_upload_sanitizes_response_before_persistence(tmp_path: Path) -> 
     sanitized = json.loads(sanitized_response.read_text(encoding="utf-8"))
     assert sanitized["responseSanitized"] is True
     assert sanitized["status"] == "accepted"
+    assert sanitized["generationId"] == "gen-run-20260720-abcdef0123456789"
+    assert sanitized["activationReceiptId"] == "activation-abcdef0123456789"
+    assert sanitized["canonicalManifestSha256"] == "sha256:" + "a" * 64
+    assert sanitized["compatibilityManifestSha256"] == "sha256:" + "b" * 64
     assert sanitized["installDispatchUrls"] == [
         "https://chummer.run/downloads/install/proof-artifact"
     ]

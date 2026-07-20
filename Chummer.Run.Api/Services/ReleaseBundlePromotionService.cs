@@ -1091,7 +1091,10 @@ public sealed class ReleaseBundlePromotionService
             incomingCanonicalManifest,
             exactIncomingDesktopScope);
         DateTimeOffset activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
-        string generationId = NewGenerationId(activatedAt);
+        string generationId = ResolveIncomingGenerationId(
+            incomingCanonicalManifest,
+            incomingCompatibilityManifestObject,
+            activatedAt);
         string activationReceiptId = $"activation-{Guid.NewGuid():N}";
         string transactionRoot = Path.Combine(downloadsRoot, $".release-promotion-transaction-{Guid.NewGuid():N}");
         string stagedRoot = Path.Combine(transactionRoot, "generation");
@@ -2685,6 +2688,47 @@ public sealed class ReleaseBundlePromotionService
 
     private static string NewGenerationId(DateTimeOffset instant)
         => $"gen-{instant.ToUniversalTime():yyyyMMdd'T'HHmmss'Z'}-{Guid.NewGuid().ToString("N")[..16]}";
+
+    internal static string ResolveIncomingGenerationId(
+        JsonObject canonicalManifest,
+        JsonObject compatibilityManifest,
+        DateTimeOffset fallbackInstant)
+    {
+        ArgumentNullException.ThrowIfNull(canonicalManifest);
+        ArgumentNullException.ThrowIfNull(compatibilityManifest);
+
+        bool canonicalDeclared = canonicalManifest.TryGetPropertyValue(
+            "generationId",
+            out JsonNode? canonicalGenerationIdNode);
+        bool compatibilityDeclared = compatibilityManifest.TryGetPropertyValue(
+            "generationId",
+            out JsonNode? compatibilityGenerationIdNode);
+        if (!canonicalDeclared && !compatibilityDeclared)
+        {
+            return NewGenerationId(fallbackInstant);
+        }
+
+        if (!canonicalDeclared
+            || !compatibilityDeclared
+            || canonicalGenerationIdNode is not JsonValue canonicalGenerationIdValue
+            || compatibilityGenerationIdNode is not JsonValue compatibilityGenerationIdValue
+            || !canonicalGenerationIdValue.TryGetValue(out string? canonicalGenerationId)
+            || !compatibilityGenerationIdValue.TryGetValue(out string? compatibilityGenerationId)
+            || string.IsNullOrWhiteSpace(canonicalGenerationId)
+            || string.IsNullOrWhiteSpace(compatibilityGenerationId)
+            || !string.Equals(
+                canonicalGenerationId,
+                compatibilityGenerationId,
+                StringComparison.Ordinal)
+            || !IsSafeGenerationId(canonicalGenerationId))
+        {
+            throw new InvalidDataException(
+                "incoming canonical and compatibility manifests must either both omit generationId " +
+                "or declare the same traversal-safe opaque generationId.");
+        }
+
+        return canonicalGenerationId!;
+    }
 
     private static bool IsSafeGenerationId(string? value)
         => value is { Length: > 0 and <= 128 }

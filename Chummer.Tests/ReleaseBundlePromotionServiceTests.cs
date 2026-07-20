@@ -18,6 +18,80 @@ public sealed class ReleaseBundlePromotionServiceTests
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
+    public void IncomingGenerationIdentityUsesExactSharedCandidateDeclaration()
+    {
+        var canonical = new JsonObject { ["generationId"] = "gen-run-20260720-abcdef0123456789" };
+        var compatibility = new JsonObject { ["generationId"] = "gen-run-20260720-abcdef0123456789" };
+
+        string resolved = ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+            canonical,
+            compatibility,
+            DateTimeOffset.Parse("2026-07-20T20:00:00Z"));
+
+        Assert.Equal("gen-run-20260720-abcdef0123456789", resolved);
+    }
+
+    [Fact]
+    public void IncomingGenerationIdentityKeepsLegacyServerGeneratedFallbackWhenBothOmitIt()
+    {
+        string resolved = ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+            new JsonObject(),
+            new JsonObject(),
+            DateTimeOffset.Parse("2026-07-20T20:00:00Z"));
+
+        Assert.StartsWith("gen-20260720T200000Z-", resolved, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("gen-shared", null)]
+    [InlineData(null, "gen-shared")]
+    [InlineData("gen-one", "gen-two")]
+    [InlineData("../escape", "../escape")]
+    [InlineData("gen..escape", "gen..escape")]
+    public void IncomingGenerationIdentityRejectsPartialContradictoryOrUnsafeDeclarations(
+        string? canonicalGenerationId,
+        string? compatibilityGenerationId)
+    {
+        var canonical = new JsonObject();
+        var compatibility = new JsonObject();
+        if (canonicalGenerationId is not null)
+        {
+            canonical["generationId"] = canonicalGenerationId;
+        }
+        if (compatibilityGenerationId is not null)
+        {
+            compatibility["generationId"] = compatibilityGenerationId;
+        }
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+                canonical,
+                compatibility,
+                DateTimeOffset.Parse("2026-07-20T20:00:00Z")));
+    }
+
+    [Theory]
+    [InlineData("{\"generationId\":123}", "{\"generationId\":123}")]
+    [InlineData("{\"generationId\":true}", "{\"generationId\":true}")]
+    [InlineData("{\"generationId\":null}", "{\"generationId\":null}")]
+    [InlineData("{\"generationId\":\"\"}", "{}")]
+    [InlineData("{\"generationId\":\"\"}", "{\"generationId\":\"\"}")]
+    [InlineData("{\"generationId\":\" \"}", "{\"generationId\":\" \"}")]
+    public void IncomingGenerationIdentityRejectsPresentInvalidJsonDeclarations(
+        string canonicalJson,
+        string compatibilityJson)
+    {
+        JsonObject canonical = JsonNode.Parse(canonicalJson)!.AsObject();
+        JsonObject compatibility = JsonNode.Parse(compatibilityJson)!.AsObject();
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+                canonical,
+                compatibility,
+                DateTimeOffset.Parse("2026-07-20T20:00:00Z")));
+    }
+
+    [Fact]
     public void RegistryGenerationProjectionMatchesCrossLanguageGoldenBytes()
     {
         const string source = """
