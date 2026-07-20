@@ -1292,43 +1292,43 @@ def _candidate_windows_scope(
     artifacts_value = canonical.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
         raise ProjectionBlocked("candidate release manifest has no artifacts")
+    windows_artifacts: list[dict[str, object]] = []
     for artifact in artifacts_value:
-        if (
-            isinstance(artifact, dict)
-            and artifact.get("platform") == "windows"
-            and artifact.get("head") not in heads
-        ):
+        if not isinstance(artifact, dict) or artifact.get("platform") != "windows":
+            continue
+        if artifact.get("head") not in heads:
             raise ProjectionBlocked(
                 "candidate release manifest contains a Windows artifact outside "
                 "requiredDesktopHeads"
             )
+        if artifact.get("rid") != CANDIDATE_RID or artifact.get("kind") != "installer":
+            raise ProjectionBlocked(
+                "candidate release manifest contains a Windows artifact outside "
+                "the exact required desktop tuple scope"
+            )
+        windows_artifacts.append(artifact)
     candidate_by_path = {str(row["path"]): row for row in candidate_rows}
     artifacts: dict[str, dict[str, dict[str, object]]] = {}
     for head in heads:
-        matching = [
-            artifact
-            for artifact in artifacts_value
-            if isinstance(artifact, dict)
-            and artifact.get("head") == head
-            and artifact.get("platform") == "windows"
-            and artifact.get("rid") == CANDIDATE_RID
-        ]
-        installers = [artifact for artifact in matching if artifact.get("kind") == "installer"]
-        payloads = [
-            artifact
-            for artifact in matching
-            if artifact.get("kind") in {"archive", "payload"}
-            and str(artifact.get("fileName") or "").endswith("-payload.zip")
-        ]
-        if len(installers) != 1 or len(payloads) != 1:
+        matching = [artifact for artifact in windows_artifacts if artifact.get("head") == head]
+        if len(matching) != 1:
             raise ProjectionBlocked(
-                f"candidate manifest must name one Windows installer and payload for {head}"
+                f"candidate manifest must name one Windows installer row for {head}"
             )
+        installer_row = matching[0]
+        if (
+            installer_row.get("installerMode") != "bootstrap"
+            or installer_row.get("payloadAcquisitionMode") != "download"
+        ):
+            raise ProjectionBlocked(f"candidate {head} installer delivery mode is invalid")
         artifacts[head] = {}
-        for role, artifact in (("installer", installers[0]), ("payload", payloads[0])):
-            file_name = artifact.get("fileName")
-            digest = artifact.get("sha256")
-            size = artifact.get("sizeBytes")
+        for role, file_key, digest_key, size_key in (
+            ("installer", "fileName", "sha256", "sizeBytes"),
+            ("payload", "payloadFileName", "payloadSha256", "payloadSizeBytes"),
+        ):
+            file_name = installer_row.get(file_key)
+            digest = installer_row.get(digest_key)
+            size = installer_row.get(size_key)
             if (
                 not isinstance(file_name, str)
                 or not file_name
@@ -1352,6 +1352,21 @@ def _candidate_windows_scope(
                 **expected_row,
                 "fileName": file_name,
             }
+    expected_file_paths = {
+        str(artifacts[head][role]["path"])
+        for head in heads
+        for role in ("installer", "payload")
+    }
+    actual_file_paths = {
+        str(row["path"])
+        for row in candidate_rows
+        if str(row["path"]).startswith("files/")
+    }
+    if actual_file_paths != expected_file_paths:
+        raise ProjectionBlocked(
+            "candidate upload Windows artifact file set differs from the exact "
+            "required desktop tuples"
+        )
     return {"version": version, "channel": channel, "heads": heads, "artifacts": artifacts}
 
 
@@ -1832,6 +1847,8 @@ def _validate_candidate_native_evidence(
             or native_host.get("status") != "verified"
             or native_host.get("isNativeWindows") is not True
             or native_host.get("hostPlatform") != "windows"
+            or not isinstance(native_host.get("runner"), str)
+            or not native_host["runner"].strip()
             or "wine" in str(native_host.get("runner") or "").lower()
         ):
             raise ProjectionBlocked(f"candidate {head} startup receipt is not native Windows")
@@ -1862,7 +1879,8 @@ def _validate_candidate_native_evidence(
             roles.add(str(role))
         if (
             proof.get("contractName") != "chummer6-ui.windows_installer_visual_proof"
-            or proof.get("contractVersion") != 1
+            or type(proof.get("contractVersion")) is not int
+            or proof["contractVersion"] != 1
             or proof.get("status") != "passed"
             or proof.get("headId") != head
             or proof.get("platform") != "windows"

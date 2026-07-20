@@ -803,9 +803,9 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 RequireExactString(nativeHost, "status", "verified");
                 RequireBoolean(nativeHost, "isNativeWindows", expected: true);
                 RequireExactString(nativeHost, "hostPlatform", "windows");
-                if (RequireString(nativeHost, "runner").Contains(
-                        "wine",
-                        StringComparison.OrdinalIgnoreCase))
+                string runner = RequireString(nativeHost, "runner");
+                if (string.IsNullOrWhiteSpace(runner)
+                    || runner.Contains("wine", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidDataException("candidate startup runner is not native Windows");
                 }
@@ -922,61 +922,79 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException("candidate requiredDesktopHeads is empty");
         }
         JsonElement artifactsElement = RequireArray(canonical, "artifacts");
+        var windowsArtifacts = new List<JsonElement>();
         foreach (JsonElement artifact in artifactsElement.EnumerateArray())
         {
-            if (artifact.ValueKind == JsonValueKind.Object
-                && HasExactString(artifact, "platform", "windows")
-                && (!artifact.TryGetProperty("head", out JsonElement artifactHead)
-                    || artifactHead.ValueKind != JsonValueKind.String
-                    || artifactHead.GetString() is not { } head
-                    || !headSet.Contains(head)))
+            if (artifact.ValueKind != JsonValueKind.Object
+                || !HasExactString(artifact, "platform", "windows"))
+            {
+                continue;
+            }
+            if (!artifact.TryGetProperty("head", out JsonElement artifactHead)
+                || artifactHead.ValueKind != JsonValueKind.String
+                || artifactHead.GetString() is not { } head
+                || !headSet.Contains(head))
             {
                 throw new InvalidDataException(
                     "candidate release manifest contains a Windows artifact outside "
                     + "requiredDesktopHeads");
             }
+            if (!HasExactString(artifact, "rid", WindowsRid)
+                || !HasExactString(artifact, "kind", "installer"))
+            {
+                throw new InvalidDataException(
+                    "candidate release manifest contains a Windows artifact outside "
+                    + "the exact required desktop tuple scope");
+            }
+            windowsArtifacts.Add(artifact);
         }
         var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
         var artifacts = new Dictionary<string, CandidateHeadArtifacts>(StringComparer.Ordinal);
         foreach (string head in heads)
         {
-            JsonElement[] matching = artifactsElement.EnumerateArray()
-                .Where(artifact =>
-                    artifact.ValueKind == JsonValueKind.Object
-                    && HasExactString(artifact, "head", head)
-                    && HasExactString(artifact, "platform", "windows")
-                    && HasExactString(artifact, "rid", WindowsRid))
+            JsonElement[] matching = windowsArtifacts
+                .Where(artifact => HasExactString(artifact, "head", head))
                 .ToArray();
-            JsonElement[] installers = matching
-                .Where(artifact => HasExactString(artifact, "kind", "installer"))
-                .ToArray();
-            JsonElement[] payloads = matching
-                .Where(artifact =>
-                    artifact.TryGetProperty("kind", out JsonElement kind)
-                    && kind.ValueKind == JsonValueKind.String
-                    && kind.GetString() is "archive" or "payload"
-                    && artifact.TryGetProperty("fileName", out JsonElement fileName)
-                    && fileName.ValueKind == JsonValueKind.String
-                    && fileName.GetString()!.EndsWith("-payload.zip", StringComparison.Ordinal))
-                .ToArray();
-            if (installers.Length != 1 || payloads.Length != 1)
+            if (matching.Length != 1)
             {
                 throw new InvalidDataException(
-                    $"candidate manifest must name one Windows installer and payload for {head}");
+                    $"candidate manifest must name one Windows installer row for {head}");
             }
+            JsonElement installer = matching[0];
+            RequireExactString(installer, "installerMode", "bootstrap");
+            RequireExactString(installer, "payloadAcquisitionMode", "download");
             artifacts.Add(
                 head,
                 new CandidateHeadArtifacts(
                     ParseCandidateArtifact(
-                        installers[0],
+                        installer,
                         head,
                         "installer",
+                        "fileName",
+                        "sha256",
+                        "sizeBytes",
                         candidateByPath),
                     ParseCandidateArtifact(
-                        payloads[0],
+                        installer,
                         head,
                         "payload",
+                        "payloadFileName",
+                        "payloadSha256",
+                        "payloadSizeBytes",
                         candidateByPath)));
+        }
+        var expectedFilePaths = artifacts.Values
+            .SelectMany(static value => new[] { value.Installer.Path, value.Payload.Path })
+            .ToHashSet(StringComparer.Ordinal);
+        var actualFilePaths = candidateInventory
+            .Where(static row => row.Path.StartsWith("files/", StringComparison.Ordinal))
+            .Select(static row => row.Path)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!actualFilePaths.SetEquals(expectedFilePaths))
+        {
+            throw new InvalidDataException(
+                "candidate upload Windows artifact file set differs from the exact "
+                + "required desktop tuples");
         }
         return new CandidateWindowsScope(version, channel, heads, artifacts);
     }
@@ -985,11 +1003,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         JsonElement artifact,
         string head,
         string role,
+        string fileNameProperty,
+        string digestProperty,
+        string sizeProperty,
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> candidateByPath)
     {
-        string fileName = RequireString(artifact, "fileName");
-        string digest = RequireSha256(artifact, "sha256");
-        long size = RequireNonNegativeInt64(artifact, "sizeBytes");
+        string fileName = RequireString(artifact, fileNameProperty);
+        string digest = RequireSha256(artifact, digestProperty);
+        long size = RequireNonNegativeInt64(artifact, sizeProperty);
         if (fileName.Contains('/')
             || fileName.Contains('\\')
             || size <= 0
@@ -1697,6 +1718,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static void RequireExactInt32(JsonElement parent, string property, int expected)
     {
         if (!parent.TryGetProperty(property, out JsonElement value)
+            || value.ValueKind != JsonValueKind.Number
             || !value.TryGetInt32(out int parsed)
             || parsed != expected)
         {

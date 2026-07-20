@@ -149,6 +149,11 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     [InlineData("stale_capture")]
     [InlineData("not_native")]
     [InlineData("wine_runner")]
+    [InlineData("ready_checkpoint")]
+    [InlineData("visual_contract_version")]
+    [InlineData("visual_contract_type")]
+    [InlineData("empty_runner")]
+    [InlineData("blank_runner")]
     [InlineData("artifact_digest")]
     [InlineData("scope_widen")]
     [InlineData("scope_narrow")]
@@ -177,6 +182,24 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             "candidate_import_ready",
             SnapshotFixture.BuildCandidateAuthority(
                 includeUndeclaredWindowsArtifacts: true));
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    [Theory]
+    [InlineData("rid")]
+    [InlineData("kind")]
+    [InlineData("file")]
+    public void RuntimeRejectsAllowedHeadWindowsScopeWidening(string drift)
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish(
+            "candidate_import_ready",
+            SnapshotFixture.BuildCandidateAuthority(
+                allowedHeadScopeDrift: drift));
 
         ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
 
@@ -247,6 +270,41 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             {
                 JsonObject startup = ReadEmbedded(authority, startupPath);
                 startup["nativeHostEvidence"]!["runner"] = "wine64";
+                RewriteEmbedded(authority, startupPath, startup);
+                break;
+            }
+            case "ready_checkpoint":
+            {
+                JsonObject startup = ReadEmbedded(authority, startupPath);
+                startup["readyCheckpoint"] = "post_ui_event_loop";
+                RewriteEmbedded(authority, startupPath, startup);
+                break;
+            }
+            case "visual_contract_version":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["contractVersion"] = 2;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "visual_contract_type":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["contractVersion"] = true;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "empty_runner":
+            {
+                JsonObject startup = ReadEmbedded(authority, startupPath);
+                startup["nativeHostEvidence"]!["runner"] = "";
+                RewriteEmbedded(authority, startupPath, startup);
+                break;
+            }
+            case "blank_runner":
+            {
+                JsonObject startup = ReadEmbedded(authority, startupPath);
+                startup["nativeHostEvidence"]!["runner"] = "   ";
                 RewriteEmbedded(authority, startupPath, startup);
                 break;
             }
@@ -371,8 +429,38 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 captureCandidate[$"{property}Sha256"] =
                     entry["sha256"]!.GetValue<string>();
             }
-            RewriteEmbedded(authority, capturePath, capture);
         }
+        if (capture["heads"] is JsonArray captureHeads)
+        {
+            foreach (JsonNode? node in captureHeads)
+            {
+                JsonObject head = node!.AsObject();
+                foreach (string property in new[] { "receipt", "progressLog" })
+                {
+                    if (head[property] is JsonObject reference
+                        && reference["path"] is JsonValue pathValue
+                        && entries.TryGetValue(
+                            pathValue.GetValue<string>(),
+                            out JsonObject? entry))
+                    {
+                        reference["sha256"] = entry["sha256"]!.GetValue<string>();
+                    }
+                }
+                if (head["screenshots"] is JsonArray screenshots)
+                {
+                    foreach (JsonNode? screenshotNode in screenshots)
+                    {
+                        JsonObject screenshot = screenshotNode!.AsObject();
+                        string path = screenshot["path"]!.GetValue<string>();
+                        if (entries.TryGetValue(path, out JsonObject? entry))
+                        {
+                            screenshot["sha256"] = entry["sha256"]!.GetValue<string>();
+                        }
+                    }
+                }
+            }
+        }
+        RewriteEmbedded(authority, capturePath, capture);
 
         JsonObject captureInventory = ReadEmbedded(authority, captureInventoryPath);
         captureInventory["captureManifestSha256"] = entries[capturePath]["sha256"]!.GetValue<string>();
@@ -611,7 +699,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         }
 
         public static byte[] BuildCandidateAuthority(
-            bool includeUndeclaredWindowsArtifacts = false)
+            bool includeUndeclaredWindowsArtifacts = false,
+            string? allowedHeadScopeDrift = null)
         {
             string installerSha = Sha256(InstallerBytes);
             string payloadSha = Sha256(PayloadBytes);
@@ -627,21 +716,14 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     rid = "win-x64",
                     arch = "x64",
                     kind = "installer",
+                    installerMode = "bootstrap",
+                    payloadAcquisitionMode = "download",
                     fileName = "chummer-avalonia-win-x64-installer.exe",
                     sha256 = installerSha,
-                    sizeBytes = InstallerBytes.LongLength
-                },
-                new
-                {
-                    artifactId = "avalonia-win-x64-payload",
-                    head = "avalonia",
-                    platform = "windows",
-                    rid = "win-x64",
-                    arch = "x64",
-                    kind = "archive",
-                    fileName = "chummer-avalonia-win-x64-payload.zip",
-                    sha256 = payloadSha,
-                    sizeBytes = PayloadBytes.LongLength
+                    sizeBytes = InstallerBytes.LongLength,
+                    payloadFileName = "chummer-avalonia-win-x64-payload.zip",
+                    payloadSha256 = payloadSha,
+                    payloadSizeBytes = PayloadBytes.LongLength
                 }
             };
             if (includeUndeclaredWindowsArtifacts)
@@ -654,22 +736,54 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     rid = "win-x64",
                     arch = "x64",
                     kind = "installer",
+                    installerMode = "bootstrap",
+                    payloadAcquisitionMode = "download",
                     fileName = "chummer-blazor-desktop-win-x64-installer.exe",
                     sha256 = blazorInstallerSha,
-                    sizeBytes = BlazorInstallerBytes.LongLength
+                    sizeBytes = BlazorInstallerBytes.LongLength,
+                    payloadFileName = "chummer-blazor-desktop-win-x64-payload.zip",
+                    payloadSha256 = blazorPayloadSha,
+                    payloadSizeBytes = BlazorPayloadBytes.LongLength
                 });
+            }
+            if (allowedHeadScopeDrift == "rid")
+            {
                 manifestArtifacts.Add(new
                 {
-                    artifactId = "blazor-desktop-win-x64-payload",
-                    head = "blazor-desktop",
+                    artifactId = "avalonia-win-arm64-installer",
+                    head = "avalonia",
+                    platform = "windows",
+                    rid = "win-arm64",
+                    arch = "arm64",
+                    kind = "installer",
+                    installerMode = "bootstrap",
+                    payloadAcquisitionMode = "download",
+                    fileName = "chummer-avalonia-win-arm64-installer.exe",
+                    sha256 = blazorInstallerSha,
+                    sizeBytes = BlazorInstallerBytes.LongLength,
+                    payloadFileName = "chummer-avalonia-win-arm64-payload.zip",
+                    payloadSha256 = blazorPayloadSha,
+                    payloadSizeBytes = BlazorPayloadBytes.LongLength
+                });
+            }
+            else if (allowedHeadScopeDrift == "kind")
+            {
+                manifestArtifacts.Add(new
+                {
+                    artifactId = "avalonia-win-x64-symbols",
+                    head = "avalonia",
                     platform = "windows",
                     rid = "win-x64",
                     arch = "x64",
                     kind = "archive",
-                    fileName = "chummer-blazor-desktop-win-x64-payload.zip",
+                    fileName = "chummer-avalonia-win-x64-symbols.zip",
                     sha256 = blazorPayloadSha,
                     sizeBytes = BlazorPayloadBytes.LongLength
                 });
+            }
+            else if (allowedHeadScopeDrift is not null and not "file")
+            {
+                throw new ArgumentOutOfRangeException(nameof(allowedHeadScopeDrift));
             }
             byte[] canonical = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -710,6 +824,34 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     "files/chummer-blazor-desktop-win-x64-payload.zip",
                     BlazorPayloadBytes.LongLength,
                     blazorPayloadSha));
+            }
+            if (allowedHeadScopeDrift == "rid")
+            {
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-arm64-installer.exe",
+                    BlazorInstallerBytes.LongLength,
+                    blazorInstallerSha));
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-arm64-payload.zip",
+                    BlazorPayloadBytes.LongLength,
+                    blazorPayloadSha));
+            }
+            else if (allowedHeadScopeDrift == "kind")
+            {
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-x64-symbols.zip",
+                    BlazorPayloadBytes.LongLength,
+                    blazorPayloadSha));
+            }
+            else if (allowedHeadScopeDrift == "file")
+            {
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-x64-debug.zip",
+                    BlazorPayloadBytes.LongLength,
+                    blazorPayloadSha));
+            }
+            if (includeUndeclaredWindowsArtifacts || allowedHeadScopeDrift is not null)
+            {
                 rows.Sort(static (left, right) => string.CompareOrdinal(left.Path, right.Path));
             }
             string inventorySha =

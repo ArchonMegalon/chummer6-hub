@@ -310,41 +310,41 @@ def _canonical_windows_scope(
     artifacts_value = manifest.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
         _fail("candidate release manifest has no artifacts")
+    windows_artifacts: list[dict[str, Any]] = []
     for artifact in artifacts_value:
-        if (
-            isinstance(artifact, dict)
-            and artifact.get("platform") == "windows"
-            and artifact.get("head") not in heads
-        ):
+        if not isinstance(artifact, dict) or artifact.get("platform") != "windows":
+            continue
+        if artifact.get("head") not in heads:
             _fail(
                 "candidate release manifest contains a Windows artifact outside "
                 "requiredDesktopHeads"
             )
+        if artifact.get("rid") != RID or artifact.get("kind") != "installer":
+            _fail(
+                "candidate release manifest contains a Windows artifact outside "
+                "the exact required desktop tuple scope"
+            )
+        windows_artifacts.append(artifact)
     candidate_by_path = {row["path"]: row for row in candidate_rows}
     scope_by_head: dict[str, dict[str, Any]] = {}
     for head in heads:
-        matching = [
-            artifact
-            for artifact in artifacts_value
-            if isinstance(artifact, dict)
-            and artifact.get("head") == head
-            and artifact.get("platform") == "windows"
-            and artifact.get("rid") == RID
-        ]
-        installers = [artifact for artifact in matching if artifact.get("kind") == "installer"]
-        payloads = [
-            artifact
-            for artifact in matching
-            if artifact.get("kind") in {"archive", "payload"}
-            and str(artifact.get("fileName") or "").endswith("-payload.zip")
-        ]
-        if len(installers) != 1 or len(payloads) != 1:
-            _fail(f"candidate manifest must name one Windows installer and payload for {head}")
+        matching = [artifact for artifact in windows_artifacts if artifact.get("head") == head]
+        if len(matching) != 1:
+            _fail(f"candidate manifest must name one Windows installer row for {head}")
+        installer_row = matching[0]
+        if (
+            installer_row.get("installerMode") != "bootstrap"
+            or installer_row.get("payloadAcquisitionMode") != "download"
+        ):
+            _fail(f"candidate {head} installer delivery mode is invalid")
         scope_by_head[head] = {}
-        for role, artifact in (("installer", installers[0]), ("payload", payloads[0])):
-            file_name = artifact.get("fileName")
-            digest = artifact.get("sha256")
-            size = artifact.get("sizeBytes")
+        for role, file_key, digest_key, size_key in (
+            ("installer", "fileName", "sha256", "sizeBytes"),
+            ("payload", "payloadFileName", "payloadSha256", "payloadSizeBytes"),
+        ):
+            file_name = installer_row.get(file_key)
+            digest = installer_row.get(digest_key)
+            size = installer_row.get(size_key)
             if (
                 not isinstance(file_name, str)
                 or not file_name
@@ -368,6 +368,19 @@ def _canonical_windows_scope(
                 "sha256": digest,
                 "sizeBytes": size,
             }
+    expected_file_paths = {
+        artifact["path"]
+        for head in heads
+        for artifact in scope_by_head[head].values()
+    }
+    actual_file_paths = {
+        row["path"] for row in candidate_rows if row["path"].startswith("files/")
+    }
+    if actual_file_paths != expected_file_paths:
+        _fail(
+            "candidate upload Windows artifact file set differs from the exact "
+            "required desktop tuples"
+        )
     return {
         "version": version,
         "channel": channel,
@@ -879,6 +892,7 @@ def _validate_native_evidence(
         native = startup.get("nativeHostEvidence")
         if (
             startup.get("status") != "pass"
+            or startup.get("readyCheckpoint") != "pre_ui_event_loop"
             or startup.get("executionEnvironment") != "native_windows"
             or startup.get("headId") != head
             or startup.get("platform") != "windows"
@@ -896,6 +910,8 @@ def _validate_native_evidence(
             or native.get("status") != "verified"
             or native.get("isNativeWindows") is not True
             or native.get("hostPlatform") != "windows"
+            or not isinstance(native.get("runner"), str)
+            or not native["runner"].strip()
             or "wine" in str(native.get("runner") or "").lower()
         ):
             _fail(f"{head} startup proof is not exact native-Windows evidence")
@@ -927,6 +943,8 @@ def _validate_native_evidence(
                 _fail(f"{head} visual proof screenshot finalized inventory binding drifted")
         if (
             proof.get("contractName") != VISUAL_PROOF_CONTRACT
+            or type(proof.get("contractVersion")) is not int
+            or proof["contractVersion"] != 1
             or proof.get("status") != "passed"
             or proof.get("headId") != head
             or proof.get("platform") != "windows"
