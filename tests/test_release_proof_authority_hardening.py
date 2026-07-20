@@ -19,6 +19,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MATERIALIZER = REPO_ROOT / "scripts" / "materialize_hub_local_release_proof.py"
 ORCHESTRATOR = REPO_ROOT / "scripts" / "release" / "verify_public_projection.py"
+SELF_HOSTED_DOWNLOADS_RUNBOOK = REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
 RELEASE_COMMIT = "1" * 40
 READINESS_COMMIT = "2" * 40
 
@@ -714,6 +715,18 @@ class ReleaseProofAuthorityHardeningTests(unittest.TestCase):
                 module._acquire_publication_lock(root)
 
             self.assertFalse((root / module.PUBLICATION_LOCK_NAME).exists())
+
+    def test_live_deploy_runbook_supplies_authenticated_projection_root(self) -> None:
+        runbook = SELF_HOSTED_DOWNLOADS_RUNBOOK.read_text(encoding="utf-8")
+
+        self.assertIn("scripts/release/verify_public_projection.sh", runbook)
+        self.assertGreaterEqual(
+            runbook.count(
+                "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="
+                "/docker/chummercomplete/chummer.run-services/.codex-studio/published"
+            ),
+            2,
+        )
 
 
 if __name__ == "__main__":

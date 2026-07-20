@@ -274,12 +274,15 @@ Repository variables:
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist. The release authority must
    independently select the exact merged commit, verifier digest, release-receipt digest, and
-   candidate runtime-proof digest. Do not derive any expected value from the checkout, receipt, or
-   proof path being executed. In particular, `CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256`
-   is a required external authority input, not a value the deploy may obtain by hashing the live bind
-   source. Place its one-line lowercase digest in an operator-owned, symlink-free mode-`0400` file
-   outside the checkout, verify that file's custody, and pass the value explicitly through the
-   otherwise empty `env -i` environment:
+   candidate runtime-proof digest. The exact authenticated public-projection root is also mandatory;
+   publish it first with `scripts/release/verify_public_projection.sh` from the five immutable,
+   owner-approved authority inputs, and do not run the deploy until its atomic `CURRENT.json`
+   authenticates. Do not derive any expected value from the checkout, receipt, or proof path being
+   executed. In particular, `CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256` is a required
+   external authority input, not a value the deploy may obtain by hashing the live bind source.
+   Place its one-line lowercase digest in an operator-owned, symlink-free mode-`0400` file outside
+   the checkout, verify that file's custody, and pass the value and exact snapshot root explicitly
+   through the otherwise empty `env -i` environment:
 ```bash
 runtime_proof_authority=/docker/chummercomplete/.state/public-edge-deploy-authority/runtime-proof-bind-source.sha256
 test -f "$runtime_proof_authority" && test ! -L "$runtime_proof_authority"
@@ -296,6 +299,7 @@ IFS= read -r approved_runtime_proof_sha256 < "$runtime_proof_authority"
   CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290' \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT=/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256='<externally-approved-lowercase-sha256>' \
+  CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT=/docker/chummercomplete/chummer.run-services/.codex-studio/published \
   CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$approved_runtime_proof_sha256" \
   CHUMMER_RUN_SERVICES_SOURCE=/docker/chummercomplete/chummer.run-services \
   /usr/bin/bash --noprofile --norc \
@@ -319,6 +323,7 @@ IFS= read -r approved_runtime_proof_sha256 < "$runtime_proof_authority"
   CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD='<externally-approved-40-hex-merged-commit>' \
   CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF='refs/remotes/origin/main' \
   CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290' \
+  CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT=/docker/chummercomplete/chummer.run-services/.codex-studio/published \
   CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$approved_runtime_proof_sha256" \
   CHUMMER_RUN_SERVICES_SOURCE=/docker/chummercomplete/chummer.run-services \
   /usr/bin/bash --noprofile --norc \
