@@ -237,8 +237,10 @@ public sealed class CampaignCollaborationController : ControllerBase
     [HttpPut("{campaignId}/sheets/{dossierId}")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType(typeof(CampaignSharedSheetEditReceipt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<CampaignSharedSheetEditReceipt>> UpdateSharedSheet(
         [FromRoute] string campaignId,
         [FromRoute] string dossierId,
@@ -404,6 +406,8 @@ public sealed class CampaignCollaborationController : ControllerBase
             or CampaignIdempotencyConflictException
             or CampaignBindingRevisionConflictException
             or CampaignRevisionConflictException
+            or CampaignCanonicalEditConflictException
+            or CampaignCanonicalEditUnavailableException
             or KeyNotFoundException
             or ArgumentException
             or InvalidOperationException;
@@ -428,6 +432,12 @@ public sealed class CampaignCollaborationController : ControllerBase
             CampaignRevisionConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
+            CampaignCanonicalEditConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignCanonicalEditUnavailableException unavailable => Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: unavailable.Message),
             KeyNotFoundException => NotFound(),
             ArgumentException invalid => Problem(
                 statusCode: StatusCodes.Status400BadRequest,

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -33,22 +34,40 @@ public sealed class CampaignCollaborationService
     private const string GmCharacterEditorAuthority = "gm_character_editor";
     private const string NoGmCharacterAuthority = "none";
     private const string HubRunnerDossierAuthorityKind = "hub_runner_dossier";
+    private const string DelegatedGmCharacterEditContract = "chummer.delegated-gm-character-edit/v1";
+    private const string DelegatedGmActorRole = "game-master";
+    private const string DelegatedProfileAliasPath = "/profile/alias";
+    private const string DelegatedProfileNamePath = "/profile/name";
+    private const int DelegatedGmMaxReasonLength = 500;
 
     private static readonly JsonSerializerOptions DigestJsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly CommunityStore _store;
+    private readonly ICanonicalGmCharacterEditGateway _canonicalCharacterEdits;
     private readonly TimeProvider _timeProvider;
     private readonly Dictionary<string, CampaignInviteAttemptWindow> _inviteAttemptsByUserId = new(StringComparer.OrdinalIgnoreCase);
 
     public CampaignCollaborationService(CommunityStore store)
-        : this(store, TimeProvider.System)
+        : this(store, new UnavailableCoreDelegatedGmCharacterEditGateway(), TimeProvider.System)
     {
     }
 
-    internal CampaignCollaborationService(CommunityStore store, TimeProvider timeProvider)
+    public CampaignCollaborationService(
+        CommunityStore store,
+        ICanonicalGmCharacterEditGateway canonicalCharacterEdits)
+        : this(store, canonicalCharacterEdits, TimeProvider.System)
     {
-        _store = store;
-        _timeProvider = timeProvider;
+    }
+
+    internal CampaignCollaborationService(
+        CommunityStore store,
+        ICanonicalGmCharacterEditGateway canonicalCharacterEdits,
+        TimeProvider timeProvider)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _canonicalCharacterEdits = canonicalCharacterEdits
+            ?? throw new ArgumentNullException(nameof(canonicalCharacterEdits));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     }
 
     public IReadOnlyList<CampaignCollaborationProjection> ListCampaigns(HubUserDto user)
@@ -467,13 +486,20 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(gm);
         ArgumentNullException.ThrowIfNull(request);
+        if (request.ExpectedRevision <= 0 || request.ExpectedRevision == long.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.ExpectedRevision));
+        }
+
         string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
         string normalizedDossierId = NormalizeRequired(dossierId, nameof(dossierId), 128);
         string runnerHandle = NormalizeRequired(request.RunnerHandle, nameof(request.RunnerHandle), MaxHandleLength);
         string displayName = NormalizeRequired(request.DisplayName, nameof(request.DisplayName), MaxDisplayNameLength);
         string status = NormalizeDossierStatus(request.Status);
-        string reason = NormalizeRequired(request.Reason, nameof(request.Reason), MaxReasonLength);
-        IReadOnlyList<PublicationSafeProjection> sections = NormalizeSafeSections(request.Sections);
+        string reason = NormalizeRequired(request.Reason, nameof(request.Reason), DelegatedGmMaxReasonLength);
+        IReadOnlyList<PublicationSafeProjection>? requestedSections = request.Sections is null
+            ? null
+            : NormalizeSafeSections(request.Sections);
         string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
         string commandKey = BuildCommandKey(gm.UserId, "sheet-edit", idempotencyKey);
         string requestSha256 = ComputeSha256(new
@@ -485,13 +511,21 @@ public sealed class CampaignCollaborationService
             DisplayName = displayName,
             Status = status,
             Reason = reason,
-            Sections = sections
+            Sections = requestedSections
         });
 
         lock (_store.Gate)
         {
-            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            (CampaignProjection campaign, GroupDto group, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             CampaignCharacterBindingState binding = RequireCurrentBindingLocked(campaign.CampaignId, normalizedDossierId);
+            if (!_store.DossiersById.TryGetValue(normalizedDossierId, out RunnerDossierProjection? boundDossier)
+                || !string.Equals(boundDossier.OwnerUserId, binding.AuthenticatedOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(binding.AuthorityKind, HubRunnerDossierAuthorityKind, StringComparison.Ordinal)
+                || !string.Equals(binding.AuthoritativeCharacterId, boundDossier.DossierId, StringComparison.Ordinal))
+            {
+                throw new KeyNotFoundException("Unknown campaign sheet.");
+            }
+
             if (!string.Equals(binding.GmAuthorityRole, GmCharacterEditorAuthority, StringComparison.Ordinal))
             {
                 throw new CampaignCollaborationAccessDeniedException("The character owner has not granted GM edit authority.");
@@ -514,19 +548,80 @@ public sealed class CampaignCollaborationService
                 throw new CampaignRevisionConflictException(currentCharacterRevision);
             }
 
+            // Core's v1 delegated edit contract owns only profile name and alias
+            // (and, when explicitly modeled, notes). Do not let the compatibility
+            // request shape turn status or publication-safe sections into a
+            // successful Hub-only character mutation.
+            if (!string.Equals(status, current.Status, StringComparison.Ordinal)
+                || (requestedSections is not null
+                    && !string.Equals(
+                        ComputeSha256(requestedSections),
+                        ComputeSha256(current.Sections),
+                        StringComparison.Ordinal)))
+            {
+                throw new ArgumentException(
+                    "GM character edits currently support only displayName and runnerHandle; status and sections must remain unchanged.",
+                    nameof(request));
+            }
+
+            var canonicalCommand = new CanonicalGmCharacterEditCommand(
+                CampaignId: campaign.CampaignId,
+                ActorUserId: gm.UserId,
+                CampaignOwnerUserId: group.OwnerUserId,
+                CharacterOwnerUserId: binding.AuthenticatedOwnerUserId,
+                DossierId: current.DossierId,
+                AuthorityKind: binding.AuthorityKind,
+                AuthoritativeCharacterId: binding.AuthoritativeCharacterId,
+                DelegationId: binding.BindingId,
+                AuthorityReceiptId: binding.BindingVersionId,
+                AuthorityRevision: binding.BindingRevision,
+                AuthorityGrantedAtUtc: binding.GrantedAtUtc,
+                ExpectedRevision: currentCharacterRevision,
+                IdempotencyKey: idempotencyKey,
+                Reason: reason,
+                RunnerHandle: runnerHandle,
+                DisplayName: displayName);
+            CanonicalGmCharacterEditResult canonicalResult;
+            try
+            {
+                canonicalResult = _canonicalCharacterEdits.Execute(canonicalCommand);
+            }
+            catch (Exception exception)
+            {
+                throw new CampaignCanonicalEditUnavailableException(exception);
+            }
+
+            CanonicalGmCharacterEditReceipt canonicalReceipt = RequireCanonicalReceipt(
+                canonicalCommand,
+                canonicalResult);
+
+            // Keep Hub authorization authoritative across the canonical call. The
+            // store lock prevents normal concurrent changes; these checks also
+            // fail closed against a re-entrant or defective adapter.
+            (CampaignProjection verifiedCampaign, GroupDto verifiedGroup, _) =
+                RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            CampaignCharacterBindingState verifiedBinding =
+                RequireCurrentBindingLocked(verifiedCampaign.CampaignId, normalizedDossierId);
+            if (!string.Equals(verifiedGroup.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(verifiedBinding.BindingVersionId, binding.BindingVersionId, StringComparison.Ordinal)
+                || !string.Equals(verifiedBinding.GmAuthorityRole, GmCharacterEditorAuthority, StringComparison.Ordinal)
+                || ResolveCurrentCharacterRevisionLocked(normalizedDossierId) != currentCharacterRevision)
+            {
+                throw new CampaignCollaborationAccessDeniedException(
+                    "GM edit authority changed while the canonical edit was being reconciled.");
+            }
+
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
                 RunnerDossierProjection dossier = _store.DossiersById[current.DossierId];
                 DateTimeOffset now = _timeProvider.GetUtcNow();
                 RunnerDossierProjection updatedDossier = dossier with
                 {
-                    RunnerHandle = runnerHandle,
-                    DisplayName = displayName,
-                    Status = status,
-                    Projections = sections,
+                    RunnerHandle = canonicalCommand.RunnerHandle,
+                    DisplayName = canonicalCommand.DisplayName,
                     UpdatedAtUtc = now
                 };
-                long nextRevision = currentCharacterRevision + 1;
+                long nextRevision = canonicalReceipt.NewRevision;
                 CampaignCharacterBindingState[] nextBindings = _store.CampaignCharacterBindings
                     .Where(item => string.Equals(item.DossierId, current.DossierId, StringComparison.OrdinalIgnoreCase))
                     .GroupBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
@@ -548,17 +643,17 @@ public sealed class CampaignCollaborationService
                     current.Role,
                     canManage: true);
                 var audit = new CampaignSharedSheetAuditState(
-                    ReceiptId: NewId("sheet-edit"),
+                    ReceiptId: canonicalReceipt.ReceiptId,
                     CampaignId: campaign.CampaignId,
                     DossierId: current.DossierId,
-                    PreviousRevision: currentCharacterRevision,
+                    PreviousRevision: canonicalReceipt.PreviousRevision,
                     Revision: nextRevision,
                     IdempotencyKey: idempotencyKey,
                     Reason: reason,
                     EditedByUserId: gm.UserId,
                     BeforeSha256: ComputeSha256(current),
                     AfterSha256: ComputeSha256(nextProjection),
-                    EditedAtUtc: now);
+                    EditedAtUtc: canonicalReceipt.AppliedAtUtc);
 
                 _store.DossiersById[current.DossierId] = updatedDossier;
                 _store.CampaignCharacterBindings.AddRange(nextBindings);
@@ -1450,6 +1545,165 @@ public sealed class CampaignCollaborationService
         => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, DigestJsonOptions)))
             .ToLowerInvariant();
 
+    private CanonicalGmCharacterEditReceipt RequireCanonicalReceipt(
+        CanonicalGmCharacterEditCommand command,
+        CanonicalGmCharacterEditResult? result)
+    {
+        if (result is null)
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        switch (result.Outcome)
+        {
+            case CanonicalGmCharacterEditOutcome.Denied:
+            case CanonicalGmCharacterEditOutcome.Forbidden:
+                throw new CampaignCollaborationAccessDeniedException(
+                    "Core rejected the current GM character-edit delegation.");
+            case CanonicalGmCharacterEditOutcome.Invalid:
+                throw new ArgumentException(
+                    "The requested GM edit is outside the canonical delegated character-edit contract.",
+                    nameof(command));
+            case CanonicalGmCharacterEditOutcome.Missing:
+                throw new KeyNotFoundException("Unknown canonical character.");
+            case CanonicalGmCharacterEditOutcome.Conflict:
+                throw new CampaignCanonicalEditConflictException(result.CurrentRevision);
+            case CanonicalGmCharacterEditOutcome.Corrupt:
+            case CanonicalGmCharacterEditOutcome.Unavailable:
+                throw new CampaignCanonicalEditUnavailableException();
+            case CanonicalGmCharacterEditOutcome.Applied:
+            case CanonicalGmCharacterEditOutcome.Replayed:
+                break;
+            default:
+                throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        CanonicalGmCharacterEditReceipt? receipt = result.Receipt;
+        string expectedIdempotencySha256 = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(command.IdempotencyKey)))
+            .ToLowerInvariant();
+        string expectedCommandSha256 = ComputeCanonicalCommandSha256(command);
+        string expectedReceiptSeed = string.Join(
+            "\n",
+            expectedCommandSha256,
+            command.DelegationId,
+            command.AuthorityReceiptId,
+            expectedIdempotencySha256);
+        string expectedReceiptId = "gm-edit-" + ComputeCanonicalStringSha256(expectedReceiptSeed)[..24];
+        CanonicalGmCharacterEditAuditOperation[] expectedOperations =
+        [
+            BuildExpectedCanonicalAuditOperation(DelegatedProfileAliasPath, command.RunnerHandle),
+            BuildExpectedCanonicalAuditOperation(DelegatedProfileNamePath, command.DisplayName)
+        ];
+        DateTimeOffset observedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
+        if (receipt is null
+            || !string.Equals(receipt.Contract, DelegatedGmCharacterEditContract, StringComparison.Ordinal)
+            || !string.Equals(receipt.ReceiptId, expectedReceiptId, StringComparison.Ordinal)
+            || !string.Equals(receipt.CampaignId, command.CampaignId, StringComparison.Ordinal)
+            || !string.Equals(receipt.DelegationId, command.DelegationId, StringComparison.Ordinal)
+            || !string.Equals(receipt.GrantedByCampaignOwnerId, command.CampaignOwnerUserId, StringComparison.Ordinal)
+            || !string.Equals(
+                receipt.GrantedByCharacterOwnerId,
+                command.CharacterOwnerUserId.Trim().ToLowerInvariant(),
+                StringComparison.Ordinal)
+            || !string.Equals(receipt.AuthorityReceiptId, command.AuthorityReceiptId, StringComparison.Ordinal)
+            || receipt.AuthorityRevision != command.AuthorityRevision
+            || !string.Equals(receipt.ActorId, command.ActorUserId, StringComparison.Ordinal)
+            || !string.Equals(receipt.ActorRole, DelegatedGmActorRole, StringComparison.Ordinal)
+            || !string.Equals(
+                receipt.CharacterOwnerId,
+                command.CharacterOwnerUserId.Trim().ToLowerInvariant(),
+                StringComparison.Ordinal)
+            || !string.Equals(receipt.AuthoritativeCharacterId, command.AuthoritativeCharacterId, StringComparison.Ordinal)
+            || !string.Equals(receipt.Reason, command.Reason, StringComparison.Ordinal)
+            || !string.Equals(receipt.IdempotencyKeySha256, expectedIdempotencySha256, StringComparison.Ordinal)
+            || !string.Equals(receipt.CommandSha256, expectedCommandSha256, StringComparison.Ordinal)
+            || receipt.PreviousRevision != command.ExpectedRevision
+            || receipt.NewRevision != command.ExpectedRevision + 1
+            || result.CurrentRevision != receipt.NewRevision
+            || receipt.AppliedAtUtc == default
+            || receipt.AppliedAtUtc.ToUniversalTime() < command.AuthorityGrantedAtUtc.ToUniversalTime()
+            || receipt.AppliedAtUtc.ToUniversalTime() > observedAtUtc.AddMinutes(5)
+            || !CanonicalOperationsMatch(receipt.Operations, expectedOperations))
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        return receipt;
+    }
+
+    private static bool CanonicalOperationsMatch(
+        IReadOnlyList<CanonicalGmCharacterEditAuditOperation>? actual,
+        IReadOnlyList<CanonicalGmCharacterEditAuditOperation> expected)
+    {
+        if (actual is null || actual.Count != expected.Count)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < expected.Count; index++)
+        {
+            CanonicalGmCharacterEditAuditOperation actualOperation = actual[index];
+            CanonicalGmCharacterEditAuditOperation expectedOperation = expected[index];
+            if (actualOperation is null
+                || actualOperation.Operation != expectedOperation.Operation
+                || !string.Equals(actualOperation.Path, expectedOperation.Path, StringComparison.Ordinal)
+                || !string.Equals(actualOperation.ValueSha256, expectedOperation.ValueSha256, StringComparison.Ordinal)
+                || actualOperation.ValueLength != expectedOperation.ValueLength)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static CanonicalGmCharacterEditAuditOperation BuildExpectedCanonicalAuditOperation(
+        string path,
+        string value)
+        => new(
+            CanonicalGmCharacterEditPatchOperationKind.Replace,
+            path,
+            ComputeCanonicalStringSha256(value),
+            value.Length);
+
+    private static string ComputeCanonicalCommandSha256(CanonicalGmCharacterEditCommand command)
+    {
+        StringBuilder builder = new();
+        AppendCanonicalFingerprintField(builder, DelegatedGmCharacterEditContract);
+        AppendCanonicalFingerprintField(builder, command.CampaignId);
+        AppendCanonicalFingerprintField(builder, command.ActorUserId);
+        AppendCanonicalFingerprintField(builder, command.CharacterOwnerUserId.Trim().ToLowerInvariant());
+        AppendCanonicalFingerprintField(builder, command.AuthoritativeCharacterId);
+        AppendCanonicalFingerprintField(
+            builder,
+            command.ExpectedRevision.ToString(CultureInfo.InvariantCulture));
+        AppendCanonicalFingerprintField(builder, command.Reason);
+        AppendCanonicalFingerprintField(
+            builder,
+            ((int)CanonicalGmCharacterEditPatchOperationKind.Replace).ToString(CultureInfo.InvariantCulture));
+        AppendCanonicalFingerprintField(builder, DelegatedProfileAliasPath);
+        AppendCanonicalFingerprintField(builder, command.RunnerHandle);
+        AppendCanonicalFingerprintField(
+            builder,
+            ((int)CanonicalGmCharacterEditPatchOperationKind.Replace).ToString(CultureInfo.InvariantCulture));
+        AppendCanonicalFingerprintField(builder, DelegatedProfileNamePath);
+        AppendCanonicalFingerprintField(builder, command.DisplayName);
+        return ComputeCanonicalStringSha256(builder.ToString());
+    }
+
+    private static void AppendCanonicalFingerprintField(StringBuilder builder, string value)
+    {
+        builder.Append(value.Length.ToString(CultureInfo.InvariantCulture))
+            .Append(':')
+            .Append(value)
+            .Append('\n');
+    }
+
+    private static string ComputeCanonicalStringSha256(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
+            .ToLowerInvariant();
+
     private static string ComputeCodeLookupSha256(string normalizedCode)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"campaign-code\0{normalizedCode}")))
             .ToLowerInvariant();
@@ -2181,6 +2435,29 @@ public sealed class CampaignBindingRevisionConflictException : Exception
     }
 
     public long CurrentBindingRevision { get; }
+}
+
+public sealed class CampaignCanonicalEditConflictException : Exception
+{
+    public CampaignCanonicalEditConflictException(long? currentRevision)
+        : base(currentRevision is > 0
+            ? $"The canonical character changed; current revision is {currentRevision}."
+            : "The canonical character changed before the GM edit could be applied.")
+    {
+        CurrentRevision = currentRevision;
+    }
+
+    public long? CurrentRevision { get; }
+}
+
+public sealed class CampaignCanonicalEditUnavailableException : Exception
+{
+    public CampaignCanonicalEditUnavailableException(Exception? innerException = null)
+        : base(
+            "Canonical character editing is temporarily unavailable; no campaign projection was changed.",
+            innerException)
+    {
+    }
 }
 
 public sealed class CampaignInviteThrottledException : Exception

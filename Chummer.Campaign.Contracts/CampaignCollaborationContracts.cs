@@ -63,6 +63,14 @@ public sealed record CampaignEligibleCharacterProjection(
     long CurrentRevision,
     DateTimeOffset UpdatedAtUtc);
 
+/// <summary>
+/// Compatibility request for a delegated canonical GM character edit.
+/// DisplayName maps to Core profile name and RunnerHandle maps to Core profile
+/// alias. Core's v1 delegation does not authorize status or player-safe section
+/// mutation, so callers must leave Sections null (or exactly unchanged) and
+/// must echo the current Status. A future Core contract may add an explicit
+/// notes field; arbitrary publication sections are never reinterpreted as it.
+/// </summary>
 public sealed record CampaignSharedSheetUpdateRequest(
     long ExpectedRevision,
     string IdempotencyKey,
