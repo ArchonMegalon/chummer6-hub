@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -58,6 +60,172 @@ def test_replacement_rejects_implicit_tuple_loss() -> None:
         MODULE.verify_replacement(existing, incoming)
 
 
+def test_replacement_accepts_an_explicit_exact_scope_with_retirement() -> None:
+    existing = manifest(
+        ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+        ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+        ("avalonia", "macos", "osx-arm64", "dmg", "mac.dmg"),
+    )
+    incoming = manifest(
+        ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+        ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+    )
+    exact = MODULE.normalize_exact_incoming_tuples(
+        ["avalonia:linux:linux-x64", "avalonia:windows:win-x64"]
+    )
+
+    assert MODULE.verify_replacement(existing, incoming, exact_incoming_tuples=exact)[1] == exact
+
+
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        (["avalonia:linux:linux-x64"], "undeclared avalonia:windows:win-x64"),
+        (
+            ["avalonia:linux:linux-x64", "avalonia:windows:win-x64", "avalonia:macos:osx-arm64"],
+            "missing avalonia:macos:osx-arm64",
+        ),
+    ],
+)
+def test_replacement_rejects_incoming_truth_that_disagrees_with_exact_scope(
+    declared: list[str], expected: str
+) -> None:
+    incoming = manifest(
+        ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+        ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+    )
+
+    with pytest.raises(MODULE.ReplacementVerificationError, match=expected):
+        MODULE.verify_replacement(
+            None,
+            incoming,
+            exact_incoming_tuples=MODULE.normalize_exact_incoming_tuples(declared),
+        )
+
+
+@pytest.mark.parametrize(
+    "declared",
+    [
+        [],
+        ["avalonia:linux"],
+        ["avalonia::linux-x64"],
+        ["avalonia:linux:../../escape"],
+        ["avalonia:linux:linux-x64", "AVALONIA:LINUX:LINUX-X64"],
+    ],
+)
+def test_exact_scope_declaration_rejects_empty_malformed_or_duplicate_values(declared: list[str]) -> None:
+    with pytest.raises(MODULE.ReplacementVerificationError):
+        MODULE.normalize_exact_incoming_tuples(declared)
+
+
+def test_selected_file_filter_cannot_fake_an_exact_scope() -> None:
+    incoming = manifest(
+        ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+        ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+    )
+    exact = MODULE.normalize_exact_incoming_tuples(
+        ["avalonia:linux:linux-x64", "avalonia:windows:win-x64"]
+    )
+
+    with pytest.raises(MODULE.ReplacementVerificationError, match="missing avalonia:windows:win-x64"):
+        MODULE.verify_replacement(
+            None,
+            incoming,
+            selected_file_names={"linux.deb"},
+            exact_incoming_tuples=exact,
+        )
+
+
+def test_cli_exact_scope_transport_allows_only_the_declared_windows_linux_shelf(
+    tmp_path: Path,
+) -> None:
+    existing = tmp_path / "existing.json"
+    incoming = tmp_path / "incoming.json"
+    selected = tmp_path / "files"
+    selected.mkdir()
+    existing.write_text(
+        json.dumps(
+            manifest(
+                ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+                ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+                ("avalonia", "macos", "osx-arm64", "dmg", "mac.dmg"),
+            )
+        ),
+        encoding="utf-8",
+    )
+    incoming.write_text(
+        json.dumps(
+            manifest(
+                ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
+                ("avalonia", "windows", "win-x64", "installer", "windows.exe"),
+            )
+        ),
+        encoding="utf-8",
+    )
+    (selected / "linux.deb").write_bytes(b"linux")
+    (selected / "windows.exe").write_bytes(b"windows")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--existing",
+            str(existing),
+            "--incoming",
+            str(incoming),
+            "--selected-files-dir",
+            str(selected),
+            "--exact-incoming-scope",
+            "avalonia:windows:win-x64,avalonia:linux:linux-x64",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "incoming tuples=2" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "scope",
+    [
+        "",
+        "avalonia:linux",
+        "avalonia:linux:linux-x64,AVALONIA:LINUX:LINUX-X64",
+    ],
+)
+def test_cli_exact_scope_transport_rejects_empty_malformed_or_duplicate_values(
+    tmp_path: Path,
+    scope: str,
+) -> None:
+    incoming = tmp_path / "incoming.json"
+    incoming.write_text(
+        json.dumps(manifest(("avalonia", "linux", "linux-x64", "installer", "linux.deb"))),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--existing",
+            str(tmp_path / "absent.json"),
+            "--allow-missing-existing",
+            "--incoming",
+            str(incoming),
+            "--exact-incoming-scope",
+            scope,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "exact incoming" in result.stderr
+
+
 def test_selected_file_filter_cannot_claim_an_unselected_tuple() -> None:
     existing = manifest(
         ("avalonia", "linux", "linux-x64", "installer", "linux.deb"),
@@ -102,3 +270,6 @@ def test_publishers_run_preflight_before_mutation() -> None:
     assert object_storage.index("verify_release_shelf_replacement.py") < object_storage.index(
         'activate_release_shelf_generation "$S3_TARGET_URI"'
     )
+    for publisher in (filesystem, object_storage):
+        assert "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES" in publisher
+        assert '--exact-incoming-scope "$EXACT_INCOMING_SCOPE"' in publisher

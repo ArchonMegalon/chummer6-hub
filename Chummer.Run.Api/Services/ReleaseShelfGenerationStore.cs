@@ -402,14 +402,24 @@ public sealed class ReleaseShelfGenerationStore
             throw new InvalidDataException("Release activation journal identity is malformed.");
         }
 
-        RequireExactProperties(
-            identity,
+        string[] identityProperties = identity.TryGetProperty("exactIncomingDesktopScope", out _)
+            ?
+            [
+                "operation", "previousGenerationId", "previousPointerSha256", "generationId",
+                "activationReceiptId", "releaseVersion", "channel", "publishedAt",
+                "inventoryDigest", "pointerSha256", "preparedAtUtc",
+                "previousPointerBase64", "targetPointerBase64", "exactIncomingDesktopScope"
+            ]
+            :
             [
                 "operation", "previousGenerationId", "previousPointerSha256", "generationId",
                 "activationReceiptId", "releaseVersion", "channel", "publishedAt",
                 "inventoryDigest", "pointerSha256", "preparedAtUtc",
                 "previousPointerBase64", "targetPointerBase64"
-            ],
+            ];
+        RequireExactProperties(
+            identity,
+            identityProperties,
             "release activation journal identity");
         ReaderActivationJournal journal = JsonSerializer.Deserialize<ReaderActivationJournal>(
                 intentBytes,
@@ -478,8 +488,17 @@ public sealed class ReleaseShelfGenerationStore
                     outcomeBytes,
                     ActivationJournalJsonOptions)
                 ?? throw new InvalidDataException("Release activation journal outcome is malformed.");
-            string computedIntentDigest = Convert.ToHexStringLower(SHA256.HashData(
-                JsonSerializer.SerializeToUtf8Bytes(journal, ActivationJournalJsonOptions)));
+            ReadOnlySpan<byte> canonicalIntentBytes = intentBytes;
+            if (canonicalIntentBytes.Length > 0 && canonicalIntentBytes[^1] == (byte)'\n')
+            {
+                canonicalIntentBytes = canonicalIntentBytes[..^1];
+            }
+            if (canonicalIntentBytes.Length > 0 && canonicalIntentBytes[^1] == (byte)'\r')
+            {
+                canonicalIntentBytes = canonicalIntentBytes[..^1];
+            }
+            string computedIntentDigest = Convert.ToHexStringLower(
+                SHA256.HashData(canonicalIntentBytes));
             if (!string.Equals(outcome.SchemaVersion, ActivationOutcomeSchemaVersion, StringComparison.Ordinal)
                 || outcome.State is not "committed" and not "aborted"
                 || !string.Equals(outcome.ActivationReceiptId, receiptId, StringComparison.Ordinal)
@@ -533,6 +552,8 @@ public sealed class ReleaseShelfGenerationStore
 
         _ = RequireSha256Binding(intent.PointerSha256, "pointerSha256");
         _ = RequireSha256Binding(intent.InventoryDigest, "inventoryDigest");
+        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
+            intent.ExactIncomingDesktopScope);
         if (intent.PreviousPointerSha256 is not null)
         {
             string previousDigest = RequireSha256Binding(
@@ -1877,7 +1898,8 @@ public sealed class ReleaseShelfGenerationStore
         string PointerSha256,
         DateTimeOffset PreparedAtUtc,
         string? PreviousPointerBase64,
-        string? TargetPointerBase64);
+        string? TargetPointerBase64,
+        string? ExactIncomingDesktopScope = null);
 
     private sealed record ReaderActivationOutcome(
         string SchemaVersion,

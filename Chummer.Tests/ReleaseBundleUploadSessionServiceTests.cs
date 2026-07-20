@@ -211,6 +211,79 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     }
 
     [Fact]
+    public void ExactIncomingDesktopScopeIsCanonicalDurableAndImmutableForAuthorization()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddHours(12);
+        ReleaseDesktopTupleScope scope = ReleaseDesktopTupleScope.Parse(
+            "AVALONIA:WIN:WIN-X64, avalonia:linux:linux-x64");
+
+        ReleaseUploadSession created = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidateImportBinding: null,
+            exactIncomingDesktopScope: scope);
+
+        Assert.Equal(
+            ["avalonia:linux:linux-x64", "avalonia:windows:win-x64"],
+            created.ExactIncomingDesktopScope!.TupleIds);
+        Assert.Equal(["linux", "windows"], created.ExactIncomingDesktopScope.RequiredPlatforms);
+        Assert.Equal(
+            ["avalonia:linux-x64:linux", "avalonia:win-x64:windows"],
+            created.ExactIncomingDesktopScope.RequiredPlatformHeadRidTuples);
+
+        ReleaseUploadSession retried = fixture.CreateService().CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidateImportBinding: null,
+            exactIncomingDesktopScope: ReleaseDesktopTupleScope.Parse(
+                "avalonia:linux:linux-x64,avalonia:windows:win-x64"));
+        Assert.Equal(created.SessionId, retried.SessionId);
+
+        InvalidOperationException changed = Assert.Throws<InvalidOperationException>(() =>
+            fixture.Service.CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidateImportBinding: null,
+                exactIncomingDesktopScope: ReleaseDesktopTupleScope.Parse(
+                    "avalonia:macos:osx-arm64")));
+        Assert.Contains("scope changed", changed.Message, StringComparison.OrdinalIgnoreCase);
+
+        ReleaseBundlePromotionResult result = BuildPromotionResult(scope.ToTransport());
+        using (ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+               fixture.CreateService().BeginCompletion(created.SessionId, AuthorizationA))
+        {
+            Assert.Equal(scope.TupleIds, completion.ExactIncomingDesktopScope!.TupleIds);
+            InvalidDataException mismatchedIntent = Assert.Throws<InvalidDataException>(() =>
+                completion.RecordActivationIntent(BuildActivationIntent(BuildPromotionResult())));
+            Assert.Contains("scope", mismatchedIntent.Message, StringComparison.OrdinalIgnoreCase);
+            completion.RecordActivationIntent(BuildActivationIntent(result));
+            completion.MarkCompleted(result);
+        }
+
+        using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completed =
+            fixture.CreateService().BeginCompletion(created.SessionId, AuthorizationA);
+        Assert.Equal(scope.ToTransport(), completed.ActivationIntent!.ExactIncomingDesktopScope);
+        Assert.Equal(scope.ToTransport(), completed.CompletedResult!.ExactIncomingDesktopScope);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("avalonia:linux")]
+    [InlineData("avalonia::linux-x64")]
+    [InlineData("avalonia:linux:linux-x64,AVALONIA:LINUX:LINUX-X64")]
+    [InlineData("avalonia:linux:../../escape")]
+    public void ExactIncomingDesktopScopeRejectsEmptyMalformedDuplicateOrUnsafeValues(string value)
+    {
+        InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+            ReleaseDesktopTupleScope.Parse(value));
+        Assert.Contains("exact incoming desktop", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CandidateImportAuthorizationIsOneShotAndCannotCrossCandidateBindings()
     {
         using Fixture fixture = new();
@@ -657,7 +730,8 @@ public sealed class ReleaseBundleUploadSessionServiceTests
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
     private const UnixFileMode OwnerFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    private static ReleaseBundlePromotionResult BuildPromotionResult()
+    private static ReleaseBundlePromotionResult BuildPromotionResult(
+        string? exactIncomingDesktopScope = null)
         => new(
             Version: "run-test",
             Channel: "preview",
@@ -668,7 +742,8 @@ public sealed class ReleaseBundleUploadSessionServiceTests
             DirectFileUrls: [],
             GenerationId: "generation-test",
             ActivationReceiptId: "activation-test",
-            InventoryDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+            InventoryDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ExactIncomingDesktopScope: exactIncomingDesktopScope);
 
     private static ReleaseActivationIntent BuildActivationIntent(ReleaseBundlePromotionResult result)
     {
@@ -686,7 +761,8 @@ public sealed class ReleaseBundleUploadSessionServiceTests
             PointerSha256: $"sha256:{Convert.ToHexStringLower(SHA256.HashData(targetPointerBytes))}",
             PreparedAtUtc: DateTimeOffset.UtcNow,
             PreviousPointerBase64: null,
-            TargetPointerBase64: Convert.ToBase64String(targetPointerBytes));
+            TargetPointerBase64: Convert.ToBase64String(targetPointerBytes),
+            ExactIncomingDesktopScope: result.ExactIncomingDesktopScope);
     }
 
     private sealed class Fixture : IDisposable

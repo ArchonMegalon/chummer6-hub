@@ -194,6 +194,104 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task AuthenticatedExactScopeAllowsWindowsLinuxShelfToRetireMacTuple()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        fixture.WriteLiveArtifact(
+            artifactId: "avalonia-linux-x64-installer",
+            fileName: "chummer-avalonia-linux-x64-installer.deb",
+            platform: "linux",
+            arch: "x64",
+            kind: "installer",
+            bytes: "linux-live");
+        fixture.AppendLiveArtifact(
+            artifactId: "avalonia-osx-arm64-installer",
+            fileName: "chummer-avalonia-osx-arm64-installer.dmg",
+            platform: "macos",
+            arch: "arm64",
+            kind: "dmg",
+            bytes: "mac-live");
+
+        ReleaseDesktopTupleScope exactScope = ReleaseDesktopTupleScope.Parse(
+            "avalonia:windows:win-x64,avalonia:linux:linux-x64");
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260720-windows-linux",
+            artifacts:
+            [
+                new BundleArtifact(
+                    "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
+                    "chummer-avalonia-linux-x64-installer.deb", "linux-new"u8.ToArray(),
+                    false, false, "not_applicable", "not_applicable"),
+                new BundleArtifact(
+                    "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
+                    "chummer-avalonia-win-x64-installer.exe", "windows-new"u8.ToArray(),
+                    false, false, "skipped_preview", "not_applicable")
+            ],
+            exactDesktopScope: exactScope);
+
+        ReleaseActivationIntent? durableIntent = null;
+        ReleaseBundlePromotionResult promoted = await fixture.PromoteDirectoryWithActivationCallbackAsync(
+            bundlePath,
+            intent => durableIntent = intent,
+            exactDesktopScope: exactScope);
+
+        Assert.Equal(exactScope.ToTransport(), promoted.ExactIncomingDesktopScope);
+        Assert.Equal(exactScope.ToTransport(), durableIntent!.ExactIncomingDesktopScope);
+        Assert.True(fixture.TryReconcileActivation(durableIntent, out ReleaseBundlePromotionResult? reconciled));
+        Assert.Equal(exactScope.ToTransport(), reconciled!.ExactIncomingDesktopScope);
+        ReleaseShelfSnapshot activeShelf = fixture.CaptureActiveShelf();
+        Assert.Equal(promoted.GenerationId, activeShelf.GenerationId);
+        Assert.Equal(promoted.Version, activeShelf.ReleaseVersion);
+
+        using JsonDocument canonical = fixture.ReadGenerationJson(
+            promoted.GenerationId!,
+            "RELEASE_CHANNEL.generated.json");
+        JsonElement coverage = canonical.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.Equal(
+            ["linux", "windows"],
+            coverage.GetProperty("requiredDesktopPlatforms")
+                .EnumerateArray()
+                .Select(static item => item.GetString()!)
+                .ToArray());
+        Assert.True(coverage.GetProperty("complete").GetBoolean());
+        Assert.Equal(
+            ["avalonia:linux:linux-x64", "avalonia:windows:win-x64"],
+            coverage.GetProperty("promotedInstallerTuples")
+                .EnumerateArray()
+                .Select(static item => item.GetProperty("tupleId").GetString()!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.DoesNotContain(
+            canonical.RootElement.GetProperty("artifacts").EnumerateArray(),
+            static item => item.GetProperty("platform").GetString() == "macos");
+    }
+
+    [Fact]
+    public async Task ExactScopeRejectsIncomingManifestWithMissingOrUndeclaredTupleBeforePromotion()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        ReleaseDesktopTupleScope exactScope = ReleaseDesktopTupleScope.Parse(
+            "avalonia:linux:linux-x64,avalonia:windows:win-x64");
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260720-scope-mismatch",
+            artifacts:
+            [
+                new BundleArtifact(
+                    "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
+                    "chummer-avalonia-linux-x64-installer.deb", "linux-only"u8.ToArray(),
+                    false, false, "not_applicable", "not_applicable")
+            ],
+            exactDesktopScope: exactScope);
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            fixture.ValidateBundleAsync(bundlePath, exactScope));
+
+        Assert.Contains("authenticated exact scope", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("missing avalonia:windows:win-x64", error.Message, StringComparison.Ordinal);
+        Assert.Empty(fixture.FindPromotionTransactionDirectories());
+    }
+
+    [Fact]
     public async Task PromoteAsyncValidatesCompleteStagedShelfBeforeMutatingLiveShelf()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -3304,7 +3402,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             Action<ReleaseActivationIntent> activationCallback,
             Action<string>? postActivationDirectoryFlush = null,
             Action<ReleaseBundlePromotionService.ActivationJournalCheckpoint>? activationJournalCheckpoint = null,
-            Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null)
+            Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             string extractRoot = Path.Combine(_root, "activation-" + Guid.NewGuid().ToString("N"));
             ZipFile.ExtractToDirectory(bundlePath, extractRoot);
@@ -3318,6 +3417,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 activationJournalCheckpoint);
             return await service.PromoteDirectoryAsync(
                 extractRoot,
+                exactDesktopScope,
                 activationCallback,
                 CancellationToken.None);
         }
@@ -3368,7 +3468,9 @@ public sealed class ReleaseBundlePromotionServiceTests
         public ReleaseShelfSnapshot CaptureActiveShelf()
             => new ReleaseShelfGenerationStore(CreateConfiguration()).Capture();
 
-        public async Task ValidateBundleAsync(string bundlePath)
+        public async Task ValidateBundleAsync(
+            string bundlePath,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             string extractRoot = Path.Combine(_root, "validate-" + Guid.NewGuid().ToString("N"));
             ZipFile.ExtractToDirectory(bundlePath, extractRoot);
@@ -3378,7 +3480,10 @@ public sealed class ReleaseBundlePromotionServiceTests
                 promotionCheckpoint: null,
                 new FixedTimeProvider(ReadBundlePublishedAt(bundlePath)),
                 PrivacyLaunchGate.ClearForTests);
-            await service.ValidateDirectoryAsync(extractRoot, CancellationToken.None);
+            await service.ValidateDirectoryAsync(
+                extractRoot,
+                exactDesktopScope,
+                CancellationToken.None);
         }
 
         public Task<ReleaseBundlePromotionResult> RollbackAsync(string generationId)
@@ -3728,7 +3833,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             bool seedReviewRequiredPosture = false,
             bool includeBuildProvenance = true,
             string? startupSmokeRecordedAt = null,
-            PrivacyLaunchGateSnapshot? privacyLaunchGate = null)
+            PrivacyLaunchGateSnapshot? privacyLaunchGate = null,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -3887,7 +3993,8 @@ public sealed class ReleaseBundlePromotionServiceTests
                 channel,
                 publicTrustMetrics,
                 privacyLaunchGate,
-                releaseProof);
+                releaseProof,
+                exactDesktopScope);
             WriteCanonicalManifest(
                 Path.Combine(bundleRoot, "RELEASE_CHANNEL.generated.json"),
                 version,
@@ -3896,7 +4003,8 @@ public sealed class ReleaseBundlePromotionServiceTests
                 channel,
                 publicTrustMetrics,
                 privacyLaunchGate,
-                releaseProof);
+                releaseProof,
+                exactDesktopScope);
 
             if (seedReviewRequiredPosture)
             {
@@ -4035,7 +4143,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             string channel = "preview",
             object? publicTrustMetrics = null,
             PrivacyLaunchGateSnapshot? privacyLaunchGate = null,
-            JsonObject? releaseProof = null)
+            JsonObject? releaseProof = null,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             RegistryArtifactProjection[] projections = downloads
                 .Select(download => ToRegistryProjection(
@@ -4060,8 +4169,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             PrivacyLaunchGateSnapshot gate = privacyLaunchGate ?? PrivacyLaunchGate.ClearForTests;
             RegistryPosture posture = gate.BlocksReleaseSupportability
                 ? BuildPrivacyRegistryPosture(gate)
-                : BuildRegistryPosture(projections, channel);
-            bool complete = IsDesktopFloorComplete(projections);
+                : BuildRegistryPosture(projections, channel, exactDesktopScope);
+            bool complete = IsDesktopFloorComplete(projections, exactDesktopScope);
             JsonObject metrics = BuildPublicTrustMetrics(posture, publicTrustMetrics, gate);
 
             var manifest = new JsonObject
@@ -4083,7 +4192,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 ["knownIssueSummary"] = posture.KnownIssueSummary,
                 ["fixAvailabilitySummary"] = posture.FixAvailabilitySummary,
                 ["releaseProof"] = releaseProof?.DeepClone() ?? BuildReleaseProof(projections, publishedAt),
-                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections),
+                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections, exactDesktopScope),
                 ["downloads"] = BuildCompatibilityArtifacts(projections),
                 ["publicTrustMetrics"] = metrics,
                 ["registryBoundaryCoverage"] = BuildRegistryBoundaryCoverage(
@@ -4102,7 +4211,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             string channel = "preview",
             object? publicTrustMetrics = null,
             PrivacyLaunchGateSnapshot? privacyLaunchGate = null,
-            JsonObject? releaseProof = null)
+            JsonObject? releaseProof = null,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             RegistryArtifactProjection[] projections = artifacts
                 .Select(artifact => ToRegistryProjection(
@@ -4127,8 +4237,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             PrivacyLaunchGateSnapshot gate = privacyLaunchGate ?? PrivacyLaunchGate.ClearForTests;
             RegistryPosture posture = gate.BlocksReleaseSupportability
                 ? BuildPrivacyRegistryPosture(gate)
-                : BuildRegistryPosture(projections, channel);
-            bool complete = IsDesktopFloorComplete(projections);
+                : BuildRegistryPosture(projections, channel, exactDesktopScope);
+            bool complete = IsDesktopFloorComplete(projections, exactDesktopScope);
             JsonObject metrics = BuildPublicTrustMetrics(posture, publicTrustMetrics, gate);
 
             var manifest = new JsonObject
@@ -4150,7 +4260,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 ["knownIssueSummary"] = posture.KnownIssueSummary,
                 ["fixAvailabilitySummary"] = posture.FixAvailabilitySummary,
                 ["releaseProof"] = releaseProof?.DeepClone() ?? BuildReleaseProof(projections, publishedAt),
-                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections),
+                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections, exactDesktopScope),
                 ["artifacts"] = BuildCanonicalArtifacts(projections),
                 ["publicTrustMetrics"] = metrics,
                 ["registryBoundaryCoverage"] = BuildRegistryBoundaryCoverage(
@@ -4364,16 +4474,19 @@ public sealed class ReleaseBundlePromotionServiceTests
         }
 
         private static JsonObject BuildDesktopTupleCoverage(
-            IReadOnlyList<RegistryArtifactProjection> artifacts)
+            IReadOnlyList<RegistryArtifactProjection> artifacts,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
-            const string requiredHead = "avalonia";
-            string[] requiredPlatforms = ["linux", "windows", "macos"];
-            string[] requiredTuples =
-            [
-                "avalonia:linux-x64:linux",
-                "avalonia:osx-arm64:macos",
-                "avalonia:win-x64:windows"
-            ];
+            string[] requiredHeads = exactDesktopScope?.RequiredHeads.ToArray() ?? ["avalonia"];
+            string[] requiredPlatforms = exactDesktopScope?.RequiredPlatforms.ToArray()
+                ?? ["linux", "windows", "macos"];
+            string[] requiredTuples = exactDesktopScope?.RequiredPlatformHeadRidTuples.ToArray()
+                ??
+                [
+                    "avalonia:linux-x64:linux",
+                    "avalonia:osx-arm64:macos",
+                    "avalonia:win-x64:windows"
+                ];
             RegistryArtifactProjection[] installers = artifacts
                 .Where(IsPromotedDesktopInstaller)
                 .ToArray();
@@ -4387,15 +4500,17 @@ public sealed class ReleaseBundlePromotionServiceTests
                 .Select(static artifact => $"{artifact.Head}:{artifact.Platform}")
                 .ToHashSet(StringComparer.Ordinal);
             HashSet<string> promotedRequiredTuples = installers
-                .Where(static artifact => artifact.Head == requiredHead)
+                .Where(artifact => requiredHeads.Contains(artifact.Head, StringComparer.Ordinal))
                 .Select(static artifact => $"{artifact.Head}:{artifact.Rid}:{artifact.Platform}")
                 .ToHashSet(StringComparer.Ordinal);
             string[] missingPlatforms = requiredPlatforms
                 .Where(platform => !promotedPlatforms.Contains(platform))
                 .ToArray();
-            string[] missingHeads = promotedHeads.Contains(requiredHead) ? [] : [requiredHead];
+            string[] missingHeads = requiredHeads
+                .Where(head => !promotedHeads.Contains(head))
+                .ToArray();
             string[] missingPairs = requiredPlatforms
-                .Select(platform => $"{requiredHead}:{platform}")
+                .SelectMany(platform => requiredHeads.Select(head => $"{head}:{platform}"))
                 .Where(pair => !promotedPairs.Contains(pair))
                 .ToArray();
             string[] missingTuples = requiredTuples
@@ -4421,7 +4536,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             return new JsonObject
             {
                 ["requiredDesktopPlatforms"] = JsonStrings(requiredPlatforms),
-                ["requiredDesktopHeads"] = JsonStrings([requiredHead]),
+                ["requiredDesktopHeads"] = JsonStrings(requiredHeads),
                 ["requiredDesktopPlatformHeadRidTuples"] = JsonStrings(requiredTuples),
                 ["promotedInstallerTuples"] = promotedInstallerTuples,
                 ["promotedPlatformHeadRidTuples"] = JsonStrings(
@@ -4440,9 +4555,10 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         private static RegistryPosture BuildRegistryPosture(
             IReadOnlyList<RegistryArtifactProjection> artifacts,
-            string channel)
+            string channel,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
-            if (!IsDesktopFloorComplete(artifacts))
+            if (!IsDesktopFloorComplete(artifacts, exactDesktopScope))
             {
                 return new RegistryPosture(
                     "coverage_incomplete",
@@ -4465,16 +4581,22 @@ public sealed class ReleaseBundlePromotionServiceTests
                 stable ? "live" : "preview");
         }
 
-        private static bool IsDesktopFloorComplete(IReadOnlyList<RegistryArtifactProjection> artifacts)
+        private static bool IsDesktopFloorComplete(
+            IReadOnlyList<RegistryArtifactProjection> artifacts,
+            ReleaseDesktopTupleScope? exactDesktopScope = null)
         {
             HashSet<string> tuples = artifacts
                 .Where(IsPromotedDesktopInstaller)
-                .Where(static artifact => artifact.Head == "avalonia")
-                .Select(static artifact => $"{artifact.Head}:{artifact.Rid}:{artifact.Platform}")
+                .Select(static artifact => $"{artifact.Head}:{artifact.Platform}:{artifact.Rid}")
                 .ToHashSet(StringComparer.Ordinal);
-            return tuples.Contains("avalonia:linux-x64:linux")
-                   && tuples.Contains("avalonia:osx-arm64:macos")
-                   && tuples.Contains("avalonia:win-x64:windows");
+            if (exactDesktopScope is not null)
+            {
+                return exactDesktopScope.TupleIds.All(tuples.Contains);
+            }
+
+            return tuples.Contains("avalonia:linux:linux-x64")
+                   && tuples.Contains("avalonia:macos:osx-arm64")
+                   && tuples.Contains("avalonia:windows:win-x64");
         }
 
         private static bool IsPromotedDesktopInstaller(RegistryArtifactProjection artifact)

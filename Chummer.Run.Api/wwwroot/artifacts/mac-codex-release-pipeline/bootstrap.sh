@@ -29,6 +29,49 @@ to_lower_ascii() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+normalize_release_exact_incoming_scope_transport() {
+  local python_bin="$1"
+  local raw_scope="$2"
+  "$python_bin" -I -S - "$raw_scope" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+
+raw = sys.argv[1]
+if not 0 < len(raw) <= 4096:
+    raise SystemExit("exact incoming desktop scope must contain 1 through 4096 characters")
+raw_values = raw.split(",")
+if not 0 < len(raw_values) <= 32:
+    raise SystemExit("exact incoming desktop scope must declare 1 through 32 tuples")
+
+platform_aliases = {
+    "win": "windows",
+    "windows": "windows",
+    "mac": "macos",
+    "macos": "macos",
+    "osx": "macos",
+    "linux": "linux",
+}
+safe_token = re.compile(r"^[a-z0-9._+-]{1,64}$")
+canonical: set[str] = set()
+for raw_value in raw_values:
+    parts = [part.strip().lower() for part in raw_value.split(":")]
+    if len(parts) != 3:
+        raise SystemExit(f"exact incoming desktop tuple must use head:platform:rid: {raw_value}")
+    head, platform, rid = parts
+    platform = platform_aliases.get(platform, platform)
+    if not all(safe_token.fullmatch(part) for part in (head, platform, rid)):
+        raise SystemExit(f"exact incoming desktop tuple contains an invalid token: {raw_value}")
+    tuple_id = f"{head}:{platform}:{rid}"
+    if tuple_id in canonical:
+        raise SystemExit(f"exact incoming desktop tuple was declared more than once: {tuple_id}")
+    canonical.add(tuple_id)
+
+print(",".join(sorted(canonical)))
+PY
+}
+
 array_count() {
   local array_name="${1:-}"
   [[ -n "$array_name" ]] || {
@@ -4243,6 +4286,7 @@ upload_release_bundle_http() {
   local release_upload_auth_value="$3"
   local response_path="$4"
   local attempt_receipt_helper="$5"
+  local exact_incoming_scope="${6:-}"
   export -n release_upload_auth_value 2>/dev/null || true
   ensure_release_upload_token "$release_upload_auth_value"
 
@@ -4626,10 +4670,22 @@ PY
 
   session_json="$(mktemp)"
   bootstrap_tmp_paths+=("$session_json")
-  if ! post_form_request \
-    "$session_json" \
-    "create upload session" \
-    "$sessions_url"; then
+  local session_create_failed=0
+  if [[ -n "$exact_incoming_scope" ]]; then
+    post_form_request \
+      "$session_json" \
+      "create upload session" \
+      "$sessions_url" \
+      -H "X-Chummer-Release-Exact-Incoming-Scope: $exact_incoming_scope" \
+      || session_create_failed=1
+  else
+    post_form_request \
+      "$session_json" \
+      "create upload session" \
+      "$sessions_url" \
+      || session_create_failed=1
+  fi
+  if (( session_create_failed == 1 )); then
     rm -f "$session_json"
     case "$last_request_status" in
       400|401|403)
@@ -4637,6 +4693,15 @@ PY
         ;;
     esac
     die "release upload session creation failed."
+  fi
+
+  if [[ -n "$exact_incoming_scope" ]]; then
+    local accepted_exact_incoming_scope
+    accepted_exact_incoming_scope="$(jq -r \
+      'if (.exactIncomingDesktopTuples | type) == "array" then .exactIncomingDesktopTuples | join(",") else empty end' \
+      "$session_json" 2>/dev/null || true)"
+    [[ "$accepted_exact_incoming_scope" == "$exact_incoming_scope" ]] \
+      || die "upload session response did not bind the authenticated exact incoming desktop scope"
   fi
 
   session_id="$(resolve_json_field "$session_json" "sessionId" "SessionId" "session_id" "id" "session")" || die "upload session response missing sessionId"
@@ -4951,6 +5016,14 @@ main() {
   bootstrap_tmp_paths=()
   trap cleanup_bootstrap_tmp_paths EXIT
 
+  local exact_incoming_scope_declared=0
+  local exact_incoming_scope_raw=""
+  local exact_incoming_scope=""
+  if [[ "${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES+x}" == "x" ]]; then
+    exact_incoming_scope_declared=1
+    exact_incoming_scope_raw="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES-}"
+  fi
+
   # Capture the one HTTP-promotion credential before any preflight/build child
   # can inherit it, then scrub every inbound bearer variable. The private local
   # remains de-exported and is streamed to curl only when upload actually starts.
@@ -4961,6 +5034,9 @@ main() {
   parse_mac_release_stage_only_args "$@"
   if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$release_upload_auth_source" ]]; then
     die "stage-only mode rejects publish-only setting $release_upload_auth_source"
+  fi
+  if (( MAC_RELEASE_STAGE_ONLY == 1 && exact_incoming_scope_declared == 1 )); then
+    die "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
   fi
 
   local publish_mode
@@ -4988,6 +5064,13 @@ main() {
   python3() {
     command "$RELEASE_PYTHON_BIN" "$@"
   }
+  if (( exact_incoming_scope_declared == 1 )); then
+    exact_incoming_scope="$(normalize_release_exact_incoming_scope_transport \
+      "$RELEASE_PYTHON_BIN" \
+      "$exact_incoming_scope_raw")" \
+      || die "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES is invalid"
+    log "authenticated exact incoming desktop scope: $exact_incoming_scope"
+  fi
   local stage_output_path=""
   if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
     stage_output_path="$(resolve_mac_release_stage_output_path "$MAC_RELEASE_STAGE_OUTPUT_DIR")" \
@@ -5723,7 +5806,8 @@ main() {
         "$sessions_url" \
         "$release_upload_auth_value" \
         "$response_path" \
-        "$hub_alias/scripts/release/release_upload_attempt_receipt.py"
+        "$hub_alias/scripts/release/release_upload_attempt_receipt.py" \
+        "$exact_incoming_scope"
       ;;
     filesystem)
       local remote_stage="${CHUMMER_REMOTE_STAGING_DIR:-/tmp/chummer-mac-release-bundle}"
@@ -5731,12 +5815,24 @@ main() {
       log "syncing bundle to ${CHUMMER_RELEASE_SSH_TARGET}:${remote_stage}"
       rsync -az --delete "$publish_bundle_dir/" "${CHUMMER_RELEASE_SSH_TARGET}:${remote_stage}/"
       log "publishing bundle on remote host"
-      ssh "$CHUMMER_RELEASE_SSH_TARGET" \
-        "cd '$remote_ui_repo' && bash scripts/publish-download-bundle.sh '$remote_stage' '${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR}'"
+      if (( exact_incoming_scope_declared == 1 )); then
+        ssh "$CHUMMER_RELEASE_SSH_TARGET" \
+          "cd '$remote_ui_repo' && CHUMMER_RELEASE_EXACT_INCOMING_TUPLES='$exact_incoming_scope' bash scripts/publish-download-bundle.sh '$remote_stage' '${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR}'"
+      else
+        ssh "$CHUMMER_RELEASE_SSH_TARGET" \
+          "cd '$remote_ui_repo' && bash scripts/publish-download-bundle.sh '$remote_stage' '${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR}'"
+      fi
       ;;
     s3)
       log "publishing bundle to object storage"
-      CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="$verify_url" bash scripts/publish-download-bundle-s3.sh "$publish_bundle_dir"
+      if (( exact_incoming_scope_declared == 1 )); then
+        CHUMMER_RELEASE_EXACT_INCOMING_TUPLES="$exact_incoming_scope" \
+          CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="$verify_url" \
+          bash scripts/publish-download-bundle-s3.sh "$publish_bundle_dir"
+      else
+        CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="$verify_url" \
+          bash scripts/publish-download-bundle-s3.sh "$publish_bundle_dir"
+      fi
       ;;
     *)
       die "unsupported publish mode: $publish_mode"

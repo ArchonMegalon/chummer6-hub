@@ -10,6 +10,9 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class InternalReleaseBundlesController : ControllerBase
 {
+    public const string ExactIncomingDesktopScopeHeader =
+        "X-Chummer-Release-Exact-Incoming-Scope";
+
     private readonly ReleaseBundlePromotionService _promotionService;
     private readonly ReleaseBundleUploadSessionService _uploadSessions;
     private readonly ReleaseUploadQuotaOptions _uploadOptions;
@@ -82,17 +85,45 @@ public sealed class InternalReleaseBundlesController : ControllerBase
 
         try
         {
+            ReleaseDesktopTupleScope? exactIncomingDesktopScope = null;
+            if (Request.Headers.TryGetValue(
+                    ExactIncomingDesktopScopeHeader,
+                    out Microsoft.Extensions.Primitives.StringValues declaredScope))
+            {
+                try
+                {
+                    if (declaredScope.Count != 1)
+                    {
+                        throw new InvalidDataException(
+                            "exact incoming desktop scope header must be supplied exactly once.");
+                    }
+
+                    exactIncomingDesktopScope = ReleaseDesktopTupleScope.Parse(
+                        declaredScope[0] ?? string.Empty);
+                }
+                catch (InvalidDataException ex)
+                {
+                    return BuildProblem(
+                        StatusCodes.Status400BadRequest,
+                        "Upload session scope rejected",
+                        ex.Message,
+                        "https://chummer.run/problems/release-bundle/invalid-exact-scope");
+                }
+            }
+
             ReleaseUploadSession session = _uploadSessions.CreateSession(
                 authorization!.AuthorizationBinding,
                 authorization.SingleUseAuthorization,
                 authorization.AuthorizationExpiresAtUtc,
-                authorization.CandidateImportAuthority?.SessionBinding);
+                authorization.CandidateImportAuthority?.SessionBinding,
+                exactIncomingDesktopScope);
             return Ok(new ReleaseUploadSessionCreatedResponse(
                 SessionId: session.SessionId,
                 ExpiresAtUtc: session.ExpiresAtUtc,
                 FilesUrl: BuildAbsoluteRoute($"/api/internal/releases/upload-sessions/{session.SessionId}/files"),
                 ChunksUrl: BuildAbsoluteRoute($"/api/internal/releases/upload-sessions/{session.SessionId}/chunks"),
-                CompleteUrl: BuildAbsoluteRoute($"/api/internal/releases/upload-sessions/{session.SessionId}/complete")));
+                CompleteUrl: BuildAbsoluteRoute($"/api/internal/releases/upload-sessions/{session.SessionId}/complete"),
+                ExactIncomingDesktopTuples: session.ExactIncomingDesktopScope?.TupleIds));
         }
         catch (ReleaseUploadQuotaException ex)
         {
@@ -500,6 +531,7 @@ public sealed class InternalReleaseBundlesController : ControllerBase
 
             await _promotionService.ValidateDirectoryAsync(
                 completion.BundleRoot,
+                completion.ExactIncomingDesktopScope,
                 cancellationToken);
             ObjectResult? admissionFailure = EvaluateFreshCompletionAdmission(
                 completion,
@@ -514,6 +546,7 @@ public sealed class InternalReleaseBundlesController : ControllerBase
             {
                 durableResult = await _promotionService.PromoteDirectoryAsync(
                     completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
                     intent =>
                     {
                         completion.RecordActivationIntent(intent);
@@ -1001,7 +1034,8 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         DateTimeOffset ExpiresAtUtc,
         string FilesUrl,
         string ChunksUrl,
-        string CompleteUrl);
+        string CompleteUrl,
+        IReadOnlyList<string>? ExactIncomingDesktopTuples);
 
     public sealed record ReleaseUploadFileStoredResponse(
         string RelativePath,

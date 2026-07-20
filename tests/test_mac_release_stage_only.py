@@ -143,6 +143,7 @@ def clean_release_environment() -> dict[str, str]:
         "CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS",
         "CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION",
         "CHUMMER_RELEASE_SKIP_STRICT_MANIFEST_VERIFY",
+        "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES",
         "CHUMMER_RELEASE_SSH_TARGET",
         "CHUMMER_REMOTE_STAGING_DIR",
         "CHUMMER_REMOTE_UI_REPO_DIR",
@@ -1166,6 +1167,57 @@ def test_producer_stage_configuration_is_explicit_and_fail_closed(tmp_path: Path
         conflict = run_sourced("parse_mac_release_stage_only_args", env=stage_environment)
         assert conflict.returncode == 1
         assert f"rejects publish-only setting {setting}" in conflict.stderr
+
+
+def test_exact_incoming_scope_transport_is_canonical_and_fail_closed() -> None:
+    accepted = run_sourced(
+        'normalize_release_exact_incoming_scope_transport python3 "$2"',
+        "AVALONIA:WIN:WIN-X64, avalonia:linux:linux-x64",
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert accepted.stdout == "avalonia:linux:linux-x64,avalonia:windows:win-x64\n"
+
+    for invalid in (
+        "",
+        "avalonia:linux",
+        "avalonia::linux-x64",
+        "avalonia:linux:linux-x64,AVALONIA:LINUX:LINUX-X64",
+        "avalonia:linux:../../escape",
+    ):
+        rejected = run_sourced(
+            'normalize_release_exact_incoming_scope_transport python3 "$2"',
+            invalid,
+        )
+        assert rejected.returncode != 0, invalid
+
+
+def test_bootstrap_binds_exact_scope_across_every_publication_transport() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+
+    assert "X-Chummer-Release-Exact-Incoming-Scope: $exact_incoming_scope" in bootstrap
+    assert ".exactIncomingDesktopTuples | join(\",\")" in bootstrap
+    assert "upload session response did not bind the authenticated exact incoming desktop scope" in bootstrap
+    assert (
+        "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES='$exact_incoming_scope' "
+        "bash scripts/publish-download-bundle.sh"
+    ) in bootstrap
+    assert 'CHUMMER_RELEASE_EXACT_INCOMING_TUPLES="$exact_incoming_scope" \\\n' in bootstrap
+
+
+def test_stage_only_rejects_exact_scope_even_when_declared_empty(tmp_path: Path) -> None:
+    environment = clean_release_environment()
+    environment.update(
+        {
+            "CHUMMER_MAC_RELEASE_STAGE_ONLY": "1",
+            "CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR": str(tmp_path / "candidate"),
+            "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES": "",
+        }
+    )
+
+    result = run_sourced("parse_mac_release_stage_only_args; main", env=environment)
+
+    assert result.returncode != 0
+    assert "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES" in result.stderr
 
 
 def test_stage_output_path_rejects_relative_existing_and_symlink_targets(tmp_path: Path) -> None:

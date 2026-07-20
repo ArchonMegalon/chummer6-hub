@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -22,6 +23,7 @@ PLATFORM_ALIASES = {
     "macos": "macos",
     "osx": "macos",
 }
+SAFE_SCOPE_TOKEN = re.compile(r"^[a-z0-9._+\-]{1,64}$")
 
 
 class ReplacementVerificationError(ValueError):
@@ -126,14 +128,66 @@ def desktop_install_tuples(
     return tuples
 
 
+def normalize_exact_incoming_tuples(values: list[str] | None) -> set[str] | None:
+    if values is None:
+        return None
+    if not values:
+        raise ReplacementVerificationError("exact incoming scope must declare at least one desktop tuple")
+    if len(values) > 32 or len(",".join(str(value) for value in values)) > 4096:
+        raise ReplacementVerificationError(
+            "exact incoming scope exceeds the 32-tuple or 4096-character limit"
+        )
+
+    normalized: set[str] = set()
+    for raw_value in values:
+        parts = [normalize_token(part) for part in str(raw_value).split(":")]
+        if len(parts) != 3 or not all(parts):
+            raise ReplacementVerificationError(
+                "exact incoming desktop tuple must use head:platform:rid: " + str(raw_value)
+            )
+        head, platform, rid = parts
+        platform = normalize_platform(platform)
+        if not all(SAFE_SCOPE_TOKEN.fullmatch(token) for token in (head, platform, rid)):
+            raise ReplacementVerificationError(
+                "exact incoming desktop tuple contains an invalid token: " + str(raw_value)
+            )
+        canonical = f"{head}:{platform}:{rid}"
+        if canonical in normalized:
+            raise ReplacementVerificationError(
+                "exact incoming desktop tuple was declared more than once: " + canonical
+            )
+        normalized.add(canonical)
+    return normalized
+
+
 def verify_replacement(
     existing: dict[str, Any] | None,
     incoming: dict[str, Any],
     *,
     selected_file_names: set[str] | None = None,
+    exact_incoming_tuples: set[str] | None = None,
 ) -> tuple[set[str], set[str]]:
     existing_tuples = desktop_install_tuples(existing or {})
     incoming_tuples = desktop_install_tuples(incoming, selected_file_names=selected_file_names)
+    if exact_incoming_tuples is not None:
+        if not exact_incoming_tuples:
+            raise ReplacementVerificationError(
+                "exact incoming scope must declare at least one desktop tuple"
+            )
+        missing_from_incoming = exact_incoming_tuples - incoming_tuples
+        undeclared_incoming = incoming_tuples - exact_incoming_tuples
+        if missing_from_incoming or undeclared_incoming:
+            details: list[str] = []
+            if missing_from_incoming:
+                details.append("missing " + ", ".join(sorted(missing_from_incoming)))
+            if undeclared_incoming:
+                details.append("undeclared " + ", ".join(sorted(undeclared_incoming)))
+            raise ReplacementVerificationError(
+                "incoming desktop install tuples do not match the explicitly declared exact scope: "
+                + "; ".join(details)
+            )
+        return existing_tuples, incoming_tuples
+
     missing = existing_tuples - incoming_tuples
     if missing:
         raise ReplacementVerificationError(
@@ -158,6 +212,24 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Allow an absent local manifest or HTTP 404 as a first-shelf publication.",
     )
+    exact_scope = parser.add_mutually_exclusive_group()
+    exact_scope.add_argument(
+        "--exact-incoming-tuple",
+        action="append",
+        help=(
+            "Declare the complete incoming desktop scope as head:platform:rid. Repeat once per tuple. "
+            "When present, intentionally retired existing tuples are allowed only if incoming truth "
+            "matches this exact non-empty scope."
+        ),
+    )
+    exact_scope.add_argument(
+        "--exact-incoming-scope",
+        help=(
+            "Comma-separated transport form of the complete head:platform:rid scope. "
+            "This is intended for governed shell publishers; empty, malformed, and duplicate "
+            "tuples fail closed."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -176,10 +248,14 @@ def main() -> int:
             selected_file_names = {
                 path.name for path in args.selected_files_dir.iterdir() if path.is_file()
             }
+        exact_incoming_values = args.exact_incoming_tuple
+        if args.exact_incoming_scope is not None:
+            exact_incoming_values = args.exact_incoming_scope.split(",")
         existing_tuples, incoming_tuples = verify_replacement(
             existing,
             incoming,
             selected_file_names=selected_file_names,
+            exact_incoming_tuples=normalize_exact_incoming_tuples(exact_incoming_values),
         )
     except ReplacementVerificationError as error:
         print(str(error), file=sys.stderr)

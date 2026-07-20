@@ -26,7 +26,8 @@ public sealed record ReleaseBundlePromotionResult(
     string? InventoryDigest = null,
     string? DurabilityWarning = null,
     string? CanonicalManifestSha256 = null,
-    string? CompatibilityManifestSha256 = null);
+    string? CompatibilityManifestSha256 = null,
+    string? ExactIncomingDesktopScope = null);
 
 public sealed record ReleasePromotionInstallClaim(
     string ArtifactId,
@@ -47,7 +48,8 @@ public sealed record ReleaseActivationIntent(
     string PointerSha256,
     DateTimeOffset PreparedAtUtc,
     string? PreviousPointerBase64 = null,
-    string? TargetPointerBase64 = null);
+    string? TargetPointerBase64 = null,
+    string? ExactIncomingDesktopScope = null);
 
 public sealed class ReleaseActivationOutcomeUnknownException : IOException
 {
@@ -290,6 +292,7 @@ public sealed class ReleaseBundlePromotionService
             return await PromotePreparedBundleAsync(
                 bundleRoot,
                 downloadsRoot,
+                exactIncomingDesktopScope: null,
                 recordActivationIntent: null,
                 cancellationToken);
         }
@@ -318,11 +321,23 @@ public sealed class ReleaseBundlePromotionService
         string bundleRoot,
         Action<ReleaseActivationIntent>? recordActivationIntent,
         CancellationToken cancellationToken)
+        => await PromoteDirectoryAsync(
+            bundleRoot,
+            exactIncomingDesktopScope: null,
+            recordActivationIntent,
+            cancellationToken);
+
+    public async Task<ReleaseBundlePromotionResult> PromoteDirectoryAsync(
+        string bundleRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        Action<ReleaseActivationIntent>? recordActivationIntent,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(bundleRoot))
         {
             throw new InvalidDataException("bundle root is required.");
         }
+        exactIncomingDesktopScope?.ValidateCanonical();
 
         cancellationToken.ThrowIfCancellationRequested();
         string downloadsRoot = ResolveDownloadsRoot();
@@ -330,6 +345,7 @@ public sealed class ReleaseBundlePromotionService
         return await PromotePreparedBundleAsync(
             bundleRoot,
             downloadsRoot,
+            exactIncomingDesktopScope,
             recordActivationIntent,
             cancellationToken);
     }
@@ -342,14 +358,24 @@ public sealed class ReleaseBundlePromotionService
     public Task ValidateDirectoryAsync(
         string bundleRoot,
         CancellationToken cancellationToken)
+        => ValidateDirectoryAsync(
+            bundleRoot,
+            exactIncomingDesktopScope: null,
+            cancellationToken);
+
+    public Task ValidateDirectoryAsync(
+        string bundleRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(bundleRoot))
         {
             throw new InvalidDataException("bundle root is required.");
         }
+        exactIncomingDesktopScope?.ValidateCanonical();
 
         cancellationToken.ThrowIfCancellationRequested();
-        _ = PrepareBundle(bundleRoot);
+        _ = PrepareBundle(bundleRoot, exactIncomingDesktopScope);
         return Task.CompletedTask;
     }
 
@@ -390,6 +416,7 @@ public sealed class ReleaseBundlePromotionService
         return await PromotePreparedBundleAsync(
             downloadsRoot,
             downloadsRoot,
+            exactIncomingDesktopScope: null,
             recordActivationIntent: null,
             cancellationToken);
     }
@@ -888,7 +915,8 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException($"retained release shelf generation does not exist: {generationId}");
         }
 
-        RequireCommittedGenerationHistory(downloadsRoot, generationId);
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope =
+            RequireCommittedGenerationHistory(downloadsRoot, generationId);
 
         ActivationCandidateDocument candidate = JsonSerializer.Deserialize<ActivationCandidateDocument>(
                 File.ReadAllText(Path.Combine(generationRoot, ActivationCandidateName)),
@@ -942,7 +970,12 @@ public sealed class ReleaseBundlePromotionService
             compatibilityManifest,
             generationRoot,
             inventoryDigest);
-        ValidatePreparedGeneration(generationRoot, pointer, inventory, artifactIds);
+        ValidatePreparedGeneration(
+            generationRoot,
+            pointer,
+            inventory,
+            artifactIds,
+            exactIncomingDesktopScope);
         cancellationToken.ThrowIfCancellationRequested();
 
         string baseUrl = ResolvePublicBaseUrl();
@@ -962,7 +995,8 @@ public sealed class ReleaseBundlePromotionService
             GenerationId: generationId,
             ActivationReceiptId: activationReceiptId,
             ActivatedAt: activatedAt,
-            InventoryDigest: $"sha256:{inventoryDigest}");
+            InventoryDigest: $"sha256:{inventoryDigest}",
+            ExactIncomingDesktopScope: exactIncomingDesktopScope?.ToTransport());
 
         string? pointerTempPath = null;
         bool pointerActivated = false;
@@ -1025,10 +1059,12 @@ public sealed class ReleaseBundlePromotionService
     private Task<ReleaseBundlePromotionResult> PromotePreparedBundleAsync(
         string bundleRoot,
         string downloadsRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         Action<ReleaseActivationIntent>? recordActivationIntent,
         CancellationToken cancellationToken)
     {
-        PreparedReleaseBundle prepared = PrepareBundle(bundleRoot);
+        exactIncomingDesktopScope?.ValidateCanonical();
+        PreparedReleaseBundle prepared = PrepareBundle(bundleRoot, exactIncomingDesktopScope);
         PublicReleaseManifestDto incomingCompatibilityManifest = prepared.CompatibilityManifest;
         JsonObject incomingCompatibilityManifestObject = prepared.CompatibilityManifestObject;
         JsonObject incomingCanonicalManifest = prepared.CanonicalManifest;
@@ -1050,7 +1086,10 @@ public sealed class ReleaseBundlePromotionService
             ? LoadJsonObject(liveCanonicalManifestPath)
             : null;
 
-        ValidateNoDesktopInstallTupleRegression(existingCanonicalManifest, incomingCanonicalManifest);
+        ValidateNoDesktopInstallTupleRegression(
+            existingCanonicalManifest,
+            incomingCanonicalManifest,
+            exactIncomingDesktopScope);
         DateTimeOffset activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
         string generationId = NewGenerationId(activatedAt);
         string activationReceiptId = $"activation-{Guid.NewGuid():N}";
@@ -1092,7 +1131,8 @@ public sealed class ReleaseBundlePromotionService
                 promotedArtifactIds,
                 generationId,
                 compatibilityManifestSha256,
-                canonicalManifestSha256);
+                canonicalManifestSha256,
+                exactIncomingDesktopScope);
             IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(stagedRoot);
             string inventoryDigest = ComputeInventoryDigest(inventory);
             WriteJsonFile(
@@ -1114,7 +1154,12 @@ public sealed class ReleaseBundlePromotionService
                 incomingCompatibilityManifest,
                 stagedRoot,
                 inventoryDigest);
-            ValidatePreparedGeneration(stagedRoot, pointer, inventory, promotedArtifactIds);
+            ValidatePreparedGeneration(
+                stagedRoot,
+                pointer,
+                inventory,
+                promotedArtifactIds,
+                exactIncomingDesktopScope);
             FlushTreeDurably(stagedRoot);
             NotifyCheckpoint(PromotionCheckpoint.StagedShelfValidated);
             cancellationToken.ThrowIfCancellationRequested();
@@ -1140,7 +1185,8 @@ public sealed class ReleaseBundlePromotionService
                 ActivatedAt: activatedAt,
                 InventoryDigest: $"sha256:{inventoryDigest}",
                 CanonicalManifestSha256: $"sha256:{canonicalManifestSha256}",
-                CompatibilityManifestSha256: $"sha256:{compatibilityManifestSha256}");
+                CompatibilityManifestSha256: $"sha256:{compatibilityManifestSha256}",
+                ExactIncomingDesktopScope: exactIncomingDesktopScope?.ToTransport());
 
             pointerTempPath = PrepareCurrentPointerFile(downloadsRoot, pointer);
             activationIntent = BuildActivationIntent(
@@ -1260,7 +1306,9 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private PreparedReleaseBundle PrepareBundle(string bundleRoot)
+    private PreparedReleaseBundle PrepareBundle(
+        string bundleRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
     {
         string compatibilityManifestPath = RequireSingleFile(bundleRoot, CompatibilityManifestName);
         string canonicalManifestPath = RequireSingleFile(bundleRoot, CanonicalManifestName);
@@ -1299,7 +1347,12 @@ public sealed class ReleaseBundlePromotionService
             incomingCompatibilityManifestObject,
             incomingCanonicalManifest,
             incomingCompatibilityManifest,
-            incomingCanonicalArtifacts);
+            incomingCanonicalArtifacts,
+            exactIncomingDesktopScope);
+        ValidateNoDesktopInstallTupleRegression(
+            null,
+            incomingCanonicalManifest,
+            exactIncomingDesktopScope);
         ValidateIncomingBundle(
             incomingCompatibilityManifest,
             incomingCanonicalArtifacts,
@@ -2570,7 +2623,8 @@ public sealed class ReleaseBundlePromotionService
         string generationRoot,
         CurrentPointerDocument pointer,
         IReadOnlyList<ActivationInventoryEntry> expectedInventory,
-        IReadOnlyList<string> promotedArtifactIds)
+        IReadOnlyList<string> promotedArtifactIds,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope = null)
     {
         PublicReleaseManifestDto manifest = ValidatePublicShelfCoherence(
             generationRoot,
@@ -2579,7 +2633,8 @@ public sealed class ReleaseBundlePromotionService
             promotedArtifactIds,
             pointer.GenerationId,
             pointer.Manifests.Compatibility.Sha256,
-            pointer.Manifests.Canonical.Sha256);
+            pointer.Manifests.Canonical.Sha256,
+            exactIncomingDesktopScope);
         if (!string.Equals(manifest.Version, pointer.ReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(manifest.Channel, pointer.Channel, StringComparison.Ordinal)
             || manifest.PublishedAt.ToUniversalTime()
@@ -2792,7 +2847,8 @@ public sealed class ReleaseBundlePromotionService
             PreviousPointerBase64: previousPointerBytes is null
                 ? null
                 : Convert.ToBase64String(previousPointerBytes),
-            TargetPointerBase64: Convert.ToBase64String(targetPointerBytes));
+            TargetPointerBase64: Convert.ToBase64String(targetPointerBytes),
+            ExactIncomingDesktopScope: result.ExactIncomingDesktopScope);
     }
 
     private static string NormalizeSha256Binding(string value)
@@ -3270,15 +3326,22 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException("release activation journal intent is malformed.");
         }
 
-        RequireExactProperties(
-            intentJson,
+        string[] intentProperties = intentJson.ContainsKey("exactIncomingDesktopScope")
+            ?
+            [
+                "operation", "previousGenerationId", "previousPointerSha256", "generationId",
+                "activationReceiptId", "releaseVersion", "channel", "publishedAt",
+                "inventoryDigest", "pointerSha256", "preparedAtUtc",
+                "previousPointerBase64", "targetPointerBase64", "exactIncomingDesktopScope"
+            ]
+            :
             [
                 "operation", "previousGenerationId", "previousPointerSha256", "generationId",
                 "activationReceiptId", "releaseVersion", "channel", "publishedAt",
                 "inventoryDigest", "pointerSha256", "preparedAtUtc",
                 "previousPointerBase64", "targetPointerBase64"
-            ],
-            "release activation intent");
+            ];
+        RequireExactProperties(intentJson, intentProperties, "release activation intent");
         ReleaseActivationJournalDocument journal = json.Deserialize<ReleaseActivationJournalDocument>(JsonOptions)
             ?? throw new InvalidDataException("release activation journal is malformed.");
         if (!string.Equals(
@@ -3376,6 +3439,9 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException("release activation intent identity is invalid.");
         }
 
+        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
+            intent.ExactIncomingDesktopScope);
+
         byte[]? previousPointerBytes;
         byte[] targetPointerBytes;
         try
@@ -3432,6 +3498,9 @@ public sealed class ReleaseBundlePromotionService
         ReleaseActivationJournalDocument journal)
     {
         CurrentPointerDocument pointer = ValidateActivationJournalTarget(journal);
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope =
+            ReleaseDesktopTupleScope.ParseOptionalCanonical(
+                journal.Intent.ExactIncomingDesktopScope);
         string generationRoot = Path.Combine(downloadsRoot, GenerationsDirectoryName, journal.Intent.GenerationId);
         if (!Directory.Exists(generationRoot))
         {
@@ -3445,7 +3514,12 @@ public sealed class ReleaseBundlePromotionService
             .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
             .ToArray();
         IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(generationRoot);
-        ValidatePreparedGeneration(generationRoot, pointer, inventory, artifactIds);
+        ValidatePreparedGeneration(
+            generationRoot,
+            pointer,
+            inventory,
+            artifactIds,
+            exactIncomingDesktopScope);
         if (!string.Equals(journal.Intent.ReleaseVersion, manifest.Version, StringComparison.Ordinal)
             || !string.Equals(journal.Intent.Channel, manifest.Channel, StringComparison.Ordinal)
             || journal.Intent.PublishedAt != manifest.PublishedAt.ToUniversalTime())
@@ -3470,10 +3544,13 @@ public sealed class ReleaseBundlePromotionService
             GenerationId: journal.Intent.GenerationId,
             ActivationReceiptId: journal.Intent.ActivationReceiptId,
             ActivatedAt: DateTimeOffset.Parse(pointer.ActivatedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal),
-            InventoryDigest: journal.Intent.InventoryDigest);
+            InventoryDigest: journal.Intent.InventoryDigest,
+            ExactIncomingDesktopScope: journal.Intent.ExactIncomingDesktopScope);
     }
 
-    private void RequireCommittedGenerationHistory(string downloadsRoot, string generationId)
+    private ReleaseDesktopTupleScope? RequireCommittedGenerationHistory(
+        string downloadsRoot,
+        string generationId)
     {
         string historyRoot = ActivationJournalHistoryRoot(downloadsRoot);
         if (!Directory.Exists(historyRoot))
@@ -3495,7 +3572,8 @@ public sealed class ReleaseBundlePromotionService
             if (outcome is not null && string.Equals(outcome.State, "committed", StringComparison.Ordinal))
             {
                 _ = BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
-                return;
+                return ReleaseDesktopTupleScope.ParseOptionalCanonical(
+                    journal.Intent.ExactIncomingDesktopScope);
             }
         }
 
@@ -4431,7 +4509,8 @@ public sealed class ReleaseBundlePromotionService
         JsonObject compatibility,
         JsonObject canonical,
         PublicReleaseManifestDto compatibilityManifest,
-        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts)
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
     {
         RequireRegistryContract(compatibility, CompatibilityManifestName);
         RequireRegistryContract(canonical, CanonicalManifestName);
@@ -4499,7 +4578,10 @@ public sealed class ReleaseBundlePromotionService
             canonical["desktopTupleCoverage"],
             "desktopTupleCoverage");
         ValidateRegistryArtifactProjection(compatibility, canonical);
-        ValidateCanonicalPlatformFloor(canonical, canonicalArtifacts);
+        ValidateCanonicalPlatformFloor(
+            canonical,
+            canonicalArtifacts,
+            exactIncomingDesktopScope);
     }
 
     private static void RequireRegistryContract(JsonObject manifest, string label)
@@ -4690,25 +4772,44 @@ public sealed class ReleaseBundlePromotionService
 
     private static void ValidateCanonicalPlatformFloor(
         JsonObject canonical,
-        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts)
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
     {
+        IReadOnlyList<string> requiredDesktopPlatforms =
+            exactIncomingDesktopScope?.RequiredPlatforms ?? RequiredDesktopPlatforms;
+        IReadOnlyList<string> requiredDesktopHeads =
+            exactIncomingDesktopScope?.RequiredHeads ?? RequiredDesktopHeads;
+        IReadOnlyList<string> requiredDesktopPlatformHeadRidTuples =
+            exactIncomingDesktopScope?.RequiredPlatformHeadRidTuples
+            ?? RequiredDesktopPlatformHeadRidTuples;
+        IReadOnlyList<string> requiredDesktopPlatformHeadPairs =
+            exactIncomingDesktopScope is null
+                ? RequiredDesktopPlatforms
+                    .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
+                    .ToArray()
+                : exactIncomingDesktopScope.TupleIds
+                    .Select(static tuple => tuple.Split(':', StringSplitOptions.None))
+                    .Select(static parts => $"{parts[0]}:{parts[1]}")
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray();
         JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
             ?? throw new InvalidDataException(
                 $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
         RequireExactStringArray(
             coverage,
             "requiredDesktopPlatforms",
-            RequiredDesktopPlatforms,
+            requiredDesktopPlatforms,
             "canonical desktop platform floor");
         RequireExactStringArray(
             coverage,
             "requiredDesktopHeads",
-            RequiredDesktopHeads,
+            requiredDesktopHeads,
             "canonical desktop head floor");
         RequireExactStringArray(
             coverage,
             "requiredDesktopPlatformHeadRidTuples",
-            RequiredDesktopPlatformHeadRidTuples,
+            requiredDesktopPlatformHeadRidTuples,
             "canonical desktop platform/head/RID floor");
 
         HashSet<string> promotedPlatforms = new(StringComparer.Ordinal);
@@ -4727,7 +4828,7 @@ public sealed class ReleaseBundlePromotionService
                 rid = RidForPlatformAndArch(platform, NormalizeToken(artifact.Arch));
             }
 
-            if (!RequiredDesktopPlatforms.Contains(platform, StringComparer.Ordinal)
+            if (!requiredDesktopPlatforms.Contains(platform, StringComparer.Ordinal)
                 || !IsPromotedDesktopInstaller(artifact, platform)
                 || head.Length == 0
                 || rid.Length == 0)
@@ -4740,23 +4841,22 @@ public sealed class ReleaseBundlePromotionService
             promotedPairs.Add($"{head}:{platform}");
             promotedAllTuples.Add($"{head}:{rid}:{platform}");
             promotedInstallerTupleIds.Add($"{head}:{platform}:{rid}");
-            if (RequiredDesktopHeads.Contains(head, StringComparer.Ordinal))
+            if (requiredDesktopHeads.Contains(head, StringComparer.Ordinal))
             {
                 promotedRequiredTuples.Add($"{head}:{rid}:{platform}");
             }
         }
 
-        string[] missingPlatforms = RequiredDesktopPlatforms
+        string[] missingPlatforms = requiredDesktopPlatforms
             .Where(platform => !promotedPlatforms.Contains(platform))
             .ToArray();
-        string[] missingHeads = RequiredDesktopHeads
+        string[] missingHeads = requiredDesktopHeads
             .Where(head => !promotedHeads.Contains(head))
             .ToArray();
-        string[] missingPairs = RequiredDesktopPlatforms
-            .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
+        string[] missingPairs = requiredDesktopPlatformHeadPairs
             .Where(pair => !promotedPairs.Contains(pair))
             .ToArray();
-        string[] missingTuples = RequiredDesktopPlatformHeadRidTuples
+        string[] missingTuples = requiredDesktopPlatformHeadRidTuples
             .Where(tuple => !promotedRequiredTuples.Contains(tuple))
             .ToArray();
 
@@ -5888,10 +5988,53 @@ public sealed class ReleaseBundlePromotionService
 
     private static void ValidateNoDesktopInstallTupleRegression(
         JsonObject? existingManifest,
-        JsonObject incomingManifest)
+        JsonObject incomingManifest,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
     {
-        if (existingManifest?["artifacts"] is not JsonArray existingArtifacts
-            || incomingManifest["artifacts"] is not JsonArray incomingArtifacts)
+        if (incomingManifest["artifacts"] is not JsonArray incomingArtifacts)
+        {
+            if (exactIncomingDesktopScope is not null)
+            {
+                throw new InvalidDataException(
+                    "incoming authoritative release bundle cannot prove its explicitly declared exact desktop scope.");
+            }
+            return;
+        }
+
+        HashSet<string> incomingTuples = DesktopInstallTupleIds(incomingArtifacts);
+        if (exactIncomingDesktopScope is not null)
+        {
+            string[] missingDeclaredTuples = exactIncomingDesktopScope.TupleIds
+                .Except(incomingTuples, StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            string[] undeclaredIncomingTuples = incomingTuples
+                .Except(exactIncomingDesktopScope.TupleIds, StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            if (missingDeclaredTuples.Length > 0 || undeclaredIncomingTuples.Length > 0)
+            {
+                var details = new List<string>();
+                if (missingDeclaredTuples.Length > 0)
+                {
+                    details.Add("missing " + string.Join(", ", missingDeclaredTuples));
+                }
+                if (undeclaredIncomingTuples.Length > 0)
+                {
+                    details.Add("undeclared " + string.Join(", ", undeclaredIncomingTuples));
+                }
+
+                throw new InvalidDataException(
+                    "incoming desktop install tuples do not match the authenticated exact scope: "
+                    + string.Join("; ", details));
+            }
+
+            // The exact scope is immutable session intent. Existing tuples outside it
+            // are intentional retirements; no implicit shrink is permitted here.
+            return;
+        }
+
+        if (existingManifest?["artifacts"] is not JsonArray existingArtifacts)
         {
             return;
         }
@@ -5902,7 +6045,6 @@ public sealed class ReleaseBundlePromotionService
             return;
         }
 
-        HashSet<string> incomingTuples = DesktopInstallTupleIds(incomingArtifacts);
         string[] missingTuples = existingTuples
             .Except(incomingTuples, StringComparer.OrdinalIgnoreCase)
             .OrderBy(static tupleId => tupleId, StringComparer.Ordinal)
@@ -5915,7 +6057,7 @@ public sealed class ReleaseBundlePromotionService
         throw new InvalidDataException(
             "incoming authoritative release bundle would drop existing desktop install tuple(s): "
             + string.Join(", ", missingTuples)
-            + ". Scoped updates and explicit removals are not supported yet; upload a complete shelf containing every existing desktop install tuple.");
+            + ". Scoped updates and explicit removals are not supported yet without an authenticated exact incoming scope; otherwise upload a complete shelf containing every existing desktop install tuple.");
     }
 
     private static HashSet<string> DesktopInstallTupleIds(JsonArray artifacts)
@@ -7838,7 +7980,8 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<string> promotedArtifactIds,
         string expectedGenerationId,
         string expectedCompatibilitySha256,
-        string expectedCanonicalSha256)
+        string expectedCanonicalSha256,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope = null)
     {
         if (!File.Exists(liveCompatibilityManifestPath))
         {
@@ -7887,7 +8030,8 @@ public sealed class ReleaseBundlePromotionService
             liveCompatibilityManifestObject,
             liveCanonicalManifest,
             liveCompatibilityManifest,
-            liveCanonicalArtifacts);
+            liveCanonicalArtifacts,
+            exactIncomingDesktopScope);
         HashSet<string> liveCanonicalIds = liveCanonicalArtifacts
             .Select(static artifact => artifact.ArtifactId)
             .Where(static id => !string.IsNullOrWhiteSpace(id))

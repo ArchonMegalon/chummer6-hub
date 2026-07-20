@@ -107,6 +107,58 @@ public sealed class InternalReleaseBundlesControllerTests
     }
 
     [Fact]
+    public void UploadSessionCreationAuthenticatesPersistsAndEchoesExactDesktopScope()
+    {
+        using ControllerFixture fixture = new();
+        PrevalidateControllerWithIssuedTicket(fixture);
+        fixture.Controller.Request.Headers[
+            InternalReleaseBundlesController.ExactIncomingDesktopScopeHeader] =
+            "AVALONIA:WIN:WIN-X64, avalonia:linux:linux-x64";
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(
+            fixture.Controller.CreateUploadSession().Result);
+        var created = Assert.IsType<InternalReleaseBundlesController.ReleaseUploadSessionCreatedResponse>(
+            ok.Value);
+        Assert.Equal(
+            ["avalonia:linux:linux-x64", "avalonia:windows:win-x64"],
+            created.ExactIncomingDesktopTuples);
+
+        ReleaseUploadSession durable = fixture.ReadSessionMetadata(created.SessionId);
+        Assert.Equal(created.ExactIncomingDesktopTuples, durable.ExactIncomingDesktopScope!.TupleIds);
+
+        fixture.Controller.Request.Headers[
+            InternalReleaseBundlesController.ExactIncomingDesktopScopeHeader] =
+            "avalonia:macos:osx-arm64";
+        ObjectResult changed = Assert.IsType<ObjectResult>(
+            fixture.Controller.CreateUploadSession().Result);
+        Assert.Equal(StatusCodes.Status409Conflict, changed.StatusCode);
+        Assert.Contains(
+            "scope changed",
+            Assert.IsType<ProblemDetails>(changed.Value).Detail ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void UploadSessionCreationRejectsMalformedExactDesktopScopeBeforeCreatingSession()
+    {
+        using ControllerFixture fixture = new();
+        PrevalidateControllerWithIssuedTicket(fixture);
+        fixture.Controller.Request.Headers[
+            InternalReleaseBundlesController.ExactIncomingDesktopScopeHeader] =
+            "avalonia:linux";
+
+        ObjectResult rejected = Assert.IsType<ObjectResult>(
+            fixture.Controller.CreateUploadSession().Result);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, rejected.StatusCode);
+        Assert.Contains(
+            "head:platform:rid",
+            Assert.IsType<ProblemDetails>(rejected.Value).Detail ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(fixture.SessionRoot));
+    }
+
+    [Fact]
     public async Task UploadSessionLifecyclePromotesBundleAndReturnsSignedInClaims()
     {
         using ControllerFixture fixture = new();
@@ -930,6 +982,35 @@ public sealed class InternalReleaseBundlesControllerTests
             evaluator.Evaluate(fixture.Controller.ControllerContext.HttpContext.Request));
         fixture.Controller.ControllerContext.HttpContext.Items[
             ReleaseUploadAuthorizationContext.HttpContextItemKey] = authorization;
+        return issued;
+    }
+
+    private static ReleaseUploadTicketIssueResult PrevalidateControllerWithIssuedTicket(
+        ControllerFixture fixture)
+    {
+        ReleaseUploadTicketIssueResult issued = fixture.ReleaseUploadTickets.Issue(
+            new AuthenticatedHubSubject(
+                SubjectId: "subject-archon",
+                DisplayName: "Archon",
+                Email: "archon@example.com",
+                Roles: ["operator"],
+                AccessToken: "token"));
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        HttpRequest request = fixture.Controller.ControllerContext.HttpContext.Request;
+        request.Scheme = "https";
+        request.Host = new HostString("chummer.run");
+        request.Headers.Authorization = $"Bearer {issued.Ticket}";
+        request.HttpContext.Items[ReleaseUploadAuthorizationContext.HttpContextItemKey] =
+            new ReleaseUploadAuthorizationContext(
+                UploadTicketClaims: issued.Claims,
+                AuthorizationBinding: new string('a', 64),
+                SingleUseAuthorization: true,
+                Method: request.Method,
+                Path: request.Path.Value ?? string.Empty,
+                AuthorizationExpiresAtUtc: issued.Claims.ExpiresAtUtc);
         return issued;
     }
 

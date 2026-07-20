@@ -30,6 +30,8 @@ GENERATION_PREPARED_DIR=""
 EXISTING_SHELF_ROOT="$AUTHORITATIVE_DEPLOY_DIR"
 ACTIVE_GENERATION_ID=""
 ACTIVE_POINTER_JSON=""
+EXACT_INCOMING_SCOPE_DECLARED="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES+yes}"
+EXACT_INCOMING_SCOPE="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES-}"
 
 assert_not_server_journal_shelf() {
   local target_root="${1:-}"
@@ -494,15 +496,23 @@ while IFS= read -r -d '' artifact; do
 done < <(array_values_nul artifacts)
 
 existing_canonical_manifest="$EXISTING_SHELF_ROOT/RELEASE_CHANNEL.generated.json"
-if [[ -f "$existing_canonical_manifest" ]]; then
+if [[ -f "$existing_canonical_manifest" || "$EXACT_INCOMING_SCOPE_DECLARED" == "yes" ]]; then
   if [[ ! -f "$CANONICAL_MANIFEST_SOURCE" ]]; then
     echo "Existing authoritative shelf requires incoming canonical manifest: $CANONICAL_MANIFEST_SOURCE" >&2
     exit 1
   fi
-  python3 "$SCRIPT_DIR/verify_release_shelf_replacement.py" \
+  replacement_preflight_args=(
     --existing "$existing_canonical_manifest" \
     --incoming "$CANONICAL_MANIFEST_SOURCE" \
     --selected-files-dir "$sync_source_dir"
+  )
+  if [[ ! -f "$existing_canonical_manifest" ]]; then
+    replacement_preflight_args+=(--allow-missing-existing)
+  fi
+  if [[ "$EXACT_INCOMING_SCOPE_DECLARED" == "yes" ]]; then
+    replacement_preflight_args+=(--exact-incoming-scope "$EXACT_INCOMING_SCOPE")
+  fi
+  python3 "$SCRIPT_DIR/verify_release_shelf_replacement.py" "${replacement_preflight_args[@]}"
 fi
 
 release_version="${RELEASE_VERSION:-}"

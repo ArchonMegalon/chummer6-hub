@@ -21,7 +21,8 @@ public sealed record ReleaseUploadSession(
     string? PoisonReason = null,
     DateTimeOffset? CompletedAtUtc = null,
     DateTimeOffset? ActivationAcknowledgedAtUtc = null,
-    ReleaseUploadCandidateSessionBinding? CandidateImportBinding = null);
+    ReleaseUploadCandidateSessionBinding? CandidateImportBinding = null,
+    ReleaseDesktopTupleScope? ExactIncomingDesktopScope = null);
 
 public sealed record ReleaseUploadChunkResult(
     string RelativePath,
@@ -105,7 +106,8 @@ public sealed class ReleaseBundleUploadSessionService
         string authorizationBinding,
         bool singleUseAuthorization,
         DateTimeOffset? authorizationExpiresAtUtc = null,
-        ReleaseUploadCandidateSessionBinding? candidateImportBinding = null)
+        ReleaseUploadCandidateSessionBinding? candidateImportBinding = null,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope = null)
     {
         string sessionsRoot = ResolveSessionsRoot(requireConfigured: singleUseAuthorization);
         authorizationBinding = NormalizeAuthorizationBinding(authorizationBinding);
@@ -123,6 +125,7 @@ public sealed class ReleaseBundleUploadSessionService
                     "candidate import authority must be a single-use authorization.");
             }
         }
+        exactIncomingDesktopScope?.ValidateCanonical();
 
         using FileStream quotaLock = AcquireQuotaLock();
         PurgeExpiredSessionsUnderQuotaLock(sessionsRoot);
@@ -139,6 +142,14 @@ public sealed class ReleaseBundleUploadSessionService
                 {
                     throw new InvalidOperationException(
                         "release upload authorization candidate binding changed.");
+                }
+                bool exactScopeMatches = existing.ExactIncomingDesktopScope is null
+                    ? exactIncomingDesktopScope is null
+                    : existing.ExactIncomingDesktopScope.SemanticallyEquals(exactIncomingDesktopScope);
+                if (!exactScopeMatches)
+                {
+                    throw new InvalidOperationException(
+                        "release upload authorization exact incoming desktop scope changed.");
                 }
                 if (existing.Completed)
                 {
@@ -189,7 +200,8 @@ public sealed class ReleaseBundleUploadSessionService
                 AuthorizationBinding: authorizationBinding,
                 SingleUseAuthorization: singleUseAuthorization,
                 AuthorizationExpiresAtUtc: authorizationExpiresAtUtc,
-                CandidateImportBinding: candidateImportBinding);
+                CandidateImportBinding: candidateImportBinding,
+                ExactIncomingDesktopScope: exactIncomingDesktopScope);
             PersistMetadata(sessionRoot, session);
             return session;
         }
@@ -1354,6 +1366,13 @@ public sealed class ReleaseBundleUploadSessionService
     {
         ArgumentNullException.ThrowIfNull(intent);
         ValidateActivationIntent(intent);
+        if (!ExactScopeMatches(
+                session.ExactIncomingDesktopScope,
+                intent.ExactIncomingDesktopScope))
+        {
+            throw new InvalidDataException(
+                "release activation intent exact incoming desktop scope does not match its authenticated upload session.");
+        }
         if (session.Completed)
         {
             throw new InvalidOperationException("upload session has already been completed.");
@@ -1446,6 +1465,9 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException("release activation intent is incomplete.");
         }
 
+        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
+            intent.ExactIncomingDesktopScope);
+
         byte[]? previousPointerBytes;
         byte[]? targetPointerBytes;
         try
@@ -1502,12 +1524,18 @@ public sealed class ReleaseBundleUploadSessionService
         ReleaseBundlePromotionResult result,
         ReleaseActivationIntent intent)
     {
+        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
+            result.ExactIncomingDesktopScope);
         if (!string.Equals(result.GenerationId, intent.GenerationId, StringComparison.Ordinal)
             || !string.Equals(result.ActivationReceiptId, intent.ActivationReceiptId, StringComparison.Ordinal)
             || !string.Equals(result.Version, intent.ReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(result.Channel, intent.Channel, StringComparison.Ordinal)
             || result.PublishedAt.ToUniversalTime() != intent.PublishedAt.ToUniversalTime()
-            || !string.Equals(result.InventoryDigest, intent.InventoryDigest, StringComparison.Ordinal))
+            || !string.Equals(result.InventoryDigest, intent.InventoryDigest, StringComparison.Ordinal)
+            || !string.Equals(
+                result.ExactIncomingDesktopScope,
+                intent.ExactIncomingDesktopScope,
+                StringComparison.Ordinal))
         {
             throw new InvalidDataException("release promotion result does not match the durable activation intent.");
         }
@@ -1542,10 +1570,18 @@ public sealed class ReleaseBundleUploadSessionService
                 throw new InvalidDataException("upload session candidate binding is invalid.");
             }
         }
+        session.ExactIncomingDesktopScope?.ValidateCanonical();
 
         if (session.ActivationIntent is not null)
         {
             ValidateActivationIntent(session.ActivationIntent);
+            if (!ExactScopeMatches(
+                    session.ExactIncomingDesktopScope,
+                    session.ActivationIntent.ExactIncomingDesktopScope))
+            {
+                throw new InvalidDataException(
+                    "upload session activation scope does not match its authenticated exact incoming desktop scope.");
+            }
             if (session.Completed)
             {
                 ValidateCompletionMatchesIntent(
@@ -1555,6 +1591,17 @@ public sealed class ReleaseBundleUploadSessionService
         }
 
         return authorizationBinding;
+    }
+
+    private static bool ExactScopeMatches(
+        ReleaseDesktopTupleScope? sessionScope,
+        string? receiptScope)
+    {
+        ReleaseDesktopTupleScope? parsedReceiptScope =
+            ReleaseDesktopTupleScope.ParseOptionalCanonical(receiptScope);
+        return sessionScope is null
+            ? parsedReceiptScope is null
+            : sessionScope.SemanticallyEquals(parsedReceiptScope);
     }
 
     private static void ValidateCandidateImportBinding(
@@ -2224,6 +2271,8 @@ public sealed class ReleaseBundleUploadSessionService
         public string BundleRoot => _session.BundleRoot;
         public ReleaseUploadCandidateSessionBinding? CandidateImportBinding
             => _session.CandidateImportBinding;
+        public ReleaseDesktopTupleScope? ExactIncomingDesktopScope
+            => _session.ExactIncomingDesktopScope;
         public ReleaseActivationIntent? ActivationIntent => _session.ActivationIntent;
         public ReleaseBundlePromotionResult? CompletedResult
             => _session.Completed ? _session.CompletionResult : null;

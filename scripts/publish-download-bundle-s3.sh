@@ -23,6 +23,8 @@ SHELF_LAYOUT_MARKER=".release-shelf-layout-v1"
 SHELF_GENERATION_ID="${CHUMMER_RELEASE_GENERATION_ID:-}"
 PRIMARY_RELEASE_COMMITTED=false
 PRIMARY_COMMITTED_GENERATION=""
+EXACT_INCOMING_SCOPE_DECLARED="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES+yes}"
+EXACT_INCOMING_SCOPE="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES-}"
 
 if [[ ! -f "$MANIFEST_SOURCE" || ! -d "$FILES_SOURCE" ]]; then
   echo "Expected desktop-download-bundle layout: releases.json + files/chummer-*" >&2
@@ -639,11 +641,16 @@ PY
   echo "Activated immutable release shelf generation $PREPARED_GENERATION_ID at $target_uri"
 }
 
-python3 "$SCRIPT_DIR/verify_release_shelf_replacement.py" \
+replacement_preflight_args=(
   --existing "$VERIFY_URL" \
   --incoming "$CANONICAL_MANIFEST_SOURCE" \
   --selected-files-dir "$filtered_files_dir" \
   --allow-missing-existing
+)
+if [[ "$EXACT_INCOMING_SCOPE_DECLARED" == "yes" ]]; then
+  replacement_preflight_args+=(--exact-incoming-scope "$EXACT_INCOMING_SCOPE")
+fi
+python3 "$SCRIPT_DIR/verify_release_shelf_replacement.py" "${replacement_preflight_args[@]}"
 
 PRIMARY_TARGET_MODE="$(remote_layout_mode "$S3_TARGET_URI")"
 LATEST_TARGET_MODE=""
