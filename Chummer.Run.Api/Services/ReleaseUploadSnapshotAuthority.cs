@@ -132,6 +132,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json";
     private const string CandidateProvenanceExportFileName =
         "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
+    private const string CandidateUploadContentInventoryFileName =
+        "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json";
+    private const string CandidateUploadExportFileName =
+        "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
     private const string CaptureWorkflow =
         ".github/workflows/windows-native-evidence-capture.yml";
     private const string FinalizationWorkflow =
@@ -141,6 +145,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private const string UiRepository = "ArchonMegalon/chummer6-ui";
     private const string UiRef = "refs/heads/main";
     private const string WindowsRid = "win-x64";
+    private static readonly string[] PromotedHeads = ["avalonia"];
     private static readonly TimeSpan MaximumNativeProofAge = TimeSpan.FromHours(24);
 
     private readonly IConfiguration _configuration;
@@ -652,6 +657,17 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             {
                 throw new InvalidDataException("candidate native-Windows content bytes drifted");
             }
+            if (!candidateByPath.TryGetValue(
+                    CandidateUploadContentInventoryFileName,
+                    out ReleaseUploadCandidateInventoryRow? uploadedInventory)
+                || uploadedInventory != new ReleaseUploadCandidateInventoryRow(
+                    CandidateUploadContentInventoryFileName,
+                    provenanceDocument.SizeBytes,
+                    provenanceDocument.Sha256))
+            {
+                throw new InvalidDataException(
+                    "candidate uploaded content inventory differs from native-Windows provenance");
+            }
 
             CandidateEvidenceDocument captureDocument = documents[CaptureFileName];
             JsonElement capture = captureDocument.Root;
@@ -675,6 +691,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 documents,
                 candidate.CanonicalManifestSha256,
                 summaryCaptureAt);
+            ValidateCaptureHeads(
+                RequireArray(capture, "heads"),
+                scope,
+                finalizedByPath);
 
             CandidateEvidenceDocument captureInventoryDocument =
                 documents[CaptureInventoryFileName];
@@ -753,6 +773,19 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
 
             JsonElement export = documents[CandidateProvenanceExportFileName].Root;
+            CandidateEvidenceDocument exportDocument =
+                documents[CandidateProvenanceExportFileName];
+            if (!candidateByPath.TryGetValue(
+                    CandidateUploadExportFileName,
+                    out ReleaseUploadCandidateInventoryRow? uploadedExport)
+                || uploadedExport != new ReleaseUploadCandidateInventoryRow(
+                    CandidateUploadExportFileName,
+                    exportDocument.SizeBytes,
+                    exportDocument.Sha256))
+            {
+                throw new InvalidDataException(
+                    "candidate uploaded export receipt differs from native-Windows provenance");
+            }
             ValidateCandidateExportReceipt(
                 export,
                 captureCandidate,
@@ -860,9 +893,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     string role = RequireString(screenshot, "role");
                     string path = RequireString(screenshot, "path");
                     string digest = RequireSha256(screenshot, "sha256");
+                    string expectedPath =
+                        $"screenshots/windows-installer-{head}-{WindowsRid}-{role}.png";
                     if (role is not "progress" and not "completion"
                         || !roles.Add(role)
                         || !IsCanonicalRelativePath(path)
+                        || !string.Equals(path, expectedPath, StringComparison.Ordinal)
                         || !finalizedByPath.TryGetValue(
                             path,
                             out ReleaseUploadCandidateInventoryRow? screenshotRow)
@@ -917,9 +953,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
             heads.Add(head);
         }
-        if (heads.Count == 0)
+        if (!heads.SequenceEqual(PromotedHeads, StringComparer.Ordinal))
         {
-            throw new InvalidDataException("candidate requiredDesktopHeads is empty");
+            throw new InvalidDataException(
+                "candidate requiredDesktopHeads differs from the promoted Avalonia head");
         }
         JsonElement artifactsElement = RequireArray(canonical, "artifacts");
         var windowsArtifacts = new List<JsonElement>();
@@ -986,15 +1023,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         var expectedFilePaths = artifacts.Values
             .SelectMany(static value => new[] { value.Installer.Path, value.Payload.Path })
             .ToHashSet(StringComparer.Ordinal);
-        var actualFilePaths = candidateInventory
-            .Where(static row => row.Path.StartsWith("files/", StringComparison.Ordinal))
+        var expectedCandidatePaths = expectedFilePaths
+            .Append("RELEASE_CHANNEL.generated.json")
+            .Append(CandidateUploadContentInventoryFileName)
+            .Append(CandidateUploadExportFileName)
+            .ToHashSet(StringComparer.Ordinal);
+        var actualCandidatePaths = candidateInventory
             .Select(static row => row.Path)
             .ToHashSet(StringComparer.Ordinal);
-        if (!actualFilePaths.SetEquals(expectedFilePaths))
+        if (!actualCandidatePaths.SetEquals(expectedCandidatePaths))
         {
             throw new InvalidDataException(
-                "candidate upload Windows artifact file set differs from the exact "
-                + "required desktop tuples");
+                "candidate upload inventory differs from the exact Avalonia UI export tree");
         }
         return new CandidateWindowsScope(version, channel, heads, artifacts);
     }
@@ -1026,6 +1066,120 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 $"candidate {head} {role} manifest bytes differ from upload inventory");
         }
         return new CandidateArtifact(path, fileName, digest, size);
+    }
+
+    private static void ValidateCaptureHeads(
+        JsonElement heads,
+        CandidateWindowsScope scope,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath)
+    {
+        if (heads.GetArrayLength() != PromotedHeads.Length)
+        {
+            throw new InvalidDataException(
+                "candidate capture must contain exactly one Avalonia head");
+        }
+        int index = 0;
+        foreach (JsonElement row in heads.EnumerateArray())
+        {
+            string head = PromotedHeads[index++];
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        [
+                            "headId",
+                            "rid",
+                            "installer",
+                            "payload",
+                            "receipt",
+                            "progressLog",
+                            "screenshots"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("candidate capture head property set drifted");
+            }
+            RequireExactString(row, "headId", head);
+            RequireExactString(row, "rid", WindowsRid);
+            CandidateHeadArtifacts artifacts = scope.Artifacts[head];
+            ValidateExportArtifactBinding(RequireObject(row, "installer"), artifacts.Installer);
+            ValidateExportArtifactBinding(RequireObject(row, "payload"), artifacts.Payload);
+
+            ValidateCaptureEvidenceBinding(
+                RequireObject(row, "receipt"),
+                $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json",
+                finalizedByPath,
+                "candidate capture startup receipt");
+            ValidateCaptureEvidenceBinding(
+                RequireObject(row, "progressLog"),
+                $"startup-smoke/windows-installer-progress-{head}-{WindowsRid}.log",
+                finalizedByPath,
+                "candidate capture progress log");
+
+            JsonElement screenshots = RequireArray(row, "screenshots");
+            if (screenshots.GetArrayLength() != 2)
+            {
+                throw new InvalidDataException("candidate capture screenshot set drifted");
+            }
+            string? previousDigest = null;
+            int screenshotIndex = 0;
+            foreach (JsonElement screenshot in screenshots.EnumerateArray())
+            {
+                string role = screenshotIndex++ == 0 ? "progress" : "completion";
+                if (!ExactPropertySet(
+                        screenshot,
+                        new HashSet<string>(
+                            ["role", "path", "sha256", "width", "height"],
+                            StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException(
+                        "candidate capture screenshot binding drifted");
+                }
+                RequireExactString(screenshot, "role", role);
+                string path =
+                    $"screenshots/windows-installer-{head}-{WindowsRid}-{role}.png";
+                RequireExactString(screenshot, "path", path);
+                string digest = RequireSha256(screenshot, "sha256");
+                int width = RequirePositiveInt32(screenshot, "width");
+                int height = RequirePositiveInt32(screenshot, "height");
+                if (width is < 320 or > 16384
+                    || height is < 200 or > 16384
+                    || !finalizedByPath.TryGetValue(
+                        path,
+                        out ReleaseUploadCandidateInventoryRow? inventoryRow)
+                    || inventoryRow.SizeBytes < 1
+                    || !string.Equals(inventoryRow.Sha256, digest, StringComparison.Ordinal)
+                    || string.Equals(previousDigest, digest, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "candidate capture screenshot differs from finalized inventory");
+                }
+                previousDigest = digest;
+            }
+        }
+    }
+
+    private static void ValidateCaptureEvidenceBinding(
+        JsonElement binding,
+        string expectedPath,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath,
+        string label)
+    {
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(["path", "sha256"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+        RequireExactString(binding, "path", expectedPath);
+        string digest = RequireSha256(binding, "sha256");
+        if (!finalizedByPath.TryGetValue(
+                expectedPath,
+                out ReleaseUploadCandidateInventoryRow? inventoryRow)
+            || inventoryRow.SizeBytes < 1
+            || !string.Equals(inventoryRow.Sha256, digest, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} differs from finalized inventory");
+        }
     }
 
     private static JsonElement ValidateCaptureCandidateBinding(

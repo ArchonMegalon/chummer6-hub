@@ -42,6 +42,11 @@ CANDIDATE_PROVENANCE_INVENTORY = (
 CANDIDATE_PROVENANCE_EXPORT = (
     "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
 )
+CANDIDATE_UPLOAD_CONTENT_INVENTORY = (
+    "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+)
+CANDIDATE_UPLOAD_EXPORT = "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+PROMOTED_HEADS = ("avalonia",)
 CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
 PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
@@ -249,11 +254,19 @@ def _validate_bundle_inventory(
 ) -> list[dict[str, Any]]:
     if (
         inventory.get("contractName") != INVENTORY_CONTRACT
+        or type(inventory.get("contractVersion")) is not int
         or inventory.get("contractVersion") != 1
         or set(inventory) != {"contractName", "contractVersion", "files"}
     ):
         _fail("candidate upload inventory contract drifted")
     rows = _inventory_rows(inventory.get("files"), label="candidate upload inventory")
+    root_paths = {row["path"] for row in rows if "/" not in row["path"]}
+    if root_paths != {
+        "RELEASE_CHANNEL.generated.json",
+        CANDIDATE_UPLOAD_CONTENT_INVENTORY,
+        CANDIDATE_UPLOAD_EXPORT,
+    }:
+        _fail("candidate upload root must contain the exact three UI provenance rows")
     actual_rows: list[dict[str, Any]] = []
     for row in rows:
         path = bundle_root / row["path"]
@@ -299,13 +312,11 @@ def _canonical_windows_scope(
     )
     coverage = manifest.get("desktopTupleCoverage")
     heads_value = coverage.get("requiredDesktopHeads") if isinstance(coverage, dict) else None
-    if (
-        not isinstance(heads_value, list)
-        or not heads_value
-        or any(not isinstance(head, str) or HEAD_RE.fullmatch(head) is None for head in heads_value)
-        or len(set(heads_value)) != len(heads_value)
+    if heads_value != list(PROMOTED_HEADS) or any(
+        not isinstance(head, str) or HEAD_RE.fullmatch(head) is None
+        for head in heads_value or []
     ):
-        _fail("candidate requiredDesktopHeads is invalid")
+        _fail("candidate requiredDesktopHeads differs from the promoted Avalonia head")
     heads = tuple(heads_value)
     artifacts_value = manifest.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
@@ -373,13 +384,16 @@ def _canonical_windows_scope(
         for head in heads
         for artifact in scope_by_head[head].values()
     }
-    actual_file_paths = {
-        row["path"] for row in candidate_rows if row["path"].startswith("files/")
+    expected_candidate_paths = {
+        "RELEASE_CHANNEL.generated.json",
+        CANDIDATE_UPLOAD_CONTENT_INVENTORY,
+        CANDIDATE_UPLOAD_EXPORT,
+        *expected_file_paths,
     }
-    if actual_file_paths != expected_file_paths:
+    actual_candidate_paths = {row["path"] for row in candidate_rows}
+    if actual_candidate_paths != expected_candidate_paths:
         _fail(
-            "candidate upload Windows artifact file set differs from the exact "
-            "required desktop tuples"
+            "candidate upload inventory differs from the exact Avalonia UI export tree"
         )
     return {
         "version": version,
@@ -615,6 +629,7 @@ def _validate_candidate_export_receipt(
         _fail("native-Windows candidate export receipt property set drifted")
     if (
         receipt.get("contractName") != CANDIDATE_EXPORT_CONTRACT
+        or type(receipt.get("contractVersion")) is not int
         or receipt.get("contractVersion") != 1
         or receipt.get("status") != "exported"
         or receipt.get("release")
@@ -679,8 +694,15 @@ def _validate_candidate_provenance(
         root / CANDIDATE_PROVENANCE_INVENTORY,
         label="native-Windows candidate provenance inventory",
     )
+    upload_inventory, upload_inventory_bytes = _strict_json(
+        bundle_root / CANDIDATE_UPLOAD_CONTENT_INVENTORY,
+        label="candidate upload content inventory",
+    )
+    if upload_inventory != inventory or upload_inventory_bytes != inventory_bytes:
+        _fail("native-Windows candidate provenance differs from the uploaded UI inventory")
     if (
         inventory.get("contractName") != CANDIDATE_CONTENT_INVENTORY_CONTRACT
+        or type(inventory.get("contractVersion")) is not int
         or inventory.get("contractVersion") != 1
         or inventory.get("release")
         != {"channel": scope["channel"], "version": scope["version"]}
@@ -710,6 +732,108 @@ def _validate_candidate_provenance(
     return inventory, inventory_bytes
 
 
+def _validate_capture_heads(
+    value: object,
+    *,
+    scope: dict[str, Any],
+    finalized_by_path: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, list) or len(value) != len(PROMOTED_HEADS):
+        _fail("native-Windows capture must contain exactly one Avalonia head")
+    result: dict[str, dict[str, Any]] = {}
+    for index, raw in enumerate(value):
+        if not isinstance(raw, dict) or set(raw) != {
+            "headId",
+            "rid",
+            "installer",
+            "payload",
+            "receipt",
+            "progressLog",
+            "screenshots",
+        }:
+            _fail("native-Windows capture head property set drifted")
+        head = PROMOTED_HEADS[index]
+        if raw.get("headId") != head or raw.get("rid") != RID or head in result:
+            _fail("native-Windows capture head scope drifted")
+        expected_export = _expected_export_heads(scope)[index]
+        if raw.get("installer") != expected_export["installer"] or raw.get(
+            "payload"
+        ) != expected_export["payload"]:
+            _fail("native-Windows capture artifact binding drifted")
+
+        for property_name, expected_path in (
+            ("receipt", f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"),
+            (
+                "progressLog",
+                f"startup-smoke/windows-installer-progress-{head}-{RID}.log",
+            ),
+        ):
+            binding = raw.get(property_name)
+            if not isinstance(binding, dict) or set(binding) != {"path", "sha256"}:
+                _fail(f"native-Windows capture {property_name} binding drifted")
+            digest = _sha256(
+                binding.get("sha256"),
+                label=f"native-Windows capture {property_name} sha256",
+            )
+            inventory_row = finalized_by_path.get(expected_path)
+            if (
+                binding.get("path") != expected_path
+                or inventory_row is None
+                or inventory_row["sha256"] != digest
+                or inventory_row["sizeBytes"] < 1
+            ):
+                _fail(
+                    f"native-Windows capture {property_name} differs from finalized inventory"
+                )
+
+        screenshots = raw.get("screenshots")
+        if not isinstance(screenshots, list) or len(screenshots) != 2:
+            _fail("native-Windows capture screenshot set drifted")
+        expected_screenshots: list[dict[str, Any]] = []
+        digests: set[str] = set()
+        for screenshot_index, role in enumerate(("progress", "completion")):
+            screenshot = screenshots[screenshot_index]
+            if not isinstance(screenshot, dict) or set(screenshot) != {
+                "role",
+                "path",
+                "sha256",
+                "width",
+                "height",
+            }:
+                _fail("native-Windows capture screenshot binding drifted")
+            expected_path = f"screenshots/windows-installer-{head}-{RID}-{role}.png"
+            digest = _sha256(
+                screenshot.get("sha256"),
+                label=f"native-Windows capture {role} screenshot sha256",
+            )
+            width = _positive_int(
+                screenshot.get("width"),
+                label=f"native-Windows capture {role} screenshot width",
+            )
+            height = _positive_int(
+                screenshot.get("height"),
+                label=f"native-Windows capture {role} screenshot height",
+            )
+            inventory_row = finalized_by_path.get(expected_path)
+            if (
+                screenshot.get("role") != role
+                or screenshot.get("path") != expected_path
+                or not 320 <= width <= 16_384
+                or not 200 <= height <= 16_384
+                or inventory_row is None
+                or inventory_row["sha256"] != digest
+                or inventory_row["sizeBytes"] < 1
+                or digest in digests
+            ):
+                _fail("native-Windows capture screenshot differs from finalized inventory")
+            digests.add(digest)
+            expected_screenshots.append(
+                {"role": role, "path": expected_path, "sha256": digest}
+            )
+        result[head] = {"screenshots": expected_screenshots}
+    return result
+
+
 def _validate_native_evidence(
     root: Path,
     *,
@@ -727,6 +851,7 @@ def _validate_native_evidence(
     )
     if (
         finalized_inventory.get("contractName") != FINALIZED_INVENTORY_CONTRACT
+        or type(finalized_inventory.get("contractVersion")) is not int
         or finalized_inventory.get("contractVersion") != 1
     ):
         _fail("finalized native-Windows inventory contract drifted")
@@ -742,6 +867,7 @@ def _validate_native_evidence(
     )
     if (
         finalization.get("contractName") != FINALIZATION_CONTRACT
+        or type(finalization.get("contractVersion")) is not int
         or finalization.get("contractVersion") != 1
         or finalization.get("status") != "passed"
         or finalization.get("humanReviewConfirmed") is not True
@@ -780,6 +906,7 @@ def _validate_native_evidence(
     )
     if (
         capture.get("contractName") != CAPTURE_CONTRACT
+        or type(capture.get("contractVersion")) is not int
         or capture.get("contractVersion") != 1
         or capture.get("status") != "captured"
         or capture.get("captureMode") != "interactive"
@@ -800,6 +927,11 @@ def _validate_native_evidence(
         or VERSION_RE.fullmatch(version) is None
     ):
         _fail("native-Windows capture release identity is invalid")
+    capture_heads = _validate_capture_heads(
+        capture.get("heads"),
+        scope=scope,
+        finalized_by_path=finalized_by_path,
+    )
     provenance_inventory, provenance_bytes = _validate_candidate_provenance(
         root,
         bundle_root=bundle_root,
@@ -810,6 +942,12 @@ def _validate_native_evidence(
         root / CANDIDATE_PROVENANCE_EXPORT,
         label="native-Windows candidate export receipt",
     )
+    upload_export, upload_export_bytes = _strict_json(
+        bundle_root / CANDIDATE_UPLOAD_EXPORT,
+        label="candidate upload export receipt",
+    )
+    if upload_export != export_receipt or upload_export_bytes != export_bytes:
+        _fail("native-Windows candidate export receipt differs from the uploaded UI receipt")
     candidate_binding = _validate_capture_candidate_binding(
         capture.get("candidate"),
         canonical_manifest_sha256=canonical_manifest_sha256,
@@ -830,6 +968,7 @@ def _validate_native_evidence(
     )
     if (
         capture_inventory.get("contractName") != CAPTURE_INVENTORY_CONTRACT
+        or type(capture_inventory.get("contractVersion")) is not int
         or capture_inventory.get("contractVersion") != 1
         or capture_inventory.get("captureManifestSha256")
         != hashlib.sha256(capture_bytes).hexdigest()
@@ -938,6 +1077,8 @@ def _validate_native_evidence(
             if role not in {"progress", "completion"} or role in screenshot_roles:
                 _fail(f"{head} visual proof screenshot role drifted")
             screenshot_roles.add(role)
+        if screenshots != capture_heads[head]["screenshots"]:
+            _fail(f"{head} visual proof screenshots differ from the capture head")
             finalized_row = finalized_by_path.get(path)
             if finalized_row is None or finalized_row["sha256"] != digest:
                 _fail(f"{head} visual proof screenshot finalized inventory binding drifted")

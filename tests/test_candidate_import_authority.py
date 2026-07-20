@@ -51,6 +51,41 @@ def write_rehashed_authority(path: Path, authority: dict[str, object]) -> None:
     )
 
 
+def rewrite_candidate_inventory(authority: dict[str, object], mutate) -> None:
+    entry = authority["custody"]["inventory"]
+    inventory = json.loads(base64.b64decode(entry["base64"]))
+    replacement = mutate(inventory)
+    payload = (json.dumps(replacement, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    entry["base64"] = base64.b64encode(payload).decode()
+    entry["sha256"] = hashlib.sha256(payload).hexdigest()
+    entry["sizeBytes"] = len(payload)
+    rows = replacement["files"]
+    digest = hashlib.sha256()
+    for row in rows:
+        path = row["path"].encode()
+        digest.update(len(path).to_bytes(8, "big"))
+        digest.update(path)
+        digest.update(row["sizeBytes"].to_bytes(8, "big"))
+        digest.update(bytes.fromhex(row["sha256"]))
+    candidate = authority["candidate"]
+    candidate["fileCount"] = len(rows)
+    candidate["totalBytes"] = sum(row["sizeBytes"] for row in rows)
+    candidate["inventorySha256"] = digest.hexdigest()
+    identity = {
+        key: candidate[key]
+        for key in (
+            "version",
+            "canonicalManifestSha256",
+            "inventorySha256",
+            "fileCount",
+            "totalBytes",
+        )
+    }
+    candidate["bundleIdentitySha256"] = hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 def refresh_rehashed_evidence_bindings(authority: dict[str, object]) -> None:
     native = authority["custody"]["nativeWindowsFinalizedEvidence"]
     entries = {entry["path"]: entry for entry in native["files"]}
@@ -418,6 +453,30 @@ def candidate_fixture(
             "heads": export_heads,
         },
     )
+    # The genuine UI candidate artifact contains five files.  Preserve the two
+    # generated provenance documents at its root as well as their identical
+    # copies carried forward by the native-Windows evidence artifact.
+    (bundle / provenance.name).write_bytes(provenance.read_bytes())
+    (bundle / export_receipt.name).write_bytes(export_receipt.read_bytes())
+    summary.unlink()
+    inventory.unlink()
+    command = [
+        sys.executable,
+        str(SUMMARY),
+        "summarize",
+        "--bundle-root",
+        str(bundle),
+        "--canonical-manifest",
+        str(canonical),
+        "--output",
+        str(summary),
+        "--inventory-output",
+        str(inventory),
+    ]
+    for path in sorted(path for path in bundle.rglob("*") if path.is_file()):
+        command.extend(("--file", str(path)))
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr
 
     capture_source = source(
         ".github/workflows/windows-native-evidence-capture.yml",
@@ -659,6 +718,31 @@ def invoke_materializer(
     return completed, output, fixture
 
 
+def resummarize_fixture(
+    fixture: tuple[Path, Path, Path, Path, Path],
+) -> None:
+    bundle, canonical, summary, inventory, _ = fixture
+    summary.unlink(missing_ok=True)
+    inventory.unlink(missing_ok=True)
+    command = [
+        sys.executable,
+        str(SUMMARY),
+        "summarize",
+        "--bundle-root",
+        str(bundle),
+        "--canonical-manifest",
+        str(canonical),
+        "--output",
+        str(summary),
+        "--inventory-output",
+        str(inventory),
+    ]
+    for path in sorted(path for path in bundle.rglob("*") if path.is_file()):
+        command.extend(("--file", str(path)))
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert completed.returncode == 0, completed.stderr
+
+
 def load_projection():
     spec = importlib.util.spec_from_file_location("candidate_projection_test", PROJECTION)
     assert spec is not None and spec.loader is not None
@@ -737,7 +821,7 @@ def test_fresh_native_finalization_materializes_exact_custody(tmp_path: Path) ->
     assert completed.returncode == 0, completed.stderr
     authority = json.loads(output.read_text())
     assert authority["status"] == "candidate_import_ready"
-    assert authority["candidate"]["fileCount"] == 3
+    assert authority["candidate"]["fileCount"] == 5
     assert authority["custody"]["canonicalManifest"]["base64"]
     evidence = authority["custody"]["nativeWindowsFinalizedEvidence"]
     assert evidence["reviewer"] == "accountable-reviewer"
@@ -804,10 +888,7 @@ def test_manifest_and_native_evidence_head_scope_cannot_widen_or_narrow(
     )
 
     assert completed.returncode != 0
-    assert (
-        "required-head" in completed.stderr
-        or "required desktop tuples" in completed.stderr
-    )
+    assert "candidate" in completed.stderr
     assert not output.exists()
 
 
@@ -826,6 +907,81 @@ def test_materializer_rejects_windows_artifact_head_outside_required_scope(
     assert not output.exists()
 
 
+def test_fully_aligned_blazor_scope_cannot_become_promoted_authority(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(
+        tmp_path,
+        required_heads=("avalonia", "blazor-desktop"),
+        artifact_heads=("avalonia", "blazor-desktop"),
+        evidence_heads=("avalonia", "blazor-desktop"),
+    )
+    completed, output, _ = invoke_materializer(
+        fixture, tmp_path / "candidate-authority.json"
+    )
+
+    assert completed.returncode != 0
+    assert "promoted Avalonia head" in completed.stderr
+    assert not output.exists()
+
+    _, canonical_path, summary_path, inventory_path, _ = fixture
+    module = load_projection()
+    with pytest.raises(module.ProjectionBlocked, match="promoted Avalonia head"):
+        module._candidate_windows_scope(
+            json.loads(canonical_path.read_text()),
+            json.loads(inventory_path.read_text())["files"],
+            json.loads(summary_path.read_text()),
+        )
+
+
+def test_candidate_inventory_rejects_extra_root_level_row(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    bundle, canonical_path, summary_path, inventory_path, _ = fixture
+    (bundle / "UNEXPECTED.generated.json").write_text("{}\n", encoding="utf-8")
+    resummarize_fixture(fixture)
+
+    completed, output, _ = invoke_materializer(
+        fixture, tmp_path / "candidate-authority.json"
+    )
+
+    assert completed.returncode != 0
+    assert "exact three UI provenance rows" in completed.stderr
+    assert not output.exists()
+
+    module = load_projection()
+    with pytest.raises(module.ProjectionBlocked, match="exact Avalonia UI export tree"):
+        module._candidate_windows_scope(
+            json.loads(canonical_path.read_text()),
+            json.loads(inventory_path.read_text())["files"],
+            json.loads(summary_path.read_text()),
+        )
+
+
+def test_uploaded_ui_provenance_must_equal_native_preserved_bytes(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    finalized_inventory = (
+        fixture[-1]
+        / "candidate-provenance"
+        / "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+    )
+    document = json.loads(finalized_inventory.read_text())
+    document["release"]["channel"] = "tampered-preview"
+    write_json(finalized_inventory, document)
+    refresh_directory_evidence_bindings(fixture[-1])
+
+    completed, output, _ = invoke_materializer(
+        fixture, tmp_path / "candidate-authority.json"
+    )
+
+    assert completed.returncode != 0
+    assert "differs from the uploaded UI inventory" in completed.stderr
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("drift", ["rid", "kind", "file"])
 def test_allowed_head_windows_scope_cannot_widen_by_rid_kind_or_file(
     tmp_path: Path,
@@ -838,12 +994,15 @@ def test_allowed_head_windows_scope_cannot_widen_by_rid_kind_or_file(
     )
 
     assert completed.returncode != 0
-    assert "required desktop tuple" in completed.stderr
+    assert "exact Avalonia UI export tree" in completed.stderr or "desktop tuple" in completed.stderr
     assert not output.exists()
 
     _, canonical_path, summary_path, inventory_path, _ = fixture
     module = load_projection()
-    with pytest.raises(module.ProjectionBlocked, match="required desktop tuple"):
+    with pytest.raises(
+        module.ProjectionBlocked,
+        match="required desktop tuple|exact Avalonia UI export tree",
+    ):
         module._candidate_windows_scope(
             json.loads(canonical_path.read_text()),
             json.loads(inventory_path.read_text())["files"],
@@ -872,7 +1031,7 @@ def test_materializer_rejects_fully_rehashed_exporter_source_tamper(
     )
 
     assert completed.returncode != 0
-    assert "source differs from capture authority" in completed.stderr
+    assert "export receipt" in completed.stderr
     assert not output.exists()
 
 
@@ -925,6 +1084,81 @@ def test_materializer_rejects_fully_rehashed_native_evidence_contract_tamper(
     completed, output, _ = invoke_materializer(
         fixture,
         tmp_path / "candidate-authority.json",
+    )
+
+    assert completed.returncode != 0
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "empty",
+        "extra",
+        "receipt_fields",
+        "progress_path",
+        "extra_screenshot",
+        "boolean_width",
+    ],
+)
+def test_materializer_rejects_rehashed_capture_head_drift(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    capture_path = fixture[-1] / "WINDOWS_NATIVE_CAPTURE.generated.json"
+    capture = json.loads(capture_path.read_text())
+    head = capture["heads"][0]
+    if tamper == "empty":
+        capture["heads"] = []
+    elif tamper == "extra":
+        capture["heads"].append(json.loads(json.dumps(head)))
+    elif tamper == "receipt_fields":
+        head["receipt"]["sizeBytes"] = 1
+    elif tamper == "progress_path":
+        head["progressLog"]["path"] = (
+            "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+        )
+    elif tamper == "extra_screenshot":
+        head["screenshots"].append(json.loads(json.dumps(head["screenshots"][0])))
+    else:
+        head["screenshots"][0]["width"] = True
+    write_json(capture_path, capture)
+    refresh_directory_evidence_bindings(fixture[-1])
+
+    completed, output, _ = invoke_materializer(
+        fixture, tmp_path / "candidate-authority.json"
+    )
+
+    assert completed.returncode != 0
+    assert "capture" in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("document", ["capture", "finalization", "upload_inventory"])
+def test_python_contract_versions_reject_boolean_one(
+    tmp_path: Path,
+    document: str,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    if document == "upload_inventory":
+        target = fixture[3]
+        payload = json.loads(target.read_text())
+        payload["contractVersion"] = True
+        write_json(target, payload)
+    else:
+        target = fixture[-1] / (
+            "WINDOWS_NATIVE_CAPTURE.generated.json"
+            if document == "capture"
+            else "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+        )
+        payload = json.loads(target.read_text())
+        payload["contractVersion"] = True
+        write_json(target, payload)
+        refresh_directory_evidence_bindings(fixture[-1])
+
+    completed, output, _ = invoke_materializer(
+        fixture, tmp_path / "candidate-authority.json"
     )
 
     assert completed.returncode != 0
@@ -1008,6 +1242,16 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
         "candidate_artifact_name",
         "export_source",
         "export_heads",
+        "capture_heads_empty",
+        "capture_heads_extra",
+        "capture_receipt_fields",
+        "capture_progress_path",
+        "capture_screenshot_extra",
+        "capture_width_type",
+        "finalization_contract_type",
+        "candidate_root_inventory_digest",
+        "candidate_root_export_digest",
+        "upload_inventory_contract_type",
     ],
 )
 def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
@@ -1135,7 +1379,7 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
                 "source": {**value["source"], "actor": "different-producer"},
             },
         )
-    else:
+    elif tamper == "export_heads":
         rewrite_embedded_document(
             authority,
             export_path,
@@ -1151,6 +1395,56 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
                     }
                 ],
             },
+        )
+    elif tamper in {
+        "candidate_root_inventory_digest",
+        "candidate_root_export_digest",
+        "upload_inventory_contract_type",
+    }:
+        def mutate_inventory(value):
+            if tamper == "upload_inventory_contract_type":
+                value["contractVersion"] = True
+                return value
+            target = (
+                "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+                if tamper == "candidate_root_inventory_digest"
+                else "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+            )
+            row = next(row for row in value["files"] if row["path"] == target)
+            row["sha256"] = "f" * 64
+            return value
+
+        rewrite_candidate_inventory(authority, mutate_inventory)
+    elif tamper.startswith("capture_"):
+        def mutate_capture(value):
+            heads = value["heads"]
+            head = heads[0]
+            if tamper == "capture_heads_empty":
+                value["heads"] = []
+            elif tamper == "capture_heads_extra":
+                heads.append(json.loads(json.dumps(head)))
+            elif tamper == "capture_receipt_fields":
+                head["receipt"]["sizeBytes"] = 1
+            elif tamper == "capture_progress_path":
+                head["progressLog"]["path"] = "startup-smoke/other.log"
+            elif tamper == "capture_screenshot_extra":
+                head["screenshots"].append(
+                    json.loads(json.dumps(head["screenshots"][0]))
+                )
+            else:
+                head["screenshots"][0]["width"] = True
+            return value
+
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            mutate_capture,
+        )
+    else:
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+            lambda value: {**value, "contractVersion": True},
         )
 
     refresh_rehashed_evidence_bindings(authority)

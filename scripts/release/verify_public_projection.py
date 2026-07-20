@@ -66,6 +66,11 @@ CANDIDATE_PROVENANCE_INVENTORY_FILE = (
 CANDIDATE_PROVENANCE_EXPORT_FILE = (
     "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
 )
+CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE = (
+    "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+)
+CANDIDATE_UPLOAD_EXPORT_FILE = "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+CANDIDATE_PROMOTED_HEADS = ("avalonia",)
 CANDIDATE_CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 CANDIDATE_FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
 CANDIDATE_PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
@@ -1278,16 +1283,13 @@ def _candidate_windows_scope(
         raise ProjectionBlocked("candidate release version differs from its authority identity")
     coverage = canonical.get("desktopTupleCoverage")
     heads_value = coverage.get("requiredDesktopHeads") if isinstance(coverage, dict) else None
-    if (
-        not isinstance(heads_value, list)
-        or not heads_value
-        or any(
-            not isinstance(head, str) or CANDIDATE_HEAD_RE.fullmatch(head) is None
-            for head in heads_value
-        )
-        or len(set(heads_value)) != len(heads_value)
+    if heads_value != list(CANDIDATE_PROMOTED_HEADS) or any(
+        not isinstance(head, str) or CANDIDATE_HEAD_RE.fullmatch(head) is None
+        for head in heads_value or []
     ):
-        raise ProjectionBlocked("candidate requiredDesktopHeads is invalid")
+        raise ProjectionBlocked(
+            "candidate requiredDesktopHeads differs from the promoted Avalonia head"
+        )
     heads = tuple(heads_value)
     artifacts_value = canonical.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
@@ -1357,15 +1359,16 @@ def _candidate_windows_scope(
         for head in heads
         for role in ("installer", "payload")
     }
-    actual_file_paths = {
-        str(row["path"])
-        for row in candidate_rows
-        if str(row["path"]).startswith("files/")
+    expected_candidate_paths = {
+        "RELEASE_CHANNEL.generated.json",
+        CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE,
+        CANDIDATE_UPLOAD_EXPORT_FILE,
+        *expected_file_paths,
     }
-    if actual_file_paths != expected_file_paths:
+    actual_candidate_paths = {str(row["path"]) for row in candidate_rows}
+    if actual_candidate_paths != expected_candidate_paths:
         raise ProjectionBlocked(
-            "candidate upload Windows artifact file set differs from the exact "
-            "required desktop tuples"
+            "candidate upload inventory differs from the exact Avalonia UI export tree"
         )
     return {"version": version, "channel": channel, "heads": heads, "artifacts": artifacts}
 
@@ -1414,6 +1417,112 @@ def _candidate_expected_export_heads(scope: dict[str, object]) -> list[dict[str,
         }
         for head in scope["heads"]
     ]
+
+
+def _validate_candidate_capture_heads(
+    value: object,
+    *,
+    scope: dict[str, object],
+    finalized_by_path: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    if not isinstance(value, list) or len(value) != len(CANDIDATE_PROMOTED_HEADS):
+        raise ProjectionBlocked("candidate capture must contain exactly one Avalonia head")
+    expected_export_heads = _candidate_expected_export_heads(scope)
+    result: dict[str, dict[str, object]] = {}
+    for index, raw in enumerate(value):
+        if not isinstance(raw, dict) or set(raw) != {
+            "headId",
+            "rid",
+            "installer",
+            "payload",
+            "receipt",
+            "progressLog",
+            "screenshots",
+        }:
+            raise ProjectionBlocked("candidate capture head property set drifted")
+        head = CANDIDATE_PROMOTED_HEADS[index]
+        if raw.get("headId") != head or raw.get("rid") != CANDIDATE_RID or head in result:
+            raise ProjectionBlocked("candidate capture head scope drifted")
+        expected_export = expected_export_heads[index]
+        if raw.get("installer") != expected_export["installer"] or raw.get(
+            "payload"
+        ) != expected_export["payload"]:
+            raise ProjectionBlocked("candidate capture artifact binding drifted")
+
+        for property_name, expected_path in (
+            (
+                "receipt",
+                f"startup-smoke/startup-smoke-{head}-{CANDIDATE_RID}.receipt.json",
+            ),
+            (
+                "progressLog",
+                f"startup-smoke/windows-installer-progress-{head}-{CANDIDATE_RID}.log",
+            ),
+        ):
+            binding = raw.get(property_name)
+            if not isinstance(binding, dict) or set(binding) != {"path", "sha256"}:
+                raise ProjectionBlocked(f"candidate capture {property_name} binding drifted")
+            digest = binding.get("sha256")
+            inventory_row = finalized_by_path.get(expected_path)
+            if (
+                binding.get("path") != expected_path
+                or SHA256_RE.fullmatch(str(digest or "")) is None
+                or inventory_row is None
+                or inventory_row["sha256"] != digest
+                or not isinstance(inventory_row["sizeBytes"], int)
+                or inventory_row["sizeBytes"] < 1
+            ):
+                raise ProjectionBlocked(
+                    f"candidate capture {property_name} differs from finalized inventory"
+                )
+
+        screenshots = raw.get("screenshots")
+        if not isinstance(screenshots, list) or len(screenshots) != 2:
+            raise ProjectionBlocked("candidate capture screenshot set drifted")
+        expected_screenshots: list[dict[str, object]] = []
+        digests: set[str] = set()
+        for screenshot_index, role in enumerate(("progress", "completion")):
+            screenshot = screenshots[screenshot_index]
+            if not isinstance(screenshot, dict) or set(screenshot) != {
+                "role",
+                "path",
+                "sha256",
+                "width",
+                "height",
+            }:
+                raise ProjectionBlocked("candidate capture screenshot binding drifted")
+            expected_path = (
+                f"screenshots/windows-installer-{head}-{CANDIDATE_RID}-{role}.png"
+            )
+            digest = screenshot.get("sha256")
+            width = screenshot.get("width")
+            height = screenshot.get("height")
+            inventory_row = finalized_by_path.get(expected_path)
+            if (
+                screenshot.get("role") != role
+                or screenshot.get("path") != expected_path
+                or SHA256_RE.fullmatch(str(digest or "")) is None
+                or isinstance(width, bool)
+                or not isinstance(width, int)
+                or not 320 <= width <= 16_384
+                or isinstance(height, bool)
+                or not isinstance(height, int)
+                or not 200 <= height <= 16_384
+                or inventory_row is None
+                or inventory_row["sha256"] != digest
+                or not isinstance(inventory_row["sizeBytes"], int)
+                or inventory_row["sizeBytes"] < 1
+                or str(digest) in digests
+            ):
+                raise ProjectionBlocked(
+                    "candidate capture screenshot differs from finalized inventory"
+                )
+            digests.add(str(digest))
+            expected_screenshots.append(
+                {"role": role, "path": expected_path, "sha256": digest}
+            )
+        result[head] = {"screenshots": expected_screenshots}
+    return result
 
 
 def _validate_capture_candidate_binding(
@@ -1536,6 +1645,7 @@ def _validate_candidate_export_receipt(
         raise ProjectionBlocked("candidate export receipt property set drifted")
     if (
         receipt.get("contractName") != "chummer6-ui.preview-nightly-candidate-export"
+        or type(receipt.get("contractVersion")) is not int
         or receipt.get("contractVersion") != 1
         or receipt.get("status") != "exported"
         or receipt.get("release")
@@ -1683,6 +1793,7 @@ def _validate_candidate_native_evidence(
     if (
         finalized.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-finalized-inventory"
+        or type(finalized.get("contractVersion")) is not int
         or finalized.get("contractVersion") != 1
     ):
         raise ProjectionBlocked("candidate finalized native-Windows inventory contract drifted")
@@ -1715,6 +1826,7 @@ def _validate_candidate_native_evidence(
     if (
         provenance.get("contractName")
         != "chummer6-ui.preview-nightly-candidate-content-inventory"
+        or type(provenance.get("contractVersion")) is not int
         or provenance.get("contractVersion") != 1
         or provenance.get("release")
         != {"channel": scope["channel"], "version": scope["version"]}
@@ -1732,6 +1844,14 @@ def _validate_candidate_native_evidence(
     candidate_by_path = {str(row["path"]): row for row in candidate_rows}
     if any(candidate_by_path.get(str(row["path"])) != row for row in provenance_rows):
         raise ProjectionBlocked("candidate native-Windows content bytes drifted")
+    if candidate_by_path.get(CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE) != {
+        "path": CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE,
+        "sha256": hashlib.sha256(provenance_bytes).hexdigest(),
+        "sizeBytes": len(provenance_bytes),
+    }:
+        raise ProjectionBlocked(
+            "candidate uploaded content inventory differs from native-Windows provenance"
+        )
 
     capture, capture_bytes, _ = documents[CANDIDATE_CAPTURE_FILE]
     capture_at = _candidate_timestamp(
@@ -1740,6 +1860,7 @@ def _validate_candidate_native_evidence(
     if (
         capture.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-capture"
+        or type(capture.get("contractVersion")) is not int
         or capture.get("contractVersion") != 1
         or capture.get("status") != "captured"
         or capture.get("captureMode") != "interactive"
@@ -1756,11 +1877,15 @@ def _validate_candidate_native_evidence(
         capture_source=capture_source,
         capture_generated_at=capture_at,
     )
+    capture_heads = _validate_candidate_capture_heads(
+        capture.get("heads"), scope=scope, finalized_by_path=finalized_by_path
+    )
 
     capture_inventory, capture_inventory_bytes, _ = documents[CANDIDATE_CAPTURE_INVENTORY_FILE]
     if (
         capture_inventory.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-capture-inventory"
+        or type(capture_inventory.get("contractVersion")) is not int
         or capture_inventory.get("contractVersion") != 1
         or capture_inventory.get("captureManifestSha256")
         != hashlib.sha256(capture_bytes).hexdigest()
@@ -1782,6 +1907,7 @@ def _validate_candidate_native_evidence(
     if (
         finalization.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-finalization"
+        or type(finalization.get("contractVersion")) is not int
         or finalization.get("contractVersion") != 1
         or finalization.get("status") != "passed"
         or finalization.get("humanReviewConfirmed") is not True
@@ -1813,7 +1939,15 @@ def _validate_candidate_native_evidence(
     if set(documents) != expected_document_paths:
         raise ProjectionBlocked("candidate native-Windows evidence file scope drifted")
 
-    export, _, _ = documents[CANDIDATE_PROVENANCE_EXPORT_FILE]
+    export, export_bytes, _ = documents[CANDIDATE_PROVENANCE_EXPORT_FILE]
+    if candidate_by_path.get(CANDIDATE_UPLOAD_EXPORT_FILE) != {
+        "path": CANDIDATE_UPLOAD_EXPORT_FILE,
+        "sha256": hashlib.sha256(export_bytes).hexdigest(),
+        "sizeBytes": len(export_bytes),
+    }:
+        raise ProjectionBlocked(
+            "candidate uploaded export receipt differs from native-Windows provenance"
+        )
     _validate_candidate_export_receipt(
         export,
         candidate_binding=capture_candidate,
@@ -1877,6 +2011,10 @@ def _validate_candidate_native_evidence(
             ):
                 raise ProjectionBlocked(f"candidate {head} visual screenshot proof drifted")
             roles.add(str(role))
+        if screenshots != capture_heads[head]["screenshots"]:
+            raise ProjectionBlocked(
+                f"candidate {head} visual screenshots differ from the capture head"
+            )
         if (
             proof.get("contractName") != "chummer6-ui.windows_installer_visual_proof"
             or type(proof.get("contractVersion")) is not int
@@ -1912,6 +2050,7 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     } or (
         authority.get("contractName")
         != "chummer.release-upload.candidate-import-authority/v1"
+        or type(authority.get("contractVersion")) is not int
         or authority.get("contractVersion") != 1
         or authority.get("status") != PROJECTION_STATUS_CANDIDATE_IMPORT_READY
     ):
@@ -2009,6 +2148,7 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     if (
         inventory.get("contractName")
         != "chummer.release-upload.candidate-inventory/v1"
+        or type(inventory.get("contractVersion")) is not int
         or inventory.get("contractVersion") != 1
         or not isinstance(rows, list)
         or len(rows) != candidate["fileCount"]

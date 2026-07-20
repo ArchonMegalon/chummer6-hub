@@ -160,6 +160,13 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     [InlineData("candidate_artifact_name")]
     [InlineData("export_source")]
     [InlineData("export_heads")]
+    [InlineData("capture_heads_empty")]
+    [InlineData("capture_heads_extra")]
+    [InlineData("capture_receipt_fields")]
+    [InlineData("capture_progress_path")]
+    [InlineData("capture_screenshot_extra")]
+    [InlineData("capture_width_type")]
+    [InlineData("finalization_contract_type")]
     public void RuntimeRejectsFreshlyRehashedSemanticEvidenceTamper(string tamper)
     {
         using var fixture = new SnapshotFixture();
@@ -175,13 +182,28 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
-    public void RuntimeRejectsWindowsArtifactsOutsideRequiredDesktopHeads()
+    public void RuntimeRejectsWidenedBlazorPromotedHeadScope()
     {
         using var fixture = new SnapshotFixture();
         fixture.Publish(
             "candidate_import_ready",
             SnapshotFixture.BuildCandidateAuthority(
                 includeUndeclaredWindowsArtifacts: true));
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    [Fact]
+    public void RuntimeRejectsExtraRootLevelCandidateInventoryRow()
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish(
+            "candidate_import_ready",
+            SnapshotFixture.BuildCandidateAuthority(
+                includeExtraRootInventoryRow: true));
 
         ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
 
@@ -355,6 +377,57 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 JsonObject export = ReadEmbedded(authority, exportPath);
                 export["heads"]![0]!["installer"]!["sha256"] = new string('f', 64);
                 RewriteEmbedded(authority, exportPath, export);
+                break;
+            }
+            case "capture_heads_empty":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["heads"] = new JsonArray();
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "capture_heads_extra":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                JsonArray heads = capture["heads"]!.AsArray();
+                heads.Add(heads[0]!.DeepClone());
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "capture_receipt_fields":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["heads"]![0]!["receipt"]!["sizeBytes"] = 1;
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "capture_progress_path":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["heads"]![0]!["progressLog"]!["path"] = startupPath;
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "capture_screenshot_extra":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                JsonArray screenshots = capture["heads"]![0]!["screenshots"]!.AsArray();
+                screenshots.Add(screenshots[0]!.DeepClone());
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "capture_width_type":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["heads"]![0]!["screenshots"]![0]!["width"] = true;
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "finalization_contract_type":
+            {
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                finalization["contractVersion"] = true;
+                RewriteEmbedded(authority, finalizationPath, finalization);
                 break;
             }
             default:
@@ -682,6 +755,16 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         {
             string root = Path.Combine(_root, "exact-bundle");
             Directory.CreateDirectory(root);
+            JsonObject generatedAuthority = JsonNode.Parse(BuildCandidateAuthority())?.AsObject()
+                ?? throw new InvalidDataException("candidate fixture authority is invalid");
+            byte[] contentInventoryBytes = Convert.FromBase64String(
+                FindEmbedded(
+                    generatedAuthority,
+                    CandidateProvenanceInventoryPath)["base64"]!.GetValue<string>());
+            byte[] exportReceiptBytes = Convert.FromBase64String(
+                FindEmbedded(
+                    generatedAuthority,
+                    CandidateProvenanceExportPath)["base64"]!.GetValue<string>());
             foreach (ReleaseUploadCandidateInventoryRow row in authority.Inventory)
             {
                 string path = Path.Combine(root, row.Path.Replace('/', Path.DirectorySeparatorChar));
@@ -689,6 +772,10 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 byte[] bytes = row.Path switch
                 {
                     "RELEASE_CHANNEL.generated.json" => authority.CanonicalManifestBytes,
+                    "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json" =>
+                        contentInventoryBytes,
+                    "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json" =>
+                        exportReceiptBytes,
                     "files/chummer-avalonia-win-x64-installer.exe" => InstallerBytes,
                     "files/chummer-avalonia-win-x64-payload.zip" => PayloadBytes,
                     _ => throw new InvalidDataException("unexpected candidate fixture path")
@@ -700,7 +787,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
 
         public static byte[] BuildCandidateAuthority(
             bool includeUndeclaredWindowsArtifacts = false,
-            string? allowedHeadScopeDrift = null)
+            string? allowedHeadScopeDrift = null,
+            bool includeExtraRootInventoryRow = false)
         {
             string installerSha = Sha256(InstallerBytes);
             string payloadSha = Sha256(PayloadBytes);
@@ -795,7 +883,9 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 artifacts = manifestArtifacts,
                 desktopTupleCoverage = new
                 {
-                    requiredDesktopHeads = new[] { "avalonia" }
+                    requiredDesktopHeads = includeUndeclaredWindowsArtifacts
+                        ? new[] { "avalonia", "blazor-desktop" }
+                        : new[] { "avalonia" }
                 }
             });
             string canonicalSha = Sha256(canonical);
@@ -973,13 +1063,13 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     new
                     {
                         role = "progress",
-                        path = "screenshots/avalonia-progress.png",
+                        path = "screenshots/windows-installer-avalonia-win-x64-progress.png",
                         sha256 = Sha256(progressScreenshot)
                     },
                     new
                     {
                         role = "completion",
-                        path = "screenshots/avalonia-completion.png",
+                        path = "screenshots/windows-installer-avalonia-win-x64-completion.png",
                         sha256 = Sha256(completionScreenshot)
                     }
                 },
@@ -1045,6 +1135,46 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 },
                 source = exportSource,
                 heads = new[] { exportHead }
+            });
+            rows.Add(new ReleaseUploadCandidateInventoryRow(
+                "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
+                provenance.LongLength,
+                Sha256(provenance)));
+            rows.Add(new ReleaseUploadCandidateInventoryRow(
+                "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
+                export.LongLength,
+                Sha256(export)));
+            if (includeExtraRootInventoryRow)
+            {
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "UNEXPECTED.generated.json",
+                    3,
+                    Sha256("{}\n"u8.ToArray())));
+            }
+            rows.Sort(static (left, right) => string.CompareOrdinal(left.Path, right.Path));
+            inventorySha = ReleaseUploadSnapshotAuthorityService.ComputeInventoryDigest(rows);
+            candidate = new ReleaseUploadCandidateIdentity(
+                "run-candidate",
+                canonicalSha,
+                inventorySha,
+                rows.Count,
+                rows.Sum(static row => row.SizeBytes),
+                string.Empty);
+            candidate = candidate with
+            {
+                BundleIdentitySha256 =
+                    ReleaseUploadSnapshotAuthorityService.ComputeBundleIdentity(candidate)
+            };
+            inventory = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer.release-upload.candidate-inventory/v1",
+                contractVersion = 1,
+                files = rows.Select(row => new
+                {
+                    path = row.Path,
+                    sha256 = row.Sha256,
+                    sizeBytes = row.SizeBytes
+                })
             });
             string artifactCreatedAt = now.AddMinutes(-1).ToString(
                 "yyyy-MM-dd'T'HH:mm:ss'Z'",
@@ -1121,7 +1251,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     new
                     {
                         role = "progress",
-                        path = "screenshots/avalonia-progress.png",
+                        path = "screenshots/windows-installer-avalonia-win-x64-progress.png",
                         sha256 = Sha256(progressScreenshot),
                         width = 1280,
                         height = 720
@@ -1129,7 +1259,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     new
                     {
                         role = "completion",
-                        path = "screenshots/avalonia-completion.png",
+                        path = "screenshots/windows-installer-avalonia-win-x64-completion.png",
                         sha256 = Sha256(completionScreenshot),
                         width = 1280,
                         height = 720
@@ -1187,8 +1317,12 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 .Select(pair => (Path: pair.Key, Bytes: pair.Value))
                 .Concat(
                 [
-                    (Path: "screenshots/avalonia-completion.png", Bytes: completionScreenshot),
-                    (Path: "screenshots/avalonia-progress.png", Bytes: progressScreenshot),
+                    (
+                        Path: "screenshots/windows-installer-avalonia-win-x64-completion.png",
+                        Bytes: completionScreenshot),
+                    (
+                        Path: "screenshots/windows-installer-avalonia-win-x64-progress.png",
+                        Bytes: progressScreenshot),
                     (
                         Path: "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
                         Bytes: progressLog)
