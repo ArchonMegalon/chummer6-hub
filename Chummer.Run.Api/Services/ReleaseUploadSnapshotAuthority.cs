@@ -385,6 +385,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     {
         using JsonDocument document = ParseStrictObject(payload, "candidate import authority");
         JsonElement root = document.RootElement;
+        if (!ExactPropertySet(
+                root,
+                new HashSet<string>(
+                    [
+                        "contractName",
+                        "contractVersion",
+                        "status",
+                        "generatedAtUtc",
+                        "expiresAtUtc",
+                        "candidate",
+                        "custody"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate import authority property set drifted");
+        }
         RequireExactString(root, "contractName", CandidateContractName);
         RequireExactInt32(root, "contractVersion", 1);
         RequireExactString(root, "status", "candidate_import_ready");
@@ -402,6 +418,21 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         }
 
         JsonElement candidateElement = RequireObject(root, "candidate");
+        if (!ExactPropertySet(
+                candidateElement,
+                new HashSet<string>(
+                    [
+                        "version",
+                        "canonicalManifestSha256",
+                        "inventorySha256",
+                        "fileCount",
+                        "totalBytes",
+                        "bundleIdentitySha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate import identity property set drifted");
+        }
         string version = RequireString(candidateElement, "version");
         if (!VersionPattern.IsMatch(version))
         {
@@ -423,9 +454,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         }
 
         JsonElement custody = RequireObject(root, "custody");
+        if (!ExactPropertySet(
+                custody,
+                new HashSet<string>(
+                    [
+                        "canonicalManifest",
+                        "inventory",
+                        "nativeWindowsFinalizedEvidence"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate import custody property set drifted");
+        }
         byte[] canonicalManifest = DecodeEmbedded(
             RequireObject(custody, "canonicalManifest"),
-            "candidate canonical manifest");
+            "candidate canonical manifest",
+            "RELEASE_CHANNEL.generated.json");
         if (!string.Equals(
                 Sha256(canonicalManifest),
                 candidate.CanonicalManifestSha256,
@@ -435,7 +479,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         }
         byte[] inventoryBytes = DecodeEmbedded(
             RequireObject(custody, "inventory"),
-            "candidate upload inventory");
+            "candidate upload inventory",
+            "CANDIDATE_UPLOAD_INVENTORY.generated.json");
         IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory =
             ParseCandidateInventory(inventoryBytes);
         if (inventory.Count != candidate.FileCount
@@ -550,7 +595,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 {
                     throw new InvalidDataException("candidate native-Windows evidence path drifted");
                 }
-                byte[] bytes = DecodeEmbedded(entry, $"candidate native-Windows {path}");
+                byte[] bytes = DecodeEmbedded(
+                    entry,
+                    $"candidate native-Windows {path}",
+                    path);
                 documents.Add(
                     path,
                     new CandidateEvidenceDocument(
@@ -582,6 +630,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
 
             JsonElement finalizedInventory = documents[FinalizedInventoryFileName].Root;
+            if (!ExactPropertySet(
+                    finalizedInventory,
+                    new HashSet<string>(
+                        ["contractName", "contractVersion", "captureInventorySha256", "files"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized native-Windows inventory property set drifted");
+            }
             RequireExactString(
                 finalizedInventory,
                 "contractName",
@@ -691,7 +748,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 documents,
                 candidate.CanonicalManifestSha256,
                 summaryCaptureAt);
-            ValidateCaptureHeads(
+            IReadOnlyDictionary<string, IReadOnlyList<CandidateScreenshotBinding>>
+                captureScreenshots = ValidateCaptureHeads(
                 RequireArray(capture, "heads"),
                 scope,
                 finalizedByPath);
@@ -699,6 +757,21 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             CandidateEvidenceDocument captureInventoryDocument =
                 documents[CaptureInventoryFileName];
             JsonElement captureInventory = captureInventoryDocument.Root;
+            if (!ExactPropertySet(
+                    captureInventory,
+                    new HashSet<string>(
+                        [
+                            "contractName",
+                            "contractVersion",
+                            "captureContract",
+                            "captureManifestSha256",
+                            "files"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate native-Windows capture inventory property set drifted");
+            }
             RequireExactString(
                 captureInventory,
                 "contractName",
@@ -706,12 +779,46 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             RequireExactInt32(captureInventory, "contractVersion", 1);
             RequireExactString(
                 captureInventory,
+                "captureContract",
+                "chummer6-ui.preview-nightly-native-windows-capture");
+            RequireExactString(
+                captureInventory,
                 "captureManifestSha256",
                 Sha256(captureDocument.Bytes));
-            _ = ParseEvidenceInventoryRows(
+            IReadOnlyList<ReleaseUploadCandidateInventoryRow> captureRows =
+                ParseEvidenceInventoryRows(
                 RequireArray(captureInventory, "files"),
                 "candidate native-Windows capture inventory",
-                allowEmpty: true);
+                allowEmpty: false);
+            string[] expectedCapturePaths =
+            [
+                CaptureFileName,
+                CandidateProvenanceInventoryFileName,
+                CandidateProvenanceExportFileName,
+                .. scope.Heads.SelectMany(head => new[]
+                {
+                    $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json",
+                    $"startup-smoke/windows-installer-progress-{head}-{WindowsRid}.log",
+                    $"screenshots/windows-installer-{head}-{WindowsRid}-progress.png",
+                    $"screenshots/windows-installer-{head}-{WindowsRid}-completion.png"
+                })
+            ];
+            Array.Sort(expectedCapturePaths, StringComparer.Ordinal);
+            if (!captureRows.Select(static row => row.Path).SequenceEqual(expectedCapturePaths)
+                || captureRows.Any(row =>
+                    !finalizedByPath.TryGetValue(
+                        row.Path,
+                        out ReleaseUploadCandidateInventoryRow? finalizedRow)
+                    || finalizedRow != row))
+            {
+                throw new InvalidDataException(
+                    "candidate native-Windows capture inventory differs from its finalized capture tree");
+            }
+            string captureInventorySha256 = Sha256(captureInventoryDocument.Bytes);
+            RequireExactString(
+                finalizedInventory,
+                "captureInventorySha256",
+                captureInventorySha256);
 
             JsonElement finalization = documents[FinalizationFileName].Root;
             RequireExactString(
@@ -726,7 +833,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             RequireExactString(
                 finalization,
                 "captureInventorySha256",
-                Sha256(captureInventoryDocument.Bytes));
+                captureInventorySha256);
             if (!JsonSemanticEquals(RequireObject(finalization, "captureSource"), captureSource)
                 || !JsonSemanticEquals(
                     RequireObject(finalization, "finalizationSource"),
@@ -765,6 +872,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 {
                     throw new InvalidDataException("candidate visual proof head or digest drifted");
                 }
+            }
+            var expectedFinalizedPaths = new HashSet<string>(
+                captureRows.Select(static row => row.Path),
+                StringComparer.Ordinal)
+            {
+                CaptureInventoryFileName,
+                FinalizationFileName
+            };
+            expectedFinalizedPaths.UnionWith(
+                proofsByHead.Values.Select(static proof => proof.Path));
+            if (!expectedFinalizedPaths.SetEquals(finalizedByPath.Keys))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized native-Windows inventory file scope drifted");
             }
             fixedPaths.UnionWith(proofsByHead.Values.Select(static proof => proof.Path));
             if (!fixedPaths.SetEquals(documents.Keys))
@@ -850,10 +971,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     "chummer6-ui.windows_installer_visual_proof");
                 RequireExactInt32(proof, "contractVersion", 1);
                 RequireExactString(proof, "status", "passed");
+                RequireExactString(proof, "version", scope.Version);
                 RequireExactString(proof, "headId", head);
+                RequireExactString(proof, "head", head);
                 RequireExactString(proof, "platform", "windows");
                 RequireExactString(proof, "rid", WindowsRid);
                 RequireExactString(proof, "releaseVersion", scope.Version);
+                RequireExactString(proof, "channel", scope.Channel);
                 RequireExactString(proof, "channelId", scope.Channel);
                 RequireExactString(
                     proof,
@@ -865,11 +989,93 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     $"sha256:{headArtifacts.Installer.Sha256}");
                 _ = RequireFreshUtcTimestamp(proof, "generatedAt", now);
                 JsonElement checks = RequireObject(proof, "checks");
+                if (!ExactPropertySet(
+                        checks,
+                        new HashSet<string>(
+                            ["capture_mode", "human_review_confirmed"],
+                            StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException("candidate visual checks property set drifted");
+                }
                 RequireExactString(checks, "capture_mode", "interactive");
                 RequireBoolean(checks, "human_review_confirmed", expected: true);
                 ValidatePassedReview(proof, "readabilityReview", reviewer);
                 ValidatePassedReview(proof, "contrastReview", reviewer);
                 ValidatePassedReview(proof, "clippingReview", reviewer);
+                JsonElement review = RequireObject(proof, "review");
+                if (!ExactPropertySet(
+                        review,
+                        new HashSet<string>(
+                            [
+                                "authenticatedReviewer",
+                                "captureActor",
+                                "allowlistSource",
+                                "explicitConfirmations"
+                            ],
+                            StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException("candidate visual review property set drifted");
+                }
+                RequireExactString(review, "authenticatedReviewer", reviewer);
+                RequireExactString(
+                    review,
+                    "captureActor",
+                    RequireString(captureSource, "actor"));
+                RequireExactString(
+                    review,
+                    "allowlistSource",
+                    "repository variable plus protected environment");
+                JsonElement confirmations = RequireObject(
+                    review,
+                    "explicitConfirmations");
+                if (!ExactPropertySet(
+                        confirmations,
+                        new HashSet<string>(
+                            ["readability", "contrast", "clipping"],
+                            StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException(
+                        "candidate visual confirmations property set drifted");
+                }
+                foreach (string confirmation in new[]
+                         {
+                             "readability",
+                             "contrast",
+                             "clipping"
+                         })
+                {
+                    RequireExactString(confirmations, confirmation, "passed");
+                }
+                JsonElement captureBinding = RequireObject(proof, "captureBinding");
+                var captureBindingKeys = new HashSet<string>(
+                    [
+                        "repository",
+                        "workflow",
+                        "runId",
+                        "runAttempt",
+                        "ref",
+                        "sha",
+                        "artifactName",
+                        "inventorySha256"
+                    ],
+                    StringComparer.Ordinal);
+                if (!ExactPropertySet(captureBinding, captureBindingKeys))
+                {
+                    throw new InvalidDataException(
+                        "candidate visual capture binding property set drifted");
+                }
+                foreach (string property in captureBindingKeys.Where(
+                             static name => name != "inventorySha256"))
+                {
+                    RequireExactString(
+                        captureBinding,
+                        property,
+                        RequireString(captureSource, property));
+                }
+                RequireExactString(
+                    captureBinding,
+                    "inventorySha256",
+                    Sha256(captureInventoryDocument.Bytes));
                 if (!JsonSemanticEquals(
                         RequireObject(proof, "finalizationBinding"),
                         finalizationSource))
@@ -881,7 +1087,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 {
                     throw new InvalidDataException("candidate visual screenshot set drifted");
                 }
-                var roles = new HashSet<string>(StringComparer.Ordinal);
+                var visualScreenshots = new List<CandidateScreenshotBinding>(2);
                 foreach (JsonElement screenshot in screenshots.EnumerateArray())
                 {
                     if (!ExactPropertySet(
@@ -896,7 +1102,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     string expectedPath =
                         $"screenshots/windows-installer-{head}-{WindowsRid}-{role}.png";
                     if (role is not "progress" and not "completion"
-                        || !roles.Add(role)
                         || !IsCanonicalRelativePath(path)
                         || !string.Equals(path, expectedPath, StringComparison.Ordinal)
                         || !finalizedByPath.TryGetValue(
@@ -906,6 +1111,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     {
                         throw new InvalidDataException("candidate visual screenshot proof drifted");
                     }
+                    visualScreenshots.Add(new CandidateScreenshotBinding(role, path, digest));
+                }
+                if (!visualScreenshots.SequenceEqual(captureScreenshots[head]))
+                {
+                    throw new InvalidDataException(
+                        "candidate visual screenshots differ from the capture head");
                 }
             }
         }
@@ -1068,7 +1279,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         return new CandidateArtifact(path, fileName, digest, size);
     }
 
-    private static void ValidateCaptureHeads(
+    private static IReadOnlyDictionary<string, IReadOnlyList<CandidateScreenshotBinding>>
+        ValidateCaptureHeads(
         JsonElement heads,
         CandidateWindowsScope scope,
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath)
@@ -1078,6 +1290,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException(
                 "candidate capture must contain exactly one Avalonia head");
         }
+        var result = new Dictionary<string, IReadOnlyList<CandidateScreenshotBinding>>(
+            StringComparer.Ordinal);
         int index = 0;
         foreach (JsonElement row in heads.EnumerateArray())
         {
@@ -1121,6 +1335,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 throw new InvalidDataException("candidate capture screenshot set drifted");
             }
             string? previousDigest = null;
+            var bindings = new List<CandidateScreenshotBinding>(2);
             int screenshotIndex = 0;
             foreach (JsonElement screenshot in screenshots.EnumerateArray())
             {
@@ -1154,8 +1369,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "candidate capture screenshot differs from finalized inventory");
                 }
                 previousDigest = digest;
+                bindings.Add(new CandidateScreenshotBinding(role, path, digest));
             }
+            result.Add(head, bindings);
         }
+        return result;
     }
 
     private static void ValidateCaptureEvidenceBinding(
@@ -1521,15 +1739,40 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException($"{label} revision drifted");
         }
-        foreach (string field in new[] { "runId", "runAttempt", "actor", "artifactName" })
+        string runId = RequirePositiveGitHubIntegerString(source, "runId");
+        string runAttempt = RequirePositiveGitHubIntegerString(source, "runAttempt");
+        string actor = RequireString(source, "actor");
+        Regex actorPattern = string.Equals(workflow, CaptureWorkflow, StringComparison.Ordinal)
+            ? GitHubLoginPattern
+            : ReviewerPattern;
+        if (!actorPattern.IsMatch(actor))
         {
-            _ = RequireString(source, field);
+            throw new InvalidDataException($"{label} actor drifted");
+        }
+        string expectedArtifactName = string.Equals(
+            workflow,
+            CaptureWorkflow,
+            StringComparison.Ordinal)
+            ? $"windows-native-evidence-{runId}-{runAttempt}"
+            : $"windows-native-evidence-finalized-{runId}-{runAttempt}";
+        if (!string.Equals(
+                RequireString(source, "artifactName"),
+                expectedArtifactName,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} artifact identity drifted");
         }
     }
 
     private static void ValidatePassedReview(JsonElement proof, string name, string reviewer)
     {
         JsonElement review = RequireObject(proof, name);
+        if (!ExactPropertySet(
+                review,
+                new HashSet<string>(["status", "reviewer"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"candidate visual {name} property set drifted");
+        }
         RequireExactString(review, "status", "passed");
         RequireExactString(review, "reviewer", reviewer);
     }
@@ -1553,14 +1796,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string second,
         string label)
     {
-        string? firstValue = parent.TryGetProperty(first, out JsonElement firstElement)
-                             && firstElement.ValueKind == JsonValueKind.String
-            ? firstElement.GetString()
-            : null;
-        string? secondValue = parent.TryGetProperty(second, out JsonElement secondElement)
-                              && secondElement.ValueKind == JsonValueKind.String
-            ? secondElement.GetString()
-            : null;
+        bool firstPresent = parent.TryGetProperty(first, out JsonElement firstElement);
+        bool secondPresent = parent.TryGetProperty(second, out JsonElement secondElement);
+        if (firstPresent && firstElement.ValueKind != JsonValueKind.String
+            || secondPresent && secondElement.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidDataException($"{label} alias type drifted");
+        }
+        string? firstValue = firstPresent ? firstElement.GetString() : null;
+        string? secondValue = secondPresent ? secondElement.GetString() : null;
         if (firstValue is not null
             && secondValue is not null
             && !string.Equals(firstValue, secondValue, StringComparison.Ordinal))
@@ -1618,6 +1862,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     {
         using JsonDocument document = ParseStrictObject(payload, "candidate upload inventory");
         JsonElement root = document.RootElement;
+        if (!ExactPropertySet(
+                root,
+                new HashSet<string>(
+                    ["contractName", "contractVersion", "files"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate upload inventory property set drifted");
+        }
         RequireExactString(root, "contractName", CandidateInventoryContractName);
         RequireExactInt32(root, "contractVersion", 1);
         if (!root.TryGetProperty("files", out JsonElement files)
@@ -1630,6 +1882,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string? previous = null;
         foreach (JsonElement row in files.EnumerateArray())
         {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("candidate upload inventory row drifted");
+            }
             string path = RequireString(row, "path");
             if (!IsCanonicalRelativePath(path)
                 || previous is not null
@@ -1646,8 +1906,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         return rows;
     }
 
-    private static byte[] DecodeEmbedded(JsonElement entry, string label)
+    private static byte[] DecodeEmbedded(
+        JsonElement entry,
+        string label,
+        string expectedPath)
     {
+        if (!ExactPropertySet(
+                entry,
+                new HashSet<string>(
+                    ["path", "sha256", "sizeBytes", "base64"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} custody binding drifted");
+        }
+        RequireExactString(entry, "path", expectedPath);
         string sha256 = RequireSha256(entry, "sha256");
         long size = RequireNonNegativeInt64(entry, "sizeBytes");
         string encoded = RequireString(entry, "base64");
@@ -1962,6 +2234,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string Path,
         JsonElement Root,
         byte[] Bytes);
+
+    private sealed record CandidateScreenshotBinding(
+        string Role,
+        string Path,
+        string Sha256);
 
     private sealed class CandidateEvidenceDocument : IDisposable
     {

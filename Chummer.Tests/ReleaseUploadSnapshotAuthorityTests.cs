@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -146,6 +147,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     [InlineData("empty_capture")]
     [InlineData("capture_actor")]
     [InlineData("capture_workflow")]
+    [InlineData("capture_run_id_whitespace")]
+    [InlineData("capture_artifact_identity")]
     [InlineData("stale_capture")]
     [InlineData("not_native")]
     [InlineData("wine_runner")]
@@ -167,6 +170,21 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     [InlineData("capture_screenshot_extra")]
     [InlineData("capture_width_type")]
     [InlineData("finalization_contract_type")]
+    [InlineData("capture_inventory_root_extra")]
+    [InlineData("capture_inventory_empty")]
+    [InlineData("finalized_inventory_extra_row")]
+    [InlineData("authority_root_extra")]
+    [InlineData("candidate_extra")]
+    [InlineData("custody_extra")]
+    [InlineData("canonical_manifest_path")]
+    [InlineData("inventory_path")]
+    [InlineData("inventory_root_extra")]
+    [InlineData("inventory_row_extra")]
+    [InlineData("embedded_entry_extra")]
+    [InlineData("visual_screenshot_order")]
+    [InlineData("visual_checks_extra")]
+    [InlineData("visual_checks_numeric")]
+    [InlineData("visual_review_extra")]
     public void RuntimeRejectsFreshlyRehashedSemanticEvidenceTamper(string tamper)
     {
         using var fixture = new SnapshotFixture();
@@ -179,6 +197,29 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
         Assert.False(rejected.IsValid);
         Assert.Null(rejected.Candidate);
+    }
+
+    [Fact]
+    public void MatchingAliasRejectsExplicitNullWhenCompatibilityAliasExists()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            "{\"version\":null,\"releaseVersion\":\"run-candidate\"}");
+        MethodInfo method = typeof(ReleaseUploadSnapshotAuthorityService).GetMethod(
+            "RequireMatchingAlias",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("alias validator is unavailable");
+
+        TargetInvocationException rejected = Assert.Throws<TargetInvocationException>(() =>
+            method.Invoke(
+                null,
+                [
+                    document.RootElement,
+                    "version",
+                    "releaseVersion",
+                    "candidate release version"
+                ]));
+
+        Assert.IsType<InvalidDataException>(rejected.InnerException);
     }
 
     [Fact]
@@ -263,6 +304,26 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             {
                 JsonObject source = native["captureSource"]!.AsObject();
                 source["workflow"] = ".github/workflows/untrusted.yml";
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["source"] = source.DeepClone();
+                RewriteEmbedded(authority, capturePath, capture);
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                finalization["captureSource"] = source.DeepClone();
+                RewriteEmbedded(authority, finalizationPath, finalization);
+                break;
+            }
+            case "capture_run_id_whitespace":
+            case "capture_artifact_identity":
+            {
+                JsonObject source = native["captureSource"]!.AsObject();
+                if (tamper == "capture_run_id_whitespace")
+                {
+                    source["runId"] = "   ";
+                }
+                else
+                {
+                    source["artifactName"] = "unbound-capture-artifact";
+                }
                 JsonObject capture = ReadEmbedded(authority, capturePath);
                 capture["source"] = source.DeepClone();
                 RewriteEmbedded(authority, capturePath, capture);
@@ -430,6 +491,108 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 RewriteEmbedded(authority, finalizationPath, finalization);
                 break;
             }
+            case "capture_inventory_root_extra":
+            case "capture_inventory_empty":
+            {
+                JsonObject captureInventory = ReadEmbedded(
+                    authority,
+                    "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json");
+                if (tamper == "capture_inventory_root_extra")
+                {
+                    captureInventory["unexpected"] = true;
+                }
+                else
+                {
+                    captureInventory["files"] = new JsonArray();
+                }
+                RewriteEmbedded(
+                    authority,
+                    "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json",
+                    captureInventory);
+                break;
+            }
+            case "finalized_inventory_extra_row":
+            {
+                JsonObject finalizedInventory = ReadEmbedded(
+                    authority,
+                    "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json");
+                finalizedInventory["files"]!.AsArray().Add(new JsonObject
+                {
+                    ["path"] = "zz-unexpected.bin",
+                    ["sha256"] = new string('0', 64),
+                    ["sizeBytes"] = 1
+                });
+                RewriteEmbedded(
+                    authority,
+                    "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json",
+                    finalizedInventory);
+                break;
+            }
+            case "authority_root_extra":
+                authority["unexpected"] = true;
+                break;
+            case "candidate_extra":
+                authority["candidate"]!["unexpected"] = true;
+                break;
+            case "custody_extra":
+                authority["custody"]!["unexpected"] = true;
+                break;
+            case "canonical_manifest_path":
+                authority["custody"]!["canonicalManifest"]!["path"] =
+                    "renamed-release-channel.json";
+                break;
+            case "inventory_path":
+                authority["custody"]!["inventory"]!["path"] =
+                    "renamed-candidate-inventory.json";
+                break;
+            case "inventory_root_extra":
+            {
+                JsonObject inventory = ReadCustodyEmbedded(authority, "inventory");
+                inventory["unexpected"] = true;
+                RewriteCustodyEmbedded(authority, "inventory", inventory);
+                break;
+            }
+            case "inventory_row_extra":
+            {
+                JsonObject inventory = ReadCustodyEmbedded(authority, "inventory");
+                inventory["files"]![0]!["unexpected"] = true;
+                RewriteCustodyEmbedded(authority, "inventory", inventory);
+                break;
+            }
+            case "embedded_entry_extra":
+                FindEmbedded(authority, capturePath)["unexpected"] = true;
+                break;
+            case "visual_screenshot_order":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                JsonArray screenshots = visual["screenshots"]!.AsArray();
+                JsonNode first = screenshots[0]!.DeepClone();
+                screenshots[0] = screenshots[1]!.DeepClone();
+                screenshots[1] = first;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "visual_checks_extra":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["checks"]!["unexpected"] = true;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "visual_checks_numeric":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["checks"]!["human_review_confirmed"] = 1;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "visual_review_extra":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["readabilityReview"]!["unexpected"] = true;
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
             default:
                 throw new ArgumentOutOfRangeException(nameof(tamper));
         }
@@ -450,6 +613,26 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     {
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document);
         JsonObject entry = FindEmbedded(authority, path);
+        entry["base64"] = Convert.ToBase64String(bytes);
+        entry["sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        entry["sizeBytes"] = bytes.LongLength;
+    }
+
+    private static JsonObject ReadCustodyEmbedded(JsonObject authority, string name)
+    {
+        JsonObject entry = authority["custody"]![name]!.AsObject();
+        byte[] bytes = Convert.FromBase64String(entry["base64"]!.GetValue<string>());
+        return JsonNode.Parse(bytes)?.AsObject()
+            ?? throw new InvalidDataException("embedded custody fixture is invalid");
+    }
+
+    private static void RewriteCustodyEmbedded(
+        JsonObject authority,
+        string name,
+        JsonObject document)
+    {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document);
+        JsonObject entry = authority["custody"]![name]!.AsObject();
         entry["base64"] = Convert.ToBase64String(bytes);
         entry["sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes));
         entry["sizeBytes"] = bytes.LongLength;
@@ -537,19 +720,50 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
 
         JsonObject captureInventory = ReadEmbedded(authority, captureInventoryPath);
         captureInventory["captureManifestSha256"] = entries[capturePath]["sha256"]!.GetValue<string>();
+        foreach (JsonNode? node in captureInventory["files"]!.AsArray())
+        {
+            JsonObject row = node!.AsObject();
+            string path = row["path"]!.GetValue<string>();
+            if (entries.TryGetValue(path, out JsonObject? entry))
+            {
+                row["sha256"] = entry["sha256"]!.GetValue<string>();
+                row["sizeBytes"] = entry["sizeBytes"]!.GetValue<long>();
+            }
+        }
         RewriteEmbedded(authority, captureInventoryPath, captureInventory);
 
         JsonObject finalization = ReadEmbedded(authority, finalizationPath);
-        finalization["captureInventorySha256"] =
+        string captureInventorySha256 =
             entries[captureInventoryPath]["sha256"]!.GetValue<string>();
+        finalization["captureInventorySha256"] = captureInventorySha256;
         foreach (JsonNode? node in finalization["proofs"]!.AsArray())
         {
-            JsonObject proof = node!.AsObject();
-            proof["sha256"] = entries[proof["path"]!.GetValue<string>()]["sha256"]!.GetValue<string>();
+            JsonObject proofBinding = node!.AsObject();
+            string proofPath = proofBinding["path"]!.GetValue<string>();
+            JsonObject proof = ReadEmbedded(authority, proofPath);
+            if (capture["source"] is JsonObject refreshedCaptureSource)
+            {
+                proof["review"]!["captureActor"] =
+                    refreshedCaptureSource["actor"]!.GetValue<string>();
+                proof["captureBinding"] = new JsonObject
+                {
+                    ["repository"] = refreshedCaptureSource["repository"]!.GetValue<string>(),
+                    ["workflow"] = refreshedCaptureSource["workflow"]!.GetValue<string>(),
+                    ["runId"] = refreshedCaptureSource["runId"]!.GetValue<string>(),
+                    ["runAttempt"] = refreshedCaptureSource["runAttempt"]!.GetValue<string>(),
+                    ["ref"] = refreshedCaptureSource["ref"]!.GetValue<string>(),
+                    ["sha"] = refreshedCaptureSource["sha"]!.GetValue<string>(),
+                    ["artifactName"] = refreshedCaptureSource["artifactName"]!.GetValue<string>(),
+                    ["inventorySha256"] = captureInventorySha256
+                };
+                RewriteEmbedded(authority, proofPath, proof);
+            }
+            proofBinding["sha256"] = entries[proofPath]["sha256"]!.GetValue<string>();
         }
         RewriteEmbedded(authority, finalizationPath, finalization);
 
         JsonObject finalizedInventory = ReadEmbedded(authority, finalizedInventoryPath);
+        finalizedInventory["captureInventorySha256"] = captureInventorySha256;
         foreach (JsonNode? node in finalizedInventory["files"]!.AsArray())
         {
             JsonObject row = node!.AsObject();
@@ -1279,13 +1493,65 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 candidate = captureCandidate,
                 heads = new[] { captureHead }
             });
+            object[] captureInventoryRows = new (string Path, byte[] Bytes)[]
+                {
+                    ("WINDOWS_NATIVE_CAPTURE.generated.json", capture),
+                    (CandidateProvenanceInventoryPath, provenance),
+                    (CandidateProvenanceExportPath, export),
+                    (
+                        "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+                        startup),
+                    (
+                        "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
+                        progressLog),
+                    (
+                        "screenshots/windows-installer-avalonia-win-x64-progress.png",
+                        progressScreenshot),
+                    (
+                        "screenshots/windows-installer-avalonia-win-x64-completion.png",
+                        completionScreenshot)
+                }
+                .OrderBy(static row => row.Path, StringComparer.Ordinal)
+                .Select(row => (object)new
+                {
+                    path = row.Path,
+                    sha256 = Sha256(row.Bytes),
+                    sizeBytes = row.Bytes.LongLength
+                })
+                .ToArray();
             byte[] captureInventory = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 contractName = "chummer6-ui.preview-nightly-native-windows-capture-inventory",
                 contractVersion = 1,
+                captureContract = "chummer6-ui.preview-nightly-native-windows-capture",
                 captureManifestSha256 = Sha256(capture),
-                files = Array.Empty<object>()
+                files = captureInventoryRows
             });
+            JsonObject visualDocument = JsonNode.Parse(visual)!.AsObject();
+            visualDocument["review"] = JsonSerializer.SerializeToNode(new
+            {
+                authenticatedReviewer = "accountable-reviewer",
+                captureActor = "github-actions[bot]",
+                allowlistSource = "repository variable plus protected environment",
+                explicitConfirmations = new
+                {
+                    readability = "passed",
+                    contrast = "passed",
+                    clipping = "passed"
+                }
+            });
+            visualDocument["captureBinding"] = JsonSerializer.SerializeToNode(new
+            {
+                repository = captureSource["repository"],
+                workflow = captureSource["workflow"],
+                runId = captureSource["runId"],
+                runAttempt = captureSource["runAttempt"],
+                @ref = captureSource["ref"],
+                sha = captureSource["sha"],
+                artifactName = captureSource["artifactName"],
+                inventorySha256 = Sha256(captureInventory)
+            });
+            visual = JsonSerializer.SerializeToUtf8Bytes(visualDocument);
             byte[] finalization = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 contractName = "chummer6-ui.preview-nightly-native-windows-finalization",
@@ -1339,6 +1605,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             {
                 contractName = "chummer6-ui.preview-nightly-native-windows-finalized-inventory",
                 contractVersion = 1,
+                captureInventorySha256 = Sha256(captureInventory),
                 files = finalizedRows
             });
             evidence["WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json"] = finalizedInventory;

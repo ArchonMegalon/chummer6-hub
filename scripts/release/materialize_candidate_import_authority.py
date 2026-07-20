@@ -224,9 +224,20 @@ def _validate_relative_path(value: object, *, label: str) -> str:
     return value
 
 
-def _inventory_rows(value: object, *, label: str) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or not value or len(value) > 100_000:
-        _fail(f"{label} must be a bounded non-empty list")
+def _inventory_rows(
+    value: object,
+    *,
+    label: str,
+    allow_empty: bool = False,
+) -> list[dict[str, Any]]:
+    if (
+        not isinstance(value, list)
+        or not allow_empty
+        and not value
+        or len(value) > 100_000
+    ):
+        qualifier = "bounded list" if allow_empty else "bounded non-empty list"
+        _fail(f"{label} must be a {qualifier}")
     rows: list[dict[str, Any]] = []
     for index, raw in enumerate(value):
         if not isinstance(raw, dict) or set(raw) != {"path", "sha256", "sizeBytes"}:
@@ -290,6 +301,10 @@ def _validate_bundle_inventory(
 
 
 def _matching_alias(value: dict[str, Any], first: str, second: str, *, label: str) -> str:
+    if first in value and not isinstance(value[first], str):
+        _fail(f"{label} alias type drifted")
+    if second in value and not isinstance(value[second], str):
+        _fail(f"{label} alias type drifted")
     first_value = value.get(first)
     second_value = value.get(second)
     if first_value is not None and second_value is not None and first_value != second_value:
@@ -441,9 +456,22 @@ def _source(value: object, *, label: str, workflow: str) -> dict[str, Any]:
         _fail(f"{label} repository/workflow drifted")
     if value.get("ref") != PRODUCER_REF or not isinstance(value.get("sha"), str) or COMMIT_RE.fullmatch(value["sha"]) is None:
         _fail(f"{label} source revision drifted")
-    for name in ("runId", "runAttempt", "actor", "artifactName"):
-        if not isinstance(value.get(name), str) or not value[name].strip():
-            _fail(f"{label} {name} is missing")
+    run_id = _github_positive_integer(value.get("runId"), label=f"{label} runId")
+    run_attempt = _github_positive_integer(
+        value.get("runAttempt"), label=f"{label} runAttempt"
+    )
+    actor = value.get("actor")
+    artifact_name = value.get("artifactName")
+    actor_pattern = GITHUB_LOGIN_RE if workflow == CAPTURE_WORKFLOW else REVIEWER_RE
+    if not isinstance(actor, str) or actor_pattern.fullmatch(actor) is None:
+        _fail(f"{label} actor is invalid")
+    expected_artifact_name = (
+        f"windows-native-evidence-{run_id}-{run_attempt}"
+        if workflow == CAPTURE_WORKFLOW
+        else f"windows-native-evidence-finalized-{run_id}-{run_attempt}"
+    )
+    if artifact_name != expected_artifact_name:
+        _fail(f"{label} artifact identity drifted")
     return value
 
 
@@ -505,6 +533,63 @@ def _expected_export_heads(scope: dict[str, Any]) -> list[dict[str, Any]]:
         }
         for head in scope["heads"]
     ]
+
+
+def _validate_export_artifact_binding(
+    value: object,
+    *,
+    expected: dict[str, Any],
+    label: str,
+) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "relativePath",
+        "fileName",
+        "sha256",
+        "sizeBytes",
+    }:
+        _fail(f"{label} property set drifted")
+    size = value.get("sizeBytes")
+    if (
+        value.get("relativePath") != expected["relativePath"]
+        or value.get("fileName") != expected["fileName"]
+        or value.get("sha256") != expected["sha256"]
+        or isinstance(size, bool)
+        or not isinstance(size, int)
+        or size != expected["sizeBytes"]
+    ):
+        _fail(f"{label} drifted")
+
+
+def _validate_export_heads(
+    value: object,
+    *,
+    scope: dict[str, Any],
+    label: str,
+) -> None:
+    expected_heads = _expected_export_heads(scope)
+    if not isinstance(value, list) or len(value) != len(expected_heads):
+        _fail(f"{label} scope drifted")
+    for index, raw in enumerate(value):
+        if not isinstance(raw, dict) or set(raw) != {
+            "headId",
+            "rid",
+            "installer",
+            "payload",
+        }:
+            _fail(f"{label} head property set drifted")
+        expected = expected_heads[index]
+        if raw.get("headId") != expected["headId"] or raw.get("rid") != expected["rid"]:
+            _fail(f"{label} scope drifted")
+        _validate_export_artifact_binding(
+            raw.get("installer"),
+            expected=expected["installer"],
+            label=f"{label} installer",
+        )
+        _validate_export_artifact_binding(
+            raw.get("payload"),
+            expected=expected["payload"],
+            label=f"{label} payload",
+        )
 
 
 def _validate_capture_candidate_binding(
@@ -646,8 +731,11 @@ def _validate_candidate_export_receipt(
         }
     ):
         _fail("native-Windows candidate export release or byte binding drifted")
-    if receipt.get("heads") != _expected_export_heads(scope):
-        _fail("native-Windows candidate export required-head scope drifted")
+    _validate_export_heads(
+        receipt.get("heads"),
+        scope=scope,
+        label="native-Windows candidate export required-head",
+    )
     source_value = receipt.get("source")
     required_source = {
         "actor",
@@ -756,10 +844,16 @@ def _validate_capture_heads(
         if raw.get("headId") != head or raw.get("rid") != RID or head in result:
             _fail("native-Windows capture head scope drifted")
         expected_export = _expected_export_heads(scope)[index]
-        if raw.get("installer") != expected_export["installer"] or raw.get(
-            "payload"
-        ) != expected_export["payload"]:
-            _fail("native-Windows capture artifact binding drifted")
+        _validate_export_artifact_binding(
+            raw.get("installer"),
+            expected=expected_export["installer"],
+            label="native-Windows capture installer binding",
+        )
+        _validate_export_artifact_binding(
+            raw.get("payload"),
+            expected=expected_export["payload"],
+            label="native-Windows capture payload binding",
+        )
 
         for property_name, expected_path in (
             ("receipt", f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"),
@@ -850,6 +944,9 @@ def _validate_native_evidence(
         label="finalized native-Windows inventory",
     )
     if (
+        set(finalized_inventory)
+        != {"contractName", "contractVersion", "captureInventorySha256", "files"}
+        or
         finalized_inventory.get("contractName") != FINALIZED_INVENTORY_CONTRACT
         or type(finalized_inventory.get("contractVersion")) is not int
         or finalized_inventory.get("contractVersion") != 1
@@ -967,15 +1064,54 @@ def _validate_native_evidence(
         root / CAPTURE_INVENTORY_FILE, label="native-Windows capture inventory"
     )
     if (
+        set(capture_inventory)
+        != {
+            "contractName",
+            "contractVersion",
+            "captureContract",
+            "captureManifestSha256",
+            "files",
+        }
+        or
         capture_inventory.get("contractName") != CAPTURE_INVENTORY_CONTRACT
         or type(capture_inventory.get("contractVersion")) is not int
         or capture_inventory.get("contractVersion") != 1
+        or capture_inventory.get("captureContract") != CAPTURE_CONTRACT
         or capture_inventory.get("captureManifestSha256")
         != hashlib.sha256(capture_bytes).hexdigest()
-        or not isinstance(capture_inventory.get("files"), list)
     ):
         _fail("native-Windows capture inventory binding drifted")
-    if finalization.get("captureInventorySha256") != hashlib.sha256(capture_inventory_bytes).hexdigest():
+    capture_rows = _inventory_rows(
+        capture_inventory.get("files"),
+        label="native-Windows capture inventory",
+    )
+    expected_capture_paths = sorted(
+        [
+            CAPTURE_FILE,
+            CANDIDATE_PROVENANCE_INVENTORY,
+            CANDIDATE_PROVENANCE_EXPORT,
+            *[
+                path
+                for head in scope["heads"]
+                for path in (
+                    f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json",
+                    f"startup-smoke/windows-installer-progress-{head}-{RID}.log",
+                    f"screenshots/windows-installer-{head}-{RID}-progress.png",
+                    f"screenshots/windows-installer-{head}-{RID}-completion.png",
+                )
+            ],
+        ]
+    )
+    if [row["path"] for row in capture_rows] != expected_capture_paths or any(
+        finalized_by_path.get(row["path"]) != row for row in capture_rows
+    ):
+        _fail("native-Windows capture inventory differs from its finalized capture tree")
+    capture_inventory_sha256 = hashlib.sha256(capture_inventory_bytes).hexdigest()
+    if (
+        finalization.get("captureInventorySha256") != capture_inventory_sha256
+        or finalized_inventory.get("captureInventorySha256")
+        != capture_inventory_sha256
+    ):
         _fail("native-Windows finalization capture inventory binding drifted")
 
     proof_rows = finalization.get("proofs")
@@ -1010,6 +1146,15 @@ def _validate_native_evidence(
         proof_by_head[head] = (relative, proof_bytes, proof)
         custody.append((relative, proof_bytes))
 
+    expected_finalized_paths = {
+        *(row["path"] for row in capture_rows),
+        CAPTURE_INVENTORY_FILE,
+        FINALIZATION_FILE,
+        *(relative for relative, _proof_bytes, _proof in proof_by_head.values()),
+    }
+    if set(finalized_by_path) != expected_finalized_paths:
+        _fail("finalized native-Windows inventory file scope drifted")
+
     for head in scope["heads"]:
         relative, _proof_bytes, proof = proof_by_head[head]
         installer_artifact = scope["artifacts"][head]["installer"]
@@ -1043,6 +1188,8 @@ def _validate_native_evidence(
             or startup.get("bootstrapPayloadAcquisitionMode") != "download"
             or startup.get("bootstrapPayloadFileName") != payload_name
             or startup.get("bootstrapPayloadSha256") != payload_artifact["sha256"]
+            or isinstance(startup.get("bootstrapPayloadSizeBytes"), bool)
+            or not isinstance(startup.get("bootstrapPayloadSizeBytes"), int)
             or startup.get("bootstrapPayloadSizeBytes") != payload_artifact["sizeBytes"]
             or not isinstance(native, dict)
             or native.get("contractName") != NATIVE_HOST_CONTRACT
@@ -1077,31 +1224,66 @@ def _validate_native_evidence(
             if role not in {"progress", "completion"} or role in screenshot_roles:
                 _fail(f"{head} visual proof screenshot role drifted")
             screenshot_roles.add(role)
-        if screenshots != capture_heads[head]["screenshots"]:
-            _fail(f"{head} visual proof screenshots differ from the capture head")
             finalized_row = finalized_by_path.get(path)
             if finalized_row is None or finalized_row["sha256"] != digest:
                 _fail(f"{head} visual proof screenshot finalized inventory binding drifted")
+        if screenshots != capture_heads[head]["screenshots"]:
+            _fail(f"{head} visual proof screenshots differ from the capture head")
+        checks = proof.get("checks")
+        review = proof.get("review")
+        capture_binding = proof.get("captureBinding")
+        expected_capture_binding = {
+            key: capture_source[key]
+            for key in (
+                "repository",
+                "workflow",
+                "runId",
+                "runAttempt",
+                "ref",
+                "sha",
+                "artifactName",
+            )
+        }
+        expected_capture_binding["inventorySha256"] = hashlib.sha256(
+            capture_inventory_bytes
+        ).hexdigest()
         if (
             proof.get("contractName") != VISUAL_PROOF_CONTRACT
             or type(proof.get("contractVersion")) is not int
             or proof["contractVersion"] != 1
             or proof.get("status") != "passed"
+            or proof.get("version") != version
             or proof.get("headId") != head
+            or proof.get("head") != head
             or proof.get("platform") != "windows"
             or proof.get("rid") != RID
             or proof.get("releaseVersion") != version
+            or proof.get("channel") != channel
             or proof.get("channelId") != channel
             or proof.get("artifactFileName") != installer_name
             or proof.get("artifactDigest") != f"sha256:{installer_artifact['sha256']}"
-            or proof.get("checks")
-            != {"capture_mode": "interactive", "human_review_confirmed": True}
+            or not isinstance(checks, dict)
+            or set(checks) != {"capture_mode", "human_review_confirmed"}
+            or checks.get("capture_mode") != "interactive"
+            or checks.get("human_review_confirmed") is not True
             or proof.get("readabilityReview")
             != {"status": "passed", "reviewer": reviewer}
             or proof.get("contrastReview")
             != {"status": "passed", "reviewer": reviewer}
             or proof.get("clippingReview")
             != {"status": "passed", "reviewer": reviewer}
+            or review
+            != {
+                "authenticatedReviewer": reviewer,
+                "captureActor": capture_source["actor"],
+                "allowlistSource": "repository variable plus protected environment",
+                "explicitConfirmations": {
+                    "readability": "passed",
+                    "contrast": "passed",
+                    "clipping": "passed",
+                },
+            }
+            or capture_binding != expected_capture_binding
             or proof.get("finalizationBinding") != finalization_source
         ):
             _fail(f"{head} visual proof is not an exact finalized human pass")
