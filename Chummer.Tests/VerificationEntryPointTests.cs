@@ -1179,7 +1179,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("desktop installer temp root: $CHUMMER_DESKTOP_INSTALLER_TMPDIR", bootstrap, StringComparison.Ordinal);
         Assert.Contains("pruning repo-local build intermediates before retry", bootstrap, StringComparison.Ordinal);
         Assert.Contains("json_generated_at_health()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("require_all_reviewed_commit_pins", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("resolve_release_python", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("release bootstrap requires Python 3.11 or newer", bootstrap, StringComparison.Ordinal);
         Assert.Contains("generate_hub_local_release_proof()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("sanitize_hub_generator_diagnostic", bootstrap, StringComparison.Ordinal);
         Assert.Contains("generate_ui_localization_release_gate()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("resolve_ui_localization_release_gate_repo()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("allow_remote_release_proof_inputs()", bootstrap, StringComparison.Ordinal);
@@ -1189,7 +1194,26 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Ignoring remote requested release proof because remote proof inputs are disabled by default", bootstrap, StringComparison.Ordinal);
         Assert.Contains("Ignoring remote requested release gate because remote proof inputs are disabled by default", bootstrap, StringComparison.Ordinal);
         Assert.Contains("Cache-Control: no-cache", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("release proof validation failed before build", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("write_release_upload_curl_config \"$release_upload_auth_value\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("| curl -q --config - \"$@\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("release proof validation failed after candidate build", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("release proof validation failed before build", bootstrap, StringComparison.Ordinal);
+        int candidateSealed = bootstrap.IndexOf(
+            "all requested candidate bytes are built, startup-smoked, and provenance-sealed",
+            StringComparison.Ordinal);
+        int proofResolution = bootstrap.IndexOf(
+            "resolving current release proof after candidate build and before manifest materialization or upload",
+            StringComparison.Ordinal);
+        int manifestMaterialization = bootstrap.IndexOf(
+            "log \"generating release manifests\"",
+            StringComparison.Ordinal);
+        Assert.True(candidateSealed >= 0, "bootstrap must identify the sealed candidate boundary");
+        Assert.True(
+            candidateSealed < proofResolution,
+            "bootstrap must resolve release proof only after candidate bytes are sealed");
+        Assert.True(
+            proofResolution < manifestMaterialization,
+            "bootstrap must validate release proof before manifest materialization and upload");
         Assert.Contains("bootstrap synthetic hub local release-proof fallback is disabled", bootstrap, StringComparison.Ordinal);
         Assert.Contains("regenerated release proof validated against the current ui localization release gate", bootstrap, StringComparison.Ordinal);
         Assert.Contains("retrying regenerated release proof against a freshly generated ui localization release gate", bootstrap, StringComparison.Ordinal);

@@ -5213,136 +5213,6 @@ main() {
   ensure_link_target "$registry_alias" "$complete_alias_root/chummer-hub-registry"
   ensure_link_target "$ui_repo" "$complete_alias_root/chummer6-ui"
 
-  local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
-  local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
-  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
-  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}"
-  local release_proof_path
-  local ui_localization_release_gate_path
-  local sanitized_release_proof_path
-  local sanitized_ui_localization_release_gate_path
-  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-86400}}"
-  local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
-  local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
-  local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
-  local release_proof_health=""
-  local ui_localization_release_gate_health=""
-
-  release_proof_path="$(resolve_hub_local_release_proof_path \
-    "$requested_release_proof" \
-    "$hub_alias/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$work_root/.c/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$fallback_release_proof_url")"
-  if [[ -n "$release_proof_path" ]]; then
-    if ! release_proof_health="$(json_generated_at_health \
-      "$release_proof_path" \
-      "release proof" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" 2>&1)"; then
-      log "$release_proof_health"
-      release_proof_path=""
-    fi
-  fi
-  if [[ -z "$release_proof_path" ]]; then
-    release_proof_path="$(mktemp)"
-    bootstrap_tmp_paths+=("$release_proof_path")
-    generate_validated_hub_local_release_proof \
-      "$hub_alias" \
-      "$hub_repo" \
-      "$release_proof_path" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" \
-      "${registry_alias}/scripts/materialize_public_release_channel.py"
-    log "generated fresh hub local release proof at $release_proof_path"
-  fi
-
-  ui_localization_release_gate_path="$(resolve_first_existing_file_path \
-    "$requested_ui_localization_release_gate" \
-    "$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
-    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
-    "$fallback_ui_localization_release_gate_url")"
-  if [[ -n "$ui_localization_release_gate_path" ]]; then
-    if ! ui_localization_release_gate_health="$(json_generated_at_health \
-      "$ui_localization_release_gate_path" \
-      "ui localization release gate" \
-      "$localization_gate_max_age_seconds" \
-      "$localization_gate_max_future_skew_seconds" 2>&1)"; then
-      log "$ui_localization_release_gate_health"
-      ui_localization_release_gate_path=""
-    fi
-  fi
-  if [[ -z "$ui_localization_release_gate_path" ]]; then
-    ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
-      "$ui_repo" \
-      "$localization_gate_max_age_seconds" \
-      "$localization_gate_max_future_skew_seconds" \
-      "$complete_alias_root/chummer6-ui")"
-    bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
-    log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
-  fi
-
-  if [[ -z "$release_proof_path" ]] || [[ ! -f "$release_proof_path" ]]; then
-    die "release proof file is missing and could not be generated: $release_proof_path"
-  fi
-  if [[ -z "$ui_localization_release_gate_path" ]] || [[ ! -f "$ui_localization_release_gate_path" ]]; then
-    die "ui localization release gate file is missing: set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
-  fi
-
-  sanitized_release_proof_path="$(mktemp)"
-  sanitized_ui_localization_release_gate_path="$(mktemp)"
-  bootstrap_tmp_paths+=("$sanitized_release_proof_path" "$sanitized_ui_localization_release_gate_path")
-  sanitize_release_proof_payload "$release_proof_path" "$sanitized_release_proof_path"
-  sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
-  release_proof_path="$sanitized_release_proof_path"
-  ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
-
-  local materializer_path="${registry_alias}/scripts/materialize_public_release_channel.py"
-  local proof_validation_output
-  if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-    log "release proof validation failed before build: $proof_validation_output"
-    log "attempting fresh local hub release proof and ui localization release gate generation to recover"
-    local regenerated_release_proof_path
-    regenerated_release_proof_path="$(mktemp)"
-    bootstrap_tmp_paths+=("$regenerated_release_proof_path")
-    generate_validated_hub_local_release_proof \
-      "$hub_alias" \
-      "$hub_repo" \
-      "$regenerated_release_proof_path" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" \
-      "$materializer_path"
-    sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
-    release_proof_path="$sanitized_release_proof_path"
-
-    if proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-      log "regenerated release proof validated against the current ui localization release gate"
-    else
-      log "regenerated release proof still failed against the current ui localization release gate: $proof_validation_output"
-      log "retrying regenerated release proof against a freshly generated ui localization release gate"
-      ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
-        "$ui_repo" \
-        "$localization_gate_max_age_seconds" \
-        "$localization_gate_max_future_skew_seconds" \
-        "$complete_alias_root/chummer6-ui")"
-      bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
-      sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
-      ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
-
-      if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-        die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
-      fi
-    fi
-  fi
-
-  log "resolved release proof: $release_proof_path"
-  log "resolved ui localization release gate: $ui_localization_release_gate_path"
-  local release_proof_status
-  local ui_gate_status
-  release_proof_status="$(jq -r '.status // "missing"' "$release_proof_path" 2>/dev/null || true)"
-  ui_gate_status="$(jq -r '.status // "missing"' "$ui_localization_release_gate_path" 2>/dev/null || true)"
-  log "proof provenance: release proof status=${release_proof_status}, ui gate status=${ui_gate_status}"
-
   log "building media-factory compatibility assemblies"
   dotnet build "$media_repo/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj" -c Release --nologo -m:1 -p:RestoreDisableParallel=true
   dotnet build "$media_repo/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj" -c Release --nologo -m:1 -p:RestoreDisableParallel=true
@@ -5617,6 +5487,139 @@ main() {
       "$archive_state_path" \
       "$archive_receipt_path"
   done
+
+  log "all requested candidate bytes are built, startup-smoked, and provenance-sealed"
+  log "resolving current release proof after candidate build and before manifest materialization or upload"
+
+  local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
+  local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
+  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
+  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}"
+  local release_proof_path
+  local ui_localization_release_gate_path
+  local sanitized_release_proof_path
+  local sanitized_ui_localization_release_gate_path
+  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-86400}}"
+  local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
+  local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local release_proof_health=""
+  local ui_localization_release_gate_health=""
+
+  release_proof_path="$(resolve_hub_local_release_proof_path \
+    "$requested_release_proof" \
+    "$hub_alias/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$work_root/.c/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$fallback_release_proof_url")"
+  if [[ -n "$release_proof_path" ]]; then
+    if ! release_proof_health="$(json_generated_at_health \
+      "$release_proof_path" \
+      "release proof" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" 2>&1)"; then
+      log "$release_proof_health"
+      release_proof_path=""
+    fi
+  fi
+  if [[ -z "$release_proof_path" ]]; then
+    release_proof_path="$(mktemp)"
+    bootstrap_tmp_paths+=("$release_proof_path")
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
+      "$release_proof_path" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" \
+      "${registry_alias}/scripts/materialize_public_release_channel.py"
+    log "generated fresh hub local release proof at $release_proof_path"
+  fi
+
+  ui_localization_release_gate_path="$(resolve_first_existing_file_path \
+    "$requested_ui_localization_release_gate" \
+    "$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$fallback_ui_localization_release_gate_url")"
+  if [[ -n "$ui_localization_release_gate_path" ]]; then
+    if ! ui_localization_release_gate_health="$(json_generated_at_health \
+      "$ui_localization_release_gate_path" \
+      "ui localization release gate" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" 2>&1)"; then
+      log "$ui_localization_release_gate_health"
+      ui_localization_release_gate_path=""
+    fi
+  fi
+  if [[ -z "$ui_localization_release_gate_path" ]]; then
+    ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+      "$ui_repo" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" \
+      "$complete_alias_root/chummer6-ui")"
+    bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
+    log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
+  fi
+
+  if [[ -z "$release_proof_path" ]] || [[ ! -f "$release_proof_path" ]]; then
+    die "release proof file is missing and could not be generated: $release_proof_path"
+  fi
+  if [[ -z "$ui_localization_release_gate_path" ]] || [[ ! -f "$ui_localization_release_gate_path" ]]; then
+    die "ui localization release gate file is missing: set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
+  fi
+
+  sanitized_release_proof_path="$(mktemp)"
+  sanitized_ui_localization_release_gate_path="$(mktemp)"
+  bootstrap_tmp_paths+=("$sanitized_release_proof_path" "$sanitized_ui_localization_release_gate_path")
+  sanitize_release_proof_payload "$release_proof_path" "$sanitized_release_proof_path"
+  sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
+  release_proof_path="$sanitized_release_proof_path"
+  ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
+
+  local materializer_path="${registry_alias}/scripts/materialize_public_release_channel.py"
+  local proof_validation_output
+  if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+    log "release proof validation failed after candidate build: $proof_validation_output"
+    log "attempting fresh local hub release proof and ui localization release gate generation to recover"
+    local regenerated_release_proof_path
+    regenerated_release_proof_path="$(mktemp)"
+    bootstrap_tmp_paths+=("$regenerated_release_proof_path")
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
+      "$regenerated_release_proof_path" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" \
+      "$materializer_path"
+    sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
+    release_proof_path="$sanitized_release_proof_path"
+
+    if proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+      log "regenerated release proof validated against the current ui localization release gate"
+    else
+      log "regenerated release proof still failed against the current ui localization release gate: $proof_validation_output"
+      log "retrying regenerated release proof against a freshly generated ui localization release gate"
+      ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+        "$ui_repo" \
+        "$localization_gate_max_age_seconds" \
+        "$localization_gate_max_future_skew_seconds" \
+        "$complete_alias_root/chummer6-ui")"
+      bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
+      sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
+      ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
+
+      if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+        die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
+      fi
+    fi
+  fi
+
+  log "resolved release proof: $release_proof_path"
+  log "resolved ui localization release gate: $ui_localization_release_gate_path"
+  local release_proof_status
+  local ui_gate_status
+  release_proof_status="$(jq -r '.status // "missing"' "$release_proof_path" 2>/dev/null || true)"
+  ui_gate_status="$(jq -r '.status // "missing"' "$ui_localization_release_gate_path" 2>/dev/null || true)"
+  log "proof provenance: release proof status=${release_proof_status}, ui gate status=${ui_gate_status}"
 
   log "generating release manifests"
   write_release_manifests \
