@@ -24,18 +24,33 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 
-LOCK_CONTRACT = "chummer-hub.package-plane-lock/v3"
-INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v2"
+LOCK_CONTRACT = "chummer-hub.package-plane-lock/v4"
+INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v3"
 INVENTORY_FILE_NAME = "chummer-hub-packages.inventory.json"
+OBSERVED_AUTHORITY_FILE_NAME = "chummer-hub-packages.observed-authority.json"
 EXPECTED_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
     "Chummer.Hub.Registry.Contracts",
     "Chummer.Run.Registry",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
+    "Chummer.Engine.GmCharacterEdits",
 )
 EXPECTED_INTERNAL_DEPENDENCIES = {
     "Chummer.Engine.Contracts": (),
     "Chummer.Hub.Registry.Contracts": (),
     "Chummer.Run.Registry": ("Chummer.Hub.Registry.Contracts",),
+    "Chummer.Play.Contracts": (),
+    "Chummer.Run.Contracts": (
+        "Chummer.Engine.Contracts",
+        "Chummer.Hub.Registry.Contracts",
+        "Chummer.Play.Contracts",
+    ),
+    "Chummer.Engine.GmCharacterEdits": (
+        "Chummer.Engine.Contracts",
+        "Chummer.Hub.Registry.Contracts",
+        "Chummer.Run.Contracts",
+    ),
 }
 EXPECTED_PACKAGE_AUTHORITIES = {
     "Chummer.Engine.Contracts": {
@@ -66,6 +81,34 @@ EXPECTED_PACKAGE_AUTHORITIES = {
             "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
         ),
     },
+    "Chummer.Play.Contracts": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
+        "checkout_directory": "chummer-run-services",
+        "project": "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj",
+        "license_type": "file",
+        "license_value": "LICENSE",
+        "license_sha256": (
+            "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+        ),
+    },
+    "Chummer.Run.Contracts": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
+        "checkout_directory": "chummer-run-services",
+        "project": "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
+        "license_type": "file",
+        "license_value": "LICENSE",
+        "license_sha256": (
+            "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+        ),
+    },
+    "Chummer.Engine.GmCharacterEdits": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
+        "checkout_directory": "chummer-core-engine",
+        "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
+        "license_type": "expression",
+        "license_value": "GPL-3.0-only",
+        "license_sha256": None,
+    },
 }
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -89,6 +132,14 @@ RELATIONSHIPS_NAMESPACE = (
 )
 CANONICAL_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 CANONICAL_ZIP_EXTERNAL_ATTR = 0o100644 << 16
+GM_RUNTIME_ASSEMBLIES = (
+    "Chummer.Application",
+    "Chummer.Engine.GmCharacterEdits",
+    "Chummer.Infrastructure",
+    "Chummer.Rulesets.Hosting",
+    "Chummer.Rulesets.Sr5",
+    "Chummer.Rulesets.Sr6",
+)
 
 
 class PackagePlaneError(RuntimeError):
@@ -154,7 +205,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         "packages",
     }
     if not isinstance(payload, dict) or set(payload) != expected_top_level:
-        raise PackagePlaneError("package-plane lock must contain the exact v3 fields")
+        raise PackagePlaneError("package-plane lock must contain the exact v4 fields")
     if payload.get("contract") != LOCK_CONTRACT:
         raise PackagePlaneError(f"package-plane lock contract must be {LOCK_CONTRACT}")
     dotnet_sdk = _required_string(payload, "dotnet_sdk")
@@ -481,6 +532,8 @@ def package_build_properties(
     package_root: Path,
 ) -> tuple[str, ...]:
     normalized_source_root = f"/_/src/{spec.checkout_directory}"
+    versions = {row.package_id: row.version for row in lock.packages}
+    missing_local_contracts = package_root.parent / "no-local-core-contracts.csproj"
     return (
         f"-p:PackageVersion={spec.version}",
         f"-p:Version={spec.version}",
@@ -493,6 +546,16 @@ def package_build_properties(
         "-p:Deterministic=true",
         "-p:DeterministicSourcePaths=true",
         "-p:EmbedUntrackedSources=false",
+        "-p:RestorePackagesWithLockFile=true",
+        "-p:RestoreLockedMode=false",
+        "-p:ChummerUseLocalCompatibilityTree=false",
+        f"-p:ChummerPackagePlaneVersion={lock.package_version}",
+        f"-p:ChummerEngineContractsPackageVersion={versions['Chummer.Engine.Contracts']}",
+        f"-p:ChummerHubRegistryContractsPackageVersion={versions['Chummer.Hub.Registry.Contracts']}",
+        f"-p:ChummerRunRegistryPackageVersion={versions['Chummer.Run.Registry']}",
+        f"-p:ChummerRunContractsPackageVersion={versions['Chummer.Run.Contracts']}",
+        f"-p:ChummerLocalContractsProject={missing_local_contracts}",
+        "-p:PreferBundledChummerMediaContracts=true",
         f"-p:PathMap={checkout.resolve()}={normalized_source_root}",
         "-p:UseSharedCompilation=false",
         f"-p:RestorePackagesPath={package_root}",
@@ -573,6 +636,10 @@ def _validate_payload_names(names: list[str], spec: PackageSpec) -> None:
         "README.md",
         "[Content_Types].xml",
     }
+    if spec.package_id == "Chummer.Engine.GmCharacterEdits":
+        allowed_exact.update(
+            f"lib/net10.0/{assembly}.dll" for assembly in GM_RUNTIME_ASSEMBLIES
+        )
     for name in names:
         path = PurePosixPath(name)
         if path.is_absolute() or "\\" in name or ".." in path.parts:
@@ -714,6 +781,8 @@ def validate_package(
     feed: Path,
     spec: PackageSpec,
     dependency_versions: Mapping[str, str] | None = None,
+    *,
+    enforce_locked_bytes: bool = True,
 ) -> Path:
     version = spec.version
     path = _package_path(feed, spec.package_id, version)
@@ -756,7 +825,9 @@ def validate_package(
         raise PackagePlaneError(f"internal dependency drift in {path.name}")
     observed_size = path.stat().st_size
     observed_sha256 = _sha256(path)
-    if observed_size != spec.nupkg_size_bytes or observed_sha256 != spec.nupkg_sha256:
+    if enforce_locked_bytes and (
+        observed_size != spec.nupkg_size_bytes or observed_sha256 != spec.nupkg_sha256
+    ):
         raise PackagePlaneError(
             f"locked package byte authority mismatch in {path.name}: "
             f"expected sha256={spec.nupkg_sha256} size={spec.nupkg_size_bytes}; "
@@ -914,6 +985,7 @@ def build_feed(
     lock_sha256: str,
     feed: Path,
     dotnet: str,
+    observe_package_authority: bool = False,
 ) -> str:
     if feed.exists() or feed.is_symlink():
         raise PackagePlaneError("feed destination must start absent; package reuse is forbidden")
@@ -938,8 +1010,12 @@ def build_feed(
         nuget_config.write_text(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
             "<configuration><packageSources><clear />"
+            f"<add key=\"locked-chummer\" value=\"{staged_feed}\" />"
             f"<add key=\"nuget.org\" value=\"{lock.approved_remote_source}\" protocolVersion=\"3\" />"
-            "</packageSources></configuration>\n",
+            "</packageSources><packageSourceMapping>"
+            "<packageSource key=\"locked-chummer\"><package pattern=\"Chummer.*\" /></packageSource>"
+            "<packageSource key=\"nuget.org\"><package pattern=\"*\" /></packageSource>"
+            "</packageSourceMapping></configuration>\n",
             encoding="utf-8",
         )
         repositories: dict[str, PackageSpec] = {}
@@ -958,6 +1034,11 @@ def build_feed(
                 checkout,
                 package_root,
             )
+            source_lock_bytes = {
+                path.resolve(): path.read_bytes()
+                for path in checkout.rglob("packages.lock.json")
+                if path.is_file() and not path.is_symlink()
+            }
             _run(
                 (
                     dotnet,
@@ -975,6 +1056,15 @@ def build_feed(
                 cwd=checkout,
                 env=env,
             )
+            current_source_locks = {
+                path.resolve()
+                for path in checkout.rglob("packages.lock.json")
+                if path.is_file() and not path.is_symlink()
+            }
+            for path in current_source_locks - set(source_lock_bytes):
+                path.unlink()
+            for path, content in source_lock_bytes.items():
+                path.write_bytes(content)
             pack_command = [
                 dotnet,
                 "pack",
@@ -1000,7 +1090,29 @@ def build_feed(
                 staged_feed,
                 spec,
                 {row.package_id: row.version for row in lock.packages},
+                enforce_locked_bytes=not observe_package_authority,
             )
+        if observe_package_authority:
+            observed = {
+                "contract": "chummer-hub.observed-package-authority/v1",
+                "packages": [
+                    {
+                        "id": spec.package_id,
+                        "version": spec.version,
+                        "sha256": _sha256(
+                            _package_path(staged_feed, spec.package_id, spec.version)
+                        ),
+                        "size_bytes": _package_path(
+                            staged_feed, spec.package_id, spec.version
+                        ).stat().st_size,
+                    }
+                    for spec in lock.packages
+                ],
+            }
+            _write_json(staged_feed / OBSERVED_AUTHORITY_FILE_NAME, observed)
+            observed_bytes = (staged_feed / OBSERVED_AUTHORITY_FILE_NAME).read_bytes()
+            os.replace(staged_feed, feed)
+            return hashlib.sha256(observed_bytes).hexdigest()
         inventory = _inventory_payload(lock, staged_feed, lock_sha256)
         _write_json(staged_feed / INVENTORY_FILE_NAME, inventory)
         os.replace(staged_feed, feed)
@@ -1015,6 +1127,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--print-version", action="store_true")
+    parser.add_argument("--observe-package-authority", action="store_true")
     return parser.parse_args()
 
 
@@ -1034,8 +1147,15 @@ def main() -> int:
     if args.validate_only:
         digest = validate_feed_inventory(feed, lock, lock_sha256)
     else:
-        digest = build_feed(lock, lock_sha256=lock_sha256, feed=feed, dotnet=args.dotnet)
-    print(f"hub-package-plane: ok ({len(lock.packages)} packages; inventory {digest})")
+        digest = build_feed(
+            lock,
+            lock_sha256=lock_sha256,
+            feed=feed,
+            dotnet=args.dotnet,
+            observe_package_authority=args.observe_package_authority,
+        )
+    label = "observed authority" if args.observe_package_authority else "inventory"
+    print(f"hub-package-plane: ok ({len(lock.packages)} packages; {label} {digest})")
     return 0
 
 

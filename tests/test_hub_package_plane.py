@@ -19,9 +19,12 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
 PACKAGE_VERSION = "0.1.0-preview"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "5.225.0",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
     "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
     "Chummer.Run.Registry": "0.1.0-preview",
+    "Chummer.Play.Contracts": "0.1.0-preview",
+    "Chummer.Run.Contracts": "0.1.0-preview",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -50,6 +53,7 @@ OWNER_VERSION_PROPERTIES = {
     "Chummer.Engine.Contracts": "ChummerEngineContractsPackageVersion",
     "Chummer.Hub.Registry.Contracts": "ChummerHubRegistryContractsPackageVersion",
     "Chummer.Run.Registry": "ChummerRunRegistryPackageVersion",
+    "Chummer.Engine.GmCharacterEdits": "ChummerCoreGmCharacterEditsPackageVersion",
 }
 
 
@@ -74,6 +78,9 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.Contracts",
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Run.Registry",
+        "Chummer.Play.Contracts",
+        "Chummer.Run.Contracts",
+        "Chummer.Engine.GmCharacterEdits",
     ]
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
@@ -86,7 +93,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v3 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v4 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))

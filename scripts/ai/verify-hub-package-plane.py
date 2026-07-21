@@ -39,6 +39,12 @@ LOCKED_PROJECTS = (
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
 )
+LOCAL_PROJECT_PACKAGE_IDS = frozenset(
+    {
+        "Chummer.Play.Contracts",
+        "Chummer.Run.Contracts",
+    }
+)
 
 
 class VerificationError(RuntimeError):
@@ -132,14 +138,15 @@ def _clean_commit(repo_root: Path) -> str:
     return commit
 
 
-def _write_nuget_config(path: Path, feed: Path, remote: str) -> None:
+def _write_nuget_config(
+    path: Path,
+    feed: Path,
+    remote: str,
+    package_ids: Iterable[str],
+) -> None:
     exact_patterns = "".join(
         f'<package pattern="{package_id}" />'
-        for package_id in (
-            "Chummer.Engine.Contracts",
-            "Chummer.Hub.Registry.Contracts",
-            "Chummer.Run.Registry",
-        )
+        for package_id in package_ids
     )
     path.write_text(
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -182,8 +189,14 @@ def _audit_assets(
     for package_id, package_version in owner_versions.items():
         identity = f"{package_id}/{package_version}"
         metadata = observed_libraries.get(identity)
-        if not isinstance(metadata, dict) or metadata.get("type") != "package":
-            raise VerificationError(f"locked package was not restored as a package: {identity}")
+        expected_type = (
+            "project" if package_id in LOCAL_PROJECT_PACKAGE_IDS else "package"
+        )
+        if not isinstance(metadata, dict) or metadata.get("type") != expected_type:
+            raise VerificationError(
+                f"locked authority resolved with wrong consumer type: "
+                f"{identity} expected={expected_type}"
+            )
     return len(asset_paths)
 
 
@@ -374,7 +387,12 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                 raise VerificationError(f"forbidden sibling exists: {forbidden.name}")
 
         nuget_config = root / "NuGet.Config"
-        _write_nuget_config(nuget_config, feed, lock.approved_remote_source)
+        _write_nuget_config(
+            nuget_config,
+            feed,
+            lock.approved_remote_source,
+            (spec.package_id for spec in lock.packages),
+        )
         env = bootstrap.isolated_environment(os.environ, package_root, cli_home, http_cache)
         owner_versions = {spec.package_id: spec.version for spec in lock.packages}
         common = (
@@ -386,6 +404,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             + owner_versions["Chummer.Hub.Registry.Contracts"],
             "-p:ChummerRunRegistryPackageVersion="
             + owner_versions["Chummer.Run.Registry"],
+            "-p:ChummerCoreGmCharacterEditsPackageVersion="
+            + owner_versions["Chummer.Engine.GmCharacterEdits"],
             "-p:ChummerPackageFeed=",
             "-p:RestoreAdditionalProjectSources=",
             f"-p:RestorePackagesPath={package_root}",

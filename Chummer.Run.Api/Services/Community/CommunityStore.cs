@@ -86,6 +86,10 @@ public sealed class CommunityStore
     internal List<CampaignCharacterBindingState> CampaignCharacterBindings { get; } = new();
     internal List<CampaignSharedSheetAuditState> CampaignSharedSheetAudit { get; } = new();
     internal Dictionary<string, CampaignRunsiteState> CampaignRunsitesByRunId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, CampaignCreationIdempotencyState> CampaignCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignInviteCreationIdempotencyState> CampaignInviteCreationsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignRunsiteDraftIdempotencyState> CampaignRunsiteDraftCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignRunsitePublishIdempotencyState> CampaignRunsitePublishCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignRedemptionIdempotencyState> CampaignRedemptionsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, CampaignSheetEditIdempotencyState> CampaignSheetEditsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal List<CampaignGmAuthorityAuditState> CampaignGmAuthorityAudit { get; } = new();
@@ -136,6 +140,10 @@ public sealed class CommunityStore
             CampaignCharacterBindings.ToArray(),
             CampaignSharedSheetAudit.ToArray(),
             CampaignRunsitesByRunId.ToArray(),
+            CampaignCreationsByIdempotencyKey.ToArray(),
+            CampaignInviteCreationsByIdempotencyKey.ToArray(),
+            CampaignRunsiteDraftCommandsByIdempotencyKey.ToArray(),
+            CampaignRunsitePublishCommandsByIdempotencyKey.ToArray(),
             CampaignRedemptionsByIdempotencyKey.ToArray(),
             CampaignSheetEditsByIdempotencyKey.ToArray(),
             CampaignGmAuthorityAudit.ToArray(),
@@ -167,6 +175,10 @@ public sealed class CommunityStore
         ReplaceList(CampaignCharacterBindings, snapshot.CharacterBindings);
         ReplaceList(CampaignSharedSheetAudit, snapshot.SheetAudit);
         ReplaceDictionary(CampaignRunsitesByRunId, snapshot.Runsites);
+        ReplaceDictionary(CampaignCreationsByIdempotencyKey, snapshot.CampaignCreations);
+        ReplaceDictionary(CampaignInviteCreationsByIdempotencyKey, snapshot.InviteCreations);
+        ReplaceDictionary(CampaignRunsiteDraftCommandsByIdempotencyKey, snapshot.RunsiteDraftCommands);
+        ReplaceDictionary(CampaignRunsitePublishCommandsByIdempotencyKey, snapshot.RunsitePublishCommands);
         ReplaceDictionary(CampaignRedemptionsByIdempotencyKey, snapshot.Redemptions);
         ReplaceDictionary(CampaignSheetEditsByIdempotencyKey, snapshot.SheetEdits);
         ReplaceList(CampaignGmAuthorityAudit, snapshot.GmAuthorityAudit);
@@ -339,6 +351,18 @@ public sealed class CommunityStore
                 .OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
+            CampaignCreations: CampaignCreationsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignInviteCreations: CampaignInviteCreationsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignRunsiteDraftCommands: CampaignRunsiteDraftCommandsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignRunsitePublishCommands: CampaignRunsitePublishCommandsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
             CampaignRedemptions: CampaignRedemptionsByIdempotencyKey.Values
                 .OrderBy(static item => item.Key, StringComparer.Ordinal)
                 .ToArray(),
@@ -358,6 +382,10 @@ public sealed class CommunityStore
             snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
             snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
             snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
+            snapshot.CampaignCreations ?? Array.Empty<CampaignCreationIdempotencyState>(),
+            snapshot.CampaignInviteCreations ?? Array.Empty<CampaignInviteCreationIdempotencyState>(),
+            snapshot.CampaignRunsiteDraftCommands ?? Array.Empty<CampaignRunsiteDraftIdempotencyState>(),
+            snapshot.CampaignRunsitePublishCommands ?? Array.Empty<CampaignRunsitePublishIdempotencyState>(),
             snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
             snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
             snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
@@ -443,6 +471,10 @@ public sealed class CommunityStore
             snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
             snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
             snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
+            snapshot.CampaignCreations ?? Array.Empty<CampaignCreationIdempotencyState>(),
+            snapshot.CampaignInviteCreations ?? Array.Empty<CampaignInviteCreationIdempotencyState>(),
+            snapshot.CampaignRunsiteDraftCommands ?? Array.Empty<CampaignRunsiteDraftIdempotencyState>(),
+            snapshot.CampaignRunsitePublishCommands ?? Array.Empty<CampaignRunsitePublishIdempotencyState>(),
             snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
             snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
             snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
@@ -507,6 +539,10 @@ public sealed class CommunityStore
         CampaignCharacterBindings.Clear();
         CampaignSharedSheetAudit.Clear();
         CampaignRunsitesByRunId.Clear();
+        CampaignCreationsByIdempotencyKey.Clear();
+        CampaignInviteCreationsByIdempotencyKey.Clear();
+        CampaignRunsiteDraftCommandsByIdempotencyKey.Clear();
+        CampaignRunsitePublishCommandsByIdempotencyKey.Clear();
         CampaignRedemptionsByIdempotencyKey.Clear();
         CampaignSheetEditsByIdempotencyKey.Clear();
         CampaignGmAuthorityAudit.Clear();
@@ -639,6 +675,26 @@ public sealed class CommunityStore
         foreach (CampaignRunsiteState runsite in snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>())
         {
             CampaignRunsitesByRunId[$"{runsite.CampaignId}:{runsite.RunId}"] = runsite;
+        }
+
+        foreach (CampaignCreationIdempotencyState campaignCreation in snapshot.CampaignCreations ?? Array.Empty<CampaignCreationIdempotencyState>())
+        {
+            CampaignCreationsByIdempotencyKey[campaignCreation.Key] = campaignCreation;
+        }
+
+        foreach (CampaignInviteCreationIdempotencyState inviteCreation in snapshot.CampaignInviteCreations ?? Array.Empty<CampaignInviteCreationIdempotencyState>())
+        {
+            CampaignInviteCreationsByIdempotencyKey[inviteCreation.Key] = inviteCreation;
+        }
+
+        foreach (CampaignRunsiteDraftIdempotencyState command in snapshot.CampaignRunsiteDraftCommands ?? Array.Empty<CampaignRunsiteDraftIdempotencyState>())
+        {
+            CampaignRunsiteDraftCommandsByIdempotencyKey[command.Key] = command;
+        }
+
+        foreach (CampaignRunsitePublishIdempotencyState command in snapshot.CampaignRunsitePublishCommands ?? Array.Empty<CampaignRunsitePublishIdempotencyState>())
+        {
+            CampaignRunsitePublishCommandsByIdempotencyKey[command.Key] = command;
         }
 
         foreach (CampaignRedemptionIdempotencyState redemption in snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>())
@@ -823,6 +879,10 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignCharacterBindingState>? CampaignCharacterBindings = null,
     IReadOnlyList<CampaignSharedSheetAuditState>? CampaignSharedSheetAudit = null,
     IReadOnlyList<CampaignRunsiteState>? CampaignRunsites = null,
+    IReadOnlyList<CampaignCreationIdempotencyState>? CampaignCreations = null,
+    IReadOnlyList<CampaignInviteCreationIdempotencyState>? CampaignInviteCreations = null,
+    IReadOnlyList<CampaignRunsiteDraftIdempotencyState>? CampaignRunsiteDraftCommands = null,
+    IReadOnlyList<CampaignRunsitePublishIdempotencyState>? CampaignRunsitePublishCommands = null,
     IReadOnlyList<CampaignRedemptionIdempotencyState>? CampaignRedemptions = null,
     IReadOnlyList<CampaignSheetEditIdempotencyState>? CampaignSheetEdits = null,
     IReadOnlyList<CampaignGmAuthorityAuditState>? CampaignGmAuthorityAudit = null,
@@ -840,6 +900,10 @@ internal sealed record CampaignCollaborationTransactionSnapshot(
     IReadOnlyList<CampaignCharacterBindingState> CharacterBindings,
     IReadOnlyList<CampaignSharedSheetAuditState> SheetAudit,
     IReadOnlyList<KeyValuePair<string, CampaignRunsiteState>> Runsites,
+    IReadOnlyList<KeyValuePair<string, CampaignCreationIdempotencyState>> CampaignCreations,
+    IReadOnlyList<KeyValuePair<string, CampaignInviteCreationIdempotencyState>> InviteCreations,
+    IReadOnlyList<KeyValuePair<string, CampaignRunsiteDraftIdempotencyState>> RunsiteDraftCommands,
+    IReadOnlyList<KeyValuePair<string, CampaignRunsitePublishIdempotencyState>> RunsitePublishCommands,
     IReadOnlyList<KeyValuePair<string, CampaignRedemptionIdempotencyState>> Redemptions,
     IReadOnlyList<KeyValuePair<string, CampaignSheetEditIdempotencyState>> SheetEdits,
     IReadOnlyList<CampaignGmAuthorityAuditState> GmAuthorityAudit,

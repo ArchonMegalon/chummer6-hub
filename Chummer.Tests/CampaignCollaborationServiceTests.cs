@@ -1,18 +1,24 @@
 using System.Net;
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Owners;
+using Chummer.Contracts.Workspaces;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -120,7 +126,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(ExpiresInMinutes: 60, MaxUses: 2));
+            InviteRequest(ExpiresInMinutes: 60, MaxUses: 2));
 
         CampaignCollaborationInviteState state = Assert.Single(fixture.Store.CampaignCollaborationInvitesById.Values);
         Assert.Equal(64, state.LinkSecretSha256.Length);
@@ -139,6 +145,122 @@ public sealed class CampaignCollaborationServiceTests
     }
 
     [Fact]
+    public void CampaignCreationIsDurablyIdempotentAndRejectsKeyReuseForChangedPayload()
+    {
+        using var fixture = new CampaignFixture();
+        CreateCampaignCollaborationRequest request = CampaignRequest(
+            "Response Safe Campaign",
+            "Campaign creation response-loss test.",
+            "private",
+            "Opening Run",
+            "campaign-create-response-loss");
+
+        CampaignCollaborationProjection first = fixture.Service.CreateCampaign(fixture.Gm, request);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("replay must not persist");
+        CampaignCollaborationProjection replay = fixture.Service.CreateCampaign(fixture.Gm, request);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
+
+        Assert.Equal(first, replay);
+        Assert.Single(fixture.Store.CampaignSpinesById);
+        Assert.Single(fixture.Store.CampaignCreationsByIdempotencyKey);
+        Assert.Throws<CampaignIdempotencyConflictException>(() => fixture.Service.CreateCampaign(
+            fixture.Gm,
+            request with { Name = "Changed Campaign" }));
+
+        var reloadedStore = new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance);
+        IDataProtectionProvider reloadedProtection = DataProtectionProvider.Create(
+            new DirectoryInfo(fixture.DataProtectionPath));
+        var reloadedService = new CampaignCollaborationService(
+            reloadedStore,
+            new RecordingCanonicalGmCharacterEditGateway(reloadedStore, fixture.Clock),
+            reloadedProtection,
+            fixture.Clock);
+
+        Assert.Equal(
+            JsonSerializer.Serialize(first),
+            JsonSerializer.Serialize(reloadedService.CreateCampaign(fixture.Gm, request)));
+        Assert.Single(reloadedStore.CampaignSpinesById);
+        Assert.Single(reloadedStore.CampaignCreationsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void InviteCreationReplaySurvivesRestartWithoutPersistingOrProjectingSecrets()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign();
+        CreateCampaignInviteRequest request = InviteRequest(
+            ExpiresInMinutes: 60,
+            MaxUses: 2,
+            IdempotencyKey: "invite-create-response-loss");
+
+        CampaignInviteSecretProjection first = fixture.Service.CreateInvite(
+            fixture.Gm,
+            campaign.CampaignId,
+            request);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("replay must not persist");
+        CampaignInviteSecretProjection replay = fixture.Service.CreateInvite(
+            fixture.Gm,
+            campaign.CampaignId.ToUpperInvariant(),
+            request);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
+
+        Assert.Equal(first, replay);
+        Assert.Single(fixture.Store.CampaignCollaborationInvitesById);
+        CampaignInviteCreationIdempotencyState replayState =
+            Assert.Single(fixture.Store.CampaignInviteCreationsByIdempotencyKey.Values);
+        Assert.DoesNotContain(
+            replayState.GetType().GetProperties(),
+            property => property.Name.Contains("LinkSecret", StringComparison.OrdinalIgnoreCase)
+                || property.Name.Contains("ShortCode", StringComparison.OrdinalIgnoreCase));
+        Assert.Throws<CampaignIdempotencyConflictException>(() => fixture.Service.CreateInvite(
+            fixture.Gm,
+            campaign.CampaignId,
+            request with { MaxUses = 3 }));
+
+        string persisted = File.ReadAllText(fixture.StorePath);
+        Assert.DoesNotContain(first.LinkSecret, persisted, StringComparison.Ordinal);
+        Assert.DoesNotContain(first.ShortCode, persisted, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            first.ShortCode.Replace("-", string.Empty, StringComparison.Ordinal),
+            persisted,
+            StringComparison.Ordinal);
+
+        var reloadedStore = new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance);
+        IDataProtectionProvider reloadedProtection = DataProtectionProvider.Create(
+            new DirectoryInfo(fixture.DataProtectionPath));
+        var reloadedService = new CampaignCollaborationService(
+            reloadedStore,
+            new RecordingCanonicalGmCharacterEditGateway(reloadedStore, fixture.Clock),
+            reloadedProtection,
+            fixture.Clock);
+        CampaignInviteSecretProjection restartedReplay = reloadedService.CreateInvite(
+            fixture.Gm,
+            campaign.CampaignId,
+            request);
+
+        Assert.Equal(first, restartedReplay);
+        Assert.Single(reloadedStore.CampaignCollaborationInvitesById);
+        Assert.Single(reloadedStore.CampaignInviteCreationsByIdempotencyKey);
+        HubUserDto player = fixture.CreateUser("subject.invite-replay-player", "Invite Replay Player");
+        Assert.Throws<KeyNotFoundException>(() => reloadedService.CreateInvite(
+            player,
+            campaign.CampaignId,
+            request));
+
+        fixture.Clock.Advance(TimeSpan.FromDays(8));
+        CampaignInviteSecretProjection afterRetention = reloadedService.CreateInvite(
+            fixture.Gm,
+            campaign.CampaignId,
+            request);
+        Assert.NotEqual(first.InviteId, afterRetention.InviteId);
+        Assert.NotEqual(first.LinkSecret, afterRetention.LinkSecret);
+        Assert.Single(reloadedStore.CampaignCollaborationInvitesById);
+        Assert.Single(reloadedStore.CampaignInviteCreationsByIdempotencyKey);
+    }
+
+    [Fact]
     public void RedemptionBindsSelectedExistingOwnerDossierWithoutCreatingPlaceholderAndIsIdempotent()
     {
         using var fixture = new CampaignFixture();
@@ -146,7 +268,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 1));
+            InviteRequest(60, 1));
         HubUserDto player = fixture.CreateUser("subject.player-a", "Player A");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
         int dossierCountBefore = fixture.Store.DossiersById.Count;
@@ -202,7 +324,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 2));
+            InviteRequest(60, 2));
         HubUserDto playerA = fixture.CreateUser("subject.player-a", "Player A");
         HubUserDto playerB = fixture.CreateUser("subject.player-b", "Player B");
         RunnerDossierProjection foreign = fixture.CreateCharacter(playerB, "Cipher", "Blake Cipher");
@@ -226,7 +348,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 2));
+            InviteRequest(60, 2));
         HubUserDto playerA = fixture.CreateUser("subject.player-a", "Player A");
         HubUserDto playerB = fixture.CreateUser("subject.player-b", "Player B");
         HubUserDto outsider = fixture.CreateUser("subject.outsider", "Outsider");
@@ -278,7 +400,7 @@ public sealed class CampaignCollaborationServiceTests
             fixture.Store.PersistLocked();
         }
 
-        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         fixture.Service.RedeemInvite(player, invite.InviteId, fixture.LinkRequest(invite, character, "sanitize"));
         PublicationSafeProjection section = Assert.Single(
             fixture.Service.GetSharedSheet(player, campaign.CampaignId, character.DossierId).Sections);
@@ -300,7 +422,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection expired = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(5, 1));
+            InviteRequest(5, 1));
         fixture.Clock.Advance(TimeSpan.FromMinutes(6));
 
         CampaignInviteRejectedException expiredError = Assert.Throws<CampaignInviteRejectedException>(() =>
@@ -308,7 +430,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection revoked = fixture.Service.CreateInvite(
             fixture.Gm,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 1));
+            InviteRequest(60, 1));
         fixture.Service.RevokeInvite(fixture.Gm, campaign.CampaignId, revoked.InviteId);
         CampaignInviteRejectedException revokedError = Assert.Throws<CampaignInviteRejectedException>(() =>
             fixture.Service.RedeemInvite(player, revoked.InviteId, fixture.LinkRequest(revoked, character, "revoked")));
@@ -328,7 +450,7 @@ public sealed class CampaignCollaborationServiceTests
     {
         using var fixture = new CampaignFixture();
         CampaignCollaborationProjection campaign = fixture.CreateCampaign();
-        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
         RedeemCampaignInviteRequest request = fixture.LinkRequest(invite, character, "throttle") with { Secret = "wrong-secret" };
@@ -374,15 +496,21 @@ public sealed class CampaignCollaborationServiceTests
         Assert.Equal(1, fixture.CanonicalEdits.ApplyCount);
         Assert.Equal(1, fixture.CanonicalEdits.CallCount);
         Assert.StartsWith("gm-edit-", receipt.ReceiptId, StringComparison.Ordinal);
-        CoreDelegatedGmEditTransportCommand canonicalCommand = Assert.Single(fixture.CanonicalEdits.Commands);
-        Assert.Equal(campaign.CampaignId, canonicalCommand.Context.CampaignId);
-        Assert.Equal(fixture.Gm.UserId, canonicalCommand.Context.ActorUserId);
-        Assert.Equal(player.UserId, canonicalCommand.Context.CharacterOwnerUserId);
-        Assert.Equal(joined.Binding.AuthoritativeCharacterId, canonicalCommand.Context.AuthoritativeCharacterId);
-        Assert.Equal("Razor-2", canonicalCommand.RunnerHandle);
-        Assert.Equal("Alex Razor", canonicalCommand.DisplayName);
+        DelegatedGmCharacterEditCommand canonicalCommand = Assert.Single(fixture.CanonicalEdits.Commands);
+        Assert.Equal(campaign.CampaignId, canonicalCommand.CampaignId);
+        Assert.Equal(fixture.Gm.UserId, canonicalCommand.ActorId);
+        Assert.Equal(player.UserId, canonicalCommand.CharacterOwner.Value);
+        Assert.Equal(joined.Binding.AuthoritativeCharacterId, canonicalCommand.CharacterId.Value);
+        Assert.Equal(
+            "Razor-2",
+            Assert.Single(canonicalCommand.Operations, operation =>
+                operation.Path == DelegatedGmCharacterEditContract.ProfileAliasPath).Value);
+        Assert.Equal(
+            "Alex Razor",
+            Assert.Single(canonicalCommand.Operations, operation =>
+                operation.Path == DelegatedGmCharacterEditContract.ProfileNamePath).Value);
         Assert.DoesNotContain(
-            typeof(CoreDelegatedGmEditTransportCommand).GetProperties(),
+            typeof(DelegatedGmCharacterEditCommand).GetProperties(),
             property => property.Name is "Status" or "Sections" or "Balance" or "Quota");
         Assert.Equal("Razor-2", fixture.Store.DossiersById[joined.DossierId].RunnerHandle);
         CampaignPlayerSafeSheetProjection persistedProjection = fixture.Service.GetSharedSheet(
@@ -410,6 +538,159 @@ public sealed class CampaignCollaborationServiceTests
             campaign.CampaignId,
             joined.DossierId,
             request with { ExpectedRevision = 2, IdempotencyKey = "self-edit" }));
+    }
+
+    [Fact]
+    public void HubIdempotencyReplayReadsLaterOwnerProfileWithoutReapplyingGmEdit()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign();
+        HubUserDto player = fixture.CreateUser("subject.player", "Player");
+        CampaignInviteRedemptionProjection joined = fixture.Join(
+            campaign,
+            player,
+            "Razor",
+            "Alex Razor");
+        var request = new CampaignSharedSheetUpdateRequest(
+            1,
+            "stored-replay-owner-wins",
+            "GM Razor",
+            "GM Alex",
+            "active",
+            "Prove replay never rolls back a later owner edit.");
+
+        CampaignSharedSheetEditReceipt applied = fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId,
+            request);
+        DelegatedGmCharacterProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
+            player.UserId,
+            joined.Binding.AuthoritativeCharacterId,
+            "Owner Razor",
+            "Owner Alex");
+
+        CampaignSharedSheetEditReceipt replay = fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId,
+            request);
+        CampaignPlayerSafeSheetProjection current = fixture.Service.GetSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId);
+
+        Assert.Equal(applied.Revision, replay.Revision);
+        Assert.Equal(ownerProfile.Revision, replay.CurrentRevision);
+        Assert.Equal(ownerProfile.Revision, current.Revision);
+        Assert.Equal("Owner Razor", current.RunnerHandle);
+        Assert.Equal("Owner Alex", current.DisplayName);
+        Assert.Equal(1, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(1, fixture.CanonicalEdits.ApplyCount);
+        Assert.Equal(3, fixture.CanonicalEdits.ReadCount);
+        Assert.Single(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
+    }
+
+    [Fact]
+    public void StoreAuthorizerRechecksCurrentManagerOwnerGrantAndBindingOnEveryDecision()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign();
+        HubUserDto player = fixture.CreateUser("subject.player", "Player");
+        CampaignInviteRedemptionProjection joined = fixture.Join(
+            campaign,
+            player,
+            "Razor",
+            "Alex Razor");
+        var authorizer = new CommunityStoreCampaignGmCharacterEditAuthorizer(
+            fixture.Store,
+            fixture.Clock);
+        var request = new CampaignGmCharacterEditAuthorizationRequest(
+            campaign.CampaignId,
+            fixture.Gm.UserId,
+            new OwnerScope(player.UserId),
+            new CharacterWorkspaceId(joined.Binding.AuthoritativeCharacterId),
+            ImmutableArray.Create(
+                DelegatedGmCharacterEditContract.ProfileAliasPath,
+                DelegatedGmCharacterEditContract.ProfileNamePath));
+
+        CampaignGmCharacterEditAuthorization granted = authorizer.Authorize(request);
+        CampaignCharacterBindingState binding = Assert.Single(
+            fixture.Store.CampaignCharacterBindings);
+
+        Assert.True(granted.Authorized);
+        Assert.Equal(binding.BindingId, granted.DelegationId);
+        Assert.Equal(binding.BindingVersionId, granted.AuthorityReceiptId);
+        Assert.Equal(binding.BindingRevision, granted.AuthorityRevision);
+        Assert.Equal(player.UserId, granted.GrantedByCharacterOwnerId);
+        Assert.False(authorizer.Authorize(request with { ActorId = player.UserId }).Authorized);
+        Assert.False(authorizer.Authorize(request with
+        {
+            RequestedPatchPaths = ImmutableArray.Create(
+                DelegatedGmCharacterEditContract.ProfileNotesPath)
+        }).Authorized);
+
+        _ = fixture.Service.UpdateGmAuthority(
+            player,
+            campaign.CampaignId,
+            joined.DossierId,
+            new CampaignGmAuthorityUpdateRequest(
+                joined.Binding.BindingRevision,
+                GrantGmEditAuthority: false,
+                IdempotencyKey: "revoke-before-next-core-call",
+                Reason: "Character owner revoked GM edit authority."));
+
+        Assert.False(authorizer.Authorize(request).Authorized);
+    }
+
+    [Fact]
+    public void PackageGatewayRegistrationIsUnavailableWithoutPathAndRejectsBlankConfiguration()
+    {
+        using var fixture = new CampaignFixture();
+        ServiceProvider unavailableProvider = BuildCampaignGatewayProvider(
+            fixture.Store,
+            fixture.Clock,
+            new ConfigurationBuilder().Build());
+        using (unavailableProvider)
+        {
+            Assert.IsType<UnavailableCoreGmCharacterEditGateway>(
+                unavailableProvider.GetRequiredService<ICoreGmCharacterEditGateway>());
+        }
+
+        IConfiguration blankConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Chummer:CoreGmCharacterEdits:WorkspaceStorePath"] = " "
+            })
+            .Build();
+        using ServiceProvider blankProvider = BuildCampaignGatewayProvider(
+            fixture.Store,
+            fixture.Clock,
+            blankConfiguration);
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            blankProvider.GetRequiredService<ICoreGmCharacterEditGateway>());
+        Assert.Contains("cannot be blank", exception.Message, StringComparison.Ordinal);
+
+        string coreStorePath = Path.Combine(
+            Path.GetDirectoryName(fixture.StorePath)!,
+            "core-workspaces");
+        Directory.CreateDirectory(coreStorePath);
+        IConfiguration configured = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Chummer:CoreGmCharacterEdits:WorkspaceStorePath"] = coreStorePath
+            })
+            .Build();
+        using ServiceProvider configuredProvider = BuildCampaignGatewayProvider(
+            fixture.Store,
+            fixture.Clock,
+            configured);
+        ICoreGmCharacterEditGateway configuredGateway =
+            configuredProvider.GetRequiredService<ICoreGmCharacterEditGateway>();
+        Assert.IsNotType<UnavailableCoreGmCharacterEditGateway>(configuredGateway);
+        Assert.Equal(
+            "Chummer.Application.Workspaces.DelegatedGmCharacterEditService",
+            configuredGateway.GetType().FullName);
     }
 
     [Fact]
@@ -470,7 +751,7 @@ public sealed class CampaignCollaborationServiceTests
                 "Stale command.")));
 
         Assert.Equal(1, conflict.CurrentRevision);
-        Assert.Equal(1, fixture.CanonicalEdits.ReadCount);
+        Assert.Equal(2, fixture.CanonicalEdits.ReadCount);
         Assert.Equal(1, fixture.CanonicalEdits.CallCount);
         Assert.Equal(0, fixture.CanonicalEdits.ApplyCount);
         Assert.Empty(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
@@ -484,7 +765,7 @@ public sealed class CampaignCollaborationServiceTests
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
         CampaignCharacterBindingState consentBefore = Assert.Single(fixture.Store.CampaignCharacterBindings);
-        CoreDelegatedGmEditTransportProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
+        DelegatedGmCharacterProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
             player.UserId,
             joined.Binding.AuthoritativeCharacterId,
             "Owner Razor",
@@ -529,13 +810,13 @@ public sealed class CampaignCollaborationServiceTests
         HubUserDto secondGm = fixture.CreateUser("subject.gm-two", "Second GM");
         CampaignCollaborationProjection secondCampaign = fixture.Service.CreateCampaign(
             secondGm,
-            new CreateCampaignCollaborationRequest("Second"));
+            CampaignRequest("Second"));
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
         CampaignInviteSecretProjection firstInvite = fixture.Service.CreateInvite(
             fixture.Gm,
             firstCampaign.CampaignId,
-            new(60, 1));
+            InviteRequest(60, 1));
         CampaignInviteRedemptionProjection firstJoined = fixture.Service.RedeemInvite(
             player,
             firstInvite.InviteId,
@@ -543,7 +824,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection secondInvite = fixture.Service.CreateInvite(
             secondGm,
             secondCampaign.CampaignId,
-            new(60, 1));
+            InviteRequest(60, 1));
         _ = fixture.Service.RedeemInvite(
             player,
             secondInvite.InviteId,
@@ -585,7 +866,7 @@ public sealed class CampaignCollaborationServiceTests
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
         int bindingCount = fixture.Store.CampaignCharacterBindings.Count;
-        fixture.CanonicalEdits.ForcedOutcome = CoreDelegatedGmEditTransportOutcome.Unavailable;
+        fixture.CanonicalEdits.ForcedOutcome = DelegatedGmCharacterEditOutcome.Unavailable;
 
         Assert.Throws<CampaignCanonicalEditUnavailableException>(() => fixture.Service.UpdateSharedSheet(
             fixture.Gm,
@@ -702,7 +983,7 @@ public sealed class CampaignCollaborationServiceTests
             joined.DossierId,
             edit));
         fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
-        CoreDelegatedGmEditTransportProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
+        DelegatedGmCharacterProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
             player.UserId,
             joined.Binding.AuthoritativeCharacterId,
             "Owner Razor",
@@ -742,13 +1023,13 @@ public sealed class CampaignCollaborationServiceTests
         HubUserDto secondGm = fixture.CreateUser("subject.gm-two", "Second GM");
         CampaignCollaborationProjection secondCampaign = fixture.Service.CreateCampaign(
             secondGm,
-            new CreateCampaignCollaborationRequest("Second"));
+            CampaignRequest("Second"));
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
         CampaignInviteSecretProjection firstInvite = fixture.Service.CreateInvite(
             fixture.Gm,
             firstCampaign.CampaignId,
-            new(60, 1));
+            InviteRequest(60, 1));
         CampaignInviteRedemptionProjection firstJoined = fixture.Service.RedeemInvite(
             player,
             firstInvite.InviteId,
@@ -756,7 +1037,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignInviteSecretProjection secondInvite = fixture.Service.CreateInvite(
             secondGm,
             secondCampaign.CampaignId,
-            new(60, 1));
+            InviteRequest(60, 1));
         _ = fixture.Service.RedeemInvite(
             player,
             secondInvite.InviteId,
@@ -836,7 +1117,7 @@ public sealed class CampaignCollaborationServiceTests
         CampaignCollaborationProjection campaign = fixture.CreateCampaign();
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
-        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         CampaignInviteRedemptionProjection joined = fixture.Service.RedeemInvite(
             player,
             invite.InviteId,
@@ -916,7 +1197,7 @@ public sealed class CampaignCollaborationServiceTests
         Assert.Throws<CampaignCollaborationAccessDeniedException>(() => fixture.Service.CreateInvite(
             user,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 1)));
+            InviteRequest(60, 1)));
         Assert.Throws<CampaignCollaborationAccessDeniedException>(() => fixture.Service.GetSharedSheet(
             user,
             campaign.CampaignId,
@@ -976,7 +1257,7 @@ public sealed class CampaignCollaborationServiceTests
         Assert.Throws<CampaignCollaborationAccessDeniedException>(() => fixture.Service.CreateInvite(
             falseOwner,
             campaign.CampaignId,
-            new CreateCampaignInviteRequest(60, 1)));
+            InviteRequest(60, 1)));
         Assert.Throws<InvalidDataException>(() => fixture.Service.GetCampaign(falseOwner, campaign.CampaignId));
     }
 
@@ -1083,7 +1364,7 @@ public sealed class CampaignCollaborationServiceTests
     {
         using var fixture = new CampaignFixture();
         CampaignCollaborationProjection campaign = fixture.CreateCampaign();
-        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+        CampaignInviteSecretProjection invite = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
         string durableBefore = File.ReadAllText(fixture.StorePath);
@@ -1110,15 +1391,15 @@ public sealed class CampaignCollaborationServiceTests
     {
         using var fixture = new CampaignFixture();
         CampaignCollaborationProjection campaign = fixture.CreateCampaign();
-        CampaignInviteSecretProjection first = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(5, 1));
+        CampaignInviteSecretProjection first = fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(5, 1));
         for (int index = 1; index < 32; index++)
         {
-            fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+            fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         }
 
-        Assert.Throws<InvalidOperationException>(() => fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1)));
+        Assert.Throws<InvalidOperationException>(() => fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1)));
         fixture.Clock.Advance(TimeSpan.FromDays(8));
-        fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, new(60, 1));
+        fixture.Service.CreateInvite(fixture.Gm, campaign.CampaignId, InviteRequest(60, 1));
         Assert.False(fixture.Store.CampaignCollaborationInvitesById.ContainsKey(first.InviteId));
         Assert.DoesNotContain(first.InviteId, fixture.Store.CampaignInviteIdByCodeLookupSha256.Values);
     }
@@ -1148,32 +1429,68 @@ public sealed class CampaignCollaborationServiceTests
             player,
             campaign.CampaignId,
             runId,
-            new CampaignRunsiteDraftUpdateRequest(0, "Hidden", "Hidden", [], "player note")));
+            new CampaignRunsiteDraftUpdateRequest(
+                0,
+                "runsite-draft-player-denied",
+                "Hidden",
+                "Hidden",
+                [],
+                "player note")));
 
+        var draftRequest = new CampaignRunsiteDraftUpdateRequest(
+            0,
+            "runsite-draft-response-loss",
+            "Neon Vault",
+            "Meet the Johnson at midnight.",
+            [new RunsitePlayerSectionInput("Approach", "Use the freight entrance.")],
+            "Secret ambush.");
         CampaignRunsiteDraftProjection first = fixture.Service.UpsertRunsiteDraft(
             fixture.Gm,
             campaign.CampaignId,
             runId,
-            new CampaignRunsiteDraftUpdateRequest(
-                0,
-                "Neon Vault",
-                "Meet the Johnson at midnight.",
-                [new RunsitePlayerSectionInput("Approach", "Use the freight entrance.")],
-                "Secret ambush."));
+            draftRequest);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("replay must not persist");
+        CampaignRunsiteDraftProjection draftReplay = fixture.Service.UpsertRunsiteDraft(
+            fixture.Gm,
+            campaign.CampaignId.ToUpperInvariant(),
+            runId.ToUpperInvariant(),
+            draftRequest);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
+        Assert.Equal(first, draftReplay);
+        Assert.Single(fixture.Store.CampaignRunsiteDraftCommandsByIdempotencyKey);
+        Assert.Throws<CampaignIdempotencyConflictException>(() => fixture.Service.UpsertRunsiteDraft(
+            fixture.Gm,
+            campaign.CampaignId,
+            runId,
+            draftRequest with { Title = "Changed after response loss" }));
+
+        var publishRequest = new PublishCampaignRunsiteRequest(
+            first.Revision,
+            "runsite-publish-response-loss");
         CampaignRunsitePlayerProjection published = fixture.Service.PublishRunsite(
             fixture.Gm,
             campaign.CampaignId,
             runId,
-            new PublishCampaignRunsiteRequest(first.Revision));
+            publishRequest);
         fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("replay must not persist");
         CampaignRunsitePlayerProjection replay = fixture.Service.PublishRunsite(
             fixture.Gm,
-            campaign.CampaignId,
-            runId,
-            new PublishCampaignRunsiteRequest(first.Revision));
+            campaign.CampaignId.ToUpperInvariant(),
+            runId.ToUpperInvariant(),
+            publishRequest);
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
 
         Assert.DoesNotContain("Secret ambush", JsonSerializer.Serialize(published), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(JsonSerializer.Serialize(published), JsonSerializer.Serialize(replay));
+        Assert.Single(fixture.Store.CampaignRunsitePublishCommandsByIdempotencyKey);
+        Assert.Throws<CampaignIdempotencyConflictException>(() => fixture.Service.PublishRunsite(
+            fixture.Gm,
+            campaign.CampaignId,
+            runId,
+            publishRequest with { ExpectedRevision = first.Revision + 1 }));
         Assert.Equal("Neon Vault", fixture.Service.GetPublishedRunsite(player, campaign.CampaignId, runId)?.Title);
     }
 
@@ -1200,11 +1517,47 @@ public sealed class CampaignCollaborationServiceTests
             new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance));
     }
 
+    private static CreateCampaignCollaborationRequest CampaignRequest(
+        string Name,
+        string? Summary = null,
+        string? Visibility = null,
+        string? InitialRunTitle = null,
+        string? IdempotencyKey = null)
+        => new(
+            Name,
+            IdempotencyKey ?? $"campaign-create-{Guid.NewGuid():N}",
+            Summary,
+            Visibility,
+            InitialRunTitle);
+
+    private static CreateCampaignInviteRequest InviteRequest(
+        int ExpiresInMinutes = 1440,
+        int MaxUses = 1,
+        string? IdempotencyKey = null)
+        => new(
+            IdempotencyKey ?? $"invite-create-{Guid.NewGuid():N}",
+            ExpiresInMinutes,
+            MaxUses);
+
     private static string PadBase64Url(string value)
     {
         string padded = value.Replace('-', '+').Replace('_', '/');
         padded += (padded.Length % 4) switch { 2 => "==", 3 => "=", _ => string.Empty };
         return padded;
+    }
+
+    private static ServiceProvider BuildCampaignGatewayProvider(
+        CommunityStore store,
+        TimeProvider timeProvider,
+        IConfiguration configuration)
+    {
+        var services = new ServiceCollection();
+        services.AddDataProtection();
+        services.AddSingleton(configuration);
+        services.AddSingleton(store);
+        services.AddSingleton(timeProvider);
+        services.AddHubCampaignSpineContext();
+        return services.BuildServiceProvider();
     }
 
     private sealed class CampaignFixture : IDisposable
@@ -1216,23 +1569,28 @@ public sealed class CampaignCollaborationServiceTests
             _directory = Path.Combine(Path.GetTempPath(), "chummer-campaign-collaboration-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
             StorePath = Path.Combine(_directory, "community-store.json");
+            DataProtectionPath = Path.Combine(_directory, "data-protection-keys");
             Configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_COMMUNITY_STORE_PATH"] = StorePath })
                 .Build();
             Store = new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(Store);
             Clock = new AdjustableTimeProvider(DateTimeOffset.Parse("2026-07-20T12:00:00Z"));
-            CanonicalEdits = new RecordingCanonicalGmCharacterEditGateway(Clock);
-            Service = new CampaignCollaborationService(Store, CanonicalEdits, Clock);
+            CanonicalEdits = new RecordingCanonicalGmCharacterEditGateway(Store, Clock);
+            DataProtection = DataProtectionProvider.Create(
+                new DirectoryInfo(DataProtectionPath));
+            Service = new CampaignCollaborationService(Store, CanonicalEdits, DataProtection, Clock);
             Gm = CreateUser("subject.gm", "Game Master");
         }
 
         public string StorePath { get; }
+        public string DataProtectionPath { get; }
         public IConfiguration Configuration { get; }
         public CommunityStore Store { get; }
         public AccountService Accounts { get; }
         public AdjustableTimeProvider Clock { get; }
         public RecordingCanonicalGmCharacterEditGateway CanonicalEdits { get; }
+        public IDataProtectionProvider DataProtection { get; }
         public CampaignCollaborationService Service { get; }
         public HubUserDto Gm { get; }
 
@@ -1280,7 +1638,7 @@ public sealed class CampaignCollaborationServiceTests
         }
 
         public CampaignCollaborationProjection CreateCampaign(string name = "Neon Shadows")
-            => Service.CreateCampaign(Gm, new CreateCampaignCollaborationRequest(name, $"{name} summary", "private", $"{name} first run"));
+            => Service.CreateCampaign(Gm, CampaignRequest(name, $"{name} summary", "private", $"{name} first run"));
 
         public RedeemCampaignInviteRequest LinkRequest(
             CampaignInviteSecretProjection invite,
@@ -1301,7 +1659,7 @@ public sealed class CampaignCollaborationServiceTests
             string displayName)
         {
             RunnerDossierProjection character = CreateCharacter(player, runnerHandle, displayName);
-            CampaignInviteSecretProjection invite = Service.CreateInvite(Gm, campaign.CampaignId, new(60, 1));
+            CampaignInviteSecretProjection invite = Service.CreateInvite(Gm, campaign.CampaignId, InviteRequest(60, 1));
             return Service.RedeemInvite(player, invite.InviteId, LinkRequest(invite, character, $"join-{Guid.NewGuid():N}"));
         }
 
@@ -1312,29 +1670,30 @@ public sealed class CampaignCollaborationServiceTests
         }
     }
 
-    internal sealed class RecordingCanonicalGmCharacterEditGateway : ICanonicalGmCharacterEditGateway
+    internal sealed class RecordingCanonicalGmCharacterEditGateway : ICoreGmCharacterEditGateway
     {
-        private const string Contract = "chummer.delegated-gm-character-edit/v1";
+        private readonly CommunityStore _store;
         private readonly TimeProvider _clock;
-        private readonly Dictionary<string, (string RequestSha256, CoreDelegatedGmEditTransportReceipt Receipt)> _ledger =
+        private readonly Dictionary<string, (string RequestSha256, DelegatedGmCharacterEditAuditReceipt Receipt)> _ledger =
             new(StringComparer.Ordinal);
-        private readonly Dictionary<string, CoreDelegatedGmEditTransportProfile> _profiles =
+        private readonly Dictionary<string, DelegatedGmCharacterProfile> _profiles =
             new(StringComparer.Ordinal);
 
-        public RecordingCanonicalGmCharacterEditGateway(TimeProvider clock)
+        public RecordingCanonicalGmCharacterEditGateway(CommunityStore store, TimeProvider clock)
         {
+            _store = store;
             _clock = clock;
         }
 
         public int CallCount { get; private set; }
         public int ReadCount { get; private set; }
         public int ApplyCount { get; private set; }
-        public CoreDelegatedGmEditTransportOutcome? ForcedOutcome { get; set; }
+        public DelegatedGmCharacterEditOutcome? ForcedOutcome { get; set; }
         public Exception? ExceptionToThrow { get; set; }
-        public Func<CoreDelegatedGmEditTransportReceipt, CoreDelegatedGmEditTransportReceipt>? ReceiptMutator { get; set; }
-        public IReadOnlyList<CoreDelegatedGmEditTransportCommand> Commands => _commands;
+        public Func<DelegatedGmCharacterEditAuditReceipt, DelegatedGmCharacterEditAuditReceipt>? ReceiptMutator { get; set; }
+        public IReadOnlyList<DelegatedGmCharacterEditCommand> Commands => _commands;
 
-        private readonly List<CoreDelegatedGmEditTransportCommand> _commands = new();
+        private readonly List<DelegatedGmCharacterEditCommand> _commands = new();
 
         public void RegisterCharacter(
             string characterOwnerUserId,
@@ -1345,42 +1704,41 @@ public sealed class CampaignCollaborationServiceTests
         {
             _profiles[ProfileKey(characterOwnerUserId, authoritativeCharacterId)] = new(
                 revision,
-                runnerHandle,
-                displayName);
+                displayName,
+                runnerHandle);
         }
 
-        public CoreDelegatedGmEditTransportProfile ApplyOwnerEdit(
+        public DelegatedGmCharacterProfile ApplyOwnerEdit(
             string characterOwnerUserId,
             string authoritativeCharacterId,
             string runnerHandle,
             string displayName)
         {
             string key = ProfileKey(characterOwnerUserId, authoritativeCharacterId);
-            CoreDelegatedGmEditTransportProfile current = _profiles[key];
-            var next = new CoreDelegatedGmEditTransportProfile(
+            DelegatedGmCharacterProfile current = _profiles[key];
+            var next = new DelegatedGmCharacterProfile(
                 current.Revision + 1,
-                runnerHandle,
-                displayName);
+                displayName,
+                runnerHandle);
             _profiles[key] = next;
             return next;
         }
 
-        public CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
-            CoreDelegatedGmEditTransportReadCommand command)
+        public DelegatedGmCharacterProfileReadResult ReadCurrentProfile(
+            DelegatedGmCharacterProfileReadCommand command)
         {
             ReadCount++;
-            CoreDelegatedGmEditTransportContext context = command.Context;
             return _profiles.TryGetValue(
-                ProfileKey(context.CharacterOwnerUserId, context.AuthoritativeCharacterId),
-                out CoreDelegatedGmEditTransportProfile? profile)
-                    ? new CoreDelegatedGmEditTransportReadResult(
-                        CoreDelegatedGmEditTransportReadOutcome.Available,
+                ProfileKey(command.CharacterOwner.NormalizedValue, command.CharacterId.Value),
+                out DelegatedGmCharacterProfile? profile)
+                    ? new DelegatedGmCharacterProfileReadResult(
+                        DelegatedGmCharacterProfileReadOutcome.Available,
                         profile)
-                    : new CoreDelegatedGmEditTransportReadResult(
-                        CoreDelegatedGmEditTransportReadOutcome.Missing);
+                    : new DelegatedGmCharacterProfileReadResult(
+                        DelegatedGmCharacterProfileReadOutcome.Missing);
         }
 
-        public CoreDelegatedGmEditTransportResult Execute(CoreDelegatedGmEditTransportCommand command)
+        public DelegatedGmCharacterEditResult Execute(DelegatedGmCharacterEditCommand command)
         {
             CallCount++;
             _commands.Add(command);
@@ -1389,19 +1747,18 @@ public sealed class CampaignCollaborationServiceTests
                 throw ExceptionToThrow;
             }
 
-            if (ForcedOutcome is CoreDelegatedGmEditTransportOutcome forced)
+            if (ForcedOutcome is DelegatedGmCharacterEditOutcome forced)
             {
-                return new CoreDelegatedGmEditTransportResult(forced);
+                return new DelegatedGmCharacterEditResult(forced);
             }
 
-            CoreDelegatedGmEditTransportContext context = command.Context;
             string profileKey = ProfileKey(
-                context.CharacterOwnerUserId,
-                context.AuthoritativeCharacterId);
-            if (!_profiles.TryGetValue(profileKey, out CoreDelegatedGmEditTransportProfile? currentProfile))
+                command.CharacterOwner.NormalizedValue,
+                command.CharacterId.Value);
+            if (!_profiles.TryGetValue(profileKey, out DelegatedGmCharacterProfile? currentProfile))
             {
-                return new CoreDelegatedGmEditTransportResult(
-                    CoreDelegatedGmEditTransportOutcome.Missing);
+                return new DelegatedGmCharacterEditResult(
+                    DelegatedGmCharacterEditOutcome.Missing);
             }
 
             string ledgerKey = $"{profileKey}\0{command.IdempotencyKey}";
@@ -1410,95 +1767,110 @@ public sealed class CampaignCollaborationServiceTests
             {
                 if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
                 {
-                    return new CoreDelegatedGmEditTransportResult(
-                        CoreDelegatedGmEditTransportOutcome.Conflict,
-                        CurrentProfile: currentProfile);
+                    return new DelegatedGmCharacterEditResult(
+                        DelegatedGmCharacterEditOutcome.Conflict);
                 }
 
-                return new CoreDelegatedGmEditTransportResult(
-                    CoreDelegatedGmEditTransportOutcome.Replayed,
-                    replay.Receipt,
-                    currentProfile);
+                return new DelegatedGmCharacterEditResult(
+                    DelegatedGmCharacterEditOutcome.Replayed,
+                    replay.Receipt);
             }
 
             if (currentProfile.Revision != command.ExpectedRevision)
             {
-                return new CoreDelegatedGmEditTransportResult(
-                    CoreDelegatedGmEditTransportOutcome.Conflict,
-                    CurrentProfile: currentProfile);
+                return new DelegatedGmCharacterEditResult(
+                    DelegatedGmCharacterEditOutcome.Conflict);
             }
 
             ApplyCount++;
             string idempotencyKeySha256 = Convert.ToHexString(
                     SHA256.HashData(Encoding.UTF8.GetBytes(command.IdempotencyKey)))
                 .ToLowerInvariant();
-            CoreDelegatedGmEditTransportAuditOperation[] operations =
+            string runnerHandle = OperationValue(
+                command,
+                DelegatedGmCharacterEditContract.ProfileAliasPath);
+            string displayName = OperationValue(
+                command,
+                DelegatedGmCharacterEditContract.ProfileNamePath);
+            DelegatedGmCharacterEditAuditOperation[] operations =
             [
-                AuditOperation("/profile/alias", command.RunnerHandle),
-                AuditOperation("/profile/name", command.DisplayName)
+                AuditOperation(DelegatedGmCharacterEditContract.ProfileAliasPath, runnerHandle),
+                AuditOperation(DelegatedGmCharacterEditContract.ProfileNamePath, displayName)
             ];
+            CampaignCharacterBindingState binding = _store.CampaignCharacterBindings
+                .Where(item => string.Equals(item.CampaignId, command.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.AuthoritativeCharacterId, command.CharacterId.Value, StringComparison.Ordinal))
+                .OrderByDescending(static item => item.BindingRevision)
+                .ThenByDescending(static item => item.RecordedAtUtc)
+                .First();
+            CampaignProjection campaign = _store.CampaignSpinesById[command.CampaignId];
+            GroupDto group = _store.GroupsById[campaign.GroupId];
             string receiptSeed = string.Join(
                 "\n",
                 requestSha256,
-                context.DelegationId,
-                context.AuthorityReceiptId,
+                binding.BindingId,
+                binding.BindingVersionId,
                 idempotencyKeySha256);
-            var receipt = new CoreDelegatedGmEditTransportReceipt(
-                Contract: Contract,
+            var receipt = new DelegatedGmCharacterEditAuditReceipt(
+                Contract: DelegatedGmCharacterEditContract.Name,
                 ReceiptId: $"gm-edit-{Sha256(receiptSeed)[..24]}",
-                CampaignId: context.CampaignId,
-                DelegationId: context.DelegationId,
-                GrantedByCampaignOwnerId: context.CampaignOwnerUserId,
-                GrantedByCharacterOwnerId: context.CharacterOwnerUserId,
-                AuthorityReceiptId: context.AuthorityReceiptId,
-                AuthorityRevision: context.AuthorityRevision,
-                ActorId: context.ActorUserId,
-                ActorRole: "game-master",
-                CharacterOwnerId: context.CharacterOwnerUserId.Trim().ToLowerInvariant(),
-                AuthoritativeCharacterId: context.AuthoritativeCharacterId,
+                CampaignId: command.CampaignId,
+                DelegationId: binding.BindingId,
+                GrantedByCampaignOwnerId: group.OwnerUserId,
+                GrantedByCharacterOwnerId: command.CharacterOwner.NormalizedValue,
+                AuthorityReceiptId: binding.BindingVersionId,
+                AuthorityRevision: binding.BindingRevision,
+                ActorId: command.ActorId,
+                ActorRole: DelegatedGmCharacterEditContract.GameMasterRole,
+                CharacterOwnerId: command.CharacterOwner.NormalizedValue,
+                CharacterId: command.CharacterId,
                 Reason: command.Reason,
                 IdempotencyKeySha256: idempotencyKeySha256,
                 CommandSha256: requestSha256,
                 PreviousRevision: command.ExpectedRevision,
                 NewRevision: command.ExpectedRevision + 1,
                 AppliedAtUtc: _clock.GetUtcNow(),
-                Operations: operations);
-            currentProfile = new CoreDelegatedGmEditTransportProfile(
+                Operations: operations.ToImmutableArray());
+            currentProfile = new DelegatedGmCharacterProfile(
                 receipt.NewRevision,
-                command.RunnerHandle,
-                command.DisplayName);
+                displayName,
+                runnerHandle);
             _profiles[profileKey] = currentProfile;
             receipt = ReceiptMutator?.Invoke(receipt) ?? receipt;
             _ledger[ledgerKey] = (requestSha256, receipt);
-            return new CoreDelegatedGmEditTransportResult(
-                CoreDelegatedGmEditTransportOutcome.Applied,
-                receipt,
-                currentProfile);
+            return new DelegatedGmCharacterEditResult(
+                DelegatedGmCharacterEditOutcome.Applied,
+                receipt);
         }
 
-        private static CoreDelegatedGmEditTransportAuditOperation AuditOperation(string path, string value)
+        private static DelegatedGmCharacterEditAuditOperation AuditOperation(string path, string value)
             => new(
-                CoreDelegatedGmEditTransportPatchOperationKind.Replace,
+                DelegatedGmCharacterPatchOperationKind.Replace,
                 path,
                 Sha256(value),
                 value.Length);
 
-        private static string Digest(CoreDelegatedGmEditTransportCommand command)
+        private static string OperationValue(DelegatedGmCharacterEditCommand command, string path)
+            => Assert.Single(command.Operations, operation => operation.Path == path).Value!;
+
+        private static string Digest(DelegatedGmCharacterEditCommand command)
         {
             StringBuilder builder = new();
-            Append(builder, Contract);
-            Append(builder, command.Context.CampaignId);
-            Append(builder, command.Context.ActorUserId);
-            Append(builder, command.Context.CharacterOwnerUserId.Trim().ToLowerInvariant());
-            Append(builder, command.Context.AuthoritativeCharacterId);
+            Append(builder, DelegatedGmCharacterEditContract.Name);
+            Append(builder, command.CampaignId.Trim());
+            Append(builder, command.ActorId.Trim());
+            Append(builder, command.CharacterOwner.NormalizedValue);
+            Append(builder, command.CharacterId.Value.Trim());
             Append(builder, command.ExpectedRevision.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            Append(builder, command.Reason);
-            Append(builder, "0");
-            Append(builder, "/profile/alias");
-            Append(builder, command.RunnerHandle);
-            Append(builder, "0");
-            Append(builder, "/profile/name");
-            Append(builder, command.DisplayName);
+            Append(builder, command.Reason.Trim());
+            foreach (DelegatedGmCharacterPatchOperation operation in command.Operations
+                         .OrderBy(static item => item.Path?.Trim().ToLowerInvariant(), StringComparer.Ordinal))
+            {
+                Append(builder, ((int)operation.Operation).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                Append(builder, operation.Path.Trim().ToLowerInvariant());
+                Append(builder, operation.Value!);
+            }
+
             return Sha256(builder.ToString());
         }
 

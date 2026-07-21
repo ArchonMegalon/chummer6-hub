@@ -6,6 +6,7 @@ public sealed record AntiforgeryTokenProjection(
 
 public sealed record CreateCampaignCollaborationRequest(
     string Name,
+    string IdempotencyKey,
     string? Summary = null,
     string? Visibility = null,
     string? InitialRunTitle = null);
@@ -117,6 +118,7 @@ public sealed record CampaignGmAuthorityUpdateReceipt(
     DateTimeOffset ChangedAtUtc);
 
 public sealed record CreateCampaignInviteRequest(
+    string IdempotencyKey,
     int ExpiresInMinutes = 1440,
     int MaxUses = 1);
 
@@ -172,6 +174,7 @@ public sealed record RunsitePlayerSectionInput(
 
 public sealed record CampaignRunsiteDraftUpdateRequest(
     long ExpectedRevision,
+    string IdempotencyKey,
     string Title,
     string Summary,
     IReadOnlyList<RunsitePlayerSectionInput> PlayerSections,
@@ -190,7 +193,8 @@ public sealed record CampaignRunsiteDraftProjection(
     DateTimeOffset? PublishedAtUtc);
 
 public sealed record PublishCampaignRunsiteRequest(
-    long ExpectedRevision);
+    long ExpectedRevision,
+    string IdempotencyKey);
 
 public sealed record CampaignRunsitePlayerProjection(
     string CampaignId,

@@ -404,6 +404,7 @@ public sealed class CampaignCollaborationController : ControllerBase
             or CampaignInviteRejectedException
             or CampaignInviteThrottledException
             or CampaignIdempotencyConflictException
+            or CampaignInviteReplayUnavailableException
             or CampaignBindingRevisionConflictException
             or CampaignRevisionConflictException
             or CampaignCanonicalEditConflictException
@@ -426,6 +427,9 @@ public sealed class CampaignCollaborationController : ControllerBase
             CampaignIdempotencyConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
+            CampaignInviteReplayUnavailableException unavailable => Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: unavailable.Message),
             CampaignBindingRevisionConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),

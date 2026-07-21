@@ -1,156 +1,210 @@
+using System.Collections.Immutable;
+using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Owners;
+using Chummer.Contracts.Workspaces;
+using Chummer.Run.Contracts.Community;
+
 namespace Chummer.Run.Api.Services.Community;
 
 /// <summary>
-/// Hub-private routing context for a future adapter over Core's
-/// chummer.delegated-gm-character-edit/v1 package contract. These transport
-/// envelopes are deliberately not copies of Chummer.Contracts.Workspaces.
-/// The production adapter must consume the pinned Core package types, ask a
-/// store-backed Core authorizer to re-check the current Hub grant, and map the
-/// exact Core result into this bounded Hub transport seam.
+/// Safe runtime default when the durable Core workspace store has not been
+/// explicitly provisioned. It implements the package-owned boundary and can
+/// neither read nor mutate character state.
 /// </summary>
-public sealed record CoreDelegatedGmEditTransportContext(
-    string CampaignId,
-    string ActorUserId,
-    string CampaignOwnerUserId,
-    string CharacterOwnerUserId,
-    string DossierId,
-    string AuthorityKind,
-    string AuthoritativeCharacterId,
-    string DelegationId,
-    string AuthorityReceiptId,
-    long AuthorityRevision,
-    DateTimeOffset AuthorityGrantedAtUtc);
-
-public sealed record CoreDelegatedGmEditTransportReadCommand(
-    CoreDelegatedGmEditTransportContext Context);
-
-public sealed record CoreDelegatedGmEditTransportCommand(
-    CoreDelegatedGmEditTransportContext Context,
-    long ExpectedRevision,
-    string IdempotencyKey,
-    string Reason,
-    string RunnerHandle,
-    string DisplayName);
-
-/// <summary>
-/// Privacy-bounded canonical readback. A real adapter obtains these values from
-/// Core after authorization; it must never echo Hub request values as proof.
-/// </summary>
-public sealed record CoreDelegatedGmEditTransportProfile(
-    long Revision,
-    string RunnerHandle,
-    string DisplayName);
-
-public enum CoreDelegatedGmEditTransportReadOutcome
+public sealed class UnavailableCoreGmCharacterEditGateway : ICoreGmCharacterEditGateway
 {
-    Available = 0,
-    Denied = 1,
-    Forbidden = 2,
-    Invalid = 3,
-    Missing = 4,
-    Corrupt = 5,
-    Unavailable = 6
-}
-
-public sealed record CoreDelegatedGmEditTransportReadResult(
-    CoreDelegatedGmEditTransportReadOutcome Outcome,
-    CoreDelegatedGmEditTransportProfile? Profile = null,
-    string? ErrorCode = null);
-
-public enum CoreDelegatedGmEditTransportPatchOperationKind
-{
-    Replace = 0
-}
-
-/// <summary>
-/// Privacy-safe transport projection of one Core receipt operation. The real
-/// adapter maps the package-owned receipt; Hub never synthesizes this receipt
-/// from the mutation request.
-/// </summary>
-public sealed record CoreDelegatedGmEditTransportAuditOperation(
-    CoreDelegatedGmEditTransportPatchOperationKind Operation,
-    string Path,
-    string ValueSha256,
-    int ValueLength);
-
-public enum CoreDelegatedGmEditTransportOutcome
-{
-    Applied = 0,
-    Replayed = 1,
-    Denied = 2,
-    Forbidden = 3,
-    Invalid = 4,
-    Missing = 5,
-    Conflict = 6,
-    Corrupt = 7,
-    Unavailable = 8
-}
-
-public sealed record CoreDelegatedGmEditTransportReceipt(
-    string Contract,
-    string ReceiptId,
-    string CampaignId,
-    string DelegationId,
-    string GrantedByCampaignOwnerId,
-    string GrantedByCharacterOwnerId,
-    string AuthorityReceiptId,
-    long AuthorityRevision,
-    string ActorId,
-    string ActorRole,
-    string CharacterOwnerId,
-    string AuthoritativeCharacterId,
-    string Reason,
-    string IdempotencyKeySha256,
-    string CommandSha256,
-    long PreviousRevision,
-    long NewRevision,
-    DateTimeOffset AppliedAtUtc,
-    IReadOnlyList<CoreDelegatedGmEditTransportAuditOperation> Operations);
-
-public sealed record CoreDelegatedGmEditTransportResult(
-    CoreDelegatedGmEditTransportOutcome Outcome,
-    CoreDelegatedGmEditTransportReceipt? Receipt = null,
-    // Mandatory for Applied, Replayed, and Conflict. This is an
-    // authoritative read after execution/replay, so Hub can reconcile without
-    // overwriting a later character-owner edit.
-    CoreDelegatedGmEditTransportProfile? CurrentProfile = null,
-    string? ErrorCode = null);
-
-/// <summary>
-/// Hub-private seam for the future pinned Core adapter. Readback is mandatory:
-/// Hub-derived revisions are only a projection and may never veto a Core
-/// idempotent replay or overwrite a newer owner edit.
-/// </summary>
-public interface ICanonicalGmCharacterEditGateway
-{
-    CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
-        CoreDelegatedGmEditTransportReadCommand command);
-
-    CoreDelegatedGmEditTransportResult Execute(
-        CoreDelegatedGmEditTransportCommand command);
-}
-
-/// <summary>
-/// Safe release default until the exact Core package plus authoritative
-/// readback adapter is pinned. It deliberately cannot mutate Core or Hub.
-/// </summary>
-public sealed class UnavailableCoreDelegatedGmCharacterEditGateway : ICanonicalGmCharacterEditGateway
-{
-    public CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
-        CoreDelegatedGmEditTransportReadCommand command)
+    public DelegatedGmCharacterProfileReadResult ReadCurrentProfile(
+        DelegatedGmCharacterProfileReadCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return new CoreDelegatedGmEditTransportReadResult(
-            CoreDelegatedGmEditTransportReadOutcome.Unavailable,
-            ErrorCode: "core_delegated_edit_package_unavailable");
+        return new DelegatedGmCharacterProfileReadResult(
+            DelegatedGmCharacterProfileReadOutcome.Unavailable,
+            ErrorCode: "core_gm_character_edit_store_unconfigured");
     }
 
-    public CoreDelegatedGmEditTransportResult Execute(
-        CoreDelegatedGmEditTransportCommand command)
+    public DelegatedGmCharacterEditResult Execute(DelegatedGmCharacterEditCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return new CoreDelegatedGmEditTransportResult(
-            CoreDelegatedGmEditTransportOutcome.Unavailable,
-            ErrorCode: "core_delegated_edit_package_unavailable");
+        return new DelegatedGmCharacterEditResult(
+            DelegatedGmCharacterEditOutcome.Unavailable,
+            ErrorCode: "core_gm_character_edit_store_unconfigured");
     }
+}
+
+/// <summary>
+/// Hub-owned campaign authority adapter. Core calls this adapter on every
+/// delegated profile read and mutation, so serialized role labels or a stale
+/// prior decision can never authorize owner-scoped character access.
+/// </summary>
+public sealed class CommunityStoreCampaignGmCharacterEditAuthorizer
+    : ICampaignGmCharacterEditAuthorizer
+{
+    private const string CollaborationCapability = "campaign_collaboration";
+    private const string OwnerRole = "owner";
+    private const string GmRole = "gm";
+    private const string GmCharacterEditorAuthority = "gm_character_editor";
+    private const string HubRunnerDossierAuthorityKind = "hub_runner_dossier";
+    private static readonly TimeSpan DecisionLifetime = TimeSpan.FromMinutes(1);
+    private static readonly ImmutableArray<string> AllowedProfilePaths =
+    [
+        DelegatedGmCharacterEditContract.ProfileAliasPath,
+        DelegatedGmCharacterEditContract.ProfileNamePath
+    ];
+
+    private readonly CommunityStore _store;
+    private readonly TimeProvider _timeProvider;
+
+    public CommunityStoreCampaignGmCharacterEditAuthorizer(
+        CommunityStore store,
+        TimeProvider timeProvider)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    }
+
+    public CampaignGmCharacterEditAuthorization Authorize(
+        CampaignGmCharacterEditAuthorizationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        DateTimeOffset nowUtc = _timeProvider.GetUtcNow().ToUniversalTime();
+        lock (_store.Gate)
+        {
+            return TryAuthorizeLocked(request, nowUtc, out CampaignGmCharacterEditAuthorization? authorization)
+                ? authorization
+                : Denied(request, nowUtc);
+        }
+    }
+
+    private bool TryAuthorizeLocked(
+        CampaignGmCharacterEditAuthorizationRequest request,
+        DateTimeOffset nowUtc,
+        out CampaignGmCharacterEditAuthorization authorization)
+    {
+        authorization = null!;
+        string campaignId = request.CampaignId?.Trim() ?? string.Empty;
+        string actorId = request.ActorId?.Trim() ?? string.Empty;
+        string characterId = request.CharacterId.Value?.Trim() ?? string.Empty;
+        string ownerId = request.CharacterOwner.NormalizedValue;
+        if (campaignId.Length == 0
+            || actorId.Length == 0
+            || characterId.Length == 0
+            || ownerId.Length == 0
+            || request.CharacterOwner.UsesLocalSingleUserValue
+            || request.RequestedPatchPaths.IsDefaultOrEmpty
+            || request.RequestedPatchPaths.Any(path =>
+                path is null
+                || !AllowedProfilePaths.Contains(path.Trim(), StringComparer.Ordinal)))
+        {
+            return false;
+        }
+
+        if (!_store.CampaignSpinesById.TryGetValue(campaignId, out CampaignProjection? campaign)
+            || !_store.GroupsById.TryGetValue(campaign.GroupId, out GroupDto? group)
+            || !group.Capabilities.Contains(CollaborationCapability, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        GroupMembershipDto? membership = group.Memberships.FirstOrDefault(member =>
+            string.Equals(member.UserId, actorId, StringComparison.OrdinalIgnoreCase));
+        if (membership is null
+            || !(string.Equals(group.OwnerUserId, actorId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(membership.Role, GmRole, StringComparison.OrdinalIgnoreCase))
+            || (string.Equals(membership.Role, OwnerRole, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(group.OwnerUserId, actorId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        CampaignCharacterBindingState? binding = _store.CampaignCharacterBindings
+            .Where(item => string.Equals(
+                    item.CampaignId,
+                    campaign.CampaignId,
+                    StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    item.AuthoritativeCharacterId,
+                    characterId,
+                    StringComparison.Ordinal))
+            .OrderByDescending(static item => item.BindingRevision)
+            .ThenByDescending(static item => item.RecordedAtUtc)
+            .FirstOrDefault();
+        if (binding is null
+            || !campaign.DossierIds.Contains(binding.DossierId, StringComparer.OrdinalIgnoreCase)
+            || !_store.DossiersById.TryGetValue(binding.DossierId, out RunnerDossierProjection? dossier)
+            || !string.Equals(binding.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(binding.AuthorityKind, HubRunnerDossierAuthorityKind, StringComparison.Ordinal)
+            || !string.Equals(binding.AuthoritativeCharacterId, dossier.DossierId, StringComparison.Ordinal)
+            || !string.Equals(binding.AuthenticatedOwnerUserId, ownerId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(dossier.OwnerUserId, ownerId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(binding.GmAuthorityRole, GmCharacterEditorAuthority, StringComparison.Ordinal)
+            || !string.Equals(binding.GrantedByUserId, ownerId, StringComparison.OrdinalIgnoreCase)
+            || binding.BindingRevision <= 0
+            || binding.CurrentRevision <= 0
+            || string.IsNullOrWhiteSpace(binding.BindingId)
+            || string.IsNullOrWhiteSpace(binding.BindingVersionId)
+            || binding.GrantedAtUtc.ToUniversalTime() > nowUtc
+            || binding.RecordedAtUtc.ToUniversalTime() > nowUtc)
+        {
+            return false;
+        }
+
+        CampaignCharacterBindingState? currentBinding = _store.CampaignCharacterBindings
+            .Where(item => string.Equals(
+                    item.CampaignId,
+                    campaign.CampaignId,
+                    StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.DossierId, binding.DossierId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.BindingRevision)
+            .ThenByDescending(static item => item.RecordedAtUtc)
+            .FirstOrDefault();
+        if (currentBinding is null
+            || !string.Equals(currentBinding.BindingId, binding.BindingId, StringComparison.Ordinal)
+            || !string.Equals(
+                currentBinding.BindingVersionId,
+                binding.BindingVersionId,
+                StringComparison.Ordinal)
+            || currentBinding.BindingRevision != binding.BindingRevision)
+        {
+            return false;
+        }
+
+        authorization = new CampaignGmCharacterEditAuthorization(
+            Authorized: true,
+            CampaignId: campaign.CampaignId,
+            ActorId: actorId,
+            Role: DelegatedGmCharacterEditContract.GameMasterRole,
+            Scope: DelegatedGmCharacterEditContract.CharacterEditScope,
+            CharacterOwner: new OwnerScope(binding.AuthenticatedOwnerUserId),
+            CharacterId: new CharacterWorkspaceId(binding.AuthoritativeCharacterId),
+            DelegationId: binding.BindingId,
+            GrantedByCampaignOwnerId: group.OwnerUserId,
+            GrantedByCharacterOwnerId: ownerId,
+            AuthorityReceiptId: binding.BindingVersionId,
+            AuthorityRevision: binding.BindingRevision,
+            ValidFromUtc: binding.GrantedAtUtc.ToUniversalTime(),
+            ExpiresAtUtc: nowUtc.Add(DecisionLifetime),
+            AllowedPatchPaths: AllowedProfilePaths);
+        return true;
+    }
+
+    private static CampaignGmCharacterEditAuthorization Denied(
+        CampaignGmCharacterEditAuthorizationRequest request,
+        DateTimeOffset nowUtc)
+        => new(
+            Authorized: false,
+            CampaignId: request.CampaignId?.Trim() ?? string.Empty,
+            ActorId: request.ActorId?.Trim() ?? string.Empty,
+            Role: string.Empty,
+            Scope: string.Empty,
+            CharacterOwner: request.CharacterOwner,
+            CharacterId: request.CharacterId,
+            DelegationId: string.Empty,
+            GrantedByCampaignOwnerId: string.Empty,
+            GrantedByCharacterOwnerId: string.Empty,
+            AuthorityReceiptId: string.Empty,
+            AuthorityRevision: 0,
+            ValidFromUtc: nowUtc,
+            ExpiresAtUtc: nowUtc,
+            AllowedPatchPaths: ImmutableArray<string>.Empty,
+            DenialReason: "current_campaign_gm_character_edit_grant_required");
 }
