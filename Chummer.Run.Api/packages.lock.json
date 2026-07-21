@@ -12,7 +12,7 @@
         "type": "Direct",
         "requested": "[0.0.0-packageplane.candidate.sha0612fb3ebf2b, )",
         "resolved": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
-        "contentHash": "tKhcjnUoPRnmqQDmZI63rzMO7aihpxJMbQ+oi0w+Ti0BSc+R/9CxfnntPFJdZeDUi0+diQ6oh9BablwJqUtbjg==",
+        "contentHash": "EH2nQ1rg8Klk6t1nkMz/sYTFeRvdOg6CQsPkSdwA7ckKmJiQan7hZmxMcr2NHBV9KGNmBAGIAwVNthx8EVC5Pw==",
         "dependencies": {
           "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
           "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
@@ -23,13 +23,13 @@
         "type": "Direct",
         "requested": "[0.1.0-preview, )",
         "resolved": "0.1.0-preview",
-        "contentHash": "A/iH3pSgE7cPCzudlz7aM0hNBapVsB2jaEUUWaU5WSej21lwGaJ2bsGJl7UWASqxKRLnwek1gp6NF0gPaesrrg=="
+        "contentHash": "ti+zD2zVexuQXcO+/ahEVVzqcfJSND9X2MLcSG/gf3n90Uiux+xKVMC64nRzZaDT3t1rWFcFfULfBk401sRd9g=="
       },
       "Chummer.Run.Registry": {
         "type": "Direct",
         "requested": "[0.1.0-preview, )",
         "resolved": "0.1.0-preview",
-        "contentHash": "dCYEFwKVCGW6Sk6jPzo/PFTPU67v++TSOk6Ti2Lw+SIyRfM8MasMJWiFclr/D4fZSMGV9+xVggzAvqFwsARAMw==",
+        "contentHash": "ztQNNH2NlX6upBPhbHXY0EYvZ5HFkqR6bapHo29Nbmz08Esc+xP/1LPATxuTnJGuHVDB0BpBMhb1IQVjZeRs4w==",
         "dependencies": {
           "Chummer.Hub.Registry.Contracts": "0.1.0-preview"
         }
