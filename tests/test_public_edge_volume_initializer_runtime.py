@@ -120,6 +120,25 @@ def test_initializer_migrates_named_volumes_and_only_probes_downloads_bind(tmp_p
             )
             assert ownership.stdout.strip() == f"{PORTAL_UID}:{PORTAL_GID}"
 
+        core_workspace_root = docker(
+            "run",
+            "--rm",
+            "--user",
+            "0:0",
+            "--entrypoint",
+            "/bin/sh",
+            "-v",
+            f"{volumes[0]}:/fixture:ro",
+            IMAGE,
+            "-eu",
+            "-c",
+            "stat -c '%u:%g:%a:%F' /fixture/core-workspaces; "
+            "test -z \"$(find /fixture/core-workspaces -mindepth 1 -print -quit)\"",
+        )
+        assert core_workspace_root.stdout.strip() == (
+            f"{PORTAL_UID}:{PORTAL_GID}:700:directory"
+        )
+
         assert (downloads.stat().st_uid, downloads.stat().st_gid) == downloads_owner_before
         assert downloads.stat().st_mode & 0o777 == 0o777
         assert list(downloads.iterdir()) == []

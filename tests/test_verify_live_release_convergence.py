@@ -62,6 +62,7 @@ def test_required_fields_and_matching_routes_pass() -> None:
             "/downloads": AUTHORITY_SNAPSHOT_SHA256,
             "/status": AUTHORITY_SNAPSHOT_SHA256,
         },
+        generated_at_utc="2026-07-20T21:00:00Z",
     )
 
     assert result["status"] == "pass"
@@ -69,12 +70,36 @@ def test_required_fields_and_matching_routes_pass() -> None:
     assert result["contractVersion"] == 1
     assert result["mismatchCount"] == 0
     assert result["failureCount"] == 0
+    assert result["generatedAtUtc"] == "2026-07-20T21:00:00Z"
     assert result["mismatches"] == []
     assert result["failures"] == []
     assert result["checkedRouteCount"] == 2
     assert result["comparedFields"] == list(module.REQUIRED_FIELDS)
     assert result["releaseTruth"]["contractName"] == "chummer.release-truth-projection/v1"
     assert result["authoritySnapshotSha256"] == AUTHORITY_SNAPSHOT_SHA256
+
+
+def test_staged_probe_token_file_and_response_headers_are_private(tmp_path: Path) -> None:
+    module = load_module()
+    token_file = tmp_path / "probe-token"
+    token_file.write_text("a" * 43 + "\n", encoding="ascii")
+    token_file.chmod(0o600)
+
+    assert module._read_staged_probe_token(token_file) == "a" * 43
+    module._validate_staged_response_headers(
+        "/downloads",
+        {
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Robots-Tag": "noindex, nofollow",
+            "Vary": module.STAGED_PROBE_HEADER,
+        },
+    )
+
+    token_file.chmod(0o644)
+    with pytest.raises(module.ConvergenceError, match="mode-0600"):
+        module._read_staged_probe_token(token_file)
+    with pytest.raises(module.ConvergenceError, match="no-store/noindex"):
+        module._validate_staged_response_headers("/downloads", {})
 
 
 def test_missing_required_field_fails_closed() -> None:
@@ -133,6 +158,208 @@ def test_body_and_header_contradiction_is_rejected() -> None:
             body=body,
             content_type="text/html",
         )
+
+
+def test_withheld_projection_rejects_optimistic_rendered_copy() -> None:
+    module = load_module()
+    withheld = projection(
+        availablePlatforms=[],
+        primaryHeadByPlatform={},
+        artifactCount=0,
+        downloadAccessPosture="unavailable",
+        releaseDecisionStatus="review_required",
+    )
+    body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(withheld)
+        + "</script><main>Current builds are published and ready to download.</main>"
+    ).encode()
+
+    with pytest.raises(module.ConvergenceError, match="rendered release fields"):
+        module.extract_route_projection(
+            route="/now",
+            headers={module.PROJECTION_HEADER: encode_header(withheld)},
+            body=body,
+            content_type="text/html",
+        )
+
+
+def test_available_projection_rejects_paused_rendered_copy() -> None:
+    module = load_module()
+    current = projection()
+    body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(current)
+        + "</script><main><h2>No build is available right now</h2></main>"
+    ).encode()
+
+    with pytest.raises(module.ConvergenceError, match="rendered release fields"):
+        module.extract_route_projection(
+            route="/downloads",
+            headers={module.PROJECTION_HEADER: encode_header(current)},
+            body=body,
+            content_type="text/html",
+        )
+
+
+def test_availability_copy_inside_embedded_json_is_not_treated_as_visible() -> None:
+    module = load_module()
+    withheld = projection(
+        availablePlatforms=[],
+        primaryHeadByPlatform={},
+        artifactCount=0,
+        downloadAccessPosture="unavailable",
+        releaseDecisionStatus="review_required",
+        knownIssueSummary="Current builds are published and ready to download.",
+    )
+    body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(withheld)
+        + "</script><main>Release review required.</main>"
+    ).encode()
+
+    assert module.extract_route_projection(
+        route="/now",
+        headers={module.PROJECTION_HEADER: encode_header(withheld)},
+        body=body,
+        content_type="text/html",
+    ) == withheld
+
+
+def test_preview_states_are_not_mistaken_for_review_states() -> None:
+    module = load_module()
+    preview = projection(
+        channel="preview",
+        rolloutState="preview",
+        supportabilityState="preview_supported",
+        releaseDecisionStatus="preview_ready",
+    )
+
+    assert module._availability_claims_allowed(preview) is True
+    assert module._availability_claims_allowed(
+        {**preview, "rolloutState": "review_required"}
+    ) is False
+    assert module._availability_claims_allowed(
+        {**preview, "supportabilityState": "preview_review_required"}
+    ) is False
+
+
+def test_truthful_negative_installer_copy_is_not_treated_as_optimistic() -> None:
+    module = load_module()
+    withheld = projection(
+        availablePlatforms=[],
+        primaryHeadByPlatform={},
+        artifactCount=0,
+        downloadAccessPosture="unavailable",
+        releaseDecisionStatus="review_required",
+    )
+    body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(withheld)
+        + "</script><main>There is no current public installer.</main>"
+    ).encode()
+
+    assert module.extract_route_projection(
+        route="/",
+        headers={module.PROJECTION_HEADER: encode_header(withheld)},
+        body=body,
+        content_type="text/html",
+    ) == withheld
+
+    platform_body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(withheld)
+        + "</script><main>No Windows downloads are available.</main>"
+    ).encode()
+    assert module.extract_route_projection(
+        route="/downloads",
+        headers={module.PROJECTION_HEADER: encode_header(withheld)},
+        body=platform_body,
+        content_type="text/html",
+    ) == withheld
+
+
+def test_rendered_platform_claims_must_match_available_platforms() -> None:
+    module = load_module()
+    mac_preview = projection(
+        channel="preview",
+        rolloutState="preview",
+        supportabilityState="preview_supported",
+        availablePlatforms=["macos"],
+        primaryHeadByPlatform={"macos": "avalonia"},
+        artifactCount=1,
+        releaseDecisionStatus="preview_ready",
+    )
+    contradictory = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(mac_preview)
+        + "</script><main>Windows and Linux downloads are live.</main>"
+    ).encode()
+
+    with pytest.raises(module.ConvergenceError, match="availablePlatforms"):
+        module.extract_route_projection(
+            route="/downloads",
+            headers={module.PROJECTION_HEADER: encode_header(mac_preview)},
+            body=contradictory,
+            content_type="text/html",
+        )
+
+    matching = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(mac_preview)
+        + "</script><main>macOS downloads are live.</main>"
+    ).encode()
+    assert module.extract_route_projection(
+        route="/downloads",
+        headers={module.PROJECTION_HEADER: encode_header(mac_preview)},
+        body=matching,
+        content_type="text/html",
+    ) == mac_preview
+
+    mixed_claims = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(mac_preview)
+        + "</script><main>Windows downloads are unavailable. "
+        "Mac downloads are live.</main>"
+    ).encode()
+    assert module.extract_route_projection(
+        route="/downloads",
+        headers={module.PROJECTION_HEADER: encode_header(mac_preview)},
+        body=mixed_claims,
+        content_type="text/html",
+    ) == mac_preview
+
+
+def test_labeled_rendered_release_fields_must_match_projection() -> None:
+    module = load_module()
+    current = projection()
+    contradictory = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(current)
+        + "</script><main>Release version: 5.9.0. "
+        "Release channel: public_stable. Artifact count: 2.</main>"
+    ).encode()
+
+    with pytest.raises(module.ConvergenceError, match="releaseVersion"):
+        module.extract_route_projection(
+            route="/status",
+            headers={module.PROJECTION_HEADER: encode_header(current)},
+            body=contradictory,
+            content_type="text/html",
+        )
+
+    matching = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(current)
+        + "</script><main>Release version: 6.2.0. "
+        "Release channel: public_stable. Artifact count: 2.</main>"
+    ).encode()
+    assert module.extract_route_projection(
+        route="/status",
+        headers={module.PROJECTION_HEADER: encode_header(current)},
+        body=matching,
+        content_type="text/html",
+    ) == current
 
 
 def test_legacy_status_alias_is_rejected() -> None:
@@ -342,6 +569,104 @@ def test_projection_rejects_unknown_fields_and_short_registry_commit() -> None:
         )
 
 
+def test_expected_candidate_binding_requires_exact_release_digests() -> None:
+    module = load_module()
+    current = projection()
+    expected = {
+        "releaseVersion": current["releaseVersion"],
+        "manifestSha256": current["manifestSha256"],
+        "releaseDecisionSha256": current["releaseDecisionSha256"],
+    }
+
+    module.validate_expected_release_truth(current, expected)
+
+    with pytest.raises(module.ConvergenceError, match="candidate release truth mismatch"):
+        module.validate_expected_release_truth(
+            current,
+            {**expected, "manifestSha256": "f" * 64},
+        )
+    with pytest.raises(module.ConvergenceError, match="lower-case SHA-256"):
+        module.validate_expected_release_truth(
+            current,
+            {**expected, "releaseDecisionSha256": "F" * 64},
+        )
+
+
+def test_expected_candidate_cli_binding_is_all_or_nothing() -> None:
+    module = load_module()
+    args = module.parse_args(
+        [
+            "--expected-release-version",
+            "6.2.0",
+            "--expected-manifest-sha256",
+            "a" * 64,
+            "--expected-release-decision-sha256",
+            "c" * 64,
+        ]
+    )
+
+    assert module._expected_release_truth_from_args(args) == {
+        "releaseVersion": "6.2.0",
+        "manifestSha256": "a" * 64,
+        "releaseDecisionSha256": "c" * 64,
+    }
+
+    incomplete = module.parse_args(
+        ["--expected-release-version", "6.2.0"]
+    )
+    with pytest.raises(module.ConvergenceError, match="binding is incomplete"):
+        module._expected_release_truth_from_args(incomplete)
+
+
+def test_incomplete_expected_candidate_cli_emits_failure_receipt_without_network(
+    monkeypatch,
+    capsys,
+) -> None:
+    module = load_module()
+
+    def unexpected_network(*args, **kwargs):
+        raise AssertionError("network verification must not run")
+
+    monkeypatch.setattr(module, "verify_live", unexpected_network)
+
+    assert module.main(["--expected-release-version", "6.2.0"]) == 1
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["status"] == "fail"
+    assert receipt["generatedAtUtc"].endswith("Z")
+    assert "expected release binding is incomplete" in receipt["failures"][0]
+
+
+def test_complete_expected_candidate_cli_is_forwarded_to_live_authority_check(
+    monkeypatch,
+    capsys,
+) -> None:
+    module = load_module()
+    captured = {}
+
+    def fake_verify_live(*args, **kwargs):
+        captured.update(kwargs)
+        return {"status": "pass"}
+
+    monkeypatch.setattr(module, "verify_live", fake_verify_live)
+
+    assert module.main(
+        [
+            "--expected-release-version",
+            "6.2.0",
+            "--expected-manifest-sha256",
+            "a" * 64,
+            "--expected-release-decision-sha256",
+            "c" * 64,
+        ]
+    ) == 0
+    assert json.loads(capsys.readouterr().out) == {"status": "pass"}
+    assert captured["expected_release_truth"] == {
+        "releaseVersion": "6.2.0",
+        "manifestSha256": "a" * 64,
+        "releaseDecisionSha256": "c" * 64,
+    }
+
+
 def test_committed_generation_routes_are_independent_of_current() -> None:
     module = load_module()
 
@@ -515,14 +840,18 @@ def test_stable_installer_source_hop_rejects_governed_409() -> None:
         )
 
 
-def test_failure_receipt_has_the_exact_sixteen_field_contract() -> None:
+def test_failure_receipt_has_the_exact_seventeen_field_contract() -> None:
     module = load_module()
 
-    receipt = module.build_failure_receipt("/help: missing embedded releaseTruth")
+    receipt = module.build_failure_receipt(
+        "/help: missing embedded releaseTruth",
+        generated_at_utc="2026-07-20T21:00:00Z",
+    )
 
     assert set(receipt) == {
         "contractName",
         "contractVersion",
+        "generatedAtUtc",
         "status",
         "mismatchCount",
         "failureCount",
@@ -538,6 +867,7 @@ def test_failure_receipt_has_the_exact_sixteen_field_contract() -> None:
         "releaseDecisionSha256",
         "authoritySnapshotSha256",
     }
+    assert receipt["generatedAtUtc"] == "2026-07-20T21:00:00Z"
     assert "error" not in receipt
 
 

@@ -33,40 +33,84 @@ public sealed class CampaignArtifactRegistryBridge
 
         lock (_sync)
         {
-            string normalizedPackageKind = NormalizeToken(request.PackageKind, "session_recap");
-            string version = ComposeArtifactVersion(request.GeneratedAtUtc, normalizedPackageKind);
-            string runtimeFingerprint = $"sha256:{ComputeFingerprint(request)}";
-            HubArtifactKind artifactKind = ResolveArtifactKind(normalizedPackageKind);
-            HubArtifactMetadata artifact = _store.UpsertArtifact(new HubArtifactCreateRequest(
-                Name: BuildArtifactName(request),
-                Kind: artifactKind,
-                Version: version,
-                RulesetId: NormalizeToken(request.RulesetId, "sr5"),
-                Visibility: ArtifactVisibilityModes.CampaignShared,
-                TrustTier: ArtifactTrustTiers.Curated,
-                OwnerId: NormalizeToken(request.OwnerUserId, "unknown"),
-                PublisherId: null,
-                Summary: NormalizeToken(request.Summary, request.Title),
-                Description: BuildArtifactDescription(request),
-                RuntimeFingerprint: runtimeFingerprint,
-                StateReason: $"Bound to campaign {NormalizeToken(request.CampaignId, "unknown")} package {NormalizeToken(request.PackageId, "unknown")}.",
-                EngineApiVersion: null));
-            PersistLocked();
-
-            string packageLabel = artifactKind == HubArtifactKind.ReplayPackage ? "replay" : "recap";
-            string runScope = string.IsNullOrWhiteSpace(request.RunTitle)
-                ? $"{NormalizeToken(request.CampaignName, "Campaign")} campaign lane"
-                : $"{request.RunTitle} run";
-            return new CampaignArtifactRegistration(
-                ArtifactId: artifact.Id,
-                ArtifactKind: artifact.Kind.ToString(),
-                ArtifactVersion: artifact.Version,
-                ArtifactVisibility: artifact.Visibility,
-                ArtifactTrustTier: artifact.TrustTier,
-                ArtifactRulesetId: artifact.RulesetId,
-                ProvenanceSummary: $"{NormalizeToken(request.RuleEnvironmentFingerprint, artifact.RulesetId)} + {packageLabel} artifact {artifact.Id} v{artifact.Version} keeps {runScope} attached to package {NormalizeToken(request.PackageId, "unknown")}.",
-                AuditSummary: $"Artifact {artifact.Id} is active on the {artifact.Visibility} shelf with {artifact.TrustTier} trust for {artifact.RulesetId}; generated {request.GeneratedAtUtc:yyyy-MM-dd HH:mm} UTC by {NormalizeToken(request.OwnerUserId, "unknown")}.");
+            return RegisterAftermathPackageLocked(request);
         }
+    }
+
+    public TResult ExecuteAftermathRegistrationTransaction<TResult>(
+        AftermathArtifactRegistrationRequest request,
+        Func<CampaignArtifactRegistration, TResult> operation)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(operation);
+
+        lock (_sync)
+        {
+            HubArtifactStoreBackupPackage storeBefore = _store.ExportBackup();
+            byte[]? durableStateBefore = File.Exists(_storagePath)
+                ? File.ReadAllBytes(_storagePath)
+                : null;
+
+            try
+            {
+                CampaignArtifactRegistration registration = RegisterAftermathPackageLocked(request);
+                return operation(registration);
+            }
+            catch (Exception failure)
+            {
+                try
+                {
+                    _store.RestoreBackup(storeBefore);
+                    RestoreDurableStateLocked(durableStateBefore);
+                }
+                catch (Exception rollbackFailure)
+                {
+                    throw new AggregateException(
+                        "Aftermath artifact registration failed and its registry rollback also failed.",
+                        failure,
+                        rollbackFailure);
+                }
+
+                throw;
+            }
+        }
+    }
+
+    private CampaignArtifactRegistration RegisterAftermathPackageLocked(AftermathArtifactRegistrationRequest request)
+    {
+        string normalizedPackageKind = NormalizeToken(request.PackageKind, "session_recap");
+        string version = ComposeArtifactVersion(request.GeneratedAtUtc, normalizedPackageKind);
+        string runtimeFingerprint = $"sha256:{ComputeFingerprint(request)}";
+        HubArtifactKind artifactKind = ResolveArtifactKind(normalizedPackageKind);
+        HubArtifactMetadata artifact = _store.UpsertArtifact(new HubArtifactCreateRequest(
+            Name: BuildArtifactName(request),
+            Kind: artifactKind,
+            Version: version,
+            RulesetId: NormalizeToken(request.RulesetId, "sr5"),
+            Visibility: ArtifactVisibilityModes.CampaignShared,
+            TrustTier: ArtifactTrustTiers.Curated,
+            OwnerId: NormalizeToken(request.OwnerUserId, "unknown"),
+            PublisherId: null,
+            Summary: NormalizeToken(request.Summary, request.Title),
+            Description: BuildArtifactDescription(request),
+            RuntimeFingerprint: runtimeFingerprint,
+            StateReason: $"Bound to campaign {NormalizeToken(request.CampaignId, "unknown")} package {NormalizeToken(request.PackageId, "unknown")}.",
+            EngineApiVersion: null));
+        PersistLocked();
+
+        string packageLabel = artifactKind == HubArtifactKind.ReplayPackage ? "replay" : "recap";
+        string runScope = string.IsNullOrWhiteSpace(request.RunTitle)
+            ? $"{NormalizeToken(request.CampaignName, "Campaign")} campaign lane"
+            : $"{request.RunTitle} run";
+        return new CampaignArtifactRegistration(
+            ArtifactId: artifact.Id,
+            ArtifactKind: artifact.Kind.ToString(),
+            ArtifactVersion: artifact.Version,
+            ArtifactVisibility: artifact.Visibility,
+            ArtifactTrustTier: artifact.TrustTier,
+            ArtifactRulesetId: artifact.RulesetId,
+            ProvenanceSummary: $"{NormalizeToken(request.RuleEnvironmentFingerprint, artifact.RulesetId)} + {packageLabel} artifact {artifact.Id} v{artifact.Version} keeps {runScope} attached to package {NormalizeToken(request.PackageId, "unknown")}.",
+            AuditSummary: $"Artifact {artifact.Id} is active on the {artifact.Visibility} shelf with {artifact.TrustTier} trust for {artifact.RulesetId}; generated {request.GeneratedAtUtc:yyyy-MM-dd HH:mm} UTC by {NormalizeToken(request.OwnerUserId, "unknown")}.");
     }
 
     private void Load()
@@ -91,6 +135,21 @@ public sealed class CampaignArtifactRegistryBridge
         string tempPath = $"{_storagePath}.tmp";
         string payload = JsonSerializer.Serialize(_store.ExportBackup(), _jsonOptions);
         File.WriteAllText(tempPath, payload);
+        File.Move(tempPath, _storagePath, true);
+    }
+
+    private void RestoreDurableStateLocked(byte[]? durableState)
+    {
+        string tempPath = $"{_storagePath}.tmp";
+        if (durableState is null)
+        {
+            File.Delete(tempPath);
+            File.Delete(_storagePath);
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
+        File.WriteAllBytes(tempPath, durableState);
         File.Move(tempPath, _storagePath, true);
     }
 

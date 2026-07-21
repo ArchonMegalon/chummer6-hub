@@ -6,6 +6,7 @@ public sealed record AntiforgeryTokenProjection(
 
 public sealed record CreateCampaignCollaborationRequest(
     string Name,
+    string IdempotencyKey,
     string? Summary = null,
     string? Visibility = null,
     string? InitialRunTitle = null);
@@ -23,6 +24,35 @@ public sealed record CampaignCollaborationProjection(
     IReadOnlyList<CampaignRosterEntryProjection> Roster,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed record DeleteCampaignCollaborationRequest(
+    string ConfirmCampaignName,
+    DateTimeOffset ExpectedUpdatedAtUtc,
+    string IdempotencyKey);
+
+public sealed record CampaignTeardownCleanupCounts(
+    int Campaigns,
+    int Groups,
+    int Crews,
+    int Runs,
+    int Invites,
+    int InviteCodeIndexes,
+    int CharacterBindings,
+    int Runsites,
+    int CommandRecords,
+    int AuditRecords,
+    int UserGroupMemberships,
+    int RestoreProjections = 0,
+    int WorkspacePrepLibrarySearchHistoryItems = 0);
+
+public sealed record CampaignTeardownReceipt(
+    string ReceiptId,
+    string CampaignId,
+    string CampaignNameSha256,
+    DateTimeOffset PreviousUpdatedAtUtc,
+    CampaignTeardownCleanupCounts Removed,
+    string CleanupSha256,
+    DateTimeOffset DeletedAtUtc);
 
 public sealed record CampaignRosterEntryProjection(
     string DossierId,
@@ -63,6 +93,14 @@ public sealed record CampaignEligibleCharacterProjection(
     long CurrentRevision,
     DateTimeOffset UpdatedAtUtc);
 
+/// <summary>
+/// Compatibility request for a delegated canonical GM character edit.
+/// DisplayName maps to Core profile name and RunnerHandle maps to Core profile
+/// alias. Core's v1 delegation does not authorize status or player-safe section
+/// mutation, so callers must leave Sections null (or exactly unchanged) and
+/// must echo the current Status. A future Core contract may add an explicit
+/// notes field; arbitrary publication sections are never reinterpreted as it.
+/// </summary>
 public sealed record CampaignSharedSheetUpdateRequest(
     long ExpectedRevision,
     string IdempotencyKey,
@@ -83,7 +121,11 @@ public sealed record CampaignSharedSheetEditReceipt(
     string EditedByUserId,
     string BeforeSha256,
     string AfterSha256,
-    DateTimeOffset EditedAtUtc);
+    DateTimeOffset EditedAtUtc,
+    // Revision is the exact canonical revision created by this GM command.
+    // CurrentRevision may be newer when Core replays the command after a later
+    // character-owner edit; clients must reload instead of rolling it back.
+    long? CurrentRevision = null);
 
 public sealed record CampaignGmAuthorityUpdateRequest(
     long ExpectedBindingRevision,
@@ -105,6 +147,7 @@ public sealed record CampaignGmAuthorityUpdateReceipt(
     DateTimeOffset ChangedAtUtc);
 
 public sealed record CreateCampaignInviteRequest(
+    string IdempotencyKey,
     int ExpiresInMinutes = 1440,
     int MaxUses = 1);
 
@@ -160,6 +203,7 @@ public sealed record RunsitePlayerSectionInput(
 
 public sealed record CampaignRunsiteDraftUpdateRequest(
     long ExpectedRevision,
+    string IdempotencyKey,
     string Title,
     string Summary,
     IReadOnlyList<RunsitePlayerSectionInput> PlayerSections,
@@ -178,7 +222,8 @@ public sealed record CampaignRunsiteDraftProjection(
     DateTimeOffset? PublishedAtUtc);
 
 public sealed record PublishCampaignRunsiteRequest(
-    long ExpectedRevision);
+    long ExpectedRevision,
+    string IdempotencyKey);
 
 public sealed record CampaignRunsitePlayerProjection(
     string CampaignId,

@@ -22,6 +22,7 @@ def test_release_rehearsal_propagates_target_and_requires_signed_in_account_proo
     assert 'CHUMMER_E2E_IDENTITY_TOKEN="$ACCOUNT_PROOF_IDENTITY_TOKEN" \\\n' in REHEARSAL
     assert 'CHUMMER_E2E_LOCAL_IDENTITY_TOKEN="$ACCOUNT_PROOF_LOCAL_IDENTITY_TOKEN" \\\n' in REHEARSAL
     assert "tests/public/account-access.spec.ts" in REHEARSAL
+    assert '--completion-dir "$(dirname "$CHUMMER_UI_FRAME_RECEIPT_PATH")"' in REHEARSAL
 
 
 def test_release_rehearsal_fails_before_work_when_signed_in_proof_token_is_missing() -> None:

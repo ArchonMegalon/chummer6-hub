@@ -252,6 +252,9 @@ services:
       CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
+      # Core's delegated GM edit boundary requires an explicit, pre-provisioned
+      # directory and never falls back to temporary or in-memory character state.
+      Chummer__CoreGmCharacterEdits__WorkspaceStorePath: /app/state/core-workspaces
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password

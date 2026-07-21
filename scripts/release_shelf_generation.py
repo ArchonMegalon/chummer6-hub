@@ -432,6 +432,115 @@ def normalize_manifest(
     return normalized
 
 
+def project_manifest_pair(
+    canonical_path: Path,
+    compatibility_path: Path,
+    generation_id: str,
+) -> dict[str, Any]:
+    """Atomically project both incoming manifests to one caller-declared generation.
+
+    HTTP promotion uses the same normalization contract server-side. Projecting the
+    pair before upload lets Registry authority bind the exact bytes that the server
+    will seal, without copying the much larger artifact tree.
+    """
+
+    generation_id = validate_generation_id(generation_id)
+    for path, label in (
+        (canonical_path, CANONICAL_MANIFEST),
+        (compatibility_path, COMPATIBILITY_MANIFEST),
+    ):
+        if path.is_symlink() or not path.is_file():
+            raise ReleaseShelfError(f"{label} must be a regular non-symlink file: {path}")
+
+    canonical_source = read_json_object(canonical_path, CANONICAL_MANIFEST)
+    compatibility_source = read_json_object(
+        compatibility_path, COMPATIBILITY_MANIFEST
+    )
+    canonical_identity = _manifest_identity(canonical_source, CANONICAL_MANIFEST)
+    compatibility_identity = _manifest_identity(
+        compatibility_source, COMPATIBILITY_MANIFEST
+    )
+    if canonical_identity[:2] != compatibility_identity[:2] or (
+        canonical_identity[2]
+        and compatibility_identity[2]
+        and _normalize_timestamp(canonical_identity[2])
+        != _normalize_timestamp(compatibility_identity[2])
+    ):
+        raise ReleaseShelfError(
+            "canonical and compatibility manifests must expose the same release identity"
+        )
+
+    artifact_routes = _artifact_routes(compatibility_source, generation_id)
+    temporary_paths: list[Path] = []
+    try:
+        projected: dict[str, tuple[Path, dict[str, Any]]] = {}
+        for destination, label in (
+            (canonical_path, CANONICAL_MANIFEST),
+            (compatibility_path, COMPATIBILITY_MANIFEST),
+        ):
+            descriptor, raw_temporary = tempfile.mkstemp(
+                prefix=f".{destination.name}.generation-",
+                dir=destination.parent,
+            )
+            temporary = Path(raw_temporary)
+            temporary_paths.append(temporary)
+            try:
+                os.fchmod(descriptor, 0o600)
+            except Exception:
+                os.close(descriptor)
+                raise
+            with os.fdopen(descriptor, "wb") as handle:
+                source_payload = (
+                    canonical_source
+                    if label == CANONICAL_MANIFEST
+                    else compatibility_source
+                )
+                handle.write(canonical_json_bytes(source_payload) + b"\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            normalized = normalize_manifest(
+                temporary,
+                generation_id,
+                artifact_routes,
+            )
+            validate_manifest_routes(normalized, generation_id, label)
+            projected[label] = (temporary, normalized)
+
+        projected_canonical_identity = _manifest_identity(
+            projected[CANONICAL_MANIFEST][1], CANONICAL_MANIFEST
+        )
+        projected_compatibility_identity = _manifest_identity(
+            projected[COMPATIBILITY_MANIFEST][1], COMPATIBILITY_MANIFEST
+        )
+        if projected_canonical_identity != projected_compatibility_identity:
+            raise ReleaseShelfError(
+                "generation-projected manifests changed or contradicted release identity"
+            )
+
+        os.replace(projected[CANONICAL_MANIFEST][0], canonical_path)
+        temporary_paths.remove(projected[CANONICAL_MANIFEST][0])
+        os.replace(projected[COMPATIBILITY_MANIFEST][0], compatibility_path)
+        temporary_paths.remove(projected[COMPATIBILITY_MANIFEST][0])
+        for parent in {canonical_path.parent, compatibility_path.parent}:
+            descriptor = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+
+        return {
+            "generationId": generation_id,
+            "releaseVersion": projected_canonical_identity[0],
+            "channel": projected_canonical_identity[1],
+            "publishedAt": projected_canonical_identity[2],
+            "canonicalManifestSha256": sha256_file(canonical_path),
+            "compatibilityManifestSha256": sha256_file(compatibility_path),
+        }
+    finally:
+        for temporary in temporary_paths:
+            temporary.unlink(missing_ok=True)
+
+
 def _walk_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[str]:
     if isinstance(value, dict):
         for key, item in value.items():
@@ -1130,6 +1239,14 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--activated-at")
     prepare.add_argument("--activation-receipt-id")
 
+    project_manifests = subparsers.add_parser(
+        "project-manifests",
+        help="project one canonical/compatibility manifest pair to an exact generation",
+    )
+    project_manifests.add_argument("--canonical-manifest", type=Path, required=True)
+    project_manifests.add_argument("--compatibility-manifest", type=Path, required=True)
+    project_manifests.add_argument("--generation-id", required=True)
+
     activate = subparsers.add_parser(
         "activate-filesystem", help="stage, validate, and atomically activate a filesystem shelf"
     )
@@ -1182,6 +1299,13 @@ def main(argv: list[str] | None = None) -> int:
                 activation_receipt_id=args.activation_receipt_id,
             )
             print(json.dumps(pointer, sort_keys=True))
+        elif args.command == "project-manifests":
+            result = project_manifest_pair(
+                args.canonical_manifest,
+                args.compatibility_manifest,
+                args.generation_id,
+            )
+            print(json.dumps(result, sort_keys=True))
         elif args.command == "activate-filesystem":
             pointer = activate_filesystem(
                 args.candidate_root,

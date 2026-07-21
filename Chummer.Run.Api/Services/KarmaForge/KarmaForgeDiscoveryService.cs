@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.Contracts;
 using Microsoft.Extensions.Configuration;
 
@@ -208,6 +209,54 @@ public sealed class KarmaForgeDiscoveryService
 
     public IReadOnlyList<string> GetCanonicalOutputs()
         => CanonicalOutputs;
+
+    public KarmaForgeDiscoveryArtifact BuildPublicDiscoveryArtifact()
+    {
+        const string destinationRoute = "/participate/karma-forge/discovery";
+        const string contentType = "application/json; charset=utf-8";
+        string content = JsonSerializer.Serialize(
+            new
+            {
+                contract_name = "chummer.karma_forge.public_discovery_packet.v1",
+                horizon_id = "karma-forge",
+                capability_id = "karma-forge-discovery",
+                artifact_kind = "discovery_packet",
+                mime_type = "application/json",
+                source_ref = "karma-forge:public-intake",
+                destination_route = destinationRoute,
+                intake_route = "/participate/karma-forge",
+                status = "ready",
+                canonical_lane = CanonicalLane,
+                entry_lane = EntryLane,
+                discovery_steps = GetDiscoverySteps(),
+                canonical_outputs = GetCanonicalOutputs(),
+                tracks = ListTracks().Select(static track => new
+                {
+                    key = track.Key,
+                    title = track.Title,
+                    family = track.Family,
+                    questions = track.Questions
+                }),
+                boundaries = new
+                {
+                    canonical_truth = "chummer_owned_discovery_template",
+                    contains_submission_data = false,
+                    contains_personal_data = false,
+                    contains_raw_rules_text = false,
+                    provider_urls_included = false,
+                    intake_is_not_backlog_or_rules_truth = true
+                }
+            },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }) + "\n";
+
+        return new KarmaForgeDiscoveryArtifact(
+            Content: content,
+            ContentType: contentType,
+            FileName: "karma-forge-discovery-packet.json",
+            ArtifactKind: "discovery_packet",
+            DestinationRoute: destinationRoute,
+            SourceRef: "karma-forge:public-intake");
+    }
 
     public IReadOnlyList<KarmaForgeExternalStageProjection> GetExternalStageProjections(KarmaForgeSubmissionProjection? submission = null)
     {
@@ -1208,6 +1257,14 @@ public sealed record KarmaForgeSubmissionProjection(
     HouseRuleDemandPacketProjection Packet,
     KarmaForgeCandidateProjection Candidate,
     RuleEnvironmentImpactHypothesisProjection ImpactHypothesis);
+
+public sealed record KarmaForgeDiscoveryArtifact(
+    string Content,
+    string ContentType,
+    string FileName,
+    string ArtifactKind,
+    string DestinationRoute,
+    string SourceRef);
 
 public sealed record HouseRuleDemandPacketProjection(
     string Id,

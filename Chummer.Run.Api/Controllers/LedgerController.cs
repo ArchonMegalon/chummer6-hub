@@ -43,6 +43,8 @@ public sealed class LedgerController : ControllerBase
     [HttpPost("receipts")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ReceiptIngestResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<ReceiptIngestResultDto> Ingest([FromBody] JsonElement receipt)
     {
         try
@@ -54,11 +56,22 @@ public sealed class LedgerController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (IsMappedIngestException(ex))
         {
-            return BadRequest(ex.Message);
+            return MapIngestException(ex);
         }
     }
+
+    private static bool IsMappedIngestException(Exception exception)
+        => exception is ArgumentException or KeyNotFoundException;
+
+    private ActionResult MapIngestException(Exception exception)
+        => exception switch
+        {
+            KeyNotFoundException ex => NotFound(ex.Message),
+            ArgumentException ex => BadRequest(ex.Message),
+            _ => Problem(statusCode: StatusCodes.Status500InternalServerError, detail: exception.Message),
+        };
 
     [HttpGet("me")]
     [ProducesResponseType(StatusCodes.Status200OK)]

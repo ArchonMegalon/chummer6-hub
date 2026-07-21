@@ -497,7 +497,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("newsroom_bulletin", capability.GetProperty("ArtifactKind").GetString());
         Assert.Equal("Newsroom Bulletin", capability.GetProperty("PublicLabel").GetString());
         Assert.Equal("public_bulletin_media", capability.GetProperty("CapabilitySlot").GetString());
-        Assert.Equal("available", capability.GetProperty("Status").GetString());
+        Assert.Equal("configured", capability.GetProperty("Status").GetString());
         Assert.Equal("black-ledger:turn-1:newsroom", capability.GetProperty("SourceRef").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
@@ -538,8 +538,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.NotNull(model.DigestCapability);
         Assert.Equal("black-ledger", model.DigestCapability!.HorizonId);
         Assert.Equal("black-ledger-digest", model.DigestCapability.CapabilityId);
-        Assert.Equal("available", model.DigestCapability.Status);
-        Assert.True(model.DigestCapability.RequestSupported);
+        Assert.Equal("configured", model.DigestCapability.Status);
+        Assert.False(model.DigestCapability.RequestSupported);
         Assert.Equal("black-ledger:turn-1:digest", model.DigestCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
@@ -588,8 +588,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("viewer_network", capability.GetProperty("ArtifactKind").GetString());
         Assert.Equal("3D Tour", capability.GetProperty("PublicLabel").GetString());
         Assert.Equal("public_viewer_handoff", capability.GetProperty("CapabilitySlot").GetString());
-        Assert.Equal("available", capability.GetProperty("Status").GetString());
-        Assert.True(capability.GetProperty("RequestSupported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("Status").GetString());
+        Assert.False(capability.GetProperty("RequestSupported").GetBoolean());
         Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
         Assert.Equal("black-ledger:viewer-network", capability.GetProperty("SourceRef").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
@@ -790,8 +790,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.NotNull(model.HorizonCapability);
         Assert.Equal("table-pulse", model.HorizonCapability!.HorizonId);
         Assert.Equal("table-pulse-debrief", model.HorizonCapability.CapabilityId);
-        Assert.Equal("available", model.HorizonCapability.Status);
-        Assert.True(model.HorizonCapability.RequestSupported);
+        Assert.Equal("configured", model.HorizonCapability.Status);
+        Assert.False(model.HorizonCapability.RequestSupported);
         Assert.Equal("table-pulse:live-and-aftermath", model.HorizonCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
@@ -831,8 +831,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("dossier_media", model.HorizonCapability.ArtifactKind);
         Assert.Equal("Dossier Media", model.HorizonCapability.PublicLabel);
         Assert.Equal("approved_origin_media", model.HorizonCapability.CapabilitySlot);
-        Assert.Equal("available", model.HorizonCapability.Status);
-        Assert.True(model.HorizonCapability.RequestSupported);
+        Assert.Equal("configured", model.HorizonCapability.Status);
+        Assert.False(model.HorizonCapability.RequestSupported);
         Assert.Equal("origin-dossier:public-story-edition", model.HorizonCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
@@ -883,7 +883,7 @@ public sealed class PublicLandingDownloadDispatchTests
         TrustPageViewModel model = Assert.IsType<TrustPageViewModel>(view.Model);
         Assert.NotNull(model.HorizonCapability);
         Assert.Equal("origin-dossier-media", model.HorizonCapability!.CapabilityId);
-        Assert.Equal("available", model.HorizonCapability.Status);
+        Assert.Equal("configured", model.HorizonCapability.Status);
         Assert.Equal("origin-dossier:document:origin-dossier-the-name-she-chose", model.HorizonCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
@@ -935,8 +935,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("identity_network", capability.GetProperty("ArtifactKind").GetString());
         Assert.Equal("Identity Network", capability.GetProperty("PublicLabel").GetString());
         Assert.Equal("public_identity_return", capability.GetProperty("CapabilitySlot").GetString());
-        Assert.Equal("available", capability.GetProperty("Status").GetString());
-        Assert.True(capability.GetProperty("RequestSupported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("Status").GetString());
+        Assert.False(capability.GetProperty("RequestSupported").GetBoolean());
         Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
         Assert.Equal("runner_passport:identity-network", capability.GetProperty("SourceRef").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
@@ -1220,6 +1220,34 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", payload.RootElement.GetProperty("tour_href").GetString());
         Assert.False(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
         Assert.Equal("3D Tour", payload.RootElement.GetProperty("tour_label").GetString());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/map", payload.RootElement.GetProperty("map_href").GetString());
+        Assert.Equal("Route Map", payload.RootElement.GetProperty("map_label").GetString());
+    }
+
+    [Fact]
+    public void RunsiteMapArtifactIsDeterministicFirstPartySvgWithExplicitBoundary()
+    {
+        var service = new MediaArtifactHorizonsService();
+        MediaArtifactDocument pack = service.GetRunsitePack("redmond-dockyard-pack");
+
+        MediaArtifactTerminalDocument first = service.BuildRunsiteMap(pack);
+        MediaArtifactTerminalDocument second = service.BuildRunsiteMap(pack);
+
+        Assert.Equal("map", first.ArtifactKind);
+        Assert.Equal("image/svg+xml; charset=utf-8", first.ContentType);
+        Assert.Equal("redmond-dockyard-pack-route-map.svg", first.FileName);
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/map", first.DestinationRoute);
+        Assert.Equal("runsite:redmond-dockyard-pack", first.SourceRef);
+        Assert.Equal(first.Content, second.Content);
+        Assert.StartsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<svg ", first.Content, StringComparison.Ordinal);
+        Assert.Contains("data-contract=\"chummer.runsite.route-map.v1\"", first.Content, StringComparison.Ordinal);
+        Assert.Contains("id=\"entry\"", first.Content, StringComparison.Ordinal);
+        Assert.Contains("id=\"objective\"", first.Content, StringComparison.Ordinal);
+        Assert.Contains("id=\"exit\"", first.Content, StringComparison.Ordinal);
+        Assert.Contains("PLANNING AID ONLY — NOT A TACTICAL MAP", first.Content, StringComparison.Ordinal);
+        Assert.Contains("Distances, line of sight, security state, occupancy, and live positions are not authoritative.", first.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("AvoMap", first.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Matterport", first.Content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1300,8 +1328,10 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("tour", capability.GetProperty("artifact_kind").GetString());
         Assert.Equal("3D Tour", capability.GetProperty("public_label").GetString());
         Assert.Equal("explorable_location", capability.GetProperty("capability_slot").GetString());
-        Assert.Equal("available", capability.GetProperty("status").GetString());
-        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("configuration_enabled").GetBoolean());
+        Assert.Equal("unverified", capability.GetProperty("operational_readiness").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
         Assert.True(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.True(capability.GetProperty("quota_tracked").GetBoolean());
@@ -1369,8 +1399,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("tour", capability.GetProperty("artifact_kind").GetString());
         Assert.Equal("3D Tour", capability.GetProperty("public_label").GetString());
         Assert.Equal("explorable_location", capability.GetProperty("capability_slot").GetString());
-        Assert.Equal("available", capability.GetProperty("status").GetString());
-        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("status").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
         Assert.Equal("propertyquarry:northbound-research-lab", capability.GetProperty("source_ref").GetString());
         Assert.False(capability.TryGetProperty("internal_provider_lane", out _));
         Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
@@ -1403,8 +1433,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("document_export", capability.GetProperty("artifact_kind").GetString());
         Assert.Equal("Formatted Export", capability.GetProperty("public_label").GetString());
         Assert.Equal("document_render", capability.GetProperty("capability_slot").GetString());
-        Assert.Equal("available", capability.GetProperty("status").GetString());
-        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("status").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
         Assert.True(capability.GetProperty("quota_tracked").GetBoolean());
         Assert.Equal("runbook-press:new-runner-primer", capability.GetProperty("source_ref").GetString());
         Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
@@ -1437,8 +1467,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("command_network", capability.GetProperty("artifact_kind").GetString());
         Assert.Equal("Command Network", capability.GetProperty("public_label").GetString());
         Assert.Equal("public_command_pressure", capability.GetProperty("capability_slot").GetString());
-        Assert.Equal("available", capability.GetProperty("status").GetString());
-        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("status").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
@@ -1476,8 +1506,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("watch_network", capability.GetProperty("artifact_kind").GetString());
         Assert.Equal("Watch Network", capability.GetProperty("public_label").GetString());
         Assert.Equal("public_world_watch", capability.GetProperty("capability_slot").GetString());
-        Assert.Equal("available", capability.GetProperty("status").GetString());
-        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("configured", capability.GetProperty("status").GetString());
+        Assert.False(capability.GetProperty("request_supported").GetBoolean());
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
         Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
@@ -1704,7 +1734,9 @@ public sealed class PublicLandingDownloadDispatchTests
         HorizonCapabilityHealthSnapshot internalHealth = capabilities.GetHealth("runsite", "tour", publicSafe: false);
         HorizonCapabilityHealthSnapshot publicSafeHealth = capabilities.GetHealth("runsite", "tour", publicSafe: true);
 
-        Assert.Equal("available", internalHealth.Status);
+        Assert.Equal("configured", internalHealth.Status);
+        Assert.True(internalHealth.ConfigurationEnabled);
+        Assert.Equal("unverified", internalHealth.OperationalReadiness);
         Assert.Contains("Matterport", internalHealth.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
         Assert.Null(publicSafeHealth.InternalProviderLane);
         Assert.Equal("3D Tour", publicSafeHealth.PublicLabel);
@@ -1721,7 +1753,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         HorizonCapabilityHealthSnapshot health = capabilities.GetHealth("runner_passport", "identity_network", publicSafe: true);
 
-        Assert.Equal("available", health.Status);
+        Assert.Equal("configured", health.Status);
         Assert.False(health.RequiresAuthentication);
         Assert.True(health.PublicVisible);
         Assert.False(health.QuotaTracked);
@@ -2033,7 +2065,7 @@ public sealed class PublicLandingDownloadDispatchTests
         HorizonCapabilityHealthSnapshot runsiteTour = Assert.Single(catalog.Capabilities, item => item.CapabilityId == "runsite-tour");
         Assert.True(catalog.PublicSafe);
         Assert.Null(runsiteTour.InternalProviderLane);
-        Assert.Equal("available", runsiteTour.Status);
+        Assert.Equal("configured", runsiteTour.Status);
         Assert.Equal(1, runsiteTour.FreeWeeklyLimit);
         Assert.Equal(10, runsiteTour.SupporterWeeklyLimit);
         Assert.True(runsiteTour.QuotaTracked);
@@ -2058,11 +2090,11 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "runsite"
             && capability.CapabilityId == "runsite-tour"
-            && capability.Status == "available");
+            && capability.Status == "configured");
         Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "runsite"
             && capability.CapabilityId == "runsite-map"
-            && capability.Status == "disabled");
+            && capability.Status == "configured");
 
         string serialized = JsonSerializer.Serialize(catalog);
         Assert.DoesNotContain("Matterport", serialized, StringComparison.OrdinalIgnoreCase);
@@ -2141,11 +2173,11 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "runbook-press"
             && capability.CapabilityId == "runbook-export"
-            && capability.Status == "available");
+            && capability.Status == "configured");
         Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "jackpoint"
             && capability.CapabilityId == "jackpoint-briefing-video"
-            && capability.Status == "available");
+            && capability.Status == "configured");
         Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "origin-dossier"
             && capability.CapabilityId == "origin-dossier-media"
@@ -2182,7 +2214,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         HorizonCapabilityHealthSnapshot health = capabilities.GetHealth("runbook-press", "document_export", publicSafe: true);
 
-        Assert.Equal("available", health.Status);
+        Assert.Equal("configured", health.Status);
         Assert.Null(health.InternalProviderLane);
         Assert.Equal(3, health.FreeWeeklyLimit);
         Assert.Equal(12, health.SupporterWeeklyLimit);
@@ -2202,8 +2234,9 @@ public sealed class PublicLandingDownloadDispatchTests
         HorizonCapabilityHealthSnapshot publicSafeRunbook = capabilities.GetHealth("runbook-press", "document_export", publicSafe: true);
         HorizonCapabilityHealthSnapshot publicSafeOrigin = capabilities.GetHealth("origin-dossier", "dossier_media", publicSafe: true);
 
-        Assert.Contains("Subscribr.ai", runbook.InternalProviderLane, StringComparison.Ordinal);
-        Assert.Contains("First Book ai", runbook.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Contains("first-party", runbook.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Markdown", runbook.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Subscribr.ai", runbook.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Magicfit", origin.InternalProviderLane, StringComparison.Ordinal);
         Assert.Contains("Subscribr.ai", origin.InternalProviderLane, StringComparison.Ordinal);
         Assert.Contains("First Book ai", origin.InternalProviderLane, StringComparison.Ordinal);
@@ -2456,11 +2489,12 @@ public sealed class PublicLandingDownloadDispatchTests
         HorizonArtifactQuotaCatalog catalog = Assert.IsType<HorizonArtifactQuotaCatalog>(ok.Value);
         Assert.Equal("subject.internal-quotas", catalog.UserId);
         Assert.True(catalog.PublicVisibleOnly);
-        Assert.Equal(3, catalog.Quotas.Count);
+        Assert.Equal(5, catalog.Quotas.Count);
         Assert.Contains(catalog.Quotas, quota => quota.CapabilityId == "runsite-tour");
         Assert.Contains(catalog.Quotas, quota => quota.CapabilityId == "runsite-map");
         Assert.Contains(catalog.Quotas, quota => quota.CapabilityId == "propertyquarry-tour");
-        Assert.DoesNotContain(catalog.Quotas, quota => quota.CapabilityId == "runbook-export");
+        Assert.Contains(catalog.Quotas, quota => quota.CapabilityId == "runbook-export");
+        Assert.Contains(catalog.Quotas, quota => quota.CapabilityId == "karma-forge-discovery");
         Assert.All(catalog.Quotas, quota =>
         {
             Assert.Equal("free", quota.AllowanceTier);
@@ -3097,8 +3131,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("discovery_packet", model.DiscoveryCapability.ArtifactKind);
         Assert.Equal("Discovery Packet", model.DiscoveryCapability.PublicLabel);
         Assert.Equal("demand_validation", model.DiscoveryCapability.CapabilitySlot);
-        Assert.Equal("available", model.DiscoveryCapability.Status);
-        Assert.True(model.DiscoveryCapability.RequestSupported);
+        Assert.Equal("configured", model.DiscoveryCapability.Status);
+        Assert.False(model.DiscoveryCapability.RequestSupported);
         Assert.Equal("karma-forge:public-intake", model.DiscoveryCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
@@ -3170,6 +3204,91 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.RunsiteTourDispatch("not-a-pack", CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RunsiteMapDispatchUnauthenticatedRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RunsiteMapDispatch("redmond-dockyard-pack", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Frunsites%2Fpacks%2Fredmond-dockyard-pack%2Fmap", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RunsiteMapDispatchUnknownPackReturnsNotFound()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteMapDispatch("not-a-pack", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RunsiteMapDispatchReturnsSemanticSvgAndPersistsQuotaReceipt()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult first = await fixture.Controller.RunsiteMapDispatch("redmond-dockyard-pack", CancellationToken.None);
+
+        FileContentResult file = Assert.IsType<FileContentResult>(first);
+        Assert.Equal("image/svg+xml; charset=utf-8", file.ContentType);
+        Assert.Equal("redmond-dockyard-pack-route-map.svg", file.FileDownloadName);
+        string svg = Encoding.UTF8.GetString(file.FileContents);
+        Assert.Contains("<svg ", svg, StringComparison.Ordinal);
+        Assert.Contains("id=\"entry\"", svg, StringComparison.Ordinal);
+        Assert.Contains("id=\"objective\"", svg, StringComparison.Ordinal);
+        Assert.Contains("id=\"exit\"", svg, StringComparison.Ordinal);
+        Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("map", fixture.Controller.Response.Headers["X-Horizon-Artifact-Kind"].ToString());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack/map", fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
+        Assert.Equal("weekly", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.False(fixture.Controller.Response.Headers.ContainsKey("X-Runsite-Tour-Limit"));
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/horizons/artifact-requests/me/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+
+        HorizonArtifactRequestReceipt accepted = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runsite", fixture.DispatchUserId, limit: 10));
+        Assert.Equal("accepted", accepted.Status);
+        Assert.Equal("runsite-map", accepted.CapabilityId);
+        Assert.Equal("map", accepted.ArtifactKind);
+        Assert.Equal("runsite:redmond-dockyard-pack", accepted.SourceRef);
+        Assert.Equal("private", accepted.Visibility);
+        Assert.Equal(1, accepted.Quota?.WeeklyUsed);
+        Assert.Equal(0, accepted.Quota?.WeeklyRemaining);
+
+        IActionResult second = await fixture.Controller.RunsiteMapDispatch("everett-switchyard-pack", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        ProblemDetails details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("route map allowance is exhausted for this week.", details.Detail);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("runsite", fixture.DispatchUserId, limit: 10);
+        Assert.Equal(2, receipts.Count);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "blocked"
+            && receipt.CapabilityId == "runsite-map"
+            && receipt.SourceRef == "runsite:everett-switchyard-pack"
+            && receipt.BlockedReasons.Contains("artifact allowance"));
     }
 
     [Fact]
@@ -3564,6 +3683,24 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void RunbookPrimerExportArtifactIsAFirstPartyMarkdownDocument()
+    {
+        var service = new MediaArtifactHorizonsService();
+        MediaArtifactDocument primer = service.GetRunbookPrimer("new-runner-primer");
+
+        MediaArtifactTerminalDocument artifact = service.BuildRunbookPrimerExport(primer);
+
+        Assert.Equal("document_export", artifact.ArtifactKind);
+        Assert.Equal("text/markdown; charset=utf-8", artifact.ContentType);
+        Assert.Equal("new-runner-primer.md", artifact.FileName);
+        Assert.Equal("/runbook/primers/new-runner-primer/export", artifact.DestinationRoute);
+        Assert.Equal(artifact.DestinationRoute, primer.DispatchTargetHref);
+        Assert.Contains("artifact_kind: document_export", artifact.Content, StringComparison.Ordinal);
+        Assert.Contains("# New runner primer", artifact.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain(".mp4", artifact.Content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunbookPrimerExportDispatchUnknownPrimerReturnsNotFound()
     {
         using Fixture fixture = new(authenticated: true, configureSettings: settings =>
@@ -3597,9 +3734,13 @@ public sealed class PublicLandingDownloadDispatchTests
         fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
 
         IActionResult first = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
-        var firstRedirect = Assert.IsType<RedirectResult>(first);
-        AssertProtectedMediaRedirect(firstRedirect.Url, "/media/horizons/runbook-press-90s-deepdive.mp4");
+        FileContentResult firstFile = Assert.IsType<FileContentResult>(first);
+        Assert.Equal("text/markdown; charset=utf-8", firstFile.ContentType);
+        Assert.Equal("new-runner-primer.md", firstFile.FileDownloadName);
+        Assert.Contains("artifact_kind: document_export", Encoding.UTF8.GetString(firstFile.FileContents), StringComparison.Ordinal);
         Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("document_export", fixture.Controller.Response.Headers["X-Horizon-Artifact-Kind"].ToString());
+        Assert.Equal("/runbook/primers/new-runner-primer/export", fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
         Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
@@ -3643,7 +3784,10 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult result = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
 
-        Assert.IsType<RedirectResult>(result);
+        FileContentResult file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/markdown; charset=utf-8", file.ContentType);
+        Assert.Equal("new-runner-primer.md", file.FileDownloadName);
+        Assert.DoesNotContain(".mp4", Encoding.UTF8.GetString(file.FileContents), StringComparison.OrdinalIgnoreCase);
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runbook-press", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("runbook-export", receipt.CapabilityId);
@@ -3818,8 +3962,21 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult result = await fixture.Controller.KarmaForgeDiscoveryPacketDispatch(CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate/karma-forge", redirect.Url);
+        FileContentResult file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/json; charset=utf-8", file.ContentType);
+        Assert.Equal("karma-forge-discovery-packet.json", file.FileDownloadName);
+        using JsonDocument payload = JsonDocument.Parse(file.FileContents);
+        Assert.Equal("discovery_packet", payload.RootElement.GetProperty("artifact_kind").GetString());
+        Assert.Equal("application/json", payload.RootElement.GetProperty("mime_type").GetString());
+        Assert.Equal("/participate/karma-forge/discovery", payload.RootElement.GetProperty("destination_route").GetString());
+        Assert.Equal("/participate/karma-forge", payload.RootElement.GetProperty("intake_route").GetString());
+        Assert.False(payload.RootElement.GetProperty("boundaries").GetProperty("contains_personal_data").GetBoolean());
+        Assert.False(payload.RootElement.GetProperty("boundaries").GetProperty("provider_urls_included").GetBoolean());
+        string packet = Encoding.UTF8.GetString(file.FileContents);
+        Assert.DoesNotContain("example.invalid", packet, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("redirect", packet, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("discovery_packet", fixture.Controller.Response.Headers["X-Horizon-Artifact-Kind"].ToString());
+        Assert.Equal("/participate/karma-forge/discovery", fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("karma-forge", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("karma-forge-discovery", receipt.CapabilityId);

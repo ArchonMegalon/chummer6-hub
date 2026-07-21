@@ -101,6 +101,34 @@ public sealed class CampaignCollaborationController : ControllerBase
         }
     }
 
+    [HttpDelete("{campaignId}")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
+    [ProducesResponseType(typeof(CampaignTeardownReceipt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CampaignTeardownReceipt>> Delete(
+        [FromRoute] string campaignId,
+        [FromBody] DeleteCampaignCollaborationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("campaign teardown payload is required.");
+        }
+
+        try
+        {
+            HubUserDto user = await RequireUserAsync(cancellationToken);
+            return Ok(_campaigns.DeleteCampaign(user, campaignId, request));
+        }
+        catch (Exception ex) when (IsMapped(ex))
+        {
+            return MapException(ex);
+        }
+    }
+
     [HttpGet("{campaignId}/roster")]
     [ProducesResponseType(typeof(IReadOnlyList<CampaignRosterEntryProjection>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -237,8 +265,10 @@ public sealed class CampaignCollaborationController : ControllerBase
     [HttpPut("{campaignId}/sheets/{dossierId}")]
     [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType(typeof(CampaignSharedSheetEditReceipt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<CampaignSharedSheetEditReceipt>> UpdateSharedSheet(
         [FromRoute] string campaignId,
         [FromRoute] string dossierId,
@@ -402,8 +432,13 @@ public sealed class CampaignCollaborationController : ControllerBase
             or CampaignInviteRejectedException
             or CampaignInviteThrottledException
             or CampaignIdempotencyConflictException
+            or CampaignInviteReplayUnavailableException
             or CampaignBindingRevisionConflictException
             or CampaignRevisionConflictException
+            or CampaignUpdatedAtConflictException
+            or CampaignTeardownConflictException
+            or CampaignCanonicalEditConflictException
+            or CampaignCanonicalEditUnavailableException
             or KeyNotFoundException
             or ArgumentException
             or InvalidOperationException;
@@ -422,12 +457,27 @@ public sealed class CampaignCollaborationController : ControllerBase
             CampaignIdempotencyConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
+            CampaignInviteReplayUnavailableException unavailable => Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: unavailable.Message),
             CampaignBindingRevisionConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
             CampaignRevisionConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
+            CampaignUpdatedAtConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignTeardownConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignCanonicalEditConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignCanonicalEditUnavailableException unavailable => Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: unavailable.Message),
             KeyNotFoundException => NotFound(),
             ArgumentException invalid => Problem(
                 statusCode: StatusCodes.Status400BadRequest,

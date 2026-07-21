@@ -31,7 +31,7 @@ public sealed class EntitlementService
             var userTotal = _store.RewardEntries
                 .Where(entry => string.Equals(entry.UserId, receipt.UserId, StringComparison.OrdinalIgnoreCase))
                 .Sum(entry => entry.Points);
-            if (userTotal + mintedPoints >= 25)
+            if (userTotal >= 25)
             {
                 GrantIfMissingLocked("user", receipt.UserId!, "gm-tools-waitlist-priority", receipt.ReceiptId, "community contribution threshold", grantedKeys);
             }
@@ -41,7 +41,7 @@ public sealed class EntitlementService
                 var groupTotal = _store.RewardEntries
                     .Where(entry => string.Equals(entry.GroupId, receipt.GroupId, StringComparison.OrdinalIgnoreCase))
                     .Sum(entry => entry.Points);
-                if (groupTotal + mintedPoints >= 50)
+                if (groupTotal >= 50)
                 {
                     GrantIfMissingLocked("group", receipt.GroupId!, "private-leaderboard", receipt.ReceiptId, "group contribution threshold", grantedKeys);
                 }

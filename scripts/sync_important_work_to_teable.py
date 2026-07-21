@@ -136,7 +136,196 @@ def configured_value(*keys: str) -> str | None:
     return None
 
 
-def important_work_items() -> list[ImportantWorkItem]:
+def read_json_object(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def file_contains(path: Path, needles: tuple[str, ...]) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return all(needle in text for needle in needles)
+
+
+def count_phrase(count: int, singular: str, plural: str | None = None) -> str:
+    label = singular if count == 1 else (plural or f"{singular}s")
+    return f"{count} {label}"
+
+
+def magicai_pool_readiness(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, int]:
+    return shared_magicai_pool_counts(env_assignments(repo_root / ".env"))
+
+
+def magicai_platform_audit(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
+    return shared_magicai_platform_audit(repo_root)
+
+
+def render_lane_readiness(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, bool]:
+    return {
+        "governed_render_contract": file_contains(
+            repo_root / "Chummer.Run.Api/Services/Community/HorizonGovernedRenderRequestComposerService.cs",
+            (
+                'public const string OrchestrationLane = "ea_governed_render";',
+                'public const string ContractName = "chummer6-hub.horizon_governed_render_request.v1";',
+            ),
+        ),
+        "runsite_bridge": file_contains(
+            repo_root / "Chummer.Run.Api/Services/RunsiteOrientationArtifactRequestBridgeService.cs",
+            (
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "runsite-scene-render"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+            ),
+        ),
+        "propertyquarry_bridge": file_contains(
+            repo_root / "Chummer.Run.Api/Services/PropertyquarryApartmentVideoArtifactRequestBridgeService.cs",
+            (
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "propertyquarry-apartment-video"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+                "propertyquarry:property-packet",
+                "propertyquarry:property-continuity",
+            ),
+        ),
+        "propertyquarry_internal_controller": file_contains(
+            repo_root / "Chummer.Run.Api/Controllers/InternalPropertyquarryApartmentVideoController.cs",
+            (
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/requests")]',
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/artifact-requests")]',
+                "PropertyquarryApartmentVideoArtifactRequestBridgeResult",
+            ),
+        ),
+        "propertyquarry_signed_in_route": file_contains(
+            repo_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+            (
+                '[HttpPost("me/property-workspaces/{propertyId}/apartment-video")]',
+                "PropertyquarryApartmentVideoRequest",
+                "BuildPropertyquarryApartmentVideoLane(property)",
+                "apartmentVideoRequestApiHrefTemplate",
+            ),
+        ),
+    }
+
+
+def origin_gold_proof_status(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
+    local_path = repo_root / ".tmp/origin-dossier-fresh-gold/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json"
+    payload = read_json_object(local_path)
+    if payload is None and repo_root.resolve() == RUN_SERVICES_ROOT.resolve():
+        payload = read_json_object(DEFAULT_ORIGIN_GOLD_PROOF_CHAIN)
+    payload = payload or {}
+    ready = (
+        payload.get("status") == "pass"
+        and payload.get("finalVerdict") == "ORIGIN_EDITION_GOLD_READY"
+        and payload.get("goalCompletionClaimAllowed") is True
+    )
+    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+    return {
+        "ready": ready,
+        "status": str(payload.get("status") or "").strip(),
+        "finalVerdict": str(payload.get("finalVerdict") or "").strip(),
+        "passedStages": progress.get("passedStages"),
+        "totalStages": progress.get("totalStages"),
+    }
+
+
+def origin_visuals_magicai_runtime(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, str]:
+    pool = magicai_pool_readiness(repo_root)
+    audit = magicai_platform_audit(repo_root)
+    lane = render_lane_readiness(repo_root)
+    gold = origin_gold_proof_status(repo_root)
+    render_lane_ready = all(lane.values())
+    pending = pool["pending_api_key_count"]
+    api_ready = pool["api_key_ready_count"]
+    declared = pool["declared_count"]
+    login_ready = pool["login_ready_count"]
+    pending_blocker_count = (
+        audit["pending_blocked_count"]
+        + audit["pending_login_failed_count"]
+        + audit["pending_unverified_count"]
+    )
+
+    if render_lane_ready and audit["attempted"] and audit["pending_mintable_count"] > 0:
+        status = "live-gold-pass-api-keys-pending"
+    elif render_lane_ready and audit["attempted"] and pending > 0 and pending_blocker_count > 0:
+        status = "live-gold-pass-api-key-path-blocked"
+    elif render_lane_ready and pending > 0:
+        status = "live-gold-pass-api-keys-pending"
+    elif render_lane_ready and api_ready > 0:
+        status = "live-gold-pass-render-lane-ready"
+    elif render_lane_ready and declared > 0:
+        status = "live-gold-pass-pool-declared"
+    elif render_lane_ready:
+        status = "live-gold-pass-pool-missing"
+    else:
+        status = "live-gold-pass-render-lane-pending"
+    if gold["ready"]:
+        if status == "live-gold-pass-api-key-path-blocked":
+            status = "origin-gold-ready-api-key-path-blocked"
+        elif status == "live-gold-pass-api-keys-pending":
+            status = "origin-gold-ready-api-keys-pending"
+        else:
+            status = "origin-gold-ready"
+
+    if audit["attempted"]:
+        constraints: list[str] = []
+        if audit["pending_blocked_count"]:
+            constraints.append(
+                f"{count_phrase(audit['pending_blocked_count'], 'slot')} "
+                f"{'is' if audit['pending_blocked_count'] == 1 else 'are'} currently API-forbidden"
+            )
+        if audit["pending_login_failed_count"]:
+            constraints.append(
+                f"{count_phrase(audit['pending_login_failed_count'], 'slot')} currently "
+                f"{'fails' if audit['pending_login_failed_count'] == 1 else 'fail'} platform login"
+            )
+        if audit["pending_unverified_count"]:
+            constraints.append(
+                f"{count_phrase(audit['pending_unverified_count'], 'slot')} still "
+                f"{'needs' if audit['pending_unverified_count'] == 1 else 'need'} a fresh live probe"
+            )
+        if audit["pending_mintable_count"] > 0:
+            action_bits = [
+                "mint the remaining MagicAI/omagic API keys for "
+                f"{count_phrase(audit['pending_mintable_count'], 'mintable slot')}"
+            ]
+        elif constraints:
+            action_bits = ["clear the remaining MagicAI/omagic API key path blockers"]
+        else:
+            action_bits = ["keep the MagicAI/omagic API key pool verified"]
+        if constraints:
+            action_bits.append(", ".join(constraints))
+        action_fragment = "; ".join(action_bits)
+    else:
+        action_fragment = (
+            "mint the remaining MagicAI/omagic API keys for "
+            f"{pending} of {login_ready or declared} declared login-ready pool slots"
+        )
+
+    proof_stage_fragment = ""
+    if gold["passedStages"] is not None and gold["totalStages"] is not None:
+        proof_stage_fragment = f" ({gold['passedStages']}/{gold['totalStages']} proof stages)"
+    next_action = (
+        f"Origin Dossier Gold is {'ready' if gold['ready'] else 'not yet fully proven'}"
+        f"{proof_stage_fragment}; "
+        "keep the deployed owner proof green on chummer.run, keep Magicfit as the preferred visual lane, "
+        f"and {action_fragment}; the shared EA render lane is "
+        f"{'ready' if render_lane_ready else 'still being wired'} for Runsite and Propertyquarry via internal EA skills."
+    )
+
+    return {
+        "status": status,
+        "next_action": next_action,
+    }
+
+
+def important_work_items(repo_root: Path = RUN_SERVICES_ROOT) -> list[ImportantWorkItem]:
+    origin_visuals_runtime = origin_visuals_magicai_runtime(repo_root)
     return [
         ImportantWorkItem(
             item_id="desktop-premium-ui-polish",
@@ -1565,6 +1754,41 @@ def find_existing_record(
     return record_id
 
 
+def existing_record_ids_by_item_id(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    item_ids: list[str],
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+    transient_retry_limit: int = DEFAULT_TRANSIENT_RETRY_LIMIT,
+    retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
+    retry_state: dict[str, int] | None = None,
+) -> dict[str, str]:
+    result: dict[str, str] = {}
+    seen_item_ids: set[str] = set()
+    for item_id in item_ids:
+        validated = validated_item_id(item_id)
+        if validated in seen_item_ids:
+            raise RuntimeError("teable_source_duplicate_item_id")
+        seen_item_ids.add(validated)
+        record_id = find_existing_record(
+            api_base_url,
+            api_key,
+            table_id,
+            validated,
+            request_timeout_seconds=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+            transient_retry_limit=transient_retry_limit,
+            retry_backoff_seconds=retry_backoff_seconds,
+            retry_state=retry_state,
+        )
+        if record_id is not None:
+            result[validated] = record_id
+    return result
+
+
 def chunked(items: list[Any], batch_size: int) -> list[list[Any]]:
     effective_batch_size = min(DEFAULT_BATCH_SIZE, max(1, int(batch_size)))
     return [items[index : index + effective_batch_size] for index in range(0, len(items), effective_batch_size)]
@@ -2066,21 +2290,17 @@ def _sync_to_teable_impl(
 
         # Complete and validate every exact-key lookup before the first record POST.
         # Item Id is not provider-enforced unique, so a duplicate is a hard stop.
-        existing_record_ids: dict[str, str] = {}
-        for item in rows:
-            record_id = find_existing_record(
-                api_base_url,
-                api_key,
-                resolved_table_id,
-                item.item_id,
-                request_timeout_seconds=effective_timeout,
-                deadline_monotonic=deadline_monotonic,
-                transient_retry_limit=effective_retry_limit,
-                retry_backoff_seconds=retry_backoff_seconds,
-                retry_state=retry_state,
-            )
-            if record_id:
-                existing_record_ids[item.item_id] = record_id
+        existing_record_ids = existing_record_ids_by_item_id(
+            api_base_url,
+            api_key,
+            resolved_table_id,
+            [item.item_id for item in rows],
+            request_timeout_seconds=effective_timeout,
+            deadline_monotonic=deadline_monotonic,
+            transient_retry_limit=effective_retry_limit,
+            retry_backoff_seconds=retry_backoff_seconds,
+            retry_state=retry_state,
+        )
     except Exception as exc:
         result_context["base_id"] = resolved_base_id
         result_context["table_id"] = resolved_table_id
@@ -2255,7 +2475,6 @@ def send_hub_json(
     effective_timeout_seconds = bounded_timeout_seconds(
         requested_timeout_seconds,
         deadline_monotonic=deadline_monotonic,
-        label="hub_request",
     )
     data: bytes | None = None
     headers = {
@@ -2268,7 +2487,7 @@ def send_hub_json(
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
     try:
-        with open_hub_url(request, timeout=timeout) as response:
+        with open_hub_url(request, timeout=effective_timeout_seconds) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"hub_http_{exc.code}") from exc
@@ -2322,7 +2541,7 @@ def seed_hub_store(
     *,
     hub_base_url: str,
     hub_token: str | None,
-    request_timeout_seconds: float,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     started_at = now_iso()
     rows = important_work_items()

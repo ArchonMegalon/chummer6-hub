@@ -1,3 +1,5 @@
+using Chummer.Contracts.Workspaces;
+using Chummer.Engine.GmCharacterEdits;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -64,6 +66,7 @@ internal static class ServiceCollectionBoundedContextExtensions
             provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<ReleaseShelfGenerationStore>()));
         services.AddSingleton<ArtifactDeliveryPolicy>();
+        services.AddSingleton<ReleaseAuthorityRevisionStore>();
         services.AddSingleton<IReleaseTruthProjection, PublicReleaseTruthProjectionService>();
         services.AddSingleton<WindowsProofManifestValidator>();
         services.AddSingleton<WindowsProofGenerationStore>();
@@ -86,6 +89,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PlayAuthorizationApiPolicy>();
         services.AddSingleton<PlayAuthorizationRequestLimiter>();
         services.AddSingleton<TeableUserProjectionService>();
+        services.AddSingleton<IHubUserProjectionSyncQueue>(serviceProvider =>
+            serviceProvider.GetRequiredService<TeableUserProjectionService>());
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddSingleton<TeableHeyyScamChatService>();
         services.AddSingleton<TeableExecutiveAssistantChannelService>();
@@ -117,6 +122,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
         services.AddSingleton<OriginDossierPublicationService>();
+        services.AddSingleton<OriginDossierFirstPartyDocumentService>();
         services.AddSingleton<OriginDossierProviderCreditReservationStore>();
         services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();
@@ -146,6 +152,31 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CreatorPublicationRegistryBridge>();
         services.AddSingleton<PublicCreatorPublicationDiscoveryService>();
         services.AddSingleton<CampaignSpineService>();
+        services.AddSingleton<ICampaignGmCharacterEditAuthorizer>(static provider =>
+            new CommunityStoreCampaignGmCharacterEditAuthorizer(
+                provider.GetRequiredService<CommunityStore>(),
+                provider.GetService<TimeProvider>() ?? TimeProvider.System));
+        services.AddSingleton<ICoreGmCharacterEditGateway>(static provider =>
+        {
+            IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
+            string? workspaceStorePath =
+                configuration["Chummer:CoreGmCharacterEdits:WorkspaceStorePath"];
+            if (workspaceStorePath is null)
+            {
+                return new UnavailableCoreGmCharacterEditGateway();
+            }
+
+            if (string.IsNullOrWhiteSpace(workspaceStorePath))
+            {
+                throw new InvalidOperationException(
+                    "Chummer:CoreGmCharacterEdits:WorkspaceStorePath cannot be blank when configured.");
+            }
+
+            return CoreGmCharacterEditGatewayFactory.CreateStoreBacked(
+                workspaceStorePath,
+                provider.GetRequiredService<ICampaignGmCharacterEditAuthorizer>(),
+                provider.GetService<TimeProvider>() ?? TimeProvider.System);
+        });
         services.AddSingleton<CampaignCollaborationService>();
         services.AddSingleton<GmSessionVenueStore>();
         services.AddSingleton<IGmSessionVenueAdapter, BeHumanGmSessionVenueAdapter>();

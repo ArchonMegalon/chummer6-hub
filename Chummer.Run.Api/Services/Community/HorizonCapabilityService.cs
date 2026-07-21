@@ -27,12 +27,12 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "map",
             PublicLabel: "Route Map",
             CapabilitySlot: "location_visualization",
-            InternalProviderLane: "AvoMap",
+            InternalProviderLane: "First-party deterministic route schematic",
             FreeWeeklyLimit: 1,
             SupporterWeeklyLimit: 10,
             RequiresAuthentication: true,
             PublicVisible: true,
-            EnabledByDefault: false,
+            EnabledByDefault: true,
             CostClass: "low"),
         new(
             HorizonId: "runsite",
@@ -94,25 +94,25 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "document_export",
             PublicLabel: "Formatted Export",
             CapabilitySlot: "document_render",
-            InternalProviderLane: "Subscribr.ai / First Book ai / MarkupGo / Documentation.AI",
-            FreeWeeklyLimit: 0,
-            SupporterWeeklyLimit: 2,
+            InternalProviderLane: "Chummer first-party deterministic Markdown export",
+            FreeWeeklyLimit: 10,
+            SupporterWeeklyLimit: 50,
             RequiresAuthentication: true,
-            PublicVisible: false,
-            EnabledByDefault: false,
-            CostClass: "medium"),
+            PublicVisible: true,
+            EnabledByDefault: true,
+            CostClass: "low"),
         new(
             HorizonId: "karma-forge",
             CapabilityId: "karma-forge-discovery",
             ArtifactKind: "discovery_packet",
             PublicLabel: "Discovery Packet",
             CapabilitySlot: "demand_validation",
-            InternalProviderLane: "Icanpreneur / Deftform / MetaSurvey",
-            FreeWeeklyLimit: 0,
-            SupporterWeeklyLimit: 3,
+            InternalProviderLane: "Chummer first-party deterministic discovery packet",
+            FreeWeeklyLimit: 10,
+            SupporterWeeklyLimit: 50,
             RequiresAuthentication: true,
-            PublicVisible: false,
-            EnabledByDefault: false,
+            PublicVisible: true,
+            EnabledByDefault: true,
             CostClass: "low"),
         new(
             HorizonId: "table-pulse",
@@ -327,7 +327,7 @@ public sealed class HorizonCapabilityService
     public HorizonCapabilityHealthSnapshot GetHealth(string horizonId, string artifactKindOrCapabilityId, bool publicSafe = false)
     {
         HorizonCapabilityDefinition capability = GetCapability(horizonId, artifactKindOrCapabilityId);
-        string status = capability.Enabled ? "available" : "disabled";
+        string status = capability.Enabled ? "configured" : "disabled";
         return new HorizonCapabilityHealthSnapshot(
             capability.HorizonId,
             capability.CapabilityId,
@@ -342,7 +342,9 @@ public sealed class HorizonCapabilityService
             capability.SupporterWeeklyLimit,
             capability.CostClass,
             capability.QuotaTracked,
-            capability.AllowanceWindowKind);
+            capability.AllowanceWindowKind,
+            ConfigurationEnabled: capability.Enabled,
+            OperationalReadiness: "unverified");
     }
 
     public PublicHorizonCapabilityViewModel BuildPublicCapabilityViewModel(
@@ -359,13 +361,16 @@ public sealed class HorizonCapabilityService
             PublicLabel: health.PublicLabel,
             CapabilitySlot: health.CapabilitySlot,
             Status: health.Status,
-            RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
+            RequestSupported: health.ConfigurationEnabled
+                && string.Equals(health.OperationalReadiness, "verified", StringComparison.Ordinal),
             RequiresAuthentication: health.RequiresAuthentication,
             PublicVisible: health.PublicVisible,
             QuotaTracked: health.QuotaTracked,
             AllowanceWindowKind: health.AllowanceWindowKind,
             SourceRef: sourceRef,
-            Visibility: visibility);
+            Visibility: visibility,
+            ConfigurationEnabled: health.ConfigurationEnabled,
+            OperationalReadiness: health.OperationalReadiness);
     }
 
     public JsonObject BuildPublicCapabilityJsonNode(
@@ -393,7 +398,9 @@ public sealed class HorizonCapabilityService
             ["quota_tracked"] = capability.QuotaTracked,
             ["allowance_window_kind"] = capability.AllowanceWindowKind,
             ["source_ref"] = capability.SourceRef,
-            ["visibility"] = capability.Visibility
+            ["visibility"] = capability.Visibility,
+            ["configuration_enabled"] = capability.ConfigurationEnabled,
+            ["operational_readiness"] = capability.OperationalReadiness
         };
     }
 
@@ -517,4 +524,6 @@ public sealed record HorizonCapabilityHealthSnapshot(
     int SupporterWeeklyLimit,
     string CostClass,
     bool QuotaTracked,
-    string AllowanceWindowKind);
+    string AllowanceWindowKind,
+    bool ConfigurationEnabled,
+    string OperationalReadiness);

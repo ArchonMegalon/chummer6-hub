@@ -34,7 +34,7 @@ SCRIPT_EXPECTATIONS = {
             'if (( $(array_count artifacts) == 0 )); then',
             'if (( $(array_count live_downloads_mirror_dirs) > 0 )); then',
             'if (( $(array_count promoted_file_names) > 0 )); then',
-            'echo "Published $(array_count promoted_file_names) desktop artifact(s) into $DEPLOY_DIR"',
+            'echo "Published $(array_count promoted_file_names) desktop artifact(s) into $AUTHORITATIVE_DEPLOY_DIR"',
         ),
         "forbidden": (
             '${#artifacts[@]}',

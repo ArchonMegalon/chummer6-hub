@@ -19,9 +19,12 @@ SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
 PACKAGE_VERSION = "0.1.0-preview"
 OWNER_PACKAGE_VERSIONS = {
-    "Chummer.Engine.Contracts": "5.225.0",
+    "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
     "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
     "Chummer.Run.Registry": "0.1.0-preview",
+    "Chummer.Play.Contracts": "0.1.0-preview",
+    "Chummer.Run.Contracts": "0.1.0-preview",
+    "Chummer.Engine.GmCharacterEdits": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
 }
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -50,6 +53,7 @@ OWNER_VERSION_PROPERTIES = {
     "Chummer.Engine.Contracts": "ChummerEngineContractsPackageVersion",
     "Chummer.Hub.Registry.Contracts": "ChummerHubRegistryContractsPackageVersion",
     "Chummer.Run.Registry": "ChummerRunRegistryPackageVersion",
+    "Chummer.Engine.GmCharacterEdits": "ChummerCoreGmCharacterEditsPackageVersion",
 }
 
 
@@ -74,6 +78,9 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Engine.Contracts",
         "Chummer.Hub.Registry.Contracts",
         "Chummer.Run.Registry",
+        "Chummer.Play.Contracts",
+        "Chummer.Run.Contracts",
+        "Chummer.Engine.GmCharacterEdits",
     ]
     assert all(len(spec.commit) == 40 for spec in lock.packages)
     assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
@@ -86,7 +93,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v3 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v4 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -521,6 +528,27 @@ def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> No
     assert (
         "../Chummer.Tests/ReleaseUploadAuthorityHandoffCompatibilityTests.cs" in linked
     )
+
+
+def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020" in workflow
+    assert 'node-version: "22.17.0"' in workflow
+    assert "scripts/materialize_release_authority_advance_request.py" in workflow
+    assert "scripts/materialize_release_scorecard_handoff.py" in workflow
+    assert "scripts/materialize_release_ready_receipt.py" in workflow
+    assert "scripts/verify_governed_campaign_e2e_receipt.py" in workflow
+    assert "scripts/verify_post_activation_acceptance.py" in workflow
+    assert "scripts/verify_public_edge_compose_operability.py" in workflow
+    assert "tests/test_materialize_release_authority_advance_request.py" in workflow
+    assert "tests/test_materialize_release_scorecard_handoff.py" in workflow
+    assert "tests/test_materialize_release_ready_campaign_preview.py" in workflow
+    assert "tests/test_verify_governed_campaign_e2e_receipt.py" in workflow
+    assert "tests/test_verify_post_activation_acceptance.py" in workflow
+    assert "tests/test_public_edge_volume_initializer.py" in workflow
+    assert "tests/public/ui-frame-candidate-binding.spec.ts" in workflow
 
 
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:

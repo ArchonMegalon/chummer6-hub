@@ -47,9 +47,28 @@
     <Compile Include="..\Chummer.Tests\RepoPaths.cs" Link="RepoPaths.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerFactionOnboardingTests.cs" Link="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerTickNewsTests.cs" Link="BlackLedgerTickNewsTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignCollaborationServiceTests.cs" Link="CampaignCollaborationServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignSpineGuardrailTests.cs" Link="CampaignSpineGuardrailTests.cs" />
+    <Compile Include="..\Chummer.Tests\CampaignSpineServiceReceiptEnvelopeTests.cs" Link="CampaignSpineServiceReceiptEnvelopeTests.cs" />
+    <Compile Include="..\Chummer.Tests\LedgerServiceTests.cs" Link="LedgerServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionSnapshotServiceTests.cs" Link="PublicProjectionSnapshotServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionProofRequestPathPolicyTests.cs" Link="PublicProjectionProofRequestPathPolicyTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadAuthorityHandoffCompatibilityTests.cs" Link="ReleaseUploadAuthorityHandoffCompatibilityTests.cs" />
+    <Compile Include="..\Chummer.Tests\PublicReleaseTruthProjectionTests.cs" Link="PublicReleaseTruthProjectionTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseShelfGenerationStoreTests.cs" Link="ReleaseShelfGenerationStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseAuthorityRevisionStoreTests.cs" Link="ReleaseAuthorityRevisionStoreTests.cs" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_score_two_evidence.json"
+          Link="Fixtures\campaign_operability_score_two_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_candidate_evidence.json"
+          Link="Fixtures\campaign_operability_candidate_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_cell_inventory.json"
+          Link="Fixtures\campaign_operability_cell_inventory.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\Chummer.Tests\ReleaseUploadRequestGateMiddlewareTests.cs" Link="ReleaseUploadRequestGateMiddlewareTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseUploadSnapshotAuthorityTests.cs" Link="ReleaseUploadSnapshotAuthorityTests.cs" />
+    <Compile Include="ReleaseAuthorityEndpointContractTests.cs" />
   </ItemGroup>
 
 </Project>

@@ -371,6 +371,8 @@ def materialize(
     evidence_root: Path,
     output: Path,
     context: OriginEditionContext | None = None,
+    *,
+    runsite_env: Path | None = None,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     ea_root = ea_root.resolve()
@@ -579,7 +581,7 @@ def materialize(
         )
     )
 
-    local_env = repo_root / ".env"
+    local_env = runsite_env.resolve() if runsite_env is not None else repo_root / ".env"
     ea_env = ea_root / ".env"
     ltds = ea_root / "LTDs.md"
     ltd_text = read_text(ltds) if ltds.is_file() else ""

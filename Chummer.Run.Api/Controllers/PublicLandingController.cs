@@ -4821,6 +4821,47 @@ document.addEventListener('DOMContentLoaded', function () {
             cancellationToken: cancellationToken);
     }
 
+    [HttpGet("/runsites/packs/{packId}/map")]
+    [Produces("image/svg+xml")]
+    public async Task<IActionResult> RunsiteMapDispatch([FromRoute] string packId, CancellationToken cancellationToken)
+    {
+        string dispatchRoute = $"/runsites/packs/{Uri.EscapeDataString(packId)}/map";
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            _logger.LogInformation("Runsite map dispatch rejected because no authenticated user was present for {PackId}.", packId);
+            return Redirect($"/login?next={Uri.EscapeDataString(dispatchRoute)}");
+        }
+
+        MediaArtifactDocument pack;
+        try
+        {
+            pack = _mediaHorizons.GetRunsitePack(packId);
+        }
+        catch (KeyNotFoundException)
+        {
+            _logger.LogWarning("Runsite map dispatch requested unknown pack {PackId}.", packId);
+            return NotFound();
+        }
+
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("runsite", "runsite-map");
+        return await DispatchResolvedHorizonArtifactAsync(
+            operationLabel: "runsite map",
+            dispatchRoute: dispatchRoute,
+            sourceId: pack.Id,
+            surface: surface,
+            dispatchTarget: dispatchRoute,
+            emitRunsiteHeaders: false,
+            fallbackQuotaUnavailableMessage: "Unable to confirm route-map allowance receipt right now.",
+            cancellationToken: cancellationToken,
+            authenticatedSubject: subject,
+            terminalArtifactFactory: () =>
+            {
+                MediaArtifactTerminalDocument artifact = _mediaHorizons.BuildRunsiteMap(pack);
+                return File(Encoding.UTF8.GetBytes(artifact.Content), artifact.ContentType, artifact.FileName);
+            });
+    }
+
     [HttpGet("/propertyquarry")]
     [Produces("text/html")]
     public async Task<IActionResult> PropertyquarryPreviewPage(CancellationToken cancellationToken)
@@ -4931,7 +4972,12 @@ document.addEventListener('DOMContentLoaded', function () {
             resolveSource: _mediaHorizons.GetRunbookPrimer,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            buildTerminalArtifact: document =>
+            {
+                MediaArtifactTerminalDocument artifact = _mediaHorizons.BuildRunbookPrimerExport(document);
+                return File(Encoding.UTF8.GetBytes(artifact.Content), artifact.ContentType, artifact.FileName);
+            });
     }
 
     [HttpGet("/table-pulse/debrief")]
@@ -4998,7 +5044,8 @@ document.addEventListener('DOMContentLoaded', function () {
         bool emitRunsiteHeaders,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
-        AuthenticatedHubSubject? authenticatedSubject = null)
+        AuthenticatedHubSubject? authenticatedSubject = null,
+        Func<IActionResult>? terminalArtifactFactory = null)
         => await DispatchResolvedHorizonArtifactAsync(
             operationLabel,
             dispatchRoute,
@@ -5010,7 +5057,8 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
-            authenticatedSubject);
+            authenticatedSubject,
+            terminalArtifactFactory);
 
     private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
         string operationLabel,
@@ -5021,7 +5069,8 @@ document.addEventListener('DOMContentLoaded', function () {
         bool emitRunsiteHeaders,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
-        AuthenticatedHubSubject? authenticatedSubject = null)
+        AuthenticatedHubSubject? authenticatedSubject = null,
+        Func<IActionResult>? terminalArtifactFactory = null)
         => await DispatchResolvedHorizonArtifactAsync(
             operationLabel,
             dispatchRoute,
@@ -5033,7 +5082,8 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
-            authenticatedSubject);
+            authenticatedSubject,
+            terminalArtifactFactory);
 
     [HttpGet("/participate/karma-forge/discovery")]
     public async Task<IActionResult> KarmaForgeDiscoveryPacketDispatch(CancellationToken cancellationToken)
@@ -5044,10 +5094,15 @@ document.addEventListener('DOMContentLoaded', function () {
             dispatchRoute: "/participate/karma-forge/discovery",
             sourceId: "public-intake",
             surface: surface,
-            dispatchTarget: "/participate/karma-forge",
+            dispatchTarget: "/participate/karma-forge/discovery",
             emitRunsiteHeaders: false,
             fallbackQuotaUnavailableMessage: "Unable to confirm discovery packet allowance receipt right now.",
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken,
+            terminalArtifactFactory: () =>
+            {
+                KarmaForgeDiscoveryArtifact artifact = _karmaForge.BuildPublicDiscoveryArtifact();
+                return File(Encoding.UTF8.GetBytes(artifact.Content), artifact.ContentType, artifact.FileName);
+            });
     }
 
     private async Task<IActionResult> DispatchHorizonArtifactAsync(
@@ -5059,7 +5114,8 @@ document.addEventListener('DOMContentLoaded', function () {
         Func<string, MediaArtifactDocument> resolveSource,
         Func<MediaArtifactDocument, string?> resolveDispatchTarget,
         string fallbackQuotaUnavailableMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<MediaArtifactDocument, IActionResult>? buildTerminalArtifact = null)
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
         if (subject is null)
@@ -5097,7 +5153,10 @@ document.addEventListener('DOMContentLoaded', function () {
             emitRunsiteHeaders,
             fallbackQuotaUnavailableMessage,
             cancellationToken,
-            authenticatedSubject: subject);
+            authenticatedSubject: subject,
+            terminalArtifactFactory: buildTerminalArtifact is null
+                ? null
+                : () => buildTerminalArtifact(source));
     }
 
     private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
@@ -5111,7 +5170,8 @@ document.addEventListener('DOMContentLoaded', function () {
         bool emitRunsiteHeaders,
         string fallbackQuotaUnavailableMessage,
         CancellationToken cancellationToken,
-        AuthenticatedHubSubject? authenticatedSubject = null)
+        AuthenticatedHubSubject? authenticatedSubject = null,
+        Func<IActionResult>? terminalArtifactFactory = null)
     {
         AuthenticatedHubSubject? subject = authenticatedSubject ?? await TryGetOptionalSubjectAsync(cancellationToken);
         if (subject is null)
@@ -5189,6 +5249,12 @@ document.addEventListener('DOMContentLoaded', function () {
             dispatchQuota?.WindowRemaining,
             dispatchQuota?.WindowLimit);
 
+        if (terminalArtifactFactory is not null)
+        {
+            Response.Headers["X-Horizon-Artifact-Destination"] = dispatchTarget;
+            return terminalArtifactFactory();
+        }
+
         return Redirect(ProtectHorizonArtifactDispatchTarget(dispatchTarget));
     }
 
@@ -5198,6 +5264,7 @@ document.addEventListener('DOMContentLoaded', function () {
         bool emitRunsiteHeaders)
     {
         Response.Headers["X-Horizon-Artifact-Quota-Tracked"] = receipt.QuotaTracked ? "true" : "false";
+        Response.Headers["X-Horizon-Artifact-Kind"] = receipt.ArtifactKind;
         if (receiptQuota is not null)
         {
             Response.Headers["X-Horizon-Artifact-Allowance-Window-Kind"] = receiptQuota.WindowKind;

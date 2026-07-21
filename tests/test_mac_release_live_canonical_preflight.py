@@ -354,7 +354,7 @@ def test_preflight_fails_closed_on_network_and_contract_failures() -> None:
     assert missing_requests == ["GET"]
 
 
-def test_preflight_runs_before_clone_restore_build_and_upload_but_final_verifier_remains() -> None:
+def test_preflight_runs_before_clone_restore_build_upload_and_private_stage_probe() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
 
     call = 'verify_live_canonical_supportability_preflight "$canonical_verify_url"'
@@ -363,12 +363,13 @@ def test_preflight_runs_before_clone_restore_build_and_upload_but_final_verifier
     restore_index = bootstrap.index('log "restoring $project for $rid"')
     build_index = bootstrap.index('log "publishing $project"')
     upload_index = bootstrap.index('log "uploading release bundle via staged HTTP session"')
-    final_verify_index = bootstrap.index('log "verifying live canonical manifest at $canonical_verify_url"')
+    staged_probe_index = bootstrap.index(
+        'log "privately probing the sealed review-required generation; public CURRENT remains unchanged"'
+    )
+    handoff_index = bootstrap.index("materialize_staged_release_finalizer_handoff.py")
 
-    assert preflight_index < clone_index < restore_index < build_index < upload_index < final_verify_index
+    assert preflight_index < clone_index < restore_index < build_index < upload_index
+    assert upload_index < staged_probe_index < handoff_index
     assert bootstrap.count(call) == 1
-    assert bootstrap.count('bash scripts/verify-releases-manifest.sh "$canonical_verify_url"') == 1
-    assert bootstrap.count(
-        'verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" '
-        '"$compatibility_verify_url" "$canonical_verify_url"'
-    ) == 1
+    assert 'log "verifying live canonical manifest at $canonical_verify_url"' not in bootstrap
+    assert "public CURRENT was not changed" in bootstrap

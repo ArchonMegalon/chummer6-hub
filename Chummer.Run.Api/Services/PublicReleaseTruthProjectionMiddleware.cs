@@ -9,6 +9,7 @@ public sealed class PublicReleaseTruthProjectionMiddleware
     public const string DecisionStatusHeaderName = "X-Chummer-Release-Decision-Status";
     public const string AuthoritySnapshotSha256HeaderName =
         "X-Chummer-Release-Authority-Snapshot-Sha256";
+    public const string StagedProbeHeaderName = "X-Chummer-Staged-Release-Probe";
     public static readonly object HttpContextItemKey = new();
     private static readonly object AuthoritySnapshotSha256ItemKey = new();
 
@@ -20,12 +21,40 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         _next = next;
     }
 
-    public async Task InvokeAsync(HttpContext context, IReleaseTruthProjection releaseTruth)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IReleaseTruthProjection releaseTruth,
+        ReleaseBundlePromotionService promotions,
+        ReleaseShelfGenerationStore shelfStore)
     {
         if (!IsReleaseFacingRoute(context.Request.Path))
         {
             await _next(context);
             return;
+        }
+
+        string? stagedProbe = context.Request.Headers[StagedProbeHeaderName].FirstOrDefault();
+        bool stagedRequest = stagedProbe is not null;
+        if (stagedRequest)
+        {
+            _ = TryResolveGenerationId(context.Request.Path, out string? requestedGenerationId);
+            if (!promotions.TryCaptureStageProbe(
+                    stagedProbe,
+                    requestedGenerationId,
+                    out ReleaseShelfSnapshot? stagedSnapshot)
+                || stagedSnapshot is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                ApplyStagedProbeNoStore(context.Response.Headers);
+                return;
+            }
+
+            shelfStore.PinForCurrentRequest(stagedSnapshot);
+            context.Response.OnStarting(() =>
+            {
+                ApplyStagedProbeNoStore(context.Response.Headers);
+                return Task.CompletedTask;
+            });
         }
 
         PublicReleaseTruthCapture capture;
@@ -86,6 +115,19 @@ public sealed class PublicReleaseTruthProjectionMiddleware
             return;
         }
         await _next(context);
+    }
+
+    private static void ApplyStagedProbeNoStore(IHeaderDictionary headers)
+    {
+        headers["Cache-Control"] = "private, no-store, no-cache, max-age=0";
+        headers["CDN-Cache-Control"] = "no-store";
+        headers["Cloudflare-CDN-Cache-Control"] = "no-store";
+        headers["Surrogate-Control"] = "no-store";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
+        headers["Vary"] = StagedProbeHeaderName;
     }
 
     public static PublicReleaseTruthProjectionDto? TryGet(HttpContext? context)

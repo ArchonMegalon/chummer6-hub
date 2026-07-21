@@ -5,6 +5,8 @@ using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -342,6 +344,36 @@ public sealed class PublicReleaseTruthProjectionTests
     }
 
     [Fact]
+    public void AuthorityArtifactRoutesMustMatchTheirAccessClass()
+    {
+        PublicReleaseManifestDto openManifest = BuildManifest(
+            BuildArtifact("windows-open", "windows", "avalonia", 'd', "open_public"));
+        AuthorityEnvelope openRoutesCollapsed = MutateSnapshot(
+            BuildAuthorityEnvelope(openManifest, "review_required"),
+            static snapshot =>
+            {
+                JsonObject artifact = snapshot["artifacts"]!.AsArray()[0]!.AsObject();
+                artifact["publicInstallRoute"] = artifact["downloadUrl"]!.GetValue<string>();
+            });
+
+        PublicReleaseManifestDto protectedManifest = BuildManifest(
+            BuildArtifact("linux-protected", "linux", "avalonia", 'e', "account_required"));
+        AuthorityEnvelope protectedAuthority = BuildAuthorityEnvelope(
+            protectedManifest,
+            "review_required");
+        AuthorityEnvelope protectedRoutesSplit = MutateSnapshot(
+            protectedAuthority,
+            static snapshot => snapshot["artifacts"]!.AsArray()[0]!.AsObject()["publicInstallRoute"] =
+                "/downloads/get/different-artifact");
+
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(openManifest, openRoutesCollapsed));
+        Assert.Equal(
+            "account_required",
+            ProjectAuthority(protectedManifest, protectedAuthority).DownloadAccessPosture);
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(protectedManifest, protectedRoutesSplit));
+    }
+
+    [Fact]
     public void NextActionsAreRequiredForReviewButMayBeEmptyWhenReady()
     {
         PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
@@ -462,7 +494,7 @@ public sealed class PublicReleaseTruthProjectionTests
             responseContext.Response.ContentType = "application/json";
             await JsonSerializer.SerializeAsync(responseContext.Response.Body, projection);
         });
-        await bodyMiddleware.InvokeAsync(context, source);
+        await InvokeMiddlewareAsync(bodyMiddleware, context, source);
 
         if (route.Contains("/g/candidate-42", StringComparison.Ordinal))
         {
@@ -522,7 +554,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new StubProjection(projection));
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
 
         Assert.False(downstreamInvoked);
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
@@ -554,7 +586,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new StubProjection(projection));
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
 
         Assert.True(downstreamInvoked);
         Assert.Equal(StatusCodes.Status202Accepted, context.Response.StatusCode);
@@ -584,7 +616,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new ThrowingProjection());
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
 
         Assert.False(downstreamInvoked);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
@@ -608,7 +640,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new ThrowingProjection());
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
 
         Assert.True(downstreamInvoked);
         Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
@@ -624,6 +656,60 @@ public sealed class PublicReleaseTruthProjectionTests
             manifest,
             Digest(authority.ManifestBytes),
             authority.ManifestBytes);
+
+    [Fact]
+    public async Task InvalidStagedProbeFailsClosedWithoutConsultingCommittedProjection()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/downloads/g/candidate-42/releases.json";
+        context.Request.Headers[PublicReleaseTruthProjectionMiddleware.StagedProbeHeaderName] =
+            "invalid-stage-probe-token";
+        bool downstreamInvoked = false;
+        var middleware = new PublicReleaseTruthProjectionMiddleware(_ =>
+        {
+            downstreamInvoked = true;
+            return Task.CompletedTask;
+        });
+
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
+
+        Assert.False(downstreamInvoked);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+        Assert.Equal(
+            "private, no-store, no-cache, max-age=0",
+            context.Response.Headers.CacheControl.ToString());
+        Assert.Equal(
+            "noindex, nofollow, noarchive",
+            context.Response.Headers["X-Robots-Tag"].ToString());
+        Assert.Equal(
+            PublicReleaseTruthProjectionMiddleware.StagedProbeHeaderName,
+            context.Response.Headers.Vary.ToString());
+        Assert.False(context.Response.Headers.ContainsKey(
+            PublicReleaseTruthProjectionMiddleware.ProjectionHeaderName));
+    }
+
+    private static Task InvokeMiddlewareAsync(
+        PublicReleaseTruthProjectionMiddleware middleware,
+        HttpContext context,
+        IReleaseTruthProjection releaseTruth)
+    {
+        string downloadsRoot = Path.Combine(
+            Path.GetTempPath(),
+            "release-truth-middleware-tests",
+            Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot
+            })
+            .Build();
+        var promotions = new ReleaseBundlePromotionService(
+            configuration,
+            NullLogger<ReleaseBundlePromotionService>.Instance,
+            promotionCheckpoint: null);
+        var shelfStore = new ReleaseShelfGenerationStore(configuration);
+        return middleware.InvokeAsync(context, releaseTruth, promotions, shelfStore);
+    }
 
     private static AuthorityEnvelope MutateSnapshot(
         AuthorityEnvelope authority,
@@ -644,7 +730,7 @@ public sealed class PublicReleaseTruthProjectionTests
         };
     }
 
-    private static AuthorityEnvelope RebindDecision(AuthorityEnvelope authority, ReadOnlyMemory<byte> decisionBytes)
+    internal static AuthorityEnvelope RebindDecision(AuthorityEnvelope authority, ReadOnlyMemory<byte> decisionBytes)
     {
         string decisionSha256 = Digest(decisionBytes);
         JsonObject snapshot = JsonNode.Parse(
@@ -664,13 +750,14 @@ public sealed class PublicReleaseTruthProjectionTests
         };
     }
 
-    private static AuthorityEnvelope BuildAuthorityEnvelope(
+    internal static AuthorityEnvelope BuildAuthorityEnvelope(
         PublicReleaseManifestDto manifest,
         string releaseDecisionStatus,
         IReadOnlyDictionary<string, string>? primaryHeads = null,
-        string releaseDecisionPath = PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath)
+        string releaseDecisionPath = PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath,
+        ReadOnlyMemory<byte>? manifestBytesOverride = null)
     {
-        ReadOnlyMemory<byte> manifestBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        ReadOnlyMemory<byte> manifestBytes = manifestBytesOverride ?? Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             contractName = "Chummer.Hub.Registry.Contracts",
             version = manifest.Version,
@@ -831,8 +918,8 @@ public sealed class PublicReleaseTruthProjectionTests
             ["candidateDecisionStatus"] = ready ? "review_required" : string.Empty,
             ["candidateDecisionSha256"] = ready ? new string('b', 64) : string.Empty,
             ["manifestGeneratedAt"] = "2026-07-18T11:59:00Z",
-            ["scorecardSha256"] = new string('c', 64),
-            ["convergenceSha256"] = new string('d', 64),
+            ["scorecardSha256"] = ready ? new string('c', 64) : string.Empty,
+            ["convergenceSha256"] = ready ? new string('d', 64) : string.Empty,
             ["blockingFindings"] = ready
                 ? new JsonArray()
                 : new JsonArray(new JsonObject
@@ -1067,7 +1154,9 @@ public sealed class PublicReleaseTruthProjectionTests
         => new(
             Id: id,
             Platform: platform,
-            Url: $"/downloads/{id}",
+            Url: installAccessClass == "open_public"
+                ? $"/downloads/{id}"
+                : $"/downloads/get/{id}",
             Sha256: new string(shaCharacter, 64),
             Head: head,
             PlatformId: platform,
@@ -1100,7 +1189,7 @@ public sealed class PublicReleaseTruthProjectionTests
             new ReleaseShelfInventoryEntry(relativePath, Digest(bytes), bytes.Length));
     }
 
-    private sealed record AuthorityEnvelope(
+    internal sealed record AuthorityEnvelope(
         ReadOnlyMemory<byte> CurrentBytes,
         ReadOnlyMemory<byte> SnapshotBytes,
         ReadOnlyMemory<byte> DecisionBytes,

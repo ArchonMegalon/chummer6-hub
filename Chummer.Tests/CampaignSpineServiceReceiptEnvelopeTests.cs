@@ -15,37 +15,17 @@ public sealed class CampaignSpineServiceReceiptEnvelopeTests
     {
         IConfiguration configuration = CreateConfiguration();
         CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+        HubUserDto user = new AccountService(store).EnsureUser("sub-a", "Apex");
         CampaignSpineService service = new(
             store,
             new WorkspaceLifecyclePolicyService(configuration),
             new CampaignArtifactRegistryBridge(store));
+        CampaignWorkspaceProjection workspace = Assert.IsType<CampaignWorkspaceProjection>(
+            service.GetStarterWorkspace(user));
 
         TravelPrefetchReceiptProjection receipt = service.RecordTravelPrefetch(
-            user: new HubUserDto(
-                UserId: "user-a",
-                SubjectId: "sub-a",
-                DisplayName: "Apex",
-                Handle: "apex",
-                Visibility: "private",
-                Timezone: "UTC",
-                CountryCode: "AT",
-                LinkedPrincipals: [],
-                GroupIds: [],
-                CreatedAtUtc: DateTimeOffset.UtcNow,
-                UpdatedAtUtc: DateTimeOffset.UtcNow),
-            workspace: new CampaignWorkspaceProjection(
-                WorkspaceId: "workspace-a",
-                CampaignId: "campaign-a",
-                CampaignName: "Neon Cradle",
-                Visibility: "group",
-                RuleEnvironment: new RuleEnvironmentRef("env-a", "campaign", "sr5-core", "approved", [], [], []),
-                Crews: [],
-                Dossiers: [],
-                Runs: [],
-                RecapShelf: [],
-                ReadinessCues: [],
-                LatestContinuity: null,
-                ReturnSummary: "Return to the active runboard."),
+            user: user,
+            workspace: workspace,
             device: new ClaimedDeviceRestoreProjection(
                 InstallationId: "install-a",
                 DeviceRole: "travel",

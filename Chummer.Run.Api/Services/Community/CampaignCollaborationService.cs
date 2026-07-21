@@ -1,8 +1,12 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
+using Chummer.Contracts.Owners;
+using Chummer.Contracts.Workspaces;
 using Chummer.Run.Contracts.Community;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -22,8 +26,10 @@ public sealed class CampaignCollaborationService
     private const int MaxCampaignRosterSize = 100;
     private const int MaxIdempotencyKeyLength = 128;
     private const int MaxInviteAttemptsPerWindow = 10;
+    internal const int MaxCampaignTeardownReceipts = 1024;
     private static readonly TimeSpan InviteAttemptWindow = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan InviteRetention = TimeSpan.FromDays(7);
+    internal static readonly TimeSpan CampaignTeardownRetention = TimeSpan.FromDays(30);
     private const string ShortCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private const string PlayerRole = "player";
     private const string OwnerRole = "owner";
@@ -33,22 +39,68 @@ public sealed class CampaignCollaborationService
     private const string GmCharacterEditorAuthority = "gm_character_editor";
     private const string NoGmCharacterAuthority = "none";
     private const string HubRunnerDossierAuthorityKind = "hub_runner_dossier";
+    private const int DelegatedGmMaxReasonLength = 500;
+    private const string InviteReplayProtectionPurpose =
+        "Chummer.Run.Api.CampaignCollaboration.InviteCreationReplay.v1";
 
     private static readonly JsonSerializerOptions DigestJsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly CommunityStore _store;
+    private readonly ICoreGmCharacterEditGateway _canonicalCharacterEdits;
+    private readonly IDataProtector _inviteReplayProtector;
     private readonly TimeProvider _timeProvider;
+    private readonly IHubUserProjectionSyncQueue? _userProjectionSync;
+    private readonly ILogger<CampaignCollaborationService> _logger;
     private readonly Dictionary<string, CampaignInviteAttemptWindow> _inviteAttemptsByUserId = new(StringComparer.OrdinalIgnoreCase);
 
     public CampaignCollaborationService(CommunityStore store)
-        : this(store, TimeProvider.System)
+        : this(
+            store,
+            new UnavailableCoreGmCharacterEditGateway(),
+            new EphemeralDataProtectionProvider(),
+            TimeProvider.System)
     {
     }
 
-    internal CampaignCollaborationService(CommunityStore store, TimeProvider timeProvider)
+    public CampaignCollaborationService(
+        CommunityStore store,
+        ICoreGmCharacterEditGateway canonicalCharacterEdits)
+        : this(
+            store,
+            canonicalCharacterEdits,
+            new EphemeralDataProtectionProvider(),
+            TimeProvider.System)
     {
-        _store = store;
-        _timeProvider = timeProvider;
+    }
+
+    internal CampaignCollaborationService(
+        CommunityStore store,
+        ICoreGmCharacterEditGateway canonicalCharacterEdits,
+        TimeProvider timeProvider)
+        : this(
+            store,
+            canonicalCharacterEdits,
+            new EphemeralDataProtectionProvider(),
+            timeProvider)
+    {
+    }
+
+    public CampaignCollaborationService(
+        CommunityStore store,
+        ICoreGmCharacterEditGateway canonicalCharacterEdits,
+        IDataProtectionProvider dataProtectionProvider,
+        TimeProvider timeProvider,
+        IHubUserProjectionSyncQueue? userProjectionSync = null,
+        ILogger<CampaignCollaborationService>? logger = null)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _canonicalCharacterEdits = canonicalCharacterEdits
+            ?? throw new ArgumentNullException(nameof(canonicalCharacterEdits));
+        ArgumentNullException.ThrowIfNull(dataProtectionProvider);
+        _inviteReplayProtector = dataProtectionProvider.CreateProtector(InviteReplayProtectionPurpose);
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _userProjectionSync = userProjectionSync;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<CampaignCollaborationService>.Instance;
     }
 
     public IReadOnlyList<CampaignCollaborationProjection> ListCampaigns(HubUserDto user)
@@ -93,9 +145,30 @@ public sealed class CampaignCollaborationService
         string visibility = NormalizeVisibility(request.Visibility);
         string initialRunTitle = NormalizeOptional(request.InitialRunTitle, nameof(request.InitialRunTitle), MaxNameLength)
             ?? $"{name}: first run";
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(gm.UserId, "campaign-create", idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            Name = name,
+            Summary = summary,
+            Visibility = visibility,
+            InitialRunTitle = initialRunTitle
+        });
 
         lock (_store.Gate)
         {
+            if (_store.CampaignCreationsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignCreationIdempotencyState? replay))
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return replay.Response;
+            }
+
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
                 int ownedCampaignCount = _store.CampaignSpinesById.Values.Count(campaign =>
@@ -190,8 +263,564 @@ public sealed class CampaignCollaborationService
                         .ToArray(),
                     UpdatedAtUtc = now
                 };
-                return BuildCampaignProjectionLocked(gm, campaign, group, OwnerRole);
+                CampaignCollaborationProjection response =
+                    BuildCampaignProjectionLocked(gm, campaign, group, OwnerRole);
+                _store.CampaignCreationsByIdempotencyKey[commandKey] = new CampaignCreationIdempotencyState(
+                    commandKey,
+                    gm.UserId,
+                    idempotencyKey,
+                    requestSha256,
+                    response,
+                    now);
+                return response;
             });
+        }
+    }
+
+    public CampaignTeardownReceipt DeleteCampaign(
+        HubUserDto owner,
+        string campaignId,
+        DeleteCampaignCollaborationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(request);
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
+        string confirmedName = NormalizeRequired(
+            request.ConfirmCampaignName,
+            nameof(request.ConfirmCampaignName),
+            MaxNameLength);
+        if (!string.Equals(request.ConfirmCampaignName, confirmedName, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "campaign name confirmation must exactly match the stored normalized name.",
+                nameof(request));
+        }
+
+        if (request.ExpectedUpdatedAtUtc.Offset != TimeSpan.Zero)
+        {
+            throw new ArgumentException("expectedUpdatedAtUtc must use the UTC offset.", nameof(request));
+        }
+
+        DateTimeOffset expectedUpdatedAtUtc = request.ExpectedUpdatedAtUtc.ToUniversalTime();
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(owner.UserId, "campaign-teardown", idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            CampaignId = normalizedCampaignId.ToLowerInvariant(),
+            ConfirmCampaignName = confirmedName,
+            ExpectedUpdatedAtUtc = expectedUpdatedAtUtc
+        });
+
+        CampaignTeardownReceipt result;
+        HubUserDto[] usersToSync;
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
+            if (_store.CampaignTeardownsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignTeardownIdempotencyState? replay)
+                && replay.CreatedAtUtc.Add(CampaignTeardownRetention) > now)
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return replay.Response;
+            }
+
+            (CampaignProjection campaign, GroupDto group, string role) =
+                RequireMemberCampaignLocked(owner, normalizedCampaignId);
+            if (!string.Equals(group.OwnerUserId, owner.UserId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(role, OwnerRole, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new CampaignCollaborationAccessDeniedException(
+                    "Campaign owner access is required for teardown.");
+            }
+
+            if (!string.Equals(campaign.Name, confirmedName, StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "campaign name confirmation does not match the current campaign name.",
+                    nameof(request));
+            }
+
+            DateTimeOffset currentUpdatedAtUtc = campaign.UpdatedAtUtc.ToUniversalTime();
+            if (currentUpdatedAtUtc != expectedUpdatedAtUtc)
+            {
+                throw new CampaignUpdatedAtConflictException(currentUpdatedAtUtc);
+            }
+
+            string[] crewIds = _store.CrewsById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.CrewId)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (campaign.CrewIds.Any(campaignCrewId =>
+                    !crewIds.Contains(campaignCrewId, StringComparer.OrdinalIgnoreCase))
+                || crewIds.Any(crewId =>
+                    !_store.CrewsById.TryGetValue(crewId, out CrewProjection? crew)
+                    || !string.Equals(crew.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found an invalid campaign-owned crew reference.");
+            }
+
+            string[] runIds = _store.RunsById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.RunId)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (campaign.RunIds.Any(campaignRunId =>
+                !runIds.Contains(campaignRunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found an invalid campaign-owned run reference.");
+            }
+
+            CampaignProjection[] unrelatedCampaigns = _store.CampaignSpinesById.Values
+                .Where(item => !string.Equals(
+                    item.CampaignId,
+                    campaign.CampaignId,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (unrelatedCampaigns.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || unrelatedCampaigns.Any(item => item.CrewIds.Any(crewId =>
+                    crewIds.Contains(crewId, StringComparer.OrdinalIgnoreCase)))
+                || unrelatedCampaigns.Any(item => item.RunIds.Any(runId =>
+                    runIds.Contains(runId, StringComparer.OrdinalIgnoreCase))))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a group, crew, or run referenced by another campaign.");
+            }
+
+            if (_store.DossiersById.Values.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.CrewId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    || runIds.Contains(item.CurrentRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a campaign, crew, or run referenced by a preserved dossier.");
+            }
+
+            string[] sponsorSessionIds = _store.SponsorSessionsById.Values
+                .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.BoostCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.SponsorSessionId)
+                .ToArray();
+            string[] contributionReceiptIds = _store.Receipts
+                .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || sponsorSessionIds.Contains(item.SponsorSessionId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                .Select(static item => item.ReceiptId)
+                .ToArray();
+            if (_store.JoinCodesByValue.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || _store.CampaignsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.BoostCodesByValue.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.SponsorSessionsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.BoostCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || contributionReceiptIds.Length > 0
+                || _store.LedgerEntries.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || _store.RewardEntries.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || contributionReceiptIds.Contains(item.SourceReceiptId, StringComparer.OrdinalIgnoreCase))
+                || _store.EntitlementEntries.Any(item =>
+                    (string.Equals(item.Scope, "group", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(item.ScopeId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                    || contributionReceiptIds.Contains(item.SourceReceiptId, StringComparer.OrdinalIgnoreCase))
+                || _store.Badges.Any(item => sponsorSessionIds.Contains(
+                    item.SourceSponsorSessionId ?? string.Empty,
+                    StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a group or campaign referenced by preserved sponsorship state.");
+            }
+
+            if (_store.RosterTransfers.Any(item =>
+                    string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.SourceCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.SourceCrewId, StringComparer.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.TargetCrewId, StringComparer.OrdinalIgnoreCase))
+                || _store.DossierMovements.Any(item =>
+                    string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.SourceCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.SourceRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    || runIds.Contains(item.TargetRunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused resources referenced by preserved movement history.");
+            }
+
+            if (_store.PrepLaunches.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.TargetRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                || _store.TravelPrefetchReceipts.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.AftermathPackages.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                || _store.CampaignAdoptions.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.RunnerGoals.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.ResolutionReportApprovals.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase))
+                || _store.WorldTicks.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase))
+                || _store.PlayerSafeNews.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused campaign or run resources referenced by preserved workspace history.");
+            }
+
+            if (_store.OpenRuns.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a campaign or run referenced by a preserved open-run listing.");
+            }
+
+            if (_store.PlaySessionsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused group, campaign, or run resources referenced by a preserved play session.");
+            }
+
+            HubUserDto[] affectedUsers = _store.UsersById.Values
+                .Where(user => user.GroupIds.Contains(group.GroupId, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(static user => user.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            HashSet<string> affectedUserIds = affectedUsers
+                .Select(static user => user.UserId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string[] restoreProjectionUserIds = _store.RestoreByUserId
+                .Where(item => affectedUserIds.Contains(item.Key)
+                    || item.Value.RecentCampaigns.Any(recent =>
+                        string.Equals(recent.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(recent.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                        || recent.CrewIds.Any(crewId => crewIds.Contains(crewId, StringComparer.OrdinalIgnoreCase))
+                        || recent.RunIds.Any(runId => runIds.Contains(runId, StringComparer.OrdinalIgnoreCase)))
+                    || item.Value.RecentDossiers.Any(recent =>
+                        string.Equals(recent.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                        || crewIds.Contains(recent.CrewId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        || runIds.Contains(recent.CurrentRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)))
+                .Select(static item => item.Key)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            string campaignWorkspaceId = BuildCampaignWorkspaceId(campaign.CampaignId);
+            var removedWorkspacePrepHistoryByUser = _store.UserExperienceByUserId
+                .Select(item => new
+                {
+                    UserId = item.Key,
+                    Items = (item.Value.WorkspacePrepLibrarySearchHistory
+                            ?? Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())
+                        .Where(history => string.Equals(
+                            history.WorkspaceId,
+                            campaignWorkspaceId,
+                            StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(static history => history.WorkspaceId, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(static history => history.Query, StringComparer.Ordinal)
+                        .ThenBy(static history => history.LastUsedUtc)
+                        .ToArray()
+                })
+                .Where(static item => item.Items.Length > 0)
+                .OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            CampaignCollaborationInviteState[] invites = _store.CampaignCollaborationInvitesById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            foreach (CampaignCollaborationInviteState invite in invites)
+            {
+                if (!_store.CampaignInviteIdByCodeLookupSha256.TryGetValue(
+                        invite.ShortCodeLookupSha256,
+                        out string? indexedInviteId)
+                    || !string.Equals(indexedInviteId, invite.InviteId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("Campaign teardown found an invalid invite code index.");
+                }
+            }
+
+            HashSet<string> inviteIds = invites
+                .Select(static item => item.InviteId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string[] inviteCodeIndexKeys = _store.CampaignInviteIdByCodeLookupSha256
+                .Where(item => inviteIds.Contains(item.Value))
+                .Select(static item => item.Key)
+                .OrderBy(static value => value, StringComparer.Ordinal)
+                .ToArray();
+            CampaignCharacterBindingState[] bindings = _store.CampaignCharacterBindings
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.BindingId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.BindingRevision)
+                .ToArray();
+            KeyValuePair<string, CampaignRunsiteState>[] runsites = _store.CampaignRunsitesByRunId
+                .Where(item => string.Equals(item.Value.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (runsites.Any(item => !runIds.Contains(item.Value.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found a runsite outside the campaign run set.");
+            }
+
+            string[] campaignCreationKeys = _store.CampaignCreationsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] inviteCreationKeys = _store.CampaignInviteCreationsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] runsiteDraftKeys = _store.CampaignRunsiteDraftCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] runsitePublishKeys = _store.CampaignRunsitePublishCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] redemptionKeys = _store.CampaignRedemptionsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] sheetEditKeys = _store.CampaignSheetEditsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] gmAuthorityCommandKeys = _store.CampaignGmAuthorityCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            CampaignSharedSheetAuditState[] sheetAudit = _store.CampaignSharedSheetAudit
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            CampaignGmAuthorityAuditState[] gmAuthorityAudit = _store.CampaignGmAuthorityAudit
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            int removedUserGroupMemberships = affectedUsers.Sum(user =>
+                user.GroupIds.Count(groupId => string.Equals(
+                    groupId,
+                    group.GroupId,
+                    StringComparison.OrdinalIgnoreCase)));
+            int removedCommandRecords = campaignCreationKeys.Length
+                + inviteCreationKeys.Length
+                + runsiteDraftKeys.Length
+                + runsitePublishKeys.Length
+                + redemptionKeys.Length
+                + sheetEditKeys.Length
+                + gmAuthorityCommandKeys.Length;
+            int removedAuditRecords = sheetAudit.Length + gmAuthorityAudit.Length;
+            var removed = new CampaignTeardownCleanupCounts(
+                Campaigns: 1,
+                Groups: 1,
+                Crews: crewIds.Length,
+                Runs: runIds.Length,
+                Invites: invites.Length,
+                InviteCodeIndexes: inviteCodeIndexKeys.Length,
+                CharacterBindings: bindings.Length,
+                Runsites: runsites.Length,
+                CommandRecords: removedCommandRecords,
+                AuditRecords: removedAuditRecords,
+                UserGroupMemberships: removedUserGroupMemberships,
+                RestoreProjections: restoreProjectionUserIds.Length,
+                WorkspacePrepLibrarySearchHistoryItems: removedWorkspacePrepHistoryByUser.Sum(static item => item.Items.Length));
+            DateTimeOffset deletedAtUtc = now;
+            string campaignNameSha256 = ComputeCanonicalStringSha256(campaign.Name);
+            string cleanupSha256 = ComputeSha256(new
+            {
+                CampaignId = campaign.CampaignId,
+                CampaignNameSha256 = campaignNameSha256,
+                PreviousUpdatedAtUtc = currentUpdatedAtUtc,
+                Removed = removed,
+                GroupIds = new[] { group.GroupId },
+                CrewIds = crewIds,
+                RunIds = runIds,
+                InviteIds = invites.Select(static item => item.InviteId).ToArray(),
+                BindingIds = bindings.Select(static item => item.BindingId).Distinct(StringComparer.Ordinal).ToArray(),
+                RunsiteKeys = runsites.Select(static item => item.Key).ToArray(),
+                SheetAuditReceiptIds = sheetAudit.Select(static item => item.ReceiptId)
+                    .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                GmAuthorityAuditReceiptIds = gmAuthorityAudit.Select(static item => item.ReceiptId)
+                    .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                RestoreProjectionUserIds = restoreProjectionUserIds,
+                WorkspacePrepLibrarySearchHistory = removedWorkspacePrepHistoryByUser
+                    .Select(item => new
+                    {
+                        item.UserId,
+                        Items = item.Items.Select(history => new
+                        {
+                            history.WorkspaceId,
+                            history.Query,
+                            history.LastUsedUtc,
+                            Sha256 = ComputeSha256(history)
+                        }).ToArray()
+                    })
+                    .ToArray()
+            });
+            var receipt = new CampaignTeardownReceipt(
+                ReceiptId: NewId("campaign-teardown"),
+                CampaignId: campaign.CampaignId,
+                CampaignNameSha256: campaignNameSha256,
+                PreviousUpdatedAtUtc: currentUpdatedAtUtc,
+                Removed: removed,
+                CleanupSha256: cleanupSha256,
+                DeletedAtUtc: deletedAtUtc);
+
+            result = _store.ExecuteCampaignCollaborationTransactionLocked(() =>
+            {
+                foreach (string key in campaignCreationKeys)
+                {
+                    _store.CampaignCreationsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in inviteCreationKeys)
+                {
+                    _store.CampaignInviteCreationsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in runsiteDraftKeys)
+                {
+                    _store.CampaignRunsiteDraftCommandsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in runsitePublishKeys)
+                {
+                    _store.CampaignRunsitePublishCommandsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in redemptionKeys)
+                {
+                    _store.CampaignRedemptionsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in sheetEditKeys)
+                {
+                    _store.CampaignSheetEditsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in gmAuthorityCommandKeys)
+                {
+                    _store.CampaignGmAuthorityCommandsByIdempotencyKey.Remove(key);
+                }
+
+                _store.CampaignSharedSheetAudit.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                _store.CampaignGmAuthorityAudit.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                _store.CampaignCharacterBindings.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                foreach (KeyValuePair<string, CampaignRunsiteState> runsite in runsites)
+                {
+                    _store.CampaignRunsitesByRunId.Remove(runsite.Key);
+                }
+                foreach (string key in inviteCodeIndexKeys)
+                {
+                    _store.CampaignInviteIdByCodeLookupSha256.Remove(key);
+                }
+                foreach (CampaignCollaborationInviteState invite in invites)
+                {
+                    _store.CampaignCollaborationInvitesById.Remove(invite.InviteId);
+                }
+                foreach (string runId in runIds)
+                {
+                    _store.RunsById.Remove(runId);
+                }
+                foreach (string crewId in crewIds)
+                {
+                    _store.CrewsById.Remove(crewId);
+                }
+                _store.GroupsById.Remove(group.GroupId);
+                _store.CampaignSpinesById.Remove(campaign.CampaignId);
+                foreach (string restoreUserId in restoreProjectionUserIds)
+                {
+                    _store.RestoreByUserId.Remove(restoreUserId);
+                }
+                foreach (var removedHistory in removedWorkspacePrepHistoryByUser)
+                {
+                    HubUserExperienceDto experience = _store.UserExperienceByUserId[removedHistory.UserId];
+                    _store.UserExperienceByUserId[removedHistory.UserId] = experience with
+                    {
+                        WorkspacePrepLibrarySearchHistory =
+                            (experience.WorkspacePrepLibrarySearchHistory
+                                ?? Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())
+                            .Where(history => !string.Equals(
+                                history.WorkspaceId,
+                                campaignWorkspaceId,
+                                StringComparison.OrdinalIgnoreCase))
+                            .ToArray(),
+                        UpdatedAtUtc = deletedAtUtc
+                    };
+                }
+                foreach (HubUserDto user in affectedUsers)
+                {
+                    _store.UsersById[user.UserId] = user with
+                    {
+                        GroupIds = user.GroupIds
+                            .Where(groupId => !string.Equals(
+                                groupId,
+                                group.GroupId,
+                                StringComparison.OrdinalIgnoreCase))
+                            .ToArray(),
+                        UpdatedAtUtc = deletedAtUtc
+                    };
+                }
+
+                PruneCampaignTeardownLedgerLocked(deletedAtUtc);
+                _store.CampaignTeardownsByIdempotencyKey[commandKey] = new CampaignTeardownIdempotencyState(
+                    commandKey,
+                    owner.UserId,
+                    idempotencyKey,
+                    requestSha256,
+                    receipt,
+                    deletedAtUtc);
+                return receipt;
+            });
+            usersToSync = affectedUsers
+                .Select(static user => user.UserId)
+                .Concat(removedWorkspacePrepHistoryByUser.Select(static item => item.UserId))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(_store.UsersById.ContainsKey)
+                .Select(userId => _store.UsersById[userId])
+                .ToArray();
+        }
+
+        foreach (HubUserDto user in usersToSync)
+        {
+            QueueUserProjectionSync(user);
+        }
+        return result;
+    }
+
+    private void QueueUserProjectionSync(HubUserDto user)
+    {
+        if (_userProjectionSync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _userProjectionSync.QueueSyncUser(user);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "campaign teardown persisted but user {UserId} could not be queued for projection reconciliation",
+                user.UserId);
         }
     }
 
@@ -216,13 +845,47 @@ public sealed class CampaignCollaborationService
                 $"invite max uses must be between 1 and {MaxInviteUses}.");
         }
 
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(
+            gm.UserId,
+            $"invite-create:{normalizedCampaignId.ToLowerInvariant()}",
+            idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            CampaignId = normalizedCampaignId.ToLowerInvariant(),
+            request.ExpiresInMinutes,
+            request.MaxUses
+        });
+
         lock (_store.Gate)
         {
+            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            DateTimeOffset now = _timeProvider.GetUtcNow();
+            if (_store.CampaignInviteCreationsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignInviteCreationIdempotencyState? replay)
+                && _store.CampaignCollaborationInvitesById.TryGetValue(
+                    replay.InviteId,
+                    out CampaignCollaborationInviteState? replayInvite)
+                && !ShouldPruneInvite(replayInvite, now))
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return RestoreInviteCreationResponseLocked(gm, replay);
+            }
+
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
-                (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, campaignId);
-                DateTimeOffset now = _timeProvider.GetUtcNow();
                 PruneInvitesLocked(now);
+                if (_store.CampaignInviteCreationsByIdempotencyKey.ContainsKey(commandKey))
+                {
+                    throw new CampaignInviteReplayUnavailableException();
+                }
+
                 int activeInviteCount = _store.CampaignCollaborationInvitesById.Values.Count(invite =>
                     string.Equals(invite.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
                     && invite.RevokedAtUtc is null
@@ -255,7 +918,7 @@ public sealed class CampaignCollaborationService
                 _store.CampaignCollaborationInvitesById[state.InviteId] = state;
                 _store.CampaignInviteIdByCodeLookupSha256[state.ShortCodeLookupSha256] = state.InviteId;
 
-                return new CampaignInviteSecretProjection(
+                var response = new CampaignInviteSecretProjection(
                     InviteId: state.InviteId,
                     CampaignId: state.CampaignId,
                     JoinPath: $"/join/campaign/{state.InviteId}#secret={linkSecret}",
@@ -264,6 +927,21 @@ public sealed class CampaignCollaborationService
                     ExpiresAtUtc: state.ExpiresAtUtc,
                     MaxUses: state.MaxUses,
                     CreatedAtUtc: state.CreatedAtUtc);
+                string protectedSecrets = ProtectInviteCreationResponse(
+                    gm.UserId,
+                    idempotencyKey,
+                    response);
+                _store.CampaignInviteCreationsByIdempotencyKey[commandKey] =
+                    new CampaignInviteCreationIdempotencyState(
+                        commandKey,
+                        gm.UserId,
+                        idempotencyKey,
+                        requestSha256,
+                        state.CampaignId,
+                        state.InviteId,
+                        protectedSecrets,
+                        now);
+                return response;
             });
         }
     }
@@ -467,13 +1145,20 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(gm);
         ArgumentNullException.ThrowIfNull(request);
+        if (request.ExpectedRevision <= 0 || request.ExpectedRevision == long.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request.ExpectedRevision));
+        }
+
         string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
         string normalizedDossierId = NormalizeRequired(dossierId, nameof(dossierId), 128);
         string runnerHandle = NormalizeRequired(request.RunnerHandle, nameof(request.RunnerHandle), MaxHandleLength);
         string displayName = NormalizeRequired(request.DisplayName, nameof(request.DisplayName), MaxDisplayNameLength);
         string status = NormalizeDossierStatus(request.Status);
-        string reason = NormalizeRequired(request.Reason, nameof(request.Reason), MaxReasonLength);
-        IReadOnlyList<PublicationSafeProjection> sections = NormalizeSafeSections(request.Sections);
+        string reason = NormalizeRequired(request.Reason, nameof(request.Reason), DelegatedGmMaxReasonLength);
+        IReadOnlyList<PublicationSafeProjection>? requestedSections = request.Sections is null
+            ? null
+            : NormalizeSafeSections(request.Sections);
         string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
         string commandKey = BuildCommandKey(gm.UserId, "sheet-edit", idempotencyKey);
         string requestSha256 = ComputeSha256(new
@@ -485,85 +1170,188 @@ public sealed class CampaignCollaborationService
             DisplayName = displayName,
             Status = status,
             Reason = reason,
-            Sections = sections
+            Sections = requestedSections
         });
 
         lock (_store.Gate)
         {
-            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            (CampaignProjection campaign, GroupDto group, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
             CampaignCharacterBindingState binding = RequireCurrentBindingLocked(campaign.CampaignId, normalizedDossierId);
+            if (!_store.DossiersById.TryGetValue(normalizedDossierId, out RunnerDossierProjection? boundDossier)
+                || !string.Equals(boundDossier.OwnerUserId, binding.AuthenticatedOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(binding.AuthorityKind, HubRunnerDossierAuthorityKind, StringComparison.Ordinal)
+                || !string.Equals(binding.AuthoritativeCharacterId, boundDossier.DossierId, StringComparison.Ordinal))
+            {
+                throw new KeyNotFoundException("Unknown campaign sheet.");
+            }
+
             if (!string.Equals(binding.GmAuthorityRole, GmCharacterEditorAuthority, StringComparison.Ordinal))
             {
                 throw new CampaignCollaborationAccessDeniedException("The character owner has not granted GM edit authority.");
             }
 
-            if (_store.CampaignSheetEditsByIdempotencyKey.TryGetValue(commandKey, out CampaignSheetEditIdempotencyState? replay))
+            CampaignPlayerSafeSheetProjection current = BuildSharedSheetLocked(
+                campaign,
+                normalizedDossierId,
+                canManage: true);
+            var canonicalReadCommand = new DelegatedGmCharacterProfileReadCommand(
+                campaign.CampaignId,
+                gm.UserId,
+                new OwnerScope(binding.AuthenticatedOwnerUserId),
+                new CharacterWorkspaceId(binding.AuthoritativeCharacterId));
+            DelegatedGmCharacterProfile profileBeforeExecution = ReadCanonicalProfile(
+                canonicalReadCommand);
+            current = SynchronizeCanonicalProfileLocked(
+                campaign.CampaignId,
+                current.DossierId,
+                profileBeforeExecution,
+                canManage: true);
+
+            // Core's v1 delegated edit contract owns only profile name and alias
+            // (and, when explicitly modeled, notes). Do not let the compatibility
+            // request shape turn status or publication-safe sections into a
+            // successful Hub-only character mutation.
+            if (!string.Equals(status, current.Status, StringComparison.Ordinal)
+                || (requestedSections is not null
+                    && !string.Equals(
+                        ComputeSha256(requestedSections),
+                        ComputeSha256(current.Sections),
+                        StringComparison.Ordinal)))
+            {
+                throw new ArgumentException(
+                    "GM character edits currently support only displayName and runnerHandle; status and sections must remain unchanged.",
+                    nameof(request));
+            }
+
+            if (_store.CampaignSheetEditsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignSheetEditIdempotencyState? replay))
             {
                 if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
                 {
                     throw new CampaignIdempotencyConflictException();
                 }
 
-                return replay.Response;
+                return replay.Response with { CurrentRevision = profileBeforeExecution.Revision };
             }
 
-            CampaignPlayerSafeSheetProjection current = BuildSharedSheetLocked(campaign, normalizedDossierId, canManage: true);
-            long currentCharacterRevision = ResolveCurrentCharacterRevisionLocked(normalizedDossierId);
-            if (currentCharacterRevision != request.ExpectedRevision)
+            var canonicalCommand = new DelegatedGmCharacterEditCommand(
+                CampaignId: campaign.CampaignId,
+                ActorId: gm.UserId,
+                CharacterOwner: canonicalReadCommand.CharacterOwner,
+                CharacterId: canonicalReadCommand.CharacterId,
+                ExpectedRevision: request.ExpectedRevision,
+                IdempotencyKey: idempotencyKey,
+                Reason: reason,
+                Operations:
+                [
+                    new DelegatedGmCharacterPatchOperation(
+                        DelegatedGmCharacterPatchOperationKind.Replace,
+                        DelegatedGmCharacterEditContract.ProfileAliasPath,
+                        runnerHandle),
+                    new DelegatedGmCharacterPatchOperation(
+                        DelegatedGmCharacterPatchOperationKind.Replace,
+                        DelegatedGmCharacterEditContract.ProfileNamePath,
+                        displayName)
+                ]);
+            DelegatedGmCharacterEditResult canonicalResult;
+            try
             {
-                throw new CampaignRevisionConflictException(currentCharacterRevision);
+                canonicalResult = _canonicalCharacterEdits.Execute(canonicalCommand);
+            }
+            catch (Exception exception)
+            {
+                throw new CampaignCanonicalEditUnavailableException(exception);
+            }
+
+            if (canonicalResult?.Outcome == DelegatedGmCharacterEditOutcome.Conflict)
+            {
+                DelegatedGmCharacterProfile conflictProfile = ReadCanonicalProfile(canonicalReadCommand);
+                if (conflictProfile.Revision < profileBeforeExecution.Revision)
+                {
+                    throw new CampaignCanonicalEditUnavailableException();
+                }
+
+                _ = SynchronizeCanonicalProfileLocked(
+                    campaign.CampaignId,
+                    current.DossierId,
+                    conflictProfile,
+                    canManage: true);
+                throw new CampaignCanonicalEditConflictException(conflictProfile.Revision);
+            }
+
+            DelegatedGmCharacterEditAuditReceipt canonicalReceipt = RequireCanonicalReceipt(
+                canonicalCommand,
+                canonicalResult,
+                binding,
+                group.OwnerUserId);
+            DelegatedGmCharacterProfile profileAfterExecution = ReadCanonicalProfile(canonicalReadCommand);
+            if (profileAfterExecution.Revision < profileBeforeExecution.Revision)
+            {
+                throw new CampaignCanonicalEditUnavailableException();
+            }
+
+            // Keep Hub authorization authoritative across the canonical call. The
+            // store lock prevents normal concurrent changes; these checks also
+            // fail closed against a re-entrant or defective adapter.
+            (CampaignProjection verifiedCampaign, GroupDto verifiedGroup, _) =
+                RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            CampaignCharacterBindingState verifiedBinding =
+                RequireCurrentBindingLocked(verifiedCampaign.CampaignId, normalizedDossierId);
+            if (!string.Equals(verifiedGroup.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(verifiedGroup.OwnerUserId, group.OwnerUserId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(verifiedBinding.BindingId, binding.BindingId, StringComparison.Ordinal)
+                || !string.Equals(verifiedBinding.BindingVersionId, binding.BindingVersionId, StringComparison.Ordinal)
+                || verifiedBinding.BindingRevision != binding.BindingRevision
+                || !string.Equals(verifiedBinding.GmAuthorityRole, GmCharacterEditorAuthority, StringComparison.Ordinal)
+                || !string.Equals(verifiedBinding.AuthorityKind, binding.AuthorityKind, StringComparison.Ordinal)
+                || !string.Equals(
+                    verifiedBinding.AuthoritativeCharacterId,
+                    binding.AuthoritativeCharacterId,
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    verifiedBinding.AuthenticatedOwnerUserId,
+                    binding.AuthenticatedOwnerUserId,
+                    StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(
+                    verifiedBinding.GrantedByUserId,
+                    binding.GrantedByUserId,
+                    StringComparison.OrdinalIgnoreCase)
+                || verifiedBinding.GrantedAtUtc != binding.GrantedAtUtc
+                || !_store.DossiersById.TryGetValue(normalizedDossierId, out RunnerDossierProjection? verifiedDossier)
+                || !string.Equals(
+                    verifiedDossier.OwnerUserId,
+                    verifiedBinding.AuthenticatedOwnerUserId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new CampaignCollaborationAccessDeniedException(
+                    "GM edit authority changed while the canonical edit was being reconciled.");
             }
 
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
-                RunnerDossierProjection dossier = _store.DossiersById[current.DossierId];
                 DateTimeOffset now = _timeProvider.GetUtcNow();
-                RunnerDossierProjection updatedDossier = dossier with
-                {
-                    RunnerHandle = runnerHandle,
-                    DisplayName = displayName,
-                    Status = status,
-                    Projections = sections,
-                    UpdatedAtUtc = now
-                };
-                long nextRevision = currentCharacterRevision + 1;
-                CampaignCharacterBindingState[] nextBindings = _store.CampaignCharacterBindings
-                    .Where(item => string.Equals(item.DossierId, current.DossierId, StringComparison.OrdinalIgnoreCase))
-                    .GroupBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.OrderByDescending(static item => item.BindingRevision).First())
-                    .Select(item => item with
-                    {
-                        BindingVersionId = NewId("binding-version"),
-                        BindingRevision = item.BindingRevision + 1,
-                        CurrentRevision = nextRevision,
-                        RecordedAtUtc = now
-                    })
-                    .ToArray();
-                CampaignCharacterBindingState nextBinding = nextBindings.Single(item =>
-                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
-                CampaignPlayerSafeSheetProjection nextProjection = BuildSharedSheetProjection(
-                    campaign,
-                    updatedDossier,
-                    nextBinding,
-                    current.Role,
+                ApplyCanonicalProfileToHubLocked(current.DossierId, profileAfterExecution, now);
+                CampaignProjection currentCampaign = _store.CampaignSpinesById[campaign.CampaignId];
+                CampaignPlayerSafeSheetProjection nextProjection = BuildSharedSheetLocked(
+                    currentCampaign,
+                    current.DossierId,
                     canManage: true);
                 var audit = new CampaignSharedSheetAuditState(
-                    ReceiptId: NewId("sheet-edit"),
+                    ReceiptId: canonicalReceipt.ReceiptId,
                     CampaignId: campaign.CampaignId,
                     DossierId: current.DossierId,
-                    PreviousRevision: currentCharacterRevision,
-                    Revision: nextRevision,
+                    PreviousRevision: canonicalReceipt.PreviousRevision,
+                    Revision: canonicalReceipt.NewRevision,
+                    CurrentRevision: profileAfterExecution.Revision,
                     IdempotencyKey: idempotencyKey,
                     Reason: reason,
                     EditedByUserId: gm.UserId,
                     BeforeSha256: ComputeSha256(current),
                     AfterSha256: ComputeSha256(nextProjection),
-                    EditedAtUtc: now);
+                    EditedAtUtc: canonicalReceipt.AppliedAtUtc);
 
-                _store.DossiersById[current.DossierId] = updatedDossier;
-                _store.CampaignCharacterBindings.AddRange(nextBindings);
                 _store.CampaignSharedSheetAudit.Add(audit);
-                _store.CampaignSpinesById[campaign.CampaignId] = campaign with { UpdatedAtUtc = now };
                 CampaignSharedSheetEditReceipt receipt = ToEditReceipt(audit);
                 _store.CampaignSheetEditsByIdempotencyKey[commandKey] = new CampaignSheetEditIdempotencyState(
                     commandKey,
@@ -714,11 +1502,40 @@ public sealed class CampaignCollaborationService
         string summary = NormalizeRequired(request.Summary, nameof(request.Summary), MaxSummaryLength);
         string? gmNotes = NormalizeOptional(request.GmNotes, nameof(request.GmNotes), MaxSummaryLength);
         IReadOnlyList<RunsitePlayerSectionInput> playerSections = NormalizeRunsiteSections(request.PlayerSections);
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
+        string normalizedRunId = NormalizeRequired(runId, nameof(runId), 128);
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(
+            gm.UserId,
+            $"runsite-draft:{normalizedCampaignId.ToLowerInvariant()}:{normalizedRunId.ToLowerInvariant()}",
+            idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            CampaignId = normalizedCampaignId.ToLowerInvariant(),
+            RunId = normalizedRunId.ToLowerInvariant(),
+            request.ExpectedRevision,
+            Title = title,
+            Summary = summary,
+            PlayerSections = playerSections,
+            GmNotes = gmNotes
+        });
 
         lock (_store.Gate)
         {
-            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, campaignId);
-            RunProjection run = RequireCampaignRunLocked(campaign, runId);
+            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            RunProjection run = RequireCampaignRunLocked(campaign, normalizedRunId);
+            if (_store.CampaignRunsiteDraftCommandsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignRunsiteDraftIdempotencyState? replay))
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return replay.Response;
+            }
+
             string key = RunsiteKey(campaign.CampaignId, run.RunId);
             _store.CampaignRunsitesByRunId.TryGetValue(key, out CampaignRunsiteState? current);
             long currentRevision = current?.Revision ?? 0;
@@ -744,7 +1561,16 @@ public sealed class CampaignCollaborationService
                 _store.CampaignRunsitesByRunId[key] = next;
                 _store.RunsById[run.RunId] = run with { UpdatedAtUtc = now };
                 _store.CampaignSpinesById[campaign.CampaignId] = campaign with { UpdatedAtUtc = now };
-                return ToDraftProjection(next);
+                CampaignRunsiteDraftProjection response = ToDraftProjection(next);
+                _store.CampaignRunsiteDraftCommandsByIdempotencyKey[commandKey] =
+                    new CampaignRunsiteDraftIdempotencyState(
+                        commandKey,
+                        gm.UserId,
+                        idempotencyKey,
+                        requestSha256,
+                        response,
+                        now);
+                return response;
             });
         }
     }
@@ -757,11 +1583,36 @@ public sealed class CampaignCollaborationService
     {
         ArgumentNullException.ThrowIfNull(gm);
         ArgumentNullException.ThrowIfNull(request);
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
+        string normalizedRunId = NormalizeRequired(runId, nameof(runId), 128);
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(
+            gm.UserId,
+            $"runsite-publish:{normalizedCampaignId.ToLowerInvariant()}:{normalizedRunId.ToLowerInvariant()}",
+            idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            CampaignId = normalizedCampaignId.ToLowerInvariant(),
+            RunId = normalizedRunId.ToLowerInvariant(),
+            request.ExpectedRevision
+        });
 
         lock (_store.Gate)
         {
-            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, campaignId);
-            RunProjection run = RequireCampaignRunLocked(campaign, runId);
+            (CampaignProjection campaign, _, _) = RequireManagerCampaignLocked(gm, normalizedCampaignId);
+            RunProjection run = RequireCampaignRunLocked(campaign, normalizedRunId);
+            if (_store.CampaignRunsitePublishCommandsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignRunsitePublishIdempotencyState? replay))
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return replay.Response;
+            }
+
             string key = RunsiteKey(campaign.CampaignId, run.RunId);
             if (!_store.CampaignRunsitesByRunId.TryGetValue(key, out CampaignRunsiteState? current))
             {
@@ -773,30 +1624,39 @@ public sealed class CampaignCollaborationService
                 throw new CampaignRevisionConflictException(current.Revision);
             }
 
-            if (current.Published?.Revision == current.Revision)
-            {
-                return ToPlayerRunsiteProjection(current.Published);
-            }
-
             DateTimeOffset now = _timeProvider.GetUtcNow();
-            var published = new CampaignRunsitePlayerProjection(
-                CampaignId: current.CampaignId,
-                RunId: current.RunId,
-                Revision: current.Revision,
-                Title: current.Title,
-                Summary: current.Summary,
-                Sections: current.PlayerSections.ToArray(),
-                PublishedAtUtc: now);
+            CampaignRunsitePlayerProjection published = current.Published?.Revision == current.Revision
+                ? ToPlayerRunsiteProjection(current.Published)
+                : new CampaignRunsitePlayerProjection(
+                    CampaignId: current.CampaignId,
+                    RunId: current.RunId,
+                    Revision: current.Revision,
+                    Title: current.Title,
+                    Summary: current.Summary,
+                    Sections: current.PlayerSections.ToArray(),
+                    PublishedAtUtc: now);
             return _store.ExecuteCampaignCollaborationTransactionLocked(() =>
             {
-                _store.CampaignRunsitesByRunId[key] = current with
+                if (current.Published?.Revision != current.Revision)
                 {
-                    Published = published,
-                    UpdatedByUserId = gm.UserId,
-                    UpdatedAtUtc = now
-                };
-                _store.RunsById[run.RunId] = run with { UpdatedAtUtc = now };
-                _store.CampaignSpinesById[campaign.CampaignId] = campaign with { UpdatedAtUtc = now };
+                    _store.CampaignRunsitesByRunId[key] = current with
+                    {
+                        Published = published,
+                        UpdatedByUserId = gm.UserId,
+                        UpdatedAtUtc = now
+                    };
+                    _store.RunsById[run.RunId] = run with { UpdatedAtUtc = now };
+                    _store.CampaignSpinesById[campaign.CampaignId] = campaign with { UpdatedAtUtc = now };
+                }
+
+                _store.CampaignRunsitePublishCommandsByIdempotencyKey[commandKey] =
+                    new CampaignRunsitePublishIdempotencyState(
+                        commandKey,
+                        gm.UserId,
+                        idempotencyKey,
+                        requestSha256,
+                        published,
+                        now);
                 return published;
             });
         }
@@ -1338,7 +2198,8 @@ public sealed class CampaignCollaborationService
             EditedByUserId: state.EditedByUserId,
             BeforeSha256: state.BeforeSha256,
             AfterSha256: state.AfterSha256,
-            EditedAtUtc: state.EditedAtUtc);
+            EditedAtUtc: state.EditedAtUtc,
+            CurrentRevision: state.CurrentRevision ?? state.Revision);
 
     private static CampaignGmAuthorityUpdateReceipt ToGmAuthorityReceipt(CampaignGmAuthorityAuditState state)
         => new(
@@ -1450,12 +2311,425 @@ public sealed class CampaignCollaborationService
         => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, DigestJsonOptions)))
             .ToLowerInvariant();
 
+    private DelegatedGmCharacterProfile ReadCanonicalProfile(
+        DelegatedGmCharacterProfileReadCommand command)
+    {
+        DelegatedGmCharacterProfileReadResult? result;
+        try
+        {
+            result = _canonicalCharacterEdits.ReadCurrentProfile(command);
+        }
+        catch (Exception exception)
+        {
+            throw new CampaignCanonicalEditUnavailableException(exception);
+        }
+
+        if (result is null)
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        return result.Outcome switch
+        {
+            DelegatedGmCharacterProfileReadOutcome.Available =>
+                NormalizeCanonicalProfile(result.Profile),
+            DelegatedGmCharacterProfileReadOutcome.Denied =>
+                throw new CampaignCollaborationAccessDeniedException(
+                    "Core rejected the current GM character-read delegation."),
+            DelegatedGmCharacterProfileReadOutcome.Missing =>
+                throw new KeyNotFoundException("Unknown canonical character."),
+            _ => throw new CampaignCanonicalEditUnavailableException()
+        };
+    }
+
+    private DelegatedGmCharacterProfile NormalizeCanonicalProfile(
+        DelegatedGmCharacterProfile? profile)
+    {
+        try
+        {
+            if (profile is null || profile.Revision <= 0)
+            {
+                throw new InvalidDataException("canonical profile revision is missing");
+            }
+
+            string runnerHandle = NormalizeRequired(
+                profile.Alias,
+                "canonicalRunnerHandle",
+                MaxHandleLength);
+            string displayName = NormalizeRequired(
+                profile.Name,
+                "canonicalDisplayName",
+                MaxDisplayNameLength);
+            if (runnerHandle.Any(char.IsControl) || displayName.Any(char.IsControl))
+            {
+                throw new InvalidDataException("canonical profile contains unsupported controls");
+            }
+
+            return new DelegatedGmCharacterProfile(
+                profile.Revision,
+                displayName,
+                runnerHandle);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
+        {
+            throw new CampaignCanonicalEditUnavailableException(exception);
+        }
+    }
+
+    private CampaignPlayerSafeSheetProjection SynchronizeCanonicalProfileLocked(
+        string campaignId,
+        string dossierId,
+        DelegatedGmCharacterProfile profile,
+        bool canManage)
+    {
+        DelegatedGmCharacterProfile normalized = NormalizeCanonicalProfile(profile);
+        long projectedRevision = ResolveCurrentCharacterRevisionLocked(dossierId);
+        if (normalized.Revision < projectedRevision)
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        if (!_store.DossiersById.TryGetValue(dossierId, out RunnerDossierProjection? dossier))
+        {
+            throw new KeyNotFoundException("Unknown campaign sheet.");
+        }
+
+        bool requiresSync = normalized.Revision != projectedRevision
+            || !string.Equals(dossier.RunnerHandle, normalized.Alias, StringComparison.Ordinal)
+            || !string.Equals(dossier.DisplayName, normalized.Name, StringComparison.Ordinal);
+        if (requiresSync)
+        {
+            _store.ExecuteCampaignCollaborationTransactionLocked(() =>
+            {
+                ApplyCanonicalProfileToHubLocked(
+                    dossierId,
+                    normalized,
+                    _timeProvider.GetUtcNow());
+                return true;
+            });
+        }
+
+        if (!_store.CampaignSpinesById.TryGetValue(campaignId, out CampaignProjection? campaign))
+        {
+            throw new KeyNotFoundException("Unknown campaign.");
+        }
+
+        return BuildSharedSheetLocked(campaign, dossierId, canManage);
+    }
+
+    private void ApplyCanonicalProfileToHubLocked(
+        string dossierId,
+        DelegatedGmCharacterProfile profile,
+        DateTimeOffset recordedAtUtc)
+    {
+        DelegatedGmCharacterProfile normalized = NormalizeCanonicalProfile(profile);
+        long projectedRevision = ResolveCurrentCharacterRevisionLocked(dossierId);
+        if (normalized.Revision < projectedRevision
+            || !_store.DossiersById.TryGetValue(dossierId, out RunnerDossierProjection? dossier))
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        var latestBindings = _store.CampaignCharacterBindings
+            .Select(static (state, index) => (State: state, Index: index))
+            .Where(item => string.Equals(item.State.DossierId, dossierId, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(item => item.State.CampaignId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(static item => item.State.BindingRevision)
+                .ThenByDescending(static item => item.State.RecordedAtUtc)
+                .First())
+            .ToArray();
+        if (latestBindings.Length == 0
+            || latestBindings.Any(item => item.State.CurrentRevision > normalized.Revision))
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        bool profileChanged = !string.Equals(dossier.RunnerHandle, normalized.Alias, StringComparison.Ordinal)
+            || !string.Equals(dossier.DisplayName, normalized.Name, StringComparison.Ordinal);
+        bool revisionChanged = latestBindings.Any(item => item.State.CurrentRevision != normalized.Revision);
+        if (profileChanged || revisionChanged)
+        {
+            _store.DossiersById[dossierId] = dossier with
+            {
+                RunnerHandle = normalized.Alias,
+                DisplayName = normalized.Name,
+                UpdatedAtUtc = recordedAtUtc
+            };
+        }
+
+        foreach ((CampaignCharacterBindingState State, int Index) item in latestBindings)
+        {
+            if (item.State.CurrentRevision != normalized.Revision)
+            {
+                // Character projection freshness is not consent. Keep the exact
+                // owner-issued binding/version/revision and update only the
+                // mirrored canonical character revision.
+                _store.CampaignCharacterBindings[item.Index] = item.State with
+                {
+                    CurrentRevision = normalized.Revision
+                };
+            }
+
+            if (_store.CampaignSpinesById.TryGetValue(item.State.CampaignId, out CampaignProjection? campaign)
+                && (profileChanged || revisionChanged))
+            {
+                _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+                {
+                    UpdatedAtUtc = recordedAtUtc
+                };
+            }
+        }
+    }
+
+    private DelegatedGmCharacterEditAuditReceipt RequireCanonicalReceipt(
+        DelegatedGmCharacterEditCommand command,
+        DelegatedGmCharacterEditResult? result,
+        CampaignCharacterBindingState binding,
+        string campaignOwnerUserId)
+    {
+        if (result is null)
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        switch (result.Outcome)
+        {
+            case DelegatedGmCharacterEditOutcome.Denied:
+            case DelegatedGmCharacterEditOutcome.Forbidden:
+                throw new CampaignCollaborationAccessDeniedException(
+                    "Core rejected the current GM character-edit delegation.");
+            case DelegatedGmCharacterEditOutcome.Invalid:
+                throw new ArgumentException(
+                    "The requested GM edit is outside the canonical delegated character-edit contract.",
+                    nameof(command));
+            case DelegatedGmCharacterEditOutcome.Missing:
+                throw new KeyNotFoundException("Unknown canonical character.");
+            case DelegatedGmCharacterEditOutcome.Conflict:
+                throw new CampaignCanonicalEditConflictException(null);
+            case DelegatedGmCharacterEditOutcome.Corrupt:
+            case DelegatedGmCharacterEditOutcome.Unavailable:
+                throw new CampaignCanonicalEditUnavailableException();
+            case DelegatedGmCharacterEditOutcome.Applied:
+            case DelegatedGmCharacterEditOutcome.Replayed:
+                break;
+            default:
+                throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        DelegatedGmCharacterEditAuditReceipt? receipt = result.Receipt;
+        string expectedIdempotencySha256 = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(command.IdempotencyKey)))
+            .ToLowerInvariant();
+        string expectedCommandSha256 = ComputeCanonicalCommandSha256(command);
+        string expectedReceiptSeed = string.Join(
+            "\n",
+            expectedCommandSha256,
+            binding.BindingId,
+            binding.BindingVersionId,
+            expectedIdempotencySha256);
+        string expectedReceiptId = "gm-edit-" + ComputeCanonicalStringSha256(expectedReceiptSeed)[..24];
+        DelegatedGmCharacterEditAuditOperation[] expectedOperations =
+        [
+            BuildExpectedCanonicalAuditOperation(
+                DelegatedGmCharacterEditContract.ProfileAliasPath,
+                RequireCanonicalOperationValue(command, DelegatedGmCharacterEditContract.ProfileAliasPath)),
+            BuildExpectedCanonicalAuditOperation(
+                DelegatedGmCharacterEditContract.ProfileNamePath,
+                RequireCanonicalOperationValue(command, DelegatedGmCharacterEditContract.ProfileNamePath))
+        ];
+        DateTimeOffset observedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
+        if (receipt is null
+            || !string.Equals(receipt.Contract, DelegatedGmCharacterEditContract.Name, StringComparison.Ordinal)
+            || !string.Equals(receipt.ReceiptId, expectedReceiptId, StringComparison.Ordinal)
+            || !string.Equals(receipt.CampaignId, command.CampaignId, StringComparison.Ordinal)
+            || !string.Equals(receipt.DelegationId, binding.BindingId, StringComparison.Ordinal)
+            || !string.Equals(receipt.GrantedByCampaignOwnerId, campaignOwnerUserId, StringComparison.Ordinal)
+            || !string.Equals(
+                receipt.GrantedByCharacterOwnerId,
+                command.CharacterOwner.NormalizedValue,
+                StringComparison.Ordinal)
+            || !string.Equals(receipt.AuthorityReceiptId, binding.BindingVersionId, StringComparison.Ordinal)
+            || receipt.AuthorityRevision != binding.BindingRevision
+            || !string.Equals(receipt.ActorId, command.ActorId, StringComparison.Ordinal)
+            || !string.Equals(
+                receipt.ActorRole,
+                DelegatedGmCharacterEditContract.GameMasterRole,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                receipt.CharacterOwnerId,
+                command.CharacterOwner.NormalizedValue,
+                StringComparison.Ordinal)
+            || !string.Equals(receipt.CharacterId.Value, command.CharacterId.Value, StringComparison.Ordinal)
+            || !string.Equals(receipt.Reason, command.Reason, StringComparison.Ordinal)
+            || !string.Equals(receipt.IdempotencyKeySha256, expectedIdempotencySha256, StringComparison.Ordinal)
+            || !string.Equals(receipt.CommandSha256, expectedCommandSha256, StringComparison.Ordinal)
+            || receipt.PreviousRevision != command.ExpectedRevision
+            || receipt.NewRevision != command.ExpectedRevision + 1
+            || receipt.AppliedAtUtc == default
+            || receipt.AppliedAtUtc.ToUniversalTime() < binding.GrantedAtUtc.ToUniversalTime()
+            || receipt.AppliedAtUtc.ToUniversalTime() > observedAtUtc.AddMinutes(5)
+            || !CanonicalOperationsMatch(receipt.Operations, expectedOperations))
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        return receipt;
+    }
+
+    private static bool CanonicalOperationsMatch(
+        IReadOnlyList<DelegatedGmCharacterEditAuditOperation>? actual,
+        IReadOnlyList<DelegatedGmCharacterEditAuditOperation> expected)
+    {
+        if (actual is null || actual.Count != expected.Count)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < expected.Count; index++)
+        {
+            DelegatedGmCharacterEditAuditOperation actualOperation = actual[index];
+            DelegatedGmCharacterEditAuditOperation expectedOperation = expected[index];
+            if (actualOperation is null
+                || actualOperation.Operation != expectedOperation.Operation
+                || !string.Equals(actualOperation.Path, expectedOperation.Path, StringComparison.Ordinal)
+                || !string.Equals(actualOperation.ValueSha256, expectedOperation.ValueSha256, StringComparison.Ordinal)
+                || actualOperation.ValueLength != expectedOperation.ValueLength)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static DelegatedGmCharacterEditAuditOperation BuildExpectedCanonicalAuditOperation(
+        string path,
+        string value)
+        => new(
+            DelegatedGmCharacterPatchOperationKind.Replace,
+            path,
+            ComputeCanonicalStringSha256(value),
+            value.Length);
+
+    private static string RequireCanonicalOperationValue(
+        DelegatedGmCharacterEditCommand command,
+        string path)
+    {
+        DelegatedGmCharacterPatchOperation? operation = command.Operations.SingleOrDefault(item =>
+            item is not null && string.Equals(item.Path, path, StringComparison.Ordinal));
+        if (operation?.Value is null)
+        {
+            throw new CampaignCanonicalEditUnavailableException();
+        }
+
+        return operation.Value;
+    }
+
+    private static string ComputeCanonicalCommandSha256(DelegatedGmCharacterEditCommand command)
+    {
+        StringBuilder builder = new();
+        AppendCanonicalFingerprintField(builder, DelegatedGmCharacterEditContract.Name);
+        AppendCanonicalFingerprintField(builder, command.CampaignId.Trim());
+        AppendCanonicalFingerprintField(builder, command.ActorId.Trim());
+        AppendCanonicalFingerprintField(builder, command.CharacterOwner.NormalizedValue);
+        AppendCanonicalFingerprintField(builder, command.CharacterId.Value.Trim());
+        AppendCanonicalFingerprintField(
+            builder,
+            command.ExpectedRevision.ToString(CultureInfo.InvariantCulture));
+        AppendCanonicalFingerprintField(builder, command.Reason.Trim());
+        foreach (DelegatedGmCharacterPatchOperation operation in command.Operations
+                     .OrderBy(static item => item.Path?.Trim().ToLowerInvariant(), StringComparer.Ordinal))
+        {
+            AppendCanonicalFingerprintField(
+                builder,
+                ((int)operation.Operation).ToString(CultureInfo.InvariantCulture));
+            AppendCanonicalFingerprintField(builder, operation.Path.Trim().ToLowerInvariant());
+            AppendCanonicalFingerprintField(builder, operation.Value!);
+        }
+
+        return ComputeCanonicalStringSha256(builder.ToString());
+    }
+
+    private static void AppendCanonicalFingerprintField(StringBuilder builder, string value)
+    {
+        builder.Append(value.Length.ToString(CultureInfo.InvariantCulture))
+            .Append(':')
+            .Append(value)
+            .Append('\n');
+    }
+
+    private static string ComputeCanonicalStringSha256(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
+            .ToLowerInvariant();
+
+    private static string BuildCampaignWorkspaceId(string campaignId)
+        => $"workspace-{ComputeCanonicalStringSha256(campaignId)[..12]}";
+
     private static string ComputeCodeLookupSha256(string normalizedCode)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"campaign-code\0{normalizedCode}")))
             .ToLowerInvariant();
 
     private static string BuildCommandKey(string userId, string commandKind, string idempotencyKey)
         => $"{userId.Trim().ToLowerInvariant()}:{commandKind}:{idempotencyKey}";
+
+    private string ProtectInviteCreationResponse(
+        string userId,
+        string idempotencyKey,
+        CampaignInviteSecretProjection response)
+    {
+        var payload = new CampaignInviteSecretReplayPayload(
+            Version: 1,
+            UserId: userId,
+            IdempotencyKey: idempotencyKey,
+            CampaignId: response.CampaignId,
+            InviteId: response.InviteId,
+            LinkSecret: response.LinkSecret,
+            ShortCode: response.ShortCode);
+        return _inviteReplayProtector.Protect(JsonSerializer.Serialize(payload, DigestJsonOptions));
+    }
+
+    private CampaignInviteSecretProjection RestoreInviteCreationResponseLocked(
+        HubUserDto gm,
+        CampaignInviteCreationIdempotencyState replay)
+    {
+        CampaignInviteSecretReplayPayload? payload;
+        try
+        {
+            string json = _inviteReplayProtector.Unprotect(replay.ProtectedSecrets);
+            payload = JsonSerializer.Deserialize<CampaignInviteSecretReplayPayload>(json, DigestJsonOptions);
+        }
+        catch (Exception exception) when (exception is CryptographicException or JsonException)
+        {
+            throw new CampaignInviteReplayUnavailableException(exception);
+        }
+
+        if (payload is null
+            || payload.Version != 1
+            || !string.Equals(payload.UserId, gm.UserId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(payload.IdempotencyKey, replay.IdempotencyKey, StringComparison.Ordinal)
+            || !string.Equals(payload.CampaignId, replay.CampaignId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(payload.InviteId, replay.InviteId, StringComparison.OrdinalIgnoreCase)
+            || !_store.CampaignCollaborationInvitesById.TryGetValue(
+                replay.InviteId,
+                out CampaignCollaborationInviteState? invite)
+            || !string.Equals(invite.CampaignId, replay.CampaignId, StringComparison.OrdinalIgnoreCase)
+            || !SecretMatches(invite, "link", payload.LinkSecret)
+            || !SecretMatches(invite, "code", NormalizeShortCode(payload.ShortCode)))
+        {
+            throw new CampaignInviteReplayUnavailableException();
+        }
+
+        return new CampaignInviteSecretProjection(
+            InviteId: invite.InviteId,
+            CampaignId: invite.CampaignId,
+            JoinPath: $"/join/campaign/{invite.InviteId}#secret={payload.LinkSecret}",
+            LinkSecret: payload.LinkSecret,
+            ShortCode: payload.ShortCode,
+            ExpiresAtUtc: invite.ExpiresAtUtc,
+            MaxUses: invite.MaxUses,
+            CreatedAtUtc: invite.CreatedAtUtc);
+    }
 
     private static string NormalizeIdempotencyKey(string? value)
     {
@@ -1471,8 +2745,7 @@ public sealed class CampaignCollaborationService
     private void PruneInvitesLocked(DateTimeOffset now)
     {
         string[] expiredIds = _store.CampaignCollaborationInvitesById.Values
-            .Where(invite => invite.ExpiresAtUtc.Add(InviteRetention) <= now
-                || (invite.RevokedAtUtc is DateTimeOffset revokedAt && revokedAt.Add(InviteRetention) <= now))
+            .Where(invite => ShouldPruneInvite(invite, now))
             .Select(static invite => invite.InviteId)
             .ToArray();
         foreach (string inviteId in expiredIds)
@@ -1480,9 +2753,50 @@ public sealed class CampaignCollaborationService
             if (_store.CampaignCollaborationInvitesById.Remove(inviteId, out CampaignCollaborationInviteState? removed))
             {
                 _store.CampaignInviteIdByCodeLookupSha256.Remove(removed.ShortCodeLookupSha256);
+                string[] replayKeys = _store.CampaignInviteCreationsByIdempotencyKey.Values
+                    .Where(item => string.Equals(item.InviteId, inviteId, StringComparison.OrdinalIgnoreCase))
+                    .Select(static item => item.Key)
+                    .ToArray();
+                foreach (string replayKey in replayKeys)
+                {
+                    _store.CampaignInviteCreationsByIdempotencyKey.Remove(replayKey);
+                }
             }
         }
     }
+
+    private void PruneCampaignTeardownLedgerLocked(DateTimeOffset now)
+    {
+        string[] expiredKeys = _store.CampaignTeardownsByIdempotencyKey.Values
+            .Where(item => item.CreatedAtUtc.Add(CampaignTeardownRetention) <= now)
+            .OrderBy(static item => item.CreatedAtUtc)
+            .ThenBy(static item => item.Key, StringComparer.Ordinal)
+            .Select(static item => item.Key)
+            .ToArray();
+        foreach (string key in expiredKeys)
+        {
+            _store.CampaignTeardownsByIdempotencyKey.Remove(key);
+        }
+
+        int receiptsToRemove = Math.Max(
+            0,
+            _store.CampaignTeardownsByIdempotencyKey.Count - MaxCampaignTeardownReceipts + 1);
+        string[] oldestKeys = _store.CampaignTeardownsByIdempotencyKey.Values
+            .OrderBy(static item => item.CreatedAtUtc)
+            .ThenBy(static item => item.Key, StringComparer.Ordinal)
+            .Take(receiptsToRemove)
+            .Select(static item => item.Key)
+            .ToArray();
+        foreach (string key in oldestKeys)
+        {
+            _store.CampaignTeardownsByIdempotencyKey.Remove(key);
+        }
+    }
+
+    private static bool ShouldPruneInvite(CampaignCollaborationInviteState invite, DateTimeOffset now)
+        => invite.ExpiresAtUtc.Add(InviteRetention) <= now
+            || (invite.RevokedAtUtc is DateTimeOffset revokedAt
+                && revokedAt.Add(InviteRetention) <= now);
 
     private void EnsureInviteAttemptAllowedLocked(string userId, DateTimeOffset now)
     {
@@ -1756,7 +3070,8 @@ internal sealed record CampaignSharedSheetAuditState(
     string EditedByUserId,
     string BeforeSha256,
     string AfterSha256,
-    DateTimeOffset EditedAtUtc);
+    DateTimeOffset EditedAtUtc,
+    long? CurrentRevision = null);
 
 internal sealed record CampaignRedemptionIdempotencyState(
     string Key,
@@ -1764,6 +3079,49 @@ internal sealed record CampaignRedemptionIdempotencyState(
     string IdempotencyKey,
     string RequestSha256,
     CampaignInviteRedemptionProjection Response,
+    DateTimeOffset CreatedAtUtc);
+
+internal sealed record CampaignCreationIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    CampaignCollaborationProjection Response,
+    DateTimeOffset CreatedAtUtc);
+
+internal sealed record CampaignInviteCreationIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    string CampaignId,
+    string InviteId,
+    string ProtectedSecrets,
+    DateTimeOffset CreatedAtUtc);
+
+internal sealed record CampaignInviteSecretReplayPayload(
+    int Version,
+    string UserId,
+    string IdempotencyKey,
+    string CampaignId,
+    string InviteId,
+    string LinkSecret,
+    string ShortCode);
+
+internal sealed record CampaignRunsiteDraftIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    CampaignRunsiteDraftProjection Response,
+    DateTimeOffset CreatedAtUtc);
+
+internal sealed record CampaignRunsitePublishIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    CampaignRunsitePlayerProjection Response,
     DateTimeOffset CreatedAtUtc);
 
 internal sealed record CampaignSheetEditIdempotencyState(
@@ -1797,6 +3155,14 @@ internal sealed record CampaignGmAuthorityIdempotencyState(
     CampaignGmAuthorityUpdateReceipt Response,
     DateTimeOffset CreatedAtUtc);
 
+internal sealed record CampaignTeardownIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    CampaignTeardownReceipt Response,
+    DateTimeOffset CreatedAtUtc);
+
 internal sealed record CampaignInviteAttemptWindow(
     DateTimeOffset WindowStartedAtUtc,
     int Failures);
@@ -1823,15 +3189,25 @@ internal static class CampaignCollaborationStateValidator
         IReadOnlyList<CampaignCharacterBindingState> bindings,
         IReadOnlyList<CampaignSharedSheetAuditState> audit,
         IReadOnlyList<CampaignRunsiteState> runsites,
+        IReadOnlyList<CampaignCreationIdempotencyState> campaignCreations,
+        IReadOnlyList<CampaignInviteCreationIdempotencyState> inviteCreations,
+        IReadOnlyList<CampaignRunsiteDraftIdempotencyState> runsiteDraftCommands,
+        IReadOnlyList<CampaignRunsitePublishIdempotencyState> runsitePublishCommands,
         IReadOnlyList<CampaignRedemptionIdempotencyState> redemptions,
         IReadOnlyList<CampaignSheetEditIdempotencyState> edits,
         IReadOnlyList<CampaignGmAuthorityAuditState> gmAuthorityAudit,
         IReadOnlyList<CampaignGmAuthorityIdempotencyState> gmAuthorityCommands,
+        IReadOnlyList<CampaignTeardownIdempotencyState> teardowns,
         IReadOnlyList<RunnerDossierProjection> dossiers,
         IReadOnlyList<CampaignProjection> campaigns)
     {
         ArgumentNullException.ThrowIfNull(invites);
         ArgumentNullException.ThrowIfNull(bindings);
+        ArgumentNullException.ThrowIfNull(teardowns);
+        if (teardowns.Count > CampaignCollaborationService.MaxCampaignTeardownReceipts)
+        {
+            throw Invalid("campaign teardown replay ledger exceeds its deterministic bound");
+        }
         Dictionary<string, RunnerDossierProjection> dossiersById = dossiers
             .ToDictionary(static item => item.DossierId, StringComparer.OrdinalIgnoreCase);
         HashSet<string> campaignIds = campaigns
@@ -1935,7 +3311,9 @@ internal static class CampaignCollaborationStateValidator
             Required(item.EditedByUserId, nameof(item.EditedByUserId));
             HexDigest(item.BeforeSha256, nameof(item.BeforeSha256));
             HexDigest(item.AfterSha256, nameof(item.AfterSha256));
-            if (item.PreviousRevision < 1 || item.Revision != item.PreviousRevision + 1)
+            if (item.PreviousRevision < 1
+                || item.Revision != item.PreviousRevision + 1
+                || item.CurrentRevision is long currentRevision && currentRevision < item.Revision)
             {
                 throw Invalid("campaign sheet audit revision is invalid");
             }
@@ -1987,6 +3365,104 @@ internal static class CampaignCollaborationStateValidator
             }
         }
 
+        foreach (CampaignCreationIdempotencyState item in campaignCreations)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            CampaignCollaborationProjection response = item.Response
+                ?? throw Invalid("campaign creation idempotency response is missing");
+            Required(response.CampaignId, nameof(response.CampaignId));
+            Required(response.GroupId, nameof(response.GroupId));
+            Required(response.CrewId, nameof(response.CrewId));
+            Required(response.Name, nameof(response.Name), 160);
+            Required(response.Summary, nameof(response.Summary), MaxTextLength);
+            Required(response.Visibility, nameof(response.Visibility), 32);
+            Required(response.Role, nameof(response.Role), 32);
+            if (!campaignIds.Contains(response.CampaignId)
+                || !response.CanManage
+                || !string.Equals(response.Role, "gm_owner", StringComparison.Ordinal)
+                || response.RunIds.Count < 1)
+            {
+                throw Invalid("campaign creation idempotency response violates campaign-owner authority");
+            }
+        }
+
+        Dictionary<string, CampaignCollaborationInviteState> invitesById = invites
+            .ToDictionary(static item => item.InviteId, StringComparer.OrdinalIgnoreCase);
+        foreach (CampaignInviteCreationIdempotencyState item in inviteCreations)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            Required(item.CampaignId, nameof(item.CampaignId));
+            Required(item.InviteId, nameof(item.InviteId));
+            Required(item.ProtectedSecrets, nameof(item.ProtectedSecrets), MaxTextLength);
+            if (!campaignIds.Contains(item.CampaignId)
+                || !invitesById.TryGetValue(item.InviteId, out CampaignCollaborationInviteState? invite)
+                || !string.Equals(invite.CampaignId, item.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(invite.CreatedByUserId, item.UserId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw Invalid("campaign invite creation replay violates campaign-manager authority");
+            }
+        }
+
+        Dictionary<string, CampaignRunsiteState> runsitesByKey = runsites.ToDictionary(
+            static item => $"{item.CampaignId.ToLowerInvariant()}:{item.RunId.ToLowerInvariant()}",
+            StringComparer.Ordinal);
+        foreach (CampaignRunsiteDraftIdempotencyState item in runsiteDraftCommands)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            CampaignRunsiteDraftProjection response = item.Response
+                ?? throw Invalid("runsite draft idempotency response is missing");
+            Required(response.CampaignId, nameof(response.CampaignId));
+            Required(response.RunId, nameof(response.RunId));
+            Required(response.Title, nameof(response.Title), 160);
+            Required(response.Summary, nameof(response.Summary), MaxTextLength);
+            if (response.GmNotes is not null)
+            {
+                Required(response.GmNotes, nameof(response.GmNotes), MaxTextLength);
+            }
+
+            string runsiteKey = $"{response.CampaignId.ToLowerInvariant()}:{response.RunId.ToLowerInvariant()}";
+            if (!campaignIds.Contains(response.CampaignId)
+                || !runsitesByKey.TryGetValue(runsiteKey, out CampaignRunsiteState? current)
+                || response.Revision < 1
+                || response.Revision > current.Revision
+                || response.PlayerSections.Count > 64)
+            {
+                throw Invalid("runsite draft idempotency response violates campaign or revision authority");
+            }
+
+            foreach (RunsitePlayerSectionInput section in response.PlayerSections)
+            {
+                Required(section.Heading, nameof(section.Heading), 160);
+                Required(section.Body, nameof(section.Body), MaxTextLength);
+            }
+        }
+
+        foreach (CampaignRunsitePublishIdempotencyState item in runsitePublishCommands)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            CampaignRunsitePlayerProjection response = item.Response
+                ?? throw Invalid("runsite publish idempotency response is missing");
+            Required(response.CampaignId, nameof(response.CampaignId));
+            Required(response.RunId, nameof(response.RunId));
+            Required(response.Title, nameof(response.Title), 160);
+            Required(response.Summary, nameof(response.Summary), MaxTextLength);
+            string runsiteKey = $"{response.CampaignId.ToLowerInvariant()}:{response.RunId.ToLowerInvariant()}";
+            if (!campaignIds.Contains(response.CampaignId)
+                || !runsitesByKey.TryGetValue(runsiteKey, out CampaignRunsiteState? current)
+                || response.Revision < 1
+                || response.Revision > current.Revision
+                || response.Sections.Count > 64)
+            {
+                throw Invalid("runsite publish idempotency response violates campaign or revision authority");
+            }
+
+            foreach (RunsitePlayerSectionInput section in response.Sections)
+            {
+                Required(section.Heading, nameof(section.Heading), 160);
+                Required(section.Body, nameof(section.Body), MaxTextLength);
+            }
+        }
+
         foreach (CampaignRedemptionIdempotencyState item in redemptions)
         {
             ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
@@ -2026,7 +3502,8 @@ internal static class CampaignCollaborationStateValidator
             if (!string.Equals(response.IdempotencyKey, item.IdempotencyKey, StringComparison.Ordinal)
                 || !string.Equals(response.EditedByUserId, item.UserId, StringComparison.OrdinalIgnoreCase)
                 || response.PreviousRevision < 1
-                || response.Revision != response.PreviousRevision + 1)
+                || response.Revision != response.PreviousRevision + 1
+                || response.CurrentRevision is long currentRevision && currentRevision < response.Revision)
             {
                 throw Invalid("campaign sheet edit idempotency response is inconsistent");
             }
@@ -2071,6 +3548,44 @@ internal static class CampaignCollaborationStateValidator
                 || !string.Equals(dossier.OwnerUserId, item.UserId, StringComparison.OrdinalIgnoreCase))
             {
                 throw Invalid("GM authority idempotency response is inconsistent");
+            }
+        }
+
+        var teardownReceiptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (CampaignTeardownIdempotencyState item in teardowns)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            CampaignTeardownReceipt response = item.Response
+                ?? throw Invalid("campaign teardown idempotency response is missing");
+            Required(response.ReceiptId, nameof(response.ReceiptId));
+            Required(response.CampaignId, nameof(response.CampaignId));
+            HexDigest(response.CampaignNameSha256, nameof(response.CampaignNameSha256));
+            HexDigest(response.CleanupSha256, nameof(response.CleanupSha256));
+            CampaignTeardownCleanupCounts removed = response.Removed
+                ?? throw Invalid("campaign teardown cleanup counts are missing");
+            int[] nonNegativeCounts =
+            [
+                removed.Crews,
+                removed.Runs,
+                removed.Invites,
+                removed.InviteCodeIndexes,
+                removed.CharacterBindings,
+                removed.Runsites,
+                removed.CommandRecords,
+                removed.AuditRecords,
+                removed.UserGroupMemberships,
+                removed.RestoreProjections,
+                removed.WorkspacePrepLibrarySearchHistoryItems
+            ];
+            if (!teardownReceiptIds.Add(response.ReceiptId)
+                || campaignIds.Contains(response.CampaignId)
+                || removed.Campaigns != 1
+                || removed.Groups != 1
+                || nonNegativeCounts.Any(static count => count < 0)
+                || response.DeletedAtUtc != item.CreatedAtUtc
+                || response.DeletedAtUtc < response.PreviousUpdatedAtUtc)
+            {
+                throw Invalid("campaign teardown idempotency response is inconsistent");
             }
         }
     }
@@ -2163,11 +3678,40 @@ public sealed class CampaignRevisionConflictException : Exception
     public long CurrentRevision { get; }
 }
 
+public sealed class CampaignUpdatedAtConflictException : Exception
+{
+    public CampaignUpdatedAtConflictException(DateTimeOffset currentUpdatedAtUtc)
+        : base("The campaign changed after the teardown precondition was captured.")
+    {
+        CurrentUpdatedAtUtc = currentUpdatedAtUtc;
+    }
+
+    public DateTimeOffset CurrentUpdatedAtUtc { get; }
+}
+
+public sealed class CampaignTeardownConflictException : Exception
+{
+    public CampaignTeardownConflictException(string message)
+        : base(message)
+    {
+    }
+}
+
 public sealed class CampaignIdempotencyConflictException : Exception
 {
     public CampaignIdempotencyConflictException(
         string message = "The idempotency key was already used for a different campaign command.")
         : base(message)
+    {
+    }
+}
+
+public sealed class CampaignInviteReplayUnavailableException : Exception
+{
+    public CampaignInviteReplayUnavailableException(Exception? innerException = null)
+        : base(
+            "The protected invite replay is unavailable; no new invite was created.",
+            innerException)
     {
     }
 }
@@ -2181,6 +3725,29 @@ public sealed class CampaignBindingRevisionConflictException : Exception
     }
 
     public long CurrentBindingRevision { get; }
+}
+
+public sealed class CampaignCanonicalEditConflictException : Exception
+{
+    public CampaignCanonicalEditConflictException(long? currentRevision)
+        : base(currentRevision is > 0
+            ? $"The canonical character changed; current revision is {currentRevision}."
+            : "The canonical character changed before the GM edit could be applied.")
+    {
+        CurrentRevision = currentRevision;
+    }
+
+    public long? CurrentRevision { get; }
+}
+
+public sealed class CampaignCanonicalEditUnavailableException : Exception
+{
+    public CampaignCanonicalEditUnavailableException(Exception? innerException = null)
+        : base(
+            "Canonical character editing is temporarily unavailable; no campaign projection was changed.",
+            innerException)
+    {
+    }
 }
 
 public sealed class CampaignInviteThrottledException : Exception

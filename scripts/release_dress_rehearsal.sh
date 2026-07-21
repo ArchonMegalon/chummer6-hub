@@ -45,4 +45,5 @@ npx playwright test \
   public-responsive-gold.spec.ts \
   tests/public/ui-frame-integrity.spec.ts
 
-python3 scripts/ui_layout_exit_gate.py
+python3 scripts/ui_layout_exit_gate.py \
+  --completion-dir "$(dirname "$CHUMMER_UI_FRAME_RECEIPT_PATH")"

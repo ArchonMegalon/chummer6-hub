@@ -6,6 +6,11 @@ using Chummer.Run.Contracts.Community;
 
 namespace Chummer.Run.Api.Services.Community;
 
+public interface IHubUserProjectionSyncQueue
+{
+    void QueueSyncUser(HubUserDto user);
+}
+
 public sealed record TeableUserProjectionRow(
     string UserId,
     string SubjectId,
@@ -52,7 +57,7 @@ public sealed record TeableUserProjectionSyncResult(
     DateTimeOffset OccurredAtUtc,
     IReadOnlyList<string> Errors);
 
-public sealed class TeableUserProjectionService
+public sealed class TeableUserProjectionService : IHubUserProjectionSyncQueue
 {
     private const string HttpTimeoutSecondsConfigKey = "CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS";
     private static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(15);

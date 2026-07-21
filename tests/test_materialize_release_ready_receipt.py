@@ -329,6 +329,78 @@ def live_controller_result(
 
 
 class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
+    def test_campaign_preview_declaration_is_exact_and_preserves_raw_failure_truth(self) -> None:
+        module = load_module()
+        release_version = "run-20260728-050000"
+        scope_sha256 = "a" * 64
+        environment = {
+            module.CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV: release_version,
+            module.CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV: scope_sha256,
+            module.CAMPAIGN_PREVIEW_OWNER_ENV: "chummer-release-operations",
+            module.CAMPAIGN_PREVIEW_ACTIONS_ENV: json.dumps(
+                ["Close the bounded release-ready flagship gap."]
+            ),
+        }
+
+        declaration = module.campaign_operability_preview_declaration(
+            environment,
+            {"version": release_version},
+        )
+
+        self.assertEqual(
+            {
+                "bounded_owner",
+                "contract_name",
+                "contract_version",
+                "next_actions",
+                "release_scope_decision_sha256",
+                "release_version",
+                "status",
+            },
+            set(declaration or {}),
+        )
+        self.assertEqual("chummer.campaign_operability_preview_evidence", declaration["contract_name"])
+        self.assertEqual(2, declaration["contract_version"])
+        self.assertEqual("pass", declaration["status"])
+        payload: dict[str, object] = {
+            "status": "fail",
+            "verdict": "NOT_RELEASE_READY",
+            "failures": ["raw gate remains blocked"],
+        }
+        module.apply_campaign_operability_preview_declaration(payload, declaration)
+        self.assertEqual("fail", payload["status"])
+        self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+        self.assertEqual(["raw gate remains blocked"], payload["failures"])
+        self.assertEqual(declaration, payload["campaign_operability_preview"])
+
+    def test_campaign_preview_declaration_rejects_partial_or_unapproved_inputs(self) -> None:
+        module = load_module()
+        release_version = "run-20260728-050000"
+        valid = {
+            module.CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV: release_version,
+            module.CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV: "a" * 64,
+            module.CAMPAIGN_PREVIEW_OWNER_ENV: "chummer-release-operations",
+            module.CAMPAIGN_PREVIEW_ACTIONS_ENV: '["Close the bounded flagship gap."]',
+        }
+        with self.assertRaisesRegex(ValueError, "all-or-none"):
+            module.campaign_operability_preview_declaration(
+                {module.CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV: release_version},
+                {"version": release_version},
+            )
+        for name, value, expected in (
+            (module.CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV, "run-stale", "current release channel"),
+            (module.CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV, "A" * 64, "canonical SHA-256"),
+            (module.CAMPAIGN_PREVIEW_OWNER_ENV, "Release Operations", "unresolved"),
+            (module.CAMPAIGN_PREVIEW_ACTIONS_ENV, '["todo"]', "concrete canonical text"),
+        ):
+            mutated = dict(valid)
+            mutated[name] = value
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, expected):
+                module.campaign_operability_preview_declaration(
+                    mutated,
+                    {"version": release_version},
+                )
+
     def test_release_controller_outputs_and_binds_the_current_checkout(self) -> None:
         module = load_module()
 

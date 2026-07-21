@@ -1,0 +1,51 @@
+{
+  "fixture_contract": "chummer.design.campaign_operability_score_two_fixture/v1",
+  "source_receipt": {
+    "campaign_operability_preview": {
+      "bounded_owner": "owner_desktop_workbench",
+      "contract_name": "chummer.campaign_operability_preview_evidence",
+      "contract_version": 2,
+      "next_actions": [
+        "Close the bounded preview action for evidence_00."
+      ],
+      "release_scope_decision_sha256": "2eeeadbf76c3a0ce4de0dfebd5bc57e858d79e2cae4f52a6d722c2f3a051950a",
+      "release_version": "run-20260728-050000",
+      "status": "pass"
+    },
+    "generated_at_utc": "2026-07-20T20:00:00Z",
+    "status": "fail",
+    "verdict": "DESKTOP_VISUAL_NOT_READY"
+  },
+  "scorecard_row": {
+    "bounded_owner": "owner_desktop_workbench",
+    "failure": "evidence_00 is not passing",
+    "generated_at": "2026-07-20T20:00:00Z",
+    "id": "evidence_00",
+    "next_actions": [
+      "Close the bounded preview action for evidence_00."
+    ],
+    "path": "proof/evidence_00.json",
+    "preview_evidence": {
+      "proof": {
+        "bounded_owner": "owner_desktop_workbench",
+        "contract_name": "chummer.campaign_operability_preview_evidence",
+        "contract_version": 2,
+        "next_actions": [
+          "Close the bounded preview action for evidence_00."
+        ],
+        "release_scope_decision_sha256": "2eeeadbf76c3a0ce4de0dfebd5bc57e858d79e2cae4f52a6d722c2f3a051950a",
+        "release_version": "run-20260728-050000",
+        "status": "pass"
+      },
+      "proof_sha256": "54a2e623f5950bd07a8669026fd44340823ffc1cb5aced2cf26831d80afc4900",
+      "provenance_kind": "nested_declaration",
+      "source_receipt_sha256": "981310c58e1d9247de72ebc64225e3202b687e7f0757ee45a780cd1a778c3db7"
+    },
+    "preview_failure": "",
+    "score": 2,
+    "source_sha256": "981310c58e1d9247de72ebc64225e3202b687e7f0757ee45a780cd1a778c3db7",
+    "source_status": "fail",
+    "source_verdict": "DESKTOP_VISUAL_NOT_READY",
+    "status": "preview"
+  }
+}

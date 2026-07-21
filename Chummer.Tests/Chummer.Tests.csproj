@@ -33,6 +33,12 @@
              Condition="Exists('$(Pkgxunit_abstractions)\lib\netstandard2.0\xunit.abstractions.dll')"
              Link="xunit.abstractions.dll"
              CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\campaign_operability_score_two_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\campaign_operability_candidate_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\campaign_operability_cell_inventory.json"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutTestsOnly)' == 'true'">

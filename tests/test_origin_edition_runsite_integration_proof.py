@@ -112,6 +112,27 @@ def seed_ea_inventory(root: Path) -> Path:
     return root
 
 
+def seed_runsite_env(path: Path) -> Path:
+    write_text(
+        path,
+        "\n".join(
+            [
+                "RYBBIT_CHUMMER_RUN_SITE_ID=test-site",
+                "RYBBIT_CHUMMER_RUN_SCRIPT_URL=https://app.rybbit.io/api/script.js",
+                "RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN=https://app.rybbit.io",
+                "RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY=false",
+                "CHUMMER_EA_MAGICFIT_EMAIL=visual@example.test",
+                "CHUMMER_EA_MAGICFIT_PASSWORD=redacted-visual-password",
+                "MAGICAI_ACCOUNT_01_EMAIL=render@example.test",
+                "MAGICAI_ACCOUNT_01_PASSWORD=redacted-render-password",
+                "MAGICAI_ACCOUNT_01_API_KEY=redacted-render-key",
+                "",
+            ]
+        ),
+    )
+    return path
+
+
 def seed_evidence(root: Path, namespace: str = "origin.chummer.run/Varga/Mira/Kestrel") -> None:
     branch = root / namespace
     write_json(root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json", {"status": "pass"})
@@ -154,7 +175,13 @@ def test_runsite_integration_proof_passes_without_exposing_env_values(tmp_path: 
     ea_root = seed_ea_inventory(tmp_path / "ea")
     output = tmp_path / "runsite-proof.json"
 
-    result = module.materialize(REPO_ROOT, ea_root, tmp_path, output)
+    result = module.materialize(
+        REPO_ROOT,
+        ea_root,
+        tmp_path,
+        output,
+        runsite_env=seed_runsite_env(tmp_path / "runsite.env"),
+    )
 
     assert result["status"] == "pass"
     assert result["integrationEligible"] is True
@@ -209,7 +236,14 @@ def test_runsite_integration_proof_uses_origin_edition_context_namespace(tmp_pat
     )
     output = tmp_path / namespace / "runsite-integration-proof.receipt.json"
 
-    result = module.materialize(REPO_ROOT, ea_root, tmp_path, output, context)
+    result = module.materialize(
+        REPO_ROOT,
+        ea_root,
+        tmp_path,
+        output,
+        context,
+        runsite_env=seed_runsite_env(tmp_path / "runsite.env"),
+    )
 
     assert result["status"] == "pass"
     assert result["namespace"] == namespace
@@ -483,7 +517,13 @@ def test_runsite_integration_proof_reports_raw_provider_signals_separately_from_
         ),
     )
 
-    result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
+    result = module.materialize(
+        REPO_ROOT,
+        ea_root,
+        tmp_path,
+        tmp_path / "runsite-proof.json",
+        runsite_env=seed_runsite_env(tmp_path / "runsite.env"),
+    )
 
     assert result["inventoryInspection"]["newestProviderInventorySignals"]["unmixr"] is False
     assert "originGoldCapabilitySignals" in result["inventoryInspection"]
@@ -557,7 +597,13 @@ def test_runsite_integration_proof_reports_unmixr_accounts_missing_voice_ids_wit
         ),
     )
 
-    result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
+    result = module.materialize(
+        REPO_ROOT,
+        ea_root,
+        tmp_path,
+        tmp_path / "runsite-proof.json",
+        runsite_env=seed_runsite_env(tmp_path / "runsite.env"),
+    )
 
     inventory = result["inventoryInspection"]
     assert inventory["newestProviderInventorySignals"]["unmixr"] is True
@@ -579,7 +625,13 @@ def test_runsite_integration_proof_uses_configured_provider_tokens_for_capabilit
     write_text(ea_root / "LTDs.md", "| MemoirForge | owned |\n| VoiceForge | owned |\n")
     write_text(ea_root / ".env", "MEMOIRFORGE_ACCOUNT_EMAILS=one@example.test\nVOICEFORGE_API_KEY=redacted-test-key\n")
 
-    result = module.materialize(REPO_ROOT, ea_root, tmp_path, tmp_path / "runsite-proof.json")
+    result = module.materialize(
+        REPO_ROOT,
+        ea_root,
+        tmp_path,
+        tmp_path / "runsite-proof.json",
+        runsite_env=seed_runsite_env(tmp_path / "runsite.env"),
+    )
 
     signals = result["inventoryInspection"]["newestProviderInventorySignals"]
     capabilities = result["inventoryInspection"]["originGoldCapabilitySignals"]
