@@ -29,6 +29,36 @@ public sealed record ReleaseBundlePromotionResult(
     string? CompatibilityManifestSha256 = null,
     string? ExactIncomingDesktopScope = null);
 
+public sealed record ReleaseBundleStageResult(
+    string Version,
+    string Channel,
+    DateTimeOffset PublishedAt,
+    IReadOnlyList<string> CandidateArtifactIds,
+    string GenerationId,
+    string StageReceiptId,
+    DateTimeOffset StagedAtUtc,
+    string InventoryDigest,
+    string CanonicalManifestSha256,
+    string CompatibilityManifestSha256,
+    string TargetPointerSha256,
+    string? PreviousGenerationId,
+    string? PreviousPointerSha256,
+    string? ExactIncomingDesktopScope = null,
+    string? ProbeToken = null,
+    DateTimeOffset? ProbeTokenExpiresAtUtc = null);
+
+public sealed record ReleaseStagedActivationRequest(
+    string StageReceiptId,
+    string ExpectedAuthorityRevisionId,
+    string ExpectedSnapshotSha256,
+    string ExpectedDecisionSha256);
+
+public sealed record ReleaseStageProbeGrant(
+    string StageReceiptId,
+    string GenerationId,
+    string Token,
+    DateTimeOffset ExpiresAtUtc);
+
 public sealed record ReleasePromotionInstallClaim(
     string ArtifactId,
     string InstallDispatchUrl,
@@ -108,11 +138,15 @@ public sealed class ReleaseBundlePromotionService
     private const string LayoutMarkerContents = "chummer.release-shelf-layout/v1\n";
     private const string CurrentPointerSchema = "chummer.release-shelf.current/v1";
     private const string ActivationCandidateSchema = "chummer.release-shelf.activation-candidate/v1";
-    private const string PromotionLockName = ".release-shelf-promotion.lock";
+    private const string PromotionLockName = ReleaseShelfPromotionLock.FileName;
     private const string ActivationIntentName = ".release-shelf-activation-intent.json";
     private const string ActivationJournalDirectoryName = ".release-shelf-activation-journal";
     private const string ActivationJournalIntentName = "intent.json";
     private const string ActivationJournalOutcomeName = "outcome.json";
+    private const string StageJournalDirectoryName = ".release-shelf-stage-journal";
+    private const string StageProbeDirectoryName = ".release-shelf-stage-probes";
+    private const string StageReceiptSchema = "chummer.release-shelf.stage-receipt/v1";
+    private const string StageProbeSchema = "chummer.release-shelf.stage-probe/v1";
     private const string WriterPolicyName = ".release-shelf-writer-policy.json";
     private const string WriterPolicySchema = "chummer.release-shelf.writer-policy/v1";
     private const string WriterPolicyMode = "server-journal-v1";
@@ -123,6 +157,7 @@ public sealed class ReleaseBundlePromotionService
     private static readonly TimeSpan MaximumReleaseProofPublicationClockSkew = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan MaximumStartupSmokeAge = TimeSpan.FromDays(7);
     private static readonly TimeSpan MaximumStartupSmokeClockSkew = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StageProbeLifetime = TimeSpan.FromMinutes(10);
     private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
     private static readonly string[] RequiredDesktopPlatformHeadRidTuples =
@@ -181,6 +216,7 @@ public sealed class ReleaseBundlePromotionService
         StagedShelfValidated,
         ActivationIntentRecorded,
         GenerationDirectoryDurable,
+        StageReceiptDurable,
         GenerationPrepared,
         PointerPrepared,
         PointerActivated,
@@ -380,6 +416,132 @@ public sealed class ReleaseBundlePromotionService
     }
 
     /// <summary>
+    /// Seals an immutable release generation and a session-bound stage receipt without
+    /// changing the public current pointer. The returned probe credential is short-lived,
+    /// owner-only state and is never persisted in the upload-session receipt.
+    /// </summary>
+    public Task<ReleaseBundleStageResult> StageDirectoryAsync(
+        string bundleRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(bundleRoot))
+        {
+            throw new InvalidDataException("bundle root is required.");
+        }
+        if (!IsSafeGenerationId(sessionId))
+        {
+            throw new InvalidDataException("stage sessionId is not a traversal-safe opaque token.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        string downloadsRoot = ResolveDownloadsRoot();
+        EnsureDownloadsRootWritable(downloadsRoot);
+        ReleaseBundleStageResult durable = StagePreparedBundle(
+            bundleRoot,
+            downloadsRoot,
+            exactIncomingDesktopScope,
+            sessionId,
+            cancellationToken);
+        ReleaseStageProbeGrant grant = IssueStageProbe(durable.StageReceiptId, sessionId);
+        return Task.FromResult(durable with
+        {
+            ProbeToken = grant.Token,
+            ProbeTokenExpiresAtUtc = grant.ExpiresAtUtc
+        });
+    }
+
+    public ReleaseStageProbeGrant RenewStageProbe(
+        string stageReceiptId,
+        string sessionId)
+        => IssueStageProbe(stageReceiptId, sessionId);
+
+    internal bool TryCaptureStageProbe(
+        string? rawToken,
+        string? routeGenerationId,
+        out ReleaseShelfSnapshot? snapshot)
+    {
+        snapshot = null;
+        if (string.IsNullOrWhiteSpace(rawToken)
+            || rawToken.Length > 512
+            || rawToken.Any(static character => !char.IsAsciiLetterOrDigit(character)
+                && character is not '-' and not '_'))
+        {
+            return false;
+        }
+
+        string downloadsRoot = ResolveDownloadsRoot();
+        string tokenDigest = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+        string leasePath = Path.Combine(
+            downloadsRoot,
+            StageProbeDirectoryName,
+            $"{tokenDigest}.json");
+        try
+        {
+            StageProbeDocument lease = LoadStageProbe(leasePath);
+            if (!FixedTimeHexEquals(lease.TokenSha256, tokenDigest)
+                || lease.ExpiresAtUtc <= _timeProvider.GetUtcNow().ToUniversalTime()
+                || routeGenerationId is { Length: > 0 }
+                   && !string.Equals(routeGenerationId, lease.GenerationId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            StageReceiptDocument receipt = LoadStageReceipt(downloadsRoot, lease.StageReceiptId);
+            if (!string.Equals(receipt.GenerationId, lease.GenerationId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            snapshot = CaptureStagedSnapshot(receipt);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                           or IOException
+                                           or UnauthorizedAccessException
+                                           or JsonException
+                                           or FormatException)
+        {
+            return false;
+        }
+    }
+
+    internal ReleaseShelfSnapshot CaptureStagedSnapshot(string stageReceiptId)
+        => CaptureStagedSnapshot(LoadStageReceipt(ResolveDownloadsRoot(), stageReceiptId));
+
+    internal ReleaseShelfSnapshot CaptureStagedSnapshot(
+        string stageReceiptId,
+        out string? expectedPredecessorPointerSha256)
+    {
+        StageReceiptDocument receipt = LoadStageReceipt(
+            ResolveDownloadsRoot(),
+            stageReceiptId);
+        expectedPredecessorPointerSha256 = receipt.PreviousPointerSha256;
+        return CaptureStagedSnapshot(receipt);
+    }
+
+    public Task<ReleaseBundlePromotionResult> ActivateStagedGenerationAsync(
+        ReleaseStagedActivationRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        string downloadsRoot = ResolveDownloadsRoot();
+        EnsureDownloadsRootWritable(downloadsRoot);
+        using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        StageReceiptDocument receipt = LoadStageReceipt(downloadsRoot, request.StageReceiptId);
+        ReleaseShelfSnapshot targetShelf = CaptureStagedSnapshot(receipt);
+        ValidateStagedAuthorityClosure(targetShelf, request);
+        return Task.FromResult(CommitStagedActivationUnderLock(
+            downloadsRoot,
+            receipt,
+            targetShelf,
+            cancellationToken));
+    }
+
+    /// <summary>
     /// Performs the one-time legacy-to-layout-v1 cutover during host startup. The
     /// legacy shelf is treated as the prepared Registry bundle and enters the same
     /// durable server-journal transaction as an HTTP upload; no second upload is
@@ -409,6 +571,7 @@ public sealed class ReleaseBundlePromotionService
         if (!snapshot.IsLegacy)
         {
             using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+            ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
             EnsureServerWriterPolicy(downloadsRoot);
             return null;
         }
@@ -497,6 +660,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         string activePath = Path.Combine(downloadsRoot, ActivationIntentName);
         ReleaseActivationJournalDocument? active = File.Exists(activePath)
@@ -874,6 +1038,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
     }
@@ -894,6 +1059,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         EnsureNoUnresolvedActivationIntent(downloadsRoot);
         ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
@@ -1056,6 +1222,203 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
+    private ReleaseBundleStageResult StagePreparedBundle(
+        string bundleRoot,
+        string downloadsRoot,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        string sessionId,
+        CancellationToken cancellationToken)
+    {
+        exactIncomingDesktopScope?.ValidateCanonical();
+        PreparedReleaseBundle prepared = PrepareBundle(bundleRoot, exactIncomingDesktopScope);
+        using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
+        EnsureServerWriterPolicy(downloadsRoot);
+        EnsureNoUnresolvedActivationIntent(downloadsRoot);
+        ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
+        JsonObject? existingCanonicalManifest = File.Exists(
+                Path.Combine(activeShelf.PhysicalRoot, CanonicalManifestName))
+            ? LoadJsonObject(Path.Combine(activeShelf.PhysicalRoot, CanonicalManifestName))
+            : null;
+        ValidateNoDesktopInstallTupleRegression(
+            existingCanonicalManifest,
+            prepared.CanonicalManifest,
+            exactIncomingDesktopScope);
+
+        DateTimeOffset stagedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
+        string generationId = ResolveIncomingStagedGenerationId(
+            prepared.CanonicalManifest,
+            prepared.CompatibilityManifestObject,
+            sessionId,
+            prepared.CompatibilityManifest);
+        string transactionRoot = Path.Combine(
+            downloadsRoot,
+            $".release-stage-transaction-{Guid.NewGuid():N}");
+        string stagedRoot = Path.Combine(transactionRoot, "generation");
+        string generationsRoot = Path.Combine(downloadsRoot, GenerationsDirectoryName);
+        string generationRoot = Path.Combine(generationsRoot, generationId);
+        try
+        {
+            PrepareStagedShelf(
+                stagedRoot,
+                activeShelf,
+                prepared.FilesRoot,
+                prepared.StartupSmokeRoot,
+                prepared.SigningRoot,
+                prepared.ProofRoot,
+                prepared.ReleaseEvidenceRoot,
+                prepared.AurPackagesPath,
+                prepared.CompatibilityManifest,
+                prepared.CompatibilityManifestObject,
+                prepared.CanonicalManifest,
+                generationId,
+                cancellationToken);
+            ValidatePreparedArtifactDeliveryContracts(stagedRoot, generationId);
+
+            string compatibilityPath = Path.Combine(stagedRoot, CompatibilityManifestName);
+            string canonicalPath = Path.Combine(stagedRoot, CanonicalManifestName);
+            string compatibilitySha256 = Sha256For(compatibilityPath);
+            string canonicalSha256 = Sha256For(canonicalPath);
+            PublicReleaseManifestDto publicManifest = ValidatePublicShelfCoherence(
+                stagedRoot,
+                compatibilityPath,
+                canonicalPath,
+                prepared.PromotedArtifactIds,
+                generationId,
+                compatibilitySha256,
+                canonicalSha256,
+                exactIncomingDesktopScope);
+            IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(stagedRoot);
+            string inventoryDigest = ComputeInventoryDigest(inventory);
+            string candidatePath = Path.Combine(stagedRoot, ActivationCandidateName);
+            WriteJsonFile(
+                candidatePath,
+                new ActivationCandidateDocument(
+                    ActivationCandidateSchema,
+                    generationId,
+                    publicManifest.Version,
+                    publicManifest.Channel,
+                    FormatTimestamp(publicManifest.PublishedAt),
+                    BuildManifestBindings(generationId, stagedRoot),
+                    $"sha256:{inventoryDigest}",
+                    inventory));
+
+            string stageReceiptId = BuildStageReceiptId(sessionId, generationId, inventoryDigest);
+            string candidateSha256 = Sha256For(candidatePath);
+            if (TryLoadStageReceipt(downloadsRoot, stageReceiptId, out StageReceiptDocument? existingReceipt)
+                && existingReceipt is not null)
+            {
+                ValidateExistingStageReceiptMatchesPrepared(
+                    existingReceipt,
+                    sessionId,
+                    generationId,
+                    publicManifest,
+                    inventoryDigest,
+                    canonicalSha256,
+                    compatibilitySha256,
+                    candidateSha256,
+                    prepared.PromotedArtifactIds,
+                    exactIncomingDesktopScope);
+                CurrentPointerDocument existingTargetPointer = DeserializeStageTargetPointer(
+                    existingReceipt);
+                EnsureExistingGenerationMatchesStaged(
+                    generationRoot,
+                    stagedRoot,
+                    existingTargetPointer,
+                    inventory,
+                    prepared.PromotedArtifactIds,
+                    exactIncomingDesktopScope);
+                return BuildStageResult(existingReceipt);
+            }
+            string activationReceiptId = BuildPreparedActivationReceiptId(stageReceiptId, inventoryDigest);
+            CurrentPointerDocument targetPointer = BuildCurrentPointer(
+                generationId,
+                activationReceiptId,
+                stagedAtUtc,
+                publicManifest,
+                stagedRoot,
+                inventoryDigest);
+            ValidatePreparedGeneration(
+                stagedRoot,
+                targetPointer,
+                inventory,
+                prepared.PromotedArtifactIds,
+                exactIncomingDesktopScope);
+            FlushTreeDurably(stagedRoot);
+            NotifyCheckpoint(PromotionCheckpoint.StagedShelfValidated);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Directory.CreateDirectory(generationsRoot);
+            if (Directory.Exists(generationRoot) || File.Exists(generationRoot))
+            {
+                EnsureExistingGenerationMatchesStaged(
+                    generationRoot,
+                    stagedRoot,
+                    targetPointer,
+                    inventory,
+                    prepared.PromotedArtifactIds,
+                    exactIncomingDesktopScope);
+            }
+            else
+            {
+                Directory.Move(stagedRoot, generationRoot);
+                MakeGenerationReadOnly(generationRoot);
+                FlushDirectoryDurably(generationsRoot);
+                NotifyCheckpoint(PromotionCheckpoint.GenerationDirectoryDurable);
+                NotifyCheckpoint(PromotionCheckpoint.GenerationPrepared);
+            }
+
+            byte[]? previousPointerBytes = ReadRegularFileBytesOrNull(
+                Path.Combine(downloadsRoot, CurrentPointerName),
+                "release shelf current pointer");
+            string? previousPointerSha256 = Sha256BindingForBytes(previousPointerBytes);
+            string? expectedPreviousPointerSha256 = string.IsNullOrWhiteSpace(activeShelf.PointerDigest)
+                ? null
+                : $"sha256:{activeShelf.PointerDigest}";
+            if (!string.Equals(
+                    previousPointerSha256,
+                    expectedPreviousPointerSha256,
+                    StringComparison.Ordinal))
+            {
+                throw new ReleaseShelfMutationConcurrencyException(
+                    "public release shelf changed while sealing the staged generation.");
+            }
+
+            byte[] targetPointerBytes = SerializeCurrentPointer(targetPointer);
+            string targetPointerSha256 = Convert.ToHexStringLower(
+                SHA256.HashData(targetPointerBytes));
+            var receipt = new StageReceiptDocument(
+                StageReceiptSchema,
+                stageReceiptId,
+                sessionId,
+                generationId,
+                publicManifest.Version,
+                publicManifest.Channel,
+                publicManifest.PublishedAt.ToUniversalTime(),
+                stagedAtUtc,
+                activationReceiptId,
+                activeShelf.GenerationId,
+                previousPointerSha256,
+                previousPointerBytes is null ? null : Convert.ToBase64String(previousPointerBytes),
+                targetPointerSha256,
+                Convert.ToBase64String(targetPointerBytes),
+                $"sha256:{inventoryDigest}",
+                canonicalSha256,
+                compatibilitySha256,
+                candidateSha256,
+                prepared.PromotedArtifactIds.OrderBy(static id => id, StringComparer.Ordinal).ToArray(),
+                exactIncomingDesktopScope?.ToTransport());
+            PersistStageReceiptIdempotently(downloadsRoot, receipt);
+            NotifyCheckpoint(PromotionCheckpoint.StageReceiptDurable);
+
+            return BuildStageResult(receipt);
+        }
+        finally
+        {
+            TryDeletePromotionTransaction(transactionRoot);
+        }
+    }
+
     private Task<ReleaseBundlePromotionResult> PromotePreparedBundleAsync(
         string bundleRoot,
         string downloadsRoot,
@@ -1077,6 +1440,7 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<string> promotedArtifactIds = prepared.PromotedArtifactIds;
 
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         EnsureNoUnresolvedActivationIntent(downloadsRoot);
         ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
@@ -1091,7 +1455,10 @@ public sealed class ReleaseBundlePromotionService
             incomingCanonicalManifest,
             exactIncomingDesktopScope);
         DateTimeOffset activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
-        string generationId = NewGenerationId(activatedAt);
+        string generationId = ResolveIncomingGenerationId(
+            incomingCanonicalManifest,
+            incomingCompatibilityManifestObject,
+            activatedAt);
         string activationReceiptId = $"activation-{Guid.NewGuid():N}";
         string transactionRoot = Path.Combine(downloadsRoot, $".release-promotion-transaction-{Guid.NewGuid():N}");
         string stagedRoot = Path.Combine(transactionRoot, "generation");
@@ -1430,42 +1797,7 @@ public sealed class ReleaseBundlePromotionService
     }
 
     private static FileStream AcquirePromotionLock(string downloadsRoot)
-    {
-        string lockPath = Path.Combine(downloadsRoot, PromotionLockName);
-        try
-        {
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.OpenOrCreate,
-                Access = FileAccess.ReadWrite,
-                Share = FileShare.None
-            };
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            FileStream promotionLock = new(lockPath, options);
-            try
-            {
-                if (!OperatingSystem.IsWindows())
-                {
-                    File.SetUnixFileMode(lockPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-                }
-
-                return promotionLock;
-            }
-            catch
-            {
-                promotionLock.Dispose();
-                throw;
-            }
-        }
-        catch (IOException ex)
-        {
-            throw new InvalidOperationException("another release bundle promotion is already in progress.", ex);
-        }
-    }
+        => ReleaseShelfPromotionLock.Acquire(downloadsRoot);
 
     private static void EnsureServerWriterPolicy(string downloadsRoot)
     {
@@ -2579,6 +2911,104 @@ public sealed class ReleaseBundlePromotionService
             activationReceiptId);
     }
 
+    private static byte[] SerializeCurrentPointer(CurrentPointerDocument pointer)
+    {
+        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(pointer, JsonOptions);
+        byte[] terminated = new byte[payload.Length + 1];
+        payload.CopyTo(terminated, 0);
+        terminated[^1] = (byte)'\n';
+        return terminated;
+    }
+
+    private static string ResolveIncomingStagedGenerationId(
+        JsonObject canonicalManifest,
+        JsonObject compatibilityManifest,
+        string sessionId,
+        PublicReleaseManifestDto manifest)
+    {
+        bool canonicalDeclared = canonicalManifest.ContainsKey("generationId");
+        bool compatibilityDeclared = compatibilityManifest.ContainsKey("generationId");
+        if (canonicalDeclared || compatibilityDeclared)
+        {
+            return ResolveIncomingGenerationId(
+                canonicalManifest,
+                compatibilityManifest,
+                manifest.PublishedAt);
+        }
+
+        string binding = string.Join(
+            '\n',
+            sessionId,
+            manifest.Version,
+            manifest.Channel,
+            FormatTimestamp(manifest.PublishedAt));
+        string digest = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
+        return $"gen-stage-{digest[..32]}";
+    }
+
+    private static string BuildStageReceiptId(
+        string sessionId,
+        string generationId,
+        string inventoryDigest)
+    {
+        string binding = $"{sessionId}\n{generationId}\n{inventoryDigest}";
+        string digest = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
+        return $"stage-{digest[..32]}";
+    }
+
+    private static string BuildPreparedActivationReceiptId(
+        string stageReceiptId,
+        string inventoryDigest)
+    {
+        string digest = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"prepared-activation\n{stageReceiptId}\n{inventoryDigest}")));
+        return $"activation-{digest[..32]}";
+    }
+
+    private void EnsureExistingGenerationMatchesStaged(
+        string generationRoot,
+        string stagedRoot,
+        CurrentPointerDocument pointer,
+        IReadOnlyList<ActivationInventoryEntry> expectedInventory,
+        IReadOnlyList<string> artifactIds,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
+    {
+        if (!Directory.Exists(generationRoot) || File.Exists(generationRoot))
+        {
+            throw new InvalidOperationException(
+                $"release shelf generation ID has already been used: {pointer.GenerationId}");
+        }
+
+        CurrentPointerDocument existingPointer = pointer with
+        {
+            Manifests = BuildManifestBindings(pointer.GenerationId, generationRoot)
+        };
+        ValidatePreparedGeneration(
+            generationRoot,
+            existingPointer,
+            expectedInventory,
+            artifactIds,
+            exactIncomingDesktopScope);
+        foreach (string name in new[]
+                 {
+                     ActivationCandidateName,
+                     CanonicalManifestName,
+                     CompatibilityManifestName
+                 })
+        {
+            if (!FixedTimeHexEquals(
+                    Sha256For(Path.Combine(generationRoot, name)),
+                    Sha256For(Path.Combine(stagedRoot, name))))
+            {
+                throw new ReleaseShelfMutationConcurrencyException(
+                    $"staged generation ID '{pointer.GenerationId}' is already bound to different immutable bytes.");
+            }
+        }
+    }
+
     private static CurrentManifestBindings BuildManifestBindings(string generationId, string generationRoot)
         => new(
             new CurrentManifestBinding(
@@ -2685,6 +3115,47 @@ public sealed class ReleaseBundlePromotionService
 
     private static string NewGenerationId(DateTimeOffset instant)
         => $"gen-{instant.ToUniversalTime():yyyyMMdd'T'HHmmss'Z'}-{Guid.NewGuid().ToString("N")[..16]}";
+
+    internal static string ResolveIncomingGenerationId(
+        JsonObject canonicalManifest,
+        JsonObject compatibilityManifest,
+        DateTimeOffset fallbackInstant)
+    {
+        ArgumentNullException.ThrowIfNull(canonicalManifest);
+        ArgumentNullException.ThrowIfNull(compatibilityManifest);
+
+        bool canonicalDeclared = canonicalManifest.TryGetPropertyValue(
+            "generationId",
+            out JsonNode? canonicalGenerationIdNode);
+        bool compatibilityDeclared = compatibilityManifest.TryGetPropertyValue(
+            "generationId",
+            out JsonNode? compatibilityGenerationIdNode);
+        if (!canonicalDeclared && !compatibilityDeclared)
+        {
+            return NewGenerationId(fallbackInstant);
+        }
+
+        if (!canonicalDeclared
+            || !compatibilityDeclared
+            || canonicalGenerationIdNode is not JsonValue canonicalGenerationIdValue
+            || compatibilityGenerationIdNode is not JsonValue compatibilityGenerationIdValue
+            || !canonicalGenerationIdValue.TryGetValue(out string? canonicalGenerationId)
+            || !compatibilityGenerationIdValue.TryGetValue(out string? compatibilityGenerationId)
+            || string.IsNullOrWhiteSpace(canonicalGenerationId)
+            || string.IsNullOrWhiteSpace(compatibilityGenerationId)
+            || !string.Equals(
+                canonicalGenerationId,
+                compatibilityGenerationId,
+                StringComparison.Ordinal)
+            || !IsSafeGenerationId(canonicalGenerationId))
+        {
+            throw new InvalidDataException(
+                "incoming canonical and compatibility manifests must either both omit generationId " +
+                "or declare the same traversal-safe opaque generationId.");
+        }
+
+        return canonicalGenerationId!;
+    }
 
     private static bool IsSafeGenerationId(string? value)
         => value is { Length: > 0 and <= 128 }
@@ -3071,6 +3542,544 @@ public sealed class ReleaseBundlePromotionService
         {
             TryDeleteFile(tempPath);
         }
+    }
+
+    private void PersistStageReceiptIdempotently(
+        string downloadsRoot,
+        StageReceiptDocument receipt)
+    {
+        ValidateStageReceipt(receipt);
+        string receiptRoot = Path.Combine(downloadsRoot, StageJournalDirectoryName);
+        EnsureOwnerOnlyDirectory(receiptRoot);
+        string path = Path.Combine(receiptRoot, $"{receipt.StageReceiptId}.json");
+        if (File.Exists(path))
+        {
+            StageReceiptDocument existing = LoadStageReceipt(downloadsRoot, receipt.StageReceiptId);
+            if (!CryptographicOperations.FixedTimeEquals(
+                    SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(existing, JsonOptions)),
+                    SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(receipt, JsonOptions))))
+            {
+                throw new ReleaseShelfMutationConcurrencyException(
+                    "stage receipt identifier is already bound to different immutable bytes.");
+            }
+            FlushDirectoryDurably(receiptRoot);
+            return;
+        }
+
+        WriteOwnerOnlyJsonAtomicallyDurable(path, receipt, overwrite: false);
+    }
+
+    private bool TryLoadStageReceipt(
+        string downloadsRoot,
+        string stageReceiptId,
+        out StageReceiptDocument? receipt)
+    {
+        receipt = null;
+        string path = Path.Combine(
+            downloadsRoot,
+            StageJournalDirectoryName,
+            $"{stageReceiptId}.json");
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+        receipt = LoadStageReceipt(downloadsRoot, stageReceiptId);
+        return true;
+    }
+
+    private static void ValidateExistingStageReceiptMatchesPrepared(
+        StageReceiptDocument receipt,
+        string sessionId,
+        string generationId,
+        PublicReleaseManifestDto manifest,
+        string inventoryDigest,
+        string canonicalManifestSha256,
+        string compatibilityManifestSha256,
+        string candidateSha256,
+        IReadOnlyCollection<string> candidateArtifactIds,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
+    {
+        string[] expectedArtifactIds = candidateArtifactIds
+            .OrderBy(static id => id, StringComparer.Ordinal)
+            .ToArray();
+        string? expectedScope = exactIncomingDesktopScope?.ToTransport();
+        if (!string.Equals(receipt.SessionId, sessionId, StringComparison.Ordinal)
+            || !string.Equals(receipt.GenerationId, generationId, StringComparison.Ordinal)
+            || !string.Equals(receipt.ReleaseVersion, manifest.Version, StringComparison.Ordinal)
+            || !string.Equals(receipt.Channel, manifest.Channel, StringComparison.Ordinal)
+            || receipt.PublishedAt != manifest.PublishedAt.ToUniversalTime()
+            || !string.Equals(receipt.InventoryDigest, $"sha256:{inventoryDigest}", StringComparison.Ordinal)
+            || !FixedTimeHexEquals(receipt.CanonicalManifestSha256, canonicalManifestSha256)
+            || !FixedTimeHexEquals(receipt.CompatibilityManifestSha256, compatibilityManifestSha256)
+            || !FixedTimeHexEquals(receipt.CandidateSha256, candidateSha256)
+            || !receipt.CandidateArtifactIds.SequenceEqual(expectedArtifactIds, StringComparer.Ordinal)
+            || !string.Equals(receipt.ExactIncomingDesktopScope, expectedScope, StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "existing stage receipt does not match the exact reconstructed candidate bytes.");
+        }
+    }
+
+    private static CurrentPointerDocument DeserializeStageTargetPointer(
+        StageReceiptDocument receipt)
+    {
+        byte[] pointerBytes = Convert.FromBase64String(receipt.TargetPointerBase64);
+        CurrentPointerDocument pointer = JsonSerializer.Deserialize<CurrentPointerDocument>(
+                pointerBytes,
+                JsonOptions)
+            ?? throw new InvalidDataException("stage receipt target pointer is malformed.");
+        if (!string.Equals(pointer.GenerationId, receipt.GenerationId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "stage receipt target pointer disagrees with the staged generation.");
+        }
+        return pointer;
+    }
+
+    private static ReleaseBundleStageResult BuildStageResult(StageReceiptDocument receipt)
+        => new(
+            receipt.ReleaseVersion,
+            receipt.Channel,
+            receipt.PublishedAt,
+            receipt.CandidateArtifactIds,
+            receipt.GenerationId,
+            receipt.StageReceiptId,
+            receipt.StagedAtUtc,
+            receipt.InventoryDigest,
+            receipt.CanonicalManifestSha256,
+            receipt.CompatibilityManifestSha256,
+            receipt.TargetPointerSha256,
+            receipt.PreviousGenerationId,
+            receipt.PreviousPointerSha256,
+            receipt.ExactIncomingDesktopScope);
+
+    private StageReceiptDocument LoadStageReceipt(
+        string downloadsRoot,
+        string stageReceiptId)
+    {
+        if (!IsSafeGenerationId(stageReceiptId)
+            || !stageReceiptId.StartsWith("stage-", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("stage receipt id is not a safe canonical token.");
+        }
+
+        string receiptRoot = Path.Combine(downloadsRoot, StageJournalDirectoryName);
+        string path = Path.Combine(receiptRoot, $"{stageReceiptId}.json");
+        EnsureOwnerOnlyRegularFile(path, "release stage receipt");
+        var info = new FileInfo(path);
+        if (info.Length is < 1 or > 1024 * 1024)
+        {
+            throw new InvalidDataException("release stage receipt has an invalid size.");
+        }
+        StageReceiptDocument receipt = JsonSerializer.Deserialize<StageReceiptDocument>(
+                File.ReadAllBytes(path),
+                JsonOptions)
+            ?? throw new InvalidDataException("release stage receipt is malformed.");
+        ValidateStageReceipt(receipt);
+        if (!string.Equals(receipt.StageReceiptId, stageReceiptId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("release stage receipt identity disagrees with its path.");
+        }
+        return receipt;
+    }
+
+    private static void ValidateStageReceipt(StageReceiptDocument receipt)
+    {
+        if (!string.Equals(receipt.SchemaVersion, StageReceiptSchema, StringComparison.Ordinal)
+            || !IsSafeGenerationId(receipt.StageReceiptId)
+            || !receipt.StageReceiptId.StartsWith("stage-", StringComparison.Ordinal)
+            || !IsSafeGenerationId(receipt.SessionId)
+            || !IsSafeGenerationId(receipt.GenerationId)
+            || !IsSafeGenerationId(receipt.PreparedActivationReceiptId)
+            || receipt.PreviousGenerationId is not null
+               && !IsSafeGenerationId(receipt.PreviousGenerationId)
+            || string.IsNullOrWhiteSpace(receipt.ReleaseVersion)
+            || string.IsNullOrWhiteSpace(receipt.Channel)
+            || receipt.PublishedAt.Offset != TimeSpan.Zero
+            || receipt.StagedAtUtc.Offset != TimeSpan.Zero
+            || !IsSha256Binding(receipt.InventoryDigest)
+            || !IsBareLowerSha256(receipt.CanonicalManifestSha256)
+            || !IsBareLowerSha256(receipt.CompatibilityManifestSha256)
+            || !IsBareLowerSha256(receipt.CandidateSha256)
+            || !IsBareLowerSha256(receipt.TargetPointerSha256)
+            || (receipt.PreviousGenerationId is null) != (receipt.PreviousPointerSha256 is null)
+            || receipt.PreviousPointerSha256 is not null
+               && !IsSha256Binding(receipt.PreviousPointerSha256)
+            || receipt.CandidateArtifactIds.Count == 0
+            || receipt.CandidateArtifactIds.Any(static id => !IsSafeGenerationId(id))
+            || receipt.CandidateArtifactIds.Distinct(StringComparer.Ordinal).Count()
+               != receipt.CandidateArtifactIds.Count)
+        {
+            throw new InvalidDataException("release stage receipt contract is invalid.");
+        }
+        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(receipt.ExactIncomingDesktopScope);
+
+        byte[] targetBytes;
+        byte[]? previousBytes;
+        try
+        {
+            targetBytes = Convert.FromBase64String(receipt.TargetPointerBase64);
+            previousBytes = receipt.PreviousPointerBase64 is null
+                ? null
+                : Convert.FromBase64String(receipt.PreviousPointerBase64);
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidDataException("release stage receipt pointer bytes are malformed.", exception);
+        }
+        if (!string.Equals(Convert.ToBase64String(targetBytes), receipt.TargetPointerBase64, StringComparison.Ordinal)
+            || !FixedTimeHexEquals(
+                Convert.ToHexStringLower(SHA256.HashData(targetBytes)),
+                receipt.TargetPointerSha256)
+            || (previousBytes is null) != (receipt.PreviousPointerSha256 is null)
+            || !string.Equals(
+                Sha256BindingForBytes(previousBytes),
+                receipt.PreviousPointerSha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("release stage receipt pointer binding is invalid.");
+        }
+    }
+
+    private ReleaseStageProbeGrant IssueStageProbe(
+        string stageReceiptId,
+        string sessionId)
+    {
+        string downloadsRoot = ResolveDownloadsRoot();
+        StageReceiptDocument receipt = LoadStageReceipt(downloadsRoot, stageReceiptId);
+        if (!string.Equals(receipt.SessionId, sessionId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("stage probe request does not match its upload session.");
+        }
+
+        byte[] secret = RandomNumberGenerator.GetBytes(32);
+        string token = Convert.ToBase64String(secret)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        string tokenSha256 = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        DateTimeOffset expiresAtUtc = _timeProvider.GetUtcNow()
+            .ToUniversalTime()
+            .Add(StageProbeLifetime);
+        var lease = new StageProbeDocument(
+            StageProbeSchema,
+            stageReceiptId,
+            receipt.GenerationId,
+            tokenSha256,
+            expiresAtUtc);
+        string probeRoot = Path.Combine(downloadsRoot, StageProbeDirectoryName);
+        EnsureOwnerOnlyDirectory(probeRoot);
+        WriteOwnerOnlyJsonAtomicallyDurable(
+            Path.Combine(probeRoot, $"{tokenSha256}.json"),
+            lease,
+            overwrite: false);
+        return new ReleaseStageProbeGrant(
+            stageReceiptId,
+            receipt.GenerationId,
+            token,
+            expiresAtUtc);
+    }
+
+    private static StageProbeDocument LoadStageProbe(string path)
+    {
+        EnsureOwnerOnlyRegularFile(path, "release stage probe lease");
+        var info = new FileInfo(path);
+        if (info.Length is < 1 or > 64 * 1024)
+        {
+            throw new InvalidDataException("release stage probe lease has an invalid size.");
+        }
+        StageProbeDocument lease = JsonSerializer.Deserialize<StageProbeDocument>(
+                File.ReadAllBytes(path),
+                JsonOptions)
+            ?? throw new InvalidDataException("release stage probe lease is malformed.");
+        if (!string.Equals(lease.SchemaVersion, StageProbeSchema, StringComparison.Ordinal)
+            || !IsSafeGenerationId(lease.StageReceiptId)
+            || !IsSafeGenerationId(lease.GenerationId)
+            || !IsBareLowerSha256(lease.TokenSha256)
+            || lease.ExpiresAtUtc.Offset != TimeSpan.Zero)
+        {
+            throw new InvalidDataException("release stage probe lease contract is invalid.");
+        }
+        return lease;
+    }
+
+    private ReleaseShelfSnapshot CaptureStagedSnapshot(StageReceiptDocument receipt)
+    {
+        ValidateStageReceipt(receipt);
+        return new ReleaseShelfGenerationStore(_configuration)
+            .CaptureStagedGenerationForProbe(
+                receipt.GenerationId,
+                receipt.TargetPointerBase64,
+                receipt.TargetPointerSha256,
+                receipt.CandidateSha256);
+    }
+
+    private static void ValidateStagedAuthorityClosure(
+        ReleaseShelfSnapshot targetShelf,
+        ReleaseStagedActivationRequest request)
+    {
+        ReleaseAuthorityEnvelopeBytes revision =
+            ReleaseAuthorityRevisionStore.TryResolveCommittedRevision(targetShelf)
+            ?? throw new InvalidDataException(
+                "staged release activation requires a committed preview authority revision.");
+        if (string.IsNullOrWhiteSpace(request.ExpectedAuthorityRevisionId)
+            || !string.Equals(
+                revision.RevisionId,
+                request.ExpectedAuthorityRevisionId,
+                StringComparison.Ordinal)
+            || !IsBareLowerSha256(request.ExpectedSnapshotSha256)
+            || !IsBareLowerSha256(request.ExpectedDecisionSha256)
+            || !FixedTimeHexEquals(
+                Convert.ToHexStringLower(SHA256.HashData(revision.SnapshotBytes)),
+                request.ExpectedSnapshotSha256)
+            || !FixedTimeHexEquals(
+                Convert.ToHexStringLower(SHA256.HashData(revision.DecisionBytes)),
+                request.ExpectedDecisionSha256)
+            || revision.ScorecardSha256 is null
+            || revision.ConvergenceSha256 is null)
+        {
+            throw new InvalidDataException(
+                "staged release activation authority closure does not match the committed successor.");
+        }
+    }
+
+    private ReleaseBundlePromotionResult CommitStagedActivationUnderLock(
+        string downloadsRoot,
+        StageReceiptDocument receipt,
+        ReleaseShelfSnapshot targetShelf,
+        CancellationToken cancellationToken)
+    {
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
+        EnsureServerWriterPolicy(downloadsRoot);
+        ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
+        byte[]? currentPointerBytes = ReadRegularFileBytesOrNull(
+            Path.Combine(downloadsRoot, CurrentPointerName),
+            "release shelf current pointer");
+        string? currentPointerSha256 = Sha256BindingForBytes(currentPointerBytes);
+        string targetPointerBinding = $"sha256:{receipt.TargetPointerSha256}";
+        ReleaseActivationIntent intent = BuildStagedActivationIntent(receipt);
+        ReleaseBundlePromotionResult result = BuildStagedPromotionResult(receipt, targetShelf);
+
+        if (string.Equals(currentPointerSha256, targetPointerBinding, StringComparison.Ordinal))
+        {
+            ReleaseActivationJournalDocument journal = LoadActivationHistoryJournal(
+                downloadsRoot,
+                receipt.PreparedActivationReceiptId);
+            if (journal.Intent != intent)
+            {
+                throw new InvalidDataException(
+                    "staged activation target is visible with different immutable journal history.");
+            }
+            ReleaseActivationOutcomeDocument? outcome = TryLoadActivationOutcome(downloadsRoot, journal);
+            if (outcome is null)
+            {
+                ConfirmActivationDirectoryDurability(downloadsRoot, intent);
+                ResolveActivationIntentDurably(downloadsRoot, journal, state: "committed");
+            }
+            else if (!string.Equals(outcome.State, "committed", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "staged activation target is visible with an aborted journal outcome.");
+            }
+            AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
+            return result;
+        }
+
+        if (!string.Equals(
+                currentPointerSha256,
+                receipt.PreviousPointerSha256,
+                StringComparison.Ordinal)
+            || !BytesEqual(
+                currentPointerBytes,
+                DecodeOptionalPointerBytes(receipt.PreviousPointerBase64)))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "public release shelf no longer matches the staged generation predecessor.");
+        }
+        if (!string.Equals(activeShelf.GenerationId, receipt.PreviousGenerationId, StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "public release generation changed before staged activation.");
+        }
+
+        string receiptRoot = ActivationJournalReceiptRoot(
+            downloadsRoot,
+            receipt.PreparedActivationReceiptId);
+        if (Directory.Exists(receiptRoot) || File.Exists(receiptRoot))
+        {
+            ReleaseActivationJournalDocument prior = LoadActivationHistoryJournal(
+                downloadsRoot,
+                receipt.PreparedActivationReceiptId);
+            ReleaseActivationOutcomeDocument? priorOutcome = TryLoadActivationOutcome(downloadsRoot, prior);
+            if (prior.Intent == intent
+                && priorOutcome is not null
+                && string.Equals(priorOutcome.State, "aborted", StringComparison.Ordinal))
+            {
+                throw new ReleaseActivationAbortedException(
+                    intent,
+                    new InvalidOperationException(
+                        "the prepared staged activation was durably aborted and must be restaged."));
+            }
+            throw new InvalidDataException(
+                "staged activation receipt has conflicting immutable history.");
+        }
+
+        string? pointerTempPath = null;
+        bool pointerActivated = false;
+        bool activationPrepared = false;
+        try
+        {
+            pointerTempPath = PrepareExactCurrentPointerFile(
+                downloadsRoot,
+                Convert.FromBase64String(receipt.TargetPointerBase64));
+            PrepareActivationIntentDurably(downloadsRoot, intent, pointerTempPath);
+            activationPrepared = true;
+            NotifyCheckpoint(PromotionCheckpoint.PointerPrepared);
+            cancellationToken.ThrowIfCancellationRequested();
+            ActivateCurrentPointer(pointerTempPath, Path.Combine(downloadsRoot, CurrentPointerName));
+            pointerTempPath = null;
+            pointerActivated = true;
+            ConfirmActivationDirectoryDurability(downloadsRoot, intent);
+            AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
+            if (activeShelf.IsLegacy)
+            {
+                TryCreateLayoutMarkerAfterActivation(downloadsRoot);
+            }
+            NotifyPostActivationCheckpoint(PromotionCheckpoint.PointerActivated);
+            TryUpdateCompatibilityMirrors(targetShelf.PhysicalRoot, downloadsRoot);
+            NotifyPostActivationCheckpoint(PromotionCheckpoint.CompatibilityMirrorsUpdated);
+            return result;
+        }
+        catch (Exception exception)
+        {
+            if (exception is ReleaseActivationProcessTerminationSimulationException)
+            {
+                throw;
+            }
+            if (!pointerActivated && activationPrepared)
+            {
+                try
+                {
+                    AbortPreparedActivationIntent(downloadsRoot, intent);
+                }
+                catch (Exception recovery)
+                {
+                    throw new ReleaseActivationOutcomeUnknownException(
+                        intent,
+                        new AggregateException(exception, recovery));
+                }
+                throw new ReleaseActivationAbortedException(intent, exception);
+            }
+            if (pointerActivated)
+            {
+                throw new ReleaseActivationOutcomeUnknownException(intent, exception);
+            }
+            throw;
+        }
+        finally
+        {
+            if (pointerTempPath is not null)
+            {
+                TryDeleteFile(pointerTempPath);
+            }
+        }
+    }
+
+    private ReleaseActivationIntent BuildStagedActivationIntent(StageReceiptDocument receipt)
+        => new(
+            "promotion",
+            receipt.PreviousGenerationId,
+            receipt.PreviousPointerSha256,
+            receipt.GenerationId,
+            receipt.PreparedActivationReceiptId,
+            receipt.ReleaseVersion,
+            receipt.Channel,
+            receipt.PublishedAt,
+            receipt.InventoryDigest,
+            $"sha256:{receipt.TargetPointerSha256}",
+            receipt.StagedAtUtc,
+            receipt.PreviousPointerBase64,
+            receipt.TargetPointerBase64,
+            receipt.ExactIncomingDesktopScope);
+
+    private ReleaseBundlePromotionResult BuildStagedPromotionResult(
+        StageReceiptDocument receipt,
+        ReleaseShelfSnapshot targetShelf)
+    {
+        PublicReleaseManifestDto manifest = LoadCompatibilityManifest(
+            Path.Combine(targetShelf.PhysicalRoot, CompatibilityManifestName));
+        string baseUrl = ResolvePublicBaseUrl();
+        Dictionary<string, PublicReleaseArtifactDto> byId = manifest.Downloads
+            .ToDictionary(static artifact => artifact.Id, StringComparer.OrdinalIgnoreCase);
+        PublicReleaseArtifactDto[] artifacts = receipt.CandidateArtifactIds
+            .Select(id => byId.TryGetValue(id, out PublicReleaseArtifactDto? artifact)
+                ? artifact
+                : throw new InvalidDataException(
+                    $"staged activation artifact '{id}' is missing from its immutable manifest."))
+            .ToArray();
+        return new ReleaseBundlePromotionResult(
+            receipt.ReleaseVersion,
+            receipt.Channel,
+            receipt.PublishedAt,
+            receipt.CandidateArtifactIds,
+            $"{baseUrl}/downloads/",
+            artifacts.Select(artifact => BuildGenerationArtifactUrl(
+                    baseUrl,
+                    receipt.GenerationId,
+                    artifact))
+                .ToArray(),
+            artifacts.Select(artifact => BuildGenerationArtifactUrl(
+                    baseUrl,
+                    receipt.GenerationId,
+                    artifact))
+                .ToArray(),
+            GenerationId: receipt.GenerationId,
+            ActivationReceiptId: receipt.PreparedActivationReceiptId,
+            ActivatedAt: receipt.StagedAtUtc,
+            InventoryDigest: receipt.InventoryDigest,
+            CanonicalManifestSha256: receipt.CanonicalManifestSha256,
+            CompatibilityManifestSha256: receipt.CompatibilityManifestSha256,
+            ExactIncomingDesktopScope: receipt.ExactIncomingDesktopScope);
+    }
+
+    private static string PrepareExactCurrentPointerFile(
+        string downloadsRoot,
+        byte[] pointerBytes)
+    {
+        string path = Path.Combine(
+            downloadsRoot,
+            $".{CurrentPointerName}.{Guid.NewGuid():N}.tmp");
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+            Options = FileOptions.WriteThrough
+        };
+        using (var stream = new FileStream(path, options))
+        {
+            stream.Write(pointerBytes);
+            stream.Flush(flushToDisk: true);
+        }
+        FlushDirectoryDurably(downloadsRoot);
+        return path;
+    }
+
+    private static bool IsBareLowerSha256(string? value)
+        => value is { Length: 64 }
+           && value.All(static character => character is >= '0' and <= '9'
+               or >= 'a' and <= 'f');
+
+    private static bool FixedTimeHexEquals(string? left, string? right)
+    {
+        if (!IsBareLowerSha256(left) || !IsBareLowerSha256(right))
+        {
+            return false;
+        }
+        return CryptographicOperations.FixedTimeEquals(
+            Convert.FromHexString(left!),
+            Convert.FromHexString(right!));
     }
 
     private static void EnsureNoUnresolvedActivationIntent(string downloadsRoot)
@@ -8239,6 +9248,35 @@ public sealed class ReleaseBundlePromotionService
     private sealed record ReleaseShelfWriterPolicyDocument(
         string SchemaVersion,
         string Mode);
+
+    private sealed record StageReceiptDocument(
+        string SchemaVersion,
+        string StageReceiptId,
+        string SessionId,
+        string GenerationId,
+        string ReleaseVersion,
+        string Channel,
+        DateTimeOffset PublishedAt,
+        DateTimeOffset StagedAtUtc,
+        string PreparedActivationReceiptId,
+        string? PreviousGenerationId,
+        string? PreviousPointerSha256,
+        string? PreviousPointerBase64,
+        string TargetPointerSha256,
+        string TargetPointerBase64,
+        string InventoryDigest,
+        string CanonicalManifestSha256,
+        string CompatibilityManifestSha256,
+        string CandidateSha256,
+        IReadOnlyList<string> CandidateArtifactIds,
+        string? ExactIncomingDesktopScope);
+
+    private sealed record StageProbeDocument(
+        string SchemaVersion,
+        string StageReceiptId,
+        string GenerationId,
+        string TokenSha256,
+        DateTimeOffset ExpiresAtUtc);
 
     private sealed record CurrentManifestBinding(
         string Path,

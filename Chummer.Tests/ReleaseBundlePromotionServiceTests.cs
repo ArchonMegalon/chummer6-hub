@@ -18,6 +18,198 @@ public sealed class ReleaseBundlePromotionServiceTests
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
+    public void IncomingGenerationIdentityUsesExactSharedCandidateDeclaration()
+    {
+        var canonical = new JsonObject { ["generationId"] = "gen-run-20260720-abcdef0123456789" };
+        var compatibility = new JsonObject { ["generationId"] = "gen-run-20260720-abcdef0123456789" };
+
+        string resolved = ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+            canonical,
+            compatibility,
+            DateTimeOffset.Parse("2026-07-20T20:00:00Z"));
+
+        Assert.Equal("gen-run-20260720-abcdef0123456789", resolved);
+    }
+
+    [Fact]
+    public void IncomingGenerationIdentityKeepsLegacyServerGeneratedFallbackWhenBothOmitIt()
+    {
+        string resolved = ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+            new JsonObject(),
+            new JsonObject(),
+            DateTimeOffset.Parse("2026-07-20T20:00:00Z"));
+
+        Assert.StartsWith("gen-20260720T200000Z-", resolved, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("gen-shared", null)]
+    [InlineData(null, "gen-shared")]
+    [InlineData("gen-one", "gen-two")]
+    [InlineData("../escape", "../escape")]
+    [InlineData("gen..escape", "gen..escape")]
+    public void IncomingGenerationIdentityRejectsPartialContradictoryOrUnsafeDeclarations(
+        string? canonicalGenerationId,
+        string? compatibilityGenerationId)
+    {
+        var canonical = new JsonObject();
+        var compatibility = new JsonObject();
+        if (canonicalGenerationId is not null)
+        {
+            canonical["generationId"] = canonicalGenerationId;
+        }
+        if (compatibilityGenerationId is not null)
+        {
+            compatibility["generationId"] = compatibilityGenerationId;
+        }
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+                canonical,
+                compatibility,
+                DateTimeOffset.Parse("2026-07-20T20:00:00Z")));
+    }
+
+    [Theory]
+    [InlineData("{\"generationId\":123}", "{\"generationId\":123}")]
+    [InlineData("{\"generationId\":true}", "{\"generationId\":true}")]
+    [InlineData("{\"generationId\":null}", "{\"generationId\":null}")]
+    [InlineData("{\"generationId\":\"\"}", "{}")]
+    [InlineData("{\"generationId\":\"\"}", "{\"generationId\":\"\"}")]
+    [InlineData("{\"generationId\":\" \"}", "{\"generationId\":\" \"}")]
+    public void IncomingGenerationIdentityRejectsPresentInvalidJsonDeclarations(
+        string canonicalJson,
+        string compatibilityJson)
+    {
+        JsonObject canonical = JsonNode.Parse(canonicalJson)!.AsObject();
+        JsonObject compatibility = JsonNode.Parse(compatibilityJson)!.AsObject();
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ResolveIncomingGenerationId(
+                canonical,
+                compatibility,
+                DateTimeOffset.Parse("2026-07-20T20:00:00Z")));
+    }
+
+    [Fact]
+    public async Task StagingSealsGenerationWithoutChangingCurrentAndProbeIsCredentialBound()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-staged-no-early-current",
+            RequiredPreviewArtifacts());
+        string sessionId = Guid.NewGuid().ToString("N");
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(bundle, sessionId);
+
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+        Assert.True(Directory.Exists(Path.Combine(
+            fixture.DownloadsRoot,
+            "generations",
+            staged.GenerationId)));
+        Assert.NotNull(staged.ProbeToken);
+        Assert.True(fixture.TryCaptureStageProbe(
+            staged.ProbeToken,
+            staged.GenerationId,
+            out ReleaseShelfSnapshot? snapshot));
+        Assert.Equal(staged.GenerationId, snapshot!.GenerationId);
+        Assert.False(fixture.TryCaptureStageProbe(
+            "invalid-stage-probe-token",
+            staged.GenerationId,
+            out _));
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+    }
+
+    [Fact]
+    public async Task StagingRetryRecoversMoveBeforeReceiptWithoutPublishingCurrent()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-staged-move-recovery",
+            RequiredPreviewArtifacts());
+        string sessionId = Guid.NewGuid().ToString("N");
+        bool failed = false;
+
+        await Assert.ThrowsAsync<IOException>(() => fixture.StageAsync(
+            bundle,
+            sessionId,
+            checkpoint =>
+            {
+                if (!failed
+                    && checkpoint == ReleaseBundlePromotionService.PromotionCheckpoint.GenerationDirectoryDurable)
+                {
+                    failed = true;
+                    throw new IOException("simulated process loss after immutable generation move");
+                }
+            }));
+
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+        ReleaseBundleStageResult recovered = await fixture.StageAsync(bundle, sessionId);
+        ReleaseBundleStageResult replayed = await fixture.StageAsync(bundle, sessionId);
+        Assert.Equal(recovered.StageReceiptId, replayed.StageReceiptId);
+        Assert.Equal(recovered.GenerationId, replayed.GenerationId);
+        Assert.Equal(recovered.TargetPointerSha256, replayed.TargetPointerSha256);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+    }
+
+    [Fact]
+    public async Task StagingRetryReturnsExactReceiptAfterReceiptDurableBeforeSessionMark()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-staged-receipt-recovery",
+            RequiredPreviewArtifacts());
+        string sessionId = Guid.NewGuid().ToString("N");
+        DateTimeOffset firstInstant = DateTimeOffset.Parse("2026-07-21T01:00:00Z");
+        bool failed = false;
+
+        await Assert.ThrowsAsync<IOException>(() => fixture.StageAsync(
+            bundle,
+            sessionId,
+            checkpoint =>
+            {
+                if (!failed
+                    && checkpoint == ReleaseBundlePromotionService.PromotionCheckpoint.StageReceiptDurable)
+                {
+                    failed = true;
+                    throw new IOException("simulated process loss before upload session MarkStaged");
+                }
+            },
+            evaluationInstant: firstInstant));
+
+        ReleaseBundleStageResult recovered = await fixture.StageAsync(
+            bundle,
+            sessionId,
+            evaluationInstant: firstInstant.AddMinutes(5));
+
+        Assert.Equal(firstInstant, recovered.StagedAtUtc);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+        Assert.True(fixture.TryCaptureStageProbe(
+            recovered.ProbeToken,
+            recovered.GenerationId,
+            out ReleaseShelfSnapshot? snapshot,
+            evaluationInstant: firstInstant.AddMinutes(5)));
+        Assert.Equal(recovered.GenerationId, snapshot!.GenerationId);
+    }
+
+    private static IReadOnlyList<BundleArtifact> RequiredPreviewArtifacts()
+        =>
+        [
+            new(
+                "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
+                "chummer-avalonia-linux-x64-installer.deb", "linux-stage"u8.ToArray(),
+                false, false, "not_applicable", "not_applicable"),
+            new(
+                "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
+                "chummer-avalonia-win-x64-installer.exe", "windows-stage"u8.ToArray(),
+                false, false, "skipped_preview", "not_applicable"),
+            new(
+                "avalonia-osx-arm64-installer", "avalonia", "macos", "arm64", "dmg",
+                "chummer-avalonia-osx-arm64-installer.dmg", "mac-stage"u8.ToArray(),
+                false, false, "skipped_preview", "skipped_preview")
+        ];
+
+    [Fact]
     public void RegistryGenerationProjectionMatchesCrossLanguageGoldenBytes()
     {
         const string source = """
@@ -3395,6 +3587,44 @@ public sealed class ReleaseBundlePromotionServiceTests
 
             await using FileStream stream = File.OpenRead(bundlePath);
             return await service.PromoteAsync(Path.GetFileName(bundlePath), stream, cancellationToken);
+        }
+
+        public Task<ReleaseBundleStageResult> StageAsync(
+            string bundlePath,
+            string sessionId,
+            Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
+            ReleaseDesktopTupleScope? exactDesktopScope = null,
+            DateTimeOffset? evaluationInstant = null)
+        {
+            string extractRoot = Path.Combine(_root, "stage-" + Guid.NewGuid().ToString("N"));
+            ZipFile.ExtractToDirectory(bundlePath, extractRoot);
+            var service = new ReleaseBundlePromotionService(
+                CreateConfiguration(initialMigrationAllowed: true),
+                NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint,
+                new FixedTimeProvider(evaluationInstant ?? ReadBundlePublishedAt(bundlePath)),
+                PrivacyLaunchGate.ClearForTests);
+            return service.StageDirectoryAsync(
+                extractRoot,
+                exactDesktopScope,
+                sessionId,
+                CancellationToken.None);
+        }
+
+        public bool TryCaptureStageProbe(
+            string? token,
+            string? routeGenerationId,
+            out ReleaseShelfSnapshot? snapshot,
+            DateTimeOffset? evaluationInstant = null)
+        {
+            var service = new ReleaseBundlePromotionService(
+                CreateConfiguration(initialMigrationAllowed: true),
+                NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint: null,
+                new FixedTimeProvider(
+                    evaluationInstant ?? DateTimeOffset.Parse("2026-07-17T20:00:00Z")),
+                PrivacyLaunchGate.ClearForTests);
+            return service.TryCaptureStageProbe(token, routeGenerationId, out snapshot);
         }
 
         public async Task<ReleaseBundlePromotionResult> PromoteDirectoryWithActivationCallbackAsync(

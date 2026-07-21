@@ -2,10 +2,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+
+
+CONTRACT_NAME = "chummer.release_upload_response_truth"
+SCHEMA_VERSION = "chummer.release-upload-response-truth/v2"
+SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
+BARE_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
+SAFE_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+SAFE_ARTIFACT_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,67 +31,193 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path} did not contain a JSON object")
+def sha256_bytes(content: bytes) -> str:
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError("JSON input contains duplicate object keys")
+        payload[key] = value
     return payload
 
 
-def normalize_text(value: Any) -> str:
-    return str(value or "").strip()
+def load_json(path: Path) -> tuple[dict[str, Any], str]:
+    content = path.read_bytes()
+    payload = json.loads(content.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
+    if not isinstance(payload, dict):
+        raise ValueError("JSON input did not contain an object")
+    return payload, sha256_bytes(content)
 
 
-def normalize_token(value: Any) -> str:
-    return normalize_text(value).lower()
-
-
-def normalize_iso(value: Any) -> str:
-    raw = normalize_text(value)
-    if not raw:
+def _required_canonical_text(
+    payload: dict[str, Any],
+    key: str,
+    source: str,
+    *,
+    failures: list[str],
+    pattern: re.Pattern[str] = SAFE_ID_PATTERN,
+) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not pattern.fullmatch(value) or ".." in value:
+        failures.append(f"{source} {key} is missing or noncanonical")
         return ""
-    if raw.endswith("Z"):
-        raw = raw[:-1] + "+00:00"
+    return value
+
+
+def _required_timestamp(
+    payload: dict[str, Any],
+    key: str,
+    source: str,
+    *,
+    failures: list[str],
+) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value or value != value.strip():
+        failures.append(f"{source} {key} is missing or noncanonical")
+        return ""
+    raw = value[:-1] + "+00:00" if value.endswith("Z") else value
     try:
         parsed = datetime.fromisoformat(raw)
     except ValueError:
-        return normalize_text(value)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        failures.append(f"{source} {key} is not a valid ISO-8601 timestamp")
+        return ""
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        failures.append(f"{source} {key} must include a UTC offset")
+        return ""
     return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def manifest_view(payload: dict[str, Any]) -> dict[str, str]:
+def manifest_view(
+    payload: dict[str, Any],
+    *,
+    source: str,
+    channel_key: str,
+    failures: list[str],
+) -> dict[str, str]:
     return {
-        "version": normalize_text(payload.get("version")),
-        "channel": normalize_text(payload.get("channelId") or payload.get("channel")),
-        "publishedAt": normalize_iso(payload.get("publishedAt")),
-        "status": normalize_text(payload.get("status")),
+        "version": _required_canonical_text(payload, "version", source, failures=failures),
+        "channel": _required_canonical_text(payload, channel_key, source, failures=failures),
+        "publishedAt": _required_timestamp(payload, "publishedAt", source, failures=failures),
+        "status": _required_canonical_text(payload, "status", source, failures=failures),
     }
 
 
-def upload_response_view(payload: dict[str, Any]) -> dict[str, str]:
+def upload_response_view(payload: dict[str, Any], *, failures: list[str]) -> dict[str, str]:
+    source = "upload response"
     return {
-        "version": normalize_text(payload.get("version") or payload.get("releaseVersion")),
-        "channel": normalize_text(payload.get("channelId") or payload.get("channel")),
-        "publishedAt": normalize_iso(payload.get("publishedAt")),
+        "version": _required_canonical_text(payload, "version", source, failures=failures),
+        "channel": _required_canonical_text(payload, "channel", source, failures=failures),
+        "publishedAt": _required_timestamp(payload, "publishedAt", source, failures=failures),
     }
 
 
-def artifact_ids(payload: dict[str, Any]) -> set[str]:
-    rows = payload.get("downloads")
-    if not isinstance(rows, list):
-        rows = payload.get("artifacts")
-    if not isinstance(rows, list):
-        return set()
-    ids: set[str] = set()
-    for row in rows:
+def _artifact_id_from_row(
+    row: dict[str, Any],
+    *,
+    source: str,
+    index: int,
+    primary_key: str,
+    alias_key: Optional[str],
+    failures: list[str],
+) -> str:
+    value = row.get(primary_key)
+    if not isinstance(value, str) or not SAFE_ARTIFACT_ID_PATTERN.fullmatch(value) or ".." in value:
+        failures.append(f"{source} artifact row {index} has a missing or noncanonical {primary_key}")
+        return ""
+    if alias_key is not None and alias_key in row:
+        alias = row.get(alias_key)
+        if not isinstance(alias, str) or alias != value:
+            failures.append(f"{source} artifact row {index} has conflicting artifact ID aliases")
+            return ""
+    return value
+
+
+def manifest_artifact_ids(
+    payload: dict[str, Any],
+    *,
+    source: str,
+    collection_key: str,
+    primary_key: str,
+    alias_key: Optional[str],
+    failures: list[str],
+) -> list[str]:
+    rows = payload.get(collection_key)
+    if not isinstance(rows, list) or not rows:
+        failures.append(f"{source} {collection_key} must be a non-empty array")
+        return []
+
+    artifact_ids: list[str] = []
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
         if not isinstance(row, dict):
+            failures.append(f"{source} artifact row {index} is not an object")
             continue
-        artifact_id = normalize_text(row.get("artifactId") or row.get("id"))
-        if artifact_id:
-            ids.add(artifact_id)
-    return ids
+        artifact_id = _artifact_id_from_row(
+            row,
+            source=source,
+            index=index,
+            primary_key=primary_key,
+            alias_key=alias_key,
+            failures=failures,
+        )
+        if not artifact_id:
+            continue
+        folded = artifact_id.casefold()
+        if folded in seen:
+            failures.append(f"{source} contains duplicate or case-ambiguous artifact IDs")
+            continue
+        seen.add(folded)
+        artifact_ids.append(artifact_id)
+    return artifact_ids
+
+
+def promoted_artifact_ids(payload: dict[str, Any], *, failures: list[str]) -> list[str]:
+    collection_name = (
+        "candidateArtifactIds"
+        if "candidateArtifactIds" in payload
+        else "promotedArtifactIds"
+    )
+    rows = payload.get(collection_name)
+    if not isinstance(rows, list) or not rows:
+        failures.append(f"upload response {collection_name} must be a non-empty array")
+        return []
+
+    artifact_ids: list[str] = []
+    seen: set[str] = set()
+    for index, value in enumerate(rows):
+        if not isinstance(value, str) or not SAFE_ARTIFACT_ID_PATTERN.fullmatch(value) or ".." in value:
+            failures.append(f"upload response {collection_name} row {index} is noncanonical")
+            continue
+        folded = value.casefold()
+        if folded in seen:
+            failures.append(
+                f"upload response {collection_name} contains duplicate or case-ambiguous IDs"
+            )
+            continue
+        seen.add(folded)
+        artifact_ids.append(value)
+    return artifact_ids
+
+
+def response_generation_id(payload: dict[str, Any], *, failures: list[str]) -> str:
+    value = _required_canonical_text(payload, "generationId", "upload response", failures=failures)
+    if value in {".", ".."}:
+        failures.append("upload response generationId is not a traversal-safe opaque token")
+        return ""
+    return value
+
+
+def response_manifest_digest(payload: dict[str, Any], key: str, *, failures: list[str]) -> str:
+    value = payload.get(key)
+    if isinstance(value, str) and BARE_SHA256_PATTERN.fullmatch(value):
+        return f"sha256:{value}"
+    if not isinstance(value, str) or not SHA256_PATTERN.fullmatch(value):
+        failures.append(f"upload response {key} is missing or noncanonical")
+        return ""
+    return value
 
 
 def compare_views(
@@ -94,7 +230,12 @@ def compare_views(
 ) -> None:
     for key in sorted(set(left) | set(right)):
         if left.get(key) != right.get(key):
-            failures.append(f"{left_name} and {right_name} differ for {key}: {left.get(key)!r} != {right.get(key)!r}")
+            failures.append(f"{left_name} and {right_name} differ for {key}")
+
+
+def binding_sha256(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return sha256_bytes(encoded)
 
 
 def evaluate(
@@ -103,15 +244,25 @@ def evaluate(
     local_canonical_manifest_path: Path,
     upload_response_path: Path,
 ) -> dict[str, Any]:
-    local_manifest_payload = load_json(local_manifest_path)
-    local_canonical_payload = load_json(local_canonical_manifest_path)
-    upload_response_payload = load_json(upload_response_path)
-
-    local_manifest = manifest_view(local_manifest_payload)
-    local_canonical = manifest_view(local_canonical_payload)
-    upload_response = upload_response_view(upload_response_payload)
+    local_manifest_payload, local_manifest_sha256 = load_json(local_manifest_path)
+    local_canonical_payload, local_canonical_sha256 = load_json(local_canonical_manifest_path)
+    upload_response_payload, upload_response_sha256 = load_json(upload_response_path)
 
     failures: list[str] = []
+    local_manifest = manifest_view(
+        local_manifest_payload,
+        source="local releases.json",
+        channel_key="channel",
+        failures=failures,
+    )
+    local_canonical = manifest_view(
+        local_canonical_payload,
+        source="local RELEASE_CHANNEL.generated.json",
+        channel_key="channelId",
+        failures=failures,
+    )
+    upload_response = upload_response_view(upload_response_payload, failures=failures)
+
     compare_views(
         "local releases.json",
         local_manifest,
@@ -131,34 +282,111 @@ def evaluate(
         failures=failures,
     )
 
-    promoted_artifact_ids = [
-        normalize_text(item)
-        for item in upload_response_payload.get("promotedArtifactIds") or []
-        if normalize_text(item)
-    ]
-    local_known_artifact_ids = artifact_ids(local_manifest_payload) | artifact_ids(local_canonical_payload)
-    unknown_promoted_artifact_ids = sorted(set(promoted_artifact_ids) - local_known_artifact_ids)
-    if unknown_promoted_artifact_ids:
+    local_compatibility_artifact_ids = manifest_artifact_ids(
+        local_manifest_payload,
+        source="local releases.json",
+        collection_key="downloads",
+        primary_key="id",
+        alias_key="artifactId",
+        failures=failures,
+    )
+    local_canonical_artifact_ids = manifest_artifact_ids(
+        local_canonical_payload,
+        source="local RELEASE_CHANNEL.generated.json",
+        collection_key="artifacts",
+        primary_key="artifactId",
+        alias_key=None,
+        failures=failures,
+    )
+    response_artifact_ids = promoted_artifact_ids(upload_response_payload, failures=failures)
+
+    if set(local_compatibility_artifact_ids) != set(local_canonical_artifact_ids):
+        failures.append("local release manifests disagree on the exact artifact ID inventory")
+    if response_artifact_ids != local_compatibility_artifact_ids:
+        failures.append("upload response promotedArtifactIds do not exactly match the candidate artifact ID inventory")
+
+    local_compatibility_generation_id = _required_canonical_text(
+        local_manifest_payload,
+        "generationId",
+        "local releases.json",
+        failures=failures,
+    )
+    local_canonical_generation_id = _required_canonical_text(
+        local_canonical_payload,
+        "generationId",
+        "local RELEASE_CHANNEL.generated.json",
+        failures=failures,
+    )
+    generation_id = response_generation_id(upload_response_payload, failures=failures)
+    if local_compatibility_generation_id != local_canonical_generation_id:
+        failures.append("local release manifests disagree for generationId")
+    if generation_id != local_canonical_generation_id:
+        failures.append("upload response generationId does not match the exact candidate generationId")
+
+    canonical_manifest_sha256 = response_manifest_digest(
+        upload_response_payload,
+        "canonicalManifestSha256",
+        failures=failures,
+    )
+    compatibility_manifest_sha256 = response_manifest_digest(
+        upload_response_payload,
+        "compatibilityManifestSha256",
+        failures=failures,
+    )
+    if (
+        canonical_manifest_sha256
+        and compatibility_manifest_sha256
+        and canonical_manifest_sha256 == compatibility_manifest_sha256
+    ):
+        failures.append("upload response canonical and compatibility manifest digests must identify distinct bytes")
+    if canonical_manifest_sha256 != local_canonical_sha256:
         failures.append(
-            "upload response promotedArtifactIds are missing from local manifests: "
-            + ", ".join(unknown_promoted_artifact_ids)
+            "upload response canonicalManifestSha256 does not match exact local canonical manifest bytes"
+        )
+    if compatibility_manifest_sha256 != local_manifest_sha256:
+        failures.append(
+            "upload response compatibilityManifestSha256 does not match exact local compatibility manifest bytes"
+        )
+
+    candidate_binding = {
+        "generationId": local_canonical_generation_id,
+        "version": local_canonical["version"],
+        "channel": local_canonical["channel"],
+        "publishedAt": local_canonical["publishedAt"],
+        "artifactIds": local_canonical_artifact_ids,
+        "canonicalInputSha256": local_canonical_sha256,
+        "compatibilityInputSha256": local_manifest_sha256,
+    }
+
+    publication_binding: Optional[dict[str, Any]] = None
+    if not failures:
+        publication_binding = {
+            "generationId": generation_id,
+            "releaseVersion": upload_response["version"],
+            "channel": upload_response["channel"],
+            "publishedAt": upload_response["publishedAt"],
+            "artifactIds": response_artifact_ids,
+            "canonicalManifestSha256": canonical_manifest_sha256,
+            "compatibilityManifestSha256": compatibility_manifest_sha256,
+            "sanitizedUploadResponseSha256": upload_response_sha256,
+            "candidateBindingSha256": binding_sha256(candidate_binding),
+        }
+        publication_binding["bindingSha256"] = binding_sha256(
+            {
+                "schemaVersion": SCHEMA_VERSION,
+                "candidate": candidate_binding,
+                "publication": publication_binding,
+            }
         )
 
     return {
         "generated_at_utc": now_iso(),
-        "contract_name": "chummer.release_upload_response_truth",
+        "contract_name": CONTRACT_NAME,
+        "schemaVersion": SCHEMA_VERSION,
         "status": "fail" if failures else "pass",
         "failures": failures,
-        "local": {
-            "manifest": local_manifest,
-            "canonicalManifest": local_canonical,
-            "artifactIds": sorted(local_known_artifact_ids),
-        },
-        "uploadResponse": {
-            "view": upload_response,
-            "promotedArtifactIds": promoted_artifact_ids,
-            "downloadsUrl": normalize_text(upload_response_payload.get("downloadsUrl")),
-        },
+        "candidateBinding": candidate_binding,
+        "publicationBinding": publication_binding,
     }
 
 

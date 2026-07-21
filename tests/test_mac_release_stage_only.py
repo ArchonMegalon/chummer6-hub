@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,35 @@ EXPECTED_COMMIT_SETTINGS = (
 )
 
 
+def test_release_generation_id_is_safe_and_operator_override_is_exact() -> None:
+    generated = run_sourced('resolve_release_generation_id "run-20260720 nightly" ""')
+    exact = run_sourced(
+        'resolve_release_generation_id "ignored" "gen-reviewed-abcdef0123456789"'
+    )
+    unsafe = run_sourced('resolve_release_generation_id "ignored" "../escape"')
+
+    assert generated.returncode == 0, generated.stderr
+    assert re.fullmatch(
+        r"gen-run-20260720-nightly-[0-9a-f]{16}", generated.stdout.strip()
+    )
+    assert exact.returncode == 0, exact.stderr
+    assert exact.stdout.strip() == "gen-reviewed-abcdef0123456789"
+    assert unsafe.returncode != 0
+
+
+def test_live_convergence_origin_is_derived_from_canonical_https_manifest() -> None:
+    valid = run_sourced(
+        'resolve_https_release_origin "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"'
+    )
+    unsafe = run_sourced(
+        'resolve_https_release_origin "https://operator:secret@chummer.run/downloads/RELEASE_CHANNEL.generated.json"'
+    )
+
+    assert valid.returncode == 0, valid.stderr
+    assert valid.stdout.strip() == "https://chummer.run"
+    assert unsafe.returncode != 0
+
+
 def test_hosted_bootstrap_http_publication_is_session_only() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
     runbook = RUNBOOK.read_text(encoding="utf-8")
@@ -54,7 +84,8 @@ def test_hosted_bootstrap_http_publication_is_session_only() -> None:
     assert "candidate_authority != canonical_authority" in bootstrap
     assert "release upload response contained an unsafe direct-file URL" in bootstrap
     assert '--max-filesize "$max_response_bytes"' in bootstrap
-    assert '"$complete_url" \\\n      --no-retry' in bootstrap
+    assert '"$stage_url" \\\n      --no-retry' in bootstrap
+    assert '"$complete_url" \\\n      --no-retry' not in bootstrap
     assert "https://chummer.run/api/internal/releases/upload-sessions" in runbook
     assert "https://chummer.run/api/internal/releases/bundles" not in runbook
 
@@ -144,6 +175,9 @@ def clean_release_environment() -> dict[str, str]:
         "CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION",
         "CHUMMER_RELEASE_SKIP_STRICT_MANIFEST_VERIFY",
         "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES",
+        "CHUMMER_RELEASE_SCOPE_DECISION_PATH",
+        "CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256",
+        "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY",
         "CHUMMER_RELEASE_SSH_TARGET",
         "CHUMMER_REMOTE_STAGING_DIR",
         "CHUMMER_REMOTE_UI_REPO_DIR",
@@ -805,10 +839,10 @@ def test_hub_generator_rejects_missing_authority_before_execution(tmp_path: Path
     assert not marker.exists()
 
 
-def test_post_completion_exit_trap_forbids_blind_retry(tmp_path: Path) -> None:
+def test_post_stage_exit_trap_preserves_inert_recovery_handoff(tmp_path: Path) -> None:
     receipt_path = tmp_path / "release-upload-handoff.json"
     result = run_sourced(
-        'BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1; '
+        'BOOTSTRAP_RELEASE_STAGE_ACCEPTED=1; '
         'BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH="$2"; '
         'trap cleanup_bootstrap_tmp_paths EXIT; '
         'exit 73',
@@ -816,13 +850,13 @@ def test_post_completion_exit_trap_forbids_blind_retry(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 73
-    assert "Release completion was accepted" in result.stderr
-    assert "may already be public" in result.stderr
-    assert "Do not create or publish another session" in result.stderr
+    assert "immutable generation was staged" in result.stderr
+    assert "public CURRENT was not activated" in result.stderr
+    assert "do not create a different candidate session" in result.stderr
     assert str(receipt_path) in result.stderr
 
 
-def test_hosted_upload_persists_recovery_state_around_completion() -> None:
+def test_hosted_upload_persists_recovery_state_around_staging() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
     upload_start = bootstrap.index("upload_release_bundle_http() {")
     upload_end = bootstrap.index("\nstage_local_release_bundle() {", upload_start)
@@ -832,15 +866,15 @@ def test_hosted_upload_persists_recovery_state_around_completion() -> None:
     endpoint_validation = upload.index("upload session response endpoints do not match the created session")
     uploaded = upload.index("record_upload_attempt_state uploaded")
     request_started = upload.index("record_upload_attempt_state request_started")
-    completion = upload.index('"complete staged upload"')
-    accepted = upload.index("BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1")
+    completion = upload.index('"seal immutable staged generation"')
+    accepted = upload.index("BOOTSTRAP_RELEASE_STAGE_ACCEPTED=1")
     response_fsync = upload.index('fsync-file --path "$response_path"')
     completed = upload.index("record_upload_attempt_state completed")
 
     assert created < endpoint_validation < uploaded < request_started < completion
     assert completion < accepted < response_fsync < completed
     assert '--max-filesize "$max_response_bytes"' in upload
-    assert '"$complete_url" \\\n      --no-retry' in upload
+    assert '"$stage_url" \\\n      --no-retry' in upload
 
     main_call = bootstrap.index('"$hub_alias/scripts/release/release_upload_attempt_receipt.py"', upload_end)
     response_argument = bootstrap.rindex('"$response_path" \\', upload_end, main_call)
@@ -858,7 +892,7 @@ def test_hosted_upload_has_no_empty_common_array_expansion_under_bash3_nounset()
     assert "request_common" not in upload
 
 
-def test_hosted_upload_retains_request_started_on_ambiguous_completion(tmp_path: Path) -> None:
+def test_hosted_upload_retains_request_started_on_ambiguous_staging(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     files = bundle / "files"
     files.mkdir(parents=True)
@@ -869,7 +903,7 @@ def test_hosted_upload_retains_request_started_on_ambiguous_completion(tmp_path:
     response_path = tmp_path / "release-upload-response.json"
     receipt_path = tmp_path / "release-upload-handoff.json"
     upload_auth = "synthetic-upload-auth"
-    completion_marker = tmp_path / "completion-count"
+    completion_marker = tmp_path / "stage-count"
 
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
@@ -888,10 +922,10 @@ done
 cat >/dev/null
 case "$url" in
   */upload-sessions)
-    printf '%s' '{"sessionId":"0123456789abcdef0123456789abcdef","expiresAtUtc":"2026-07-16T00:00:00Z","filesUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/files","chunksUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/chunks","completeUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/complete"}'
+    printf '%s' '{"sessionId":"0123456789abcdef0123456789abcdef","expiresAtUtc":"2026-07-16T00:00:00Z","filesUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/files","chunksUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/chunks","stageUrl":"/api/internal/releases/upload-sessions/0123456789abcdef0123456789abcdef/stage"}'
     printf '\nCHUMMER_HTTP_STATUS:200'
     ;;
-  */complete)
+  */stage)
     count=0
     test -f "$COMPLETION_MARKER" && count="$(cat "$COMPLETION_MARKER")"
     printf '%s' "$((count + 1))" >"$COMPLETION_MARKER"
@@ -928,7 +962,7 @@ esac
     assert result.returncode != 0
     assert completion_marker.exists(), result.stderr or result.stdout
     assert completion_marker.read_text(encoding="utf-8") == "1"
-    assert "completion outcome is unknown" in result.stderr
+    assert "generation staging outcome is unknown" in result.stderr
     assert "Do not create another session" in result.stderr
     assert str(receipt_path) in result.stderr
     assert upload_auth not in result.stdout
@@ -966,6 +1000,10 @@ def test_hosted_upload_sanitizes_response_before_persistence(tmp_path: Path) -> 
         json.dumps(
             {
                 "status": "accepted",
+                "generationId": "gen-run-20260720-abcdef0123456789",
+                "activationReceiptId": "activation-abcdef0123456789",
+                "canonicalManifestSha256": "sha256:" + "a" * 64,
+                "compatibilityManifestSha256": "sha256:" + "b" * 64,
                 "installDispatchUrls": [
                     "https://chummer.run/downloads/install/proof-artifact",
                     f"https://chummer.run/downloads/install/proof-artifact?claim={secret}",
@@ -990,6 +1028,10 @@ def test_hosted_upload_sanitizes_response_before_persistence(tmp_path: Path) -> 
     sanitized = json.loads(sanitized_response.read_text(encoding="utf-8"))
     assert sanitized["responseSanitized"] is True
     assert sanitized["status"] == "accepted"
+    assert sanitized["generationId"] == "gen-run-20260720-abcdef0123456789"
+    assert sanitized["activationReceiptId"] == "activation-abcdef0123456789"
+    assert sanitized["canonicalManifestSha256"] == "sha256:" + "a" * 64
+    assert sanitized["compatibilityManifestSha256"] == "sha256:" + "b" * 64
     assert sanitized["installDispatchUrls"] == [
         "https://chummer.run/downloads/install/proof-artifact"
     ]
@@ -1045,11 +1087,16 @@ def test_hosted_bootstrap_disables_inherited_xtrace_before_auth_capture(tmp_path
     environment = clean_release_environment()
     environment.update(
         {
-            "CHUMMER_RELEASE_UPLOAD_TICKET": synthetic,
-            "CHUMMER_MAC_RELEASE_STAGE_ONLY": "1",
-            "CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR": str(output_path),
-        }
-    )
+                "CHUMMER_RELEASE_UPLOAD_TICKET": synthetic,
+                "CHUMMER_MAC_RELEASE_STAGE_ONLY": "1",
+                "CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR": str(output_path),
+                "CHUMMER_RELEASE_SCOPE_DECISION_PATH": str(tmp_path / "scope.json"),
+                "CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256": "a" * 64,
+                "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY": (
+                    "design://release-scope/test/sha256/" + "a" * 64
+                ),
+            }
+        )
 
     result = subprocess.run(
         ["bash", "-x", str(BOOTSTRAP)],
@@ -1202,22 +1249,22 @@ def test_bootstrap_binds_exact_scope_across_every_publication_transport() -> Non
         "bash scripts/publish-download-bundle.sh"
     ) in bootstrap
     assert 'CHUMMER_RELEASE_EXACT_INCOMING_TUPLES="$exact_incoming_scope" \\\n' in bootstrap
+    assert 'export CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS="$release_scope_required_heads"' in bootstrap
+    assert 'export CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS="$release_scope_required_platforms"' in bootstrap
+    assert '"--required-desktop-heads" "$required_desktop_heads"' in bootstrap
+    assert '"--required-desktop-platforms" "$required_desktop_platforms"' in bootstrap
+    assert "required_heads=required_heads" in bootstrap
+    assert "required_platforms=required_platforms" in bootstrap
 
 
-def test_stage_only_rejects_exact_scope_even_when_declared_empty(tmp_path: Path) -> None:
-    environment = clean_release_environment()
-    environment.update(
-        {
-            "CHUMMER_MAC_RELEASE_STAGE_ONLY": "1",
-            "CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR": str(tmp_path / "candidate"),
-            "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES": "",
-        }
-    )
-
-    result = run_sourced("parse_mac_release_stage_only_args; main", env=environment)
-
-    assert result.returncode != 0
-    assert "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES" in result.stderr
+def test_stage_only_scope_is_derived_from_approved_decision_and_persisted() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    assert "CHUMMER_RELEASE_SCOPE_DECISION_PATH is required before candidate production" in bootstrap
+    assert "exact scope is derived from the approved release-scope decision" in bootstrap
+    assert '--expected-platform macos \\\n' in bootstrap
+    assert 'exact_incoming_scope="$(jq -r' in bootstrap
+    assert '"exactIncomingDesktopScope": sys.argv[7]' in bootstrap
+    assert '"releaseScopeDecisionSha256": sys.argv[8]' in bootstrap
 
 
 def test_stage_output_path_rejects_relative_existing_and_symlink_targets(tmp_path: Path) -> None:
@@ -1264,7 +1311,8 @@ def test_staged_copy_is_revalidated_and_atomically_placed(tmp_path: Path) -> Non
     environment["VERIFIER_MARKER"] = str(verifier_marker)
     command = (
         'validate_bundle_directory_integrity() { test -f "$1/release-evidence/mac-stage-only.json"; }; '
-        'stage_local_release_bundle "$2" "$3" "$4" run-test preview osx-arm64 avalonia'
+        'stage_local_release_bundle "$2" "$3" "$4" run-test preview osx-arm64 avalonia '
+        'avalonia:macos:osx-arm64 "$(printf scope | shasum -a 256 | cut -d" " -f1)"'
     )
     result = run_sourced(command, str(source), str(output), str(verifier), env=environment)
 
@@ -1277,19 +1325,24 @@ def test_staged_copy_is_revalidated_and_atomically_placed(tmp_path: Path) -> Non
     assert receipt["uploadAttempted"] is False
     assert receipt["publicationAttempted"] is False
     assert receipt["countsAsPublicationEvidence"] is False
+    assert receipt["exactIncomingDesktopScope"] == "avalonia:macos:osx-arm64"
     assert list(tmp_path.glob(".candidate.stage.*")) == []
 
 
-def test_stage_only_returns_before_every_publish_and_live_verification_path() -> None:
+def test_local_stage_only_returns_before_http_stage_and_owner_finalizer_handoff() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
     main_index = bootstrap.index("main() {")
     stage_branch = bootstrap.index("if (( MAC_RELEASE_STAGE_ONLY == 1 )); then", bootstrap.index("create_minimal_promotion_bundle", main_index))
     stage_call = bootstrap.index("stage_local_release_bundle \\", stage_branch)
     stage_return = bootstrap.index("return 0", stage_call)
     publish_switch = bootstrap.index('case "$publish_mode" in', stage_return)
-    live_verify = bootstrap.index('log "verifying live canonical manifest at $canonical_verify_url"', publish_switch)
+    private_probe = bootstrap.index(
+        'log "privately probing the sealed review-required generation; public CURRENT remains unchanged"',
+        publish_switch,
+    )
+    owner_handoff = bootstrap.index("materialize_staged_release_finalizer_handoff.py", private_probe)
 
-    assert stage_branch < stage_call < stage_return < publish_switch < live_verify
+    assert stage_branch < stage_call < stage_return < publish_switch < private_probe < owner_handoff
     assert 'if (( MAC_RELEASE_STAGE_ONLY == 0 )); then\n    validate_publish_mode' in bootstrap
     assert 'verify_live_canonical_supportability_preflight "$canonical_verify_url"' in bootstrap
     assert "upload/publication/live verification were not attempted" in bootstrap
@@ -1319,11 +1372,9 @@ def test_served_runbook_documents_governed_stage_only_handoff() -> None:
         "proof/build-provenance/v1/invocations/",
         "proof/build-provenance/v1/sbom/",
         "countsAsPublicationEvidence=false",
-        "It must fail the canonical publisher's Linux/Windows/macOS platform floor if supplied by itself.",
-        "governed Linux and Windows outputs carrying the same fresh version",
-        "CHUMMER_RELEASE_CANDIDATE_STAGE_ONLY=1",
-        'CHUMMER_RELEASE_CANDIDATE_OUTPUT_DIR="$validated_candidate"',
-        '"$full_candidate"',
-        "Promotion or activation is a later, separately authorized operation.",
+        "There is no implicit Linux/Windows/macOS shelf floor in this lane.",
+        "RELEASE_SCOPE_DECISION.approved.json",
+        "RELEASE_SCOPE_VERIFICATION.generated.json",
+        "A multi-platform release requires a separately approved multi-platform decision",
     ):
         assert required_fragment in runbook

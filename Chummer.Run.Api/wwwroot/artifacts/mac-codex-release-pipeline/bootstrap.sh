@@ -12,9 +12,18 @@ set -euo pipefail
 umask 077
 
 bootstrap_tmp_paths=()
-BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=0
+BOOTSTRAP_RELEASE_STAGE_ACCEPTED=0
+BOOTSTRAP_RELEASE_CURRENT_ACTIVATED=0
 BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH=""
+BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
+BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
 RELEASE_PYTHON_BIN=""
+export -n \
+  BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN \
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID \
+  BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH \
+  RELEASE_PYTHON_BIN \
+  2>/dev/null || true
 
 log() {
   printf '[chummer-mac-release] %s\n' "$*"
@@ -135,8 +144,11 @@ cleanup_bootstrap_tmp_paths() {
     rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
   fi
 
-  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED:-0}" == "1" ]]; then
-    printf '[chummer-mac-release] ERROR: Release completion was accepted before a later check failed; the release may already be public. Do not create or publish another session. Inspect %s and reconcile the recorded session.\n' \
+  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_CURRENT_ACTIVATED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: Staged activation was accepted before a later check failed; reconcile the exact generation and CURRENT convergence from %s.\n' \
+      "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
+  elif (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_STAGE_ACCEPTED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: The immutable generation was staged, but public CURRENT was not activated by this bootstrap. Reconcile the recorded stage at %s; do not create a different candidate session.\n' \
       "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
   fi
   return "$status"
@@ -731,6 +743,30 @@ create_minimal_promotion_bundle() {
   cp "$source_root/releases.json" "$bundle_root/releases.json"
   cp "$source_root/RELEASE_CHANNEL.generated.json" "$bundle_root/RELEASE_CHANNEL.generated.json"
   cp "$source_root/release-evidence/public-promotion.json" "$bundle_root/release-evidence/public-promotion.json"
+  cp \
+    "$source_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json" \
+    "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json"
+  cp \
+    "$source_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json" \
+    "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json"
+  if [[ -f "$source_root/release-evidence/HORIZON_READINESS.generated.json" ]]; then
+    cp \
+      "$source_root/release-evidence/HORIZON_READINESS.generated.json" \
+      "$bundle_root/release-evidence/HORIZON_READINESS.generated.json"
+  fi
+  if [[ -f "$source_root/release-evidence/GENERATION_PROJECTION.generated.json" ]]; then
+    cp \
+      "$source_root/release-evidence/GENERATION_PROJECTION.generated.json" \
+      "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json"
+  fi
+  local authority_file
+  for authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    [[ -f "$source_root/release-evidence/$authority_file" ]] \
+      || die "release authority envelope is incomplete: missing release-evidence/$authority_file"
+    cp \
+      "$source_root/release-evidence/$authority_file" \
+      "$bundle_root/release-evidence/$authority_file"
+  done
 
   if compgen -G "$source_root/files/*" >/dev/null; then
     cp -aL "$source_root/files/"* "$bundle_root/files/"
@@ -1179,6 +1215,63 @@ resolve_live_release_verify_urls() {
   fi
   local base="${requested%/}"
   printf '%s|%s\n' "$base/releases.json" "$base/RELEASE_CHANNEL.generated.json"
+}
+
+resolve_release_generation_id() {
+  local release_version="$1"
+  local requested="${2:-}"
+  python3 - "$release_version" "$requested" <<'PY'
+from __future__ import annotations
+
+import re
+import secrets
+import sys
+
+release_version = str(sys.argv[1]).strip()
+requested = str(sys.argv[2]).strip()
+safe = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+if requested:
+    generation_id = requested
+else:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", release_version).strip("._-").lower()
+    slug = (slug or "nightly")[:88].rstrip("._-") or "nightly"
+    generation_id = f"gen-{slug}-{secrets.token_hex(8)}"
+if (
+    safe.fullmatch(generation_id) is None
+    or generation_id in {".", ".."}
+    or ".." in generation_id
+):
+    raise SystemExit("release generationId must be a traversal-safe opaque token of at most 128 characters")
+print(generation_id)
+PY
+}
+
+resolve_https_release_origin() {
+  local canonical_manifest_url="$1"
+  python3 - "$canonical_manifest_url" <<'PY'
+from __future__ import annotations
+
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+value = str(sys.argv[1]).strip()
+parsed = urlsplit(value)
+if (
+    parsed.scheme.lower() != "https"
+    or not parsed.hostname
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.query
+    or parsed.fragment
+    or not parsed.path.endswith("/RELEASE_CHANNEL.generated.json")
+):
+    raise SystemExit("canonical release verification URL must be an HTTPS manifest URL without credentials, query, or fragment")
+try:
+    _ = parsed.port
+except ValueError as error:
+    raise SystemExit("canonical release verification URL has an invalid port") from error
+print(urlunsplit(("https", parsed.netloc, "", "", "")))
+PY
 }
 
 resolve_head_build_metadata() {
@@ -2822,9 +2915,6 @@ capture_release_upload_auth_value() {
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
     captured_value="$CHUMMER_RELEASE_UPLOAD_TICKET"
     captured_source="CHUMMER_RELEASE_UPLOAD_TICKET"
-  elif [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
-    captured_value="$FLEET_INTERNAL_API_TOKEN"
-    captured_source="FLEET_INTERNAL_API_TOKEN"
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" ]]; then
     captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}" ]]; then
@@ -2845,7 +2935,9 @@ capture_release_upload_auth_value() {
     CHUMMER_RELEASE_UPLOAD_TOKEN_PATH \
     CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
     CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
-    FLEET_INTERNAL_API_TOKEN
+    FLEET_INTERNAL_API_TOKEN \
+    CHUMMER_REGISTRY_CONTROL_API_KEY \
+    REGISTRY_CONTROL_API_KEY
 }
 
 prompt_for_release_upload_ticket() {
@@ -2922,12 +3014,19 @@ is_true() {
 
 MAC_RELEASE_STAGE_ONLY=0
 MAC_RELEASE_STAGE_OUTPUT_DIR=""
+MAC_RELEASE_AUTHORITY_RESUME=0
+MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT=""
+MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256=""
+MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE=""
 
 parse_mac_release_stage_only_args() {
   local env_mode="${CHUMMER_MAC_RELEASE_STAGE_ONLY:-}"
   local env_output="${CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR:-}"
   local flag_mode=0
   local flag_output=""
+  local resume_checkpoint=""
+  local resume_checkpoint_sha256=""
+  local resume_workspace=""
   local value=""
 
   if [[ -n "$env_mode" ]]; then
@@ -2958,8 +3057,41 @@ parse_mac_release_stage_only_args() {
         flag_output="${1#--stage-output-dir=}"
         shift
         ;;
-      *)
+      --resume-authority-checkpoint)
+        (( $# >= 2 )) || die "--resume-authority-checkpoint requires a path"
+        [[ -z "$resume_checkpoint" ]] || die "--resume-authority-checkpoint may be supplied only once"
+        resume_checkpoint="$2"
+        shift 2
+        ;;
+      --resume-authority-checkpoint=*)
+        [[ -z "$resume_checkpoint" ]] || die "--resume-authority-checkpoint may be supplied only once"
+        resume_checkpoint="${1#--resume-authority-checkpoint=}"
         shift
+        ;;
+      --resume-authority-checkpoint-sha256)
+        (( $# >= 2 )) || die "--resume-authority-checkpoint-sha256 requires a digest"
+        [[ -z "$resume_checkpoint_sha256" ]] || die "--resume-authority-checkpoint-sha256 may be supplied only once"
+        resume_checkpoint_sha256="$2"
+        shift 2
+        ;;
+      --resume-authority-checkpoint-sha256=*)
+        [[ -z "$resume_checkpoint_sha256" ]] || die "--resume-authority-checkpoint-sha256 may be supplied only once"
+        resume_checkpoint_sha256="${1#--resume-authority-checkpoint-sha256=}"
+        shift
+        ;;
+      --resume-authority-workspace)
+        (( $# >= 2 )) || die "--resume-authority-workspace requires a path"
+        [[ -z "$resume_workspace" ]] || die "--resume-authority-workspace may be supplied only once"
+        resume_workspace="$2"
+        shift 2
+        ;;
+      --resume-authority-workspace=*)
+        [[ -z "$resume_workspace" ]] || die "--resume-authority-workspace may be supplied only once"
+        resume_workspace="${1#--resume-authority-workspace=}"
+        shift
+        ;;
+      *)
+        die "unsupported bootstrap argument: $1"
         ;;
     esac
   done
@@ -2974,6 +3106,28 @@ parse_mac_release_stage_only_args() {
     die "--stage-output-dir conflicts with CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR"
   fi
   MAC_RELEASE_STAGE_OUTPUT_DIR="${flag_output:-$env_output}"
+
+  if [[ -n "$resume_checkpoint" || -n "$resume_checkpoint_sha256" || -n "$resume_workspace" ]]; then
+    [[ -n "$resume_checkpoint" && -n "$resume_checkpoint_sha256" && -n "$resume_workspace" ]] \
+      || die "authority resume requires --resume-authority-checkpoint, --resume-authority-checkpoint-sha256, and --resume-authority-workspace together"
+    (( MAC_RELEASE_STAGE_ONLY == 0 && flag_mode == 0 )) \
+      || die "authority resume cannot be combined with stage-only mode"
+    [[ -z "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
+      || die "authority resume cannot be combined with a stage-only output directory"
+    [[ "$resume_checkpoint" == /* && "$resume_workspace" == /* ]] \
+      || die "authority resume checkpoint and workspace must be absolute paths"
+    [[ "$resume_checkpoint_sha256" =~ ^[0-9a-f]{64}$ ]] \
+      || die "authority resume checkpoint SHA-256 must be 64 lowercase hexadecimal characters"
+    MAC_RELEASE_AUTHORITY_RESUME=1
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT="$resume_checkpoint"
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256="$resume_checkpoint_sha256"
+    MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE="$resume_workspace"
+  else
+    MAC_RELEASE_AUTHORITY_RESUME=0
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT=""
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256=""
+    MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE=""
+  fi
 
   if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
     [[ -z "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
@@ -3079,6 +3233,14 @@ write_release_manifests() {
     "--version" "$release_version"
     "--published-at" "$published_at"
     "--downloads-prefix" "/downloads/files"
+  )
+  local required_desktop_heads="${CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS:-}"
+  local required_desktop_platforms="${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-}"
+  [[ -n "$required_desktop_heads" && -n "$required_desktop_platforms" ]] \
+    || die "release manifest materialization requires the approved desktop head/platform scope"
+  args+=(
+    "--required-desktop-heads" "$required_desktop_heads"
+    "--required-desktop-platforms" "$required_desktop_platforms"
   )
 
   if [[ -d "$startup_smoke_dir" ]] && [[ "$help_text" == *"--startup-smoke-dir"* ]]; then
@@ -3239,6 +3401,7 @@ stamp_startup_smoke_receipt_artifact_identity() {
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import pathlib
 import re
@@ -3326,7 +3489,7 @@ write_release_manifests_fallback_no_filter() {
   local proof_path="$8"
   local ui_localization_release_gate_path="${9:-}"
 
-  python3 - "$registry_root" "$downloads_dir" "$compatibility_manifest_path" "$canonical_manifest_path" "$release_version" "$release_channel" "$published_at" "$proof_path" "$ui_localization_release_gate_path" <<'PY'
+  python3 - "$registry_root" "$downloads_dir" "$compatibility_manifest_path" "$canonical_manifest_path" "$release_version" "$release_channel" "$published_at" "$proof_path" "$ui_localization_release_gate_path" "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS:-}" "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-}" <<'PY'
 from __future__ import annotations
 
 import importlib.util
@@ -3344,6 +3507,10 @@ release_channel = (sys.argv[6] or "preview").strip().lower() or "preview"
 published_at = (sys.argv[7] or "").strip()
 proof_path = Path(sys.argv[8]) if len(sys.argv) > 8 and sys.argv[8] else None
 ui_gate_path = Path(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9] else None
+required_heads = sorted({value.strip().lower() for value in sys.argv[10].split(",") if value.strip()})
+required_platforms = sorted({value.strip().lower() for value in sys.argv[11].split(",") if value.strip()})
+if not required_heads or not required_platforms:
+  raise SystemExit("fallback manifest materialization requires approved desktop heads and platforms")
 
 if not published_at:
   published_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -3411,8 +3578,8 @@ if not artifacts:
 artifacts.sort(key=lambda row: (row.get("kind") != "installer", row.get("platform"), row.get("arch"), row.get("head"), row.get("fileName")))
 tuple_coverage = materializer.desktop_tuple_coverage(
   artifacts,
-  required_heads=list(materializer.DEFAULT_REQUIRED_DESKTOP_HEADS),
-  required_platforms=list(materializer.DEFAULT_REQUIRED_DESKTOP_PLATFORMS),
+  required_heads=required_heads,
+  required_platforms=required_platforms,
   channel_id=release_channel,
   downloads_dir=downloads_dir,
 )
@@ -4188,13 +4355,18 @@ safe_identifier = re.compile(r"^[A-Za-z0-9._:+-]{1,200}$")
 endpoint_fields = {
     "filesUrl", "FilesUrl", "files_url", "files",
     "chunksUrl", "ChunksUrl", "chunks_url", "chunks",
-    "completeUrl", "CompleteUrl", "complete_url", "complete",
+    "stageUrl", "StageUrl", "stage_url", "stage",
 }
 scalar_fields = (
     "contractName", "sessionId", "SessionId", "session_id", "id",
     "expiresAtUtc", "ExpiresAtUtc", "expires_at_utc", "expiresAt",
     *sorted(endpoint_fields), "status", "state", "version", "channel",
-    "publishedAt", "supportabilityState", "compatibilityState",
+    "releaseVersion", "publishedAt", "supportabilityState", "compatibilityState",
+    "generationId", "activationReceiptId", "activatedAt", "inventoryDigest",
+    "stageReceiptId", "stagedAtUtc", "targetPointerSha256",
+    "previousGenerationId", "previousPointerSha256", "probeTokenExpiresAtUtc",
+    "canonicalManifestSha256", "compatibilityManifestSha256",
+    "exactIncomingDesktopScope", "downloadsUrl",
     "traceId", "requestId", "success", "fileCount", "totalBytes",
 )
 
@@ -4249,6 +4421,28 @@ if isinstance(payload, dict):
             item for item in promoted_ids[:512]
             if isinstance(item, str) and safe_identifier.fullmatch(item)
         ]
+    candidate_ids = payload.get("candidateArtifactIds")
+    if isinstance(candidate_ids, list):
+        summary["candidateArtifactIds"] = [
+            item for item in candidate_ids[:512]
+            if isinstance(item, str) and safe_identifier.fullmatch(item)
+        ]
+    secret_output = Path(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
+    probe_token = payload.get("probeToken")
+    if secret_output is not None and isinstance(probe_token, str) and re.fullmatch(r"[A-Za-z0-9_-]{32,128}", probe_token):
+        descriptor = os.open(secret_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+                handle.write(probe_token)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except BaseException:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            raise
     summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 2)
 elif isinstance(payload, list):
     summary["itemCount"] = len(payload)
@@ -4277,7 +4471,7 @@ finally:
 print(status_code)
 if not status_match:
     raise SystemExit(65)
-' "$output_path" "$max_bytes"
+' "$output_path" "$max_bytes" "${3:-}"
 }
 
 upload_release_bundle_http() {
@@ -4309,7 +4503,8 @@ upload_release_bundle_http() {
   local upload_failed=0
   local completion_attempted=0
   local last_request_status=""
-  local session_json session_id files_url chunks_url complete_url
+  local session_json session_id files_url chunks_url stage_url
+  local stage_probe_capture_path=""
   local file_path relative_path file_size
   local attempt_receipt_path="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$(dirname "$response_path")/release-upload-handoff.json}"
   local candidate_summary=""
@@ -4355,6 +4550,11 @@ try:
         "releaseVersion",
         "channel",
         "generationId",
+        "activationReceiptId",
+        "activatedAt",
+        "inventoryDigest",
+        "canonicalManifestSha256",
+        "compatibilityManifestSha256",
         "publishedAt",
         "type",
         "traceId",
@@ -4567,7 +4767,10 @@ PY
       request_ok=0
       if http_status="$(release_upload_curl --fail-with-body -sS --max-filesize "$max_response_bytes" \
           --write-out $'\nCHUMMER_HTTP_STATUS:%{http_code}' -X POST "$@" "$request_url" \
-          | sanitize_release_upload_response_stream "$body_file" "$max_response_bytes")"; then
+          | sanitize_release_upload_response_stream \
+              "$body_file" \
+              "$max_response_bytes" \
+              "$stage_probe_capture_path")"; then
         [[ "$http_status" =~ ^2 ]] && request_ok=1
       fi
       if (( request_ok == 1 )); then
@@ -4633,6 +4836,13 @@ PY
     [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
     [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
     [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json"
+    [[ -f "$bundle_root/release-evidence/HORIZON_READINESS.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/HORIZON_READINESS.generated.json"
+    [[ -f "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json"
+    [[ -f "$bundle_root/release-evidence/CURRENT.json" ]] && printf '%s\n' "$bundle_root/release-evidence/CURRENT.json"
+    [[ -f "$bundle_root/release-evidence/SNAPSHOT.json" ]] && printf '%s\n' "$bundle_root/release-evidence/SNAPSHOT.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_DECISION.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_DECISION.json"
     if [[ -d "$bundle_root/files" ]]; then
       find "$bundle_root/files" -type f | sort
     fi
@@ -4707,10 +4917,11 @@ PY
   session_id="$(resolve_json_field "$session_json" "sessionId" "SessionId" "session_id" "id" "session")" || die "upload session response missing sessionId"
   [[ "$session_id" =~ ^[0-9a-f]{32}$ ]] \
     || die "upload session response contains an unsafe sessionId"
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID="$session_id"
 
   files_url="$(resolve_json_field "$session_json" "filesUrl" "files_url" "FilesUrl" "files" || true)"
   chunks_url="$(resolve_json_field "$session_json" "chunksUrl" "chunks_url" "ChunksUrl" "chunks" || true)"
-  complete_url="$(resolve_json_field "$session_json" "completeUrl" "complete_url" "CompleteUrl" "complete" || true)"
+  stage_url="$(resolve_json_field "$session_json" "stageUrl" "stage_url" "StageUrl" "stage" || true)"
   local expires_at
   expires_at="$(resolve_json_field "$session_json" "expiresAtUtc" "ExpiresAtUtc" "expires_at_utc" "expiresAt" || true)"
 
@@ -4731,12 +4942,12 @@ PY
     die "upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded"
   fi
 
-  local expected_files_url expected_chunks_url expected_complete_url
+  local expected_files_url expected_chunks_url expected_stage_url
   expected_files_url="$(normalize_upload_url "${session_id}/files" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
   expected_chunks_url="$(normalize_upload_url "${session_id}/chunks" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
-  expected_complete_url="$(normalize_upload_url "${session_id}/complete" "$sessions_url")" \
+  expected_stage_url="$(normalize_upload_url "${session_id}/stage" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
   if [[ -n "$files_url" ]]; then
     files_url="$(normalize_upload_url "$files_url" "$sessions_url")" \
@@ -4750,15 +4961,15 @@ PY
   else
     chunks_url="$expected_chunks_url"
   fi
-  if [[ -n "$complete_url" ]]; then
-    complete_url="$(normalize_upload_url "$complete_url" "$sessions_url")" \
-      || die "upload session completion URL escaped its same-origin session root"
+  if [[ -n "$stage_url" ]]; then
+    stage_url="$(normalize_upload_url "$stage_url" "$sessions_url")" \
+      || die "upload session stage URL escaped its same-origin session root"
   else
-    complete_url="$expected_complete_url"
+    stage_url="$expected_stage_url"
   fi
   [[ "$files_url" == "$expected_files_url" \
       && "$chunks_url" == "$expected_chunks_url" \
-      && "$complete_url" == "$expected_complete_url" ]] \
+      && "$stage_url" == "$expected_stage_url" ]] \
     || die "upload session response endpoints do not match the created session"
 
   upload_file() {
@@ -4876,14 +5087,17 @@ PY
     record_upload_attempt_state uploaded
     record_upload_attempt_state request_started
     completion_attempted=1
+    stage_probe_capture_path="$(mktemp "${TMPDIR:-$(dirname "$response_path")}/chummer-stage-probe.XXXXXX")"
+    rm -f "$stage_probe_capture_path"
+    bootstrap_tmp_paths+=("$stage_probe_capture_path")
     if ! post_form_request \
       "$response_path" \
-      "complete staged upload" \
-      "$complete_url" \
+      "seal immutable staged generation" \
+      "$stage_url" \
       --no-retry; then
       case "$last_request_status" in
         400|401|403)
-          die "release upload completion returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
+          die "release generation staging returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
           ;;
         *)
           upload_failed=1
@@ -4891,10 +5105,18 @@ PY
       esac
     fi
     if (( upload_failed == 0 )); then
-      BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1
+      [[ -f "$stage_probe_capture_path" && ! -L "$stage_probe_capture_path" ]] \
+        || die "release generation staging succeeded without returning a private probe credential"
+      BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN="$(tr -d '\r\n' < "$stage_probe_capture_path")"
+      export -n BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN 2>/dev/null || true
+      [[ "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" =~ ^[A-Za-z0-9_-]{32,128}$ ]] \
+        || die "release generation staging returned a malformed private probe credential"
+      rm -f "$stage_probe_capture_path"
+      stage_probe_capture_path=""
+      BOOTSTRAP_RELEASE_STAGE_ACCEPTED=1
       python3 "$attempt_receipt_helper" fsync-file --path "$response_path"
       if ! record_upload_attempt_state completed; then
-        die "release completion returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release"
+        die "release staging returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release"
       fi
     fi
   fi
@@ -4902,7 +5124,7 @@ PY
   if (( upload_failed == 1 )); then
     rm -f "$session_json"
     if (( completion_attempted == 1 )); then
-      die "release completion outcome is unknown. Do not create another session. Reconcile the request_started handoff at $attempt_receipt_path."
+      die "release generation staging outcome is unknown. Do not create another session. Reconcile the request_started handoff at $attempt_receipt_path."
     fi
     if [[ -f "$response_path" ]]; then
       die "staged release upload failed before completion. inspect the sanitized diagnostic response at: $response_path"
@@ -4922,6 +5144,8 @@ stage_local_release_bundle() {
   local release_channel="$5"
   local rid="$6"
   local apps_raw="$7"
+  local exact_incoming_scope="$8"
+  local release_scope_sha256="$9"
 
   [[ -d "$source_bundle" && ! -L "$source_bundle" ]] \
     || die "stage-only source bundle must be a real directory: $source_bundle"
@@ -4944,7 +5168,9 @@ stage_local_release_bundle() {
       "$release_version" \
       "$release_channel" \
       "$rid" \
-      "$apps_raw" <<'PY'
+      "$apps_raw" \
+      "$exact_incoming_scope" \
+      "$release_scope_sha256" <<'PY'
 from __future__ import annotations
 
 import datetime as dt
@@ -4963,6 +5189,8 @@ payload = {
     "releaseChannel": sys.argv[4],
     "rid": sys.argv[5],
     "appHeads": [item.strip() for item in sys.argv[6].replace(" ", ",").split(",") if item.strip()],
+    "exactIncomingDesktopScope": sys.argv[7],
+    "releaseScopeDecisionSha256": sys.argv[8],
     "uploadAttempted": False,
     "publicationAttempted": False,
     "publicActivationAttempted": False,
@@ -5016,27 +5244,60 @@ main() {
   bootstrap_tmp_paths=()
   trap cleanup_bootstrap_tmp_paths EXIT
 
-  local exact_incoming_scope_declared=0
-  local exact_incoming_scope_raw=""
+  local release_scope_source="${CHUMMER_RELEASE_SCOPE_DECISION_PATH:-}"
+  local release_scope_expected_sha256="${CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256:-}"
+  local release_scope_authority="${CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY:-}"
+  [[ -n "$release_scope_source" ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_PATH is required before candidate production"
+  [[ "$release_scope_expected_sha256" =~ ^[0-9a-fA-F]{64}$ ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256 must be a canonical SHA-256"
+  release_scope_expected_sha256="$(to_lower_ascii "$release_scope_expected_sha256")"
+  [[ -n "$release_scope_authority" && "$release_scope_authority" != file://* ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY must be a non-file immutable authority reference"
+  [[ "$(to_lower_ascii "$release_scope_authority")" == *"$release_scope_expected_sha256"* ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY must contain the exact decision SHA-256"
+  [[ -z "${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES:-}" ]] \
+    || die "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES is retired for this pipeline; exact scope is derived from the approved release-scope decision"
+
+  local exact_incoming_scope_declared=1
   local exact_incoming_scope=""
-  if [[ "${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES+x}" == "x" ]]; then
-    exact_incoming_scope_declared=1
-    exact_incoming_scope_raw="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES-}"
-  fi
 
   # Capture the one HTTP-promotion credential before any preflight/build child
   # can inherit it, then scrub every inbound bearer variable. The private local
   # remains de-exported and is streamed to curl only when upload actually starts.
+  [[ -z "${FLEET_INTERNAL_API_TOKEN:-}" ]] \
+    || die "the downloaded release bootstrap rejects FLEET_INTERNAL_API_TOKEN; owner finalization must use the non-public finalizer"
+  [[ -z "${CHUMMER_REGISTRY_CONTROL_API_KEY:-}" && -z "${REGISTRY_CONTROL_API_KEY:-}" ]] \
+    || die "the downloaded release bootstrap rejects Registry control credentials; owner finalization is a separate non-public step"
   local release_upload_auth_value=""
   local release_upload_auth_source=""
   capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source
 
   parse_mac_release_stage_only_args "$@"
+  if (( MAC_RELEASE_AUTHORITY_RESUME == 1 )); then
+    die "authority resume moved to the non-public staged-release owner finalizer; the downloaded bootstrap can only create an immutable review-required stage"
+  fi
+  local retired_scorecard_setting=""
+  for retired_scorecard_setting in \
+    CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_PATH \
+    CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_EXPECTED_SHA256; do
+    [[ -z "${!retired_scorecard_setting:-}" ]] \
+      || die "$retired_scorecard_setting is retired because a launch-time scorecard digest cannot bind post-convergence evidence; use CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH"
+  done
   if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$release_upload_auth_source" ]]; then
     die "stage-only mode rejects publish-only setting $release_upload_auth_source"
   fi
-  if (( MAC_RELEASE_STAGE_ONLY == 1 && exact_incoming_scope_declared == 1 )); then
-    die "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    local registry_publish_setting=""
+    for registry_publish_setting in \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS; do
+      [[ -z "${!registry_publish_setting:-}" ]] \
+        || die "stage-only mode rejects Registry publication setting $registry_publish_setting"
+    done
   fi
 
   local publish_mode
@@ -5056,6 +5317,8 @@ main() {
     else
       release_upload_auth_value=""
     fi
+    [[ "$publish_mode" == "http" ]] \
+      || die "same-generation release-authority closure requires staged HTTP publication"
   fi
 
   require_all_reviewed_commit_pins
@@ -5064,13 +5327,6 @@ main() {
   python3() {
     command "$RELEASE_PYTHON_BIN" "$@"
   }
-  if (( exact_incoming_scope_declared == 1 )); then
-    exact_incoming_scope="$(normalize_release_exact_incoming_scope_transport \
-      "$RELEASE_PYTHON_BIN" \
-      "$exact_incoming_scope_raw")" \
-      || die "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES is invalid"
-    log "authenticated exact incoming desktop scope: $exact_incoming_scope"
-  fi
   local stage_output_path=""
   if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
     stage_output_path="$(resolve_mac_release_stage_output_path "$MAC_RELEASE_STAGE_OUTPUT_DIR")" \
@@ -5104,10 +5360,24 @@ main() {
   local registry_expected_commit="${CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT:-}"
   local media_factory_expected_commit="${CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT:-}"
   local legacy_expected_commit="${CHUMMER_LEGACY_EXPECTED_COMMIT:-}"
-  local apps_raw="${CHUMMER_RELEASE_APP:-avalonia,blazor-desktop}"
-  local rid="${CHUMMER_RELEASE_RID:-osx-arm64}"
-  local release_channel="${CHUMMER_RELEASE_CHANNEL:-preview}"
-  local release_version="${CHUMMER_RELEASE_VERSION:-run-$(date -u +%Y%m%d-%H%M%S)}"
+  local apps_raw="${CHUMMER_RELEASE_APP:-}"
+  local rid="${CHUMMER_RELEASE_RID:-}"
+  local release_channel="${CHUMMER_RELEASE_CHANNEL:-}"
+  local release_version="${CHUMMER_RELEASE_VERSION:-}"
+  [[ -n "$apps_raw" ]] \
+    || die "CHUMMER_RELEASE_APP must explicitly match the approved primary/fallback head order"
+  [[ -n "$rid" ]] \
+    || die "CHUMMER_RELEASE_RID must explicitly match the approved platform RID"
+  [[ -n "$release_channel" ]] \
+    || die "CHUMMER_RELEASE_CHANNEL must explicitly match the approved release scope"
+  [[ -n "$release_version" ]] \
+    || die "CHUMMER_RELEASE_VERSION must explicitly match the approved release scope"
+  local release_generation_id
+  release_generation_id="$(resolve_release_generation_id \
+    "$release_version" \
+    "${CHUMMER_RELEASE_GENERATION_ID:-}")" \
+    || die "CHUMMER_RELEASE_GENERATION_ID is invalid"
+  log "candidate immutable generation identity: $release_generation_id"
   local allow_unsigned_preview="${CHUMMER_ALLOW_UNSIGNED_PREVIEW:-0}"
   local minimum_free_gib="${CHUMMER_MAC_RELEASE_MIN_FREE_GIB:-20}"
   local packaging_minimum_free_gib="${CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB:-8}"
@@ -5115,6 +5385,20 @@ main() {
   local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json}"
   local require_compatibility_projection="${CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION:-0}"
   local sessions_url="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-https://chummer.run/api/internal/releases/upload-sessions}"
+  local registry_authority_current_url="${CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL:-}"
+  local registry_authority_publish_url="${CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL:-}"
+  local scorecard_handoff_request_path="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH:-}"
+  local scorecard_handoff_wait_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS:-900}"
+  local scorecard_handoff_poll_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS:-15}"
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    [[ -z "$registry_authority_current_url" && -z "$registry_authority_publish_url" ]] \
+      || die "Registry authority endpoints belong to the non-public owner finalizer, not the downloaded staging bootstrap"
+    [[ -z "$scorecard_handoff_request_path" ]] \
+      || die "campaign-operability scorecard handoff belongs to the non-public owner finalizer"
+    [[ -z "${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS:-}" \
+        && -z "${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS:-}" ]] \
+      || die "scorecard wait settings belong to the non-public owner finalizer"
+  fi
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
   if [[ -z "$materializer_retry_without_filter" ]]; then
@@ -5177,6 +5461,115 @@ main() {
   local complete_alias_root="$work_root/chummercomplete"
 
   mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos" "$temp_root"
+  chmod 700 "$work_root" "$work_root/.c" 2>/dev/null || true
+  local pinned_executed_bootstrap="$work_root/.c/mac-release-bootstrap.executed.sh"
+  command "$RELEASE_PYTHON_BIN" - "$executed_bootstrap_path" "$pinned_executed_bootstrap" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import os
+from pathlib import Path
+import stat
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+source_metadata = os.lstat(source)
+if stat.S_ISLNK(source_metadata.st_mode) or not stat.S_ISREG(source_metadata.st_mode):
+    raise SystemExit("executed bootstrap source must be a regular non-symlink file")
+raw = source.read_bytes()
+try:
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o700)
+except FileExistsError as error:
+    raise SystemExit("pinned executed bootstrap already exists in the run workspace") from error
+try:
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(raw)
+        handle.flush()
+        os.fsync(handle.fileno())
+except BaseException:
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+    target.unlink(missing_ok=True)
+    raise
+if hashlib.sha256(target.read_bytes()).digest() != hashlib.sha256(raw).digest():
+    target.unlink(missing_ok=True)
+    raise SystemExit("pinned executed bootstrap bytes changed during durable copy")
+PY
+  log "pinned exact executing bootstrap bytes for the owner handoff: $pinned_executed_bootstrap"
+  local pinned_release_scope_decision="$work_root/.c/RELEASE_SCOPE_DECISION.approved.json"
+  command "$RELEASE_PYTHON_BIN" - \
+    "$release_scope_source" \
+    "$pinned_release_scope_decision" \
+    "$release_scope_expected_sha256" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import hmac
+import os
+from pathlib import Path
+import stat
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+expected = sys.argv[3]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+descriptor = os.open(source, flags)
+try:
+    before = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or before.st_mode & 0o022
+        or before.st_nlink != 1
+        or not 1 <= before.st_size <= 8 * 1024 * 1024
+    ):
+        raise SystemExit(
+            "release scope decision must be a caller-owned single-link regular file not writable by other users"
+        )
+    chunks: list[bytes] = []
+    remaining = before.st_size + 1
+    while remaining:
+        chunk = os.read(descriptor, min(1024 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+finally:
+    os.close(descriptor)
+
+identity = lambda item: (
+    item.st_dev,
+    item.st_ino,
+    item.st_size,
+    item.st_mtime_ns,
+    item.st_ctime_ns,
+    item.st_mode,
+    item.st_nlink,
+)
+raw = b"".join(chunks)
+if identity(before) != identity(after) or len(raw) != before.st_size:
+    raise SystemExit("release scope decision changed during stable read")
+if not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), expected):
+    raise SystemExit("release scope decision SHA-256 does not match the approved digest")
+try:
+    output = os.open(
+        target,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+        0o600,
+    )
+except FileExistsError as error:
+    raise SystemExit("pinned release scope decision already exists") from error
+with os.fdopen(output, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+  log "pinned approved release scope bytes: $pinned_release_scope_decision"
   export TMPDIR="$temp_root"
   export CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"
   mkdir -p "$CHUMMER_DESKTOP_INSTALLER_TMPDIR"
@@ -5213,135 +5606,48 @@ main() {
   ensure_link_target "$registry_alias" "$complete_alias_root/chummer-hub-registry"
   ensure_link_target "$ui_repo" "$complete_alias_root/chummer6-ui"
 
-  local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
-  local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
-  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
-  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}"
-  local release_proof_path
-  local ui_localization_release_gate_path
-  local sanitized_release_proof_path
-  local sanitized_ui_localization_release_gate_path
-  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-86400}}"
-  local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
-  local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
-  local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
-  local release_proof_health=""
-  local ui_localization_release_gate_health=""
-
-  release_proof_path="$(resolve_hub_local_release_proof_path \
-    "$requested_release_proof" \
-    "$hub_alias/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$work_root/.c/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$fallback_release_proof_url")"
-  if [[ -n "$release_proof_path" ]]; then
-    if ! release_proof_health="$(json_generated_at_health \
-      "$release_proof_path" \
-      "release proof" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" 2>&1)"; then
-      log "$release_proof_health"
-      release_proof_path=""
-    fi
-  fi
-  if [[ -z "$release_proof_path" ]]; then
-    release_proof_path="$(mktemp)"
-    bootstrap_tmp_paths+=("$release_proof_path")
-    generate_validated_hub_local_release_proof \
-      "$hub_alias" \
-      "$hub_repo" \
-      "$release_proof_path" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" \
-      "${registry_alias}/scripts/materialize_public_release_channel.py"
-    log "generated fresh hub local release proof at $release_proof_path"
-  fi
-
-  ui_localization_release_gate_path="$(resolve_first_existing_file_path \
-    "$requested_ui_localization_release_gate" \
-    "$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
-    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
-    "$fallback_ui_localization_release_gate_url")"
-  if [[ -n "$ui_localization_release_gate_path" ]]; then
-    if ! ui_localization_release_gate_health="$(json_generated_at_health \
-      "$ui_localization_release_gate_path" \
-      "ui localization release gate" \
-      "$localization_gate_max_age_seconds" \
-      "$localization_gate_max_future_skew_seconds" 2>&1)"; then
-      log "$ui_localization_release_gate_health"
-      ui_localization_release_gate_path=""
-    fi
-  fi
-  if [[ -z "$ui_localization_release_gate_path" ]]; then
-    ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
-      "$ui_repo" \
-      "$localization_gate_max_age_seconds" \
-      "$localization_gate_max_future_skew_seconds" \
-      "$complete_alias_root/chummer6-ui")"
-    bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
-    log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
-  fi
-
-  if [[ -z "$release_proof_path" ]] || [[ ! -f "$release_proof_path" ]]; then
-    die "release proof file is missing and could not be generated: $release_proof_path"
-  fi
-  if [[ -z "$ui_localization_release_gate_path" ]] || [[ ! -f "$ui_localization_release_gate_path" ]]; then
-    die "ui localization release gate file is missing: set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
-  fi
-
-  sanitized_release_proof_path="$(mktemp)"
-  sanitized_ui_localization_release_gate_path="$(mktemp)"
-  bootstrap_tmp_paths+=("$sanitized_release_proof_path" "$sanitized_ui_localization_release_gate_path")
-  sanitize_release_proof_payload "$release_proof_path" "$sanitized_release_proof_path"
-  sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
-  release_proof_path="$sanitized_release_proof_path"
-  ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
-
-  local materializer_path="${registry_alias}/scripts/materialize_public_release_channel.py"
-  local proof_validation_output
-  if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-    log "release proof validation failed before build: $proof_validation_output"
-    log "attempting fresh local hub release proof and ui localization release gate generation to recover"
-    local regenerated_release_proof_path
-    regenerated_release_proof_path="$(mktemp)"
-    bootstrap_tmp_paths+=("$regenerated_release_proof_path")
-    generate_validated_hub_local_release_proof \
-      "$hub_alias" \
-      "$hub_repo" \
-      "$regenerated_release_proof_path" \
-      "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds" \
-      "$materializer_path"
-    sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
-    release_proof_path="$sanitized_release_proof_path"
-
-    if proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-      log "regenerated release proof validated against the current ui localization release gate"
-    else
-      log "regenerated release proof still failed against the current ui localization release gate: $proof_validation_output"
-      log "retrying regenerated release proof against a freshly generated ui localization release gate"
-      ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
-        "$ui_repo" \
-        "$localization_gate_max_age_seconds" \
-        "$localization_gate_max_future_skew_seconds" \
-        "$complete_alias_root/chummer6-ui")"
-      bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
-      sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
-      ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
-
-      if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-        die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
-      fi
-    fi
-  fi
-
-  log "resolved release proof: $release_proof_path"
-  log "resolved ui localization release gate: $ui_localization_release_gate_path"
-  local release_proof_status
-  local ui_gate_status
-  release_proof_status="$(jq -r '.status // "missing"' "$release_proof_path" 2>/dev/null || true)"
-  ui_gate_status="$(jq -r '.status // "missing"' "$ui_localization_release_gate_path" 2>/dev/null || true)"
-  log "proof provenance: release proof status=${release_proof_status}, ui gate status=${ui_gate_status}"
+  local release_scope_verifier="$hub_alias/scripts/verify_release_scope_decision.py"
+  local release_scope_preflight_receipt="$work_root/.c/RELEASE_SCOPE_PREFLIGHT.generated.json"
+  [[ -f "$release_scope_verifier" && ! -L "$release_scope_verifier" ]] \
+    || die "release scope verifier is missing or unsafe: $release_scope_verifier"
+  log "verifying the immutable approved macOS release scope before candidate production"
+  command "$RELEASE_PYTHON_BIN" "$release_scope_verifier" \
+    --decision "$pinned_release_scope_decision" \
+    --expected-sha256 "$release_scope_expected_sha256" \
+    --authority "$release_scope_authority" \
+    --expected-release-version "$release_version" \
+    --expected-channel "$release_channel" \
+    --expected-platform macos \
+    --expected-rid "$rid" \
+    --expected-heads "$apps_raw" \
+    --output "$release_scope_preflight_receipt"
+  exact_incoming_scope="$(jq -r '.exactIncomingDesktopScope // empty' "$release_scope_preflight_receipt")"
+  [[ -n "$exact_incoming_scope" ]] \
+    || die "approved release scope did not project an exact desktop tuple set"
+  local canonical_exact_incoming_scope
+  canonical_exact_incoming_scope="$(normalize_release_exact_incoming_scope_transport \
+    "$RELEASE_PYTHON_BIN" \
+    "$exact_incoming_scope")" \
+    || die "approved release scope projected an invalid desktop tuple set"
+  [[ "$canonical_exact_incoming_scope" == "$exact_incoming_scope" ]] \
+    || die "approved release scope tuple transport is not canonical"
+  local approved_release_support_owner
+  approved_release_support_owner="$(jq -r '.supportOwner // empty' "$release_scope_preflight_receipt")"
+  [[ -n "$approved_release_support_owner" ]] \
+    || die "approved release scope omitted its bounded support owner"
+  local release_scope_required_heads
+  local release_scope_required_platforms
+  release_scope_required_heads="$(jq -r \
+    '[.platforms[] | .primaryHead, .fallbackHeads[]] | unique | join(",")' \
+    "$release_scope_preflight_receipt")"
+  release_scope_required_platforms="$(jq -r \
+    '[.platforms[].platform] | unique | join(",")' \
+    "$release_scope_preflight_receipt")"
+  [[ -n "$release_scope_required_heads" && -n "$release_scope_required_platforms" ]] \
+    || die "approved release scope did not project manifest head/platform floors"
+  export CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS="$release_scope_required_heads"
+  export CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS="$release_scope_required_platforms"
+  log "approved exact incoming desktop scope: $exact_incoming_scope"
 
   log "building media-factory compatibility assemblies"
   dotnet build "$media_repo/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj" -c Release --nologo -m:1 -p:RestoreDisableParallel=true
@@ -5350,6 +5656,7 @@ main() {
   cd "$ui_repo"
 
   local normalized_apps_csv="${apps_raw// /,}"
+  # shellcheck disable=SC2034 # consumed by array_values_nul via its variable-name API
   local -a raw_heads=()
   local -a app_heads=()
   local raw_head
@@ -5403,6 +5710,12 @@ main() {
     "$dist_dir/proof/build-provenance/v1/invocations" \
     "$dist_dir/proof/build-provenance/v1/sbom" \
     "$dist_dir/.build-provenance-state"
+  cp \
+    "$pinned_release_scope_decision" \
+    "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json"
+  cp \
+    "$release_scope_preflight_receipt" \
+    "$release_evidence_dir/RELEASE_SCOPE_PREFLIGHT.generated.json"
 
   local provenance_generator="$hub_alias/scripts/release/materialize_build_provenance.py"
   local provenance_support="$hub_alias/scripts/release/build_provenance_support.py"
@@ -5618,6 +5931,156 @@ main() {
       "$archive_receipt_path"
   done
 
+  log "all requested candidate bytes are built, startup-smoked, and provenance-sealed"
+  log "resolving current release proof after candidate build and before manifest materialization or upload"
+
+  local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
+  local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
+  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
+  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}"
+  local release_proof_path
+  local ui_localization_release_gate_path
+  local sanitized_release_proof_path
+  local sanitized_ui_localization_release_gate_path
+  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-86400}}"
+  local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
+  local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local release_proof_health=""
+  local ui_localization_release_gate_health=""
+
+  release_proof_path="$(resolve_hub_local_release_proof_path \
+    "$requested_release_proof" \
+    "$hub_alias/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$work_root/.c/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$fallback_release_proof_url")"
+  if [[ -n "$release_proof_path" ]]; then
+    if ! release_proof_health="$(json_generated_at_health \
+      "$release_proof_path" \
+      "release proof" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" 2>&1)"; then
+      log "$release_proof_health"
+      release_proof_path=""
+    fi
+  fi
+  if [[ -z "$release_proof_path" ]]; then
+    release_proof_path="$(mktemp)"
+    bootstrap_tmp_paths+=("$release_proof_path")
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
+      "$release_proof_path" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" \
+      "${registry_alias}/scripts/materialize_public_release_channel.py"
+    log "generated fresh hub local release proof at $release_proof_path"
+  fi
+
+  ui_localization_release_gate_path="$(resolve_first_existing_file_path \
+    "$requested_ui_localization_release_gate" \
+    "$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$fallback_ui_localization_release_gate_url")"
+  if [[ -n "$ui_localization_release_gate_path" ]]; then
+    if ! ui_localization_release_gate_health="$(json_generated_at_health \
+      "$ui_localization_release_gate_path" \
+      "ui localization release gate" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" 2>&1)"; then
+      log "$ui_localization_release_gate_health"
+      ui_localization_release_gate_path=""
+    fi
+  fi
+  if [[ -z "$ui_localization_release_gate_path" ]]; then
+    ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+      "$ui_repo" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" \
+      "$complete_alias_root/chummer6-ui")"
+    bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
+    log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
+  fi
+
+  if [[ -z "$release_proof_path" ]] || [[ ! -f "$release_proof_path" ]]; then
+    die "release proof file is missing and could not be generated: $release_proof_path"
+  fi
+  if [[ -z "$ui_localization_release_gate_path" ]] || [[ ! -f "$ui_localization_release_gate_path" ]]; then
+    die "ui localization release gate file is missing: set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
+  fi
+
+  sanitized_release_proof_path="$(mktemp)"
+  sanitized_ui_localization_release_gate_path="$(mktemp)"
+  bootstrap_tmp_paths+=("$sanitized_release_proof_path" "$sanitized_ui_localization_release_gate_path")
+  sanitize_release_proof_payload "$release_proof_path" "$sanitized_release_proof_path"
+  sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
+  release_proof_path="$sanitized_release_proof_path"
+  ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
+
+  local materializer_path="${registry_alias}/scripts/materialize_public_release_channel.py"
+  local proof_validation_output
+  if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+    log "release proof validation failed after candidate build: $proof_validation_output"
+    log "attempting fresh local hub release proof and ui localization release gate generation to recover"
+    local regenerated_release_proof_path
+    regenerated_release_proof_path="$(mktemp)"
+    bootstrap_tmp_paths+=("$regenerated_release_proof_path")
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
+      "$regenerated_release_proof_path" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" \
+      "$materializer_path"
+    sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
+    release_proof_path="$sanitized_release_proof_path"
+
+    if proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+      log "regenerated release proof validated against the current ui localization release gate"
+    else
+      log "regenerated release proof still failed against the current ui localization release gate: $proof_validation_output"
+      log "retrying regenerated release proof against a freshly generated ui localization release gate"
+      ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+        "$ui_repo" \
+        "$localization_gate_max_age_seconds" \
+        "$localization_gate_max_future_skew_seconds" \
+        "$complete_alias_root/chummer6-ui")"
+      bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
+      sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
+      ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
+
+      if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+        die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
+      fi
+    fi
+  fi
+
+  log "resolved release proof: $release_proof_path"
+  log "resolved ui localization release gate: $ui_localization_release_gate_path"
+  local release_proof_status
+  local ui_gate_status
+  release_proof_status="$(jq -r '.status // "missing"' "$release_proof_path" 2>/dev/null || true)"
+  ui_gate_status="$(jq -r '.status // "missing"' "$ui_localization_release_gate_path" 2>/dev/null || true)"
+  log "proof provenance: release proof status=${release_proof_status}, ui gate status=${ui_gate_status}"
+
+  local horizon_readiness_materializer="$hub_alias/scripts/materialize_horizon_readiness.py"
+  local horizon_readiness_verifier="$hub_alias/scripts/verify_horizon_readiness.py"
+  local horizon_readiness_path="$release_evidence_dir/HORIZON_READINESS.generated.json"
+  [[ -f "$horizon_readiness_materializer" ]] \
+    || die "catalog-driven horizon readiness materializer is missing: $horizon_readiness_materializer"
+  [[ -f "$horizon_readiness_verifier" ]] \
+    || die "catalog-driven horizon readiness verifier is missing: $horizon_readiness_verifier"
+  log "materializing catalog-driven horizon readiness after candidate and proof validation"
+  command "$RELEASE_PYTHON_BIN" "$horizon_readiness_materializer" \
+    --repo-root "$hub_alias" \
+    --output "$horizon_readiness_path"
+  command "$RELEASE_PYTHON_BIN" "$horizon_readiness_verifier" \
+    --repo-root "$hub_alias" \
+    --artifact "$horizon_readiness_path" \
+    --max-age-seconds 86400 \
+    --require-source-working
+
   log "generating release manifests"
   write_release_manifests \
     "$registry_alias" \
@@ -5774,6 +6237,132 @@ main() {
     fi
   fi
 
+  local generation_projection_path="$release_evidence_dir/GENERATION_PROJECTION.generated.json"
+  log "projecting both release manifests to immutable generation $release_generation_id"
+  command "$RELEASE_PYTHON_BIN" "$hub_alias/scripts/release_shelf_generation.py" \
+    project-manifests \
+    --canonical-manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --compatibility-manifest "$dist_dir/releases.json" \
+    --generation-id "$release_generation_id" \
+    > "$generation_projection_path"
+  command "$RELEASE_PYTHON_BIN" - \
+    "$generation_projection_path" \
+    "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$dist_dir/releases.json" \
+    "$release_generation_id" \
+    "$release_version" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import re
+import sys
+from pathlib import Path
+
+receipt_path, canonical_path, compatibility_path = map(Path, sys.argv[1:4])
+expected_generation_id, expected_version = sys.argv[4:6]
+receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+canonical_bytes = canonical_path.read_bytes()
+compatibility_bytes = compatibility_path.read_bytes()
+canonical = json.loads(canonical_bytes)
+compatibility = json.loads(compatibility_bytes)
+expected_fields = {
+    "generationId",
+    "releaseVersion",
+    "channel",
+    "publishedAt",
+    "canonicalManifestSha256",
+    "compatibilityManifestSha256",
+}
+if not isinstance(receipt, dict) or set(receipt) != expected_fields:
+    raise SystemExit("generation projection receipt has an unexpected schema")
+if receipt["generationId"] != expected_generation_id:
+    raise SystemExit("generation projection receipt does not bind the planned generationId")
+if receipt["releaseVersion"] != expected_version:
+    raise SystemExit("generation projection receipt does not bind the planned release version")
+if canonical.get("generationId") != expected_generation_id or compatibility.get("generationId") != expected_generation_id:
+    raise SystemExit("generation-projected manifests disagree with the planned generationId")
+for label, observed, body in (
+    ("canonical", receipt["canonicalManifestSha256"], canonical_bytes),
+    ("compatibility", receipt["compatibilityManifestSha256"], compatibility_bytes),
+):
+    if not isinstance(observed, str) or re.fullmatch(r"[0-9a-f]{64}", observed) is None:
+        raise SystemExit(f"{label} generation projection digest is not canonical SHA-256")
+    if not hmac.compare_digest(observed, hashlib.sha256(body).hexdigest()):
+        raise SystemExit(f"{label} generation projection digest does not bind exact bytes")
+PY
+  validate_release_payload_contracts "$dist_dir/RELEASE_CHANNEL.generated.json"
+
+  local release_scope_verification_receipt="$release_evidence_dir/RELEASE_SCOPE_VERIFICATION.generated.json"
+  log "verifying the generation-projected candidate inventory against the approved release scope"
+  command "$RELEASE_PYTHON_BIN" "$release_scope_verifier" \
+    --decision "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --expected-sha256 "$release_scope_expected_sha256" \
+    --authority "$release_scope_authority" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --promotion-evidence "$release_evidence_dir/public-promotion.json" \
+    --expected-release-version "$release_version" \
+    --expected-channel "$release_channel" \
+    --expected-platform macos \
+    --expected-rid "$rid" \
+    --expected-heads "$apps_raw" \
+    --output "$release_scope_verification_receipt"
+  [[ "$(jq -r '.exactIncomingDesktopScope // empty' "$release_scope_verification_receipt")" == "$exact_incoming_scope" ]] \
+    || die "candidate scope receipt disagrees with the upload-session exact tuple intent"
+
+  local release_authority_materializer="$registry_alias/scripts/materialize_release_authority_snapshot.py"
+  local release_authority_verifier="$registry_alias/scripts/verify_release_authority_snapshot.py"
+  [[ -z "${CHUMMER_RELEASE_SUPPORT_OWNER:-}" \
+      || "${CHUMMER_RELEASE_SUPPORT_OWNER}" == "$approved_release_support_owner" ]] \
+    || die "CHUMMER_RELEASE_SUPPORT_OWNER disagrees with the approved release scope"
+  local release_authority_support_owner="$approved_release_support_owner"
+  local release_authority_registry_commit
+  local release_authority_envelope_dir="$release_evidence_dir/.authority-envelope-$release_generation_id"
+  release_authority_registry_commit="$(git -C "$registry_repo" rev-parse HEAD)"
+  [[ -f "$release_authority_materializer" && ! -L "$release_authority_materializer" ]] \
+    || die "Registry release authority materializer is missing or unsafe: $release_authority_materializer"
+  [[ -f "$release_authority_verifier" && ! -L "$release_authority_verifier" ]] \
+    || die "Registry release authority verifier is missing or unsafe: $release_authority_verifier"
+  [[ "$release_authority_registry_commit" == "$registry_expected_commit" ]] \
+    || die "Registry release authority commit drifted after reviewed checkout validation"
+  [[ ! -e "$release_authority_envelope_dir" && ! -L "$release_authority_envelope_dir" ]] \
+    || die "temporary release authority envelope destination already exists"
+  local release_authority_file
+  for release_authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    [[ ! -e "$release_evidence_dir/$release_authority_file" \
+       && ! -L "$release_evidence_dir/$release_authority_file" ]] \
+      || die "release authority evidence destination already exists: $release_authority_file"
+  done
+  log "materializing review-required Registry authority for the exact generation-projected nightly"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_materializer" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --output-dir "$release_authority_envelope_dir" \
+    --registry-commit "$release_authority_registry_commit" \
+    --decision-status review_required \
+    --support-owner "$release_authority_support_owner" \
+    --generated-at "$published_at" \
+    --next-action "Run exact immutable-generation and CURRENT convergence after activation, then close preview readiness from those receipts." \
+    --blocking-finding "Postdeploy convergence proof is pending for this newly built nightly generation." \
+    --blocking-finding "Runtime horizon readiness remains unverified; this nightly must not be promoted as stable or gold." \
+    > "$release_evidence_dir/AUTHORITY_MATERIALIZATION.generated.json"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_verifier" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$release_authority_envelope_dir/CURRENT.json" \
+    --snapshot "$release_authority_envelope_dir/SNAPSHOT.json" \
+    --decision "$release_authority_envelope_dir/RELEASE_DECISION.json" \
+    > "$release_evidence_dir/AUTHORITY_VERIFICATION.generated.json"
+  for release_authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json; do
+    cp \
+      "$release_authority_envelope_dir/$release_authority_file" \
+      "$release_evidence_dir/$release_authority_file"
+  done
+  rm -f \
+    "$release_authority_envelope_dir/CURRENT.json" \
+    "$release_authority_envelope_dir/SNAPSHOT.json" \
+    "$release_authority_envelope_dir/RELEASE_DECISION.json"
+  rmdir "$release_authority_envelope_dir"
+
   log "validating governed build provenance against final release bytes"
   python3 "$hub_alias/scripts/release/verify_release_build_provenance_bundle.py" "$ui_repo/$dist_dir"
   validate_bundle_directory_integrity "$dist_dir"
@@ -5794,7 +6383,9 @@ main() {
       "$release_version" \
       "$release_channel" \
       "$rid" \
-      "$apps_raw"
+      "$apps_raw" \
+      "$exact_incoming_scope" \
+      "$release_scope_expected_sha256"
     return 0
   fi
 
@@ -5839,35 +6430,173 @@ main() {
       ;;
   esac
 
+  local upload_response_truth_receipt="$release_evidence_dir/RELEASE_UPLOAD_RESPONSE_TRUTH.generated.json"
   python3 "$hub_alias/scripts/verify_release_upload_response_truth.py" \
     --local-manifest "$dist_dir/releases.json" \
     --local-canonical-manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --upload-response "$response_path"
+    --upload-response "$response_path" \
+    --output "$upload_response_truth_receipt" \
+    >/dev/null
 
-  log "verifying local bundle manifest"
-  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
-    bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"
+  local response_generation_id
+  local response_canonical_manifest_sha256
+  local response_exact_incoming_scope
+  response_generation_id="$(jq -r '.generationId // empty' "$response_path")"
+  response_canonical_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$response_path")"
+  response_exact_incoming_scope="$(jq -r '.exactIncomingDesktopScope // empty' "$response_path")"
+  response_canonical_manifest_sha256="${response_canonical_manifest_sha256#sha256:}"
+  [[ "$response_generation_id" == "$release_generation_id" ]] \
+    || die "release upload response generationId does not match the planned immutable generation"
+  [[ "$response_canonical_manifest_sha256" == "$(jq -r '.canonicalManifestSha256' "$generation_projection_path")" ]] \
+    || die "release upload response canonical manifest digest does not match the generation-projected bytes"
+  [[ "$response_exact_incoming_scope" == "$exact_incoming_scope" ]] \
+    || die "release stage response does not bind the approved exact desktop scope"
 
-  log "verifying live canonical manifest at $canonical_verify_url"
-  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
-    bash scripts/verify-releases-manifest.sh "$canonical_verify_url"
+  local stage_receipt_id
+  local stage_target_pointer_sha256
+  stage_receipt_id="$(jq -r '.stageReceiptId // empty' "$response_path")"
+  stage_target_pointer_sha256="$(jq -r '.targetPointerSha256 // empty' "$response_path")"
+  [[ "$stage_receipt_id" =~ ^stage-[A-Za-z0-9._-]{16,120}$ ]] \
+    || die "release stage response is missing a canonical stageReceiptId"
+  [[ "$stage_target_pointer_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "release stage response is missing the exact inert target pointer digest"
+  [[ "$BOOTSTRAP_RELEASE_STAGE_SESSION_ID" =~ ^[0-9a-f]{32}$ ]] \
+    || die "release stage did not retain its exact upload-session identity"
+  [[ "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" =~ ^[A-Za-z0-9_-]{32,128}$ ]] \
+    || die "release stage did not retain a private probe grant"
+  release_upload_auth_value=""
 
-  log "verifying live release projection at $canonical_verify_url"
-  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path" "$require_compatibility_projection"
+  local live_convergence_verifier="$hub_alias/scripts/verify_live_release_convergence.py"
+  local live_convergence_base_url
+  live_convergence_base_url="$(resolve_https_release_origin "$canonical_verify_url")" \
+    || die "could not derive a safe HTTPS release origin from the canonical verification URL"
+  local live_convergence_timeout="${CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS:-15}"
+  local live_convergence_attempts="${CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS:-6}"
+  local live_convergence_retry_seconds="${CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS:-5}"
+  [[ "$live_convergence_timeout" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_timeout >= 1 && live_convergence_timeout <= 120 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS must be an integer from 1 through 120"
+  [[ "$live_convergence_attempts" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_attempts >= 1 && live_convergence_attempts <= 12 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS must be an integer from 1 through 12"
+  [[ "$live_convergence_retry_seconds" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_retry_seconds >= 1 && live_convergence_retry_seconds <= 10 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS must be an integer from 1 through 10"
+  [[ -f "$live_convergence_verifier" && ! -L "$live_convergence_verifier" ]] \
+    || die "live release convergence verifier is missing or unsafe: $live_convergence_verifier"
+  local expected_manifest_sha256
+  local expected_release_decision_sha256
+  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
+  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "staged release identity lacks immutable manifest or review-decision bindings"
 
-  if [[ -f "$response_path" ]]; then
-    chmod 600 "$response_path" 2>/dev/null || true
-    log "sanitized release upload response summary accepted; credential-bearing fields were discarded before persistence"
-    if is_true "$keep_upload_response"; then
-      log "sanitized release upload response summary retained at $response_path"
-    else
-      rm -f "$response_path"
-      BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=""
-      log "removed sanitized release upload response summary; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
+  local staged_probe_token_path
+  staged_probe_token_path="$(mktemp "$TMPDIR/chummer-staged-probe-token.XXXXXX")"
+  chmod 600 "$staged_probe_token_path"
+  bootstrap_tmp_paths+=("$staged_probe_token_path")
+  printf '%s\n' "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" > "$staged_probe_token_path"
+  BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
+  local staged_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_STAGED_CONVERGENCE.generated.json"
+  local staged_generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_STAGED_GENERATION_CONVERGENCE.generated.json"
+  local convergence_attempt
+  local staged_converged=0
+  log "privately probing the sealed review-required generation; public CURRENT remains unchanged"
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --staged-probe-token-file "$staged_probe_token_path" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$staged_convergence_receipt"; then
+      staged_converged=1
+      break
     fi
-  fi
+    (( convergence_attempt == live_convergence_attempts )) \
+      || sleep "$live_convergence_retry_seconds"
+  done
+  (( staged_converged == 1 )) \
+    || die "private staged release-facing routes did not converge. Receipt: $staged_convergence_receipt"
 
-  log "done"
+  local staged_generation_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --generation-id "$release_generation_id" \
+      --staged-probe-token-file "$staged_probe_token_path" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$staged_generation_convergence_receipt"; then
+      staged_generation_converged=1
+      break
+    fi
+    (( convergence_attempt == live_convergence_attempts )) \
+      || sleep "$live_convergence_retry_seconds"
+  done
+  (( staged_generation_converged == 1 )) \
+    || die "private immutable generation routes did not converge. Receipt: $staged_generation_convergence_receipt"
+  rm -f "$staged_probe_token_path"
+
+  local durable_stage_response="$release_evidence_dir/RELEASE_STAGE_RESPONSE.generated.json"
+  command "$RELEASE_PYTHON_BIN" - "$response_path" "$durable_stage_response" <<'PY'
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+raw = source.read_bytes()
+descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+  local finalizer_handoff_materializer="$hub_alias/scripts/materialize_staged_release_finalizer_handoff.py"
+  local finalizer_handoff_path="$release_evidence_dir/STAGED_RELEASE_FINALIZER_HANDOFF.generated.json"
+  [[ -f "$finalizer_handoff_materializer" && ! -L "$finalizer_handoff_materializer" ]] \
+    || die "staged release finalizer handoff materializer is missing or unsafe"
+  command "$RELEASE_PYTHON_BIN" "$finalizer_handoff_materializer" \
+    --workspace "$work_root" \
+    --session-id "$BOOTSTRAP_RELEASE_STAGE_SESSION_ID" \
+    --stage-response "$ui_repo/$durable_stage_response" \
+    --manifest "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --release-scope-decision "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --release-scope-verifier "$hub_alias/scripts/verify_release_scope_decision.py" \
+    --release-scope-verification "$ui_repo/$release_scope_verification_receipt" \
+    --promotion-evidence "$ui_repo/$release_evidence_dir/public-promotion.json" \
+    --release-scope-authority "$release_scope_authority" \
+    --predecessor-current "$ui_repo/$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    --staged-convergence "$ui_repo/$staged_convergence_receipt" \
+    --executed-bootstrap "$pinned_executed_bootstrap" \
+    --owner-finalizer "$hub_alias/scripts/finalize_staged_release.py" \
+    --scorecard-materializer "$hub_alias/scripts/materialize_release_scorecard_handoff.py" \
+    --authority-advance-materializer "$hub_alias/scripts/materialize_release_authority_advance_request.py" \
+    --authority-advance-verifier "$hub_alias/scripts/verify_release_authority_advance_response.py" \
+    --registry-current-inspector "$hub_alias/scripts/inspect_registry_release_authority_current.py" \
+    --live-convergence-verifier "$hub_alias/scripts/verify_live_release_convergence.py" \
+    --registry-authority-materializer "$registry_alias/scripts/materialize_release_authority_snapshot.py" \
+    --registry-authority-verifier "$registry_alias/scripts/verify_release_authority_snapshot.py" \
+    --registry-publish-materializer "$registry_alias/scripts/materialize_release_authority_publish_request.py" \
+    --registry-publish-verifier "$registry_alias/scripts/verify_release_authority_publish_response.py" \
+    --registry-authority-library "$registry_alias/scripts/release_authority_snapshot.py" \
+    --sessions-url "$sessions_url" \
+    --live-base-url "$live_convergence_base_url" \
+    --output "$ui_repo/$finalizer_handoff_path"
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
+  log "immutable nightly generation staged and privately verified; public CURRENT was not changed"
+  log "owner finalizer handoff: $finalizer_handoff_path"
+  log "status: review_required (awaiting separate owner-only scorecard, Registry CAS, and activation)"
+  return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

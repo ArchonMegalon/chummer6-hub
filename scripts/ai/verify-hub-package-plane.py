@@ -45,6 +45,13 @@ LOCAL_PROJECT_PACKAGE_IDS = frozenset(
         "Chummer.Run.Contracts",
     }
 )
+RELEASE_CONTROL_PYTHON_TESTS = (
+    "tests/test_verify_release_scope_decision.py",
+    "tests/test_materialize_staged_release_finalizer_handoff.py",
+    "tests/test_finalize_staged_release.py",
+    "tests/test_mac_release_bootstrap_authority_closure.py",
+    "tests/test_mac_release_stage_only.py",
+)
 
 
 class VerificationError(RuntimeError):
@@ -394,6 +401,17 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             (spec.package_id for spec in lock.packages),
         )
         env = bootstrap.isolated_environment(os.environ, package_root, cli_home, http_cache)
+        _run(
+            (
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                *RELEASE_CONTROL_PYTHON_TESTS,
+            ),
+            cwd=consumer,
+            env=env,
+        )
         owner_versions = {spec.package_id: spec.version for spec in lock.packages}
         common = (
             "-p:ChummerUseLocalCompatibilityTree=false",
@@ -515,6 +533,10 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "locked_mode_restore": True,
             "api_build": "pass",
             "api_tests": test_counts,
+            "release_control_python_tests": {
+                "status": "pass",
+                "files": list(RELEASE_CONTROL_PYTHON_TESTS),
+            },
             "contract_pack_license_gate": "pass",
         }
         _atomic_json(receipt_path.resolve(), payload)

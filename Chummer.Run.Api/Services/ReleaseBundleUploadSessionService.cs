@@ -22,7 +22,10 @@ public sealed record ReleaseUploadSession(
     DateTimeOffset? CompletedAtUtc = null,
     DateTimeOffset? ActivationAcknowledgedAtUtc = null,
     ReleaseUploadCandidateSessionBinding? CandidateImportBinding = null,
-    ReleaseDesktopTupleScope? ExactIncomingDesktopScope = null);
+    ReleaseDesktopTupleScope? ExactIncomingDesktopScope = null,
+    bool Staged = false,
+    ReleaseBundleStageResult? StageResult = null,
+    DateTimeOffset? StagedAtUtc = null);
 
 public sealed record ReleaseUploadChunkResult(
     string RelativePath,
@@ -151,7 +154,7 @@ public sealed class ReleaseBundleUploadSessionService
                     throw new InvalidOperationException(
                         "release upload authorization exact incoming desktop scope changed.");
                 }
-                if (existing.Completed)
+                if (existing.Completed || existing.Staged)
                 {
                     throw new InvalidOperationException("release upload authorization has already been consumed.");
                 }
@@ -568,12 +571,22 @@ public sealed class ReleaseBundleUploadSessionService
         => BeginCompletionCore(
             sessionId,
             authorizationBinding: null,
-            privilegedReconciliation: true);
+            privilegedReconciliation: true,
+            privilegedStagedActivation: false);
+
+    public ReleaseUploadSessionCompletionLease BeginPrivilegedStagedActivation(
+        string sessionId)
+        => BeginCompletionCore(
+            sessionId,
+            authorizationBinding: null,
+            privilegedReconciliation: false,
+            privilegedStagedActivation: true);
 
     private ReleaseUploadSessionCompletionLease BeginCompletionCore(
         string sessionId,
         string? authorizationBinding,
-        bool privilegedReconciliation)
+        bool privilegedReconciliation,
+        bool privilegedStagedActivation = false)
     {
         sessionId = CanonicalizeSessionId(sessionId);
         FileStream quotaLock = AcquireQuotaLock();
@@ -585,13 +598,15 @@ public sealed class ReleaseBundleUploadSessionService
                 sessionId,
                 authorizationBinding,
                 allowCompleted: true,
-                privilegedReconciliation);
+                privilegedReconciliation,
+                privilegedStagedActivation);
             return new ReleaseUploadSessionCompletionLease(
                 this,
                 quotaLock,
                 sessionLock,
                 session,
-                privilegedReconciliation);
+                privilegedReconciliation,
+                privilegedStagedActivation);
         }
         catch
         {
@@ -1099,7 +1114,7 @@ public sealed class ReleaseBundleUploadSessionService
             }
 
             string binding = ValidateDurableSessionState(session, canonicalSessionId);
-            if (!session.Completed && EffectiveExpiry(session) > DateTimeOffset.UtcNow)
+            if (!session.Completed && !session.Staged && EffectiveExpiry(session) > DateTimeOffset.UtcNow)
             {
                 activeSessionCount++;
                 activeByAuthorization[binding] =
@@ -1285,10 +1300,11 @@ public sealed class ReleaseBundleUploadSessionService
         string sessionId,
         string? authorizationBinding,
         bool allowCompleted,
-        bool privilegedReconciliation = false)
+        bool privilegedReconciliation = false,
+        bool privilegedStagedActivation = false)
     {
         sessionId = CanonicalizeSessionId(sessionId);
-        string? normalizedAuthorizationBinding = privilegedReconciliation
+        string? normalizedAuthorizationBinding = privilegedReconciliation || privilegedStagedActivation
             ? null
             : NormalizeAuthorizationBinding(authorizationBinding);
         string sessionRoot = Path.Combine(ResolveSessionsRoot(), sessionId);
@@ -1329,6 +1345,14 @@ public sealed class ReleaseBundleUploadSessionService
                     "upload session has no unresolved activation eligible for privileged reconciliation.");
             }
         }
+        else if (privilegedStagedActivation)
+        {
+            if (!session.Staged || session.StageResult is null || session.Publishing)
+            {
+                throw new InvalidOperationException(
+                    "upload session has no staged generation eligible for privileged activation.");
+            }
+        }
         else if (!string.Equals(
                      storedAuthorizationBinding,
                      normalizedAuthorizationBinding,
@@ -1349,10 +1373,12 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException("upload session has expired.");
         }
 
-        if ((session.Completed || session.Publishing) && !allowCompleted)
+        if ((session.Completed || session.Publishing || session.Staged) && !allowCompleted)
         {
             throw new InvalidDataException(
-                session.Completed
+                session.Staged
+                    ? "upload session has already been staged."
+                    : session.Completed
                     ? "upload session has already been completed."
                     : "upload session publication outcome requires reconciliation.");
         }
@@ -1373,9 +1399,9 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException(
                 "release activation intent exact incoming desktop scope does not match its authenticated upload session.");
         }
-        if (session.Completed)
+        if (session.Completed || session.Staged)
         {
-            throw new InvalidOperationException("upload session has already been completed.");
+            throw new InvalidOperationException("upload session has already crossed its immutable completion boundary.");
         }
 
         if (session.ActivationIntent is not null)
@@ -1441,6 +1467,98 @@ public sealed class ReleaseBundleUploadSessionService
         string sessionRoot = Path.Combine(ResolveSessionsRoot(), session.SessionId);
         PersistMetadata(sessionRoot, completed);
         CleanupCompletedPayload(sessionRoot, session.SessionId);
+    }
+
+    private void MarkSessionStaged(
+        ReleaseUploadSession session,
+        ReleaseBundleStageResult result)
+    {
+        ValidateStageResult(result, session);
+        if (session.Publishing || session.Completed || session.Staged
+            || session.ActivationIntent is not null)
+        {
+            throw new InvalidOperationException(
+                "only an uncommitted upload session can be sealed as a staged generation.");
+        }
+
+        ReleaseBundleStageResult durableResult = result with
+        {
+            ProbeToken = null,
+            ProbeTokenExpiresAtUtc = null
+        };
+        ReleaseUploadSession staged = session with
+        {
+            Staged = true,
+            StageResult = durableResult,
+            StagedAtUtc = result.StagedAtUtc
+        };
+        string sessionRoot = Path.Combine(ResolveSessionsRoot(), session.SessionId);
+        PersistMetadata(sessionRoot, staged);
+        CleanupCompletedPayload(sessionRoot, session.SessionId);
+    }
+
+    private void MarkStagedSessionActivated(
+        ReleaseUploadSession session,
+        ReleaseBundlePromotionResult result)
+    {
+        if (!session.Staged || session.StageResult is null || session.Publishing)
+        {
+            throw new InvalidOperationException(
+                "upload session does not hold a staged generation.");
+        }
+        if (!string.Equals(session.StageResult.GenerationId, result.GenerationId, StringComparison.Ordinal)
+            || !string.Equals(session.StageResult.Version, result.Version, StringComparison.Ordinal)
+            || !string.Equals(session.StageResult.Channel, result.Channel, StringComparison.Ordinal)
+            || !string.Equals(session.StageResult.InventoryDigest, result.InventoryDigest, StringComparison.Ordinal)
+            || !string.Equals(
+                session.StageResult.ExactIncomingDesktopScope,
+                result.ExactIncomingDesktopScope,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "staged activation result does not match its durable upload-session receipt.");
+        }
+        if (session.Completed)
+        {
+            if (session.CompletionResult == result)
+            {
+                return;
+            }
+            throw new InvalidOperationException(
+                "staged upload session is already bound to a different activation result.");
+        }
+
+        PersistMetadata(
+            Path.Combine(ResolveSessionsRoot(), session.SessionId),
+            session with
+            {
+                Completed = true,
+                CompletionResult = result with { SignedInInstallClaims = null },
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            });
+    }
+
+    private static void ValidateStageResult(
+        ReleaseBundleStageResult result,
+        ReleaseUploadSession session)
+    {
+        if (!IsSafeActivationIdentifier(result.GenerationId)
+            || !IsSafeActivationIdentifier(result.StageReceiptId)
+            || result.PublishedAt.Offset != TimeSpan.Zero
+            || result.StagedAtUtc.Offset != TimeSpan.Zero
+            || !IsSha256Binding(result.InventoryDigest)
+            || !IsBareSha256(result.CanonicalManifestSha256)
+            || !IsBareSha256(result.CompatibilityManifestSha256)
+            || !IsBareSha256(result.TargetPointerSha256)
+            || result.CandidateArtifactIds.Count == 0
+            || result.CandidateArtifactIds.Any(static id => !IsSafeActivationIdentifier(id))
+            || !ExactScopeMatches(
+                session.ExactIncomingDesktopScope,
+                result.ExactIncomingDesktopScope))
+        {
+            throw new InvalidDataException(
+                "release stage result does not match its authenticated upload session.");
+        }
     }
 
     private static void ValidateActivationIntent(ReleaseActivationIntent intent)
@@ -1549,8 +1667,12 @@ public sealed class ReleaseBundleUploadSessionService
         if (!string.Equals(session.AuthorizationBinding, authorizationBinding, StringComparison.Ordinal)
             || !string.Equals(session.SessionId, expectedSessionId, StringComparison.Ordinal)
             || session.Completed && session.Publishing
+            || session.Staged && session.Publishing
             || session.Completed && session.CompletionResult is null
             || !session.Completed && session.CompletionResult is not null
+            || session.Staged && session.StageResult is null
+            || !session.Staged && session.StageResult is not null
+            || session.Staged != (session.StagedAtUtc is not null)
             || session.SingleUseAuthorization && session.AuthorizationExpiresAtUtc is null
             || session.Publishing && session.ActivationIntent is null
             || !session.Publishing && !session.Completed && session.ActivationIntent is not null
@@ -1571,6 +1693,17 @@ public sealed class ReleaseBundleUploadSessionService
             }
         }
         session.ExactIncomingDesktopScope?.ValidateCanonical();
+
+        if (session.Staged)
+        {
+            ValidateStageResult(session.StageResult!, session);
+            if (session.StageResult!.ProbeToken is not null
+                || session.StageResult.ProbeTokenExpiresAtUtc is not null)
+            {
+                throw new InvalidDataException(
+                    "durable upload session metadata must not retain staged probe credentials.");
+            }
+        }
 
         if (session.ActivationIntent is not null)
         {
@@ -1890,15 +2023,31 @@ public sealed class ReleaseBundleUploadSessionService
 
     private DateTimeOffset EffectiveExpiry(ReleaseUploadSession session)
     {
-        if (session.Publishing || session.Completed && session.ActivationAcknowledgedAtUtc is null)
+        if (session.Publishing
+            || session.Completed
+               && session.ActivationIntent is not null
+               && session.ActivationAcknowledgedAtUtc is null)
         {
             return DateTimeOffset.MaxValue;
+        }
+
+        if (session.Staged)
+        {
+            DateTimeOffset retentionExpiry = session.StagedAtUtc!.Value.Add(
+                _options.CompletedReceiptRetention);
+            if (session.SingleUseAuthorization
+                && session.AuthorizationExpiresAtUtc is { } authorizationExpiry
+                && authorizationExpiry > retentionExpiry)
+            {
+                return authorizationExpiry;
+            }
+            return retentionExpiry;
         }
 
         if (session.Completed)
         {
             DateTimeOffset retentionExpiry =
-                session.ActivationAcknowledgedAtUtc!.Value.Add(
+                (session.ActivationAcknowledgedAtUtc ?? session.CompletedAtUtc!.Value).Add(
                     _options.CompletedReceiptRetention);
             if (session.SingleUseAuthorization
                 && session.AuthorizationExpiresAtUtc is { } authorizationExpiry
@@ -2259,13 +2408,15 @@ public sealed class ReleaseBundleUploadSessionService
             FileStream quotaLock,
             FileStream sessionLock,
             ReleaseUploadSession session,
-            bool recoveryOnly)
+            bool recoveryOnly,
+            bool stagedActivationOnly = false)
         {
             _owner = owner;
             _quotaLock = quotaLock;
             _sessionLock = sessionLock;
             _session = session;
             RecoveryOnly = recoveryOnly;
+            StagedActivationOnly = stagedActivationOnly;
         }
 
         public string BundleRoot => _session.BundleRoot;
@@ -2276,8 +2427,11 @@ public sealed class ReleaseBundleUploadSessionService
         public ReleaseActivationIntent? ActivationIntent => _session.ActivationIntent;
         public ReleaseBundlePromotionResult? CompletedResult
             => _session.Completed ? _session.CompletionResult : null;
+        public ReleaseBundleStageResult? StagedResult
+            => _session.Staged ? _session.StageResult : null;
         public bool PublicationOutcomeUnknown => _session.Publishing && !_session.Completed;
         public bool RecoveryOnly { get; }
+        public bool StagedActivationOnly { get; }
 
         public ReleaseUploadStorageReadiness EvaluateUploadStorageReadiness()
             => _owner.EvaluateStorageReadinessUnderQuotaLock(_owner.ResolveSessionsRoot());
@@ -2313,6 +2467,34 @@ public sealed class ReleaseBundleUploadSessionService
             _session = _session with
             {
                 Publishing = false,
+                Completed = true,
+                CompletionResult = result with { SignedInInstallClaims = null },
+                CompletedAtUtc = DateTimeOffset.UtcNow
+            };
+        }
+
+        public void MarkStaged(ReleaseBundleStageResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            _owner.MarkSessionStaged(_session, result);
+            _session = _session with
+            {
+                Staged = true,
+                StageResult = result with
+                {
+                    ProbeToken = null,
+                    ProbeTokenExpiresAtUtc = null
+                },
+                StagedAtUtc = result.StagedAtUtc
+            };
+        }
+
+        public void MarkStagedActivated(ReleaseBundlePromotionResult result)
+        {
+            ArgumentNullException.ThrowIfNull(result);
+            _owner.MarkStagedSessionActivated(_session, result);
+            _session = _session with
+            {
                 Completed = true,
                 CompletionResult = result with { SignedInInstallClaims = null },
                 CompletedAtUtc = DateTimeOffset.UtcNow

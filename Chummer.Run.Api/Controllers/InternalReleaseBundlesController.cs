@@ -10,6 +10,9 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class InternalReleaseBundlesController : ControllerBase
 {
+    internal const long MaxReleaseAuthorityAdvanceRequestBodyBytes =
+        ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes;
+
     public const string ExactIncomingDesktopScopeHeader =
         "X-Chummer-Release-Exact-Incoming-Scope";
 
@@ -23,6 +26,7 @@ public sealed class InternalReleaseBundlesController : ControllerBase
     private readonly InstallLinkingService _installLinking;
     private readonly PublicCanonicalOriginPolicy _publicOrigin;
     private readonly ILogger<InternalReleaseBundlesController> _logger;
+    private readonly ReleaseAuthorityRevisionStore? _releaseAuthorityRevisions;
 
     public InternalReleaseBundlesController(
         ReleaseBundlePromotionService promotionService,
@@ -35,7 +39,8 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         PublicCanonicalOriginPolicy? publicOrigin = null,
         ILogger<InternalReleaseBundlesController>? logger = null,
         ReleaseUploadQuotaOptions? uploadOptions = null,
-        ReleaseShelfGenerationStore? releaseShelfStore = null)
+        ReleaseShelfGenerationStore? releaseShelfStore = null,
+        ReleaseAuthorityRevisionStore? releaseAuthorityRevisions = null)
     {
         _promotionService = promotionService;
         _uploadSessions = uploadSessions;
@@ -47,6 +52,181 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         _installLinking = installLinking;
         _publicOrigin = publicOrigin ?? PublicCanonicalOriginPolicy.CreateUnitTestDefault(configuration);
         _logger = logger ?? NullLogger<InternalReleaseBundlesController>.Instance;
+        _releaseAuthorityRevisions = releaseAuthorityRevisions;
+    }
+
+    [HttpPost("/api/internal/releases/generations/{generationId}/authority-advances")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(MaxReleaseAuthorityAdvanceRequestBodyBytes)]
+    [ProducesResponseType<ReleaseAuthorityRevisionAdvanceResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<ReleaseAuthorityRevisionAdvanceResult>> AdvanceReleaseAuthority(
+        [FromRoute] string generationId,
+        [FromBody] ReleaseAuthorityRevisionAdvanceRequest? request,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization = RequirePrevalidatedAuthorization(
+            out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        if (authorization!.UploadTicketClaims is not null)
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        }
+
+        if (_releaseAuthorityRevisions is null)
+        {
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release authority advance unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
+
+        if (request is null
+            || string.IsNullOrWhiteSpace(generationId)
+            || !string.Equals(request.GenerationId, generationId, StringComparison.Ordinal))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release authority advance rejected",
+                "the route generationId and request generationId must be present and match exactly.",
+                "https://chummer.run/problems/release-authority/invalid-generation");
+        }
+
+        try
+        {
+            ReleaseAuthorityRevisionAdvanceResult result =
+                await _releaseAuthorityRevisions.AdvancePreviewReadyAsync(
+                    request,
+                    cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception exception) when (exception is ReleaseAuthorityRevisionConcurrencyException
+                                          or ReleaseShelfMutationConcurrencyException)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Release authority advance conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/conflict");
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                          or JsonException
+                                          or NotSupportedException
+                                          or ArgumentException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release authority advance rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/rejected");
+        }
+        catch (Exception exception) when (exception is IOException
+                                          or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release authority advance unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
+    }
+
+    [HttpPost("/api/internal/releases/stages/{stageReceiptId}/authority-advances")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(MaxReleaseAuthorityAdvanceRequestBodyBytes)]
+    [ProducesResponseType<ReleaseAuthorityRevisionAdvanceResult>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReleaseAuthorityRevisionAdvanceResult>> AdvanceStagedReleaseAuthority(
+        [FromRoute] string stageReceiptId,
+        [FromBody] ReleaseAuthorityRevisionAdvanceRequest? request,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization = RequirePrevalidatedAuthorization(
+            out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        if (!authorization!.AllowsPrivilegedReconciliation)
+        {
+            return BuildProblem(
+                StatusCodes.Status403Forbidden,
+                "Privileged staged authority required",
+                "only the owner control authority may prepare a staged release successor.",
+                "https://chummer.run/problems/release-authority/staged-forbidden");
+        }
+        if (_releaseAuthorityRevisions is null)
+        {
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Staged release authority unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
+        if (request is null || string.IsNullOrWhiteSpace(stageReceiptId))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Staged release authority rejected",
+                "stageReceiptId and an exact authority successor are required.",
+                "https://chummer.run/problems/release-authority/invalid-stage");
+        }
+
+        try
+        {
+            ReleaseShelfSnapshot target = _promotionService.CaptureStagedSnapshot(
+                stageReceiptId,
+                out string? expectedPredecessorPointerSha256);
+            if (!string.Equals(target.GenerationId, request.GenerationId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "staged release authority generation does not match its stage receipt.");
+            }
+            ReleaseAuthorityRevisionAdvanceResult result =
+                await _releaseAuthorityRevisions.AdvanceStagedPreviewReadyAsync(
+                    request,
+                    target,
+                    expectedPredecessorPointerSha256,
+                    cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception exception) when (exception is ReleaseAuthorityRevisionConcurrencyException
+                                           or ReleaseShelfMutationConcurrencyException)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Staged release authority conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/conflict");
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                           or InvalidOperationException
+                                           or JsonException
+                                           or NotSupportedException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Staged release authority rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/rejected");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Staged release authority unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
     }
 
     [HttpPost("/api/internal/releases/bundles")]
@@ -618,6 +798,213 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 StatusCodes.Status503ServiceUnavailable,
                 "Release upload infrastructure failure",
                 "release upload session storage is unavailable.",
+                "https://chummer.run/problems/release-bundle/unavailable");
+        }
+    }
+
+    [HttpPost("/api/internal/releases/upload-sessions/{sessionId}/stage")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType<ReleaseBundleStageResult>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReleaseBundleStageResult>> StageUploadSession(
+        [FromRoute] string sessionId,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization = RequirePrevalidatedAuthorization(
+            out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        if (string.IsNullOrWhiteSpace(sessionId) || !Guid.TryParse(sessionId, out _))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Upload session stage rejected",
+                "sessionId is required and must be a valid GUID.",
+                "https://chummer.run/problems/release-bundle/invalid-session-id");
+        }
+
+        try
+        {
+            using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+                _uploadSessions.BeginCompletion(sessionId, authorization!.AuthorizationBinding);
+            if (completion.CandidateImportBinding
+                != authorization.CandidateImportAuthority?.SessionBinding)
+            {
+                throw new InvalidDataException(
+                    "upload session candidate authority does not match its exact creator binding.");
+            }
+            if (completion.CompletedResult is not null || completion.PublicationOutcomeUnknown)
+            {
+                return BuildProblem(
+                    StatusCodes.Status409Conflict,
+                    "Upload session stage rejected",
+                    "an activated or unresolved legacy publication cannot be converted into a staged generation.",
+                    "https://chummer.run/problems/release-bundle/stage-conflict");
+            }
+            if (completion.StagedResult is { } existing)
+            {
+                ReleaseStageProbeGrant renewed = _promotionService.RenewStageProbe(
+                    existing.StageReceiptId,
+                    sessionId);
+                return Ok(existing with
+                {
+                    ProbeToken = renewed.Token,
+                    ProbeTokenExpiresAtUtc = renewed.ExpiresAtUtc
+                });
+            }
+
+            if (authorization.CandidateImportAuthority is not null)
+            {
+                ReleaseUploadCandidateBundleValidator.Validate(
+                    completion.BundleRoot,
+                    authorization.CandidateImportAuthority);
+            }
+            await _promotionService.ValidateDirectoryAsync(
+                completion.BundleRoot,
+                completion.ExactIncomingDesktopScope,
+                cancellationToken);
+            ObjectResult? admissionFailure = EvaluateFreshCompletionAdmission(
+                completion,
+                cancellationToken);
+            if (admissionFailure is not null)
+            {
+                return admissionFailure;
+            }
+
+            ReleaseBundleStageResult staged = await _promotionService.StageDirectoryAsync(
+                completion.BundleRoot,
+                completion.ExactIncomingDesktopScope,
+                sessionId,
+                cancellationToken);
+            completion.MarkStaged(staged);
+            return Ok(staged);
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                           or InvalidOperationException
+                                           or JsonException
+                                           or NotSupportedException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Upload session stage rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/stage-rejected");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release stage unavailable",
+                "release stage storage is unavailable.",
+                "https://chummer.run/problems/release-bundle/unavailable");
+        }
+    }
+
+    [HttpPost("/api/internal/releases/upload-sessions/{sessionId}/activate-staged")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType<ReleaseBundlePromotionResult>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<ReleaseBundlePromotionResult>> ActivateStagedUploadSession(
+        [FromRoute] string sessionId,
+        [FromBody] ReleaseStagedActivationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization = RequirePrevalidatedAuthorization(
+            out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        if (!authorization!.AllowsPrivilegedReconciliation)
+        {
+            return BuildProblem(
+                StatusCodes.Status403Forbidden,
+                "Privileged staged activation required",
+                "only the owner control authority may commit a staged release generation.",
+                "https://chummer.run/problems/release-bundle/staged-activation-forbidden");
+        }
+        if (request is null
+            || string.IsNullOrWhiteSpace(sessionId)
+            || !Guid.TryParse(sessionId, out _))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Staged activation rejected",
+                "sessionId and an exact staged activation request are required.",
+                "https://chummer.run/problems/release-bundle/invalid-staged-activation");
+        }
+
+        try
+        {
+            using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease activation =
+                _uploadSessions.BeginPrivilegedStagedActivation(sessionId);
+            if (!activation.StagedActivationOnly || activation.StagedResult is null)
+            {
+                throw new InvalidOperationException(
+                    "staged activation did not acquire an owner-only staged-session lease.");
+            }
+            if (!string.Equals(
+                    activation.StagedResult.StageReceiptId,
+                    request.StageReceiptId,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "staged activation request does not match the upload-session stage receipt.");
+            }
+            if (activation.CompletedResult is { } completed)
+            {
+                return Ok(completed);
+            }
+
+            ReleaseBundlePromotionResult result =
+                await _promotionService.ActivateStagedGenerationAsync(
+                    request,
+                    cancellationToken);
+            activation.MarkStagedActivated(result);
+            return Ok(result);
+        }
+        catch (Exception exception) when (exception is ReleaseShelfMutationConcurrencyException
+                                           or ReleaseAuthorityRevisionConcurrencyException)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Staged activation conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/staged-activation-conflict");
+        }
+        catch (ReleaseActivationOutcomeUnknownException)
+        {
+            return BuildPublicationOutcomeUnknown();
+        }
+        catch (ReleaseActivationAbortedException exception)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Staged activation aborted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/staged-activation-aborted");
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                           or InvalidOperationException
+                                           or JsonException
+                                           or NotSupportedException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Staged activation rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/staged-activation-rejected");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Staged activation unavailable",
+                "staged activation storage is unavailable.",
                 "https://chummer.run/problems/release-bundle/unavailable");
         }
     }

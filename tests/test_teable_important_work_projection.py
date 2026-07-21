@@ -31,6 +31,78 @@ def clear_local_env_cache(module) -> None:
     module.local_env_assignments.cache_clear()
 
 
+def seed_shared_render_lane(
+    root: Path,
+    *,
+    include_propertyquarry_bridge: bool = True,
+    include_internal_controller: bool = True,
+    include_signed_in_route: bool = True,
+) -> None:
+    (root / "Chummer.Run.Api/Services/Community").mkdir(parents=True, exist_ok=True)
+    (root / "Chummer.Run.Api/Services").mkdir(parents=True, exist_ok=True)
+    (root / "Chummer.Run.Api/Controllers").mkdir(parents=True, exist_ok=True)
+    (root / "Chummer.Run.Api/Services/Community/HorizonGovernedRenderRequestComposerService.cs").write_text(
+        "\n".join(
+            [
+                'public const string OrchestrationLane = "ea_governed_render";',
+                'public const string ContractName = "chummer6-hub.horizon_governed_render_request.v1";',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (root / "Chummer.Run.Api/Services/RunsiteOrientationArtifactRequestBridgeService.cs").write_text(
+        "\n".join(
+            [
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "runsite-scene-render"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    if include_propertyquarry_bridge:
+        (root / "Chummer.Run.Api/Services/PropertyquarryApartmentVideoArtifactRequestBridgeService.cs").write_text(
+            "\n".join(
+                [
+                    'private const string DefaultPreferredProvider = "magicai";',
+                    'ArtifactKindOrCapabilityId: "propertyquarry-apartment-video"',
+                    "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+                    "propertyquarry:property-packet",
+                    "propertyquarry:property-continuity",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    if include_internal_controller:
+        (root / "Chummer.Run.Api/Controllers/InternalPropertyquarryApartmentVideoController.cs").write_text(
+            "\n".join(
+                [
+                    '[HttpPost("/api/internal/propertyquarry/apartment-videos/requests")]',
+                    '[HttpPost("/api/internal/propertyquarry/apartment-videos/artifact-requests")]',
+                    "PropertyquarryApartmentVideoArtifactRequestBridgeResult",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    if include_signed_in_route:
+        (root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs").write_text(
+            "\n".join(
+                [
+                    '[HttpPost("me/property-workspaces/{propertyId}/apartment-video")]',
+                    "PropertyquarryApartmentVideoRequest",
+                    "BuildPropertyquarryApartmentVideoLane(property)",
+                    "apartmentVideoRequestApiHrefTemplate",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+
 def make_item(module, item_id: str):
     return module.ImportantWorkItem(
         item_id,
@@ -830,7 +902,10 @@ def test_sync_to_teable_stops_after_deadline(monkeypatch):
     assert result["updated_count"] == 0
     assert result["failed_count"] == 2
     assert result["last_item_id"] == "item-2"
-    assert result["errors"] == ["update:item-1..item-2:teable_sync_deadline_exceeded"]
+    assert result["errors"] == [
+        "item-1:teable_sync_deadline_exceeded",
+        "item-2:teable_sync_deadline_exceeded",
+    ]
 
 
 def test_sync_to_teable_splits_large_update_sets_into_bounded_batches(monkeypatch):
@@ -964,10 +1039,10 @@ def test_sync_to_teable_does_not_retry_permanent_update_failure(monkeypatch):
     assert attempts == 1
     assert result["retry_count"] == 0
     assert result["failed_count"] == 1
-    assert result["errors"] == ["update:item-1..item-1:teable_http_400:invalid field"]
+    assert result["errors"] == ["item-1:teable_http_400"]
 
 
-def test_sync_to_teable_reconciles_ambiguous_create_before_retry(monkeypatch):
+def test_sync_to_teable_reconciles_ambiguous_create_without_reposting(monkeypatch):
     module = load_module()
     items = [
         module.ImportantWorkItem(
@@ -984,7 +1059,6 @@ def test_sync_to_teable_reconciles_ambiguous_create_before_retry(monkeypatch):
         )
         for index in (1, 2)
     ]
-    record_snapshots = iter([{}, {"item-1": "rec-1"}])
     create_batches: list[list[str]] = []
 
     monkeypatch.setattr(module, "important_work_items", lambda repo_root=module.RUN_SERVICES_ROOT: items)
@@ -992,15 +1066,19 @@ def test_sync_to_teable_reconciles_ambiguous_create_before_retry(monkeypatch):
     monkeypatch.setattr(
         module,
         "existing_record_ids_by_item_id",
-        lambda *args, **kwargs: next(record_snapshots),
+        lambda *args, **kwargs: {},
     )
+
+    def reconcile(*args, expected_fields=None, **kwargs):
+        assert expected_fields is not None
+        return "rec-1" if args[3] == "item-1" else None
+
+    monkeypatch.setattr(module, "find_existing_record", reconcile)
 
     def flaky_create_batch(*args, **kwargs):
         batch = args[3]
         create_batches.append([item.item_id for item in batch])
-        if len(create_batches) == 1:
-            raise RuntimeError("teable_timeout_after_15s")
-        return len(batch)
+        raise RuntimeError("teable_timeout_after_15s")
 
     monkeypatch.setattr(module, "create_record_batch", flaky_create_batch)
 
@@ -1015,12 +1093,12 @@ def test_sync_to_teable_reconciles_ambiguous_create_before_retry(monkeypatch):
         retry_backoff_seconds=0,
     )
 
-    assert result["state"] == "passed"
-    assert create_batches == [["item-1", "item-2"], ["item-2"]]
-    assert result["created_count"] == 2
+    assert result["state"] == "failed"
+    assert create_batches == [["item-1", "item-2"]]
+    assert result["created_count"] == 1
     assert result["reconciled_create_count"] == 1
-    assert result["retry_count"] == 1
-    assert result["errors"] == []
+    assert result["retry_count"] == 0
+    assert result["errors"] == ["item-2:teable_create_reconciliation_absent"]
 
 
 def test_sync_to_teable_never_blindly_retries_create_when_reconciliation_fails(monkeypatch):
@@ -1028,17 +1106,12 @@ def test_sync_to_teable_never_blindly_retries_create_when_reconciliation_fails(m
     item = module.ImportantWorkItem(
         "item-1", "Item 1", "Ops", "P0", "active", "daily", "test", "why", "next", "gate"
     )
-    record_lookup_count = 0
     create_attempts = 0
 
     monkeypatch.setattr(module, "important_work_items", lambda repo_root=module.RUN_SERVICES_ROOT: [item])
     monkeypatch.setattr(module, "ensure_fields", lambda *args, **kwargs: None)
 
-    def record_ids(*args, **kwargs):
-        nonlocal record_lookup_count
-        record_lookup_count += 1
-        if record_lookup_count == 1:
-            return {}
+    def failed_reconciliation(*args, **kwargs):
         raise RuntimeError("teable_timeout_after_15s")
 
     def ambiguous_create(*args, **kwargs):
@@ -1046,7 +1119,8 @@ def test_sync_to_teable_never_blindly_retries_create_when_reconciliation_fails(m
         create_attempts += 1
         raise RuntimeError("teable_timeout_after_15s")
 
-    monkeypatch.setattr(module, "existing_record_ids_by_item_id", record_ids)
+    monkeypatch.setattr(module, "existing_record_ids_by_item_id", lambda *args, **kwargs: {})
+    monkeypatch.setattr(module, "find_existing_record", failed_reconciliation)
     monkeypatch.setattr(module, "create_record_batch", ambiguous_create)
 
     result = module.sync_to_teable(
@@ -1064,9 +1138,7 @@ def test_sync_to_teable_never_blindly_retries_create_when_reconciliation_fails(m
     assert create_attempts == 1
     assert result["retry_count"] == 0
     assert result["failed_count"] == 1
-    assert result["errors"] == [
-        "create:item-1..item-1:ambiguous_create_reconciliation_failed:teable_timeout_after_15s"
-    ]
+    assert result["errors"] == ["item-1:teable_timeout"]
 
 
 def test_sync_upserts_to_configured_table(monkeypatch):
@@ -1085,16 +1157,6 @@ def test_sync_upserts_to_configured_table(monkeypatch):
         assert api_key == "demo-token"
         if method == "GET" and "/field?" in url:
             return [{"name": field["name"]} for field in module.REQUIRED_FIELDS]
-        if method == "GET" and "/record?fieldKeyType=name&take=1000" in url:
-            first_item = module.important_work_items()[0]
-            return {
-                "records": [
-                    {
-                        "id": "rec-existing",
-                        "fields": {"Item Id": first_item.item_id},
-                    }
-                ]
-            }
         if method == "PATCH" and url.endswith("/record"):
             assert payload is not None
             return [
@@ -1112,6 +1174,12 @@ def test_sync_upserts_to_configured_table(monkeypatch):
         raise AssertionError(f"unexpected request {method} {url}")
 
     monkeypatch.setattr(module, "send_json", fake_send_json)
+    first_item = module.important_work_items()[0]
+    monkeypatch.setattr(
+        module,
+        "existing_record_ids_by_item_id",
+        lambda *args, **kwargs: {first_item.item_id: "rec-existing"},
+    )
 
     result = module.sync_to_teable(
         api_key="demo-token",
@@ -1129,13 +1197,12 @@ def test_sync_upserts_to_configured_table(monkeypatch):
     assert result["updated_count"] == 1
     assert result["created_count"] == len(module.important_work_items()) - 1
     assert any(method == "GET" and "/field?" in url for method, url, _ in requests)
-    assert all("take=2" in url for method, url, _ in requests if method == "GET" and "/record?" in url)
     create_request_sizes = [
         len(payload["records"])
         for method, url, payload in requests
         if method == "POST" and url.endswith("/record") and payload is not None
     ]
-    assert create_request_sizes == [10, 10, 10, len(module.important_work_items()) - 30]
+    assert create_request_sizes == [10, 10, 10, len(module.important_work_items()) - 31]
     assert_counter_invariants(result)
 
 
@@ -1179,6 +1246,19 @@ def test_record_lookup_rejects_duplicate_item_id_rows(monkeypatch):
 
     with pytest.raises(RuntimeError, match="teable_duplicate_item_id"):
         module.find_existing_record("https://teable.test/api", "token", "tbl", "item-1")
+
+
+def test_exact_lookup_preflight_rejects_duplicate_source_id_even_when_absent(monkeypatch):
+    module = load_module()
+    monkeypatch.setattr(module, "find_existing_record", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="teable_source_duplicate_item_id"):
+        module.existing_record_ids_by_item_id(
+            "https://teable.test/api",
+            "token",
+            "tbl",
+            ["item-1", "item-1"],
+        )
 
 
 @pytest.mark.parametrize("malformed_lane", ["field", "record"])

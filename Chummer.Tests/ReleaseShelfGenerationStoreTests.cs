@@ -1394,7 +1394,7 @@ public sealed class ReleaseShelfGenerationStoreTests
         string IntentSha256,
         DateTimeOffset ResolvedAtUtc);
 
-    private sealed class ReleaseShelfFixture : IDisposable
+    internal sealed class ReleaseShelfFixture : IDisposable
     {
         public const string PublishedAt = "2026-07-15T12:00:00Z";
         private readonly string _root = Path.Combine(
@@ -1445,7 +1445,8 @@ public sealed class ReleaseShelfGenerationStoreTests
             bool omitCanonicalGenerationId = false,
             bool omitCompatibilityGenerationId = false,
             string? canonicalGenerationIdOverride = null,
-            string? compatibilityGenerationIdOverride = null)
+            string? compatibilityGenerationIdOverride = null,
+            Func<ReadOnlyMemory<byte>, IReadOnlyDictionary<string, byte[]>>? generationBoundFilesFactory = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1565,6 +1566,16 @@ public sealed class ReleaseShelfGenerationStoreTests
             string compatibilityPath = Path.Combine(generationRoot, ReleaseShelfGenerationStore.CompatibilityManifestFileName);
             File.WriteAllText(canonicalPath, JsonSerializer.Serialize(canonical));
             File.WriteAllText(compatibilityPath, JsonSerializer.Serialize(compatibility));
+            foreach ((string relativePath, byte[] contents) in generationBoundFilesFactory?.Invoke(
+                         File.ReadAllBytes(canonicalPath))
+                     ?? new Dictionary<string, byte[]>())
+            {
+                string path = Path.Combine(
+                    generationRoot,
+                    relativePath.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllBytes(path, contents);
+            }
             var metadata = new GenerationMetadata(
                 version,
                 Sha256(canonicalPath),

@@ -66,6 +66,7 @@ internal static class ServiceCollectionBoundedContextExtensions
             provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<ReleaseShelfGenerationStore>()));
         services.AddSingleton<ArtifactDeliveryPolicy>();
+        services.AddSingleton<ReleaseAuthorityRevisionStore>();
         services.AddSingleton<IReleaseTruthProjection, PublicReleaseTruthProjectionService>();
         services.AddSingleton<WindowsProofManifestValidator>();
         services.AddSingleton<WindowsProofGenerationStore>();
@@ -119,6 +120,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
         services.AddSingleton<OriginDossierPublicationService>();
+        services.AddSingleton<OriginDossierFirstPartyDocumentService>();
         services.AddSingleton<OriginDossierProviderCreditReservationStore>();
         services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();
