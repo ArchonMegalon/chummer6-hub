@@ -1376,5 +1376,7 @@ def test_served_runbook_documents_governed_stage_only_handoff() -> None:
         "RELEASE_SCOPE_DECISION.approved.json",
         "RELEASE_SCOPE_VERIFICATION.generated.json",
         "A multi-platform release requires a separately approved multi-platform decision",
+        "a predecessor match is not abort proof",
+        "activation_outcome_unknown",
     ):
         assert required_fragment in runbook

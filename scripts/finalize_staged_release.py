@@ -543,9 +543,15 @@ def reconcile_activation_failure(
     target_pointer_sha256: str,
     predecessor_pointer_sha256: Optional[str],
     retry_activation: Callable[[], bool],
-    compensate_registry: Callable[[], bool],
 ) -> str:
-    """Resolve only the two byte-exact, safe post-CAS activation states."""
+    """Acknowledge a visible target, but never infer abort from predecessor bytes.
+
+    A transport timeout can leave the original server request running after the
+    client observes the predecessor pointer.  Registry compensation at that
+    point can race a later CURRENT activation and split public and Registry
+    truth.  Only a durable server-side aborted/reconcile receipt can make that
+    compensation safe; the current finalizer has no such receipt contract.
+    """
     classification = classify_activation_pointer(
         observed_pointer_bytes,
         target_pointer_sha256,
@@ -558,11 +564,10 @@ def reconcile_activation_failure(
             )
         return "activated"
     if classification == "predecessor":
-        if not compensate_registry():
-            raise MutationOutcomeUnknown(
-                "predecessor CURRENT remained visible but Registry compensation was not confirmed"
-            )
-        return "compensated_review_required"
+        raise MutationOutcomeUnknown(
+            "predecessor CURRENT is visible, but the original activation may still be in flight; "
+            "durable server-side aborted/reconcile proof is required before Registry compensation"
+        )
     raise MutationOutcomeUnknown(
         "public CURRENT matches neither the staged target nor its exact predecessor"
     )
@@ -685,7 +690,7 @@ def _load_checkpoint(
             "hub_authority_staged",
             "registry_preview_published",
             "hub_activation_confirmed",
-            "compensated_review_required",
+            "activation_outcome_unknown",
             "complete",
         }
     ):
@@ -1100,10 +1105,6 @@ def _execute_transaction(
     state = checkpoint["state"]
     if state == "complete":
         return
-    if state == "compensated_review_required":
-        raise ReviewRequired(
-            "Registry was compensated to review_required; CURRENT was not activated"
-        )
 
     # Establish the exact review seed in Registry. This CAS is fail-closed and
     # may already have committed if a previous request lost its response.
@@ -1267,83 +1268,111 @@ def _execute_transaction(
         ).encode()
 
     def activate() -> bool:
+        request_body = activation_body()
+        # A resumable checkpoint is not authority to activate forever.  Bind
+        # every attempt to the exact Registry preview that this transaction
+        # published so an authorized later Registry advance cannot be rolled
+        # back at the Hub by resuming stale local state.
+        _verify_registry_current(
+            transport,
+            checkpoint["registryCurrentUrl"],
+            expected["previewSnapshotSha256"],
+        )
         try:
             response = _post_json(
                 transport,
                 checkpoint["activationUrl"],
-                activation_body(),
+                request_body,
                 hub_header,
                 "Hub staged activation",
             )
-        except (FinalizerError, MutationOutcomeUnknown):
-            return False
-        payload = _strict_json(response, "Hub staged activation response")
-        if (
-            payload.get("generationId") != checkpoint["generationId"]
-            or payload.get("version") != checkpoint["releaseVersion"]
-        ):
-            return False
-        response_path = evidence / "HUB_STAGED_ACTIVATION_RESPONSE.json"
-        if not response_path.exists():
-            _write_new(response_path, root, response, "Hub activation response")
-        elif response_path.read_bytes() != response:
-            return False
-        _checkpoint_add_file(checkpoint, "hubActivationResponse", response_path, root)
-        files["hubActivationResponse"] = response_path
-        return True
-
-    def compensate() -> bool:
-        try:
-            _post_json(
-                transport,
-                checkpoint["registryPublishUrl"],
-                files["compensationRequest"].read_bytes(),
-                registry_header,
-                "Registry preview compensation CAS",
-            )
+            payload = _strict_json(response, "Hub staged activation response")
+            if (
+                payload.get("generationId") != checkpoint["generationId"]
+                or payload.get("version") != checkpoint["releaseVersion"]
+            ):
+                raise FinalizerError(
+                    "Hub staged activation response does not bind the exact target generation"
+                )
+            response_path = evidence / "HUB_STAGED_ACTIVATION_RESPONSE.json"
+            if not response_path.exists():
+                _write_new(response_path, root, response, "Hub activation response")
+            elif response_path.read_bytes() != response:
+                raise FinalizerError("idempotent Hub activation response bytes changed")
+            _checkpoint_add_file(checkpoint, "hubActivationResponse", response_path, root)
+            files["hubActivationResponse"] = response_path
         except MutationOutcomeUnknown:
-            # A lost response is not a failed CAS.  Resolve it from exact
-            # Registry CURRENT bytes before deciding whether compensation won.
-            pass
-        except FinalizerError:
-            return False
+            raise
+        except FinalizerError as error:
+            # A non-success HTTP response or malformed acknowledgement is not
+            # proof that the server failed before CURRENT mutation.
+            raise MutationOutcomeUnknown(
+                "Hub staged activation returned no durable exact success acknowledgement"
+            ) from error
+        # Hub acknowledgement alone is insufficient: Registry may have
+        # advanced while the activation request was in flight.  Do not mark
+        # activation confirmed or begin convergence unless the same exact
+        # preview remains authoritative after the acknowledgement.
         try:
             _verify_registry_current(
                 transport,
                 checkpoint["registryCurrentUrl"],
-                expected["predecessorSnapshotSha256"],
+                expected["previewSnapshotSha256"],
             )
-        except (FinalizerError, MutationOutcomeUnknown):
-            return False
+        except FinalizerError as error:
+            raise MutationOutcomeUnknown(
+                "Hub activation was acknowledged exactly, but Registry authority "
+                "could not be confirmed at the same preview snapshot"
+            ) from error
         return True
 
-    if state == "registry_preview_published":
-        if not activate():
-            pointer_url = f"{checkpoint['liveBaseUrl']}/downloads/current.json"
-            pointer_status, pointer_raw = transport.request("GET", pointer_url, maximum=131072)
-            if pointer_status != 200:
-                raise MutationOutcomeUnknown(
-                    f"activation failed and public CURRENT returned HTTP {pointer_status}"
+    if state in {"registry_preview_published", "activation_outcome_unknown"}:
+        try:
+            activate()
+        except MutationOutcomeUnknown:
+            try:
+                pointer_url = f"{checkpoint['liveBaseUrl']}/downloads/current.json"
+                pointer_status, pointer_raw = transport.request(
+                    "GET", pointer_url, maximum=131072
                 )
-            recovery = reconcile_activation_failure(
-                observed_pointer_bytes=pointer_raw,
-                target_pointer_sha256=checkpoint["targetPointerSha256"],
-                predecessor_pointer_sha256=checkpoint.get("predecessorPointerSha256"),
-                retry_activation=activate,
-                compensate_registry=compensate,
-            )
-            if recovery == "compensated_review_required":
+                if pointer_status != 200:
+                    raise MutationOutcomeUnknown(
+                        "activation outcome is unknown and public CURRENT returned "
+                        f"HTTP {pointer_status}"
+                    )
+                reconcile_activation_failure(
+                    observed_pointer_bytes=pointer_raw,
+                    target_pointer_sha256=checkpoint["targetPointerSha256"],
+                    predecessor_pointer_sha256=checkpoint.get(
+                        "predecessorPointerSha256"
+                    ),
+                    retry_activation=activate,
+                )
+            except FinalizerError as recovery_error:
                 _save_checkpoint(
-                    checkpoint, checkpoint_path, root, "compensated_review_required"
+                    checkpoint, checkpoint_path, root, "activation_outcome_unknown"
                 )
-                raise ReviewRequired(
-                    "activation was not visible; Registry was compensated to review_required"
-                )
+                raise MutationOutcomeUnknown(
+                    "staged activation remains outcome_unknown; Registry was not compensated"
+                ) from recovery_error
         _save_checkpoint(checkpoint, checkpoint_path, root, "hub_activation_confirmed")
         state = "hub_activation_confirmed"
 
     if state == "hub_activation_confirmed":
+        # A confirmed Hub activation checkpoint is not permission to finalize
+        # after Registry has moved.  Fence both resume and the convergence
+        # window with the exact preview snapshot.
+        _verify_registry_current(
+            transport,
+            checkpoint["registryCurrentUrl"],
+            expected["previewSnapshotSha256"],
+        )
         _run_convergence(checkpoint, files, root)
+        _verify_registry_current(
+            transport,
+            checkpoint["registryCurrentUrl"],
+            expected["previewSnapshotSha256"],
+        )
         receipt = {
             "contractName": FINAL_RECEIPT_CONTRACT,
             "contractVersion": 1,
@@ -1377,6 +1406,12 @@ def _execute_transaction(
         _checkpoint_add_file(checkpoint, "finalReceipt", receipt_path, root)
         files["finalReceipt"] = receipt_path
         _save_checkpoint(checkpoint, checkpoint_path, root, "complete")
+        state = "complete"
+
+    if state != "complete":
+        raise FinalizerError(
+            f"owner finalizer transaction did not reach complete state from {state!r}"
+        )
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -1421,6 +1456,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         finally:
             hub_token = ""
             registry_key = ""
+    except MutationOutcomeUnknown as error:
+        print(f"staged release activation outcome_unknown: {error}", file=sys.stderr)
+        return 3
     except ReviewRequired as error:
         print(f"staged release remains review_required: {error}", file=sys.stderr)
         return 2
