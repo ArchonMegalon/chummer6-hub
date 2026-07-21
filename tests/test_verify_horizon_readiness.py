@@ -243,6 +243,13 @@ def test_source_working_gate_requires_complete_explicit_working_catalog(
     missing_record["horizons"].pop()
     assert verifier.source_working_claim_allowed(missing_record) is False
 
+    missing_evidence = copy.deepcopy(original)
+    missing_evidence["source_evidence"]["records"][0]["state"] = "missing"
+    missing_evidence["source_evidence"]["records"][0]["sha256"] = None
+    missing_evidence["source_evidence"]["present_count"] -= 1
+    missing_evidence["source_evidence"]["missing_count"] += 1
+    assert verifier.source_working_claim_allowed(missing_evidence) is False
+
 
 def test_verifier_cli_separates_structural_truth_from_operational_readiness(
     tmp_path: Path,

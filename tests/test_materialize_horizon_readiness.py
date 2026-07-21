@@ -155,6 +155,7 @@ def test_source_evidence_inventory_exactly_binds_all_record_references(tmp_path:
     assert [record["path"] for record in inventory["records"]] == expected_refs
     assert inventory["record_count"] == len(expected_refs)
     assert inventory["present_count"] + inventory["missing_count"] == len(expected_refs)
+    assert inventory["missing_count"] == 0
     assert payload["summary"]["source_evidence"] == {
         "present_count": inventory["present_count"],
         "missing_count": inventory["missing_count"],

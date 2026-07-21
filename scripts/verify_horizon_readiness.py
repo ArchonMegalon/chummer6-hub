@@ -620,12 +620,14 @@ def source_working_claim_allowed(payload: dict[str, Any]) -> bool:
     horizons = payload.get("horizons")
     capabilities = payload.get("capabilities")
     coverage = payload.get("catalog_coverage")
+    evidence = payload.get("source_evidence")
     if (
         not isinstance(horizons, list)
         or not horizons
         or not isinstance(capabilities, list)
         or not capabilities
         or not isinstance(coverage, dict)
+        or not isinstance(evidence, dict)
     ):
         return False
     records = horizons + capabilities
@@ -653,6 +655,17 @@ def source_working_claim_allowed(payload: dict[str, Any]) -> bool:
         )
         and coverage.get("all_current_capabilities_assessed") is True
         and coverage.get("unknown_capability_ids") == []
+        and evidence.get("missing_count") == 0
+        and evidence.get("present_count") == evidence.get("record_count")
+        and isinstance(evidence.get("records"), list)
+        and len(evidence["records"]) == evidence.get("record_count")
+        and all(
+            isinstance(record, dict)
+            and record.get("state") == "present"
+            and isinstance(record.get("sha256"), str)
+            and _SHA256.fullmatch(record["sha256"]) is not None
+            for record in evidence["records"]
+        )
     )
 
 
