@@ -33,6 +33,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 REVISION_ID = re.compile(r"^auth-[0-9a-f]{64}$")
 MAX_JSON_BYTES = 64 * 1024 * 1024
@@ -70,6 +71,21 @@ REQUIRED_PINNED_FILES = REQUIRED_PINNED_TOOLS | {
     "predecessorSnapshot",
     "predecessorDecision",
     "stagedConvergence",
+    "uiFrameReceipt",
+    "desktopVisualReceipt",
+    "desktopWorkflowReceipt",
+    "desktopExecutableReceipt",
+}
+CANDIDATE_EVIDENCE_FIELDS = {
+    "authority_snapshot_sha256",
+    "contract_name",
+    "contract_version",
+    "manifest_sha256",
+    "registry_commit",
+    "release_decision_sha256",
+    "release_scope_decision_sha256",
+    "release_version",
+    "source_receipt_sha256",
 }
 
 
@@ -109,7 +125,7 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--registry-control-key-file", type=Path, required=True)
     parser.add_argument("--registry-current-url")
     parser.add_argument("--registry-publish-url")
-    parser.add_argument("--support-owner", default="Chummer release operations")
+    parser.add_argument("--support-owner", default="chummer-release-operations")
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--convergence-attempts", type=int, default=6)
@@ -421,6 +437,35 @@ def _load_handoff(
     )
     _require_sha(payload.get("predecessorSnapshotSha256"), "handoff predecessor snapshot digest")
     _require_sha(payload.get("predecessorDecisionSha256"), "handoff predecessor decision digest")
+    ui_frame_sha = _require_sha(
+        payload.get("uiFrameReceiptSha256"),
+        "handoff UI-frame receipt digest",
+    )
+    _, ui_frame_raw = _stable_file(
+        resolved_files["uiFrameReceipt"],
+        "handoff UI-frame receipt",
+        root=root,
+    )
+    if not hmac.compare_digest(_sha(ui_frame_raw), ui_frame_sha):
+        raise FinalizerError("staged finalizer handoff UI-frame receipt binding is inconsistent")
+    for file_name, digest_name, label in (
+        ("desktopVisualReceipt", "desktopVisualReceiptSha256", "desktop visual"),
+        ("desktopWorkflowReceipt", "desktopWorkflowReceiptSha256", "desktop workflow"),
+        ("desktopExecutableReceipt", "desktopExecutableReceiptSha256", "desktop executable"),
+    ):
+        expected_receipt_sha = _require_sha(
+            payload.get(digest_name),
+            f"handoff {label} Presentation receipt digest",
+        )
+        _, presentation_raw = _stable_file(
+            resolved_files[file_name],
+            f"handoff {label} Presentation receipt",
+            root=root,
+        )
+        if not hmac.compare_digest(_sha(presentation_raw), expected_receipt_sha):
+            raise FinalizerError(
+                f"staged finalizer handoff {label} Presentation receipt binding is inconsistent"
+            )
     _, scope_raw = _stable_file(
         resolved_files["releaseScopeDecision"], "handoff release scope decision", root=root
     )
@@ -726,6 +771,186 @@ def _json_file(path: Path, label: str) -> tuple[bytes, dict[str, Any]]:
     return raw, _strict_json(raw, label)
 
 
+def _validate_scorecard_handoff_binding(
+    scorecard_raw: bytes,
+    scorecard_payload: Mapping[str, Any],
+    receipt_payload: Mapping[str, Any],
+    handoff: Mapping[str, Any],
+    ui_frame_receipt_raw: bytes,
+    presentation_receipt_raws: Mapping[str, bytes],
+) -> None:
+    expected_release_version = handoff.get("releaseVersion")
+    expected_scope_sha256 = handoff.get("releaseScopeDecisionSha256")
+    manifest_sha256 = _require_sha(
+        receipt_payload.get("manifestSha256"),
+        "scorecard handoff manifest digest",
+    )
+    snapshot_sha256 = _require_sha(
+        receipt_payload.get("predecessorSnapshotSha256"),
+        "scorecard handoff predecessor snapshot digest",
+    )
+    decision_sha256 = _require_sha(
+        receipt_payload.get("predecessorDecisionSha256"),
+        "scorecard handoff predecessor decision digest",
+    )
+    registry_commit = receipt_payload.get("registryCommit")
+    if (
+        not isinstance(expected_release_version, str)
+        or not isinstance(expected_scope_sha256, str)
+        or SHA256.fullmatch(expected_scope_sha256) is None
+        or scorecard_payload.get("release_version") != expected_release_version
+        or scorecard_payload.get("releaseVersion") != expected_release_version
+        or not hmac.compare_digest(
+            str(scorecard_payload.get("release_scope_decision_sha256") or ""),
+            expected_scope_sha256,
+        )
+        or scorecard_payload.get("releaseScopeDecisionSha256")
+        != expected_scope_sha256
+        or scorecard_payload.get("manifestSha256") != manifest_sha256
+        or scorecard_payload.get("snapshotSha256") != snapshot_sha256
+        or scorecard_payload.get("releaseDecisionSha256") != decision_sha256
+        or receipt_payload.get("contractName")
+        != "chummer.release-scorecard-handoff/v3"
+        or receipt_payload.get("status") != "pass"
+        or receipt_payload.get("releaseVersion") != expected_release_version
+        or not isinstance(registry_commit, str)
+        or GIT_SHA.fullmatch(registry_commit) is None
+        or not hmac.compare_digest(
+            str(receipt_payload.get("releaseScopeDecisionSha256") or ""),
+            expected_scope_sha256,
+        )
+        or not hmac.compare_digest(
+            str(receipt_payload.get("scorecardSha256") or ""),
+            _sha(scorecard_raw),
+        )
+        or not hmac.compare_digest(
+            str(receipt_payload.get("uiFrameReceiptSha256") or ""),
+            _sha(ui_frame_receipt_raw),
+        )
+        or not hmac.compare_digest(
+            str(handoff.get("uiFrameReceiptSha256") or ""),
+            _sha(ui_frame_receipt_raw),
+        )
+    ):
+        raise FinalizerError(
+            "scorecard handoff does not bind the exact staged release scope and version"
+        )
+    for evidence_id, receipt_raw, receipt_field, handoff_field in (
+        (
+            "desktop_visual",
+            presentation_receipt_raws["desktop_visual"],
+            "desktopVisualReceiptSha256",
+            "desktopVisualReceiptSha256",
+        ),
+        (
+            "desktop_workflow",
+            presentation_receipt_raws["desktop_workflow"],
+            "desktopWorkflowReceiptSha256",
+            "desktopWorkflowReceiptSha256",
+        ),
+        (
+            "desktop_executable",
+            presentation_receipt_raws["desktop_executable"],
+            "desktopExecutableReceiptSha256",
+            "desktopExecutableReceiptSha256",
+        ),
+    ):
+        observed_receipt_sha = _sha(receipt_raw)
+        if (
+            not hmac.compare_digest(
+                str(receipt_payload.get(receipt_field) or ""), observed_receipt_sha
+            )
+            or not hmac.compare_digest(
+                str(handoff.get(handoff_field) or ""), observed_receipt_sha
+            )
+        ):
+            raise FinalizerError(
+                f"scorecard handoff does not bind exact {evidence_id} Presentation receipt bytes"
+            )
+    score_three_rows = [
+        row
+        for cell in scorecard_payload.get("cells", [])
+        if isinstance(cell, dict)
+        for row in cell.get("evidence", [])
+        if isinstance(row, dict) and row.get("score") == 3
+    ]
+    if not score_three_rows:
+        raise FinalizerError("scorecard handoff has no candidate-bound score-3 evidence")
+    for row in score_three_rows:
+        source_sha256 = row.get("source_sha256")
+        candidate = row.get("candidate_evidence")
+        expected_candidate = {
+            "contract_name": "chummer.campaign-operability-candidate-evidence/v1",
+            "contract_version": 1,
+            "release_version": expected_release_version,
+            "release_scope_decision_sha256": expected_scope_sha256,
+            "manifest_sha256": manifest_sha256,
+            "authority_snapshot_sha256": snapshot_sha256,
+            "release_decision_sha256": decision_sha256,
+            "registry_commit": registry_commit,
+            "source_receipt_sha256": source_sha256,
+        }
+        if (
+            not isinstance(source_sha256, str)
+            or SHA256.fullmatch(source_sha256) is None
+            or row.get("source_release_version") != expected_release_version
+            or not isinstance(candidate, dict)
+            or set(candidate) != CANDIDATE_EVIDENCE_FIELDS
+            or candidate != expected_candidate
+        ):
+            raise FinalizerError(
+                "scorecard handoff contains score-3 evidence outside the exact release candidate"
+            )
+    if any(
+        isinstance(row, dict)
+        and row.get("score") == 2
+        and "candidate_evidence" in row
+        for cell in scorecard_payload.get("cells", [])
+        if isinstance(cell, dict)
+        for row in cell.get("evidence", [])
+    ):
+        raise FinalizerError("scorecard score-2 evidence cannot carry candidate_evidence")
+    ui_rows = [
+        row
+        for cell in scorecard_payload.get("cells", [])
+        if isinstance(cell, dict)
+        for row in cell.get("evidence", [])
+        if isinstance(row, dict) and row.get("id") == "ui_frame"
+    ]
+    if not ui_rows or any(
+        row.get("score") != 3
+        or row.get("source_sha256") != _sha(ui_frame_receipt_raw)
+        or not isinstance(row.get("candidate_evidence"), dict)
+        or row["candidate_evidence"].get("source_receipt_sha256")
+        != _sha(ui_frame_receipt_raw)
+        for row in ui_rows
+    ):
+        raise FinalizerError(
+            "scorecard handoff does not bind the exact staged UI-frame receipt bytes"
+        )
+    for evidence_id, receipt_raw in presentation_receipt_raws.items():
+        source_sha256 = _sha(receipt_raw)
+        rows = [
+            row
+            for cell in scorecard_payload.get("cells", [])
+            if isinstance(cell, dict)
+            for row in cell.get("evidence", [])
+            if isinstance(row, dict) and row.get("id") == evidence_id
+        ]
+        if not rows or any(
+            row.get("score") != 3
+            or row.get("source_status") != "pass"
+            or row.get("source_sha256") != source_sha256
+            or not isinstance(row.get("candidate_evidence"), dict)
+            or row["candidate_evidence"].get("source_receipt_sha256")
+            != source_sha256
+            for row in rows
+        ):
+            raise FinalizerError(
+                f"scorecard handoff does not bind the exact staged {evidence_id} Presentation receipt bytes"
+            )
+
+
 def _post_json(
     transport: HttpsTransport,
     url: str,
@@ -888,10 +1113,50 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
             "--predecessor-snapshot", str(predecessor_snapshot),
             "--predecessor-decision", str(predecessor_decision),
             "--convergence", str(convergence),
+            "--release-scope-decision", str(files["releaseScopeDecision"]),
+            "--expected-release-scope-sha256", handoff["releaseScopeDecisionSha256"],
+            "--ui-frame-receipt", str(files["uiFrameReceipt"]),
+            "--desktop-visual-receipt", str(files["desktopVisualReceipt"]),
+            "--desktop-workflow-receipt", str(files["desktopWorkflowReceipt"]),
+            "--desktop-executable-receipt", str(files["desktopExecutableReceipt"]),
             "--expected-release-version", handoff["releaseVersion"],
             "--output", str(scorecard_output),
             "--receipt", str(scorecard_receipt),
         ],
+    )
+    scorecard_raw, scorecard_payload = _json_file(
+        scorecard_output, "candidate-bound campaign-operability scorecard"
+    )
+    _, scorecard_receipt_payload = _json_file(
+        scorecard_receipt, "campaign-operability scorecard handoff receipt"
+    )
+    _validate_scorecard_handoff_binding(
+        scorecard_raw,
+        scorecard_payload,
+        scorecard_receipt_payload,
+        handoff,
+        _stable_file(
+            files["uiFrameReceipt"],
+            "candidate-bound UI-frame receipt",
+            root=root,
+        )[1],
+        {
+            "desktop_visual": _stable_file(
+                files["desktopVisualReceipt"],
+                "candidate-bound desktop visual Presentation receipt",
+                root=root,
+            )[1],
+            "desktop_workflow": _stable_file(
+                files["desktopWorkflowReceipt"],
+                "candidate-bound desktop workflow Presentation receipt",
+                root=root,
+            )[1],
+            "desktop_executable": _stable_file(
+                files["desktopExecutableReceipt"],
+                "candidate-bound desktop executable Presentation receipt",
+                root=root,
+            )[1],
+        },
     )
 
     predecessor_snapshot_raw, predecessor_snapshot_json = _json_file(
@@ -954,6 +1219,8 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
             "--successor-decision", str(preview_decision),
             "--scorecard", str(scorecard_output),
             "--convergence", str(convergence),
+            "--release-scope-decision", str(files["releaseScopeDecision"]),
+            "--expected-release-scope-sha256", handoff["releaseScopeDecisionSha256"],
             "--output", str(authority_request),
         ],
         stdout_path=evidence / "HUB_STAGED_AUTHORITY_REQUEST.generated.json",

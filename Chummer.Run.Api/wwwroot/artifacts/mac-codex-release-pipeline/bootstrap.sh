@@ -5247,6 +5247,9 @@ main() {
   local release_scope_source="${CHUMMER_RELEASE_SCOPE_DECISION_PATH:-}"
   local release_scope_expected_sha256="${CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256:-}"
   local release_scope_authority="${CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY:-}"
+  local presentation_desktop_visual_source="${CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH:-}"
+  local presentation_desktop_workflow_source="${CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH:-}"
+  local presentation_desktop_executable_source="${CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH:-}"
   [[ -n "$release_scope_source" ]] \
     || die "CHUMMER_RELEASE_SCOPE_DECISION_PATH is required before candidate production"
   [[ "$release_scope_expected_sha256" =~ ^[0-9a-fA-F]{64}$ ]] \
@@ -5319,6 +5322,12 @@ main() {
     fi
     [[ "$publish_mode" == "http" ]] \
       || die "same-generation release-authority closure requires staged HTTP publication"
+    [[ "$presentation_desktop_visual_source" == /* ]] \
+      || die "CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
+    [[ "$presentation_desktop_workflow_source" == /* ]] \
+      || die "CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
+    [[ "$presentation_desktop_executable_source" == /* ]] \
+      || die "CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
   fi
 
   require_all_reviewed_commit_pins
@@ -6540,6 +6549,120 @@ PY
   done
   (( staged_generation_converged == 1 )) \
     || die "private immutable generation routes did not converge. Receipt: $staged_generation_convergence_receipt"
+
+  require_cmd node
+  require_cmd npm
+  require_cmd npx
+  local expected_authority_snapshot_sha256
+  expected_authority_snapshot_sha256="$(file_sha256 "$ui_repo/$release_evidence_dir/SNAPSHOT.json")"
+  [[ "$expected_authority_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "staged release identity lacks the exact predecessor authority snapshot digest"
+  local staged_ui_frame_output_dir="$ui_repo/$release_evidence_dir/ui-frame/$release_version"
+  local staged_ui_frame_receipt="$staged_ui_frame_output_dir/UI_FRAME_INTEGRITY.generated.json"
+  [[ ! -e "$staged_ui_frame_output_dir" && ! -L "$staged_ui_frame_output_dir" ]] \
+    || die "staged UI-frame output directory already exists: $staged_ui_frame_output_dir"
+  mkdir -p "$(dirname "$staged_ui_frame_output_dir")"
+  mkdir -m 700 "$staged_ui_frame_output_dir"
+  log "capturing candidate-bound staged UI-frame proof before deleting the private probe grant"
+  (
+    cd "$hub_alias"
+    command npm ci --ignore-scripts --no-audit --no-fund
+    command npx --no-install playwright install chromium
+    BASE_URL="$live_convergence_base_url" \
+    CHUMMER_UI_FRAME_VERIFICATION_MODE="staged_private" \
+    CHUMMER_UI_FRAME_AUTHORITY_ROUTE="/api/v1/public/release-truth/g/$release_generation_id" \
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_VERSION="$release_version" \
+    CHUMMER_UI_FRAME_EXPECTED_MANIFEST_SHA256="$expected_manifest_sha256" \
+    CHUMMER_UI_FRAME_EXPECTED_AUTHORITY_SNAPSHOT_SHA256="$expected_authority_snapshot_sha256" \
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_DECISION_SHA256="$expected_release_decision_sha256" \
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_SCOPE_SHA256="$release_scope_expected_sha256" \
+    CHUMMER_UI_FRAME_RELEASE_SCOPE_DECISION_PATH="$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    CHUMMER_UI_FRAME_RECEIPT_PATH="$staged_ui_frame_receipt" \
+    CHUMMER_UI_FRAME_STAGED_PROBE_TOKEN_FILE="$staged_probe_token_path" \
+      command npx --no-install playwright test tests/public/ui-frame-integrity.spec.ts --reporter=line
+  )
+  [[ -f "$staged_ui_frame_receipt" && ! -L "$staged_ui_frame_receipt" ]] \
+    || die "candidate-bound staged UI-frame receipt was not materialized"
+  [[ "$(jq -r '.status // empty' "$staged_ui_frame_receipt")" == "pass" \
+      && "$(jq -r '.verdict // empty' "$staged_ui_frame_receipt")" == "READY" ]] \
+    || die "candidate-bound staged UI-frame receipt did not pass"
+  local staged_presentation_dir="$ui_repo/$release_evidence_dir/presentation/$release_version"
+  local staged_desktop_visual_receipt="$staged_presentation_dir/DESKTOP_VISUAL_CANDIDATE.generated.json"
+  local staged_desktop_workflow_receipt="$staged_presentation_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
+  local staged_desktop_executable_receipt="$staged_presentation_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
+  [[ ! -e "$staged_presentation_dir" && ! -L "$staged_presentation_dir" ]] \
+    || die "staged Presentation receipt directory already exists: $staged_presentation_dir"
+  mkdir -p "$(dirname "$staged_presentation_dir")"
+  mkdir -m 700 "$staged_presentation_dir"
+  log "pinning external Presentation visual, workflow, and executable candidate receipts"
+  command "$RELEASE_PYTHON_BIN" - \
+    "$presentation_desktop_visual_source" "$staged_desktop_visual_receipt" \
+    "$presentation_desktop_workflow_source" "$staged_desktop_workflow_receipt" \
+    "$presentation_desktop_executable_source" "$staged_desktop_executable_receipt" <<'PY'
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import stat
+import sys
+
+if len(sys.argv) != 7:
+    raise SystemExit("exactly three Presentation source/target pairs are required")
+
+for source_text, target_text in zip(sys.argv[1::2], sys.argv[2::2], strict=True):
+    source = Path(source_text)
+    target = Path(target_text)
+    before = source.lstat()
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or stat.S_ISLNK(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or before.st_nlink != 1
+        or before.st_mode & 0o022
+        or not 1 <= before.st_size <= 8 * 1024 * 1024
+    ):
+        raise SystemExit(f"unsafe Presentation candidate receipt: {source.name}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(source, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+        ):
+            raise SystemExit(f"Presentation candidate receipt changed before read: {source.name}")
+        chunks: list[bytes] = []
+        remaining = 8 * 1024 * 1024 + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (
+        len(raw) != before.st_size
+        or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+        != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+    ):
+        raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
+    output = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(output, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        try:
+            target.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+PY
   rm -f "$staged_probe_token_path"
 
   local durable_stage_response="$release_evidence_dir/RELEASE_STAGE_RESPONSE.generated.json"
@@ -6577,6 +6700,10 @@ PY
     --predecessor-snapshot "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
     --predecessor-decision "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
     --staged-convergence "$ui_repo/$staged_convergence_receipt" \
+    --ui-frame-receipt "$staged_ui_frame_receipt" \
+    --desktop-visual-receipt "$staged_desktop_visual_receipt" \
+    --desktop-workflow-receipt "$staged_desktop_workflow_receipt" \
+    --desktop-executable-receipt "$staged_desktop_executable_receipt" \
     --executed-bootstrap "$pinned_executed_bootstrap" \
     --owner-finalizer "$hub_alias/scripts/finalize_staged_release.py" \
     --scorecard-materializer "$hub_alias/scripts/materialize_release_scorecard_handoff.py" \

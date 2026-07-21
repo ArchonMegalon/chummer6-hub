@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -15,6 +16,8 @@ public sealed record ReleaseAuthorityRevisionAdvanceRequest(
     string GenerationId,
     string ExpectedShelfPointerSha256,
     string ExpectedShelfInventoryDigest,
+    string ExpectedReleaseScopeDecisionSha256,
+    byte[] ReleaseScopeDecisionBytes,
     byte[] PredecessorCurrentBytes,
     byte[] PredecessorSnapshotBytes,
     byte[] PredecessorDecisionBytes,
@@ -30,6 +33,7 @@ public sealed class ReleaseAuthorityRevisionAdvanceRequestJsonConverter
     private static readonly string[] ExactFields =
     [
         "generationId", "expectedShelfPointerSha256", "expectedShelfInventoryDigest",
+        "expectedReleaseScopeDecisionSha256", "releaseScopeDecisionBytes",
         "predecessorCurrentBytes", "predecessorSnapshotBytes", "predecessorDecisionBytes",
         "successorCurrentBytes", "successorSnapshotBytes", "successorDecisionBytes",
         "scorecardBytes", "convergenceBytes"
@@ -67,6 +71,8 @@ public sealed class ReleaseAuthorityRevisionAdvanceRequestJsonConverter
             RequiredString(root, "generationId"),
             RequiredString(root, "expectedShelfPointerSha256"),
             RequiredString(root, "expectedShelfInventoryDigest"),
+            RequiredString(root, "expectedReleaseScopeDecisionSha256"),
+            CanonicalBytes(root, "releaseScopeDecisionBytes", ReleaseAuthorityRevisionStore.MaximumProofBytes),
             CanonicalBytes(root, "predecessorCurrentBytes", ReleaseAuthorityRevisionStore.MaximumCurrentBytes),
             CanonicalBytes(root, "predecessorSnapshotBytes", ReleaseAuthorityRevisionStore.MaximumSnapshotBytes),
             CanonicalBytes(root, "predecessorDecisionBytes", ReleaseAuthorityRevisionStore.MaximumDecisionBytes),
@@ -86,6 +92,8 @@ public sealed class ReleaseAuthorityRevisionAdvanceRequestJsonConverter
         writer.WriteString("generationId", value.GenerationId);
         writer.WriteString("expectedShelfPointerSha256", value.ExpectedShelfPointerSha256);
         writer.WriteString("expectedShelfInventoryDigest", value.ExpectedShelfInventoryDigest);
+        writer.WriteString("expectedReleaseScopeDecisionSha256", value.ExpectedReleaseScopeDecisionSha256);
+        WriteBytes(writer, "releaseScopeDecisionBytes", value.ReleaseScopeDecisionBytes);
         WriteBytes(writer, "predecessorCurrentBytes", value.PredecessorCurrentBytes);
         WriteBytes(writer, "predecessorSnapshotBytes", value.PredecessorSnapshotBytes);
         WriteBytes(writer, "predecessorDecisionBytes", value.PredecessorDecisionBytes);
@@ -238,6 +246,9 @@ public sealed class ReleaseAuthorityRevisionStore
     private static readonly Regex LowerSha256 = new(
         "\\A[0-9a-f]{64}\\z",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+    private static readonly Regex LowerGitCommit = new(
+        "\\A[0-9a-f]{40}\\z",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
     private static readonly Regex CanonicalToken = new(
         "\\A[a-z0-9][a-z0-9._-]{0,127}\\z",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
@@ -268,10 +279,80 @@ public sealed class ReleaseAuthorityRevisionStore
         "responsiveness",
         "design_authorship"
     ];
+    internal static string[] CampaignOperabilityOwners(string surface) => surface switch
+    {
+        "desktop_workbench" => ["chummer6-ui", "chummer6-core", "chummer6-ui-kit"],
+        "public_front_door_and_support" => ["chummer6-hub", "chummer6-hub-registry", "fleet"],
+        "install_claim_restore_continue" => ["chummer6-ui", "chummer6-hub", "chummer6-hub-registry"],
+        "build_explain_publish" => ["chummer6-core", "chummer6-ui", "chummer6-media-factory"],
+        "run_and_rejoin" => ["chummer6-mobile", "chummer6-hub", "chummer6-core"],
+        "improve_and_close_the_loop" => ["chummer6-hub", "fleet", "executive-assistant"],
+        _ => throw new InvalidDataException("Campaign-operability surface is outside the canonical v2 map.")
+    };
+
+    internal static string[] CampaignOperabilityJourneyIds(string surface) => surface switch
+    {
+        "desktop_workbench" => ["install_claim_restore_continue", "build_explain_publish"],
+        "public_front_door_and_support" => ["report_cluster_release_notify", "organize_community_and_close_loop"],
+        "install_claim_restore_continue" => ["install_claim_restore_continue"],
+        "build_explain_publish" => ["build_explain_publish"],
+        "run_and_rejoin" => ["campaign_session_recover_recap", "recover_from_sync_conflict"],
+        "improve_and_close_the_loop" => ["report_cluster_release_notify", "organize_community_and_close_loop"],
+        _ => throw new InvalidDataException("Campaign-operability surface is outside the canonical v2 map.")
+    };
+
+    internal static string[] CampaignOperabilityEvidenceIds(
+        string surface,
+        string dimension) => (surface, dimension) switch
+    {
+        ("desktop_workbench", "route_clarity") => ["fleet_flagship", "desktop_visual", "desktop_workflow"],
+        ("desktop_workbench", "rules_and_continuity_truth") => ["engine_proof", "ruleset_readiness", "localization"],
+        ("desktop_workbench", "recovery_confidence") => ["desktop_executable", "release_ready"],
+        ("desktop_workbench", "closure_honesty") => ["release_ready", "release_channel"],
+        ("desktop_workbench", "responsiveness") => ["engine_proof", "desktop_workflow"],
+        ("desktop_workbench", "design_authorship") => ["desktop_visual", "design_quality", "localization"],
+        ("public_front_door_and_support", "route_clarity") => ["public_route", "public_edge"],
+        ("public_front_door_and_support", "rules_and_continuity_truth") => ["release_channel", "public_copy"],
+        ("public_front_door_and_support", "recovery_confidence") => ["support_packets", "account_handoff"],
+        ("public_front_door_and_support", "closure_honesty") => ["support_packets", "release_ready", "release_channel"],
+        ("public_front_door_and_support", "responsiveness") => ["public_edge", "ui_frame"],
+        ("public_front_door_and_support", "design_authorship") => ["design_quality", "ui_frame", "public_copy"],
+        ("install_claim_restore_continue", "route_clarity") => ["desktop_executable", "public_route"],
+        ("install_claim_restore_continue", "rules_and_continuity_truth") => ["engine_proof", "release_channel"],
+        ("install_claim_restore_continue", "recovery_confidence") => ["desktop_executable", "account_handoff"],
+        ("install_claim_restore_continue", "closure_honesty") => ["release_channel", "windows_visual", "release_ready"],
+        ("install_claim_restore_continue", "responsiveness") => ["desktop_executable", "windows_visual"],
+        ("install_claim_restore_continue", "design_authorship") => ["desktop_visual", "windows_visual", "localization"],
+        ("build_explain_publish", "route_clarity") => ["desktop_workflow", "public_route"],
+        ("build_explain_publish", "rules_and_continuity_truth") => ["engine_proof", "ruleset_readiness"],
+        ("build_explain_publish", "recovery_confidence") => ["desktop_executable", "release_ready"],
+        ("build_explain_publish", "closure_honesty") => ["black_ledger_media", "external_distribution", "release_ready"],
+        ("build_explain_publish", "responsiveness") => ["engine_proof", "desktop_workflow"],
+        ("build_explain_publish", "design_authorship") => ["desktop_visual", "design_quality", "localization"],
+        ("run_and_rejoin", "route_clarity") => ["mobile_proof", "public_route"],
+        ("run_and_rejoin", "rules_and_continuity_truth") => ["mobile_proof", "engine_proof"],
+        ("run_and_rejoin", "recovery_confidence") => ["mobile_proof", "release_ready"],
+        ("run_and_rejoin", "closure_honesty") => ["mobile_proof", "release_ready"],
+        ("run_and_rejoin", "responsiveness") => ["mobile_proof", "public_edge"],
+        ("run_and_rejoin", "design_authorship") => ["mobile_proof", "design_quality", "localization"],
+        ("improve_and_close_the_loop", "route_clarity") => ["support_packets", "public_route"],
+        ("improve_and_close_the_loop", "rules_and_continuity_truth") => ["public_copy", "release_channel"],
+        ("improve_and_close_the_loop", "recovery_confidence") => ["support_packets", "account_handoff"],
+        ("improve_and_close_the_loop", "closure_honesty") => ["support_packets", "release_ready", "google_oauth"],
+        ("improve_and_close_the_loop", "responsiveness") => ["public_edge", "ui_frame"],
+        ("improve_and_close_the_loop", "design_authorship") => ["design_quality", "ui_frame", "localization"],
+        _ => throw new InvalidDataException("Campaign-operability cell is outside the canonical v2 dependency map.")
+    };
     private static readonly HashSet<string> PositiveEvidenceSourceStatuses = new(
         [
             "available", "clear", "complete", "completed", "current", "healthy",
             "ok", "pass", "passed", "published", "ready", "success", "succeeded"
+        ],
+        StringComparer.Ordinal);
+    private static readonly HashSet<string> PreviewEvidenceNegativeSourceStatuses = new(
+        [
+            "attention_required", "blocked", "degraded", "fail", "failed", "failure",
+            "incomplete", "needs_review", "not_ready", "pending", "review_required", "warning"
         ],
         StringComparer.Ordinal);
     private static readonly string[] LocalPathMarkers =
@@ -1129,7 +1210,11 @@ public sealed class ReleaseAuthorityRevisionStore
         RequireSha256(
             request.ExpectedShelfInventoryDigest[7..],
             "expected shelf inventory digest");
+        RequireSha256(
+            request.ExpectedReleaseScopeDecisionSha256,
+            "expected release-scope decision digest");
 
+        RequireInputBytes(request.ReleaseScopeDecisionBytes, MaximumProofBytes, "approved release-scope decision");
         RequireInputBytes(request.PredecessorCurrentBytes, MaximumCurrentBytes, "predecessor CURRENT.json");
         RequireInputBytes(request.PredecessorSnapshotBytes, MaximumSnapshotBytes, "predecessor SNAPSHOT.json");
         RequireInputBytes(request.PredecessorDecisionBytes, MaximumDecisionBytes, "predecessor RELEASE_DECISION.json");
@@ -1170,6 +1255,11 @@ public sealed class ReleaseAuthorityRevisionStore
         AppendHashPart(hash, "generation", Encoding.UTF8.GetBytes(shelf.GenerationId!));
         AppendHashPart(hash, "shelf-pointer", Encoding.ASCII.GetBytes(shelf.PointerDigest!));
         AppendHashPart(hash, "shelf-inventory", Encoding.ASCII.GetBytes(shelf.InventoryDigest!));
+        AppendHashPart(
+            hash,
+            "release-scope-digest",
+            Encoding.ASCII.GetBytes(request.ExpectedReleaseScopeDecisionSha256));
+        AppendHashPart(hash, "release-scope", request.ReleaseScopeDecisionBytes);
         AppendHashPart(hash, "predecessor-current", request.PredecessorCurrentBytes);
         AppendHashPart(hash, "predecessor-snapshot", request.PredecessorSnapshotBytes);
         AppendHashPart(hash, "predecessor-decision", request.PredecessorDecisionBytes);
@@ -1289,10 +1379,23 @@ public sealed class ReleaseAuthorityRevisionStore
                 "Review predecessor and preview successor disagree on manifest chronology.");
         }
 
+        ApprovedReleaseScopeBinding releaseScope = ValidateReleaseScopeDecision(
+            request.ReleaseScopeDecisionBytes,
+            request.ExpectedReleaseScopeDecisionSha256,
+            manifest.Version);
+        PredecessorEvidenceBinding predecessorEvidence = ValidatePredecessorEvidenceBinding(
+            request.PredecessorSnapshotBytes);
+
         (DateTimeOffset scorecardGeneratedAt,
             DateTimeOffset earliestEvidenceGeneratedAt,
             DateTimeOffset latestEvidenceGeneratedAt) = ValidateScorecardBytes(
-            request.ScorecardBytes);
+            request.ScorecardBytes,
+            manifest.Version,
+            predecessor.ManifestSha256,
+            predecessorSnapshotSha256,
+            predecessorDecisionSha256,
+            releaseScope,
+            predecessorEvidence);
         DateTimeOffset convergenceGeneratedAt = ValidateConvergenceBytes(
             request.ConvergenceBytes,
             predecessor,
@@ -1315,7 +1418,13 @@ public sealed class ReleaseAuthorityRevisionStore
         DateTimeOffset GeneratedAtUtc,
         DateTimeOffset EarliestEvidenceGeneratedAt,
         DateTimeOffset LatestEvidenceGeneratedAt) ValidateScorecardBytes(
-        ReadOnlyMemory<byte> bytes)
+        ReadOnlyMemory<byte> bytes,
+        string sealedManifestVersion,
+        string sealedManifestSha256,
+        string predecessorSnapshotSha256,
+        string predecessorDecisionSha256,
+        ApprovedReleaseScopeBinding releaseScope,
+        PredecessorEvidenceBinding predecessorEvidence)
     {
         using JsonDocument document = ParseStrictJson(bytes, "campaign-operability scorecard");
         JsonElement scorecard = document.RootElement;
@@ -1323,6 +1432,9 @@ public sealed class ReleaseAuthorityRevisionStore
             scorecard,
             [
                 "contract_name", "contract_version", "generated_at_utc", "status", "verdict",
+                "release_version", "release_scope_decision_sha256",
+                "releaseVersion", "releaseScopeDecisionSha256", "snapshotSha256",
+                "manifestSha256", "releaseDecisionSha256",
                 "preview_status", "preview_verdict", "stable_status", "stable_verdict",
                 "rubric_path", "journey_gate_path", "required_surfaces", "required_dimensions",
                 "summary", "cells", "preview_failures", "flagship_gaps", "failures"
@@ -1341,6 +1453,37 @@ public sealed class ReleaseAuthorityRevisionStore
         {
             throw new InvalidDataException(
                 "Campaign-operability scorecard must be the preview-ready version-2 contract.");
+        }
+        string scorecardReleaseVersion = RequireString(scorecard, "release_version", 128);
+        string releaseScopeDecisionSha256 = RequireSha256Property(
+            scorecard,
+            "release_scope_decision_sha256");
+        if (!string.Equals(
+                scorecardReleaseVersion,
+                sealedManifestVersion,
+                StringComparison.Ordinal)
+            || !FixedDigestEquals(
+                releaseScopeDecisionSha256,
+                releaseScope.Sha256)
+            || !string.Equals(
+                RequireString(scorecard, "releaseVersion", 128),
+                scorecardReleaseVersion,
+                StringComparison.Ordinal)
+            || !FixedDigestEquals(
+                RequireSha256Property(scorecard, "releaseScopeDecisionSha256"),
+                releaseScope.Sha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(scorecard, "snapshotSha256"),
+                predecessorSnapshotSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(scorecard, "manifestSha256"),
+                sealedManifestSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(scorecard, "releaseDecisionSha256"),
+                predecessorDecisionSha256))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability scorecard release binding does not match the sealed manifest and approved scope.");
         }
         DateTimeOffset generatedAtUtc = ParseCanonicalUtcSeconds(
             RequireString(scorecard, "generated_at_utc", 128),
@@ -1381,6 +1524,11 @@ public sealed class ReleaseAuthorityRevisionStore
         var observed = new HashSet<string>(StringComparer.Ordinal);
         var scores = new List<int>(36);
         var expectedTopGaps = new List<string>(36);
+        var canonicalRowsById = new Dictionary<string, string>(StringComparer.Ordinal);
+        var receiptIdBySourceSha256 = new Dictionary<string, string>(StringComparer.Ordinal);
+        string? journeySourceSha256 = null;
+        string? journeySourcePath = null;
+        int cellIndex = 0;
         foreach (JsonElement cell in cells.EnumerateArray())
         {
             if (cell.ValueKind != JsonValueKind.Object)
@@ -1397,14 +1545,18 @@ public sealed class ReleaseAuthorityRevisionStore
                 "campaign-operability scorecard cell");
             string surface = RequireCanonicalToken(cell, "surface_id");
             string dimension = RequireCanonicalToken(cell, "dimension_id");
+            string expectedSurface = ScorecardSurfaces[cellIndex / ScorecardDimensions.Length];
+            string expectedDimension = ScorecardDimensions[cellIndex % ScorecardDimensions.Length];
             int score = RequireBoundedInt(cell, "score", 0, 3);
             if (score < 2
                 || !surfaces.Contains(surface, StringComparer.Ordinal)
                 || !dimensions.Contains(dimension, StringComparer.Ordinal)
+                || surface != expectedSurface
+                || dimension != expectedDimension
                 || !observed.Add(surface + "\0" + dimension))
             {
                 throw new InvalidDataException(
-                    "Every scorecard cell must uniquely cover the declared 6x6 matrix at score 2 or 3.");
+                    "Every scorecard cell must follow the exact surface-major v2 sequence at score 2 or 3.");
             }
             if (RequireString(cell, "preview_status", 128) != "pass"
                 || RequireString(cell, "stable_status", 128) != (score == 3 ? "pass" : "fail"))
@@ -1412,11 +1564,16 @@ public sealed class ReleaseAuthorityRevisionStore
                 throw new InvalidDataException(
                     "Campaign-operability cell preview/stable posture contradicts its score.");
             }
-            _ = RequireCanonicalTokenArray(
-                cell,
-                "owners",
-                allowEmpty: false,
-                maximumCount: 32);
+            if (!RequireCanonicalTokenArray(
+                    cell,
+                    "owners",
+                    allowEmpty: false,
+                    maximumCount: 32)
+                .SequenceEqual(CampaignOperabilityOwners(surface), StringComparer.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "Campaign-operability cell owners do not match the exact surface authority map.");
+            }
             RequireEmptyArray(cell, "preview_blockers", "campaign-operability cell");
 
             string[] journeyIds = RequireCanonicalTokenArray(
@@ -1429,10 +1586,16 @@ public sealed class ReleaseAuthorityRevisionStore
                 "evidence_ids",
                 allowEmpty: false,
                 maximumCount: 32);
-            if (journeyIds.Intersect(evidenceIds, StringComparer.Ordinal).Any())
+            if (!journeyIds.SequenceEqual(
+                    CampaignOperabilityJourneyIds(surface),
+                    StringComparer.Ordinal)
+                || !evidenceIds.SequenceEqual(
+                    CampaignOperabilityEvidenceIds(surface, dimension),
+                    StringComparer.Ordinal)
+                || journeyIds.Intersect(evidenceIds, StringComparer.Ordinal).Any())
             {
                 throw new InvalidDataException(
-                    "Campaign-operability journey and evidence IDs must be disjoint.");
+                    "Campaign-operability journey/evidence IDs do not match the exact v2 dependency map.");
             }
             JsonElement evidenceRows = RequireArray(cell, "evidence", "campaign-operability cell");
             if (evidenceRows.GetArrayLength() == 0
@@ -1447,6 +1610,7 @@ public sealed class ReleaseAuthorityRevisionStore
             var stableGaps = new List<string>();
             var observedEvidenceIds = new List<string>();
             int minimumEvidenceScore = 3;
+            int evidenceRowIndex = 0;
             foreach (JsonElement evidence in evidenceRows.EnumerateArray())
             {
                 if (evidence.ValueKind != JsonValueKind.Object)
@@ -1460,44 +1624,106 @@ public sealed class ReleaseAuthorityRevisionStore
                 string[] journeyFields =
                 [
                     "bounded_owner", "failure", "generated_at", "id", "next_actions",
-                    "path", "preview_failure", "score", "source_status", "status"
+                    "path", "preview_evidence", "preview_failure", "score", "source_sha256",
+                    "source_status", "status"
                 ];
                 string[] receiptFields =
                 [
                     "bounded_owner", "failure", "generated_at", "id", "next_actions",
-                    "path", "preview_failure", "score", "source_status", "source_verdict", "status"
+                    "path", "preview_evidence", "preview_failure", "score", "source_sha256",
+                    "source_status", "source_verdict", "status"
                 ];
+                string[] candidateReceiptFields =
+                [
+                    "bounded_owner", "candidate_evidence", "failure", "generated_at", "id",
+                    "next_actions", "path", "preview_evidence", "preview_failure", "score",
+                    "source_release_version", "source_sha256", "source_status", "source_verdict",
+                    "status"
+                ];
+                string[] candidateJourneyFields =
+                [
+                    "bounded_owner", "candidate_evidence", "failure", "generated_at", "id",
+                    "next_actions", "path", "preview_evidence", "preview_failure", "score",
+                    "source_release_version", "source_sha256", "source_status", "status"
+                ];
+                bool receiptRow = fieldNames.SequenceEqual(receiptFields, StringComparer.Ordinal);
+                bool candidateReceiptRow = fieldNames.SequenceEqual(
+                    candidateReceiptFields,
+                    StringComparer.Ordinal);
+                bool candidateJourneyRow = fieldNames.SequenceEqual(
+                    candidateJourneyFields,
+                    StringComparer.Ordinal);
                 if (!fieldNames.SequenceEqual(journeyFields, StringComparer.Ordinal)
-                    && !fieldNames.SequenceEqual(receiptFields, StringComparer.Ordinal))
+                    && !receiptRow
+                    && !candidateReceiptRow
+                    && !candidateJourneyRow)
                 {
                     throw new InvalidDataException(
                         "Campaign-operability evidence row has unexpected or missing fields.");
                 }
                 string evidenceId = RequireCanonicalToken(evidence, "id");
-                observedEvidenceIds.Add(evidenceId);
-                ValidatePortableEvidencePath(
-                    RequireString(evidence, "path", 2048),
-                    "campaign-operability evidence path");
-                string sourceStatus = RequireCanonicalToken(evidence, "source_status");
-                if (!PositiveEvidenceSourceStatuses.Contains(sourceStatus))
+                string expectedEvidenceId = evidenceRowIndex < journeyIds.Length
+                    ? journeyIds[evidenceRowIndex]
+                    : evidenceIds[evidenceRowIndex - journeyIds.Length];
+                bool journeyRow = evidenceRowIndex < journeyIds.Length;
+                if (evidenceId != expectedEvidenceId)
                 {
                     throw new InvalidDataException(
-                        "Campaign-operability evidence source_status is not an allowed positive posture.");
+                        "Campaign-operability evidence rows do not follow exact journey-then-receipt dependency order.");
                 }
+                observedEvidenceIds.Add(evidenceId);
+                string evidencePath = RequireString(evidence, "path", 2048);
+                ValidatePortableEvidencePath(
+                    evidencePath,
+                    "campaign-operability evidence path");
+                string sourceStatus = RequireCanonicalToken(evidence, "source_status");
+                string sourceSha256 = RequireSha256Property(evidence, "source_sha256");
+                string canonicalRowSha256 = Sha256(CanonicalJsonBytes(evidence));
+                if (canonicalRowsById.TryGetValue(evidenceId, out string? priorRowSha256))
+                {
+                    if (!FixedDigestEquals(priorRowSha256, canonicalRowSha256))
+                    {
+                        throw new InvalidDataException(
+                            "Campaign-operability repeated dependency IDs must project byte-identical rows.");
+                    }
+                }
+                else
+                {
+                    canonicalRowsById.Add(evidenceId, canonicalRowSha256);
+                }
+                if (journeyRow)
+                {
+                    journeySourceSha256 ??= sourceSha256;
+                    journeySourcePath ??= evidencePath;
+                    if (!FixedDigestEquals(journeySourceSha256, sourceSha256)
+                        || journeySourcePath != evidencePath)
+                    {
+                        throw new InvalidDataException(
+                            "Campaign-operability journey dependencies must bind one exact aggregate journey receipt.");
+                    }
+                }
+                else if (receiptIdBySourceSha256.TryGetValue(
+                             sourceSha256,
+                             out string? priorEvidenceId))
+                {
+                    if (priorEvidenceId != evidenceId)
+                    {
+                        throw new InvalidDataException(
+                            "Distinct campaign-operability receipt IDs cannot reuse one raw proof digest.");
+                    }
+                }
+                else
+                {
+                    receiptIdBySourceSha256.Add(sourceSha256, evidenceId);
+                }
+                string sourceVerdict = string.Empty;
                 if (evidence.TryGetProperty("source_verdict", out _))
                 {
-                    string sourceVerdict = RequireString(
+                    sourceVerdict = RequireString(
                         evidence,
                         "source_verdict",
                         256,
                         allowEmpty: true);
-                    if (sourceVerdict.Length != 0
-                        && (IsUnresolvedToken(sourceVerdict)
-                            || ContainsNegativeReleasePosture(sourceVerdict)))
-                    {
-                        throw new InvalidDataException(
-                            "Campaign-operability evidence source_verdict is unresolved or negative.");
-                    }
                 }
                 DateTimeOffset evidenceGeneratedAt = ParseCanonicalUtcSeconds(
                     RequireString(evidence, "generated_at", 128),
@@ -1526,6 +1752,56 @@ public sealed class ReleaseAuthorityRevisionStore
                     maximumCount: 32);
                 string failure = RequireString(evidence, "failure", 512, allowEmpty: true);
                 string previewFailure = RequireString(evidence, "preview_failure", 512, allowEmpty: true);
+                if (evidenceScore == 2)
+                {
+                    if (candidateReceiptRow || candidateJourneyRow)
+                    {
+                        throw new InvalidDataException(
+                            "Campaign-operability score-2 evidence cannot claim a flagship candidate binding.");
+                    }
+                    if (!PositiveEvidenceSourceStatuses.Contains(sourceStatus)
+                        && !PreviewEvidenceNegativeSourceStatuses.Contains(sourceStatus)
+                        || sourceVerdict.Length != 0 && IsUnresolvedToken(sourceVerdict))
+                    {
+                        throw new InvalidDataException(
+                            "Campaign-operability preview evidence has an unknown raw source posture.");
+                    }
+                    ValidateScoreTwoPreviewEvidence(
+                        evidence,
+                        evidenceId,
+                        receiptRow,
+                        sourceSha256,
+                        sourceStatus,
+                        owner,
+                        actions,
+                        scorecardReleaseVersion,
+                        releaseScopeDecisionSha256,
+                        predecessorSnapshotSha256,
+                        releaseScope,
+                        predecessorEvidence);
+                }
+                else
+                {
+                    if (!PositiveEvidenceSourceStatuses.Contains(sourceStatus)
+                        || sourceVerdict.Length != 0
+                           && (IsUnresolvedToken(sourceVerdict)
+                               || ContainsNegativeReleasePosture(sourceVerdict))
+                        || evidence.GetProperty("preview_evidence").ValueKind != JsonValueKind.Null)
+                    {
+                        throw new InvalidDataException(
+                            "Campaign-operability flagship evidence lacks a positive raw source posture.");
+                    }
+                    ValidateCandidateScoreThreeEvidence(
+                        evidence,
+                        candidateReceiptRow || candidateJourneyRow,
+                        sourceSha256,
+                        scorecardReleaseVersion,
+                        releaseScope.Sha256,
+                        sealedManifestSha256,
+                        predecessorSnapshotSha256,
+                        predecessorDecisionSha256,
+                        predecessorEvidence.RegistryCommit);
+                }
                 if (previewFailure.Length != 0
                     || evidenceScore == 2
                        && (evidenceStatus != "preview"
@@ -1555,6 +1831,7 @@ public sealed class ReleaseAuthorityRevisionStore
                     }
                     stableGaps.Add(failure);
                 }
+                evidenceRowIndex++;
             }
             string[] expectedEvidenceIds = journeyIds.Concat(evidenceIds).ToArray();
             if (!observedEvidenceIds.SequenceEqual(expectedEvidenceIds, StringComparer.Ordinal)
@@ -1609,13 +1886,13 @@ public sealed class ReleaseAuthorityRevisionStore
                     $"{surface}.{dimension}: {string.Join(", ", stableGaps)}");
             }
             scores.Add(score);
+            cellIndex++;
         }
         if (observed.Count != surfaces.Length * dimensions.Length)
         {
             throw new InvalidDataException(
                 "Campaign-operability scorecard does not cover the exact 6x6 matrix.");
         }
-
         JsonElement summary = RequireObject(scorecard, "summary", "campaign-operability scorecard");
         RequireExactObject(
             summary,
@@ -1673,6 +1950,464 @@ public sealed class ReleaseAuthorityRevisionStore
             generatedAtUtc,
             earliestEvidenceGeneratedAt,
             latestEvidenceGeneratedAt);
+    }
+
+    private sealed record ApprovedReleaseScopeBinding(
+        string Sha256,
+        string ReleaseVersion,
+        string SupportOwner,
+        HashSet<string> Platforms);
+
+    private sealed record PredecessorEvidenceBinding(
+        string SupportOwner,
+        string[] NextActions,
+        string RegistryCommit);
+
+    private static ApprovedReleaseScopeBinding ValidateReleaseScopeDecision(
+        ReadOnlyMemory<byte> bytes,
+        string expectedSha256,
+        string sealedManifestVersion)
+    {
+        RequireDigest(expectedSha256, bytes.Span, "approved release-scope decision digest");
+        using JsonDocument document = ParseStrictJson(bytes, "approved release-scope decision");
+        JsonElement decision = document.RootElement;
+        byte[] canonical = CanonicalJsonBytes(decision);
+        if (bytes.Length != canonical.Length + 1
+            || bytes.Span[^1] != (byte)'\n'
+            || !bytes.Span[..^1].SequenceEqual(canonical))
+        {
+            throw new InvalidDataException(
+                "Approved release-scope decision must use exact compact sorted UTF-8 JSON plus LF bytes.");
+        }
+        RequireExactObject(
+            decision,
+            [
+                "approvedAtUtc", "approvedBy", "channel", "contractName", "contractVersion",
+                "decisionId", "platforms", "releaseTarget", "releaseVersion", "status",
+                "supportOwner"
+            ],
+            "approved release-scope decision");
+        string releaseVersion = RequireString(decision, "releaseVersion", 128);
+        string supportOwner = RequireCanonicalToken(decision, "supportOwner");
+        if (RequireString(decision, "contractName", 128)
+                != "chummer.release-scope-decision/v1"
+            || RequireBoundedInt(decision, "contractVersion", 0, 4096) != 1
+            || RequireString(decision, "status", 128) != "approved"
+            || RequireCanonicalToken(decision, "channel") != "preview"
+            || RequireCanonicalToken(decision, "releaseTarget") != "preview"
+            || !string.Equals(releaseVersion, sealedManifestVersion, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Approved release-scope decision does not bind the exact preview release version.");
+        }
+        _ = RequireCanonicalToken(decision, "decisionId");
+        _ = ParseCanonicalUtcSeconds(
+            RequireString(decision, "approvedAtUtc", 128),
+            "release-scope approvedAtUtc");
+        string approvedBy = RequireString(decision, "approvedBy", 256);
+        if (IsUnresolvedToken(approvedBy))
+        {
+            throw new InvalidDataException(
+                "Approved release-scope decision lacks a resolved approving authority.");
+        }
+
+        JsonElement platformsElement = RequireArray(
+            decision,
+            "platforms",
+            "approved release-scope decision");
+        if (platformsElement.GetArrayLength() is < 1 or > 16)
+        {
+            throw new InvalidDataException(
+                "Approved release-scope decision must contain one through sixteen platforms.");
+        }
+        var platforms = new HashSet<string>(StringComparer.Ordinal);
+        string previousPlatform = string.Empty;
+        foreach (JsonElement row in platformsElement.EnumerateArray())
+        {
+            RequireExactObject(
+                row,
+                [
+                    "artifactAccessClass", "fallbackHeads", "platform", "primaryHead", "rid",
+                    "signingRequirement"
+                ],
+                "approved release-scope platform");
+            string platform = RequireCanonicalToken(row, "platform");
+            string rid = RequireCanonicalToken(row, "rid");
+            string primaryHead = RequireCanonicalToken(row, "primaryHead");
+            string accessClass = RequireCanonicalToken(row, "artifactAccessClass");
+            string signingRequirement = RequireCanonicalToken(row, "signingRequirement");
+            string[] fallbackHeads = RequireCanonicalTokenArray(
+                row,
+                "fallbackHeads",
+                allowEmpty: true,
+                maximumCount: 15);
+            bool validRid = platform switch
+            {
+                "linux" => rid is "linux-x64" or "linux-arm64",
+                "windows" => rid is "win-x64" or "win-arm64",
+                "macos" => rid is "osx-x64" or "osx-arm64",
+                _ => false
+            };
+            if (!validRid
+                || primaryHead is not ("avalonia" or "blazor-desktop")
+                || fallbackHeads.Any(head => head is not ("avalonia" or "blazor-desktop"))
+                || fallbackHeads.Contains(primaryHead, StringComparer.Ordinal)
+                || !fallbackHeads.SequenceEqual(
+                    fallbackHeads.OrderBy(static head => head, StringComparer.Ordinal),
+                    StringComparer.Ordinal)
+                || fallbackHeads.Distinct(StringComparer.Ordinal).Count() != fallbackHeads.Length
+                || accessClass is not ("open_public" or "account_required" or "support_directed")
+                || signingRequirement is not ("signed" or "preview_unsigned_allowed" or "not_applicable")
+                || string.CompareOrdinal(previousPlatform, platform) >= 0
+                || !platforms.Add(platform))
+            {
+                throw new InvalidDataException(
+                    "Approved release-scope platform inventory is noncanonical or unsupported.");
+            }
+            previousPlatform = platform;
+        }
+        return new ApprovedReleaseScopeBinding(
+            expectedSha256,
+            releaseVersion,
+            supportOwner,
+            platforms);
+    }
+
+    private static PredecessorEvidenceBinding ValidatePredecessorEvidenceBinding(
+        ReadOnlyMemory<byte> predecessorSnapshotBytes)
+    {
+        using JsonDocument document = ParseStrictJson(
+            predecessorSnapshotBytes,
+            "predecessor SNAPSHOT.json evidence binding");
+        JsonElement snapshot = document.RootElement;
+        string registryCommit = RequireString(snapshot, "registryCommit", 128);
+        if (!LowerGitCommit.IsMatch(registryCommit))
+        {
+            throw new InvalidDataException(
+                "Predecessor authority registryCommit must be exact lowercase 40-hex.");
+        }
+        return new PredecessorEvidenceBinding(
+            RequireCanonicalToken(snapshot, "supportOwner"),
+            RequireConcreteTextArray(
+                snapshot,
+                "nextActions",
+                allowEmpty: false,
+                maximumCount: 32),
+            registryCommit);
+    }
+
+    private static void ValidateCandidateScoreThreeEvidence(
+        JsonElement evidence,
+        bool candidateRow,
+        string sourceSha256,
+        string releaseVersion,
+        string releaseScopeDecisionSha256,
+        string manifestSha256,
+        string authoritySnapshotSha256,
+        string releaseDecisionSha256,
+        string registryCommit)
+    {
+        if (!candidateRow)
+        {
+            throw new InvalidDataException(
+                "Every score-3 campaign-operability evidence row must carry an exact candidate_evidence binding.");
+        }
+        JsonElement binding = RequireObject(
+            evidence,
+            "candidate_evidence",
+            "campaign-operability candidate evidence");
+        RequireExactObject(
+            binding,
+            [
+                "authority_snapshot_sha256", "contract_name", "contract_version",
+                "manifest_sha256", "registry_commit", "release_decision_sha256",
+                "release_scope_decision_sha256", "release_version", "source_receipt_sha256"
+            ],
+            "campaign-operability candidate evidence");
+        if (RequireString(binding, "contract_name", 128)
+                != "chummer.campaign-operability-candidate-evidence/v1"
+            || RequireBoundedInt(binding, "contract_version", 0, 4096) != 1
+            || !string.Equals(
+                RequireString(evidence, "source_release_version", 128),
+                releaseVersion,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireString(binding, "release_version", 128),
+                releaseVersion,
+                StringComparison.Ordinal)
+            || !FixedDigestEquals(
+                RequireSha256Property(binding, "release_scope_decision_sha256"),
+                releaseScopeDecisionSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(binding, "manifest_sha256"),
+                manifestSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(binding, "authority_snapshot_sha256"),
+                authoritySnapshotSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(binding, "release_decision_sha256"),
+                releaseDecisionSha256)
+            || !FixedDigestEquals(
+                RequireSha256Property(binding, "source_receipt_sha256"),
+                sourceSha256)
+            || !string.Equals(
+                RequireString(binding, "registry_commit", 128),
+                registryCommit,
+                StringComparison.Ordinal)
+            || !LowerGitCommit.IsMatch(
+                RequireString(binding, "registry_commit", 128)))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability score-3 evidence does not bind the exact release candidate and raw receipt bytes.");
+        }
+    }
+
+    private static void ValidateScoreTwoPreviewEvidence(
+        JsonElement evidence,
+        string evidenceId,
+        bool receiptRow,
+        string sourceSha256,
+        string sourceStatus,
+        string owner,
+        IReadOnlyList<string> actions,
+        string scorecardReleaseVersion,
+        string releaseScopeDecisionSha256,
+        string predecessorSnapshotSha256,
+        ApprovedReleaseScopeBinding releaseScope,
+        PredecessorEvidenceBinding predecessorEvidence)
+    {
+        JsonElement previewEvidence = RequireObject(
+            evidence,
+            "preview_evidence",
+            "campaign-operability evidence row");
+        RequireExactObject(
+            previewEvidence,
+            ["provenance_kind", "source_receipt_sha256", "proof_sha256", "proof"],
+            "campaign-operability preview evidence");
+        string provenanceKind = RequireCanonicalToken(
+            previewEvidence,
+            "provenance_kind");
+        string boundSourceSha256 = RequireSha256Property(
+            previewEvidence,
+            "source_receipt_sha256");
+        if (!FixedDigestEquals(boundSourceSha256, sourceSha256))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability preview evidence does not bind the row source bytes.");
+        }
+
+        JsonElement proof = RequireObject(
+            previewEvidence,
+            "proof",
+            "campaign-operability preview evidence");
+        RequireDigest(
+            RequireSha256Property(previewEvidence, "proof_sha256"),
+            CanonicalJsonBytes(proof),
+            "campaign-operability preview proof digest");
+
+        string proofOwner;
+        string[] proofActions;
+        switch (provenanceKind)
+        {
+            case "nested_declaration":
+                RequireExactObject(
+                    proof,
+                    [
+                        "contract_name", "contract_version", "status", "release_version",
+                        "release_scope_decision_sha256", "bounded_owner", "next_actions"
+                    ],
+                    "campaign-operability nested preview proof");
+                if (RequireString(proof, "contract_name", 128)
+                        != "chummer.campaign_operability_preview_evidence"
+                    || RequireBoundedInt(proof, "contract_version", 0, 4096) != 2
+                    || RequireString(proof, "status", 128) != "pass")
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability nested preview proof has an invalid contract posture.");
+                }
+                proofOwner = RequireCanonicalToken(proof, "bounded_owner");
+                proofActions = RequireConcreteTextArray(
+                    proof,
+                    "next_actions",
+                    allowEmpty: false,
+                    maximumCount: 32);
+                break;
+            case "registry_review_seed":
+                RequireExactObject(
+                    proof,
+                    [
+                        "contract_name", "contract_version", "status", "channel",
+                        "rollout_state", "supportability_state", "release_decision_status",
+                        "release_version", "release_scope_decision_sha256",
+                        "authority_snapshot_sha256", "bounded_owner", "next_actions"
+                    ],
+                    "campaign-operability Registry preview proof");
+                string releaseDecisionStatus = RequireCanonicalToken(
+                    proof,
+                    "release_decision_status");
+                if (!receiptRow
+                    || evidenceId != "release_channel"
+                    || !FixedDigestEquals(sourceSha256, predecessorSnapshotSha256)
+                    || sourceStatus != "published"
+                    || RequireString(proof, "contract_name", 128)
+                       != "chummer.campaign_operability_registry_review_seed"
+                    || RequireBoundedInt(proof, "contract_version", 0, 4096) != 1
+                    || RequireString(proof, "status", 128) != "published"
+                    || RequireString(proof, "channel", 128) != "preview"
+                    || RequireString(proof, "rollout_state", 128) != "promoted_preview"
+                    || RequireString(proof, "supportability_state", 128) != "preview_supported"
+                    || releaseDecisionStatus != "review_required")
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability Registry preview proof has an invalid review-seed posture.");
+                }
+                proofOwner = RequireCanonicalToken(proof, "bounded_owner");
+                proofActions = RequireConcreteTextArray(
+                    proof,
+                    "next_actions",
+                    allowEmpty: false,
+                    maximumCount: 32);
+                if (!FixedDigestEquals(
+                        RequireSha256Property(proof, "authority_snapshot_sha256"),
+                        predecessorSnapshotSha256))
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability Registry review seed does not bind the predecessor authority snapshot.");
+                }
+                if (!string.Equals(
+                        proofOwner,
+                        predecessorEvidence.SupportOwner,
+                        StringComparison.Ordinal)
+                    || !string.Equals(
+                        proofOwner,
+                        releaseScope.SupportOwner,
+                        StringComparison.Ordinal)
+                    || !proofActions.SequenceEqual(
+                        predecessorEvidence.NextActions,
+                        StringComparer.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability Registry review seed does not bind release_channel predecessor owner/actions and approved scope.");
+                }
+                break;
+            case "approved_scope_exclusion":
+                RequireExactObject(
+                    proof,
+                    [
+                        "contract_name", "contract_version", "status", "release_version",
+                        "release_scope_decision_sha256", "excluded_platform", "evidence_id",
+                        "bounded_owner", "next_actions"
+                    ],
+                    "campaign-operability approved-scope exclusion proof");
+                if (!receiptRow
+                    || evidenceId != "windows_visual"
+                    || releaseScope.Platforms.Contains("windows")
+                    || RequireString(proof, "contract_name", 128)
+                        != "chummer.campaign_operability_approved_scope_exclusion"
+                    || RequireBoundedInt(proof, "contract_version", 0, 4096) != 1
+                    || RequireString(proof, "status", 128) != "approved"
+                    || RequireString(proof, "excluded_platform", 128) != "windows"
+                    || RequireString(proof, "evidence_id", 128) != "windows_visual")
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability approved-scope exclusion proof has an invalid posture.");
+                }
+                proofOwner = RequireCanonicalToken(proof, "bounded_owner");
+                proofActions = RequireConcreteTextArray(
+                    proof,
+                    "next_actions",
+                    allowEmpty: false,
+                    maximumCount: 32);
+                if (!string.Equals(
+                        proofOwner,
+                        releaseScope.SupportOwner,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "Campaign-operability approved-scope exclusion owner does not match the approved release scope.");
+                }
+                break;
+            default:
+                throw new InvalidDataException(
+                    "Campaign-operability preview evidence has an unsupported provenance kind.");
+        }
+
+        string proofReleaseVersion = RequireString(proof, "release_version", 128);
+        string proofReleaseScopeDecisionSha256 = RequireSha256Property(
+            proof,
+            "release_scope_decision_sha256");
+        if (!string.Equals(proofReleaseVersion, scorecardReleaseVersion, StringComparison.Ordinal)
+            || !FixedDigestEquals(
+                proofReleaseScopeDecisionSha256,
+                releaseScopeDecisionSha256))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability preview proof does not match the scorecard release binding.");
+        }
+
+        if (!string.Equals(proofOwner, owner, StringComparison.Ordinal)
+            || !proofActions.SequenceEqual(actions, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability preview proof owner/actions do not match the evidence row.");
+        }
+    }
+
+    private static byte[] CanonicalJsonBytes(JsonElement element)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            Indented = false
+        }))
+        {
+            WriteCanonicalJson(writer, element);
+        }
+        return stream.ToArray();
+    }
+
+    private static void WriteCanonicalJson(Utf8JsonWriter writer, JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (JsonProperty property in element.EnumerateObject()
+                             .OrderBy(static property => property.Name, StringComparer.Ordinal))
+                {
+                    writer.WritePropertyName(property.Name);
+                    WriteCanonicalJson(writer, property.Value);
+                }
+                writer.WriteEndObject();
+                break;
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (JsonElement item in element.EnumerateArray())
+                {
+                    WriteCanonicalJson(writer, item);
+                }
+                writer.WriteEndArray();
+                break;
+            case JsonValueKind.String:
+                writer.WriteStringValue(element.GetString());
+                break;
+            case JsonValueKind.Number:
+                writer.WriteRawValue(element.GetRawText(), skipInputValidation: false);
+                break;
+            case JsonValueKind.True:
+                writer.WriteBooleanValue(true);
+                break;
+            case JsonValueKind.False:
+                writer.WriteBooleanValue(false);
+                break;
+            case JsonValueKind.Null:
+                writer.WriteNullValue();
+                break;
+            default:
+                throw new InvalidDataException(
+                    "Campaign-operability canonical proof contains an unsupported JSON token.");
+        }
     }
 
     private static DateTimeOffset ValidateConvergenceBytes(

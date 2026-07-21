@@ -89,6 +89,44 @@ verify_public_projection() {
 verify_public_ui_frame_integrity() {
   cd "$run_services_root"
   local base_url="${CHUMMER_PUBLIC_BASE_URL:-${BASE_URL:-https://chummer.run}}"
+  local required_binding_vars=(
+    CHUMMER_UI_FRAME_VERIFICATION_MODE
+    CHUMMER_UI_FRAME_AUTHORITY_ROUTE
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_VERSION
+    CHUMMER_UI_FRAME_EXPECTED_MANIFEST_SHA256
+    CHUMMER_UI_FRAME_EXPECTED_AUTHORITY_SNAPSHOT_SHA256
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_DECISION_SHA256
+    CHUMMER_UI_FRAME_EXPECTED_RELEASE_SCOPE_SHA256
+    CHUMMER_UI_FRAME_RELEASE_SCOPE_DECISION_PATH
+    CHUMMER_UI_FRAME_RECEIPT_PATH
+  )
+  local binding_var
+  for binding_var in "${required_binding_vars[@]}"; do
+    if [[ -z "${!binding_var:-}" ]]; then
+      echo "ui-frame-integrity requires explicit candidate binding: $binding_var" >&2
+      return 2
+    fi
+  done
+  if [[ "${CHUMMER_UI_FRAME_RECEIPT_PATH}" != /* ]]; then
+    echo "ui-frame-integrity receipt path must be absolute" >&2
+    return 2
+  fi
+  if [[ "$(basename "$(dirname "${CHUMMER_UI_FRAME_RECEIPT_PATH}")")" != "${CHUMMER_UI_FRAME_EXPECTED_RELEASE_VERSION}" ]]; then
+    echo "ui-frame-integrity receipt directory must equal the expected release version" >&2
+    return 2
+  fi
+  if [[ "${CHUMMER_UI_FRAME_VERIFICATION_MODE}" == "staged_private" ]]; then
+    if [[ -z "${CHUMMER_UI_FRAME_STAGED_PROBE_TOKEN_FILE:-}" ]]; then
+      echo "staged ui-frame-integrity verification requires a private probe token file" >&2
+      return 2
+    fi
+  elif [[ "${CHUMMER_UI_FRAME_VERIFICATION_MODE}" != "committed_public" ]]; then
+    echo "ui-frame-integrity verification mode must be staged_private or committed_public" >&2
+    return 2
+  elif [[ -n "${CHUMMER_UI_FRAME_STAGED_PROBE_TOKEN_FILE:-}" ]]; then
+    echo "committed ui-frame-integrity verification refuses a staged probe token" >&2
+    return 2
+  fi
   local timeout_seconds="${CHUMMER_UI_FRAME_TIMEOUT_SECONDS:-900}"
   local test_timeout_ms="${CHUMMER_UI_FRAME_TEST_TIMEOUT_MS:-$((timeout_seconds * 1000 - 30000))}"
   if [ "$test_timeout_ms" -lt 600000 ]; then

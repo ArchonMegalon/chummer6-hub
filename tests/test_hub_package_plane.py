@@ -530,6 +530,21 @@ def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> No
     )
 
 
+def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020" in workflow
+    assert 'node-version: "22.17.0"' in workflow
+    assert "scripts/materialize_release_authority_advance_request.py" in workflow
+    assert "scripts/materialize_release_scorecard_handoff.py" in workflow
+    assert "scripts/materialize_release_ready_receipt.py" in workflow
+    assert "tests/test_materialize_release_authority_advance_request.py" in workflow
+    assert "tests/test_materialize_release_scorecard_handoff.py" in workflow
+    assert "tests/test_materialize_release_ready_campaign_preview.py" in workflow
+    assert "tests/public/ui-frame-candidate-binding.spec.ts" in workflow
+
+
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:
     expected_license = (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert "All rights reserved." in expected_license

@@ -6,15 +6,22 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sys
 
 import pytest
 
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "verify_post_activation_acceptance.py"
+SCRIPTS = SCRIPT.parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location("verify_post_activation_acceptance", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+CAMPAIGN_PRODUCER = importlib.import_module("accept_live_campaign_release")
+HORIZON_PRODUCER = importlib.import_module("verify_horizon_live_readiness")
 
 OBSERVED_AT = dt.datetime(2026, 7, 21, 12, 2, tzinfo=dt.timezone.utc)
 TARGET = {
@@ -172,6 +179,157 @@ def _evidence(
     return payload
 
 
+def _horizon_receipt(
+    generated_at: dt.datetime,
+    *,
+    convergence_sha256: str,
+    manifest_file_sha256: str,
+) -> dict[str, object]:
+    horizon_rows = [
+        {
+            "horizonId": horizon_id,
+            "route": route,
+            "sourceStatus": "source_working",
+            "deploymentStatus": "raw_http_reachable",
+            "configurationStatus": "not_applicable",
+            "operationalStatus": "unverified",
+            "governanceStatus": "cleared",
+            "httpStatus": 200,
+            "contentType": "text/html",
+            "responseSha256": hashlib.sha256(route.encode()).hexdigest(),
+            "identityBindingStatus": "not_exposed",
+        }
+        for horizon_id, route in sorted(MODULE.HORIZON_ROUTES.items())
+    ]
+    horizon_ids = sorted(MODULE.HORIZON_ROUTES)
+    capability_rows = [
+        {
+            "horizonId": horizon_ids[index % len(horizon_ids)],
+            "capabilityId": f"capability-{index:02d}",
+            "sourceStatus": "source_working",
+            "deploymentStatus": "raw_http_observed",
+            "configurationStatus": "configured",
+            "operationalStatus": "unverified",
+            "governanceStatus": "cleared",
+            "httpStatus": 200,
+            "responseSha256": hashlib.sha256(f"capability-{index}".encode()).hexdigest(),
+            "identityBindingStatus": "not_exposed",
+            "publicCatalogObserved": index < 8,
+        }
+        for index in range(20)
+    ]
+    fence = {
+        "route": "/api/v1/public/release-truth",
+        "releaseVersion": TARGET["releaseVersion"],
+        "manifestSha256": TARGET["manifestSha256"],
+        "releaseDecisionSha256": TARGET["decisionSha256"],
+        "releaseDecisionStatus": "preview_ready",
+        "authoritySnapshotSha256": TARGET["snapshotSha256"],
+        "releaseTruthSha256": "5" * 64,
+        "responseSha256": "6" * 64,
+    }
+    return {
+        "contractName": HORIZON_PRODUCER.CONTRACT_NAME,
+        "contractVersion": HORIZON_PRODUCER.CONTRACT_VERSION,
+        "generatedAtUtc": _utc(generated_at),
+        "status": "attention_required",
+        "operationalReadinessClaimAllowed": False,
+        "releaseBinding": {
+            "releaseVersion": TARGET["releaseVersion"],
+            "generationId": TARGET["generationId"],
+            "manifestSha256": TARGET["manifestSha256"],
+            "releaseDecisionStatus": "preview_ready",
+            "releaseDecisionSha256": TARGET["decisionSha256"],
+            "authoritySnapshotSha256": TARGET["snapshotSha256"],
+        },
+        "inputBindings": {
+            "sourceReadinessSha256": "7" * 64,
+            "committedPublicConvergenceSha256": convergence_sha256,
+            "generationManifestFileSha256": manifest_file_sha256,
+        },
+        "probePolicy": {
+            "baseOrigin": "https://chummer.run",
+            "methods": ["GET"],
+            "sameOriginOnly": True,
+            "redirectsFollowed": False,
+            "runtimeRequestsPerformed": True,
+            "providerCallsPerformed": False,
+            "quotaConsumed": False,
+            "mutationsPerformed": False,
+            "secretRedacted": True,
+        },
+        "currentFence": {
+            "preCurrent": dict(fence),
+            "postCurrent": dict(fence),
+            "stable": True,
+        },
+        "catalogObservations": {
+            "internalPublicSafe": {
+                "route": "/api/internal/horizons/capabilities?publicSafe=true",
+                "httpStatus": 200,
+                "contentType": "application/json",
+                "responseSha256": "a" * 64,
+                "identityBindingStatus": "not_exposed",
+                "rowCount": 20,
+            },
+            "public": {
+                "route": "/api/v1/public/horizons/capabilities",
+                "httpStatus": 200,
+                "contentType": "application/json",
+                "responseSha256": "b" * 64,
+                "identityBindingStatus": "not_exposed",
+                "rowCount": 8,
+            },
+        },
+        "summary": {
+            "horizonCount": 15,
+            "capabilityCount": 20,
+            "deploymentReachableCount": 15,
+            "configurationConfiguredCount": 20,
+            "configurationDisabledCount": 0,
+            "operationalReadyCount": 0,
+            "governanceClearedCount": 20,
+            "publicCapabilityCount": 8,
+        },
+        "horizons": horizon_rows,
+        "capabilities": capability_rows,
+    }
+
+
+def _campaign_state(role: str) -> dict[str, object]:
+    return {
+        "cookies": [
+            {
+                "name": "session",
+                "value": f"opaque-{role}",
+                "domain": ".chummer.run",
+                "path": "/",
+            }
+        ],
+        "origins": [
+            {
+                "origin": "https://chummer.run",
+                "localStorage": [{"name": "state", "value": role}],
+            }
+        ],
+    }
+
+
+def _campaign_permit(now: dt.datetime) -> dict[str, object]:
+    return {
+        "contractName": CAMPAIGN_PRODUCER.PERMIT_CONTRACT,
+        "contractVersion": 1,
+        "status": "approved",
+        "secretRedacted": True,
+        "permitId": "permit-acceptance-golden",
+        "issuedAtUtc": _utc(now - dt.timedelta(minutes=1)),
+        "expiresAtUtc": _utc(now + dt.timedelta(minutes=20)),
+        "allowedOrigin": CAMPAIGN_PRODUCER.PRODUCTION_ORIGIN,
+        "allowedActions": list(CAMPAIGN_PRODUCER.ALLOWED_ACTIONS),
+        "releaseBinding": dict(TARGET),
+    }
+
+
 def _manifest(release_truth: dict[str, object]) -> dict[str, object]:
     truth = json.loads(json.dumps(release_truth))
     return {
@@ -240,15 +398,86 @@ def _bundle(
         "manifest_payload": manifest_payload,
         "evidence": {},
         "evidence_payloads": {},
+        "producer_receipts": {},
+        "producer_receipt_payloads": {},
         "observed_at": observed_at,
     }
     for index, kind in enumerate(kinds):
         path = workspace / f"evidence-{kind}.json"
-        payload = _evidence(kind, f"evidence-{index}", evidence_at)
-        digest = _write(path, payload)
+        if kind == "horizon_live_readiness":
+            producer_path = workspace / "horizon-live-readiness-receipt.json"
+            producer_payload = _horizon_receipt(
+                evidence_at,
+                convergence_sha256=bundle["generation_sha"],
+                manifest_file_sha256=bundle["manifest_sha"],
+            )
+            producer_digest = _write(producer_path, producer_payload)
+            producer_raw = producer_path.read_bytes()
+            payload = HORIZON_PRODUCER.build_post_activation_evidence(
+                producer_payload,
+                producer_raw,
+                evidence_id=f"evidence-{index}",
+                target_pointer_sha256=TARGET["targetPointerSha256"],
+            )
+            digest = _write(path, payload)
+            bundle["producer_receipts"][kind] = (  # type: ignore[index]
+                producer_path,
+                producer_digest,
+            )
+            bundle["producer_receipt_payloads"][kind] = producer_payload  # type: ignore[index]
+        elif kind == "multi_account_live_journey":
+            storage_states: dict[str, tuple[Path, str]] = {}
+            for role in sorted(CAMPAIGN_PRODUCER.ROLES):
+                state_path = workspace / f"storage-{role}.json"
+                storage_states[role] = (
+                    state_path,
+                    _write(state_path, _campaign_state(role)),
+                )
+            permit_path = workspace / "campaign-mutation-permit.json"
+            permit_digest = _write(permit_path, _campaign_permit(evidence_at))
+            payload = CAMPAIGN_PRODUCER.build_evidence(
+                workspace=workspace,
+                finalization_receipt=finalization,
+                finalization_sha256=bundle["finalization_sha"],
+                storage_states=storage_states,
+                mutation_permit=permit_path,
+                mutation_permit_sha256=permit_digest,
+                evidence_id=f"evidence-{index}",
+                output=path,
+                observed_at=evidence_at,
+            )
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        else:
+            payload = _evidence(kind, f"evidence-{index}", evidence_at)
+            digest = _write(path, payload)
         bundle["evidence"][kind] = (path, digest)  # type: ignore[index]
         bundle["evidence_payloads"][kind] = payload  # type: ignore[index]
     return bundle
+
+
+def _rebind_horizon_producer_inputs(bundle: dict[str, object]) -> None:
+    kind = "horizon_live_readiness"
+    producer_path, _ = bundle["producer_receipts"][kind]
+    producer_payload = bundle["producer_receipt_payloads"][kind]
+    producer_payload["inputBindings"]["committedPublicConvergenceSha256"] = bundle[
+        "generation_sha"
+    ]
+    producer_payload["inputBindings"]["generationManifestFileSha256"] = bundle[
+        "manifest_sha"
+    ]
+    producer_digest = _write(producer_path, producer_payload)
+    bundle["producer_receipts"][kind] = (producer_path, producer_digest)
+
+    evidence_path, _ = bundle["evidence"][kind]
+    evidence_id = bundle["evidence_payloads"][kind]["evidenceId"]
+    evidence = HORIZON_PRODUCER.build_post_activation_evidence(
+        producer_payload,
+        producer_path.read_bytes(),
+        evidence_id=evidence_id,
+        target_pointer_sha256=TARGET["targetPointerSha256"],
+    )
+    bundle["evidence_payloads"][kind] = evidence
+    bundle["evidence"][kind] = (evidence_path, _write(evidence_path, evidence))
 
 
 def _verify(bundle: dict[str, object], *, output: Path | None = None):
@@ -265,6 +494,7 @@ def _verify(bundle: dict[str, object], *, output: Path | None = None):
         release_manifest=bundle["manifest"],
         release_manifest_file_sha256=bundle["manifest_sha"],
         required_evidence=bundle["evidence"],
+        producer_receipts=bundle["producer_receipts"],
         output=output or workspace / "acceptance.json",
         observed_at=bundle["observed_at"],
     )
@@ -272,7 +502,9 @@ def _verify(bundle: dict[str, object], *, output: Path | None = None):
 
 def _cli_args(bundle: dict[str, object], output: Path) -> list[str]:
     evidence = bundle["evidence"]
+    producer_receipts = bundle["producer_receipts"]
     assert isinstance(evidence, dict)
+    assert isinstance(producer_receipts, dict)
     args = [
         "--workspace",
         str(bundle["workspace"]),
@@ -296,17 +528,20 @@ def _cli_args(bundle: dict[str, object], output: Path) -> list[str]:
     for kind, (path, digest) in evidence.items():
         args.extend(["--require-evidence", f"{kind}={path}"])
         args.extend(["--evidence-sha256", f"{kind}={digest}"])
+    for kind, (path, digest) in producer_receipts.items():
+        args.extend(["--producer-receipt", f"{kind}={path}"])
+        args.extend(["--producer-receipt-sha256", f"{kind}={digest}"])
     return [*args, "--output", str(output)]
 
 
-def test_accepts_exact_explicit_denominator_and_writes_canonical_mode_0600(tmp_path: Path):
+def test_actual_producers_validate_but_keep_aggregate_attention_required(tmp_path: Path):
     kinds = ("horizon_live_readiness", "multi_account_live_journey")
     bundle = _bundle(tmp_path, kinds=kinds)
     output = bundle["workspace"] / "acceptance.json"
 
     receipt = _verify(bundle, output=output)
 
-    assert receipt["status"] == "accepted"
+    assert receipt["status"] == "attention_required"
     assert receipt["requiredEvidenceKinds"] == sorted(kinds)
     assert receipt["evidenceCount"] == 2
     assert output.read_bytes() == _canonical(receipt)
@@ -317,6 +552,142 @@ def test_accepts_exact_explicit_denominator_and_writes_canonical_mode_0600(tmp_p
         "currentConvergence",
         "releaseManifest",
     }
+    rows = {row["evidenceKind"]: row for row in receipt["evidence"]}
+    assert rows["horizon_live_readiness"]["provenanceStatus"] == (
+        "structural_attention_receipt_bound_unverified"
+    )
+    assert len(rows["horizon_live_readiness"]["producerReceiptSha256"]) == 64
+    assert rows["multi_account_live_journey"]["provenanceStatus"] == (
+        "unverified_preflight_attention_only"
+    )
+    assert all(row["accepted"] is False for row in rows.values())
+
+
+def test_aggregate_horizon_schema_matches_canonical_verifier() -> None:
+    assert MODULE.HORIZON_RECEIPT_CONTRACT == HORIZON_PRODUCER.CONTRACT_NAME
+    assert MODULE.HORIZON_EXPECTED_HORIZON_COUNT == (
+        HORIZON_PRODUCER.EXPECTED_HORIZON_COUNT
+    )
+    assert MODULE.HORIZON_EXPECTED_CAPABILITY_COUNT == (
+        HORIZON_PRODUCER.EXPECTED_CAPABILITY_COUNT
+    )
+    assert MODULE.HORIZON_ROUTES == HORIZON_PRODUCER.HORIZON_ROUTES
+    assert MODULE.HORIZON_RECEIPT_FIELDS == HORIZON_PRODUCER.TOP_LEVEL_FIELDS
+    assert MODULE.HORIZON_RELEASE_FIELDS == HORIZON_PRODUCER.RELEASE_FIELDS
+    assert MODULE.HORIZON_INPUT_FIELDS == HORIZON_PRODUCER.INPUT_FIELDS
+    assert MODULE.HORIZON_POLICY_FIELDS == HORIZON_PRODUCER.POLICY_FIELDS
+    assert MODULE.HORIZON_FENCE_FIELDS == HORIZON_PRODUCER.FENCE_FIELDS
+    assert MODULE.HORIZON_FENCE_SNAPSHOT_FIELDS == (
+        HORIZON_PRODUCER.FENCE_SNAPSHOT_FIELDS
+    )
+    assert MODULE.HORIZON_SUMMARY_FIELDS == HORIZON_PRODUCER.SUMMARY_FIELDS
+    assert MODULE.HORIZON_ROW_FIELDS == HORIZON_PRODUCER.HORIZON_FIELDS
+    assert MODULE.HORIZON_CAPABILITY_FIELDS == HORIZON_PRODUCER.CAPABILITY_FIELDS
+    assert MODULE.HORIZON_CATALOG_FIELDS == (
+        HORIZON_PRODUCER.CATALOG_OBSERVATIONS_FIELDS
+    )
+    assert MODULE.HORIZON_CATALOG_OBSERVATION_FIELDS == (
+        HORIZON_PRODUCER.CATALOG_OBSERVATION_FIELDS
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["horizon_live_readiness", "multi_account_live_journey"],
+)
+def test_arbitrary_ready_envelopes_are_rejected(tmp_path: Path, kind: str):
+    bundle = _bundle(tmp_path)
+    path, _ = bundle["evidence"][kind]
+    payload = bundle["evidence_payloads"][kind]
+    payload["status"] = "ready"
+    payload["operationalReadinessClaimAllowed"] = True
+    for claim in payload["claims"]:
+        claim["status"] = "pass"
+    bundle["evidence"][kind] = (path, _write(path, payload))
+
+    with pytest.raises(
+        MODULE.AcceptanceError,
+        match="producer-exact|producer authority",
+    ):
+        _verify(bundle)
+
+
+def test_horizon_claim_must_bind_pinned_producer_receipt_bytes(tmp_path: Path):
+    bundle = _bundle(tmp_path)
+    kind = "horizon_live_readiness"
+    path, _ = bundle["evidence"][kind]
+    payload = bundle["evidence_payloads"][kind]
+    payload["claims"][0]["evidenceSha256"] = "f" * 64
+    bundle["evidence"][kind] = (path, _write(path, payload))
+
+    with pytest.raises(MODULE.AcceptanceError, match="does not bind"):
+        _verify(bundle)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "committedPublicConvergenceSha256",
+        "generationManifestFileSha256",
+    ],
+)
+def test_horizon_receipt_input_bindings_must_match_aggregate_bytes(
+    tmp_path: Path,
+    field: str,
+):
+    bundle = _bundle(tmp_path)
+    kind = "horizon_live_readiness"
+    producer_path, _ = bundle["producer_receipts"][kind]
+    producer_payload = bundle["producer_receipt_payloads"][kind]
+    producer_payload["inputBindings"][field] = "f" * 64
+    producer_digest = _write(producer_path, producer_payload)
+    bundle["producer_receipts"][kind] = (producer_path, producer_digest)
+
+    evidence_path, _ = bundle["evidence"][kind]
+    evidence = bundle["evidence_payloads"][kind]
+    evidence["claims"][0]["evidenceSha256"] = producer_digest
+    bundle["evidence"][kind] = (evidence_path, _write(evidence_path, evidence))
+
+    with pytest.raises(MODULE.AcceptanceError, match="inputBindings do not bind"):
+        _verify(bundle)
+
+
+def test_horizon_receipt_cannot_self_authorize_mutation(tmp_path: Path):
+    bundle = _bundle(tmp_path)
+    kind = "horizon_live_readiness"
+    producer_path, _ = bundle["producer_receipts"][kind]
+    producer_payload = bundle["producer_receipt_payloads"][kind]
+    producer_payload["probePolicy"]["mutationsPerformed"] = True
+    producer_digest = _write(producer_path, producer_payload)
+    bundle["producer_receipts"][kind] = (producer_path, producer_digest)
+
+    evidence_path, _ = bundle["evidence"][kind]
+    evidence = bundle["evidence_payloads"][kind]
+    evidence["claims"][0]["evidenceSha256"] = producer_digest
+    bundle["evidence"][kind] = (evidence_path, _write(evidence_path, evidence))
+
+    with pytest.raises(MODULE.AcceptanceError, match="not read-only"):
+        _verify(bundle)
+
+
+def test_campaign_preflight_claim_ids_are_fixed(tmp_path: Path):
+    bundle = _bundle(tmp_path)
+    kind = "multi_account_live_journey"
+    path, _ = bundle["evidence"][kind]
+    payload = bundle["evidence_payloads"][kind]
+    payload["claims"][0]["claimId"] = "caller_authored_ready_claim"
+    bundle["evidence"][kind] = (path, _write(path, payload))
+
+    with pytest.raises(MODULE.AcceptanceError, match="producer-exact"):
+        _verify(bundle)
+
+
+def test_missing_horizon_producer_receipt_is_rejected(tmp_path: Path):
+    bundle = _bundle(tmp_path)
+    bundle["producer_receipts"] = {}
+
+    with pytest.raises(MODULE.AcceptanceError, match="provenance policy"):
+        _verify(bundle)
 
 
 @pytest.mark.parametrize(
@@ -344,7 +715,7 @@ def test_flagship_v1_requires_exact_evidence_kind_policy(
     ("status", "readiness"),
     [("attention_required", True), ("ready", False)],
 )
-def test_non_ready_evidence_emits_attention_required(
+def test_evidence_cannot_widen_current_producer_authority(
     tmp_path: Path, status: str, readiness: bool | None
 ):
     bundle = _bundle(tmp_path)
@@ -355,7 +726,8 @@ def test_non_ready_evidence_emits_attention_required(
     payload["operationalReadinessClaimAllowed"] = readiness
     bundle["evidence"][kind] = (path, _write(path, payload))
 
-    assert _verify(bundle)["status"] == "attention_required"
+    with pytest.raises(MODULE.AcceptanceError, match="producer authority"):
+        _verify(bundle)
 
 
 def test_operational_readiness_flag_is_required(tmp_path: Path):
@@ -600,8 +972,9 @@ def test_manifest_accepts_strict_producer_native_pretty_json(tmp_path: Path):
     bundle["manifest_sha"] = _write(
         bundle["manifest"], bundle["manifest_payload"], canonical=False
     )
+    _rebind_horizon_producer_inputs(bundle)
 
-    assert _verify(bundle)["status"] == "accepted"
+    assert _verify(bundle)["status"] == "attention_required"
 
 
 def test_convergence_accepts_strict_producer_native_pretty_json(tmp_path: Path):
@@ -612,8 +985,9 @@ def test_convergence_accepts_strict_producer_native_pretty_json(tmp_path: Path):
     bundle["current_sha"] = _write(
         bundle["current"], bundle["current_payload"], canonical=False
     )
+    _rebind_horizon_producer_inputs(bundle)
 
-    assert _verify(bundle)["status"] == "accepted"
+    assert _verify(bundle)["status"] == "attention_required"
 
 
 def test_generation_and_current_release_truth_must_match_fully(tmp_path: Path):
@@ -693,6 +1067,7 @@ def test_generation_convergence_must_precede_every_evidence(tmp_path: Path):
     generation = bundle["generation_payload"]
     generation["generatedAtUtc"] = _utc(OBSERVED_AT - dt.timedelta(seconds=30))
     bundle["generation_sha"] = _write(bundle["generation"], generation)
+    _rebind_horizon_producer_inputs(bundle)
 
     with pytest.raises(MODULE.AcceptanceError, match="postdates .* post-activation evidence"):
         _verify(bundle)

@@ -84,11 +84,46 @@ def fixture(tmp_path: Path):
             "inventoryDigest": "sha256:" + SHA,
         },
     )
-    return predecessor, successor, scorecard, convergence, shelf, shelf_raw
+    release_scope = tmp_path / "release-scope.json"
+    release_scope_raw = write_json(
+        release_scope,
+        {
+            "contractName": "chummer.release-scope-decision/v1",
+            "contractVersion": 1,
+            "decisionId": "scope-run-20260720-220000",
+            "status": "approved",
+            "approvedAtUtc": "2026-07-20T21:00:00Z",
+            "approvedBy": "Release authority",
+            "releaseVersion": "run-20260720-220000",
+            "channel": "preview",
+            "releaseTarget": "preview",
+            "supportOwner": "chummer-release-operations",
+            "platforms": [
+                {
+                    "platform": "macos",
+                    "rid": "osx-arm64",
+                    "primaryHead": "avalonia",
+                    "fallbackHeads": [],
+                    "artifactAccessClass": "open_public",
+                    "signingRequirement": "preview_unsigned_allowed",
+                }
+            ],
+        },
+    )
+    return (
+        predecessor,
+        successor,
+        scorecard,
+        convergence,
+        shelf,
+        shelf_raw,
+        release_scope,
+        release_scope_raw,
+    )
 
 
 def command(tmp_path: Path, output: Path) -> list[str]:
-    predecessor, successor, scorecard, convergence, shelf, _ = fixture(tmp_path)
+    predecessor, successor, scorecard, convergence, shelf, _, release_scope, release_scope_raw = fixture(tmp_path)
     return [
         sys.executable,
         str(SCRIPT),
@@ -112,6 +147,10 @@ def command(tmp_path: Path, output: Path) -> list[str]:
         str(scorecard),
         "--convergence",
         str(convergence),
+        "--release-scope-decision",
+        str(release_scope),
+        "--expected-release-scope-sha256",
+        digest(release_scope_raw),
         "--output",
         str(output),
     ]
@@ -127,6 +166,12 @@ def test_materializes_exact_byte_bound_authority_advance_request(tmp_path: Path)
     assert receipt["generationId"] == "run-20260720-220000"
     assert payload["expectedShelfPointerSha256"] == receipt["pointerSha256"]
     assert payload["expectedShelfInventoryDigest"] == "sha256:" + SHA
+    assert payload["expectedReleaseScopeDecisionSha256"] == digest(
+        (tmp_path / "release-scope.json").read_bytes()
+    )
+    assert base64.b64decode(payload["releaseScopeDecisionBytes"], validate=True) == (
+        tmp_path / "release-scope.json"
+    ).read_bytes()
     assert base64.b64decode(payload["predecessorCurrentBytes"], validate=True) == (
         tmp_path / "predecessor-current.json"
     ).read_bytes()
@@ -219,6 +264,19 @@ def test_rejects_successor_proof_binding_tamper(tmp_path: Path) -> None:
     completed = subprocess.run(invocation, text=True, capture_output=True)
     assert completed.returncode == 1
     assert "convergenceSha256" in completed.stderr
+    assert not output.exists()
+
+
+def test_rejects_noncanonical_or_digest_mismatched_release_scope(tmp_path: Path) -> None:
+    output = tmp_path / "request.json"
+    invocation = command(tmp_path, output)
+    scope_path = tmp_path / "release-scope.json"
+    scope_path.write_text(scope_path.read_text(encoding="utf-8").rstrip("\n"), encoding="utf-8")
+
+    completed = subprocess.run(invocation, text=True, capture_output=True)
+
+    assert completed.returncode == 1
+    assert "digest does not match exact bytes" in completed.stderr
     assert not output.exists()
 
 

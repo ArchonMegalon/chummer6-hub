@@ -1,0 +1,41 @@
+{
+  "fixture_contract": "chummer.design.campaign_operability_candidate_evidence_fixture/v1",
+  "source_receipt": {
+    "generated_at_utc": "2026-07-21T08:00:00Z",
+    "manifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "registryCommit": "cccccccccccccccccccccccccccccccccccccccc",
+    "releaseDecisionSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "releaseScopeDecisionSha256": "2eeeadbf76c3a0ce4de0dfebd5bc57e858d79e2cae4f52a6d722c2f3a051950a",
+    "releaseVersion": "run-20260728-050000",
+    "snapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "status": "pass",
+    "verdict": "PASS"
+  },
+  "scorecard_row": {
+    "bounded_owner": "",
+    "candidate_evidence": {
+      "authority_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contract_name": "chummer.campaign-operability-candidate-evidence/v1",
+      "contract_version": 1,
+      "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "registry_commit": "cccccccccccccccccccccccccccccccccccccccc",
+      "release_decision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "release_scope_decision_sha256": "2eeeadbf76c3a0ce4de0dfebd5bc57e858d79e2cae4f52a6d722c2f3a051950a",
+      "release_version": "run-20260728-050000",
+      "source_receipt_sha256": "93fdffbfe06e855acb285ef712604fd607ebb7e3939f986352986d4754a8ee93"
+    },
+    "failure": "",
+    "generated_at": "2026-07-21T08:00:00Z",
+    "id": "ui_frame",
+    "next_actions": [],
+    "path": "$CHUMMER_WORKSPACE/proof/ui-frame.json",
+    "preview_evidence": null,
+    "preview_failure": "",
+    "score": 3,
+    "source_release_version": "run-20260728-050000",
+    "source_sha256": "93fdffbfe06e855acb285ef712604fd607ebb7e3939f986352986d4754a8ee93",
+    "source_status": "pass",
+    "source_verdict": "PASS",
+    "status": "pass"
+  }
+}

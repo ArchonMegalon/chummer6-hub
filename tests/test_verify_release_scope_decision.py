@@ -30,7 +30,7 @@ def decision() -> dict[str, object]:
         "releaseVersion": VERSION,
         "channel": "preview",
         "releaseTarget": "preview",
-        "supportOwner": "Chummer release operations",
+        "supportOwner": "chummer-release-operations",
         "platforms": [
             {
                 "platform": "macos",

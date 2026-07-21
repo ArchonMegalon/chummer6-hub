@@ -132,7 +132,7 @@ The hosted/bootstrap entry points above now:
    - on any 400/401/403 upload response, the script prints parsed `Problem+JSON` fields plus `x-request-id` and actionable remediation hints.
 11. rejects an upload response unless its generation id and both manifest digests exactly match the locally projected bytes
 12. privately verifies the staged projection and immutable-generation routes against the exact manifest and review-decision digests without changing public `CURRENT`
-13. removes the private probe grant, then emits a mode-`0600`, secret-redacted owner-finalizer handoff that pins every input and helper byte
+13. captures the candidate-bound staged UI-frame receipt and stable-copies the three caller-owned external Presentation visual/workflow/executable receipts into a mode-`0700` release-version directory, removes the private probe grant only after those bytes are pinned, then emits a mode-`0600`, secret-redacted owner-finalizer handoff that pins every input and helper byte
 14. logs the executing bootstrap source path and SHA-256 so drift is visible in the transcript, then exits `review_required`
 
 The initial authority envelope is intentionally `review_required`; a successful stage is not a publication and is not by itself a `preview_ready`, stable, or gold claim. Installer availability remains fail-closed until the non-public owner finalizer accepts the exact scorecard, prepares the staged Hub authority, advances Registry by CAS, activates that exact generation, and verifies public convergence.
@@ -143,6 +143,7 @@ Before running it, the Mac environment should already have:
 
 1. Xcode Command Line Tools
 2. `.NET 10`
+3. a reviewed Node.js/npm toolchain capable of installing and running the lockfile-pinned Playwright Chromium audit
 3. `git`
 4. Python 3.11 or newer (`python3.12` is preferred on the current Mac operator host)
 5. `jq`
@@ -175,8 +176,11 @@ export CHUMMER_RELEASE_VERSION="<exact-version-in-approved-scope>"
 export CHUMMER_RELEASE_SCOPE_DECISION_PATH="/absolute/path/to/RELEASE_SCOPE_DECISION.approved.json"
 export CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256="<sha256-of-exact-json-bytes>"
 export CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY="design://release-scope/<decision-id>/sha256/<sha256>"
+export CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH="/absolute/external/path/DESKTOP_VISUAL_CANDIDATE.generated.json"
+export CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH="/absolute/external/path/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
+export CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH="/absolute/external/path/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
 export CHUMMER_RELEASE_GENERATION_ID=""              # optional reviewed safe id; normally generated once per candidate
-export CHUMMER_RELEASE_SUPPORT_OWNER="Chummer release operations"
+export CHUMMER_RELEASE_SUPPORT_OWNER="chummer-release-operations"
 export CHUMMER_RELEASE_APP="avalonia,blazor-desktop"
 export CHUMMER_RELEASE_RID="osx-arm64"
 export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK="0" # optional compatibility setting; true is rejected
@@ -259,7 +263,7 @@ When staging succeeds, the exact candidate exists as one immutable, authority-bo
 1. public `https://chummer.run/downloads/current.json` remains byte-for-byte unchanged
 2. the server response binds the caller-declared generation id, exact target pointer, inventory, and canonical/compatibility manifest digests
 3. a short-lived private probe proves the staged release-facing routes without exposing the generation publicly
-4. `STAGED_RELEASE_FINALIZER_HANDOFF.generated.json` pins the approved scope decision, exact scoped inventory receipt, candidate, predecessor, convergence, bootstrap, finalizer, and helper bytes without containing either the upload ticket or probe grant
+4. `STAGED_RELEASE_FINALIZER_HANDOFF.generated.json` pins the approved scope decision, exact scoped inventory receipt, candidate, predecessor, staged UI-frame receipt, three distinct external Presentation receipts, convergence, bootstrap, finalizer, and helper bytes without containing either the upload ticket or probe grant
 
 The owner-only finalizer reads Hub and Registry credentials only from dedicated mode-`0600` files outside the persisted run workspace. Before its first Registry mutation it writes a digest-pinned checkpoint. If Registry CAS succeeds but Hub activation is ambiguous, it reads the exact public pointer: a target match triggers idempotent activation verification, while a predecessor match is not abort proof because the original server request may still be in flight. Without a durable server-side aborted/reconcile receipt, the finalizer persists `activation_outcome_unknown`, leaves Registry uncompensated, and stops without another authority mutation. Neither staging success nor a `preview_ready` decision is a stable/gold claim.
 
@@ -273,13 +277,13 @@ After activation, use a fresh caller-owned mode-`0700` evidence workspace and ke
 2. run `scripts/probe_horizon_live_readiness.py` against the pinned `https://chummer.run` origin, using the digest-pinned source-readiness receipt, committed-generation convergence receipt, generation manifest, and internal token
 3. run the real multi-account journey with four separate interactively authenticated storage states and an explicit expiring mutation permit; mock identities, shared sessions, test headers, request interception, and administrator-issued sessions are not acceptance evidence
 4. rerun canonical `CURRENT` convergence after every required evidence producer has finished
-5. run `scripts/verify_post_activation_acceptance.py` with the digest-pinned release manifest plus the exact repeated `--require-evidence KIND=PATH` and matching `--evidence-sha256 KIND=SHA256` denominator for `horizon_live_readiness` and `multi_account_live_journey`
+5. run `scripts/verify_post_activation_acceptance.py` with the digest-pinned release manifest, the exact repeated `--require-evidence KIND=PATH` and matching `--evidence-sha256 KIND=SHA256` denominator for `horizon_live_readiness` and `multi_account_live_journey`, plus the canonical Horizon `chummer.horizon_live_readiness/v1` detailed receipt through `--producer-receipt horizon_live_readiness=PATH` and its independently pinned `--producer-receipt-sha256 horizon_live_readiness=SHA256`
 
 The Horizon v1 probe is intentionally observation-only: routes that do not expose release identity are recorded as `raw_http_*`, and the receipt remains `attention_required` because no digest-bound operational/governance evidence authority exists yet. Its default exit is non-zero. `--allow-attention-required` may be used only to retain a diagnostic receipt; it must never be used as a release-gate bypass.
 
 `scripts/accept_live_campaign_release.py` is likewise a fail-closed preflight, not the real browser journey. It validates the exact finalized release, four distinct production-bound storage-state files, and a digest-pinned expiring mutation permit, then emits `multi_account_live_journey` evidence with `operationalReadinessClaimAllowed=false`. Until governed production selectors and the real privacy/quota/consent assertions are implemented, its result is always `attention_required` and cannot satisfy flagship acceptance.
 
-The aggregate verifier accepts only canonical, digest-pinned `chummer.post-activation-evidence/v1` envelopes bound to the exact finalized release. Every envelope must contain non-empty claim digests, and the fresh `CURRENT` receipt must postdate all required evidence. The verifier exits zero only for `status=accepted`; `attention_required` exits non-zero. Missing or failed post-activation evidence does not grant rollback authority and does not erase an already activated preview. It withholds flagship/stable/gold acceptance and requires an explicit owner follow-up.
+The aggregate verifier accepts only canonical, digest-pinned `chummer.post-activation-evidence/v1` envelopes bound to the exact finalized release. Claim IDs and statuses are fixed per producer. Horizon evidence must bind the exact independently pinned canonical detailed-receipt bytes; that receipt's convergence and generation-manifest input bindings must equal the aggregate's exact pinned input bytes, and its policy must remain GET-only with no provider call, quota use, or mutation. This is structural attention evidence, not producer-native operational proof, so its provenance remains `structural_attention_receipt_bound_unverified`. The current campaign producer has no authoritative detailed journey receipt, so its provenance remains explicitly unverified and preflight-only. Consequently, both current v1 producers keep the aggregate `attention_required`; a hand-authored `ready` envelope is rejected instead of widening the aggregate to accepted. The verifier exits zero only for a future policy-authorized `status=accepted`; `attention_required` exits non-zero. Missing or failed post-activation evidence does not grant rollback authority and does not erase an already activated preview. It withholds flagship/stable/gold acceptance and requires an explicit owner follow-up.
 
 For macOS signed releases, the promoted artifact will only be visible publicly when the uploaded bundle includes:
 

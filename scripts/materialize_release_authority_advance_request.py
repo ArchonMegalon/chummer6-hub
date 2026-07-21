@@ -15,7 +15,17 @@ from typing import Any, Optional, Sequence
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 INVENTORY_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 GENERATION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+SCOPE_TOKEN = re.compile(r"^[a-z0-9][a-z0-9._+-]{0,127}$")
 MAX_FILE_BYTES = 8 * 1024 * 1024
+SCOPE_FIELDS = {
+    "approvedAtUtc", "approvedBy", "channel", "contractName", "contractVersion",
+    "decisionId", "platforms", "releaseTarget", "releaseVersion", "status",
+    "supportOwner",
+}
+SCOPE_PLATFORM_FIELDS = {
+    "artifactAccessClass", "fallbackHeads", "platform", "primaryHead", "rid",
+    "signingRequirement",
+}
 
 
 class RequestError(ValueError):
@@ -47,6 +57,8 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--successor-decision", type=Path, required=True)
     parser.add_argument("--scorecard", type=Path, required=True)
     parser.add_argument("--convergence", type=Path, required=True)
+    parser.add_argument("--release-scope-decision", type=Path, required=True)
+    parser.add_argument("--expected-release-scope-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -117,6 +129,81 @@ def _encoded(raw: bytes) -> str:
     return base64.b64encode(raw).decode("ascii")
 
 
+def _validate_release_scope(
+    raw: bytes,
+    payload: dict[str, Any],
+    expected_sha256: str,
+    release_version: str,
+) -> None:
+    if SHA256.fullmatch(expected_sha256) is None:
+        raise RequestError("expected release-scope SHA-256 must be canonical lowercase hexadecimal")
+    if _digest(raw) != expected_sha256:
+        raise RequestError("approved release-scope decision digest does not match exact bytes")
+    canonical = (
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    if raw != canonical:
+        raise RequestError(
+            "approved release-scope decision must be compact sorted UTF-8 JSON plus LF"
+        )
+    if set(payload) != SCOPE_FIELDS or (
+        payload.get("contractName") != "chummer.release-scope-decision/v1"
+        or payload.get("contractVersion") != 1
+        or payload.get("status") != "approved"
+        or payload.get("channel") != "preview"
+        or payload.get("releaseTarget") != "preview"
+        or payload.get("releaseVersion") != release_version
+    ):
+        raise RequestError("approved release-scope decision does not bind the exact preview release")
+    for name in ("decisionId", "supportOwner"):
+        value = payload.get(name)
+        if not isinstance(value, str) or SCOPE_TOKEN.fullmatch(value) is None or ".." in value:
+            raise RequestError(f"approved release-scope {name} is not a canonical token")
+    if not isinstance(payload.get("approvedBy"), str) or not payload["approvedBy"].strip():
+        raise RequestError("approved release-scope approving authority is unresolved")
+    approved_at = payload.get("approvedAtUtc")
+    if not isinstance(approved_at, str) or re.fullmatch(
+        r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", approved_at
+    ) is None:
+        raise RequestError("approved release-scope timestamp is not canonical UTC seconds")
+    platforms = payload.get("platforms")
+    if not isinstance(platforms, list) or not 1 <= len(platforms) <= 16:
+        raise RequestError("approved release-scope platform inventory is missing")
+    observed: list[str] = []
+    for row in platforms:
+        if not isinstance(row, dict) or set(row) != SCOPE_PLATFORM_FIELDS:
+            raise RequestError("approved release-scope platform row has an unexpected field set")
+        platform = row.get("platform")
+        rid = row.get("rid")
+        if platform not in {"linux", "macos", "windows"} or not isinstance(rid, str):
+            raise RequestError("approved release-scope platform/RID is unsupported")
+        allowed_rids = {
+            "linux": {"linux-x64", "linux-arm64"},
+            "macos": {"osx-x64", "osx-arm64"},
+            "windows": {"win-x64", "win-arm64"},
+        }
+        if rid not in allowed_rids[platform]:
+            raise RequestError("approved release-scope platform/RID is incompatible")
+        primary = row.get("primaryHead")
+        fallbacks = row.get("fallbackHeads")
+        if (
+            primary not in {"avalonia", "blazor-desktop"}
+            or not isinstance(fallbacks, list)
+            or fallbacks != sorted(fallbacks)
+            or len(fallbacks) != len(set(fallbacks))
+            or primary in fallbacks
+            or any(value not in {"avalonia", "blazor-desktop"} for value in fallbacks)
+            or row.get("artifactAccessClass")
+            not in {"open_public", "account_required", "support_directed"}
+            or row.get("signingRequirement")
+            not in {"signed", "preview_unsigned_allowed", "not_applicable"}
+        ):
+            raise RequestError("approved release-scope platform policy is unsupported")
+        observed.append(platform)
+    if observed != sorted(observed) or len(observed) != len(set(observed)):
+        raise RequestError("approved release-scope platforms must be sorted and unique")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _args(argv)
     try:
@@ -185,6 +272,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         scorecard_raw, _ = _strict_object(args.scorecard, "campaign-operability scorecard")
         convergence_raw, _ = _strict_object(args.convergence, "live convergence receipt")
+        release_scope_raw, release_scope = _strict_object(
+            args.release_scope_decision, "approved release-scope decision"
+        )
 
         _validate_envelope(
             predecessor_current_raw,
@@ -206,6 +296,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         if predecessor_current.get("releaseVersion") != successor_current.get("releaseVersion"):
             raise RequestError("authority advance cannot change releaseVersion")
+        expected_release_scope_sha256 = args.expected_release_scope_sha256.strip()
+        _validate_release_scope(
+            release_scope_raw,
+            release_scope,
+            expected_release_scope_sha256,
+            str(predecessor_current.get("releaseVersion") or ""),
+        )
         if (
             handoff_release_version is not None
             and predecessor_current.get("releaseVersion") != handoff_release_version
@@ -226,6 +323,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "generationId": generation_id,
             "expectedShelfPointerSha256": expected_pointer_sha256,
             "expectedShelfInventoryDigest": inventory_digest,
+            "expectedReleaseScopeDecisionSha256": expected_release_scope_sha256,
+            "releaseScopeDecisionBytes": _encoded(release_scope_raw),
             "predecessorCurrentBytes": _encoded(predecessor_current_raw),
             "predecessorSnapshotBytes": _encoded(predecessor_snapshot_raw),
             "predecessorDecisionBytes": _encoded(predecessor_decision_raw),

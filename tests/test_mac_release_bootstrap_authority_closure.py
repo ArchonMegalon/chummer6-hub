@@ -31,6 +31,7 @@ def test_downloaded_bootstrap_stages_and_privately_probes_before_stopping() -> N
     ordered = (
         'upload_release_bundle_http \\\n',
         'log "privately probing the sealed review-required generation; public CURRENT remains unchanged"',
+        'log "capturing candidate-bound staged UI-frame proof before deleting the private probe grant"',
         'materialize_staged_release_finalizer_handoff.py',
         'log "immutable nightly generation staged and privately verified; public CURRENT was not changed"',
         'log "status: review_required (awaiting separate owner-only scorecard, Registry CAS, and activation)"',
@@ -85,8 +86,50 @@ def test_private_probe_token_is_separated_from_redacted_handoff() -> None:
     assert 'chmod 600 "$staged_probe_token_path"' in main
     assert 'BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""' in main
     assert 'rm -f "$staged_probe_token_path"' in main
+    capture = main.index(
+        'log "capturing candidate-bound staged UI-frame proof before deleting the private probe grant"'
+    )
+    delete = main.index('rm -f "$staged_probe_token_path"')
+    handoff = main.index('materialize_staged_release_finalizer_handoff.py')
+    assert capture < delete < handoff
+    assert 'CHUMMER_UI_FRAME_VERIFICATION_MODE="staged_private"' in main
+    assert 'CHUMMER_UI_FRAME_AUTHORITY_ROUTE="/api/v1/public/release-truth/g/$release_generation_id"' in main
+    assert '--ui-frame-receipt "$staged_ui_frame_receipt"' in main
+    assert (
+        '--desktop-visual-receipt "$staged_desktop_visual_receipt"' in main
+    )
+    assert (
+        '--desktop-workflow-receipt "$staged_desktop_workflow_receipt"' in main
+    )
+    assert (
+        '--desktop-executable-receipt "$staged_desktop_executable_receipt"' in main
+    )
+    presentation_pin = main.index(
+        'log "pinning external Presentation visual, workflow, and executable candidate receipts"'
+    )
+    assert capture < presentation_pin < delete < handoff
+    assert 'getattr(os, "O_NOFOLLOW", 0)' in main[presentation_pin:delete]
+    assert 'os.O_EXCL' in main[presentation_pin:delete]
+    assert 'before.st_uid != os.geteuid()' in main[presentation_pin:delete]
+    assert 'before.st_nlink != 1' in main[presentation_pin:delete]
+    assert 'before.st_mode & 0o022' in main[presentation_pin:delete]
     assert '--stage-response "$ui_repo/$durable_stage_response"' in main
     assert 'STAGED_RELEASE_FINALIZER_HANDOFF.generated.json' in main
+
+
+def test_http_bootstrap_requires_external_presentation_candidate_receipts() -> None:
+    source = load_bootstrap()
+    main = staging_main_segment(source)
+    for variable in (
+        "CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH",
+        "CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH",
+        "CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH",
+    ):
+        assert f'local {variable.lower()}=' not in main
+        assert variable in main
+        requirement = main.index(f'{variable} must name an absolute caller-owned')
+        first_clone = main.index("clone_or_update")
+        assert requirement < first_clone
 
 
 def test_exact_executing_bootstrap_bytes_are_pinned_into_handoff_workspace() -> None:

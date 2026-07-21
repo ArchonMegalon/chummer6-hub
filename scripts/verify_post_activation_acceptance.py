@@ -75,7 +75,148 @@ EVIDENCE_OPTIONAL_FIELDS: set[str] = set()
 REQUIRED_EVIDENCE_KINDS = frozenset(
     {"horizon_live_readiness", "multi_account_live_journey"}
 )
+PRODUCER_RECEIPT_KINDS = frozenset({"horizon_live_readiness"})
+EVIDENCE_CLAIM_POLICIES: dict[str, tuple[tuple[str, str], ...]] = {
+    "horizon_live_readiness": (
+        ("horizon_live_readiness_v1", "attention_required"),
+    ),
+    "multi_account_live_journey": (
+        ("isolated_production_storage_states", "pass"),
+        ("mutation_permit_preflight", "pass"),
+        ("production_multi_account_journey", "attention_required"),
+    ),
+}
 CLAIM_FIELDS = {"claimId", "status", "evidenceSha256"}
+HORIZON_RECEIPT_CONTRACT = "chummer.horizon_live_readiness/v1"
+HORIZON_EXPECTED_HORIZON_COUNT = 15
+HORIZON_EXPECTED_CAPABILITY_COUNT = 20
+HORIZON_RECEIPT_FIELDS = {
+    "contractName",
+    "contractVersion",
+    "generatedAtUtc",
+    "status",
+    "operationalReadinessClaimAllowed",
+    "releaseBinding",
+    "inputBindings",
+    "probePolicy",
+    "currentFence",
+    "catalogObservations",
+    "summary",
+    "horizons",
+    "capabilities",
+}
+HORIZON_RELEASE_FIELDS = {
+    "releaseVersion",
+    "generationId",
+    "manifestSha256",
+    "releaseDecisionStatus",
+    "releaseDecisionSha256",
+    "authoritySnapshotSha256",
+}
+HORIZON_INPUT_FIELDS = {
+    "sourceReadinessSha256",
+    "committedPublicConvergenceSha256",
+    "generationManifestFileSha256",
+}
+HORIZON_POLICY_FIELDS = {
+    "baseOrigin",
+    "methods",
+    "sameOriginOnly",
+    "redirectsFollowed",
+    "runtimeRequestsPerformed",
+    "providerCallsPerformed",
+    "quotaConsumed",
+    "mutationsPerformed",
+    "secretRedacted",
+}
+HORIZON_FENCE_FIELDS = {"preCurrent", "postCurrent", "stable"}
+HORIZON_FENCE_SNAPSHOT_FIELDS = {
+    "route",
+    "releaseVersion",
+    "manifestSha256",
+    "releaseDecisionSha256",
+    "releaseDecisionStatus",
+    "authoritySnapshotSha256",
+    "releaseTruthSha256",
+    "responseSha256",
+}
+HORIZON_SUMMARY_FIELDS = {
+    "horizonCount",
+    "capabilityCount",
+    "deploymentReachableCount",
+    "configurationConfiguredCount",
+    "configurationDisabledCount",
+    "operationalReadyCount",
+    "governanceClearedCount",
+    "publicCapabilityCount",
+}
+HORIZON_ROW_FIELDS = {
+    "horizonId",
+    "route",
+    "sourceStatus",
+    "deploymentStatus",
+    "configurationStatus",
+    "operationalStatus",
+    "governanceStatus",
+    "httpStatus",
+    "contentType",
+    "responseSha256",
+    "identityBindingStatus",
+}
+HORIZON_CAPABILITY_FIELDS = {
+    "horizonId",
+    "capabilityId",
+    "sourceStatus",
+    "deploymentStatus",
+    "configurationStatus",
+    "operationalStatus",
+    "governanceStatus",
+    "httpStatus",
+    "responseSha256",
+    "identityBindingStatus",
+    "publicCatalogObserved",
+}
+HORIZON_CATALOG_FIELDS = {"internalPublicSafe", "public"}
+HORIZON_CATALOG_OBSERVATION_FIELDS = {
+    "route",
+    "httpStatus",
+    "contentType",
+    "responseSha256",
+    "identityBindingStatus",
+    "rowCount",
+}
+HORIZON_ROUTES = {
+    "alice": "/alice",
+    "origin-dossier": "/origin-dossier",
+    "karma-forge": "/participate/karma-forge",
+    "knowledge-fabric": "/rules",
+    "jackpoint": "/jackpoint",
+    "black-ledger": "/ledger/map",
+    "runsite": "/runsites",
+    "runbook-press": "/runbook",
+    "table-pulse": "/table-pulse",
+    "propertyquarry": "/propertyquarry",
+    "runner_passport": "/passport",
+    "signal_deck": "/signal-deck",
+    "living_world": "/living-world",
+    "community_hub": "/community",
+    "creator_os": "/creator",
+}
+CAMPAIGN_DEFERRED_CLAIM_SHA256 = hashlib.sha256(
+    (
+        json.dumps(
+            {
+                "contractName": "chummer.live-campaign-journey-adapter/v1",
+                "status": "not_implemented",
+                "reason": "governed_production_flow_not_available",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+).hexdigest()
 CONVERGENCE_FIELDS = {
     "contractName",
     "contractVersion",
@@ -157,6 +298,23 @@ def _args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=[],
         metavar="KIND=SHA256",
         help="Digest pin corresponding to one --require-evidence entry.",
+    )
+    parser.add_argument(
+        "--producer-receipt",
+        action="append",
+        default=[],
+        metavar="KIND=PATH",
+        help=(
+            "Require a producer-native detailed receipt for a supported evidence "
+            "kind; v1 requires the Horizon receipt."
+        ),
+    )
+    parser.add_argument(
+        "--producer-receipt-sha256",
+        action="append",
+        default=[],
+        metavar="KIND=SHA256",
+        help="Digest pin corresponding to one --producer-receipt entry.",
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
@@ -515,6 +673,255 @@ def _parse_kind_map(values: Sequence[str], label: str) -> dict[str, str]:
     return result
 
 
+def _exact_object(value: Any, fields: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != fields:
+        raise AcceptanceError(f"{label} has an unexpected field set")
+    return value
+
+
+def _bounded_int(value: Any, label: str, *, minimum: int = 0, maximum: int = 512) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise AcceptanceError(f"{label} is invalid")
+    return value
+
+
+def _validate_horizon_producer_receipt(
+    payload: dict[str, Any],
+    raw: bytes,
+    target: dict[str, str],
+    envelope: dict[str, Any],
+    *,
+    release_decision_status: str,
+    expected_convergence_sha256: str,
+    expected_manifest_file_sha256: str,
+) -> None:
+    """Validate the self-contained, mutation-free Horizon producer receipt.
+
+    This intentionally recognizes only the current observation-only v1 shape.
+    A future producer that can authorize operational readiness needs a new
+    explicit policy instead of inheriting trust from this structural binding.
+    """
+
+    _exact_object(payload, HORIZON_RECEIPT_FIELDS, "Horizon producer receipt")
+    if (
+        raw != _canonical_bytes(payload)
+        or payload.get("contractName") != HORIZON_RECEIPT_CONTRACT
+        or type(payload.get("contractVersion")) is not int
+        or payload.get("contractVersion") != 1
+        or payload.get("status") != "attention_required"
+        or payload.get("operationalReadinessClaimAllowed") is not False
+        or payload.get("generatedAtUtc") != envelope.get("generatedAtUtc")
+    ):
+        raise AcceptanceError("Horizon producer receipt identity is invalid")
+
+    binding = _exact_object(
+        payload.get("releaseBinding"),
+        HORIZON_RELEASE_FIELDS,
+        "Horizon producer receipt releaseBinding",
+    )
+    expected_binding = {
+        "releaseVersion": target["releaseVersion"],
+        "generationId": target["generationId"],
+        "manifestSha256": target["manifestSha256"],
+        "releaseDecisionStatus": release_decision_status,
+        "releaseDecisionSha256": target["decisionSha256"],
+        "authoritySnapshotSha256": target["snapshotSha256"],
+    }
+    if binding != expected_binding:
+        raise AcceptanceError("Horizon producer receipt releaseBinding drifted")
+
+    input_bindings = _exact_object(
+        payload.get("inputBindings"),
+        HORIZON_INPUT_FIELDS,
+        "Horizon producer receipt inputBindings",
+    )
+    for field in sorted(HORIZON_INPUT_FIELDS):
+        _require_sha(input_bindings.get(field), f"Horizon producer receipt {field}")
+    if (
+        input_bindings["committedPublicConvergenceSha256"]
+        != expected_convergence_sha256
+        or input_bindings["generationManifestFileSha256"]
+        != expected_manifest_file_sha256
+    ):
+        raise AcceptanceError(
+            "Horizon producer receipt inputBindings do not bind aggregate inputs"
+        )
+
+    policy = _exact_object(
+        payload.get("probePolicy"),
+        HORIZON_POLICY_FIELDS,
+        "Horizon producer receipt probePolicy",
+    )
+    if policy != {
+        "baseOrigin": "https://chummer.run",
+        "methods": ["GET"],
+        "sameOriginOnly": True,
+        "redirectsFollowed": False,
+        "runtimeRequestsPerformed": True,
+        "providerCallsPerformed": False,
+        "quotaConsumed": False,
+        "mutationsPerformed": False,
+        "secretRedacted": True,
+    }:
+        raise AcceptanceError("Horizon producer receipt probePolicy is not read-only")
+
+    fence = _exact_object(
+        payload.get("currentFence"),
+        HORIZON_FENCE_FIELDS,
+        "Horizon producer receipt currentFence",
+    )
+    if fence.get("stable") is not True or fence.get("preCurrent") != fence.get("postCurrent"):
+        raise AcceptanceError("Horizon producer receipt CURRENT fence is not stable")
+    for name in ("preCurrent", "postCurrent"):
+        snapshot = _exact_object(
+            fence.get(name),
+            HORIZON_FENCE_SNAPSHOT_FIELDS,
+            f"Horizon producer receipt {name}",
+        )
+        if (
+            snapshot.get("route") != "/api/v1/public/release-truth"
+            or snapshot.get("releaseVersion") != target["releaseVersion"]
+            or snapshot.get("manifestSha256") != target["manifestSha256"]
+            or snapshot.get("releaseDecisionSha256") != target["decisionSha256"]
+            or snapshot.get("releaseDecisionStatus") != release_decision_status
+            or snapshot.get("authoritySnapshotSha256") != target["snapshotSha256"]
+        ):
+            raise AcceptanceError("Horizon producer receipt CURRENT fence drifted")
+        _require_sha(snapshot.get("releaseTruthSha256"), "Horizon releaseTruthSha256")
+        _require_sha(snapshot.get("responseSha256"), "Horizon CURRENT responseSha256")
+
+    horizons = payload.get("horizons")
+    if (
+        not isinstance(horizons, list)
+        or len(horizons) != HORIZON_EXPECTED_HORIZON_COUNT
+        or len(HORIZON_ROUTES) != HORIZON_EXPECTED_HORIZON_COUNT
+    ):
+        raise AcceptanceError("Horizon producer receipt horizon denominator is invalid")
+    horizon_rows: dict[str, dict[str, Any]] = {}
+    for value in horizons:
+        row = _exact_object(value, HORIZON_ROW_FIELDS, "Horizon producer receipt horizon")
+        horizon_id = row.get("horizonId")
+        if not isinstance(horizon_id, str) or horizon_id in horizon_rows:
+            raise AcceptanceError("Horizon producer receipt horizon ID set is invalid")
+        if (
+            HORIZON_ROUTES.get(horizon_id) != row.get("route")
+            or row.get("httpStatus") != 200
+            or row.get("contentType") not in {"text/html", "application/xhtml+xml"}
+            or row.get("identityBindingStatus") not in {"exact", "not_exposed"}
+            or row.get("deploymentStatus")
+            not in {"raw_http_reachable", "release_bound_reachable"}
+        ):
+            raise AcceptanceError("Horizon producer receipt horizon observation is invalid")
+        _require_sha(row.get("responseSha256"), "Horizon responseSha256")
+        horizon_rows[horizon_id] = row
+    if set(horizon_rows) != set(HORIZON_ROUTES):
+        raise AcceptanceError("Horizon producer receipt horizon ID set is invalid")
+
+    capabilities = payload.get("capabilities")
+    if (
+        not isinstance(capabilities, list)
+        or len(capabilities) != HORIZON_EXPECTED_CAPABILITY_COUNT
+    ):
+        raise AcceptanceError("Horizon producer receipt capability denominator is invalid")
+    capability_rows: dict[str, dict[str, Any]] = {}
+    for value in capabilities:
+        row = _exact_object(
+            value,
+            HORIZON_CAPABILITY_FIELDS,
+            "Horizon producer receipt capability",
+        )
+        capability_id = row.get("capabilityId")
+        if (
+            not isinstance(capability_id, str)
+            or SAFE_ID.fullmatch(capability_id) is None
+            or capability_id in capability_rows
+            or row.get("horizonId") not in HORIZON_ROUTES
+            or row.get("httpStatus") != 200
+            or row.get("configurationStatus") not in {"configured", "disabled"}
+            or row.get("operationalStatus") not in {"verified", "unverified"}
+            or row.get("identityBindingStatus") not in {"exact", "not_exposed"}
+            or row.get("deploymentStatus")
+            not in {"raw_http_observed", "release_bound_observed"}
+            or not isinstance(row.get("publicCatalogObserved"), bool)
+        ):
+            raise AcceptanceError("Horizon producer receipt capability observation is invalid")
+        _require_sha(row.get("responseSha256"), "Horizon capability responseSha256")
+        capability_rows[capability_id] = row
+
+    observations = _exact_object(
+        payload.get("catalogObservations"),
+        HORIZON_CATALOG_FIELDS,
+        "Horizon producer receipt catalogObservations",
+    )
+    expected_catalog_routes = {
+        "internalPublicSafe": "/api/internal/horizons/capabilities?publicSafe=true",
+        "public": "/api/v1/public/horizons/capabilities",
+    }
+    for name, route in expected_catalog_routes.items():
+        observation = _exact_object(
+            observations.get(name),
+            HORIZON_CATALOG_OBSERVATION_FIELDS,
+            f"Horizon producer receipt {name} catalog observation",
+        )
+        row_count = _bounded_int(
+            observation.get("rowCount"),
+            f"Horizon producer receipt {name} rowCount",
+            maximum=HORIZON_EXPECTED_CAPABILITY_COUNT,
+        )
+        if (
+            observation.get("route") != route
+            or observation.get("httpStatus") != 200
+            or observation.get("contentType") != "application/json"
+            or observation.get("identityBindingStatus") not in {"exact", "not_exposed"}
+            or (
+                name == "internalPublicSafe"
+                and row_count != HORIZON_EXPECTED_CAPABILITY_COUNT
+            )
+        ):
+            raise AcceptanceError("Horizon producer receipt catalog observation is invalid")
+        _require_sha(
+            observation.get("responseSha256"),
+            "Horizon catalog responseSha256",
+        )
+
+    summary = _exact_object(
+        payload.get("summary"),
+        HORIZON_SUMMARY_FIELDS,
+        "Horizon producer receipt summary",
+    )
+    expected_summary = {
+        "horizonCount": len(horizon_rows),
+        "capabilityCount": len(capability_rows),
+        "deploymentReachableCount": sum(
+            row["deploymentStatus"]
+            in {"raw_http_reachable", "release_bound_reachable"}
+            for row in horizon_rows.values()
+        ),
+        "configurationConfiguredCount": sum(
+            row["configurationStatus"] == "configured"
+            for row in capability_rows.values()
+        ),
+        "configurationDisabledCount": sum(
+            row["configurationStatus"] == "disabled"
+            for row in capability_rows.values()
+        ),
+        "operationalReadyCount": sum(
+            row["operationalStatus"] == "verified"
+            for row in capability_rows.values()
+        ),
+        "governanceClearedCount": sum(
+            row.get("governanceStatus") in {"cleared", "not_required"}
+            for row in capability_rows.values()
+        ),
+        "publicCapabilityCount": sum(
+            row["publicCatalogObserved"] is True
+            for row in capability_rows.values()
+        ),
+    }
+    if summary != expected_summary or summary["publicCapabilityCount"] != observations["public"]["rowCount"]:
+        raise AcceptanceError("Horizon producer receipt summary is invalid")
+
+
 def _validate_evidence(
     payload: dict[str, Any],
     target: dict[str, str],
@@ -522,6 +929,10 @@ def _validate_evidence(
     *,
     completed_at: dt.datetime,
     observed_at: dt.datetime,
+    release_decision_status: str,
+    producer_receipt: tuple[bytes, dict[str, Any]] | None,
+    producer_convergence_sha256: str,
+    producer_manifest_file_sha256: str,
 ) -> tuple[dict[str, Any], bool, dt.datetime]:
     fields = set(payload)
     if not EVIDENCE_REQUIRED_FIELDS.issubset(fields) or not fields.issubset(
@@ -554,7 +965,6 @@ def _validate_evidence(
         raise AcceptanceError(f"{expected_kind} evidence claims must be a non-empty array")
     claim_ids: set[str] = set()
     normalized_claims: list[dict[str, str]] = []
-    all_claims_pass = True
     for claim in claims:
         if not isinstance(claim, dict) or set(claim) != CLAIM_FIELDS:
             raise AcceptanceError(f"{expected_kind} evidence claim schema is not exact")
@@ -575,7 +985,14 @@ def _validate_evidence(
                 "evidenceSha256": evidence_sha256,
             }
         )
-        all_claims_pass = all_claims_pass and claim_status == "pass"
+    expected_claims = EVIDENCE_CLAIM_POLICIES.get(expected_kind)
+    observed_claims = tuple(
+        (claim["claimId"], claim["status"]) for claim in normalized_claims
+    )
+    if expected_claims is None or observed_claims != expected_claims:
+        raise AcceptanceError(
+            f"{expected_kind} evidence claim IDs/statuses are not producer-exact"
+        )
     generated_at = _timestamp(payload.get("generatedAtUtc"), "evidence generatedAtUtc")
     if generated_at < completed_at:
         raise AcceptanceError(f"{expected_kind} evidence predates owner finalization")
@@ -586,12 +1003,51 @@ def _validate_evidence(
     status = payload.get("status")
     if not isinstance(status, str) or SAFE_STATUS.fullmatch(status) is None:
         raise AcceptanceError(f"{expected_kind} evidence status is invalid")
-    ready = status in {"accepted", "ready"} and all_claims_pass
     readiness = payload.get("operationalReadinessClaimAllowed")
     if not isinstance(readiness, bool):
         raise AcceptanceError("operationalReadinessClaimAllowed must be boolean")
-    ready = ready and readiness
-    return {
+    if status != "attention_required" or readiness is not False:
+        raise AcceptanceError(
+            f"{expected_kind} evidence exceeds its current producer authority"
+        )
+
+    provenance_status: str
+    producer_receipt_sha256: str | None = None
+    if expected_kind == "horizon_live_readiness":
+        if producer_receipt is None:
+            raise AcceptanceError("Horizon producer receipt is required")
+        producer_raw, producer_payload = producer_receipt
+        _validate_horizon_producer_receipt(
+            producer_payload,
+            producer_raw,
+            target,
+            payload,
+            release_decision_status=release_decision_status,
+            expected_convergence_sha256=producer_convergence_sha256,
+            expected_manifest_file_sha256=producer_manifest_file_sha256,
+        )
+        producer_receipt_sha256 = _sha(producer_raw)
+        if normalized_claims[0]["evidenceSha256"] != producer_receipt_sha256:
+            raise AcceptanceError(
+                "Horizon evidence claim does not bind the producer receipt bytes"
+            )
+        provenance_status = "structural_attention_receipt_bound_unverified"
+    elif expected_kind == "multi_account_live_journey":
+        if producer_receipt is not None:
+            raise AcceptanceError("campaign preflight has no authoritative producer receipt")
+        if (
+            normalized_claims[-1]["evidenceSha256"]
+            != CAMPAIGN_DEFERRED_CLAIM_SHA256
+        ):
+            raise AcceptanceError("campaign deferred journey claim is not producer-exact")
+        provenance_status = "unverified_preflight_attention_only"
+    else:
+        raise AcceptanceError("evidence kind has no producer provenance policy")
+
+    # Both current producers are observation/preflight-only.  No combination
+    # of caller-authored status fields can widen this v1 aggregate to accepted.
+    ready = False
+    row = {
         "evidenceId": evidence_id,
         "evidenceKind": expected_kind,
         "status": status,
@@ -600,7 +1056,11 @@ def _validate_evidence(
         "claimSetSha256": _sha(
             _canonical_bytes(sorted(normalized_claims, key=lambda claim: claim["claimId"]))
         ),
-    }, ready, generated_at
+        "provenanceStatus": provenance_status,
+    }
+    if producer_receipt_sha256 is not None:
+        row["producerReceiptSha256"] = producer_receipt_sha256
+    return row, ready, generated_at
 
 
 def verify(
@@ -615,6 +1075,7 @@ def verify(
     release_manifest: Path,
     release_manifest_file_sha256: str,
     required_evidence: dict[str, tuple[Path, str]],
+    producer_receipts: dict[str, tuple[Path, str]],
     output: Path,
     observed_at: dt.datetime | None = None,
 ) -> dict[str, Any]:
@@ -647,6 +1108,10 @@ def verify(
     if set(required_evidence) != REQUIRED_EVIDENCE_KINDS:
         raise AcceptanceError(
             "required evidence kinds must exactly match the flagship v1 denominator"
+        )
+    if set(producer_receipts) != PRODUCER_RECEIPT_KINDS:
+        raise AcceptanceError(
+            "producer receipt kinds must exactly match the flagship v1 provenance policy"
         )
     now = observed_at or dt.datetime.now(dt.timezone.utc)
     if now.tzinfo is None or now.utcoffset() != dt.timedelta(0):
@@ -699,6 +1164,16 @@ def verify(
     evidence_rows: list[dict[str, Any]] = []
     evidence_ids: set[str] = set()
     all_ready = True
+    producer_payloads: dict[str, tuple[bytes, dict[str, Any]]] = {}
+    for kind in sorted(producer_receipts):
+        path, expected_digest = producer_receipts[kind]
+        producer_payloads[kind] = _pinned_json(
+            path,
+            expected_digest,
+            root,
+            f"{kind} producer receipt",
+            require_canonical=True,
+        )
     for kind in sorted(required_evidence):
         if SAFE_KIND.fullmatch(kind) is None:
             raise AcceptanceError("required evidence kind is invalid")
@@ -716,6 +1191,10 @@ def verify(
             kind,
             completed_at=completed_at,
             observed_at=now,
+            release_decision_status=finalization["status"],
+            producer_receipt=producer_payloads.get(kind),
+            producer_convergence_sha256=_sha(generation_raw),
+            producer_manifest_file_sha256=_sha(manifest_raw),
         )
         if current_generated_at < evidence_generated_at:
             raise AcceptanceError(
@@ -872,6 +1351,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             kind: (Path(paths[kind]), _require_sha(digests[kind], f"{kind} evidence digest"))
             for kind in paths
         }
+        producer_paths = _parse_kind_map(
+            args.producer_receipt,
+            "--producer-receipt",
+        )
+        producer_digests = _parse_kind_map(
+            args.producer_receipt_sha256,
+            "--producer-receipt-sha256",
+        )
+        if set(producer_paths) != set(producer_digests):
+            raise AcceptanceError(
+                "producer receipt path and digest kinds must match exactly"
+            )
+        producer_receipts = {
+            kind: (
+                Path(producer_paths[kind]),
+                _require_sha(
+                    producer_digests[kind],
+                    f"{kind} producer receipt digest",
+                ),
+            )
+            for kind in producer_paths
+        }
         receipt = verify(
             workspace=args.workspace,
             finalization_receipt=args.finalization_receipt,
@@ -883,6 +1384,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             release_manifest=args.release_manifest,
             release_manifest_file_sha256=args.expected_release_manifest_file_sha256,
             required_evidence=evidence,
+            producer_receipts=producer_receipts,
             output=args.output,
         )
     except AcceptanceError as error:

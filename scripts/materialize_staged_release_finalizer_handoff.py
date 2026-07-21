@@ -18,6 +18,12 @@ SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SESSION_ID = re.compile(r"^[0-9a-f]{32}$")
 MAX_INPUT_BYTES = 8 * 1024 * 1024
+PRESENTATION_CANDIDATE_BINDING_FIELDS = {
+    "authority_snapshot_sha256", "contract_name", "contract_version",
+    "manifest_sha256", "platform", "primary_head", "registry_commit",
+    "release_decision_sha256", "release_scope_decision_sha256",
+    "release_version", "required_heads", "rid",
+}
 
 
 class HandoffError(ValueError):
@@ -44,6 +50,10 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--predecessor-snapshot", type=Path, required=True)
     parser.add_argument("--predecessor-decision", type=Path, required=True)
     parser.add_argument("--staged-convergence", type=Path, required=True)
+    parser.add_argument("--ui-frame-receipt", type=Path, required=True)
+    parser.add_argument("--desktop-visual-receipt", type=Path, required=True)
+    parser.add_argument("--desktop-workflow-receipt", type=Path, required=True)
+    parser.add_argument("--desktop-executable-receipt", type=Path, required=True)
     parser.add_argument("--executed-bootstrap", type=Path, required=True)
     parser.add_argument("--owner-finalizer", type=Path, required=True)
     parser.add_argument("--scorecard-materializer", type=Path, required=True)
@@ -273,6 +283,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "predecessorSnapshot": args.predecessor_snapshot,
             "predecessorDecision": args.predecessor_decision,
             "stagedConvergence": args.staged_convergence,
+            "uiFrameReceipt": args.ui_frame_receipt,
+            "desktopVisualReceipt": args.desktop_visual_receipt,
+            "desktopWorkflowReceipt": args.desktop_workflow_receipt,
+            "desktopExecutableReceipt": args.desktop_executable_receipt,
             "executedBootstrap": args.executed_bootstrap,
             "ownerFinalizer": args.owner_finalizer,
             "scorecardMaterializer": args.scorecard_materializer,
@@ -308,6 +322,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         convergence = _strict_json(
             raws["stagedConvergence"], "staged convergence receipt"
         )
+        ui_frame = _strict_json(
+            raws["uiFrameReceipt"], "candidate-bound UI-frame receipt"
+        )
+        presentation_receipts = {
+            "desktop_visual": _strict_json(
+                raws["desktopVisualReceipt"],
+                "candidate-bound desktop visual Presentation receipt",
+            ),
+            "desktop_workflow": _strict_json(
+                raws["desktopWorkflowReceipt"],
+                "candidate-bound desktop workflow Presentation receipt",
+            ),
+            "desktop_executable": _strict_json(
+                raws["desktopExecutableReceipt"],
+                "candidate-bound desktop executable Presentation receipt",
+            ),
+        }
         if stage.get("responseSanitized") is not True or "probeToken" in stage:
             raise HandoffError("stage response is not a secret-redacted sanitizer output")
         release_version = _safe_id(stage.get("version"), "staged release version")
@@ -418,6 +449,110 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             or truth.get("releaseDecisionSha256") != decision_sha256
         ):
             raise HandoffError("staged convergence does not bind the exact review candidate")
+        ui_candidate = ui_frame.get("candidate_binding")
+        expected_ui_authority_route = (
+            f"/api/v1/public/release-truth/g/{generation_id}"
+        )
+        if (
+            ui_frame.get("contract_name") != "chummer.ui-frame-integrity/v2"
+            or ui_frame.get("contract_version") != 2
+            or ui_frame.get("status") != "pass"
+            or ui_frame.get("verdict") != "READY"
+            or ui_frame.get("request_methods") != ["GET"]
+            or ui_frame.get("failures") != []
+            or ui_frame.get("release_version") != release_version
+            or ui_frame.get("manifest_sha256") != manifest_sha256
+            or ui_frame.get("authority_snapshot_sha256") != snapshot_sha256
+            or ui_frame.get("release_decision_sha256") != decision_sha256
+            or ui_frame.get("release_scope_decision_sha256") != scope_sha256
+            or not isinstance(ui_candidate, dict)
+            or ui_candidate.get("release_version") != release_version
+            or ui_candidate.get("manifest_sha256") != manifest_sha256
+            or ui_candidate.get("authority_snapshot_sha256") != snapshot_sha256
+            or ui_candidate.get("release_decision_sha256") != decision_sha256
+            or ui_candidate.get("release_scope_decision_sha256") != scope_sha256
+            or ui_candidate.get("authority_route") != expected_ui_authority_route
+            or ui_candidate.get("verification_mode") != "staged_private"
+        ):
+            raise HandoffError(
+                "staged UI-frame receipt does not bind the exact private review candidate"
+            )
+        for evidence_id, receipt in presentation_receipts.items():
+            binding = receipt.get("campaign_operability_candidate_binding")
+            release_aliases = [
+                receipt[name]
+                for name in ("releaseVersion", "release_version")
+                if name in receipt
+            ]
+            if (
+                receipt.get("status") != "pass"
+                or not release_aliases
+                or any(value != release_version for value in release_aliases)
+                or not isinstance(binding, dict)
+                or set(binding) != PRESENTATION_CANDIDATE_BINDING_FIELDS
+            ):
+                raise HandoffError(
+                    f"{evidence_id} is not an exact passing Presentation candidate receipt"
+                )
+            platform = binding.get("platform")
+            scope_row = next(
+                (
+                    row
+                    for row in scope_decision["platforms"]
+                    if isinstance(row, dict) and row.get("platform") == platform
+                ),
+                None,
+            )
+            required_heads = (
+                [scope_row["primaryHead"], *scope_row["fallbackHeads"]]
+                if isinstance(scope_row, dict)
+                else []
+            )
+            artifacts = predecessor_snapshot.get("artifacts")
+            snapshot_heads = {
+                row.get("head")
+                for row in artifacts
+                if isinstance(artifacts, list)
+                and isinstance(row, dict)
+                and row.get("platform") == platform
+            } if isinstance(artifacts, list) else set()
+            primary_by_platform = predecessor_snapshot.get("primaryHeadByPlatform")
+            if not isinstance(primary_by_platform, dict):
+                primary_by_platform = {}
+            expected_binding = {
+                "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+                "contract_version": 1,
+                "release_version": release_version,
+                "release_scope_decision_sha256": scope_sha256,
+                "manifest_sha256": manifest_sha256,
+                "authority_snapshot_sha256": snapshot_sha256,
+                "release_decision_sha256": decision_sha256,
+                "registry_commit": predecessor_snapshot.get("registryCommit"),
+                "platform": platform,
+                "rid": scope_row.get("rid") if isinstance(scope_row, dict) else None,
+                "primary_head": (
+                    scope_row.get("primaryHead") if isinstance(scope_row, dict) else None
+                ),
+                "required_heads": required_heads,
+            }
+            if (
+                scope_row is None
+                or binding != expected_binding
+                or primary_by_platform.get(platform) != scope_row.get("primaryHead")
+                or snapshot_heads != set(required_heads)
+            ):
+                raise HandoffError(
+                    f"{evidence_id} Presentation binding does not match exact staged candidate bytes"
+                )
+        presentation_digests = {
+            "desktopVisualReceiptSha256": _sha(raws["desktopVisualReceipt"]),
+            "desktopWorkflowReceiptSha256": _sha(raws["desktopWorkflowReceipt"]),
+            "desktopExecutableReceiptSha256": _sha(raws["desktopExecutableReceipt"]),
+        }
+        if len(set(presentation_digests.values())) != 3:
+            raise HandoffError(
+                "Presentation visual, workflow, and executable receipts must be distinct raw artifacts"
+            )
         probe_expires_at = _timestamp(
             stage.get("probeTokenExpiresAtUtc"), "probe grant expiry"
         )
@@ -458,6 +593,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "predecessorSnapshotSha256": snapshot_sha256,
             "predecessorDecisionSha256": decision_sha256,
             "stagedConvergenceSha256": _sha(raws["stagedConvergence"]),
+            "uiFrameReceiptSha256": _sha(raws["uiFrameReceipt"]),
+            **presentation_digests,
             "probeGrantExpiresAtUtc": probe_expires_at,
             "executedBootstrapSha256": _sha(raws["executedBootstrap"]),
             "stagedAuthorityUrl": (

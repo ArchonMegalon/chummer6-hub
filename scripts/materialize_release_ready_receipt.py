@@ -216,6 +216,24 @@ RELEASE_EXECUTION_PLAN_CONTRACT = "chummer.release_execution_plan.v4"
 RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV = (
     "CHUMMER_RELEASE_LAUNCHER_AUTHORITY_IDENTITY"
 )
+CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV = (
+    "CHUMMER_RELEASE_READY_CAMPAIGN_PREVIEW_RELEASE_VERSION"
+)
+CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV = (
+    "CHUMMER_RELEASE_READY_CAMPAIGN_PREVIEW_RELEASE_SCOPE_DECISION_SHA256"
+)
+CAMPAIGN_PREVIEW_OWNER_ENV = (
+    "CHUMMER_RELEASE_READY_CAMPAIGN_PREVIEW_BOUNDED_OWNER"
+)
+CAMPAIGN_PREVIEW_ACTIONS_ENV = (
+    "CHUMMER_RELEASE_READY_CAMPAIGN_PREVIEW_NEXT_ACTIONS_JSON"
+)
+CAMPAIGN_PREVIEW_INPUTS = (
+    CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV,
+    CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV,
+    CAMPAIGN_PREVIEW_OWNER_ENV,
+    CAMPAIGN_PREVIEW_ACTIONS_ENV,
+)
 RELEASE_LAUNCHER_AUTHORITY_IDENTITY_FIELDS = frozenset(
     {
         "path",
@@ -2062,6 +2080,96 @@ def normalized_root_blocker_entries(value: object) -> list[dict[str, object]]:
         entry["blocker_id"] = str(entry.get("blocker_id") or blocker_id).strip()
         result.append(entry)
     return result
+
+
+def campaign_operability_preview_declaration(
+    environment: dict[str, str] | None,
+    release_channel: dict[str, object],
+) -> dict[str, object] | None:
+    """Build the exact v2 preview declaration only from a complete approved binding."""
+
+    source = os.environ if environment is None else environment
+    values = {name: str(source.get(name) or "") for name in CAMPAIGN_PREVIEW_INPUTS}
+    present = {name for name, value in values.items() if value}
+    if not present:
+        return None
+    if present != set(CAMPAIGN_PREVIEW_INPUTS):
+        missing = sorted(set(CAMPAIGN_PREVIEW_INPUTS) - present)
+        raise ValueError(
+            "campaign-operability preview inputs are all-or-none; missing "
+            + ", ".join(missing)
+        )
+
+    release_version = values[CAMPAIGN_PREVIEW_RELEASE_VERSION_ENV]
+    scope_sha256 = values[CAMPAIGN_PREVIEW_SCOPE_SHA256_ENV]
+    owner = values[CAMPAIGN_PREVIEW_OWNER_ENV]
+    if (
+        re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", release_version) is None
+        or ".." in release_version
+    ):
+        raise ValueError("campaign-operability preview release version is not canonical")
+    channel_release_version = str(
+        release_channel.get("version")
+        or release_channel.get("releaseVersion")
+        or ""
+    ).strip()
+    if release_version != channel_release_version:
+        raise ValueError(
+            "campaign-operability preview release version does not match the current release channel"
+        )
+    if re.fullmatch(r"[0-9a-f]{64}", scope_sha256) is None:
+        raise ValueError(
+            "campaign-operability preview release-scope digest is not canonical SHA-256"
+        )
+    if (
+        re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", owner) is None
+        or owner in {"none", "null", "pending", "review_required", "tbd", "todo", "unknown"}
+    ):
+        raise ValueError("campaign-operability preview bounded owner is unresolved")
+    try:
+        raw_actions = json.loads(values[CAMPAIGN_PREVIEW_ACTIONS_ENV])
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "campaign-operability preview next actions must be a JSON array"
+        ) from exc
+    if not isinstance(raw_actions, list) or not 1 <= len(raw_actions) <= 32:
+        raise ValueError(
+            "campaign-operability preview next actions must contain one through 32 entries"
+        )
+    actions: list[str] = []
+    for raw_action in raw_actions:
+        if (
+            not isinstance(raw_action, str)
+            or raw_action != raw_action.strip()
+            or not 1 <= len(raw_action) <= 512
+            or any(ord(character) < 32 or ord(character) == 127 for character in raw_action)
+            or raw_action.casefold() in {"none", "null", "pending", "tbd", "todo", "unknown"}
+            or raw_action in actions
+        ):
+            raise ValueError(
+                "campaign-operability preview next actions must be unique concrete canonical text"
+            )
+        actions.append(raw_action)
+
+    return {
+        "contract_name": "chummer.campaign_operability_preview_evidence",
+        "contract_version": 2,
+        "status": "pass",
+        "release_version": release_version,
+        "release_scope_decision_sha256": scope_sha256,
+        "bounded_owner": owner,
+        "next_actions": actions,
+    }
+
+
+def apply_campaign_operability_preview_declaration(
+    payload: dict[str, object],
+    declaration: dict[str, object] | None,
+) -> None:
+    if declaration is None:
+        payload.pop("campaign_operability_preview", None)
+        return
+    payload["campaign_operability_preview"] = declaration
 
 
 def path_exists(path_value: object) -> bool:
@@ -7904,6 +8012,21 @@ def main(argv: list[str] | None = None) -> int:
             else "refresh_runtime_receipts"
         ),
     }
+    try:
+        campaign_preview_declaration = campaign_operability_preview_declaration(
+            dict(os.environ),
+            load_json(REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json"),
+        )
+    except ValueError as exc:
+        publish_release_ready_materialization_failure(
+            phase="campaign_operability_preview",
+            reason=str(exc),
+            returncode=78,
+            proof_refresh_policy=proof_refresh_policy,
+            command=receipt_command,
+        )
+        print(f"campaign-operability preview declaration rejected: {exc}", file=sys.stderr)
+        return 78
     refresh_windows_runtime_receipts = not args.skip_windows_runtime_refresh
     if args.retry_release_truth_projection:
         payload, load_status = load_json_with_status(OUTPUT_PATH)
@@ -7953,6 +8076,10 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
         apply_release_ready_actions(payload, retry_actions)
+        apply_campaign_operability_preview_declaration(
+            payload,
+            campaign_preview_declaration,
+        )
         release_channel = load_json(REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json")
         projection_refresh = converge_release_truth_projection(payload, release_channel, env)
         projection_retry = payload.get("projection_retry")
@@ -8008,6 +8135,10 @@ def main(argv: list[str] | None = None) -> int:
         apply_release_ready_actions(
             payload,
             release_ready_next_actions(blocking_gate_artifacts, release_channel, root_context),
+        )
+        apply_campaign_operability_preview_declaration(
+            payload,
+            campaign_preview_declaration,
         )
         atomic_write_json(OUTPUT_PATH, payload)
         print(f"release_ready_receipt:{payload['status']}")
@@ -8175,6 +8306,10 @@ def main(argv: list[str] | None = None) -> int:
     apply_release_ready_actions(
         payload,
         release_ready_next_actions(blocking_gate_artifacts, release_channel, root_context),
+    )
+    apply_campaign_operability_preview_declaration(
+        payload,
+        campaign_preview_declaration,
     )
     if should_refresh_release_truth_projection(release_ready):
         converge_release_truth_projection(

@@ -151,6 +151,10 @@ def test_attention_only_envelope_is_secret_safe_and_mode_0600(bundle: dict[str, 
         runner.EVIDENCE_KIND,
         completed_at=bundle["now"] - dt.timedelta(minutes=10),
         observed_at=bundle["now"],
+        release_decision_status="preview_ready",
+        producer_receipt=None,
+        producer_convergence_sha256="1" * 64,
+        producer_manifest_file_sha256="2" * 64,
     )
     assert row["evidenceKind"] == runner.EVIDENCE_KIND
     assert ready is False

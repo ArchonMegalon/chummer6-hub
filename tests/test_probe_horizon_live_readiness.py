@@ -207,6 +207,7 @@ def build_with_mock(*, drift=False):
 def test_probe_is_get_only_exact_15_20_and_does_not_infer_operational_ready():
     receipt, _, _, _, _, transport = build_with_mock()
 
+    assert verifier.HORIZON_ROUTES["black-ledger"] == "/ledger/map"
     assert len(receipt["horizons"]) == 15
     assert len(receipt["capabilities"]) == 20
     assert receipt["operationalReadinessClaimAllowed"] is False

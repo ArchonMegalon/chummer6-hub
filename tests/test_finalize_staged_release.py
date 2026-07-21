@@ -41,6 +41,146 @@ def registry_current(snapshot: bytes) -> bytes:
     ).encode()
 
 
+def test_scorecard_handoff_binding_rejects_scope_or_release_drift_before_registry() -> None:
+    scorecard_raw = b'{"release_version":"run-test"}\n'
+    ui_frame_raw = b'{"contract_name":"chummer.ui-frame-integrity/v2"}\n'
+    ui_frame_sha256 = pointer(ui_frame_raw)
+    presentation_raws = {
+        "desktop_visual": b'{"receipt":"desktop_visual"}\n',
+        "desktop_workflow": b'{"receipt":"desktop_workflow"}\n',
+        "desktop_executable": b'{"receipt":"desktop_executable"}\n',
+    }
+    presentation_shas = {
+        name: pointer(raw) for name, raw in presentation_raws.items()
+    }
+    scope_sha256 = "a" * 64
+    manifest_sha256 = "b" * 64
+    snapshot_sha256 = "c" * 64
+    decision_sha256 = "d" * 64
+    registry_commit = "e" * 40
+    scorecard = {
+        "release_version": "run-test",
+        "release_scope_decision_sha256": scope_sha256,
+        "releaseVersion": "run-test",
+        "releaseScopeDecisionSha256": scope_sha256,
+        "manifestSha256": manifest_sha256,
+        "snapshotSha256": snapshot_sha256,
+        "releaseDecisionSha256": decision_sha256,
+        "cells": [
+            {
+                "evidence": [
+                    {
+                        "id": "ui_frame",
+                        "score": 3,
+                        "source_sha256": ui_frame_sha256,
+                        "source_release_version": "run-test",
+                        "candidate_evidence": {
+                            "contract_name": "chummer.campaign-operability-candidate-evidence/v1",
+                            "contract_version": 1,
+                            "release_version": "run-test",
+                            "release_scope_decision_sha256": scope_sha256,
+                            "manifest_sha256": manifest_sha256,
+                            "authority_snapshot_sha256": snapshot_sha256,
+                            "release_decision_sha256": decision_sha256,
+                            "registry_commit": registry_commit,
+                            "source_receipt_sha256": ui_frame_sha256,
+                        },
+                    }
+                ]
+            }
+        ],
+    }
+    for evidence_id, source_sha256 in presentation_shas.items():
+        scorecard["cells"][0]["evidence"].append(
+            {
+                "id": evidence_id,
+                "score": 3,
+                "source_status": "pass",
+                "source_sha256": source_sha256,
+                "source_release_version": "run-test",
+                "candidate_evidence": {
+                    "contract_name": "chummer.campaign-operability-candidate-evidence/v1",
+                    "contract_version": 1,
+                    "release_version": "run-test",
+                    "release_scope_decision_sha256": scope_sha256,
+                    "manifest_sha256": manifest_sha256,
+                    "authority_snapshot_sha256": snapshot_sha256,
+                    "release_decision_sha256": decision_sha256,
+                    "registry_commit": registry_commit,
+                    "source_receipt_sha256": source_sha256,
+                },
+            }
+        )
+    receipt = {
+        "contractName": "chummer.release-scorecard-handoff/v3",
+        "status": "pass",
+        "releaseVersion": "run-test",
+        "releaseScopeDecisionSha256": scope_sha256,
+        "manifestSha256": manifest_sha256,
+        "predecessorSnapshotSha256": snapshot_sha256,
+        "predecessorDecisionSha256": decision_sha256,
+        "registryCommit": registry_commit,
+        "scorecardSha256": pointer(scorecard_raw),
+        "uiFrameReceiptSha256": ui_frame_sha256,
+        "desktopVisualReceiptSha256": presentation_shas["desktop_visual"],
+        "desktopWorkflowReceiptSha256": presentation_shas["desktop_workflow"],
+        "desktopExecutableReceiptSha256": presentation_shas["desktop_executable"],
+    }
+    handoff = {
+        "releaseVersion": "run-test",
+        "releaseScopeDecisionSha256": scope_sha256,
+        "uiFrameReceiptSha256": ui_frame_sha256,
+        "desktopVisualReceiptSha256": presentation_shas["desktop_visual"],
+        "desktopWorkflowReceiptSha256": presentation_shas["desktop_workflow"],
+        "desktopExecutableReceiptSha256": presentation_shas["desktop_executable"],
+    }
+
+    MODULE._validate_scorecard_handoff_binding(
+        scorecard_raw,
+        scorecard,
+        receipt,
+        handoff,
+        ui_frame_raw,
+        presentation_raws,
+    )
+
+    for target, field, value in (
+        (scorecard, "release_version", "run-stale"),
+        (scorecard, "release_scope_decision_sha256", "b" * 64),
+        (receipt, "releaseScopeDecisionSha256", "b" * 64),
+        (receipt, "scorecardSha256", "b" * 64),
+    ):
+        mutated_scorecard = dict(scorecard)
+        mutated_receipt = dict(receipt)
+        if target is scorecard:
+            mutated_scorecard[field] = value
+        else:
+            mutated_receipt[field] = value
+        with pytest.raises(MODULE.FinalizerError, match="exact staged release scope"):
+            MODULE._validate_scorecard_handoff_binding(
+                scorecard_raw,
+                mutated_scorecard,
+                mutated_receipt,
+                handoff,
+                ui_frame_raw,
+                presentation_raws,
+            )
+
+    mutated_scorecard = json.loads(json.dumps(scorecard))
+    mutated_scorecard["cells"][0]["evidence"][0]["candidate_evidence"][
+        "registry_commit"
+    ] = "f" * 40
+    with pytest.raises(MODULE.FinalizerError, match="score-3 evidence"):
+        MODULE._validate_scorecard_handoff_binding(
+            scorecard_raw,
+            mutated_scorecard,
+            receipt,
+            handoff,
+            ui_frame_raw,
+            presentation_raws,
+        )
+
+
 def test_activation_ambiguity_target_retries_idempotently_without_compensation() -> None:
     target = b'{"generationId":"target"}\n'
     calls: list[str] = []

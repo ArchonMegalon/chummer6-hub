@@ -46,7 +46,7 @@ HORIZON_ROUTES: dict[str, str] = {
     "karma-forge": "/participate/karma-forge",
     "knowledge-fabric": "/rules",
     "jackpoint": "/jackpoint",
-    "black-ledger": "/ledger",
+    "black-ledger": "/ledger/map",
     "runsite": "/runsites",
     "runbook-press": "/runbook",
     "table-pulse": "/table-pulse",

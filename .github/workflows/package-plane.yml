@@ -37,6 +37,11 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
+      - name: Set up Node.js for candidate-bound UI proof tests
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.17.0"
+          cache: npm
       - name: Assert the hosted C# lane uses exact SDK 10.0.103
         shell: bash
         run: |
@@ -58,6 +63,9 @@ jobs:
         run: |
           python3 -m py_compile \
             scripts/materialize_hub_local_release_proof.py \
+            scripts/materialize_release_authority_advance_request.py \
+            scripts/materialize_release_scorecard_handoff.py \
+            scripts/materialize_release_ready_receipt.py \
             scripts/verify_release_scope_decision.py \
             scripts/materialize_staged_release_finalizer_handoff.py \
             scripts/finalize_staged_release.py \
@@ -72,6 +80,9 @@ jobs:
           python3 -m pytest -q \
             tests/test_release_proof_authority_hardening.py \
             tests/test_live_public_windows_installer.py \
+            tests/test_materialize_release_authority_advance_request.py \
+            tests/test_materialize_release_scorecard_handoff.py \
+            tests/test_materialize_release_ready_campaign_preview.py \
             tests/test_verify_release_scope_decision.py \
             tests/test_materialize_staged_release_finalizer_handoff.py \
             tests/test_finalize_staged_release.py \
@@ -83,6 +94,13 @@ jobs:
             tests/test_mac_release_stage_only.py \
             tests/test_final_gold_janitor.py \
             tests/test_hub_local_release_proof_materializer_sync.py
+      - name: Verify candidate-bound UI proof contracts
+        shell: bash
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx --no-install playwright test \
+            tests/public/ui-frame-candidate-binding.spec.ts \
+            --reporter=line
       - name: Build and test C# projection contracts without siblings on SDK 10.0.103
         shell: bash
         run: >-
@@ -122,6 +140,9 @@ jobs:
           bash -n Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh
           python3 -m py_compile \
             scripts/materialize_hub_local_release_proof.py \
+            scripts/materialize_release_authority_advance_request.py \
+            scripts/materialize_release_scorecard_handoff.py \
+            scripts/materialize_release_ready_receipt.py \
             scripts/verify_release_scope_decision.py \
             scripts/materialize_staged_release_finalizer_handoff.py \
             scripts/finalize_staged_release.py \
@@ -134,6 +155,9 @@ jobs:
           python3 -m pytest -q \
             tests/test_release_proof_authority_hardening.py \
             tests/test_live_public_windows_installer.py \
+            tests/test_materialize_release_authority_advance_request.py \
+            tests/test_materialize_release_scorecard_handoff.py \
+            tests/test_materialize_release_ready_campaign_preview.py \
             tests/test_verify_release_scope_decision.py \
             tests/test_materialize_staged_release_finalizer_handoff.py \
             tests/test_finalize_staged_release.py \

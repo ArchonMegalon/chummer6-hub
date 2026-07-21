@@ -1,7 +1,18 @@
 import { expect, test } from 'playwright/test';
-import { writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
+import {
+  candidateBindingReceipt,
+  loadUiFrameCandidateBinding,
+  verifyUiFrameCandidateAuthority,
+  verifyUiFrameCandidateHeaders,
+  writeUiFrameCandidateJson,
+  writeUiFrameCandidateReport,
+  type UiFrameAuthorityObservation,
+  type UiFrameCandidateBinding,
+} from './ui-frame-candidate-binding';
 
-const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const baseUrl = process.env.BASE_URL?.trim()
+  || process.env.CHUMMER_PUBLIC_BASE_URL?.trim()
+  || 'https://chummer.run';
 const frameIntegrityTimeoutMs = Number.parseInt(process.env.CHUMMER_UI_FRAME_TEST_TIMEOUT_MS || '', 10);
 const frameIntegrityTestTimeout = Number.isFinite(frameIntegrityTimeoutMs) && frameIntegrityTimeoutMs > 0
   ? frameIntegrityTimeoutMs
@@ -24,7 +35,6 @@ const compactViewportNames: ViewportName[] = ['phone-390', 'tablet', 'desktop-13
 const routeViewportMatrix: Array<{ route: string; viewportNames: ViewportName[] }> = [
   { route: '/', viewportNames: allViewportNames },
   { route: '/downloads', viewportNames: allViewportNames },
-  { route: '/ledger', viewportNames: allViewportNames },
   { route: '/ledger/map', viewportNames: allViewportNames },
   { route: '/login?next=%2Faccount%2Faccess', viewportNames: allViewportNames },
   { route: '/status', viewportNames: compactViewportNames },
@@ -95,6 +105,25 @@ type FrameFailure = {
   frameOverflow?: string;
 };
 
+let candidateBinding: UiFrameCandidateBinding;
+let authorityObservation: UiFrameAuthorityObservation;
+let completedFramePayload: Record<string, unknown> | undefined;
+let completedFrameReport: string | undefined;
+let completedLoginPayload: Record<string, unknown> | undefined;
+
+type NetworkViolation = {
+  method: string;
+  url: string;
+  reason: string;
+};
+
+type PageAudit = {
+  context: import('playwright/test').BrowserContext;
+  violations: NetworkViolation[];
+};
+
+const pageAudits = new WeakMap<import('playwright/test').Page, PageAudit>();
+
 async function gotoWithRetry(page: import('playwright/test').Page, route: string, attempts = 3) {
   let lastError: unknown;
 
@@ -123,14 +152,82 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ browser }) => {
-  test.setTimeout(matrixTimeoutMs);
-  const failures: FrameFailure[] = [];
-  const pageResults: Array<Record<string, unknown>> = [];
-
-    await requestRoute.continue();
+async function createAuditedPage(
+  browser: import('playwright/test').Browser,
+  viewport: { width: number; height: number },
+) {
+  const context = await browser.newContext({
+    baseURL: candidateBinding.baseUrl,
+    viewport,
+    serviceWorkers: 'block',
   });
-  await page.addInitScript(() => {
+  const violations: NetworkViolation[] = [];
+  const violationKeys = new Set<string>();
+  const recordViolation = (violation: NetworkViolation) => {
+    const key = `${violation.reason}\0${violation.method}\0${violation.url}`;
+    if (!violationKeys.has(key)) {
+      violationKeys.add(key);
+      violations.push(violation);
+    }
+  };
+  context.on('request', (request) => {
+    const method = request.method();
+    const url = request.url();
+    let origin = '';
+    try {
+      origin = new URL(url).origin;
+    } catch {
+      recordViolation({ method, url, reason: 'request URL is not absolute' });
+      return;
+    }
+    if (method !== 'GET') {
+      recordViolation({ method, url, reason: 'non-GET request blocked' });
+    } else if (origin !== candidateBinding.baseUrl) {
+      recordViolation({ method, url, reason: 'off-origin request blocked' });
+    }
+  });
+  await context.route('**/*', async (requestRoute) => {
+    const request = requestRoute.request();
+    const method = request.method();
+    const url = request.url();
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      recordViolation({ method, url, reason: 'request URL is not absolute' });
+      await requestRoute.abort('blockedbyclient');
+      return;
+    }
+    if (method !== 'GET') {
+      recordViolation({ method, url, reason: 'non-GET request blocked' });
+      await requestRoute.abort('blockedbyclient');
+      return;
+    }
+    if (parsed.origin !== candidateBinding.baseUrl) {
+      recordViolation({ method, url, reason: 'off-origin request blocked' });
+      await requestRoute.abort('blockedbyclient');
+      return;
+    }
+    const resourceType = request.resourceType();
+    if (resourceType === 'media') {
+      await requestRoute.abort();
+      return;
+    }
+    await requestRoute.continue({
+      headers: {
+        ...request.headers(),
+        ...candidateBinding.requestHeaders,
+      },
+    });
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(globalThis, 'WebSocket', {
+      configurable: false,
+      value: function BlockedAuditWebSocket() {
+        throw new Error('WebSocket is disabled by the read-only UI-frame audit');
+      },
+      writable: false,
+    });
     const originalGetContext = HTMLCanvasElement.prototype.getContext as unknown as (
       this: HTMLCanvasElement,
       type: string,
@@ -144,8 +241,27 @@ test('public UI elements are not cut off by their frames outside intentional scr
       return originalGetContext.call(this, type, ...args);
     } as unknown as typeof HTMLCanvasElement.prototype.getContext;
   });
+  const page = await context.newPage();
+  pageAudits.set(page, { context, violations });
 
   return page;
+}
+
+function networkViolations(page: import('playwright/test').Page): NetworkViolation[] {
+  return [...(pageAudits.get(page)?.violations ?? [])];
+}
+
+async function closeAuditedPage(page: import('playwright/test').Page | undefined): Promise<void> {
+  if (!page) {
+    return;
+  }
+  const audit = pageAudits.get(page);
+  if (audit) {
+    await audit.context.close().catch(() => {});
+    pageAudits.delete(page);
+    return;
+  }
+  await page.close().catch(() => {});
 }
 
 async function launchAuditBrowser(
@@ -166,10 +282,74 @@ async function launchAuditBrowser(
   });
 }
 
+async function verifyCandidateNavigationResponse(
+  page: import('playwright/test').Page,
+  response: import('playwright/test').Response | null,
+  route: string,
+): Promise<number> {
+  if (!response) {
+    throw new Error(`${route}: navigation returned no HTTP response`);
+  }
+  const status = response.status();
+  if (status !== 200) {
+    throw new Error(`${route}: navigation returned HTTP ${status}, expected 200`);
+  }
+  if (response.request().method() !== 'GET') {
+    throw new Error(`${route}: navigation used ${response.request().method()}, expected read-only GET`);
+  }
+  const expectedUrl = new URL(route, `${candidateBinding.baseUrl}/`);
+  const observedUrl = new URL(response.url());
+  const finalPageUrl = new URL(page.url());
+  const exactRoute = (value: URL) => value.origin === expectedUrl.origin
+    && value.pathname === expectedUrl.pathname
+    && value.search === expectedUrl.search;
+  if (!exactRoute(observedUrl) || !exactRoute(finalPageUrl)) {
+    throw new Error(
+      `${route}: navigation redirected or changed exact route (response=${observedUrl.href}, page=${finalPageUrl.href})`,
+    );
+  }
+  verifyUiFrameCandidateHeaders(await response.allHeaders(), candidateBinding, route);
+  return status;
+}
+
+test.beforeAll(async ({ playwright }) => {
+  candidateBinding = loadUiFrameCandidateBinding();
+  if (new URL(baseUrl).origin !== candidateBinding.baseUrl) {
+    throw new Error('Playwright base URL does not match the candidate binding base URL');
+  }
+  const request = await playwright.request.newContext({ baseURL: candidateBinding.baseUrl });
+  try {
+    authorityObservation = await verifyUiFrameCandidateAuthority(request, candidateBinding);
+  } finally {
+    await request.dispose();
+  }
+});
+
+test.afterAll(() => {
+  if (!completedFramePayload || !completedFrameReport || !completedLoginPayload) {
+    return;
+  }
+  if (completedFramePayload.status !== 'pass' || completedLoginPayload.status !== 'pass') {
+    return;
+  }
+  writeUiFrameCandidateJson(
+    candidateBinding,
+    'LOGIN_COMPACT_FRAME.generated.json',
+    completedLoginPayload,
+  );
+  writeUiFrameCandidateReport(candidateBinding, completedFrameReport);
+  writeUiFrameCandidateJson(
+    candidateBinding,
+    'UI_FRAME_INTEGRITY.generated.json',
+    completedFramePayload,
+  );
+});
+
 test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ playwright, browserName }) => {
   test.setTimeout(frameIntegrityTestTimeout);
   const failures: FrameFailure[] = [];
   const pageResults: Array<Record<string, unknown>> = [];
+  const routeMatrixStartedAtUtc = new Date().toISOString();
   let auditBrowser = await launchAuditBrowser(playwright, browserName);
   const viewportByName = new Map(viewports.map((viewport) => [viewport.name, viewport] as const));
 
@@ -190,21 +370,25 @@ test('public UI elements are not cut off by their frames outside intentional scr
             page = await createAuditedPage(auditBrowser, { width: viewport.width, height: viewport.height });
             const response = await gotoWithRetry(page, route);
 
-            const status = response?.status() ?? 0;
-            if (status >= 500) {
+            let status: number;
+            try {
+              status = await verifyCandidateNavigationResponse(page, response, route);
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : String(error);
               failures.push({
                 route,
                 viewport: viewport.name,
                 selector: 'document',
                 text: '',
-                reason: `route returned HTTP ${status}`,
+                reason: `candidate identity verification failed: ${reason}`,
                 element: { x: 0, y: 0, width: 0, height: 0, right: 0, bottom: 0 },
               });
               pageResults.push({
                 route,
                 viewport: viewport.name,
-                status,
+                status: response?.status() ?? 0,
                 failure_count: 1,
+                candidate_identity_verified: false,
               });
               routeCompleted = true;
               continue;
@@ -511,7 +695,10 @@ test('public UI elements are not cut off by their frames outside intentional scr
 
             const frameFailures = routeFailures.failures || [];
             const lineRuleFailures = routeFailures.lineFailures || [];
-            const routeFailureCount = frameFailures.length + lineRuleFailures.length;
+            const routeNetworkViolations = networkViolations(page);
+            const routeFailureCount = frameFailures.length
+              + lineRuleFailures.length
+              + routeNetworkViolations.length;
 
             failures.push(...frameFailures.map((failure) => ({
               route,
@@ -530,12 +717,23 @@ test('public UI elements are not cut off by their frames outside intentional scr
               frameOverflow: `line-count:${failure.lines}`,
             })));
 
+            failures.push(...routeNetworkViolations.map((violation) => ({
+              route,
+              viewport: viewport.name,
+              selector: 'network',
+              text: violation.url.slice(0, 140),
+              reason: `${violation.reason}: ${violation.method} ${violation.url}`,
+              element: { x: 0, y: 0, width: 0, height: 0, right: 0, bottom: 0 },
+            })));
+
             pageResults.push({
               route,
               viewport: viewport.name,
               status,
               failure_count: routeFailureCount,
               page_closure_retries: pageClosureRetries,
+              candidate_identity_verified: true,
+              network_violation_count: routeNetworkViolations.length,
             });
             routeCompleted = true;
           } catch (error) {
@@ -556,7 +754,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
             await auditBrowser.close().catch(() => {});
             auditBrowser = await launchAuditBrowser(playwright, browserName);
           } finally {
-            await page?.close().catch(() => {});
+            await closeAuditedPage(page);
           }
         }
       }
@@ -566,8 +764,19 @@ test('public UI elements are not cut off by their frames outside intentional scr
   }
 
   const payload = {
+    contract_name: 'chummer.ui-frame-integrity/v2',
+    contract_version: 2,
     generated_at_utc: new Date().toISOString(),
-    base_url: baseUrl,
+    route_matrix_started_at_utc: routeMatrixStartedAtUtc,
+    base_url: candidateBinding.baseUrl,
+    request_methods: ['GET'],
+    candidate_binding: candidateBindingReceipt(candidateBinding),
+    authority_observation: authorityObservation,
+    release_version: candidateBinding.releaseVersion,
+    manifest_sha256: candidateBinding.manifestSha256,
+    authority_snapshot_sha256: candidateBinding.authoritySnapshotSha256,
+    release_decision_sha256: candidateBinding.releaseDecisionSha256,
+    release_scope_decision_sha256: candidateBinding.releaseScopeDecisionSha256,
     status: failures.length === 0 ? 'pass' : 'fail',
     verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
     routes: routeViewportMatrix.map((scenario) => scenario.route),
@@ -581,18 +790,23 @@ test('public UI elements are not cut off by their frames outside intentional scr
     pages: pageResults,
   };
 
-  writeJsonArtifact('UI_FRAME_INTEGRITY.generated.json', payload);
-  writeMarkdownArtifact('UI_FRAME_INTEGRITY_REPORT.md', [
+  completedFrameReport = [
     '# UI Frame Integrity Gate',
     '',
     `- Generated: ${payload.generated_at_utc}`,
-    `- Base URL: ${baseUrl}`,
+    `- Base URL: ${candidateBinding.baseUrl}`,
+    `- Release version: ${candidateBinding.releaseVersion}`,
+    `- Manifest SHA-256: ${candidateBinding.manifestSha256}`,
+    `- Authority snapshot SHA-256: ${candidateBinding.authoritySnapshotSha256}`,
+    `- Release decision SHA-256: ${candidateBinding.releaseDecisionSha256}`,
+    `- Release-scope decision SHA-256: ${candidateBinding.releaseScopeDecisionSha256}`,
     `- Status: ${payload.status}`,
     `- Checked pages: ${pageResults.length}`,
     `- Failures: ${failures.length}`,
     '',
     ...failures.slice(0, 40).map((failure) => `- ${failure.viewport} ${failure.route} ${failure.selector}: ${failure.reason}`),
-  ].join('\n'));
+  ].join('\n');
+  completedFramePayload = payload;
 
   expect(failures, failures.map((failure) => `${failure.viewport} ${failure.route} ${failure.selector}: ${failure.reason} (${failure.text})`).join('\n')).toEqual([]);
 });
@@ -611,7 +825,11 @@ test('login stays compact and does not reintroduce the old visual hero', async (
       const page = await createAuditedPage(auditBrowser, { width: viewport.width, height: viewport.height });
       try {
         const response = await gotoWithRetry(page, '/login?next=%2Faccount%2Faccess');
-        expect(response?.status() ?? 0).toBeLessThan(500);
+        await verifyCandidateNavigationResponse(
+          page,
+          response,
+          '/login?next=%2Faccount%2Faccess',
+        );
 
         const panel = page.locator('.auth-panel--entry').first();
         await expect(panel).toBeVisible();
@@ -677,21 +895,31 @@ test('login stays compact and does not reintroduce the old visual hero', async (
         }
 
         checked.push({ viewport: viewport.name, ...metrics });
+        for (const violation of networkViolations(page)) {
+          failures.push(
+            `${viewport.name}: ${violation.reason}: ${violation.method} ${violation.url}`,
+          );
+        }
       } finally {
-        await page.close().catch(() => {});
+        await closeAuditedPage(page);
       }
     }
   } finally {
     await auditBrowser.close().catch(() => {});
   }
 
-  writeJsonArtifact('LOGIN_COMPACT_FRAME.generated.json', {
+  completedLoginPayload = {
+    contract_name: 'chummer.login-compact-frame/v2',
+    contract_version: 2,
     generated_at_utc: new Date().toISOString(),
-    base_url: baseUrl,
+    base_url: candidateBinding.baseUrl,
+    request_methods: ['GET'],
+    candidate_binding: candidateBindingReceipt(candidateBinding),
+    authority_observation: authorityObservation,
     status: failures.length === 0 ? 'pass' : 'fail',
     checked,
     failures,
-  });
+  };
 
   expect(failures).toEqual([]);
 });

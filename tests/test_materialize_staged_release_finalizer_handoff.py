@@ -39,7 +39,7 @@ def fixture(tmp_path: Path) -> dict[str, Path | bytes | str]:
             "releaseVersion": VERSION,
             "channel": "preview",
             "releaseTarget": "preview",
-            "supportOwner": "Chummer release operations",
+            "supportOwner": "chummer-release-operations",
             "platforms": [
                 {
                     "platform": "macos",
@@ -76,7 +76,7 @@ def fixture(tmp_path: Path) -> dict[str, Path | bytes | str]:
             "decisionAuthority": scope_authority,
             "releaseVersion": VERSION,
             "channel": "preview",
-            "supportOwner": "Chummer release operations",
+            "supportOwner": "chummer-release-operations",
             "platforms": [
                 {
                     "platform": "macos",
@@ -109,6 +109,14 @@ def fixture(tmp_path: Path) -> dict[str, Path | bytes | str]:
             "releaseVersion": VERSION,
             "releaseDecisionStatus": "review_required",
             "releaseDecisionSha256": hashlib.sha256(decision_raw).hexdigest(),
+            "registryCommit": "b" * 40,
+            "primaryHeadByPlatform": {"macos": "avalonia"},
+            "artifacts": [
+                {
+                    "platform": "macos",
+                    "head": "avalonia",
+                }
+            ],
         },
     )
     current = tmp_path / "evidence" / "CURRENT.json"
@@ -160,6 +168,70 @@ def fixture(tmp_path: Path) -> dict[str, Path | bytes | str]:
             },
         },
     )
+    ui_frame = tmp_path / "evidence" / "UI_FRAME_INTEGRITY.generated.json"
+    ui_frame_raw = write_json(
+        ui_frame,
+        {
+            "contract_name": "chummer.ui-frame-integrity/v2",
+            "contract_version": 2,
+            "status": "pass",
+            "verdict": "READY",
+            "request_methods": ["GET"],
+            "failures": [],
+            "release_version": VERSION,
+            "manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
+            "authority_snapshot_sha256": hashlib.sha256(snapshot_raw).hexdigest(),
+            "release_decision_sha256": hashlib.sha256(decision_raw).hexdigest(),
+            "release_scope_decision_sha256": hashlib.sha256(
+                scope_decision_raw
+            ).hexdigest(),
+            "candidate_binding": {
+                "release_version": VERSION,
+                "manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
+                "authority_snapshot_sha256": hashlib.sha256(snapshot_raw).hexdigest(),
+                "release_decision_sha256": hashlib.sha256(decision_raw).hexdigest(),
+                "release_scope_decision_sha256": hashlib.sha256(
+                    scope_decision_raw
+                ).hexdigest(),
+                "authority_route": f"/api/v1/public/release-truth/g/{GENERATION}",
+                "verification_mode": "staged_private",
+            },
+        },
+    )
+    presentation_binding = {
+        "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+        "contract_version": 1,
+        "release_version": VERSION,
+        "release_scope_decision_sha256": hashlib.sha256(
+            scope_decision_raw
+        ).hexdigest(),
+        "manifest_sha256": hashlib.sha256(manifest_raw).hexdigest(),
+        "authority_snapshot_sha256": hashlib.sha256(snapshot_raw).hexdigest(),
+        "release_decision_sha256": hashlib.sha256(decision_raw).hexdigest(),
+        "registry_commit": "b" * 40,
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "primary_head": "avalonia",
+        "required_heads": ["avalonia"],
+    }
+    presentation_receipts: dict[str, Path] = {}
+    presentation_raws: dict[str, bytes] = {}
+    for evidence_id in (
+        "desktop_visual",
+        "desktop_workflow",
+        "desktop_executable",
+    ):
+        receipt_path = tmp_path / "evidence" / f"{evidence_id.upper()}.generated.json"
+        presentation_receipts[evidence_id] = receipt_path
+        presentation_raws[evidence_id] = write_json(
+            receipt_path,
+            {
+                "status": "pass",
+                "releaseVersion": VERSION,
+                "receipt_kind": evidence_id,
+                "campaign_operability_candidate_binding": presentation_binding,
+            },
+        )
     bootstrap = tmp_path / "bootstrap.sh"
     bootstrap.write_bytes(b"#!/usr/bin/env bash\nexit 0\n")
     bootstrap.chmod(0o700)
@@ -202,6 +274,10 @@ def fixture(tmp_path: Path) -> dict[str, Path | bytes | str]:
         "stage_response": stage_response,
         "convergence": convergence,
         "convergence_raw": convergence_raw,
+        "ui_frame": ui_frame,
+        "ui_frame_raw": ui_frame_raw,
+        "presentation_receipts": presentation_receipts,
+        "presentation_raws": presentation_raws,
         "bootstrap": bootstrap,
         "finalizer": finalizer,
         "tool_paths": tool_paths,
@@ -236,6 +312,14 @@ def command(tmp_path: Path, data: dict[str, Path | bytes | str], output: Path) -
         str(data["decision"]),
         "--staged-convergence",
         str(data["convergence"]),
+        "--ui-frame-receipt",
+        str(data["ui_frame"]),
+        "--desktop-visual-receipt",
+        str(dict(data["presentation_receipts"])["desktop_visual"]),
+        "--desktop-workflow-receipt",
+        str(dict(data["presentation_receipts"])["desktop_workflow"]),
+        "--desktop-executable-receipt",
+        str(dict(data["presentation_receipts"])["desktop_executable"]),
         "--executed-bootstrap",
         str(data["bootstrap"]),
         "--owner-finalizer",
@@ -271,6 +355,18 @@ def test_materializes_secret_redacted_exact_staged_handoff(tmp_path: Path) -> No
     assert payload["exactIncomingDesktopScope"] == "avalonia:macos:osx-arm64"
     assert payload["releaseScopePlatforms"][0]["primaryHead"] == "avalonia"
     assert payload["stagedConvergenceSha256"] == hashlib.sha256(data["convergence_raw"]).hexdigest()
+    assert payload["uiFrameReceiptSha256"] == hashlib.sha256(
+        data["ui_frame_raw"]
+    ).hexdigest()
+    assert payload["desktopVisualReceiptSha256"] == hashlib.sha256(
+        dict(data["presentation_raws"])["desktop_visual"]
+    ).hexdigest()
+    assert payload["desktopWorkflowReceiptSha256"] == hashlib.sha256(
+        dict(data["presentation_raws"])["desktop_workflow"]
+    ).hexdigest()
+    assert payload["desktopExecutableReceiptSha256"] == hashlib.sha256(
+        dict(data["presentation_raws"])["desktop_executable"]
+    ).hexdigest()
     assert "probeToken" not in output.read_text()
     assert output.stat().st_mode & 0o777 == 0o600
 

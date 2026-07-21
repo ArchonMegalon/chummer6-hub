@@ -1,0 +1,634 @@
+{
+  "contract_name": "chummer.campaign-operability-cell-inventory/v1",
+  "contract_version": 1,
+  "surface_order": [
+    "desktop_workbench",
+    "public_front_door_and_support",
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "run_and_rejoin",
+    "improve_and_close_the_loop"
+  ],
+  "dimension_order": [
+    "route_clarity",
+    "rules_and_continuity_truth",
+    "recovery_confidence",
+    "closure_honesty",
+    "responsiveness",
+    "design_authorship"
+  ],
+  "cells": [
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "fleet_flagship",
+        "desktop_visual",
+        "desktop_workflow"
+      ]
+    },
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "engine_proof",
+        "ruleset_readiness",
+        "localization"
+      ]
+    },
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "desktop_executable",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "release_ready",
+        "release_channel"
+      ]
+    },
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "engine_proof",
+        "desktop_workflow"
+      ]
+    },
+    {
+      "surface_id": "desktop_workbench",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-ui-kit"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue",
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "desktop_visual",
+        "design_quality",
+        "localization"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "public_route",
+        "public_edge"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "release_channel",
+        "public_copy"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "support_packets",
+        "account_handoff"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "support_packets",
+        "release_ready",
+        "release_channel"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "public_edge",
+        "ui_frame"
+      ]
+    },
+    {
+      "surface_id": "public_front_door_and_support",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "fleet"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "design_quality",
+        "ui_frame",
+        "public_copy"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "desktop_executable",
+        "public_route"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "engine_proof",
+        "release_channel"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "desktop_executable",
+        "account_handoff"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "release_channel",
+        "windows_visual",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "desktop_executable",
+        "windows_visual"
+      ]
+    },
+    {
+      "surface_id": "install_claim_restore_continue",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-ui",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "journey_ids": [
+        "install_claim_restore_continue"
+      ],
+      "evidence_ids": [
+        "desktop_visual",
+        "windows_visual",
+        "localization"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "desktop_workflow",
+        "public_route"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "engine_proof",
+        "ruleset_readiness"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "desktop_executable",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "black_ledger_media",
+        "external_distribution",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "engine_proof",
+        "desktop_workflow"
+      ]
+    },
+    {
+      "surface_id": "build_explain_publish",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-media-factory"
+      ],
+      "journey_ids": [
+        "build_explain_publish"
+      ],
+      "evidence_ids": [
+        "desktop_visual",
+        "design_quality",
+        "localization"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "public_route"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "engine_proof"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "release_ready"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "public_edge"
+      ]
+    },
+    {
+      "surface_id": "run_and_rejoin",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-mobile",
+        "chummer6-hub",
+        "chummer6-core"
+      ],
+      "journey_ids": [
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict"
+      ],
+      "evidence_ids": [
+        "mobile_proof",
+        "design_quality",
+        "localization"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "route_clarity",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "support_packets",
+        "public_route"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "rules_and_continuity_truth",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "public_copy",
+        "release_channel"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "recovery_confidence",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "support_packets",
+        "account_handoff"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "closure_honesty",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "support_packets",
+        "release_ready",
+        "google_oauth"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "responsiveness",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "public_edge",
+        "ui_frame"
+      ]
+    },
+    {
+      "surface_id": "improve_and_close_the_loop",
+      "dimension_id": "design_authorship",
+      "owners": [
+        "chummer6-hub",
+        "fleet",
+        "executive-assistant"
+      ],
+      "journey_ids": [
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+      ],
+      "evidence_ids": [
+        "design_quality",
+        "ui_frame",
+        "localization"
+      ]
+    }
+  ]
+}

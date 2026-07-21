@@ -54,6 +54,15 @@
     <Compile Include="..\Chummer.Tests\PublicReleaseTruthProjectionTests.cs" Link="PublicReleaseTruthProjectionTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseShelfGenerationStoreTests.cs" Link="ReleaseShelfGenerationStoreTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseAuthorityRevisionStoreTests.cs" Link="ReleaseAuthorityRevisionStoreTests.cs" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_score_two_evidence.json"
+          Link="Fixtures\campaign_operability_score_two_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_candidate_evidence.json"
+          Link="Fixtures\campaign_operability_candidate_evidence.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Chummer.Tests\Fixtures\campaign_operability_cell_inventory.json"
+          Link="Fixtures\campaign_operability_cell_inventory.json"
+          CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadRequestGateMiddlewareTests.cs" Link="ReleaseUploadRequestGateMiddlewareTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadSnapshotAuthorityTests.cs" Link="ReleaseUploadSnapshotAuthorityTests.cs" />
     <Compile Include="ReleaseAuthorityEndpointContractTests.cs" />
