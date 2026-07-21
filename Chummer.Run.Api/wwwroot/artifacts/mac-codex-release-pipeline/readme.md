@@ -263,6 +263,24 @@ When staging succeeds, the exact candidate exists as one immutable, authority-bo
 
 The owner-only finalizer reads Hub and Registry credentials only from dedicated mode-`0600` files outside the persisted run workspace. Before its first Registry mutation it writes a digest-pinned checkpoint. If Registry CAS succeeds but Hub activation is ambiguous, it reads the exact public pointer: a target match triggers idempotent activation verification, while a predecessor match is not abort proof because the original server request may still be in flight. Without a durable server-side aborted/reconcile receipt, the finalizer persists `activation_outcome_unknown`, leaves Registry uncompensated, and stops without another authority mutation. Neither staging success nor a `preview_ready` decision is a stable/gold claim.
 
+## Post-activation flagship acceptance
+
+Owner finalization and flagship acceptance are separate gates. A valid `chummer.staged-release-owner-finalization/v1` receipt only proves that the exact generation reached the public preview shelf; it does not prove Horizon operations, the real multi-account campaign journey, stable readiness, or gold readiness.
+
+After activation, use a fresh caller-owned mode-`0700` evidence workspace and keep every input receipt, browser storage state, internal token, and mutation permit in a distinct mode-`0600` regular file. The required order is:
+
+1. verify the immutable generation and canonical `CURRENT` against the exact finalization binding
+2. run `scripts/probe_horizon_live_readiness.py` against the pinned `https://chummer.run` origin, using the digest-pinned source-readiness receipt, committed-generation convergence receipt, generation manifest, and internal token
+3. run the real multi-account journey with four separate interactively authenticated storage states and an explicit expiring mutation permit; mock identities, shared sessions, test headers, request interception, and administrator-issued sessions are not acceptance evidence
+4. rerun canonical `CURRENT` convergence after every required evidence producer has finished
+5. run `scripts/verify_post_activation_acceptance.py` with the digest-pinned release manifest plus the exact repeated `--require-evidence KIND=PATH` and matching `--evidence-sha256 KIND=SHA256` denominator for `horizon_live_readiness` and `multi_account_live_journey`
+
+The Horizon v1 probe is intentionally observation-only: routes that do not expose release identity are recorded as `raw_http_*`, and the receipt remains `attention_required` because no digest-bound operational/governance evidence authority exists yet. Its default exit is non-zero. `--allow-attention-required` may be used only to retain a diagnostic receipt; it must never be used as a release-gate bypass.
+
+`scripts/accept_live_campaign_release.py` is likewise a fail-closed preflight, not the real browser journey. It validates the exact finalized release, four distinct production-bound storage-state files, and a digest-pinned expiring mutation permit, then emits `multi_account_live_journey` evidence with `operationalReadinessClaimAllowed=false`. Until governed production selectors and the real privacy/quota/consent assertions are implemented, its result is always `attention_required` and cannot satisfy flagship acceptance.
+
+The aggregate verifier accepts only canonical, digest-pinned `chummer.post-activation-evidence/v1` envelopes bound to the exact finalized release. Every envelope must contain non-empty claim digests, and the fresh `CURRENT` receipt must postdate all required evidence. The verifier exits zero only for `status=accepted`; `attention_required` exits non-zero. Missing or failed post-activation evidence does not grant rollback authority and does not erase an already activated preview. It withholds flagship/stable/gold acceptance and requires an explicit owner follow-up.
+
 For macOS signed releases, the promoted artifact will only be visible publicly when the uploaded bundle includes:
 
 1. startup-smoke receipts for the installer
