@@ -23,6 +23,26 @@ def fixture(tmp_path: Path, *, scorecard_before: bool = False):
     converged_at = now - dt.timedelta(minutes=2)
     scorecard_at = converged_at - dt.timedelta(seconds=1) if scorecard_before else now - dt.timedelta(minutes=1)
     release_version = "run-20260721-000001"
+    manifest = tmp_path / "RELEASE_CHANNEL.generated.json"
+    manifest_raw = write_json(manifest, {"version": release_version})
+    decision = tmp_path / "RELEASE_DECISION.json"
+    decision_raw = write_json(
+        decision,
+        {
+            "releaseVersion": release_version,
+            "releaseDecisionStatus": "review_required",
+            "status": "review_required",
+        },
+    )
+    snapshot = tmp_path / "SNAPSHOT.json"
+    snapshot_raw = write_json(
+        snapshot,
+        {
+            "releaseVersion": release_version,
+            "releaseDecisionStatus": "review_required",
+            "releaseDecisionSha256": hashlib.sha256(decision_raw).hexdigest(),
+        },
+    )
     convergence = tmp_path / "convergence.json"
     convergence_raw = write_json(
         convergence,
@@ -36,11 +56,15 @@ def fixture(tmp_path: Path, *, scorecard_before: bool = False):
             "mismatches": [],
             "failures": [],
             "releaseDecisionStatus": "review_required",
-            "releaseDecisionSha256": "a" * 64,
+            "releaseVersion": release_version,
+            "manifestSha256": hashlib.sha256(manifest_raw).hexdigest(),
+            "authoritySnapshotSha256": hashlib.sha256(snapshot_raw).hexdigest(),
+            "releaseDecisionSha256": hashlib.sha256(decision_raw).hexdigest(),
             "releaseTruth": {
                 "releaseVersion": release_version,
                 "releaseDecisionStatus": "review_required",
-                "releaseDecisionSha256": "a" * 64,
+                "manifestSha256": hashlib.sha256(manifest_raw).hexdigest(),
+                "releaseDecisionSha256": hashlib.sha256(decision_raw).hexdigest(),
             },
         },
     )
@@ -64,13 +88,23 @@ def fixture(tmp_path: Path, *, scorecard_before: bool = False):
             "cells": [{"score": 2} for _ in range(36)],
         },
     )
-    return release_version, convergence, convergence_raw, scorecard, scorecard_raw
+    return {
+        "release_version": release_version,
+        "manifest": manifest,
+        "manifest_raw": manifest_raw,
+        "snapshot": snapshot,
+        "snapshot_raw": snapshot_raw,
+        "decision": decision,
+        "decision_raw": decision_raw,
+        "convergence": convergence,
+        "convergence_raw": convergence_raw,
+        "scorecard": scorecard,
+        "scorecard_raw": scorecard_raw,
+    }
 
 
 def command(tmp_path: Path, *, scorecard_before: bool = False):
-    release_version, convergence, _, scorecard, scorecard_raw = fixture(
-        tmp_path, scorecard_before=scorecard_before
-    )
+    data = fixture(tmp_path, scorecard_before=scorecard_before)
     output = tmp_path / "release-evidence" / "scorecard.json"
     receipt = tmp_path / "release-evidence" / "handoff.json"
     return (
@@ -78,34 +112,45 @@ def command(tmp_path: Path, *, scorecard_before: bool = False):
             sys.executable,
             str(SCRIPT),
             "--source",
-            str(scorecard),
+            str(data["scorecard"]),
             "--expected-sha256",
-            hashlib.sha256(scorecard_raw).hexdigest(),
+            hashlib.sha256(data["scorecard_raw"]).hexdigest(),
             "--allowed-root",
             str(tmp_path),
+            "--manifest",
+            str(data["manifest"]),
+            "--predecessor-snapshot",
+            str(data["snapshot"]),
+            "--predecessor-decision",
+            str(data["decision"]),
             "--convergence",
-            str(convergence),
+            str(data["convergence"]),
             "--expected-release-version",
-            release_version,
+            str(data["release_version"]),
             "--output",
             str(output),
             "--receipt",
             str(receipt),
         ],
-        scorecard_raw,
+        data,
         output,
         receipt,
     )
 
 
 def test_materializes_exact_postconvergence_scorecard_handoff(tmp_path: Path) -> None:
-    invocation, scorecard_raw, output, receipt = command(tmp_path)
+    invocation, data, output, receipt = command(tmp_path)
     completed = subprocess.run(invocation, text=True, capture_output=True)
     assert completed.returncode == 0, completed.stderr
-    assert output.read_bytes() == scorecard_raw
+    assert output.read_bytes() == data["scorecard_raw"]
     payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["contractName"] == "chummer.release-scorecard-handoff/v2"
     assert payload["status"] == "pass"
-    assert payload["scorecardSha256"] == hashlib.sha256(scorecard_raw).hexdigest()
+    assert payload["scorecardSha256"] == hashlib.sha256(data["scorecard_raw"]).hexdigest()
+    assert payload["manifestSha256"] == hashlib.sha256(data["manifest_raw"]).hexdigest()
+    assert payload["predecessorSnapshotSha256"] == hashlib.sha256(data["snapshot_raw"]).hexdigest()
+    assert payload["predecessorDecisionSha256"] == hashlib.sha256(data["decision_raw"]).hexdigest()
+    assert payload["stagedConvergenceSha256"] == hashlib.sha256(data["convergence_raw"]).hexdigest()
 
 
 def test_rejects_digest_mismatch_and_preconvergence_scorecard(tmp_path: Path) -> None:
@@ -136,3 +181,24 @@ def test_rejects_scorecard_outside_caller_owned_root(tmp_path: Path) -> None:
     assert completed.returncode == 1
     assert "caller-owned run workspace" in completed.stderr
     assert not output.exists()
+
+
+def test_rejects_convergence_or_predecessor_binding_drift(tmp_path: Path) -> None:
+    for argument, label in (
+        ("--manifest", "canonical release manifest"),
+        ("--predecessor-snapshot", "predecessor authority"),
+        ("--predecessor-decision", "predecessor authority"),
+    ):
+        root = tmp_path / argument.removeprefix("--")
+        root.mkdir()
+        invocation, _, output, _ = command(root)
+        target = Path(invocation[invocation.index(argument) + 1])
+        payload = json.loads(target.read_text(encoding="utf-8"))
+        payload["releaseVersion"] = "run-different"
+        if argument == "--manifest":
+            payload["version"] = "run-different"
+        write_json(target, payload)
+        completed = subprocess.run(invocation, text=True, capture_output=True)
+        assert completed.returncode == 1, argument
+        assert label in completed.stderr
+        assert not output.exists()

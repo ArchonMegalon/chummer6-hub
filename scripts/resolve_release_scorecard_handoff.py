@@ -16,10 +16,14 @@ from typing import Any, Optional, Sequence
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_HANDOFF_BYTES = 64 * 1024
 MAX_CONVERGENCE_BYTES = 4 * 1024 * 1024
+MAX_BINDING_BYTES = 8 * 1024 * 1024
 HANDOFF_FIELDS = {
     "contractName",
     "releaseVersion",
-    "convergenceSha256",
+    "manifestSha256",
+    "predecessorSnapshotSha256",
+    "predecessorDecisionSha256",
+    "stagedConvergenceSha256",
     "scorecardPath",
     "scorecardSha256",
 }
@@ -42,6 +46,9 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--handoff", type=Path, required=True)
     parser.add_argument("--allowed-root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--predecessor-snapshot", type=Path, required=True)
+    parser.add_argument("--predecessor-decision", type=Path, required=True)
     parser.add_argument("--convergence", type=Path, required=True)
     parser.add_argument("--expected-release-version", required=True)
     parser.add_argument("--timeout-seconds", type=int, default=900)
@@ -157,14 +164,49 @@ def _stable_handoff(path: Path, root: Path) -> bytes:
     return raw
 
 
-def _convergence_digest(path: Path) -> str:
+def _bounded_json(path: Path, label: str, maximum_bytes: int) -> tuple[bytes, dict[str, Any]]:
     try:
         raw = path.read_bytes()
     except OSError as error:
-        raise ResolutionError("review-seed convergence receipt could not be read") from error
-    if not raw or len(raw) > MAX_CONVERGENCE_BYTES:
-        raise ResolutionError("review-seed convergence receipt has an invalid byte length")
-    payload = _strict_json(raw, "review-seed convergence receipt")
+        raise ResolutionError(f"{label} could not be read") from error
+    if not raw or len(raw) > maximum_bytes:
+        raise ResolutionError(f"{label} has an invalid byte length")
+    return raw, _strict_json(raw, label)
+
+
+def _exact_release_bindings(
+    manifest_path: Path,
+    predecessor_snapshot_path: Path,
+    predecessor_decision_path: Path,
+    convergence_path: Path,
+    release_version: str,
+) -> dict[str, str]:
+    manifest_raw, manifest = _bounded_json(
+        manifest_path, "canonical release manifest", MAX_BINDING_BYTES
+    )
+    snapshot_raw, snapshot = _bounded_json(
+        predecessor_snapshot_path, "predecessor authority snapshot", MAX_BINDING_BYTES
+    )
+    decision_raw, decision = _bounded_json(
+        predecessor_decision_path, "predecessor authority decision", MAX_BINDING_BYTES
+    )
+    convergence_raw, payload = _bounded_json(
+        convergence_path, "staged convergence receipt", MAX_CONVERGENCE_BYTES
+    )
+    manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
+    snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
+    decision_sha256 = hashlib.sha256(decision_raw).hexdigest()
+    if manifest.get("version") != release_version:
+        raise ResolutionError("canonical release manifest does not bind the expected release version")
+    if (
+        snapshot.get("releaseVersion") != release_version
+        or snapshot.get("releaseDecisionStatus") != "review_required"
+        or snapshot.get("releaseDecisionSha256") != decision_sha256
+        or decision.get("releaseVersion") != release_version
+        or decision.get("releaseDecisionStatus") != "review_required"
+        or decision.get("status") != "review_required"
+    ):
+        raise ResolutionError("predecessor authority is not the exact review-required release seed")
     if (
         payload.get("contractName") != "chummer.live-release-convergence/v1"
         or payload.get("contractVersion") != 1
@@ -173,25 +215,42 @@ def _convergence_digest(path: Path) -> str:
         or payload.get("failureCount") != 0
         or payload.get("releaseDecisionStatus") != "review_required"
     ):
-        raise ResolutionError("review-seed convergence receipt is not an exact passing review candidate")
-    return hashlib.sha256(raw).hexdigest()
+        raise ResolutionError("staged convergence receipt is not an exact passing review candidate")
+    truth = payload.get("releaseTruth")
+    if (
+        payload.get("releaseVersion") != release_version
+        or payload.get("manifestSha256") != manifest_sha256
+        or payload.get("authoritySnapshotSha256") != snapshot_sha256
+        or payload.get("releaseDecisionSha256") != decision_sha256
+        or not isinstance(truth, dict)
+        or truth.get("releaseVersion") != release_version
+        or truth.get("manifestSha256") != manifest_sha256
+        or truth.get("releaseDecisionSha256") != decision_sha256
+    ):
+        raise ResolutionError("staged convergence does not bind the exact candidate authority")
+    return {
+        "manifestSha256": manifest_sha256,
+        "predecessorSnapshotSha256": snapshot_sha256,
+        "predecessorDecisionSha256": decision_sha256,
+        "stagedConvergenceSha256": hashlib.sha256(convergence_raw).hexdigest(),
+    }
 
 
 def _resolve_payload(
     raw: bytes,
     root: Path,
     release_version: str,
-    convergence_sha256: str,
+    exact_bindings: dict[str, str],
 ) -> dict[str, Any]:
     payload = _strict_json(raw, "scorecard handoff")
     if set(payload) != HANDOFF_FIELDS:
         raise ResolutionError("scorecard handoff has an unexpected field set")
     if (
-        payload.get("contractName") != "chummer.release-scorecard-handoff-request/v1"
+        payload.get("contractName") != "chummer.release-scorecard-handoff-request/v2"
         or payload.get("releaseVersion") != release_version
-        or payload.get("convergenceSha256") != convergence_sha256
+        or any(payload.get(name) != value for name, value in exact_bindings.items())
     ):
-        raise ResolutionError("scorecard handoff does not bind the exact review-seed convergence")
+        raise ResolutionError("scorecard handoff does not bind the exact staged release authority")
     scorecard_sha256 = payload.get("scorecardSha256")
     scorecard_path_raw = payload.get("scorecardPath")
     if not isinstance(scorecard_sha256, str) or SHA256.fullmatch(scorecard_sha256) is None:
@@ -202,10 +261,10 @@ def _resolve_payload(
         Path(scorecard_path_raw), root, "scorecard path", must_exist=True
     )
     return {
-        "contractName": "chummer.release-scorecard-handoff-resolution/v1",
+        "contractName": "chummer.release-scorecard-handoff-resolution/v2",
         "status": "pass",
         "releaseVersion": release_version,
-        "convergenceSha256": convergence_sha256,
+        **exact_bindings,
         "scorecardPath": str(scorecard_path),
         "scorecardSha256": scorecard_sha256,
         "handoffSha256": hashlib.sha256(raw).hexdigest(),
@@ -240,13 +299,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise ResolutionError("expected release version is invalid")
         root = _caller_owned_root(args.allowed_root)
         _confined_path(args.handoff, root, "scorecard handoff", must_exist=False)
-        convergence_sha256 = _convergence_digest(args.convergence)
+        exact_bindings = _exact_release_bindings(
+            args.manifest,
+            args.predecessor_snapshot,
+            args.predecessor_decision,
+            args.convergence,
+            release_version,
+        )
         deadline = time.monotonic() + args.timeout_seconds
         while True:
             try:
                 raw = _stable_handoff(args.handoff, root)
                 resolution = _resolve_payload(
-                    raw, root, release_version, convergence_sha256
+                    raw, root, release_version, exact_bindings
                 )
                 break
             except HandoffNotReady:

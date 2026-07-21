@@ -13,6 +13,7 @@ from typing import Any, Optional
 CONTRACT_NAME = "chummer.release_upload_response_truth"
 SCHEMA_VERSION = "chummer.release-upload-response-truth/v2"
 SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
+BARE_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 SAFE_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 SAFE_ARTIFACT_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}\Z")
 
@@ -174,20 +175,27 @@ def manifest_artifact_ids(
 
 
 def promoted_artifact_ids(payload: dict[str, Any], *, failures: list[str]) -> list[str]:
-    rows = payload.get("promotedArtifactIds")
+    collection_name = (
+        "candidateArtifactIds"
+        if "candidateArtifactIds" in payload
+        else "promotedArtifactIds"
+    )
+    rows = payload.get(collection_name)
     if not isinstance(rows, list) or not rows:
-        failures.append("upload response promotedArtifactIds must be a non-empty array")
+        failures.append(f"upload response {collection_name} must be a non-empty array")
         return []
 
     artifact_ids: list[str] = []
     seen: set[str] = set()
     for index, value in enumerate(rows):
         if not isinstance(value, str) or not SAFE_ARTIFACT_ID_PATTERN.fullmatch(value) or ".." in value:
-            failures.append(f"upload response promotedArtifactIds row {index} is noncanonical")
+            failures.append(f"upload response {collection_name} row {index} is noncanonical")
             continue
         folded = value.casefold()
         if folded in seen:
-            failures.append("upload response promotedArtifactIds contains duplicate or case-ambiguous IDs")
+            failures.append(
+                f"upload response {collection_name} contains duplicate or case-ambiguous IDs"
+            )
             continue
         seen.add(folded)
         artifact_ids.append(value)
@@ -204,6 +212,8 @@ def response_generation_id(payload: dict[str, Any], *, failures: list[str]) -> s
 
 def response_manifest_digest(payload: dict[str, Any], key: str, *, failures: list[str]) -> str:
     value = payload.get(key)
+    if isinstance(value, str) and BARE_SHA256_PATTERN.fullmatch(value):
+        return f"sha256:{value}"
     if not isinstance(value, str) or not SHA256_PATTERN.fullmatch(value):
         failures.append(f"upload response {key} is missing or noncanonical")
         return ""

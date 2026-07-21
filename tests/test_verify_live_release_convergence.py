@@ -79,6 +79,29 @@ def test_required_fields_and_matching_routes_pass() -> None:
     assert result["authoritySnapshotSha256"] == AUTHORITY_SNAPSHOT_SHA256
 
 
+def test_staged_probe_token_file_and_response_headers_are_private(tmp_path: Path) -> None:
+    module = load_module()
+    token_file = tmp_path / "probe-token"
+    token_file.write_text("a" * 43 + "\n", encoding="ascii")
+    token_file.chmod(0o600)
+
+    assert module._read_staged_probe_token(token_file) == "a" * 43
+    module._validate_staged_response_headers(
+        "/downloads",
+        {
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Robots-Tag": "noindex, nofollow",
+            "Vary": module.STAGED_PROBE_HEADER,
+        },
+    )
+
+    token_file.chmod(0o644)
+    with pytest.raises(module.ConvergenceError, match="mode-0600"):
+        module._read_staged_probe_token(token_file)
+    with pytest.raises(module.ConvergenceError, match="no-store/noindex"):
+        module._validate_staged_response_headers("/downloads", {})
+
+
 def test_missing_required_field_fails_closed() -> None:
     module = load_module()
     incomplete = projection()

@@ -46,6 +46,8 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
     tool = workspace / ".c" / "hub" / "scripts" / SOURCE_TOOL.name
     tool.parent.mkdir(parents=True)
     shutil.copy2(SOURCE_TOOL, tool)
+    executed_bootstrap = workspace / "bootstrap.sh"
+    write_bytes(executed_bootstrap, b"#!/usr/bin/env bash\nexit 0\n", mode=0o700)
 
     release_version = "run-20260721-test"
     generation_id = "generation-test"
@@ -129,6 +131,7 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
     return {
         "workspace": workspace,
         "tool": tool,
+        "executed_bootstrap": executed_bootstrap,
         "paths": paths,
         "generation_id": generation_id,
         "release_version": release_version,
@@ -148,6 +151,7 @@ def create_checkpoint(setup: dict[str, object]) -> tuple[Path, str]:
         tool,
         "create",
         "--workspace", str(workspace),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
         "--generation-id", str(setup["generation_id"]),
         "--release-version", str(setup["release_version"]),
         "--registry-current-url", "https://registry.example/api/v1/registry/release-authority/current",
@@ -190,6 +194,7 @@ def test_checkpoint_round_trip_is_private_digest_pinned_and_secret_free(tmp_path
         setup["tool"],
         "resolve",
         "--workspace", str(setup["workspace"]),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
         "--checkpoint", str(checkpoint),
         "--expected-checkpoint-sha256", checkpoint_sha256,
         "--output", str(resolution),
@@ -211,6 +216,7 @@ def test_resolve_fails_closed_after_exact_request_tamper(tmp_path: Path) -> None
         setup["tool"],
         "resolve",
         "--workspace", str(setup["workspace"]),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
         "--checkpoint", str(checkpoint),
         "--expected-checkpoint-sha256", checkpoint_sha256,
         "--output", str(resolution),
@@ -237,6 +243,7 @@ def test_resolve_rejects_checkpoint_or_tool_integrity_failure(tmp_path: Path, fa
         setup["tool"],
         "resolve",
         "--workspace", str(setup["workspace"]),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
         "--checkpoint", str(checkpoint),
         "--expected-checkpoint-sha256", checkpoint_sha256,
         "--output", str(resolution),
@@ -255,10 +262,30 @@ def test_resolve_rejects_group_writable_workspace(tmp_path: Path) -> None:
         setup["tool"],
         "resolve",
         "--workspace", str(setup["workspace"]),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
         "--checkpoint", str(checkpoint),
         "--expected-checkpoint-sha256", checkpoint_sha256,
         "--output", str(resolution),
     )
     assert result.returncode == 1
     assert "must not be group- or world-writable" in result.stderr
+    assert not resolution.exists()
+
+
+def test_resolve_rejects_different_or_tampered_executed_bootstrap(tmp_path: Path) -> None:
+    setup = prepare_workspace(tmp_path)
+    checkpoint, checkpoint_sha256 = create_checkpoint(setup)
+    setup["executed_bootstrap"].write_bytes(b"#!/usr/bin/env bash\nexit 1\n")
+    resolution = setup["workspace"] / ".resolution.json"
+    result = invoke(
+        setup["tool"],
+        "resolve",
+        "--workspace", str(setup["workspace"]),
+        "--executed-bootstrap", str(setup["executed_bootstrap"]),
+        "--checkpoint", str(checkpoint),
+        "--expected-checkpoint-sha256", checkpoint_sha256,
+        "--output", str(resolution),
+    )
+    assert result.returncode == 1
+    assert "executedBootstrap SHA-256 changed" in result.stderr
     assert not resolution.exists()

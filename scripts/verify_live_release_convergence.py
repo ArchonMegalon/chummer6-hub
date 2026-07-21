@@ -6,7 +6,10 @@ import base64
 from datetime import datetime, timezone
 import html
 import json
+import os
+from pathlib import Path
 import re
+import stat
 import sys
 from typing import Any, Mapping, Sequence
 from urllib.error import HTTPError, URLError
@@ -19,6 +22,7 @@ PROJECTION_HEADER = "x-chummer-release-truth"
 AUTHORITY_SNAPSHOT_SHA256_HEADER = (
     "x-chummer-release-authority-snapshot-sha256"
 )
+STAGED_PROBE_HEADER = "X-Chummer-Staged-Release-Probe"
 PROJECTION_CONTRACT = "chummer.release-truth-projection/v1"
 RECEIPT_CONTRACT = "chummer.live-release-convergence/v1"
 REQUIRED_FIELDS = (
@@ -826,6 +830,7 @@ def verify_route_projections(
         "checkedRoutes": sorted(route_projections),
         "comparedFields": list(REQUIRED_FIELDS),
         "releaseTruth": expected,
+        "releaseVersion": expected["releaseVersion"],
         "manifestSha256": expected["manifestSha256"],
         "releaseDecisionStatus": expected["releaseDecisionStatus"],
         "releaseDecisionSha256": expected["releaseDecisionSha256"],
@@ -851,13 +856,17 @@ def fetch_route(
     method: str = "GET",
     accept_redirect_response: bool = False,
     accepted_error_statuses: Sequence[int] = (),
+    request_headers: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, str], bytes, str]:
     if not route.startswith("/") or route.startswith("//"):
         raise ConvergenceError(f"unsafe route: {route}")
     url = urljoin(base_url, route.lstrip("/"))
+    headers = {"Accept": "*/*", "User-Agent": "chummer-release-convergence/1"}
+    if request_headers:
+        headers.update(request_headers)
     request = Request(
         url,
-        headers={"Accept": "*/*", "User-Agent": "chummer-release-convergence/1"},
+        headers=headers,
         method=method,
     )
     try:
@@ -884,6 +893,21 @@ def _read_bounded_response(response, route: str) -> tuple[dict[str, str], bytes,
     headers = {key: value for key, value in response.headers.items()}
     content_type = response.headers.get_content_type()
     return headers, body, content_type
+
+
+def _validate_staged_response_headers(route: str, headers: Mapping[str, str]) -> None:
+    normalized = {str(key).lower(): str(value).lower() for key, value in headers.items()}
+    cache_control = normalized.get("cache-control", "")
+    robots = normalized.get("x-robots-tag", "")
+    vary = normalized.get("vary", "")
+    if (
+        "no-store" not in cache_control
+        or "noindex" not in robots
+        or STAGED_PROBE_HEADER.lower() not in vary
+    ):
+        raise ConvergenceError(
+            f"{route}: private staged probe response is missing no-store/noindex isolation"
+        )
 
 
 def _requires_source_hop_validation(route: str) -> bool:
@@ -1101,6 +1125,7 @@ def verify_live(
     timeout: float,
     generation_id: str | None = None,
     expected_release_truth: Mapping[str, str] | None = None,
+    staged_probe_token: str | None = None,
 ) -> dict[str, Any]:
     normalized_base = _validate_base_url(base_url)
     generation_id = _validate_generation_id(generation_id)
@@ -1108,6 +1133,11 @@ def verify_live(
     authority = (parsed.scheme.lower(), parsed.netloc.lower())
     opener = build_opener(SameOriginRedirectHandler(authority))
     no_redirect_opener = build_opener(NoRedirectHandler())
+    request_headers = (
+        {STAGED_PROBE_HEADER: staged_probe_token}
+        if staged_probe_token is not None
+        else None
+    )
 
     authority_route = (
         f"/api/v1/public/release-truth/g/{generation_id}"
@@ -1115,8 +1145,14 @@ def verify_live(
         else "/api/v1/public/release-truth"
     )
     authority_headers, authority_body, authority_content_type = fetch_route(
-        opener, normalized_base, authority_route, timeout
+        opener,
+        normalized_base,
+        authority_route,
+        timeout,
+        request_headers=request_headers,
     )
+    if staged_probe_token is not None:
+        _validate_staged_response_headers(authority_route, authority_headers)
     expected = extract_route_projection(
         route=authority_route,
         headers=authority_headers,
@@ -1137,7 +1173,15 @@ def verify_live(
         else "/downloads/releases.json"
     )
     if manifest_route in route_list:
-        fetched[manifest_route] = fetch_route(opener, normalized_base, manifest_route, timeout)
+        fetched[manifest_route] = fetch_route(
+            opener,
+            normalized_base,
+            manifest_route,
+            timeout,
+            request_headers=request_headers,
+        )
+        if staged_probe_token is not None:
+            _validate_staged_response_headers(manifest_route, fetched[manifest_route][0])
         install_route = discover_install_route(
             fetched[manifest_route][1],
             generation_id=generation_id,
@@ -1167,6 +1211,7 @@ def verify_live(
                     if header_only_head
                     else ()
                 ),
+                request_headers=request_headers,
             )
         observed[route] = extract_route_projection(
             route=route,
@@ -1175,17 +1220,50 @@ def verify_live(
             content_type=content_type,
             require_body_projection=not header_only_head,
         )
+        if staged_probe_token is not None:
+            _validate_staged_response_headers(route, headers)
         observed_snapshot_sha256[route] = extract_authority_snapshot_sha256(
             route=route,
             headers=headers,
         )
-    return verify_route_projections(
+    receipt = verify_route_projections(
         expected,
         observed,
         authority_snapshot_sha256=authority_snapshot_sha256,
         route_authority_snapshot_sha256=observed_snapshot_sha256,
         authority_route=authority_route,
     )
+    receipt["verificationMode"] = (
+        "staged_private" if staged_probe_token is not None else "committed_public"
+    )
+    return receipt
+
+
+def _read_staged_probe_token(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        metadata = os.lstat(path)
+    except OSError as error:
+        raise ConvergenceError("staged probe token file is unavailable") from error
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or not 1 <= metadata.st_size <= 512
+    ):
+        raise ConvergenceError(
+            "staged probe token file must be a caller-owned single-link mode-0600 regular file"
+        )
+    try:
+        value = path.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeDecodeError) as error:
+        raise ConvergenceError("staged probe token file could not be read safely") from error
+    if re.fullmatch(r"[A-Za-z0-9_-]{32,128}", value) is None:
+        raise ConvergenceError("staged probe token is malformed")
+    return value
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -1216,6 +1294,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--expected-release-decision-sha256",
         help="Require the live authority to match this local candidate releaseDecisionSha256.",
     )
+    parser.add_argument(
+        "--staged-probe-token-file",
+        type=Path,
+        help=(
+            "Read a caller-owned mode-0600 private staged-generation probe token. "
+            "The token is sent as a request header and is never written to the receipt."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -1227,6 +1313,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if generation_id:
             authority_route = f"/api/v1/public/release-truth/g/{generation_id}"
         expected_release_truth = _expected_release_truth_from_args(args)
+        staged_probe_token = _read_staged_probe_token(args.staged_probe_token_file)
         routes = tuple(
             args.routes
             or (generation_routes(generation_id) if generation_id else DEFAULT_ROUTES)
@@ -1237,6 +1324,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.timeout,
             generation_id=generation_id,
             expected_release_truth=expected_release_truth,
+            staged_probe_token=staged_probe_token,
         )
     except ConvergenceError as error:
         detail = str(error)

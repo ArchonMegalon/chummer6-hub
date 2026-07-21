@@ -366,6 +366,53 @@ public sealed class ReleaseAuthorityRevisionStore
         ValidateActiveShelfExpectation(shelf, request);
         cancellationToken.ThrowIfCancellationRequested();
 
+        return Task.FromResult(AdvanceValidatedShelfUnderLock(
+            shelf,
+            request,
+            recovered,
+            cancellationToken));
+    }
+
+    internal Task<ReleaseAuthorityRevisionAdvanceResult> AdvanceStagedPreviewReadyAsync(
+        ReleaseAuthorityRevisionAdvanceRequest request,
+        ReleaseShelfSnapshot stagedTarget,
+        string? expectedPredecessorPointerSha256,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(stagedTarget);
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateRequestShape(request);
+        if (stagedTarget.IsLegacy || !stagedTarget.IsExplicitGeneration)
+        {
+            throw new InvalidDataException(
+                "staged authority advancement requires an explicitly authenticated target generation.");
+        }
+
+        string downloadsRoot = Path.GetFullPath(_shelfStore.ResolveDownloadsRoot());
+        using FileStream mutationLock = ReleaseShelfPromotionLock.Acquire(downloadsRoot);
+        ReleaseShelfSnapshot active = _shelfStore.Capture();
+        ValidateStagedPredecessorExpectation(active, expectedPredecessorPointerSha256);
+        bool recovered = RecoverPendingTransactionUnderLock(downloadsRoot, stagedTarget);
+        active = _shelfStore.Capture();
+        ValidateStagedPredecessorExpectation(active, expectedPredecessorPointerSha256);
+        ValidateStagedShelfExpectation(stagedTarget, request);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(AdvanceValidatedShelfUnderLock(
+            stagedTarget,
+            request,
+            recovered,
+            cancellationToken));
+    }
+
+    private ReleaseAuthorityRevisionAdvanceResult AdvanceValidatedShelfUnderLock(
+        ReleaseShelfSnapshot shelf,
+        ReleaseAuthorityRevisionAdvanceRequest request,
+        bool recovered,
+        CancellationToken cancellationToken)
+    {
+
         PublicReleaseManifestDto manifest = _manifestLoader(shelf);
         byte[] immutableManifestBytes = shelf.ReadVerifiedFileBytes(
                 ReleaseShelfGenerationStore.CanonicalManifestFileName,
@@ -420,7 +467,7 @@ public sealed class ReleaseAuthorityRevisionStore
                     "The effective successor authority lacks committed revision metadata.");
             }
 
-            return Task.FromResult(new ReleaseAuthorityRevisionAdvanceResult(
+            return new ReleaseAuthorityRevisionAdvanceResult(
                 shelf.GenerationId!,
                 shelf.ReleaseVersion!,
                 current.RevisionId,
@@ -432,7 +479,7 @@ public sealed class ReleaseAuthorityRevisionStore
                 current.ConvergenceSha256,
                 current.JournalReceiptId,
                 current.CommittedAtUtc.Value,
-                recovered));
+                recovered);
         }
 
         if (!EnvelopeEqualsPredecessor(current, request))
@@ -447,7 +494,7 @@ public sealed class ReleaseAuthorityRevisionStore
             predecessorProjection,
             successorProjection,
             cancellationToken);
-        return Task.FromResult(result with { Recovered = recovered });
+        return result with { Recovered = recovered };
     }
 
     /// <summary>
@@ -1017,6 +1064,48 @@ public sealed class ReleaseAuthorityRevisionStore
         {
             throw new ReleaseAuthorityRevisionConcurrencyException(
                 "The active shelf inventory changed before authority advancement.");
+        }
+    }
+
+    private static void ValidateStagedPredecessorExpectation(
+        ReleaseShelfSnapshot active,
+        string? expectedPredecessorPointerSha256)
+    {
+        string? actual = active.PointerDigest is null
+            ? null
+            : "sha256:" + active.PointerDigest;
+        if (!string.Equals(actual, expectedPredecessorPointerSha256, StringComparison.Ordinal))
+        {
+            throw new ReleaseAuthorityRevisionConcurrencyException(
+                "The public release shelf changed after the staged generation was sealed.");
+        }
+    }
+
+    private static void ValidateStagedShelfExpectation(
+        ReleaseShelfSnapshot shelf,
+        ReleaseAuthorityRevisionAdvanceRequest request)
+    {
+        if (shelf.IsLegacy || !shelf.IsExplicitGeneration
+            || !string.Equals(shelf.GenerationId, request.GenerationId, StringComparison.Ordinal))
+        {
+            throw new ReleaseAuthorityRevisionConcurrencyException(
+                "The staged release target does not match the authority request generation.");
+        }
+        if (!FixedDigestEquals(shelf.PointerDigest!, request.ExpectedShelfPointerSha256))
+        {
+            throw new ReleaseAuthorityRevisionConcurrencyException(
+                "The staged target pointer digest changed before authority advancement.");
+        }
+        string inventoryDigest = ReleaseShelfGenerationStore.ComputeInventoryDigest(
+            shelf.PhysicalRoot);
+        if (!FixedDigestEquals(inventoryDigest, shelf.InventoryDigest!)
+            || !string.Equals(
+                "sha256:" + inventoryDigest,
+                request.ExpectedShelfInventoryDigest,
+                StringComparison.Ordinal))
+        {
+            throw new ReleaseAuthorityRevisionConcurrencyException(
+                "The staged target inventory changed before authority advancement.");
         }
     }
 

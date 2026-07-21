@@ -721,6 +721,84 @@ public sealed class ReleaseShelfGenerationStore
         return snapshot;
     }
 
+    /// <summary>
+    /// Resolves an immutable but not-yet-committed generation only from a separately
+    /// authenticated stage receipt. Public generation capture deliberately remains
+    /// committed-only.
+    /// </summary>
+    internal ReleaseShelfSnapshot CaptureStagedGenerationForProbe(
+        string generationId,
+        string targetPointerBase64,
+        string targetPointerSha256,
+        string expectedCandidateSha256)
+    {
+        if (!IsTraversalSafeGenerationId(generationId)
+            || !Sha256Pattern.IsMatch(targetPointerSha256)
+            || !Sha256Pattern.IsMatch(expectedCandidateSha256))
+        {
+            throw new InvalidDataException("Staged release generation binding is invalid.");
+        }
+
+        byte[] pointerBytes;
+        try
+        {
+            pointerBytes = Convert.FromBase64String(targetPointerBase64);
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidDataException("Staged release target pointer is not valid base64.", exception);
+        }
+        if (pointerBytes.Length is < 1 or > MaximumPointerBytes
+            || !string.Equals(Convert.ToBase64String(pointerBytes), targetPointerBase64, StringComparison.Ordinal)
+            || !FixedTimeSha256Equals(
+                targetPointerSha256,
+                Convert.ToHexStringLower(SHA256.HashData(pointerBytes))))
+        {
+            throw new InvalidDataException("Staged release target pointer binding is invalid.");
+        }
+
+        string downloadsRoot = Path.GetFullPath(ResolveDownloadsRoot());
+        string generationRoot = Path.GetFullPath(Path.Combine(
+            downloadsRoot,
+            GenerationsDirectoryName,
+            generationId));
+        string candidatePath = Path.Combine(generationRoot, "activation-candidate.json");
+        byte[] candidateBytes = ReadBoundedFile(
+            candidatePath,
+            MaximumActivationCandidateBytes,
+            "staged release activation candidate");
+        if (!FixedTimeSha256Equals(
+                expectedCandidateSha256,
+                Convert.ToHexStringLower(SHA256.HashData(candidateBytes))))
+        {
+            throw new InvalidDataException("Staged release activation candidate binding changed.");
+        }
+
+        ReleaseShelfSnapshot snapshot = ValidatePointerAndGeneration(
+            downloadsRoot,
+            pointerBytes,
+            targetPointerSha256);
+        if (!string.Equals(snapshot.GenerationId, generationId, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("Staged release target pointer resolved a different generation.");
+        }
+        return snapshot.AsExplicitGeneration();
+    }
+
+    internal void PinForCurrentRequest(ReleaseShelfSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        HttpContext context = _httpContextAccessor?.HttpContext
+            ?? throw new InvalidOperationException("A staged release snapshot can only be pinned during an HTTP request.");
+        if (context.Items.TryGetValue(RequestSnapshotKey, out object? existing)
+            && existing is ReleaseShelfSnapshot prior
+            && !string.Equals(prior.CacheKey, snapshot.CacheKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("This request is already pinned to a different release generation.");
+        }
+        context.Items[RequestSnapshotKey] = snapshot;
+    }
+
     private bool LayoutV1IsRequired()
         => ReadBooleanConfiguration(LayoutV1RequiredKey, defaultValue: false);
 

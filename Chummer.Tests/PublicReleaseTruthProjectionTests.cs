@@ -5,6 +5,8 @@ using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -492,7 +494,7 @@ public sealed class PublicReleaseTruthProjectionTests
             responseContext.Response.ContentType = "application/json";
             await JsonSerializer.SerializeAsync(responseContext.Response.Body, projection);
         });
-        await bodyMiddleware.InvokeAsync(context, source);
+        await InvokeMiddlewareAsync(bodyMiddleware, context, source);
 
         if (route.Contains("/g/candidate-42", StringComparison.Ordinal))
         {
@@ -552,7 +554,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new StubProjection(projection));
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
 
         Assert.False(downstreamInvoked);
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
@@ -584,7 +586,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new StubProjection(projection));
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
 
         Assert.True(downstreamInvoked);
         Assert.Equal(StatusCodes.Status202Accepted, context.Response.StatusCode);
@@ -614,7 +616,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new ThrowingProjection());
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
 
         Assert.False(downstreamInvoked);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
@@ -638,7 +640,7 @@ public sealed class PublicReleaseTruthProjectionTests
             return Task.CompletedTask;
         });
 
-        await middleware.InvokeAsync(context, new ThrowingProjection());
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
 
         Assert.True(downstreamInvoked);
         Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
@@ -654,6 +656,60 @@ public sealed class PublicReleaseTruthProjectionTests
             manifest,
             Digest(authority.ManifestBytes),
             authority.ManifestBytes);
+
+    [Fact]
+    public async Task InvalidStagedProbeFailsClosedWithoutConsultingCommittedProjection()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/downloads/g/candidate-42/releases.json";
+        context.Request.Headers[PublicReleaseTruthProjectionMiddleware.StagedProbeHeaderName] =
+            "invalid-stage-probe-token";
+        bool downstreamInvoked = false;
+        var middleware = new PublicReleaseTruthProjectionMiddleware(_ =>
+        {
+            downstreamInvoked = true;
+            return Task.CompletedTask;
+        });
+
+        await InvokeMiddlewareAsync(middleware, context, new ThrowingProjection());
+
+        Assert.False(downstreamInvoked);
+        Assert.Equal(StatusCodes.Status404NotFound, context.Response.StatusCode);
+        Assert.Equal(
+            "private, no-store, no-cache, max-age=0",
+            context.Response.Headers.CacheControl.ToString());
+        Assert.Equal(
+            "noindex, nofollow, noarchive",
+            context.Response.Headers["X-Robots-Tag"].ToString());
+        Assert.Equal(
+            PublicReleaseTruthProjectionMiddleware.StagedProbeHeaderName,
+            context.Response.Headers.Vary.ToString());
+        Assert.False(context.Response.Headers.ContainsKey(
+            PublicReleaseTruthProjectionMiddleware.ProjectionHeaderName));
+    }
+
+    private static Task InvokeMiddlewareAsync(
+        PublicReleaseTruthProjectionMiddleware middleware,
+        HttpContext context,
+        IReleaseTruthProjection releaseTruth)
+    {
+        string downloadsRoot = Path.Combine(
+            Path.GetTempPath(),
+            "release-truth-middleware-tests",
+            Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot
+            })
+            .Build();
+        var promotions = new ReleaseBundlePromotionService(
+            configuration,
+            NullLogger<ReleaseBundlePromotionService>.Instance,
+            promotionCheckpoint: null);
+        var shelfStore = new ReleaseShelfGenerationStore(configuration);
+        return middleware.InvokeAsync(context, releaseTruth, promotions, shelfStore);
+    }
 
     private static AuthorityEnvelope MutateSnapshot(
         AuthorityEnvelope authority,

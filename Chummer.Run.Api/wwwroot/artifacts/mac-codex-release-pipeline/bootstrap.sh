@@ -12,9 +12,18 @@ set -euo pipefail
 umask 077
 
 bootstrap_tmp_paths=()
-BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=0
+BOOTSTRAP_RELEASE_STAGE_ACCEPTED=0
+BOOTSTRAP_RELEASE_CURRENT_ACTIVATED=0
 BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH=""
+BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
+BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
 RELEASE_PYTHON_BIN=""
+export -n \
+  BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN \
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID \
+  BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH \
+  RELEASE_PYTHON_BIN \
+  2>/dev/null || true
 
 log() {
   printf '[chummer-mac-release] %s\n' "$*"
@@ -135,8 +144,11 @@ cleanup_bootstrap_tmp_paths() {
     rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
   fi
 
-  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED:-0}" == "1" ]]; then
-    printf '[chummer-mac-release] ERROR: Release completion was accepted before a later check failed; the release may already be public. Do not create or publish another session. Inspect %s and reconcile the recorded session.\n' \
+  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_CURRENT_ACTIVATED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: Staged activation was accepted before a later check failed; reconcile the exact generation and CURRENT convergence from %s.\n' \
+      "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
+  elif (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_STAGE_ACCEPTED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: The immutable generation was staged, but public CURRENT was not activated by this bootstrap. Reconcile the recorded stage at %s; do not create a different candidate session.\n' \
       "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
   fi
   return "$status"
@@ -731,6 +743,12 @@ create_minimal_promotion_bundle() {
   cp "$source_root/releases.json" "$bundle_root/releases.json"
   cp "$source_root/RELEASE_CHANNEL.generated.json" "$bundle_root/RELEASE_CHANNEL.generated.json"
   cp "$source_root/release-evidence/public-promotion.json" "$bundle_root/release-evidence/public-promotion.json"
+  cp \
+    "$source_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json" \
+    "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json"
+  cp \
+    "$source_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json" \
+    "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json"
   if [[ -f "$source_root/release-evidence/HORIZON_READINESS.generated.json" ]]; then
     cp \
       "$source_root/release-evidence/HORIZON_READINESS.generated.json" \
@@ -2897,9 +2915,6 @@ capture_release_upload_auth_value() {
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
     captured_value="$CHUMMER_RELEASE_UPLOAD_TICKET"
     captured_source="CHUMMER_RELEASE_UPLOAD_TICKET"
-  elif [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
-    captured_value="$FLEET_INTERNAL_API_TOKEN"
-    captured_source="FLEET_INTERNAL_API_TOKEN"
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" ]]; then
     captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"
   elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}" ]]; then
@@ -2920,7 +2935,9 @@ capture_release_upload_auth_value() {
     CHUMMER_RELEASE_UPLOAD_TOKEN_PATH \
     CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
     CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
-    FLEET_INTERNAL_API_TOKEN
+    FLEET_INTERNAL_API_TOKEN \
+    CHUMMER_REGISTRY_CONTROL_API_KEY \
+    REGISTRY_CONTROL_API_KEY
 }
 
 prompt_for_release_upload_ticket() {
@@ -2954,177 +2971,6 @@ write_release_upload_curl_config() {
   ensure_release_upload_token "$auth_value"
   printf '%s' "$auth_value" \
     | python3 -c 'import sys; token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); sys.stdout.write(f"header = \"Authorization: Bearer {escaped}\"\n")'
-}
-
-capture_registry_control_key_value() {
-  local output_value_variable="${1:-}"
-  local output_source_variable="${2:-}"
-  local primary_value="${CHUMMER_REGISTRY_CONTROL_API_KEY:-}"
-  local legacy_value="${REGISTRY_CONTROL_API_KEY:-}"
-  local captured_value=""
-  local captured_source=""
-  export -n primary_value legacy_value captured_value captured_source 2>/dev/null || true
-  [[ -n "$output_value_variable" && -n "$output_source_variable" ]] || return 1
-
-  if [[ -n "$primary_value" && -n "$legacy_value" && "$primary_value" != "$legacy_value" ]]; then
-    captured_source="CHUMMER_REGISTRY_CONTROL_API_KEY+REGISTRY_CONTROL_API_KEY"
-    printf -v "$output_value_variable" '%s' ""
-    printf -v "$output_source_variable" '%s' "$captured_source"
-    unset CHUMMER_REGISTRY_CONTROL_API_KEY REGISTRY_CONTROL_API_KEY
-    return 2
-  fi
-  if [[ -n "$primary_value" ]]; then
-    captured_value="$primary_value"
-    captured_source="CHUMMER_REGISTRY_CONTROL_API_KEY"
-  elif [[ -n "$legacy_value" ]]; then
-    captured_value="$legacy_value"
-    captured_source="REGISTRY_CONTROL_API_KEY"
-  fi
-  printf -v "$output_value_variable" '%s' "$captured_value"
-  printf -v "$output_source_variable" '%s' "$captured_source"
-  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
-  unset CHUMMER_REGISTRY_CONTROL_API_KEY REGISTRY_CONTROL_API_KEY
-}
-
-ensure_registry_control_key() {
-  local control_key="${1:-}"
-  export -n control_key 2>/dev/null || true
-  [[ -n "$control_key" ]] \
-    || die "set CHUMMER_REGISTRY_CONTROL_API_KEY for Registry authority publication"
-  (( ${#control_key} <= 8192 )) \
-    && [[ "$control_key" != *$'\n'* && "$control_key" != *$'\r'* ]] \
-    || die "Registry control authorization must be one value of at most 8192 bytes"
-}
-
-write_registry_control_curl_config() {
-  local control_key="${1:-}"
-  export -n control_key 2>/dev/null || true
-  ensure_registry_control_key "$control_key"
-  printf '%s' "$control_key" \
-    | python3 -c 'import sys; key = sys.stdin.read(); escaped = key.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); sys.stdout.write(f"header = \"X-Chummer-Registry-Key: {escaped}\"\n")'
-}
-
-resolve_registry_release_authority_urls() {
-  local current_url="$1"
-  local publish_url="$2"
-  python3 - "$current_url" "$publish_url" <<'PY'
-from __future__ import annotations
-
-import sys
-from urllib.parse import urlsplit, urlunsplit
-
-expected_paths = (
-    "/api/v1/registry/release-authority/current",
-    "/api/v1/registry/release-authority/publish",
-)
-resolved = []
-authorities = []
-for value, expected_path in zip(sys.argv[1:3], expected_paths):
-    parsed = urlsplit(value.strip())
-    if (
-        parsed.scheme.lower() != "https"
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.query
-        or parsed.fragment
-        or parsed.path != expected_path
-    ):
-        raise SystemExit("Registry release-authority endpoints must be explicit HTTPS current/publish API URLs")
-    try:
-        authority = (parsed.hostname.lower(), parsed.port)
-    except ValueError as error:
-        raise SystemExit("Registry release-authority endpoint has an invalid port") from error
-    authorities.append(authority)
-    resolved.append(urlunsplit(("https", parsed.netloc, parsed.path, "", "")))
-if authorities[0] != authorities[1]:
-    raise SystemExit("Registry release-authority current and publish endpoints must share one origin")
-print("|".join(resolved))
-PY
-}
-
-fetch_bounded_https_json() {
-  local output_path="$1"
-  local request_url="$2"
-  local max_response_bytes="$3"
-  local timeout_seconds="${4:-30}"
-  local http_status=""
-  if ! http_status="$(curl -q -sS \
-      --proto '=https' \
-      --tlsv1.2 \
-      --max-redirs 0 \
-      --connect-timeout 10 \
-      --max-time "$timeout_seconds" \
-      --max-filesize "$max_response_bytes" \
-      --header 'Accept: application/json' \
-      --header 'Cache-Control: no-cache' \
-      --output "$output_path" \
-      --write-out '%{http_code}' \
-      "$request_url")"; then
-    return 1
-  fi
-  chmod 600 "$output_path" 2>/dev/null || true
-  printf '%s\n' "$http_status"
-}
-
-post_registry_authority_request() {
-  local output_path="$1"
-  local request_url="$2"
-  local request_path="$3"
-  local control_key="${4:-}"
-  local max_response_bytes="${5:-16777216}"
-  local timeout_seconds="${6:-60}"
-  local http_status=""
-  export -n control_key 2>/dev/null || true
-  if ! http_status="$(write_registry_control_curl_config "$control_key" \
-      | curl -q --config - -sS \
-        --proto '=https' \
-        --tlsv1.2 \
-        --max-redirs 0 \
-        --connect-timeout 10 \
-        --max-time "$timeout_seconds" \
-        --max-filesize "$max_response_bytes" \
-        --header 'Accept: application/json' \
-        --header 'Content-Type: application/json' \
-        --request POST \
-        --data-binary "@$request_path" \
-        --output "$output_path" \
-        --write-out '%{http_code}' \
-        "$request_url")"; then
-    return 1
-  fi
-  chmod 600 "$output_path" 2>/dev/null || true
-  printf '%s\n' "$http_status"
-}
-
-post_hub_authority_advance_request() {
-  local output_path="$1"
-  local request_url="$2"
-  local request_path="$3"
-  local release_upload_auth_value="${4:-}"
-  local max_response_bytes="${5:-1048576}"
-  local timeout_seconds="${6:-60}"
-  local http_status=""
-  export -n release_upload_auth_value 2>/dev/null || true
-  if ! http_status="$(write_release_upload_curl_config "$release_upload_auth_value" \
-      | curl -q --config - -sS \
-        --proto '=https' \
-        --tlsv1.2 \
-        --max-redirs 0 \
-        --connect-timeout 10 \
-        --max-time "$timeout_seconds" \
-        --max-filesize "$max_response_bytes" \
-        --header 'Accept: application/json' \
-        --header 'Content-Type: application/json' \
-        --request POST \
-        --data-binary "@$request_path" \
-        --output "$output_path" \
-        --write-out '%{http_code}' \
-        "$request_url")"; then
-    return 1
-  fi
-  chmod 600 "$output_path" 2>/dev/null || true
-  printf '%s\n' "$http_status"
 }
 
 validate_publish_mode() {
@@ -3388,6 +3234,14 @@ write_release_manifests() {
     "--published-at" "$published_at"
     "--downloads-prefix" "/downloads/files"
   )
+  local required_desktop_heads="${CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS:-}"
+  local required_desktop_platforms="${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-}"
+  [[ -n "$required_desktop_heads" && -n "$required_desktop_platforms" ]] \
+    || die "release manifest materialization requires the approved desktop head/platform scope"
+  args+=(
+    "--required-desktop-heads" "$required_desktop_heads"
+    "--required-desktop-platforms" "$required_desktop_platforms"
+  )
 
   if [[ -d "$startup_smoke_dir" ]] && [[ "$help_text" == *"--startup-smoke-dir"* ]]; then
     args+=("--startup-smoke-dir" "$startup_smoke_dir")
@@ -3635,7 +3489,7 @@ write_release_manifests_fallback_no_filter() {
   local proof_path="$8"
   local ui_localization_release_gate_path="${9:-}"
 
-  python3 - "$registry_root" "$downloads_dir" "$compatibility_manifest_path" "$canonical_manifest_path" "$release_version" "$release_channel" "$published_at" "$proof_path" "$ui_localization_release_gate_path" <<'PY'
+  python3 - "$registry_root" "$downloads_dir" "$compatibility_manifest_path" "$canonical_manifest_path" "$release_version" "$release_channel" "$published_at" "$proof_path" "$ui_localization_release_gate_path" "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS:-}" "${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-}" <<'PY'
 from __future__ import annotations
 
 import importlib.util
@@ -3653,6 +3507,10 @@ release_channel = (sys.argv[6] or "preview").strip().lower() or "preview"
 published_at = (sys.argv[7] or "").strip()
 proof_path = Path(sys.argv[8]) if len(sys.argv) > 8 and sys.argv[8] else None
 ui_gate_path = Path(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9] else None
+required_heads = sorted({value.strip().lower() for value in sys.argv[10].split(",") if value.strip()})
+required_platforms = sorted({value.strip().lower() for value in sys.argv[11].split(",") if value.strip()})
+if not required_heads or not required_platforms:
+  raise SystemExit("fallback manifest materialization requires approved desktop heads and platforms")
 
 if not published_at:
   published_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -3720,8 +3578,8 @@ if not artifacts:
 artifacts.sort(key=lambda row: (row.get("kind") != "installer", row.get("platform"), row.get("arch"), row.get("head"), row.get("fileName")))
 tuple_coverage = materializer.desktop_tuple_coverage(
   artifacts,
-  required_heads=list(materializer.DEFAULT_REQUIRED_DESKTOP_HEADS),
-  required_platforms=list(materializer.DEFAULT_REQUIRED_DESKTOP_PLATFORMS),
+  required_heads=required_heads,
+  required_platforms=required_platforms,
   channel_id=release_channel,
   downloads_dir=downloads_dir,
 )
@@ -4497,7 +4355,7 @@ safe_identifier = re.compile(r"^[A-Za-z0-9._:+-]{1,200}$")
 endpoint_fields = {
     "filesUrl", "FilesUrl", "files_url", "files",
     "chunksUrl", "ChunksUrl", "chunks_url", "chunks",
-    "completeUrl", "CompleteUrl", "complete_url", "complete",
+    "stageUrl", "StageUrl", "stage_url", "stage",
 }
 scalar_fields = (
     "contractName", "sessionId", "SessionId", "session_id", "id",
@@ -4505,6 +4363,8 @@ scalar_fields = (
     *sorted(endpoint_fields), "status", "state", "version", "channel",
     "releaseVersion", "publishedAt", "supportabilityState", "compatibilityState",
     "generationId", "activationReceiptId", "activatedAt", "inventoryDigest",
+    "stageReceiptId", "stagedAtUtc", "targetPointerSha256",
+    "previousGenerationId", "previousPointerSha256", "probeTokenExpiresAtUtc",
     "canonicalManifestSha256", "compatibilityManifestSha256",
     "exactIncomingDesktopScope", "downloadsUrl",
     "traceId", "requestId", "success", "fileCount", "totalBytes",
@@ -4561,6 +4421,28 @@ if isinstance(payload, dict):
             item for item in promoted_ids[:512]
             if isinstance(item, str) and safe_identifier.fullmatch(item)
         ]
+    candidate_ids = payload.get("candidateArtifactIds")
+    if isinstance(candidate_ids, list):
+        summary["candidateArtifactIds"] = [
+            item for item in candidate_ids[:512]
+            if isinstance(item, str) and safe_identifier.fullmatch(item)
+        ]
+    secret_output = Path(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else None
+    probe_token = payload.get("probeToken")
+    if secret_output is not None and isinstance(probe_token, str) and re.fullmatch(r"[A-Za-z0-9_-]{32,128}", probe_token):
+        descriptor = os.open(secret_output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+                handle.write(probe_token)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        except BaseException:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            raise
     summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 2)
 elif isinstance(payload, list):
     summary["itemCount"] = len(payload)
@@ -4589,7 +4471,7 @@ finally:
 print(status_code)
 if not status_match:
     raise SystemExit(65)
-' "$output_path" "$max_bytes"
+' "$output_path" "$max_bytes" "${3:-}"
 }
 
 upload_release_bundle_http() {
@@ -4621,7 +4503,8 @@ upload_release_bundle_http() {
   local upload_failed=0
   local completion_attempted=0
   local last_request_status=""
-  local session_json session_id files_url chunks_url complete_url
+  local session_json session_id files_url chunks_url stage_url
+  local stage_probe_capture_path=""
   local file_path relative_path file_size
   local attempt_receipt_path="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$(dirname "$response_path")/release-upload-handoff.json}"
   local candidate_summary=""
@@ -4884,7 +4767,10 @@ PY
       request_ok=0
       if http_status="$(release_upload_curl --fail-with-body -sS --max-filesize "$max_response_bytes" \
           --write-out $'\nCHUMMER_HTTP_STATUS:%{http_code}' -X POST "$@" "$request_url" \
-          | sanitize_release_upload_response_stream "$body_file" "$max_response_bytes")"; then
+          | sanitize_release_upload_response_stream \
+              "$body_file" \
+              "$max_response_bytes" \
+              "$stage_probe_capture_path")"; then
         [[ "$http_status" =~ ^2 ]] && request_ok=1
       fi
       if (( request_ok == 1 )); then
@@ -4950,6 +4836,8 @@ PY
     [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
     [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
     [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_SCOPE_DECISION.approved.json"
+    [[ -f "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/RELEASE_SCOPE_VERIFICATION.generated.json"
     [[ -f "$bundle_root/release-evidence/HORIZON_READINESS.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/HORIZON_READINESS.generated.json"
     [[ -f "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json" ]] && printf '%s\n' "$bundle_root/release-evidence/GENERATION_PROJECTION.generated.json"
     [[ -f "$bundle_root/release-evidence/CURRENT.json" ]] && printf '%s\n' "$bundle_root/release-evidence/CURRENT.json"
@@ -5029,10 +4917,11 @@ PY
   session_id="$(resolve_json_field "$session_json" "sessionId" "SessionId" "session_id" "id" "session")" || die "upload session response missing sessionId"
   [[ "$session_id" =~ ^[0-9a-f]{32}$ ]] \
     || die "upload session response contains an unsafe sessionId"
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID="$session_id"
 
   files_url="$(resolve_json_field "$session_json" "filesUrl" "files_url" "FilesUrl" "files" || true)"
   chunks_url="$(resolve_json_field "$session_json" "chunksUrl" "chunks_url" "ChunksUrl" "chunks" || true)"
-  complete_url="$(resolve_json_field "$session_json" "completeUrl" "complete_url" "CompleteUrl" "complete" || true)"
+  stage_url="$(resolve_json_field "$session_json" "stageUrl" "stage_url" "StageUrl" "stage" || true)"
   local expires_at
   expires_at="$(resolve_json_field "$session_json" "expiresAtUtc" "ExpiresAtUtc" "expires_at_utc" "expiresAt" || true)"
 
@@ -5053,12 +4942,12 @@ PY
     die "upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded"
   fi
 
-  local expected_files_url expected_chunks_url expected_complete_url
+  local expected_files_url expected_chunks_url expected_stage_url
   expected_files_url="$(normalize_upload_url "${session_id}/files" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
   expected_chunks_url="$(normalize_upload_url "${session_id}/chunks" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
-  expected_complete_url="$(normalize_upload_url "${session_id}/complete" "$sessions_url")" \
+  expected_stage_url="$(normalize_upload_url "${session_id}/stage" "$sessions_url")" \
     || die "upload sessions base URL is invalid"
   if [[ -n "$files_url" ]]; then
     files_url="$(normalize_upload_url "$files_url" "$sessions_url")" \
@@ -5072,15 +4961,15 @@ PY
   else
     chunks_url="$expected_chunks_url"
   fi
-  if [[ -n "$complete_url" ]]; then
-    complete_url="$(normalize_upload_url "$complete_url" "$sessions_url")" \
-      || die "upload session completion URL escaped its same-origin session root"
+  if [[ -n "$stage_url" ]]; then
+    stage_url="$(normalize_upload_url "$stage_url" "$sessions_url")" \
+      || die "upload session stage URL escaped its same-origin session root"
   else
-    complete_url="$expected_complete_url"
+    stage_url="$expected_stage_url"
   fi
   [[ "$files_url" == "$expected_files_url" \
       && "$chunks_url" == "$expected_chunks_url" \
-      && "$complete_url" == "$expected_complete_url" ]] \
+      && "$stage_url" == "$expected_stage_url" ]] \
     || die "upload session response endpoints do not match the created session"
 
   upload_file() {
@@ -5198,14 +5087,17 @@ PY
     record_upload_attempt_state uploaded
     record_upload_attempt_state request_started
     completion_attempted=1
+    stage_probe_capture_path="$(mktemp "${TMPDIR:-$(dirname "$response_path")}/chummer-stage-probe.XXXXXX")"
+    rm -f "$stage_probe_capture_path"
+    bootstrap_tmp_paths+=("$stage_probe_capture_path")
     if ! post_form_request \
       "$response_path" \
-      "complete staged upload" \
-      "$complete_url" \
+      "seal immutable staged generation" \
+      "$stage_url" \
       --no-retry; then
       case "$last_request_status" in
         400|401|403)
-          die "release upload completion returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
+          die "release generation staging returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
           ;;
         *)
           upload_failed=1
@@ -5213,10 +5105,18 @@ PY
       esac
     fi
     if (( upload_failed == 0 )); then
-      BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1
+      [[ -f "$stage_probe_capture_path" && ! -L "$stage_probe_capture_path" ]] \
+        || die "release generation staging succeeded without returning a private probe credential"
+      BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN="$(tr -d '\r\n' < "$stage_probe_capture_path")"
+      export -n BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN 2>/dev/null || true
+      [[ "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" =~ ^[A-Za-z0-9_-]{32,128}$ ]] \
+        || die "release generation staging returned a malformed private probe credential"
+      rm -f "$stage_probe_capture_path"
+      stage_probe_capture_path=""
+      BOOTSTRAP_RELEASE_STAGE_ACCEPTED=1
       python3 "$attempt_receipt_helper" fsync-file --path "$response_path"
       if ! record_upload_attempt_state completed; then
-        die "release completion returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release"
+        die "release staging returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release"
       fi
     fi
   fi
@@ -5224,7 +5124,7 @@ PY
   if (( upload_failed == 1 )); then
     rm -f "$session_json"
     if (( completion_attempted == 1 )); then
-      die "release completion outcome is unknown. Do not create another session. Reconcile the request_started handoff at $attempt_receipt_path."
+      die "release generation staging outcome is unknown. Do not create another session. Reconcile the request_started handoff at $attempt_receipt_path."
     fi
     if [[ -f "$response_path" ]]; then
       die "staged release upload failed before completion. inspect the sanitized diagnostic response at: $response_path"
@@ -5244,6 +5144,8 @@ stage_local_release_bundle() {
   local release_channel="$5"
   local rid="$6"
   local apps_raw="$7"
+  local exact_incoming_scope="$8"
+  local release_scope_sha256="$9"
 
   [[ -d "$source_bundle" && ! -L "$source_bundle" ]] \
     || die "stage-only source bundle must be a real directory: $source_bundle"
@@ -5266,7 +5168,9 @@ stage_local_release_bundle() {
       "$release_version" \
       "$release_channel" \
       "$rid" \
-      "$apps_raw" <<'PY'
+      "$apps_raw" \
+      "$exact_incoming_scope" \
+      "$release_scope_sha256" <<'PY'
 from __future__ import annotations
 
 import datetime as dt
@@ -5285,6 +5189,8 @@ payload = {
     "releaseChannel": sys.argv[4],
     "rid": sys.argv[5],
     "appHeads": [item.strip() for item in sys.argv[6].replace(" ", ",").split(",") if item.strip()],
+    "exactIncomingDesktopScope": sys.argv[7],
+    "releaseScopeDecisionSha256": sys.argv[8],
     "uploadAttempted": False,
     "publicationAttempted": False,
     "publicActivationAttempted": False,
@@ -5334,244 +5240,42 @@ PY
   printf 'release_stage_only_path=%s\n' "$output_path"
 }
 
-resume_release_authority_transaction() {
-  local workspace="$1"
-  local checkpoint_path="$2"
-  local checkpoint_sha256="$3"
-  local release_upload_auth_value="${4:-}"
-  export -n release_upload_auth_value 2>/dev/null || true
-  ensure_release_upload_token "$release_upload_auth_value"
-  require_cmd curl
-  require_cmd jq
-
-  local checkpoint_tool="$workspace/.c/hub/scripts/release_authority_transaction_checkpoint.py"
-  [[ -f "$checkpoint_tool" && ! -L "$checkpoint_tool" ]] \
-    || die "authority resume checkpoint tool is missing or unsafe: $checkpoint_tool"
-  local resolution_path="$workspace/.authority-resume-resolution-${BASHPID}-${RANDOM}.json"
-  [[ ! -e "$resolution_path" && ! -L "$resolution_path" ]] \
-    || die "authority resume could not reserve a private resolution path"
-  bootstrap_tmp_paths+=("$resolution_path")
-  command "$RELEASE_PYTHON_BIN" "$checkpoint_tool" resolve \
-    --workspace "$workspace" \
-    --checkpoint "$checkpoint_path" \
-    --expected-checkpoint-sha256 "$checkpoint_sha256" \
-    --output "$resolution_path" \
-    >/dev/null \
-    || die "authority resume checkpoint or referenced transaction bytes failed validation"
-
-  local generation_id release_version registry_current_url hub_authority_url live_base_url
-  local expected_manifest_sha256 expected_snapshot_sha256 expected_decision_sha256
-  local evidence_dir request_path registry_inspector response_verifier live_convergence_verifier
-  local timeout_seconds convergence_attempts convergence_retry_seconds
-  generation_id="$(jq -r '.generationId // empty' "$resolution_path")"
-  release_version="$(jq -r '.releaseVersion // empty' "$resolution_path")"
-  registry_current_url="$(jq -r '.registryCurrentUrl // empty' "$resolution_path")"
-  hub_authority_url="$(jq -r '.hubAuthorityAdvanceUrl // empty' "$resolution_path")"
-  live_base_url="$(jq -r '.liveConvergenceBaseUrl // empty' "$resolution_path")"
-  expected_manifest_sha256="$(jq -r '.expectedManifestSha256 // empty' "$resolution_path")"
-  expected_snapshot_sha256="$(jq -r '.expectedRegistrySnapshotSha256 // empty' "$resolution_path")"
-  expected_decision_sha256="$(jq -r '.expectedRegistryDecisionSha256 // empty' "$resolution_path")"
-  evidence_dir="$(jq -r '.evidenceDirectory // empty' "$resolution_path")"
-  request_path="$(jq -r '.files.request // empty' "$resolution_path")"
-  registry_inspector="$(jq -r '.files.registryInspector // empty' "$resolution_path")"
-  response_verifier="$(jq -r '.files.responseVerifier // empty' "$resolution_path")"
-  live_convergence_verifier="$(jq -r '.files.liveConvergenceVerifier // empty' "$resolution_path")"
-  timeout_seconds="$(jq -r '.convergencePolicy.timeoutSeconds // empty' "$resolution_path")"
-  convergence_attempts="$(jq -r '.convergencePolicy.attempts // empty' "$resolution_path")"
-  convergence_retry_seconds="$(jq -r '.convergencePolicy.retrySeconds // empty' "$resolution_path")"
-  [[ "$generation_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ \
-      && -n "$release_version" \
-      && "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
-      && "$expected_snapshot_sha256" =~ ^[0-9a-f]{64}$ \
-      && "$expected_decision_sha256" =~ ^[0-9a-f]{64}$ \
-      && -d "$evidence_dir" \
-      && -f "$request_path" \
-      && -f "$registry_inspector" \
-      && -f "$response_verifier" \
-      && -f "$live_convergence_verifier" ]] \
-    || die "authority resume resolution omitted a required canonical transaction binding"
-
-  local suffix
-  suffix="$(date -u +%Y%m%d-%H%M%S)-${BASHPID}"
-  local registry_response="$evidence_dir/.registry-current-resume-response-$suffix.json"
-  local registry_inspection="$evidence_dir/.registry-current-resume-inspection-$suffix.json"
-  local hub_response="$evidence_dir/.hub-authority-resume-response-$suffix.json"
-  local response_receipt="$evidence_dir/HUB_AUTHORITY_ADVANCE_RESUME_RESPONSE.$suffix.generated.json"
-  local generation_receipt="$evidence_dir/LIVE_RELEASE_GENERATION_PREVIEW_RESUME_CONVERGENCE.$suffix.generated.json"
-  local current_receipt="$evidence_dir/LIVE_RELEASE_PREVIEW_RESUME_CONVERGENCE.$suffix.generated.json"
-  local reserved_path=""
-  for reserved_path in \
-    "$registry_response" "$registry_inspection" "$hub_response" \
-    "$response_receipt" "$generation_receipt" "$current_receipt"; do
-    [[ ! -e "$reserved_path" && ! -L "$reserved_path" ]] \
-      || die "authority resume output path already exists: $reserved_path"
-  done
-  bootstrap_tmp_paths+=("$registry_response" "$registry_inspection" "$hub_response")
-
-  log "resume mode: verifying Registry CURRENT equals the checkpointed preview successor"
-  local registry_status=""
-  registry_status="$(fetch_bounded_https_json \
-    "$registry_response" \
-    "$registry_current_url" \
-    16777216 \
-    30)" \
-    || die "authority resume could not read Registry CURRENT"
-  [[ "$registry_status" == "200" ]] \
-    || die "authority resume requires the recorded preview successor in Registry CURRENT; observed HTTP $registry_status"
-  command "$RELEASE_PYTHON_BIN" "$registry_inspector" \
-    --response "$registry_response" \
-    --output "$registry_inspection" \
-    >/dev/null \
-    || die "authority resume Registry CURRENT response failed strict inspection"
-  [[ "$(jq -r '.releaseVersion // empty' "$registry_inspection")" == "$release_version" \
-      && "$(jq -r '.releaseDecisionStatus // empty' "$registry_inspection")" == "preview_ready" \
-      && "$(jq -r '.manifestSha256 // empty' "$registry_inspection")" == "$expected_manifest_sha256" \
-      && "$(jq -r '.snapshotSha256 // empty' "$registry_inspection")" == "$expected_snapshot_sha256" \
-      && "$(jq -r '.decisionSha256 // empty' "$registry_inspection")" == "$expected_decision_sha256" ]] \
-    || die "authority resume Registry CURRENT differs from the exact checkpointed preview successor; no mutation attempted"
-
-  log "resume mode: replaying the exact Hub authority request idempotently"
-  local hub_status=""
-  local hub_transport_failed=0
-  hub_status="$(post_hub_authority_advance_request \
-    "$hub_response" \
-    "$hub_authority_url" \
-    "$request_path" \
-    "$release_upload_auth_value")" \
-    || hub_transport_failed=1
-  release_upload_auth_value=""
-  (( hub_transport_failed == 0 )) \
-    || die "authority resume Hub request failed; retain the checkpoint and retry with a fresh release-upload credential"
-  [[ "$hub_status" == "200" ]] \
-    || die "authority resume Hub request returned HTTP $hub_status; retain the checkpoint for reconciliation"
-
-  command "$RELEASE_PYTHON_BIN" "$response_verifier" \
-    --response "$hub_response" \
-    --request "$request_path" \
-    --generation-id "$generation_id" \
-    --release-version "$release_version" \
-    --predecessor-current "$(jq -r '.files.predecessorCurrent' "$resolution_path")" \
-    --predecessor-snapshot "$(jq -r '.files.predecessorSnapshot' "$resolution_path")" \
-    --predecessor-decision "$(jq -r '.files.predecessorDecision' "$resolution_path")" \
-    --successor-current "$(jq -r '.files.successorCurrent' "$resolution_path")" \
-    --successor-snapshot "$(jq -r '.files.successorSnapshot' "$resolution_path")" \
-    --successor-decision "$(jq -r '.files.successorDecision' "$resolution_path")" \
-    --scorecard "$(jq -r '.files.scorecard' "$resolution_path")" \
-    --convergence "$(jq -r '.files.convergence' "$resolution_path")" \
-    --output "$response_receipt" \
-    >/dev/null \
-    || die "authority resume Hub response did not bind the exact checkpointed request"
-
-  local attempt=0
-  local generation_converged=0
-  for ((attempt = 1; attempt <= convergence_attempts; attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_base_url" \
-      --generation-id "$generation_id" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$expected_decision_sha256" \
-      --timeout "$timeout_seconds" \
-      > "$generation_receipt"; then
-      generation_converged=1
-      break
-    fi
-    (( attempt == convergence_attempts )) || sleep "$convergence_retry_seconds"
-  done
-  (( generation_converged == 1 )) \
-    || die "authority resume generation projection did not converge; retain the checkpoint"
-
-  local current_converged=0
-  for ((attempt = 1; attempt <= convergence_attempts; attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_base_url" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$expected_decision_sha256" \
-      --timeout "$timeout_seconds" \
-      > "$current_receipt"; then
-      current_converged=1
-      break
-    fi
-    (( attempt == convergence_attempts )) || sleep "$convergence_retry_seconds"
-  done
-  (( current_converged == 1 )) \
-    || die "authority resume CURRENT routes did not converge; retain the checkpoint"
-
-  rm -f "$request_path" "$checkpoint_path"
-  log "authority resume completed without build, upload, or Registry mutation; private checkpoint removed after both convergence checks"
-  log "authority resume response receipt: $response_receipt"
-  log "authority resume CURRENT convergence: $current_receipt"
-}
-
 main() {
   bootstrap_tmp_paths=()
   trap cleanup_bootstrap_tmp_paths EXIT
 
-  local exact_incoming_scope_declared=0
-  local exact_incoming_scope_raw=""
+  local release_scope_source="${CHUMMER_RELEASE_SCOPE_DECISION_PATH:-}"
+  local release_scope_expected_sha256="${CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256:-}"
+  local release_scope_authority="${CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY:-}"
+  [[ -n "$release_scope_source" ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_PATH is required before candidate production"
+  [[ "$release_scope_expected_sha256" =~ ^[0-9a-fA-F]{64}$ ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256 must be a canonical SHA-256"
+  release_scope_expected_sha256="$(to_lower_ascii "$release_scope_expected_sha256")"
+  [[ -n "$release_scope_authority" && "$release_scope_authority" != file://* ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY must be a non-file immutable authority reference"
+  [[ "$(to_lower_ascii "$release_scope_authority")" == *"$release_scope_expected_sha256"* ]] \
+    || die "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY must contain the exact decision SHA-256"
+  [[ -z "${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES:-}" ]] \
+    || die "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES is retired for this pipeline; exact scope is derived from the approved release-scope decision"
+
+  local exact_incoming_scope_declared=1
   local exact_incoming_scope=""
-  if [[ "${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES+x}" == "x" ]]; then
-    exact_incoming_scope_declared=1
-    exact_incoming_scope_raw="${CHUMMER_RELEASE_EXACT_INCOMING_TUPLES-}"
-  fi
 
   # Capture the one HTTP-promotion credential before any preflight/build child
   # can inherit it, then scrub every inbound bearer variable. The private local
   # remains de-exported and is streamed to curl only when upload actually starts.
+  [[ -z "${FLEET_INTERNAL_API_TOKEN:-}" ]] \
+    || die "the downloaded release bootstrap rejects FLEET_INTERNAL_API_TOKEN; owner finalization must use the non-public finalizer"
+  [[ -z "${CHUMMER_REGISTRY_CONTROL_API_KEY:-}" && -z "${REGISTRY_CONTROL_API_KEY:-}" ]] \
+    || die "the downloaded release bootstrap rejects Registry control credentials; owner finalization is a separate non-public step"
   local release_upload_auth_value=""
   local release_upload_auth_source=""
   capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source
-  local registry_control_key_value=""
-  local registry_control_key_source=""
-  local registry_control_capture_status=0
-  capture_registry_control_key_value \
-    registry_control_key_value \
-    registry_control_key_source \
-    || registry_control_capture_status=$?
-  (( registry_control_capture_status != 2 )) \
-    || die "CHUMMER_REGISTRY_CONTROL_API_KEY and REGISTRY_CONTROL_API_KEY disagree"
 
   parse_mac_release_stage_only_args "$@"
   if (( MAC_RELEASE_AUTHORITY_RESUME == 1 )); then
-    [[ -z "$registry_control_key_source" ]] \
-      || die "authority resume rejects Registry publication credential $registry_control_key_source"
-    (( exact_incoming_scope_declared == 0 )) \
-      || die "authority resume rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
-    local resume_incompatible_setting=""
-    for resume_incompatible_setting in \
-      CHUMMER_MAC_RELEASE_STAGE_ONLY \
-      CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR \
-      CHUMMER_RELEASE_PUBLISH_MODE \
-      CHUMMER_RELEASE_UPLOAD_SESSIONS_URL \
-      CHUMMER_RELEASE_UPLOAD_URL \
-      CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL \
-      CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL \
-      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH \
-      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS \
-      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS \
-      CHUMMER_APP_SIGN_IDENTITY \
-      CHUMMER_NOTARY_PROFILE; do
-      [[ -z "${!resume_incompatible_setting:-}" ]] \
-        || die "authority resume rejects build/publication setting $resume_incompatible_setting"
-    done
-    if [[ -z "$release_upload_auth_value" ]]; then
-      prompt_for_release_upload_ticket release_upload_auth_value \
-        || die "authority resume requires a fresh CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN"
-    fi
-    ensure_release_upload_token "$release_upload_auth_value"
-    RELEASE_PYTHON_BIN="$(resolve_release_python)" \
-      || die "authority resume requires Python 3.11 or newer; set CHUMMER_RELEASE_PYTHON to a reviewed interpreter"
-    python3() {
-      command "$RELEASE_PYTHON_BIN" "$@"
-    }
-    resume_release_authority_transaction \
-      "$MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE" \
-      "$MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT" \
-      "$MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256" \
-      "$release_upload_auth_value"
-    release_upload_auth_value=""
-    return 0
+    die "authority resume moved to the non-public staged-release owner finalizer; the downloaded bootstrap can only create an immutable review-required stage"
   fi
   local retired_scorecard_setting=""
   for retired_scorecard_setting in \
@@ -5582,12 +5286,6 @@ main() {
   done
   if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$release_upload_auth_source" ]]; then
     die "stage-only mode rejects publish-only setting $release_upload_auth_source"
-  fi
-  if (( MAC_RELEASE_STAGE_ONLY == 1 && exact_incoming_scope_declared == 1 )); then
-    die "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
-  fi
-  if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$registry_control_key_source" ]]; then
-    die "stage-only mode rejects Registry publication credential $registry_control_key_source"
   fi
   if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
     local registry_publish_setting=""
@@ -5621,7 +5319,6 @@ main() {
     fi
     [[ "$publish_mode" == "http" ]] \
       || die "same-generation release-authority closure requires staged HTTP publication"
-    ensure_registry_control_key "$registry_control_key_value"
   fi
 
   require_all_reviewed_commit_pins
@@ -5630,13 +5327,6 @@ main() {
   python3() {
     command "$RELEASE_PYTHON_BIN" "$@"
   }
-  if (( exact_incoming_scope_declared == 1 )); then
-    exact_incoming_scope="$(normalize_release_exact_incoming_scope_transport \
-      "$RELEASE_PYTHON_BIN" \
-      "$exact_incoming_scope_raw")" \
-      || die "CHUMMER_RELEASE_EXACT_INCOMING_TUPLES is invalid"
-    log "authenticated exact incoming desktop scope: $exact_incoming_scope"
-  fi
   local stage_output_path=""
   if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
     stage_output_path="$(resolve_mac_release_stage_output_path "$MAC_RELEASE_STAGE_OUTPUT_DIR")" \
@@ -5670,10 +5360,18 @@ main() {
   local registry_expected_commit="${CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT:-}"
   local media_factory_expected_commit="${CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT:-}"
   local legacy_expected_commit="${CHUMMER_LEGACY_EXPECTED_COMMIT:-}"
-  local apps_raw="${CHUMMER_RELEASE_APP:-avalonia,blazor-desktop}"
-  local rid="${CHUMMER_RELEASE_RID:-osx-arm64}"
-  local release_channel="${CHUMMER_RELEASE_CHANNEL:-preview}"
-  local release_version="${CHUMMER_RELEASE_VERSION:-run-$(date -u +%Y%m%d-%H%M%S)}"
+  local apps_raw="${CHUMMER_RELEASE_APP:-}"
+  local rid="${CHUMMER_RELEASE_RID:-}"
+  local release_channel="${CHUMMER_RELEASE_CHANNEL:-}"
+  local release_version="${CHUMMER_RELEASE_VERSION:-}"
+  [[ -n "$apps_raw" ]] \
+    || die "CHUMMER_RELEASE_APP must explicitly match the approved primary/fallback head order"
+  [[ -n "$rid" ]] \
+    || die "CHUMMER_RELEASE_RID must explicitly match the approved platform RID"
+  [[ -n "$release_channel" ]] \
+    || die "CHUMMER_RELEASE_CHANNEL must explicitly match the approved release scope"
+  [[ -n "$release_version" ]] \
+    || die "CHUMMER_RELEASE_VERSION must explicitly match the approved release scope"
   local release_generation_id
   release_generation_id="$(resolve_release_generation_id \
     "$release_version" \
@@ -5693,23 +5391,13 @@ main() {
   local scorecard_handoff_wait_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS:-900}"
   local scorecard_handoff_poll_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS:-15}"
   if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
-    [[ -n "$registry_authority_current_url" ]] \
-      || die "set CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL to the explicit Registry current authority endpoint"
-    [[ -n "$registry_authority_publish_url" ]] \
-      || die "set CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL to the explicit Registry publish authority endpoint"
-    IFS='|' read -r registry_authority_current_url registry_authority_publish_url \
-      < <(resolve_registry_release_authority_urls \
-        "$registry_authority_current_url" \
-        "$registry_authority_publish_url") \
-      || die "Registry release-authority endpoint pair is invalid"
-    [[ -z "$scorecard_handoff_request_path" || "$scorecard_handoff_request_path" == /* ]] \
-      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH must be an absolute path beneath the caller-owned run workspace"
-    [[ "$scorecard_handoff_wait_seconds" =~ ^[0-9]{1,4}$ ]] \
-      && (( 10#$scorecard_handoff_wait_seconds <= 3600 )) \
-      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS must be between 0 and 3600"
-    [[ "$scorecard_handoff_poll_seconds" =~ ^[0-9]{1,2}$ ]] \
-      && (( 10#$scorecard_handoff_poll_seconds >= 1 && 10#$scorecard_handoff_poll_seconds <= 30 )) \
-      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS must be between 1 and 30"
+    [[ -z "$registry_authority_current_url" && -z "$registry_authority_publish_url" ]] \
+      || die "Registry authority endpoints belong to the non-public owner finalizer, not the downloaded staging bootstrap"
+    [[ -z "$scorecard_handoff_request_path" ]] \
+      || die "campaign-operability scorecard handoff belongs to the non-public owner finalizer"
+    [[ -z "${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS:-}" \
+        && -z "${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS:-}" ]] \
+      || die "scorecard wait settings belong to the non-public owner finalizer"
   fi
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
@@ -5773,6 +5461,115 @@ main() {
   local complete_alias_root="$work_root/chummercomplete"
 
   mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos" "$temp_root"
+  chmod 700 "$work_root" "$work_root/.c" 2>/dev/null || true
+  local pinned_executed_bootstrap="$work_root/.c/mac-release-bootstrap.executed.sh"
+  command "$RELEASE_PYTHON_BIN" - "$executed_bootstrap_path" "$pinned_executed_bootstrap" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import os
+from pathlib import Path
+import stat
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+source_metadata = os.lstat(source)
+if stat.S_ISLNK(source_metadata.st_mode) or not stat.S_ISREG(source_metadata.st_mode):
+    raise SystemExit("executed bootstrap source must be a regular non-symlink file")
+raw = source.read_bytes()
+try:
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o700)
+except FileExistsError as error:
+    raise SystemExit("pinned executed bootstrap already exists in the run workspace") from error
+try:
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(raw)
+        handle.flush()
+        os.fsync(handle.fileno())
+except BaseException:
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+    target.unlink(missing_ok=True)
+    raise
+if hashlib.sha256(target.read_bytes()).digest() != hashlib.sha256(raw).digest():
+    target.unlink(missing_ok=True)
+    raise SystemExit("pinned executed bootstrap bytes changed during durable copy")
+PY
+  log "pinned exact executing bootstrap bytes for the owner handoff: $pinned_executed_bootstrap"
+  local pinned_release_scope_decision="$work_root/.c/RELEASE_SCOPE_DECISION.approved.json"
+  command "$RELEASE_PYTHON_BIN" - \
+    "$release_scope_source" \
+    "$pinned_release_scope_decision" \
+    "$release_scope_expected_sha256" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import hmac
+import os
+from pathlib import Path
+import stat
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+expected = sys.argv[3]
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+descriptor = os.open(source, flags)
+try:
+    before = os.fstat(descriptor)
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or before.st_mode & 0o022
+        or before.st_nlink != 1
+        or not 1 <= before.st_size <= 8 * 1024 * 1024
+    ):
+        raise SystemExit(
+            "release scope decision must be a caller-owned single-link regular file not writable by other users"
+        )
+    chunks: list[bytes] = []
+    remaining = before.st_size + 1
+    while remaining:
+        chunk = os.read(descriptor, min(1024 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    after = os.fstat(descriptor)
+finally:
+    os.close(descriptor)
+
+identity = lambda item: (
+    item.st_dev,
+    item.st_ino,
+    item.st_size,
+    item.st_mtime_ns,
+    item.st_ctime_ns,
+    item.st_mode,
+    item.st_nlink,
+)
+raw = b"".join(chunks)
+if identity(before) != identity(after) or len(raw) != before.st_size:
+    raise SystemExit("release scope decision changed during stable read")
+if not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), expected):
+    raise SystemExit("release scope decision SHA-256 does not match the approved digest")
+try:
+    output = os.open(
+        target,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+        0o600,
+    )
+except FileExistsError as error:
+    raise SystemExit("pinned release scope decision already exists") from error
+with os.fdopen(output, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+  log "pinned approved release scope bytes: $pinned_release_scope_decision"
   export TMPDIR="$temp_root"
   export CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"
   mkdir -p "$CHUMMER_DESKTOP_INSTALLER_TMPDIR"
@@ -5809,6 +5606,49 @@ main() {
   ensure_link_target "$registry_alias" "$complete_alias_root/chummer-hub-registry"
   ensure_link_target "$ui_repo" "$complete_alias_root/chummer6-ui"
 
+  local release_scope_verifier="$hub_alias/scripts/verify_release_scope_decision.py"
+  local release_scope_preflight_receipt="$work_root/.c/RELEASE_SCOPE_PREFLIGHT.generated.json"
+  [[ -f "$release_scope_verifier" && ! -L "$release_scope_verifier" ]] \
+    || die "release scope verifier is missing or unsafe: $release_scope_verifier"
+  log "verifying the immutable approved macOS release scope before candidate production"
+  command "$RELEASE_PYTHON_BIN" "$release_scope_verifier" \
+    --decision "$pinned_release_scope_decision" \
+    --expected-sha256 "$release_scope_expected_sha256" \
+    --authority "$release_scope_authority" \
+    --expected-release-version "$release_version" \
+    --expected-channel "$release_channel" \
+    --expected-platform macos \
+    --expected-rid "$rid" \
+    --expected-heads "$apps_raw" \
+    --output "$release_scope_preflight_receipt"
+  exact_incoming_scope="$(jq -r '.exactIncomingDesktopScope // empty' "$release_scope_preflight_receipt")"
+  [[ -n "$exact_incoming_scope" ]] \
+    || die "approved release scope did not project an exact desktop tuple set"
+  local canonical_exact_incoming_scope
+  canonical_exact_incoming_scope="$(normalize_release_exact_incoming_scope_transport \
+    "$RELEASE_PYTHON_BIN" \
+    "$exact_incoming_scope")" \
+    || die "approved release scope projected an invalid desktop tuple set"
+  [[ "$canonical_exact_incoming_scope" == "$exact_incoming_scope" ]] \
+    || die "approved release scope tuple transport is not canonical"
+  local approved_release_support_owner
+  approved_release_support_owner="$(jq -r '.supportOwner // empty' "$release_scope_preflight_receipt")"
+  [[ -n "$approved_release_support_owner" ]] \
+    || die "approved release scope omitted its bounded support owner"
+  local release_scope_required_heads
+  local release_scope_required_platforms
+  release_scope_required_heads="$(jq -r \
+    '[.platforms[] | .primaryHead, .fallbackHeads[]] | unique | join(",")' \
+    "$release_scope_preflight_receipt")"
+  release_scope_required_platforms="$(jq -r \
+    '[.platforms[].platform] | unique | join(",")' \
+    "$release_scope_preflight_receipt")"
+  [[ -n "$release_scope_required_heads" && -n "$release_scope_required_platforms" ]] \
+    || die "approved release scope did not project manifest head/platform floors"
+  export CHUMMER_PUBLIC_REQUIRED_DESKTOP_HEADS="$release_scope_required_heads"
+  export CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS="$release_scope_required_platforms"
+  log "approved exact incoming desktop scope: $exact_incoming_scope"
+
   log "building media-factory compatibility assemblies"
   dotnet build "$media_repo/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj" -c Release --nologo -m:1 -p:RestoreDisableParallel=true
   dotnet build "$media_repo/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj" -c Release --nologo -m:1 -p:RestoreDisableParallel=true
@@ -5816,6 +5656,7 @@ main() {
   cd "$ui_repo"
 
   local normalized_apps_csv="${apps_raw// /,}"
+  # shellcheck disable=SC2034 # consumed by array_values_nul via its variable-name API
   local -a raw_heads=()
   local -a app_heads=()
   local raw_head
@@ -5869,6 +5710,12 @@ main() {
     "$dist_dir/proof/build-provenance/v1/invocations" \
     "$dist_dir/proof/build-provenance/v1/sbom" \
     "$dist_dir/.build-provenance-state"
+  cp \
+    "$pinned_release_scope_decision" \
+    "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json"
+  cp \
+    "$release_scope_preflight_receipt" \
+    "$release_evidence_dir/RELEASE_SCOPE_PREFLIGHT.generated.json"
 
   local provenance_generator="$hub_alias/scripts/release/materialize_build_provenance.py"
   local provenance_support="$hub_alias/scripts/release/build_provenance_support.py"
@@ -6447,9 +6294,29 @@ for label, observed, body in (
 PY
   validate_release_payload_contracts "$dist_dir/RELEASE_CHANNEL.generated.json"
 
+  local release_scope_verification_receipt="$release_evidence_dir/RELEASE_SCOPE_VERIFICATION.generated.json"
+  log "verifying the generation-projected candidate inventory against the approved release scope"
+  command "$RELEASE_PYTHON_BIN" "$release_scope_verifier" \
+    --decision "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --expected-sha256 "$release_scope_expected_sha256" \
+    --authority "$release_scope_authority" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --promotion-evidence "$release_evidence_dir/public-promotion.json" \
+    --expected-release-version "$release_version" \
+    --expected-channel "$release_channel" \
+    --expected-platform macos \
+    --expected-rid "$rid" \
+    --expected-heads "$apps_raw" \
+    --output "$release_scope_verification_receipt"
+  [[ "$(jq -r '.exactIncomingDesktopScope // empty' "$release_scope_verification_receipt")" == "$exact_incoming_scope" ]] \
+    || die "candidate scope receipt disagrees with the upload-session exact tuple intent"
+
   local release_authority_materializer="$registry_alias/scripts/materialize_release_authority_snapshot.py"
   local release_authority_verifier="$registry_alias/scripts/verify_release_authority_snapshot.py"
-  local release_authority_support_owner="${CHUMMER_RELEASE_SUPPORT_OWNER:-Chummer release operations}"
+  [[ -z "${CHUMMER_RELEASE_SUPPORT_OWNER:-}" \
+      || "${CHUMMER_RELEASE_SUPPORT_OWNER}" == "$approved_release_support_owner" ]] \
+    || die "CHUMMER_RELEASE_SUPPORT_OWNER disagrees with the approved release scope"
+  local release_authority_support_owner="$approved_release_support_owner"
   local release_authority_registry_commit
   local release_authority_envelope_dir="$release_evidence_dir/.authority-envelope-$release_generation_id"
   release_authority_registry_commit="$(git -C "$registry_repo" rev-parse HEAD)"
@@ -6516,7 +6383,9 @@ PY
       "$release_version" \
       "$release_channel" \
       "$rid" \
-      "$apps_raw"
+      "$apps_raw" \
+      "$exact_incoming_scope" \
+      "$release_scope_expected_sha256"
     return 0
   fi
 
@@ -6571,539 +6440,163 @@ PY
 
   local response_generation_id
   local response_canonical_manifest_sha256
+  local response_exact_incoming_scope
   response_generation_id="$(jq -r '.generationId // empty' "$response_path")"
   response_canonical_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$response_path")"
+  response_exact_incoming_scope="$(jq -r '.exactIncomingDesktopScope // empty' "$response_path")"
   response_canonical_manifest_sha256="${response_canonical_manifest_sha256#sha256:}"
   [[ "$response_generation_id" == "$release_generation_id" ]] \
     || die "release upload response generationId does not match the planned immutable generation"
   [[ "$response_canonical_manifest_sha256" == "$(jq -r '.canonicalManifestSha256' "$generation_projection_path")" ]] \
     || die "release upload response canonical manifest digest does not match the generation-projected bytes"
+  [[ "$response_exact_incoming_scope" == "$exact_incoming_scope" ]] \
+    || die "release stage response does not bind the approved exact desktop scope"
 
-  log "verifying local bundle manifest"
-  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
-    bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"
-
-  log "verifying live canonical manifest at $canonical_verify_url"
-  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
-    bash scripts/verify-releases-manifest.sh "$canonical_verify_url"
-
-  log "verifying live release projection at $canonical_verify_url"
-  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path" "$require_compatibility_projection"
+  local stage_receipt_id
+  local stage_target_pointer_sha256
+  stage_receipt_id="$(jq -r '.stageReceiptId // empty' "$response_path")"
+  stage_target_pointer_sha256="$(jq -r '.targetPointerSha256 // empty' "$response_path")"
+  [[ "$stage_receipt_id" =~ ^stage-[A-Za-z0-9._-]{16,120}$ ]] \
+    || die "release stage response is missing a canonical stageReceiptId"
+  [[ "$stage_target_pointer_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "release stage response is missing the exact inert target pointer digest"
+  [[ "$BOOTSTRAP_RELEASE_STAGE_SESSION_ID" =~ ^[0-9a-f]{32}$ ]] \
+    || die "release stage did not retain its exact upload-session identity"
+  [[ "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" =~ ^[A-Za-z0-9_-]{32,128}$ ]] \
+    || die "release stage did not retain a private probe grant"
+  release_upload_auth_value=""
 
   local live_convergence_verifier="$hub_alias/scripts/verify_live_release_convergence.py"
-  local generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_GENERATION_CONVERGENCE.generated.json"
-  local live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_CONVERGENCE.generated.json"
   local live_convergence_base_url
   live_convergence_base_url="$(resolve_https_release_origin "$canonical_verify_url")" \
     || die "could not derive a safe HTTPS release origin from the canonical verification URL"
   local live_convergence_timeout="${CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS:-15}"
   local live_convergence_attempts="${CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS:-6}"
   local live_convergence_retry_seconds="${CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS:-5}"
+  [[ "$live_convergence_timeout" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_timeout >= 1 && live_convergence_timeout <= 120 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS must be an integer from 1 through 120"
   [[ "$live_convergence_attempts" =~ ^[0-9]+$ ]] \
     && (( live_convergence_attempts >= 1 && live_convergence_attempts <= 12 )) \
     || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_ATTEMPTS must be an integer from 1 through 12"
   [[ "$live_convergence_retry_seconds" =~ ^[0-9]+$ ]] \
     && (( live_convergence_retry_seconds >= 1 && live_convergence_retry_seconds <= 10 )) \
     || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS must be an integer from 1 through 10"
-  [[ -f "$live_convergence_verifier" ]] \
-    || die "live release convergence verifier is missing: $live_convergence_verifier"
+  [[ -f "$live_convergence_verifier" && ! -L "$live_convergence_verifier" ]] \
+    || die "live release convergence verifier is missing or unsafe: $live_convergence_verifier"
   local expected_manifest_sha256
   local expected_release_decision_sha256
   expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
   expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
-  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "generation projection does not expose a canonical manifest SHA-256"
-  [[ "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "release authority CURRENT.json does not expose a canonical decision SHA-256"
+  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "staged release identity lacks immutable manifest or review-decision bindings"
 
-  log "verifying immutable generation $release_generation_id before accepting CURRENT"
+  local staged_probe_token_path
+  staged_probe_token_path="$(mktemp "$TMPDIR/chummer-staged-probe-token.XXXXXX")"
+  chmod 600 "$staged_probe_token_path"
+  bootstrap_tmp_paths+=("$staged_probe_token_path")
+  printf '%s\n' "$BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN" > "$staged_probe_token_path"
+  BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
+  local staged_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_STAGED_CONVERGENCE.generated.json"
+  local staged_generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_STAGED_GENERATION_CONVERGENCE.generated.json"
   local convergence_attempt
-  local generation_converged=0
+  local staged_converged=0
+  log "privately probing the sealed review-required generation; public CURRENT remains unchanged"
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --staged-probe-token-file "$staged_probe_token_path" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$staged_convergence_receipt"; then
+      staged_converged=1
+      break
+    fi
+    (( convergence_attempt == live_convergence_attempts )) \
+      || sleep "$live_convergence_retry_seconds"
+  done
+  (( staged_converged == 1 )) \
+    || die "private staged release-facing routes did not converge. Receipt: $staged_convergence_receipt"
+
+  local staged_generation_converged=0
   for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
     if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
       --base-url "$live_convergence_base_url" \
       --generation-id "$release_generation_id" \
+      --staged-probe-token-file "$staged_probe_token_path" \
       --expected-release-version "$release_version" \
       --expected-manifest-sha256 "$expected_manifest_sha256" \
       --expected-release-decision-sha256 "$expected_release_decision_sha256" \
       --timeout "$live_convergence_timeout" \
-      > "$generation_convergence_receipt"; then
-      generation_converged=1
+      > "$staged_generation_convergence_receipt"; then
+      staged_generation_converged=1
       break
     fi
-    if (( convergence_attempt < live_convergence_attempts )); then
-      log "immutable generation convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
-      sleep "$live_convergence_retry_seconds"
-    fi
+    (( convergence_attempt == live_convergence_attempts )) \
+      || sleep "$live_convergence_retry_seconds"
   done
-  (( generation_converged == 1 )) \
-    || die "immutable release generation did not converge after upload. Receipt: $generation_convergence_receipt"
+  (( staged_generation_converged == 1 )) \
+    || die "private immutable generation routes did not converge. Receipt: $staged_generation_convergence_receipt"
+  rm -f "$staged_probe_token_path"
 
-  log "verifying all CURRENT release-facing routes converge at $live_convergence_base_url"
-  local current_converged=0
-  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_convergence_base_url" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
-      --timeout "$live_convergence_timeout" \
-      > "$live_convergence_receipt"; then
-      current_converged=1
-      break
-    fi
-    if (( convergence_attempt < live_convergence_attempts )); then
-      log "CURRENT release convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
-      sleep "$live_convergence_retry_seconds"
-    fi
-  done
-  (( current_converged == 1 )) \
-    || die "CURRENT release-facing routes did not converge after upload. Receipt: $live_convergence_receipt"
-  log "live release-facing route convergence passed: $live_convergence_receipt"
+  local durable_stage_response="$release_evidence_dir/RELEASE_STAGE_RESPONSE.generated.json"
+  command "$RELEASE_PYTHON_BIN" - "$response_path" "$durable_stage_response" <<'PY'
+from __future__ import annotations
 
-  local registry_publish_request_materializer="$registry_alias/scripts/materialize_release_authority_publish_request.py"
-  local registry_publish_response_verifier="$registry_alias/scripts/verify_release_authority_publish_response.py"
-  local registry_current_inspector="$hub_alias/scripts/inspect_registry_release_authority_current.py"
-  [[ -f "$registry_publish_request_materializer" && ! -L "$registry_publish_request_materializer" ]] \
-    || die "Registry authority publish-request materializer is missing or unsafe: $registry_publish_request_materializer"
-  [[ -f "$registry_publish_response_verifier" && ! -L "$registry_publish_response_verifier" ]] \
-    || die "Registry authority publish-response verifier is missing or unsafe: $registry_publish_response_verifier"
-  [[ -f "$registry_current_inspector" && ! -L "$registry_current_inspector" ]] \
-    || die "Registry current authority inspector is missing or unsafe: $registry_current_inspector"
+import os
+from pathlib import Path
+import sys
 
-  local registry_current_response="$release_evidence_dir/.registry-current-response.json"
-  local registry_current_cas_receipt="$release_evidence_dir/REGISTRY_AUTHORITY_CURRENT_CAS.generated.json"
-  local registry_current_http_status=""
-  log "reading the exact Registry CURRENT authority CAS state"
-  registry_current_http_status="$(fetch_bounded_https_json \
-    "$registry_current_response" \
-    "$registry_authority_current_url" \
-    16777216 \
-    30)" \
-    || die "Registry CURRENT authority request failed before publication"
-  case "$registry_current_http_status" in
-    200)
-      command "$RELEASE_PYTHON_BIN" "$registry_current_inspector" \
-        --response "$registry_current_response" \
-        --output "$registry_current_cas_receipt" \
-        >/dev/null
-      ;;
-    404)
-      rm -f "$registry_current_response"
-      command "$RELEASE_PYTHON_BIN" "$registry_current_inspector" \
-        --absent \
-        --output "$registry_current_cas_receipt" \
-        >/dev/null
-      ;;
-    *)
-      die "Registry CURRENT authority request returned HTTP $registry_current_http_status"
-      ;;
-  esac
-  rm -f "$registry_current_response"
-  local registry_current_decision_status
-  local registry_current_release_version
-  local registry_expected_current_snapshot_sha256
-  registry_current_decision_status="$(jq -r '.releaseDecisionStatus // empty' "$registry_current_cas_receipt")"
-  registry_current_release_version="$(jq -r '.releaseVersion // empty' "$registry_current_cas_receipt")"
-  registry_expected_current_snapshot_sha256="$(jq -r '.snapshotSha256 // empty' "$registry_current_cas_receipt")"
-  case "$registry_current_decision_status" in
-    preview_ready|stable_ready)
-      if [[ "$registry_current_release_version" == "$release_version" ]]; then
-        die "Registry CURRENT authority for this exact release is already $registry_current_decision_status; use the digest-pinned authority resume path instead of regressing it to a review seed"
-      fi
-      log "Registry CURRENT $registry_current_release_version is $registry_current_decision_status; beginning the explicitly new release $release_version from a review-required seed"
-      ;;
-    ""|review_required)
-      ;;
-    *)
-      die "Registry CURRENT authority returned an unsupported decision status"
-      ;;
-  esac
-  [[ "$registry_expected_current_snapshot_sha256" == "none" \
-      || "$registry_expected_current_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "Registry CURRENT authority did not expose a canonical CAS digest"
-
-  local registry_review_publish_request="$release_evidence_dir/.registry-review-publish-request.json"
-  local registry_review_publish_response="$release_evidence_dir/.registry-review-publish-response.json"
-  local registry_review_publish_status=""
-  command "$RELEASE_PYTHON_BIN" "$registry_publish_request_materializer" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --current "$release_evidence_dir/CURRENT.json" \
-    --snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --expected-current-snapshot-sha256 "$registry_expected_current_snapshot_sha256" \
-    --output "$registry_review_publish_request" \
-    > "$release_evidence_dir/REGISTRY_REVIEW_SEED_PUBLISH_REQUEST.generated.json"
-  log "publishing the exact review seed to Registry with CURRENT compare-and-swap"
-  registry_review_publish_status="$(post_registry_authority_request \
-    "$registry_review_publish_response" \
-    "$registry_authority_publish_url" \
-    "$registry_review_publish_request" \
-    "$registry_control_key_value")" \
-    || die "Registry review-seed publication request failed"
-  [[ "$registry_review_publish_status" == "200" ]] \
-    || die "Registry review-seed publication returned HTTP $registry_review_publish_status"
-  command "$RELEASE_PYTHON_BIN" "$registry_publish_response_verifier" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --current "$release_evidence_dir/CURRENT.json" \
-    --snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --response "$registry_review_publish_response" \
-    --output "$release_evidence_dir/REGISTRY_REVIEW_SEED_PUBLISH_RESPONSE.generated.json" \
-    >/dev/null
-
-  local review_seed_live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_REVIEW_SEED_CONVERGENCE.generated.json"
-  local review_seed_decision_sha256
-  review_seed_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
-  [[ "$review_seed_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "review seed CURRENT.json does not expose a canonical decision digest"
-  [[ "$review_seed_decision_sha256" == "$expected_release_decision_sha256" ]] \
-    || die "review seed decision digest changed before post-Registry convergence"
-  log "verifying all CURRENT release-facing routes converge after Registry accepted the review seed"
-  local review_seed_current_converged=0
-  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_convergence_base_url" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$review_seed_decision_sha256" \
-      --timeout "$live_convergence_timeout" \
-      > "$review_seed_live_convergence_receipt"; then
-      review_seed_current_converged=1
-      break
-    fi
-    if (( convergence_attempt < live_convergence_attempts )); then
-      log "post-Registry review-seed CURRENT convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
-      sleep "$live_convergence_retry_seconds"
-    fi
-  done
-  (( review_seed_current_converged == 1 )) \
-    || die "CURRENT release-facing routes did not converge after Registry accepted the review seed. Receipt: $review_seed_live_convergence_receipt"
-  log "post-Registry review-seed CURRENT convergence passed: $review_seed_live_convergence_receipt"
-
-  local scorecard_handoff_resolver="$hub_alias/scripts/resolve_release_scorecard_handoff.py"
-  local scorecard_handoff_materializer="$hub_alias/scripts/materialize_release_scorecard_handoff.py"
-  local scorecard_handoff_path="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD.generated.json"
-  local scorecard_handoff_receipt="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF.generated.json"
-  local scorecard_handoff_resolution="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_RESOLUTION.generated.json"
-  local scorecard_source_path=""
-  local scorecard_expected_sha256=""
-  [[ -f "$scorecard_handoff_resolver" && ! -L "$scorecard_handoff_resolver" ]] \
-    || die "release scorecard handoff resolver is missing or unsafe: $scorecard_handoff_resolver"
-  [[ -f "$scorecard_handoff_materializer" && ! -L "$scorecard_handoff_materializer" ]] \
-    || die "release scorecard handoff materializer is missing or unsafe: $scorecard_handoff_materializer"
-  [[ ! -e "$scorecard_handoff_path" && ! -L "$scorecard_handoff_path" ]] \
-    || die "release scorecard handoff destination already exists"
-  [[ ! -e "$scorecard_handoff_receipt" && ! -L "$scorecard_handoff_receipt" ]] \
-    || die "release scorecard handoff receipt already exists"
-  if [[ -n "$scorecard_handoff_request_path" ]]; then
-    [[ ! -e "$scorecard_handoff_resolution" && ! -L "$scorecard_handoff_resolution" ]] \
-      || die "release scorecard handoff resolution already exists"
-    log "waiting up to ${scorecard_handoff_wait_seconds}s for the caller-owned post-convergence scorecard handoff at $scorecard_handoff_request_path"
-    command "$RELEASE_PYTHON_BIN" "$scorecard_handoff_resolver" \
-      --handoff "$scorecard_handoff_request_path" \
-      --allowed-root "$work_root" \
-      --convergence "$review_seed_live_convergence_receipt" \
-      --expected-release-version "$release_version" \
-      --timeout-seconds "$scorecard_handoff_wait_seconds" \
-      --poll-seconds "$scorecard_handoff_poll_seconds" \
-      --output "$scorecard_handoff_resolution" \
-      >/dev/null
-    scorecard_source_path="$(jq -r '.scorecardPath // empty' "$scorecard_handoff_resolution")"
-    scorecard_expected_sha256="$(jq -r '.scorecardSha256 // empty' "$scorecard_handoff_resolution")"
-  elif [[ -r /dev/tty && -w /dev/tty ]]; then
-    printf '\nRegistry accepted the review seed and CURRENT routes converged.\n' >/dev/tty
-    printf 'Generate the 36-cell preview scorecard from this convergence receipt:\n  %s\n' "$review_seed_live_convergence_receipt" >/dev/tty
-    printf 'Absolute scorecard path beneath %s: ' "$work_root" >/dev/tty
-    IFS= read -r scorecard_source_path </dev/tty \
-      || die "unable to read the post-convergence scorecard path from the controlling terminal"
-    printf 'Exact lowercase scorecard SHA-256: ' >/dev/tty
-    IFS= read -r scorecard_expected_sha256 </dev/tty \
-      || die "unable to read the post-convergence scorecard digest from the controlling terminal"
-  else
-    log "non-interactive scorecard handoff schema: {\"contractName\":\"chummer.release-scorecard-handoff-request/v1\",\"releaseVersion\":\"$release_version\",\"convergenceSha256\":\"<sha256 of $review_seed_live_convergence_receipt>\",\"scorecardPath\":\"<absolute path beneath $work_root>\",\"scorecardSha256\":\"<64 lowercase hex>\"}"
-    log "create that JSON as a caller-owned mode-0600 single-link file, set CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH to its future path before launch, and let the resolver wait for it after convergence"
-    log "resolver: $RELEASE_PYTHON_BIN $scorecard_handoff_resolver --handoff <handoff-path> --allowed-root $work_root --convergence $review_seed_live_convergence_receipt --expected-release-version $release_version --timeout-seconds 900 --poll-seconds 15 --output <resolution-path>"
-    die "post-convergence scorecard handoff is required in non-interactive release mode"
-  fi
-  [[ "$scorecard_source_path" == /* ]] \
-    || die "post-convergence scorecard path must be absolute"
-  [[ "$scorecard_expected_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "post-convergence scorecard SHA-256 must be 64 lowercase hexadecimal characters"
-  log "accepting the digest-pinned campaign-operability scorecard only after the published review seed converged"
-  command "$RELEASE_PYTHON_BIN" "$scorecard_handoff_materializer" \
-    --source "$scorecard_source_path" \
-    --expected-sha256 "$scorecard_expected_sha256" \
-    --allowed-root "$work_root" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --expected-release-version "$release_version" \
-    --output "$scorecard_handoff_path" \
-    --receipt "$scorecard_handoff_receipt" \
-    >/dev/null
-
-  local preview_authority_envelope_dir="$release_evidence_dir/preview-authority"
-  [[ ! -e "$preview_authority_envelope_dir" && ! -L "$preview_authority_envelope_dir" ]] \
-    || die "preview authority successor destination already exists"
-  local preview_authority_generated_at
-  preview_authority_generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  log "materializing the scorecard-v2-backed preview-ready Registry authority successor"
-  command "$RELEASE_PYTHON_BIN" "$release_authority_materializer" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --output-dir "$preview_authority_envelope_dir" \
-    --registry-commit "$release_authority_registry_commit" \
-    --decision-status preview_ready \
-    --support-owner "$release_authority_support_owner" \
-    --generated-at "$preview_authority_generated_at" \
-    --next-action "Close the scorecard's retained flagship gaps before any stable or gold claim." \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    > "$release_evidence_dir/PREVIEW_AUTHORITY_MATERIALIZATION.generated.json"
-  command "$RELEASE_PYTHON_BIN" "$release_authority_verifier" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --current "$preview_authority_envelope_dir/CURRENT.json" \
-    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    > "$release_evidence_dir/PREVIEW_AUTHORITY_VERIFICATION.generated.json"
-
-  local registry_preview_publish_request="$release_evidence_dir/.registry-preview-publish-request.json"
-  local registry_preview_publish_response="$release_evidence_dir/.registry-preview-publish-response.json"
-  local registry_preview_publish_status=""
-  local review_seed_snapshot_sha256
-  review_seed_snapshot_sha256="$(jq -r '.snapshotSha256 // empty' "$release_evidence_dir/CURRENT.json")"
-  [[ "$review_seed_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "review seed CURRENT.json is missing its exact snapshot digest"
-  command "$RELEASE_PYTHON_BIN" "$registry_publish_request_materializer" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --current "$preview_authority_envelope_dir/CURRENT.json" \
-    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --expected-current-snapshot-sha256 "$review_seed_snapshot_sha256" \
-    --output "$registry_preview_publish_request" \
-    > "$release_evidence_dir/REGISTRY_PREVIEW_PUBLISH_REQUEST.generated.json"
-
-  # The Hub half of the cross-service transition must be completely replayable
-  # before Registry is allowed to advance. These owner-only files deliberately
-  # survive every failure until the Hub response and both preview convergence
-  # checks have passed.
-  local shelf_current_path="$release_evidence_dir/.release-shelf-current.json"
-  local shelf_current_http_status=""
-  shelf_current_http_status="$(fetch_bounded_https_json \
-    "$shelf_current_path" \
-    "$live_convergence_base_url/downloads/current.json" \
-    131072 \
-    30)" \
-    || die "live release-shelf CURRENT request failed before authority transaction checkpoint"
-  [[ "$shelf_current_http_status" == "200" ]] \
-    || die "live release-shelf CURRENT request returned HTTP $shelf_current_http_status"
-
-  local hub_authority_advance_materializer="$hub_alias/scripts/materialize_release_authority_advance_request.py"
-  local hub_authority_advance_response_verifier="$hub_alias/scripts/verify_release_authority_advance_response.py"
-  local hub_authority_checkpoint_tool="$hub_repo/scripts/release_authority_transaction_checkpoint.py"
-  local hub_authority_advance_request="$release_evidence_dir/.hub-authority-advance-request.json"
-  local hub_authority_advance_response="$release_evidence_dir/.hub-authority-advance-response.json"
-  local hub_authority_checkpoint="$release_evidence_dir/.release-authority-transaction-checkpoint.json"
-  local hub_authority_advance_url="$live_convergence_base_url/api/internal/releases/generations/$release_generation_id/authority-advances"
-  [[ -f "$hub_authority_advance_materializer" && ! -L "$hub_authority_advance_materializer" ]] \
-    || die "Hub authority advance request materializer is missing or unsafe: $hub_authority_advance_materializer"
-  [[ -f "$hub_authority_advance_response_verifier" && ! -L "$hub_authority_advance_response_verifier" ]] \
-    || die "Hub authority advance response verifier is missing or unsafe: $hub_authority_advance_response_verifier"
-  [[ -f "$hub_authority_checkpoint_tool" && ! -L "$hub_authority_checkpoint_tool" ]] \
-    || die "Hub authority transaction checkpoint tool is missing or unsafe: $hub_authority_checkpoint_tool"
-  [[ ! -e "$hub_authority_advance_request" && ! -L "$hub_authority_advance_request" ]] \
-    || die "Hub authority advance request destination already exists"
-  [[ ! -e "$hub_authority_checkpoint" && ! -L "$hub_authority_checkpoint" ]] \
-    || die "Hub authority transaction checkpoint destination already exists"
-  command "$RELEASE_PYTHON_BIN" "$hub_authority_advance_materializer" \
-    --generation-id "$release_generation_id" \
-    --shelf-current "$shelf_current_path" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
-    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --output "$hub_authority_advance_request" \
-    > "$release_evidence_dir/HUB_AUTHORITY_ADVANCE_REQUEST.generated.json"
-  [[ "$live_convergence_timeout" =~ ^[0-9]+$ ]] \
-    && (( live_convergence_timeout >= 1 && live_convergence_timeout <= 120 )) \
-    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS must be an integer from 1 through 120"
-  local hub_authority_checkpoint_creation=""
-  hub_authority_checkpoint_creation="$(command "$RELEASE_PYTHON_BIN" "$hub_authority_checkpoint_tool" create \
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+raw = source.read_bytes()
+descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+  local finalizer_handoff_materializer="$hub_alias/scripts/materialize_staged_release_finalizer_handoff.py"
+  local finalizer_handoff_path="$release_evidence_dir/STAGED_RELEASE_FINALIZER_HANDOFF.generated.json"
+  [[ -f "$finalizer_handoff_materializer" && ! -L "$finalizer_handoff_materializer" ]] \
+    || die "staged release finalizer handoff materializer is missing or unsafe"
+  command "$RELEASE_PYTHON_BIN" "$finalizer_handoff_materializer" \
     --workspace "$work_root" \
-    --generation-id "$release_generation_id" \
-    --release-version "$release_version" \
-    --registry-current-url "$registry_authority_current_url" \
-    --hub-authority-advance-url "$hub_authority_advance_url" \
-    --live-convergence-base-url "$live_convergence_base_url" \
-    --expected-manifest-sha256 "$expected_manifest_sha256" \
-    --request "$hub_authority_advance_request" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
-    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --response-verifier "$hub_authority_advance_response_verifier" \
-    --registry-inspector "$registry_current_inspector" \
-    --live-convergence-verifier "$live_convergence_verifier" \
-    --evidence-directory "$release_evidence_dir" \
-    --convergence-timeout-seconds "$live_convergence_timeout" \
-    --convergence-attempts "$live_convergence_attempts" \
-    --convergence-retry-seconds "$live_convergence_retry_seconds" \
-    --output "$hub_authority_checkpoint")" \
-    || die "could not persist the Hub authority transaction checkpoint before Registry publication"
-  local hub_authority_checkpoint_sha256
-  hub_authority_checkpoint_sha256="$(printf '%s' "$hub_authority_checkpoint_creation" | jq -r '.checkpointSha256 // empty')"
-  [[ "$hub_authority_checkpoint_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "Hub authority transaction checkpoint did not expose its exact digest"
-  log "durable authority recovery checkpoint created before Registry CAS: $hub_authority_checkpoint"
-  log "authority recovery checkpoint SHA-256: $hub_authority_checkpoint_sha256"
-  log "resume command: $executed_bootstrap_path --resume-authority-workspace $work_root --resume-authority-checkpoint $hub_authority_checkpoint --resume-authority-checkpoint-sha256 $hub_authority_checkpoint_sha256"
-
-  log "publishing the exact preview-ready successor to Registry with predecessor compare-and-swap"
-  registry_preview_publish_status="$(post_registry_authority_request \
-    "$registry_preview_publish_response" \
-    "$registry_authority_publish_url" \
-    "$registry_preview_publish_request" \
-    "$registry_control_key_value")" \
-    || die "Registry preview-successor publication request failed"
-  registry_control_key_value=""
-  [[ "$registry_preview_publish_status" == "200" ]] \
-    || die "Registry preview-successor publication returned HTTP $registry_preview_publish_status"
-  command "$RELEASE_PYTHON_BIN" "$registry_publish_response_verifier" \
-    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
-    --current "$preview_authority_envelope_dir/CURRENT.json" \
-    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --response "$registry_preview_publish_response" \
-    --output "$release_evidence_dir/REGISTRY_PREVIEW_PUBLISH_RESPONSE.generated.json" \
-    >/dev/null
-  rm -f \
-    "$registry_review_publish_request" \
-    "$registry_review_publish_response" \
-    "$registry_preview_publish_request" \
-    "$registry_preview_publish_response"
-
-  local hub_authority_advance_http_status=""
-  local hub_authority_advance_transport_failed=0
-  log "advancing the sealed Hub generation to the exact Registry-published preview authority"
-  hub_authority_advance_http_status="$(post_hub_authority_advance_request \
-    "$hub_authority_advance_response" \
-    "$hub_authority_advance_url" \
-    "$hub_authority_advance_request" \
-    "$release_upload_auth_value")" \
-    || hub_authority_advance_transport_failed=1
-  release_upload_auth_value=""
-  (( hub_authority_advance_transport_failed == 0 )) \
-    || die "Hub same-generation authority advance request failed"
-  [[ "$hub_authority_advance_http_status" == "200" ]] \
-    || die "Hub same-generation authority advance returned HTTP $hub_authority_advance_http_status"
-  command "$RELEASE_PYTHON_BIN" "$hub_authority_advance_response_verifier" \
-    --response "$hub_authority_advance_response" \
-    --request "$hub_authority_advance_request" \
-    --generation-id "$release_generation_id" \
-    --release-version "$release_version" \
-    --predecessor-current "$release_evidence_dir/CURRENT.json" \
-    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
-    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
-    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
-    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
-    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
-    --scorecard "$scorecard_handoff_path" \
-    --convergence "$review_seed_live_convergence_receipt" \
-    --output "$release_evidence_dir/HUB_AUTHORITY_ADVANCE_RESPONSE.generated.json" \
-    >/dev/null
-  rm -f \
-    "$shelf_current_path" \
-    "$hub_authority_advance_response"
-
-  local preview_generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_GENERATION_PREVIEW_CONVERGENCE.generated.json"
-  local preview_live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_PREVIEW_CONVERGENCE.generated.json"
-  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$preview_authority_envelope_dir/CURRENT.json")"
-  [[ "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "preview successor CURRENT.json does not expose a canonical decision digest"
-
-  log "verifying immutable generation $release_generation_id converges on preview-ready authority"
-  local preview_generation_converged=0
-  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_convergence_base_url" \
-      --generation-id "$release_generation_id" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
-      --timeout "$live_convergence_timeout" \
-      > "$preview_generation_convergence_receipt"; then
-      preview_generation_converged=1
-      break
-    fi
-    if (( convergence_attempt < live_convergence_attempts )); then
-      log "preview-ready generation authority is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
-      sleep "$live_convergence_retry_seconds"
-    fi
-  done
-  (( preview_generation_converged == 1 )) \
-    || die "immutable release generation did not converge on preview-ready authority. Receipt: $preview_generation_convergence_receipt"
-
-  log "verifying all CURRENT release-facing routes converge on preview-ready authority"
-  local preview_current_converged=0
-  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
-    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
-      --base-url "$live_convergence_base_url" \
-      --expected-release-version "$release_version" \
-      --expected-manifest-sha256 "$expected_manifest_sha256" \
-      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
-      --timeout "$live_convergence_timeout" \
-      > "$preview_live_convergence_receipt"; then
-      preview_current_converged=1
-      break
-    fi
-    if (( convergence_attempt < live_convergence_attempts )); then
-      log "preview-ready CURRENT convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
-      sleep "$live_convergence_retry_seconds"
-    fi
-  done
-  (( preview_current_converged == 1 )) \
-    || die "CURRENT release-facing routes did not converge on preview-ready authority. Receipt: $preview_live_convergence_receipt"
-  log "preview-ready generation and CURRENT convergence passed: $preview_live_convergence_receipt"
-  rm -f "$hub_authority_advance_request" "$hub_authority_checkpoint"
-  log "removed the private authority request and recovery checkpoint only after Hub response and both preview convergence checks passed"
-
-  if [[ -f "$response_path" ]]; then
-    chmod 600 "$response_path" 2>/dev/null || true
-    log "sanitized release upload response summary accepted; credential-bearing fields were discarded before persistence"
-    if is_true "$keep_upload_response"; then
-      log "sanitized release upload response summary retained at $response_path"
-    else
-      rm -f "$response_path"
-      BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=""
-      log "removed sanitized release upload response summary; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
-    fi
-  fi
-
-  log "done"
+    --session-id "$BOOTSTRAP_RELEASE_STAGE_SESSION_ID" \
+    --stage-response "$ui_repo/$durable_stage_response" \
+    --manifest "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --release-scope-decision "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --release-scope-verifier "$hub_alias/scripts/verify_release_scope_decision.py" \
+    --release-scope-verification "$ui_repo/$release_scope_verification_receipt" \
+    --promotion-evidence "$ui_repo/$release_evidence_dir/public-promotion.json" \
+    --release-scope-authority "$release_scope_authority" \
+    --predecessor-current "$ui_repo/$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    --staged-convergence "$ui_repo/$staged_convergence_receipt" \
+    --executed-bootstrap "$pinned_executed_bootstrap" \
+    --owner-finalizer "$hub_alias/scripts/finalize_staged_release.py" \
+    --scorecard-materializer "$hub_alias/scripts/materialize_release_scorecard_handoff.py" \
+    --authority-advance-materializer "$hub_alias/scripts/materialize_release_authority_advance_request.py" \
+    --authority-advance-verifier "$hub_alias/scripts/verify_release_authority_advance_response.py" \
+    --registry-current-inspector "$hub_alias/scripts/inspect_registry_release_authority_current.py" \
+    --live-convergence-verifier "$hub_alias/scripts/verify_live_release_convergence.py" \
+    --registry-authority-materializer "$registry_alias/scripts/materialize_release_authority_snapshot.py" \
+    --registry-authority-verifier "$registry_alias/scripts/verify_release_authority_snapshot.py" \
+    --registry-publish-materializer "$registry_alias/scripts/materialize_release_authority_publish_request.py" \
+    --registry-publish-verifier "$registry_alias/scripts/verify_release_authority_publish_response.py" \
+    --registry-authority-library "$registry_alias/scripts/release_authority_snapshot.py" \
+    --sessions-url "$sessions_url" \
+    --live-base-url "$live_convergence_base_url" \
+    --output "$ui_repo/$finalizer_handoff_path"
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
+  log "immutable nightly generation staged and privately verified; public CURRENT was not changed"
+  log "owner finalizer handoff: $finalizer_handoff_path"
+  log "status: review_required (awaiting separate owner-only scorecard, Registry CAS, and activation)"
+  return 0
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

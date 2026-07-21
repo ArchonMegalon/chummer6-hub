@@ -29,7 +29,16 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("--generation-id", required=True)
-    parser.add_argument("--shelf-current", type=Path, required=True)
+    shelf = parser.add_mutually_exclusive_group(required=True)
+    shelf.add_argument("--shelf-current", type=Path)
+    shelf.add_argument(
+        "--staged-handoff",
+        type=Path,
+        help=(
+            "Secret-redacted staged finalizer handoff whose inert target pointer "
+            "and inventory bind the authority request before CURRENT activation."
+        ),
+    )
     parser.add_argument("--predecessor-current", type=Path, required=True)
     parser.add_argument("--predecessor-snapshot", type=Path, required=True)
     parser.add_argument("--predecessor-decision", type=Path, required=True)
@@ -114,12 +123,47 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         generation_id = args.generation_id.strip()
         if GENERATION_ID.fullmatch(generation_id) is None:
             raise RequestError("generationId is not a traversal-safe opaque token")
-        shelf_raw, shelf = _strict_object(args.shelf_current, "release shelf current.json")
-        if shelf.get("generationId") != generation_id:
-            raise RequestError("release shelf current.json does not bind generationId")
-        inventory_digest = shelf.get("inventoryDigest")
-        if not isinstance(inventory_digest, str) or INVENTORY_DIGEST.fullmatch(inventory_digest) is None:
-            raise RequestError("release shelf current.json inventoryDigest is invalid")
+        if args.shelf_current is not None:
+            shelf_raw, shelf = _strict_object(
+                args.shelf_current, "release shelf current.json"
+            )
+            if shelf.get("generationId") != generation_id:
+                raise RequestError("release shelf current.json does not bind generationId")
+            inventory_digest = shelf.get("inventoryDigest")
+            if (
+                not isinstance(inventory_digest, str)
+                or INVENTORY_DIGEST.fullmatch(inventory_digest) is None
+            ):
+                raise RequestError("release shelf current.json inventoryDigest is invalid")
+            expected_pointer_sha256 = _digest(shelf_raw)
+            handoff_release_version = None
+        else:
+            _, shelf = _strict_object(
+                args.staged_handoff, "staged release finalizer handoff"
+            )
+            if (
+                shelf.get("contractName")
+                != "chummer.staged-release-finalizer-handoff/v1"
+                or shelf.get("contractVersion") != 1
+                or shelf.get("status") != "review_required"
+                or shelf.get("state") != "awaiting_owner_finalization"
+                or shelf.get("secretRedacted") is not True
+                or shelf.get("publicCurrentMutated") is not False
+                or shelf.get("generationId") != generation_id
+            ):
+                raise RequestError(
+                    "staged release finalizer handoff does not bind an inert exact generation"
+                )
+            inventory_digest = shelf.get("inventoryDigest")
+            if (
+                not isinstance(inventory_digest, str)
+                or INVENTORY_DIGEST.fullmatch(inventory_digest) is None
+            ):
+                raise RequestError("staged release finalizer inventoryDigest is invalid")
+            expected_pointer_sha256 = _require_digest(
+                shelf.get("targetPointerSha256"), "staged target pointer digest"
+            )
+            handoff_release_version = shelf.get("releaseVersion")
 
         predecessor_current_raw, predecessor_current = _strict_object(
             args.predecessor_current, "predecessor CURRENT.json"
@@ -162,6 +206,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         if predecessor_current.get("releaseVersion") != successor_current.get("releaseVersion"):
             raise RequestError("authority advance cannot change releaseVersion")
+        if (
+            handoff_release_version is not None
+            and predecessor_current.get("releaseVersion") != handoff_release_version
+        ):
+            raise RequestError("staged handoff releaseVersion differs from authority envelopes")
         exact_bindings = {
             "authoritySnapshotSha256": _digest(predecessor_snapshot_raw),
             "candidateDecisionStatus": "review_required",
@@ -175,7 +224,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         payload = {
             "generationId": generation_id,
-            "expectedShelfPointerSha256": _digest(shelf_raw),
+            "expectedShelfPointerSha256": expected_pointer_sha256,
             "expectedShelfInventoryDigest": inventory_digest,
             "predecessorCurrentBytes": _encoded(predecessor_current_raw),
             "predecessorSnapshotBytes": _encoded(predecessor_snapshot_raw),
@@ -205,7 +254,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             {
                 "decisionSha256": _digest(successor_decision_raw),
                 "generationId": generation_id,
-                "pointerSha256": _digest(shelf_raw),
+                "pointerSha256": expected_pointer_sha256,
                 "snapshotSha256": _digest(successor_snapshot_raw),
             },
             sort_keys=True,

@@ -17,6 +17,7 @@ from typing import Any, Optional, Sequence
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 MAX_SCORECARD_BYTES = 8 * 1024 * 1024
 MAX_CONVERGENCE_BYTES = 4 * 1024 * 1024
+MAX_BINDING_BYTES = 8 * 1024 * 1024
 
 
 class HandoffError(ValueError):
@@ -33,6 +34,9 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--expected-sha256", required=True)
     parser.add_argument("--allowed-root", type=Path, required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--predecessor-snapshot", type=Path, required=True)
+    parser.add_argument("--predecessor-decision", type=Path, required=True)
     parser.add_argument("--convergence", type=Path, required=True)
     parser.add_argument("--expected-release-version", required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -155,6 +159,49 @@ def _bounded_json_file(path: Path, label: str, maximum_bytes: int) -> tuple[byte
     return raw, _strict_json(raw, label)
 
 
+def _validate_exact_release_bindings(
+    manifest_raw: bytes,
+    manifest: dict[str, Any],
+    snapshot_raw: bytes,
+    snapshot: dict[str, Any],
+    decision_raw: bytes,
+    decision: dict[str, Any],
+    convergence_payload: dict[str, Any],
+    release_version: str,
+) -> dict[str, str]:
+    manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
+    snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
+    decision_sha256 = hashlib.sha256(decision_raw).hexdigest()
+    if manifest.get("version") != release_version:
+        raise HandoffError("canonical release manifest does not bind the expected release version")
+    if (
+        snapshot.get("releaseVersion") != release_version
+        or snapshot.get("releaseDecisionStatus") != "review_required"
+        or snapshot.get("releaseDecisionSha256") != decision_sha256
+        or decision.get("releaseVersion") != release_version
+        or decision.get("releaseDecisionStatus") != "review_required"
+        or decision.get("status") != "review_required"
+    ):
+        raise HandoffError("predecessor authority is not the exact review-required release seed")
+    truth = convergence_payload.get("releaseTruth")
+    if (
+        convergence_payload.get("releaseVersion") != release_version
+        or convergence_payload.get("manifestSha256") != manifest_sha256
+        or convergence_payload.get("authoritySnapshotSha256") != snapshot_sha256
+        or convergence_payload.get("releaseDecisionSha256") != decision_sha256
+        or not isinstance(truth, dict)
+        or truth.get("releaseVersion") != release_version
+        or truth.get("manifestSha256") != manifest_sha256
+        or truth.get("releaseDecisionSha256") != decision_sha256
+    ):
+        raise HandoffError("staged convergence does not bind the exact candidate authority")
+    return {
+        "manifestSha256": manifest_sha256,
+        "predecessorSnapshotSha256": snapshot_sha256,
+        "predecessorDecisionSha256": decision_sha256,
+    }
+
+
 def _validate_convergence(payload: dict[str, Any], release_version: str) -> dt.datetime:
     if (
         payload.get("contractName") != "chummer.live-release-convergence/v1"
@@ -166,7 +213,7 @@ def _validate_convergence(payload: dict[str, Any], release_version: str) -> dt.d
         or payload.get("failures") != []
         or payload.get("releaseDecisionStatus") != "review_required"
     ):
-        raise HandoffError("convergence receipt is not an exact zero-failure review candidate")
+        raise HandoffError("staged convergence receipt is not an exact zero-failure review candidate")
     truth = payload.get("releaseTruth")
     if (
         not isinstance(truth, dict)
@@ -174,7 +221,7 @@ def _validate_convergence(payload: dict[str, Any], release_version: str) -> dt.d
         or truth.get("releaseDecisionStatus") != "review_required"
         or truth.get("releaseDecisionSha256") != payload.get("releaseDecisionSha256")
     ):
-        raise HandoffError("convergence receipt does not bind the expected review candidate")
+        raise HandoffError("staged convergence receipt does not bind the expected review candidate")
     return _timestamp(payload.get("generatedAtUtc"), "convergence generatedAtUtc")
 
 
@@ -231,6 +278,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             args.convergence, "convergence receipt", MAX_CONVERGENCE_BYTES
         )
         convergence_at = _validate_convergence(convergence, release_version)
+        manifest_raw, manifest = _bounded_json_file(
+            args.manifest, "canonical release manifest", MAX_BINDING_BYTES
+        )
+        snapshot_raw, snapshot = _bounded_json_file(
+            args.predecessor_snapshot, "predecessor authority snapshot", MAX_BINDING_BYTES
+        )
+        decision_raw, decision = _bounded_json_file(
+            args.predecessor_decision, "predecessor authority decision", MAX_BINDING_BYTES
+        )
+        exact_bindings = _validate_exact_release_bindings(
+            manifest_raw,
+            manifest,
+            snapshot_raw,
+            snapshot,
+            decision_raw,
+            decision,
+            convergence,
+            release_version,
+        )
         scorecard_raw = _stable_owned_file(
             args.source, args.allowed_root, MAX_SCORECARD_BYTES
         )
@@ -241,11 +307,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         scorecard_at = _validate_scorecard(scorecard, convergence_at)
 
         receipt = {
-            "contractName": "chummer.release-scorecard-handoff/v1",
+            "contractName": "chummer.release-scorecard-handoff/v2",
             "status": "pass",
             "releaseVersion": release_version,
+            **exact_bindings,
             "scorecardSha256": observed,
-            "convergenceSha256": hashlib.sha256(convergence_raw).hexdigest(),
+            "stagedConvergenceSha256": hashlib.sha256(convergence_raw).hexdigest(),
             "scorecardGeneratedAtUtc": scorecard_at.isoformat(timespec="seconds").replace(
                 "+00:00", "Z"
             ),

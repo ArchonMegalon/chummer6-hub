@@ -135,6 +135,70 @@ def test_materializes_exact_byte_bound_authority_advance_request(tmp_path: Path)
     ).read_bytes()
 
 
+def test_materializes_inert_staged_pointer_request_without_reading_public_current(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "staged-request.json"
+    invocation = command(tmp_path, output)
+    shelf_index = invocation.index("--shelf-current")
+    del invocation[shelf_index : shelf_index + 2]
+    staged = tmp_path / "staged-handoff.json"
+    target_pointer_sha256 = "d" * 64
+    write_json(
+        staged,
+        {
+            "contractName": "chummer.staged-release-finalizer-handoff/v1",
+            "contractVersion": 1,
+            "status": "review_required",
+            "state": "awaiting_owner_finalization",
+            "secretRedacted": True,
+            "publicCurrentMutated": False,
+            "generationId": "run-20260720-220000",
+            "releaseVersion": "run-20260720-220000",
+            "targetPointerSha256": target_pointer_sha256,
+            "inventoryDigest": "sha256:" + SHA,
+        },
+    )
+    invocation[shelf_index:shelf_index] = ["--staged-handoff", str(staged)]
+
+    completed = subprocess.run(invocation, text=True, capture_output=True)
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["expectedShelfPointerSha256"] == target_pointer_sha256
+    assert payload["expectedShelfInventoryDigest"] == "sha256:" + SHA
+
+
+def test_rejects_staged_handoff_that_claims_current_was_mutated(tmp_path: Path) -> None:
+    output = tmp_path / "staged-request.json"
+    invocation = command(tmp_path, output)
+    shelf_index = invocation.index("--shelf-current")
+    del invocation[shelf_index : shelf_index + 2]
+    staged = tmp_path / "staged-handoff.json"
+    write_json(
+        staged,
+        {
+            "contractName": "chummer.staged-release-finalizer-handoff/v1",
+            "contractVersion": 1,
+            "status": "review_required",
+            "state": "awaiting_owner_finalization",
+            "secretRedacted": True,
+            "publicCurrentMutated": True,
+            "generationId": "run-20260720-220000",
+            "releaseVersion": "run-20260720-220000",
+            "targetPointerSha256": "d" * 64,
+            "inventoryDigest": "sha256:" + SHA,
+        },
+    )
+    invocation[shelf_index:shelf_index] = ["--staged-handoff", str(staged)]
+
+    completed = subprocess.run(invocation, text=True, capture_output=True)
+
+    assert completed.returncode == 1
+    assert "inert exact generation" in completed.stderr
+    assert not output.exists()
+
+
 def test_rejects_successor_proof_binding_tamper(tmp_path: Path) -> None:
     output = tmp_path / "request.json"
     invocation = command(tmp_path, output)

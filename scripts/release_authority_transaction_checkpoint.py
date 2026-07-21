@@ -41,6 +41,7 @@ CHECKPOINT_FIELDS = {
 }
 FILE_FIELDS = {
     "checkpointTool",
+    "executedBootstrap",
     "request",
     "predecessorCurrent",
     "predecessorSnapshot",
@@ -91,6 +92,7 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
     create = commands.add_parser("create")
     create.add_argument("--workspace", type=Path, required=True)
+    create.add_argument("--executed-bootstrap", type=Path, required=True)
     create.add_argument("--generation-id", required=True)
     create.add_argument("--release-version", required=True)
     create.add_argument("--registry-current-url", required=True)
@@ -117,6 +119,7 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
     resolve = commands.add_parser("resolve")
     resolve.add_argument("--workspace", type=Path, required=True)
+    resolve.add_argument("--executed-bootstrap", type=Path, required=True)
     resolve.add_argument("--checkpoint", type=Path, required=True)
     resolve.add_argument("--expected-checkpoint-sha256", required=True)
     resolve.add_argument("--output", type=Path, required=True)
@@ -368,6 +371,7 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
 
     paths = {
         "checkpointTool": (Path(__file__), MAX_INPUT_BYTES, None),
+        "executedBootstrap": (args.executed_bootstrap, MAX_INPUT_BYTES, None),
         "request": (args.request, MAX_REQUEST_BYTES, 0o600),
         "predecessorCurrent": (args.predecessor_current, MAX_INPUT_BYTES, None),
         "predecessorSnapshot": (args.predecessor_snapshot, MAX_INPUT_BYTES, None),
@@ -416,8 +420,8 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
     if not evidence_directory.is_dir():
         raise CheckpointError("release evidence directory must be a directory")
     return {
-        "contractName": "chummer.release-authority-transaction-checkpoint/v1",
-        "contractVersion": 1,
+        "contractName": "chummer.release-authority-transaction-checkpoint/v2",
+        "contractVersion": 2,
         "createdAtUtc": dt.datetime.now(dt.timezone.utc)
         .replace(microsecond=0)
         .isoformat()
@@ -461,8 +465,8 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
     generation_id = checkpoint.get("generationId")
     release_version = checkpoint.get("releaseVersion")
     if (
-        checkpoint.get("contractName") != "chummer.release-authority-transaction-checkpoint/v1"
-        or checkpoint.get("contractVersion") != 1
+        checkpoint.get("contractName") != "chummer.release-authority-transaction-checkpoint/v2"
+        or checkpoint.get("contractVersion") != 2
         or checkpoint.get("state") != "registry_preview_pending_or_published"
         or not isinstance(generation_id, str)
         or GENERATION_ID.fullmatch(generation_id) is None
@@ -518,6 +522,23 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
     own_path = Path(__file__).resolve(strict=True)
     if own_path != Path(resolved_files["checkpointTool"]):
         raise CheckpointError("checkpoint resolver is not the exact pinned checkpoint tool")
+    executing_bootstrap, executing_bootstrap_raw = _stable_owned_file(
+        args.executed_bootstrap,
+        root,
+        "executed bootstrap",
+        MAX_INPUT_BYTES,
+    )
+    if (
+        executing_bootstrap != Path(resolved_files["executedBootstrap"])
+        or not hmac.compare_digest(
+            _sha(executing_bootstrap_raw),
+            _require_sha(
+                file_entries["executedBootstrap"].get("sha256"),
+                "checkpoint executed bootstrap digest",
+            ),
+        )
+    ):
+        raise CheckpointError("resume is not executing the exact checkpointed bootstrap bytes")
     _validate_request(file_raw["request"], generation_id, file_raw)
 
     successor_current = _strict_json(file_raw["successorCurrent"], "successor CURRENT.json")
@@ -568,7 +589,7 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
     if not evidence_directory.is_dir():
         raise CheckpointError("checkpoint evidence directory is not a directory")
     return {
-        "contractName": "chummer.release-authority-transaction-resolution/v1",
+        "contractName": "chummer.release-authority-transaction-resolution/v2",
         "status": "pass",
         "checkpointPath": str(checkpoint_path),
         "checkpointSha256": expected_checkpoint_sha256,
@@ -580,6 +601,7 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
         "expectedManifestSha256": expected_manifest_sha256,
         "expectedRegistrySnapshotSha256": expected_snapshot_sha256,
         "expectedRegistryDecisionSha256": expected_decision_sha256,
+        "executedBootstrapSha256": _sha(executing_bootstrap_raw),
         "files": resolved_files,
         "evidenceDirectory": str(evidence_directory),
         "convergencePolicy": policy,

@@ -199,7 +199,6 @@ class VerifyReleaseUploadResponseTruthTests(unittest.TestCase):
 
     def test_fails_on_noncanonical_manifest_digests(self) -> None:
         invalid_digests = [
-            "a" * 64,
             "sha256:" + "A" * 64,
             "sha256:" + "a" * 63,
             "sha256:" + "g" * 64,
@@ -216,6 +215,15 @@ class VerifyReleaseUploadResponseTruthTests(unittest.TestCase):
 
                     self.assertEqual(receipt["status"], "fail")
                     self.assertIn(f"upload response {key} is missing or noncanonical", receipt["failures"])
+
+    def test_accepts_bare_lowercase_server_manifest_digests(self) -> None:
+        response = make_upload_response()
+        for key in ("canonicalManifestSha256", "compatibilityManifestSha256"):
+            response[key] = response[key].removeprefix("sha256:")
+
+        receipt = evaluate_payloads(response=response)
+
+        self.assertEqual(receipt["status"], "pass", receipt["failures"])
 
     def test_fails_when_manifest_digest_bindings_collapse_to_one_value(self) -> None:
         response = make_upload_response()
