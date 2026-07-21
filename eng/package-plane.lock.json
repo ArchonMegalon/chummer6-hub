@@ -34,52 +34,52 @@
       "id": "Chummer.Hub.Registry.Contracts",
       "version": "0.1.0-preview",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "4a312798a10cb7ae97c77731450e24fe6a74d963",
+      "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "ece4182749d1db0cc224f7be169e7ae493b813e18f7e112bcecae77c08f1b5bc",
-      "nupkg_size_bytes": 523758
+      "nupkg_sha256": "89061d481812d9f6772c4f8c38a5b6be08609ac20760db3039d0701a3bcd681b",
+      "nupkg_size_bytes": 524782
     },
     {
       "id": "Chummer.Run.Registry",
       "version": "0.1.0-preview",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "4a312798a10cb7ae97c77731450e24fe6a74d963",
+      "commit": "af9a7e19c3bf331e96411dfb8f9e7820a98cab29",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "bccbc49cd44a21cac8cc7ed001724b410225701ba085470503efef68fdfe0233",
-      "nupkg_size_bytes": 331894
+      "nupkg_sha256": "2254800153d6799b753b91ec80320fec5fd502727fc1e8351df68e9d9430e922",
+      "nupkg_size_bytes": 345206
     },
     {
       "id": "Chummer.Play.Contracts",
       "version": "0.1.0-preview",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "f3503316955d93ee33672d5bea2b4db4792d5445",
+      "commit": "fb170842d37faf2a91ddc1f5e91bf5d50cb0dc85",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "c5100b607d6b14d3886bcf994ae56649a45b79fc12163a7a18974f5e37a643b6",
+      "nupkg_sha256": "516050b43a239ee3732e7e4ce6c422468baeb82c4b3d58e9f0412d8035337e21",
       "nupkg_size_bytes": 322484
     },
     {
       "id": "Chummer.Run.Contracts",
       "version": "0.1.0-preview",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub.git",
-      "commit": "f3503316955d93ee33672d5bea2b4db4792d5445",
+      "commit": "fb170842d37faf2a91ddc1f5e91bf5d50cb0dc85",
       "checkout_directory": "chummer-run-services",
       "project": "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
       "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
-      "nupkg_sha256": "3ed8fb49c88862ef94f52d57140e0deacdc1e07fd2b4ec67ea140ef1df2d47f2",
+      "nupkg_sha256": "e23df54ef1e5f122dba1120dcd14a9df6729edb620f7e36a1f2ed252a033b5ae",
       "nupkg_size_bytes": 1450256
     },
     {
@@ -91,7 +91,7 @@
       "project": "Chummer.GmCharacterEdits/Chummer.GmCharacterEdits.csproj",
       "license_type": "expression",
       "license_value": "GPL-3.0-only",
-      "nupkg_sha256": "dd202e1c8e6e300bd086ab2802ff2a492ea4ad8e682f5ff50569c5d760c52c17",
+      "nupkg_sha256": "0b1d9e4c0e7fc9cb0b6471c19c83749ad07073243624b33fde723fe1f028db7a",
       "nupkg_size_bytes": 1215070
     }
   ]

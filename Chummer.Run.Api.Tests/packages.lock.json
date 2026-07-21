@@ -52,7 +52,7 @@
       "Chummer.Engine.GmCharacterEdits": {
         "type": "Transitive",
         "resolved": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
-        "contentHash": "nC+cPF3JyN2LvfS1oYaZKcNy6nU0+6VoBY82R1NAqij/gu4/yC5b//xtgyms6M/gSUv0O9hqRorrGsuI2rcQaw==",
+        "contentHash": "EH2nQ1rg8Klk6t1nkMz/sYTFeRvdOg6CQsPkSdwA7ckKmJiQan7hZmxMcr2NHBV9KGNmBAGIAwVNthx8EVC5Pw==",
         "dependencies": {
           "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
           "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
@@ -223,7 +223,7 @@
       "Chummer.Engine.GmCharacterEdits": {
         "type": "Transitive",
         "resolved": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
-        "contentHash": "nC+cPF3JyN2LvfS1oYaZKcNy6nU0+6VoBY82R1NAqij/gu4/yC5b//xtgyms6M/gSUv0O9hqRorrGsuI2rcQaw==",
+        "contentHash": "EH2nQ1rg8Klk6t1nkMz/sYTFeRvdOg6CQsPkSdwA7ckKmJiQan7hZmxMcr2NHBV9KGNmBAGIAwVNthx8EVC5Pw==",
         "dependencies": {
           "Chummer.Engine.Contracts": "0.0.0-packageplane.candidate.sha0612fb3ebf2b",
           "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
