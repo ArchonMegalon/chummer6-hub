@@ -153,6 +153,7 @@ def test_attention_only_envelope_is_secret_safe_and_mode_0600(bundle: dict[str, 
         observed_at=bundle["now"],
         release_decision_status="preview_ready",
         producer_receipt=None,
+        producer_finalization_sha256="0" * 64,
         producer_convergence_sha256="1" * 64,
         producer_manifest_file_sha256="2" * 64,
     )

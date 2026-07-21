@@ -10,9 +10,13 @@ using Chummer.Contracts.Owners;
 using Chummer.Contracts.Workspaces;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Entitlements;
+using Chummer.Run.Contracts.Ledger;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -35,10 +39,13 @@ public sealed class CampaignCollaborationServiceTests
         MethodInfo update = Assert.Single(controller.GetMethods(), method => method.Name == "UpdateSharedSheet");
         Assert.NotNull(update.GetCustomAttribute<HttpPutAttribute>());
         Assert.Null(update.GetCustomAttribute<HttpPatchAttribute>());
+        MethodInfo delete = Assert.Single(controller.GetMethods(), method => method.Name == "Delete");
+        Assert.Equal("{campaignId}", delete.GetCustomAttribute<HttpDeleteAttribute>()?.Template);
 
         Type[] identityDerivedRequests =
         [
             typeof(CreateCampaignCollaborationRequest),
+            typeof(DeleteCampaignCollaborationRequest),
             typeof(CreateCampaignInviteRequest),
             typeof(RedeemCampaignInviteRequest),
             typeof(RedeemCampaignJoinCodeRequest),
@@ -51,6 +58,45 @@ public sealed class CampaignCollaborationServiceTests
             requestType.GetProperties(BindingFlags.Public | BindingFlags.Instance),
             property => string.Equals(property.Name, "SubjectId", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(property.Name, "UserId", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void ControllerMapsPreservedReferenceTeardownConflictToAdvertised409()
+    {
+        using var fixture = new CampaignFixture();
+        var controller = new CampaignCollaborationController(
+            fixture.Service,
+            fixture.Accounts,
+            new HubIdentityClient(new HttpClient(), new ConfigurationBuilder().Build()))
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        var conflict = new CampaignTeardownConflictException(
+            "Campaign teardown refused preserved state.");
+        var corruption = new InvalidDataException(
+            "Invalid campaign collaboration snapshot: secret internal invariant.");
+        MethodInfo isMapped = typeof(CampaignCollaborationController).GetMethod(
+            "IsMapped",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("IsMapped was not found.");
+        MethodInfo mapException = typeof(CampaignCollaborationController).GetMethod(
+            "MapException",
+            BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("MapException was not found.");
+
+        Assert.True(Assert.IsType<bool>(isMapped.Invoke(null, [conflict])));
+        ActionResult result = Assert.IsAssignableFrom<ActionResult>(mapException.Invoke(controller, [conflict]));
+        ObjectResult problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.False(Assert.IsType<bool>(isMapped.Invoke(null, [corruption])));
+        ActionResult corruptionResult = Assert.IsAssignableFrom<ActionResult>(
+            mapException.Invoke(controller, [corruption]));
+        ObjectResult internalProblem = Assert.IsType<ObjectResult>(corruptionResult);
+        Assert.Equal(StatusCodes.Status500InternalServerError, internalProblem.StatusCode);
+        Assert.DoesNotContain(
+            "secret internal invariant",
+            JsonSerializer.Serialize(internalProblem.Value),
+            StringComparison.Ordinal);
     }
 
     [Theory]
@@ -1418,6 +1464,977 @@ public sealed class CampaignCollaborationServiceTests
     }
 
     [Fact]
+    public void CampaignTeardownRequiresOwnerExactNameCurrentUtcPreconditionAndBoundedIdempotency()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign("Exact Name Campaign");
+        HubUserDto player = fixture.CreateUser("subject.teardown-player", "Teardown Player");
+        fixture.Join(campaign, player, "Razor", "Alex Razor");
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, campaign.CampaignId));
+        var request = new DeleteCampaignCollaborationRequest(
+            current.Name,
+            current.UpdatedAtUtc,
+            "teardown-owner-only");
+
+        Assert.Throws<CampaignCollaborationAccessDeniedException>(() =>
+            fixture.Service.DeleteCampaign(player, current.CampaignId, request));
+        Assert.Throws<ArgumentException>(() => fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            current.CampaignId,
+            request with { ConfirmCampaignName = current.Name.ToUpperInvariant() }));
+        CampaignUpdatedAtConflictException conflict = Assert.Throws<CampaignUpdatedAtConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                current.CampaignId,
+                request with { ExpectedUpdatedAtUtc = current.UpdatedAtUtc.AddTicks(-1) }));
+        Assert.Equal(current.UpdatedAtUtc, conflict.CurrentUpdatedAtUtc);
+        Assert.Throws<ArgumentException>(() => fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            current.CampaignId,
+            request with { ExpectedUpdatedAtUtc = current.UpdatedAtUtc.ToOffset(TimeSpan.FromHours(1)) }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            current.CampaignId,
+            request with { IdempotencyKey = new string('x', 129) }));
+
+        Assert.NotNull(fixture.Service.GetCampaign(fixture.Gm, current.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownRemovesOnlyOwnedCollaborationStateAndReturnsSecretFreeCounts()
+    {
+        var projectionSync = new RecordingUserProjectionSyncQueue();
+        using var fixture = new CampaignFixture(projectionSync);
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Disposable Campaign");
+        CampaignCollaborationProjection unrelated = fixture.CreateCampaign("Preserved Campaign");
+        HubUserDto player = fixture.CreateUser("subject.teardown-shared-player", "Shared Player");
+        RunnerDossierProjection targetCharacter = fixture.CreateCharacter(player, "Razor", "Alex Razor");
+        CampaignInviteSecretProjection targetInvite = fixture.Service.CreateInvite(
+            fixture.Gm,
+            target.CampaignId,
+            InviteRequest(60, 1, "target-join-invite"));
+        CampaignInviteRedemptionProjection targetJoin = fixture.Service.RedeemInvite(
+            player,
+            targetInvite.InviteId,
+            fixture.LinkRequest(targetInvite, targetCharacter, "target-join"));
+        CampaignInviteSecretProjection unusedTargetInvite = fixture.Service.CreateInvite(
+            fixture.Gm,
+            target.CampaignId,
+            InviteRequest(60, 1, "target-unused-invite"));
+        CampaignInviteRedemptionProjection unrelatedJoin = fixture.Join(
+            unrelated,
+            player,
+            "Cipher",
+            "Blake Cipher");
+
+        _ = fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            target.CampaignId,
+            targetJoin.DossierId,
+            new CampaignSharedSheetUpdateRequest(
+                1,
+                "target-gm-edit",
+                "Razor Prime",
+                "Alex Razor",
+                "active",
+                "Prepare deterministic cleanup coverage."));
+        CampaignPlayerSafeSheetProjection targetSheet = fixture.Service.GetSharedSheet(
+            player,
+            target.CampaignId,
+            targetJoin.DossierId);
+        _ = fixture.Service.UpdateGmAuthority(
+            player,
+            target.CampaignId,
+            targetJoin.DossierId,
+            new CampaignGmAuthorityUpdateRequest(
+                targetSheet.GmAuthorityBindingRevision,
+                false,
+                "target-revoke-gm",
+                "Exercise campaign-scoped consent cleanup."));
+        string targetRunId = Assert.Single(target.RunIds);
+        CampaignRunsiteDraftProjection draft = fixture.Service.UpsertRunsiteDraft(
+            fixture.Gm,
+            target.CampaignId,
+            targetRunId,
+            new CampaignRunsiteDraftUpdateRequest(
+                0,
+                "target-runsite-draft",
+                "Disposable Runsite",
+                "This runsite must be removed with only its campaign.",
+                [new RunsitePlayerSectionInput("Entry", "North door")],
+                "Never leave this GM note behind."));
+        _ = fixture.Service.PublishRunsite(
+            fixture.Gm,
+            target.CampaignId,
+            targetRunId,
+            new PublishCampaignRunsiteRequest(draft.Revision, "target-runsite-publish"));
+
+        CampaignCollaborationProjection currentTarget = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        string dossiersBefore = JsonSerializer.Serialize(
+            fixture.Store.DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase));
+        string unrelatedBefore = JsonSerializer.Serialize(
+            fixture.Service.GetCampaign(fixture.Gm, unrelated.CampaignId));
+        int usersBefore = fixture.Store.UsersById.Count;
+        var coreRead = new DelegatedGmCharacterProfileReadCommand(
+            target.CampaignId,
+            fixture.Gm.UserId,
+            new OwnerScope(player.UserId),
+            new CharacterWorkspaceId(targetJoin.Binding.AuthoritativeCharacterId));
+        string coreBefore = JsonSerializer.Serialize(fixture.CanonicalEdits.ReadCurrentProfile(coreRead));
+        int coreCallsBefore = fixture.CanonicalEdits.CallCount;
+
+        CampaignTeardownReceipt receipt = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            target.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                currentTarget.Name,
+                currentTarget.UpdatedAtUtc,
+                "target-teardown"));
+
+        Assert.Equal(target.CampaignId, receipt.CampaignId);
+        Assert.Equal(1, receipt.Removed.Campaigns);
+        Assert.Equal(1, receipt.Removed.Groups);
+        Assert.Equal(1, receipt.Removed.Crews);
+        Assert.Equal(1, receipt.Removed.Runs);
+        Assert.Equal(2, receipt.Removed.Invites);
+        Assert.Equal(2, receipt.Removed.InviteCodeIndexes);
+        Assert.Equal(2, receipt.Removed.CharacterBindings);
+        Assert.Equal(1, receipt.Removed.Runsites);
+        Assert.Equal(8, receipt.Removed.CommandRecords);
+        Assert.Equal(2, receipt.Removed.AuditRecords);
+        Assert.Equal(2, receipt.Removed.UserGroupMemberships);
+        Assert.Equal(32, Convert.FromHexString(receipt.CampaignNameSha256).Length);
+        Assert.Equal(32, Convert.FromHexString(receipt.CleanupSha256).Length);
+        string receiptJson = JsonSerializer.Serialize(receipt);
+        Assert.DoesNotContain(targetInvite.LinkSecret, receiptJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(targetInvite.ShortCode, receiptJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(unusedTargetInvite.LinkSecret, receiptJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(unusedTargetInvite.ShortCode, receiptJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(currentTarget.Name, receiptJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            typeof(CampaignTeardownReceipt).GetProperties(),
+            property => property.Name.Contains("Secret", StringComparison.OrdinalIgnoreCase)
+                || property.Name.Contains("Token", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Null(fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        Assert.Null(fixture.Service.GetCampaign(player, target.CampaignId));
+        Assert.Equal(unrelatedBefore, JsonSerializer.Serialize(
+            fixture.Service.GetCampaign(fixture.Gm, unrelated.CampaignId)));
+        Assert.NotNull(fixture.Service.GetSharedSheet(player, unrelated.CampaignId, unrelatedJoin.DossierId));
+        Assert.Equal(dossiersBefore, JsonSerializer.Serialize(
+            fixture.Store.DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase)));
+        Assert.Equal(usersBefore, fixture.Store.UsersById.Count);
+        Assert.DoesNotContain(target.GroupId, fixture.Store.UsersById[fixture.Gm.UserId].GroupIds);
+        Assert.Contains(unrelated.GroupId, fixture.Store.UsersById[fixture.Gm.UserId].GroupIds);
+        Assert.DoesNotContain(target.GroupId, fixture.Store.UsersById[player.UserId].GroupIds);
+        Assert.Contains(unrelated.GroupId, fixture.Store.UsersById[player.UserId].GroupIds);
+        Assert.Equal(2, projectionSync.Users.Count);
+        Assert.All(projectionSync.Users, user => Assert.DoesNotContain(target.GroupId, user.GroupIds));
+        Assert.Contains(projectionSync.Users, user => user.UserId == fixture.Gm.UserId);
+        Assert.Contains(projectionSync.Users, user => user.UserId == player.UserId);
+        Assert.Equal(coreCallsBefore, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(coreBefore, JsonSerializer.Serialize(fixture.CanonicalEdits.ReadCurrentProfile(coreRead)));
+        Assert.DoesNotContain(fixture.Store.CampaignCollaborationInvitesById.Values,
+            item => item.CampaignId == target.CampaignId);
+        Assert.DoesNotContain(fixture.Store.CampaignCharacterBindings,
+            item => item.CampaignId == target.CampaignId);
+        Assert.DoesNotContain(fixture.Store.CampaignRunsitesByRunId.Values,
+            item => item.CampaignId == target.CampaignId);
+        Assert.Single(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownReplaySurvivesRestartRejectsDriftAndPrunesExpiredReceipts()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign("Restart Teardown");
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, campaign.CampaignId));
+        var request = new DeleteCampaignCollaborationRequest(
+            current.Name,
+            current.UpdatedAtUtc,
+            "restart-teardown");
+        CampaignTeardownReceipt first = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            campaign.CampaignId,
+            request);
+
+        var reloadedStore = new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance);
+        IDataProtectionProvider reloadedProtection = DataProtectionProvider.Create(
+            new DirectoryInfo(fixture.DataProtectionPath));
+        var reloadedService = new CampaignCollaborationService(
+            reloadedStore,
+            fixture.CanonicalEdits,
+            reloadedProtection,
+            fixture.Clock);
+        HubUserDto reloadedGm = reloadedStore.UsersById[fixture.Gm.UserId];
+        reloadedStore.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("replay must not persist");
+
+        Assert.Equal(first, reloadedService.DeleteCampaign(reloadedGm, campaign.CampaignId, request));
+        Assert.Throws<CampaignIdempotencyConflictException>(() => reloadedService.DeleteCampaign(
+            reloadedGm,
+            campaign.CampaignId,
+            request with { ConfirmCampaignName = "Changed Restart Teardown" }));
+        Assert.Throws<CampaignIdempotencyConflictException>(() => reloadedService.DeleteCampaign(
+            reloadedGm,
+            campaign.CampaignId,
+            request with { ExpectedUpdatedAtUtc = request.ExpectedUpdatedAtUtc.AddTicks(-1) }));
+        reloadedStore.CampaignCollaborationPersistenceFaultInjector = null;
+
+        fixture.Clock.Advance(CampaignCollaborationService.CampaignTeardownRetention + TimeSpan.FromMinutes(1));
+        CampaignCollaborationProjection next = reloadedService.CreateCampaign(
+            reloadedGm,
+            CampaignRequest("Next Teardown", "Next teardown summary", "private", "Next run", "next-create"));
+        CampaignCollaborationProjection currentNext = Assert.IsType<CampaignCollaborationProjection>(
+            reloadedService.GetCampaign(reloadedGm, next.CampaignId));
+        _ = reloadedService.DeleteCampaign(
+            reloadedGm,
+            next.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                currentNext.Name,
+                currentNext.UpdatedAtUtc,
+                "next-teardown"));
+
+        CampaignTeardownIdempotencyState onlyLedgerEntry = Assert.Single(
+            reloadedStore.CampaignTeardownsByIdempotencyKey.Values);
+        Assert.NotEqual(first.ReceiptId, onlyLedgerEntry.Response.ReceiptId);
+        Assert.Throws<KeyNotFoundException>(() =>
+            reloadedService.DeleteCampaign(reloadedGm, campaign.CampaignId, request));
+    }
+
+    [Fact]
+    public void CampaignTeardownReplayLedgerDeterministicallyPrunesOldestEntryAtCapacity()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign("Capacity Teardown");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        var emptyCounts = new CampaignTeardownCleanupCounts(
+            Campaigns: 1,
+            Groups: 1,
+            Crews: 0,
+            Runs: 0,
+            Invites: 0,
+            InviteCodeIndexes: 0,
+            CharacterBindings: 0,
+            Runsites: 0,
+            CommandRecords: 0,
+            AuditRecords: 0,
+            UserGroupMemberships: 0);
+        lock (fixture.Store.Gate)
+        {
+            for (int index = 0; index < CampaignCollaborationService.MaxCampaignTeardownReceipts; index++)
+            {
+                DateTimeOffset createdAtUtc = now.AddSeconds(
+                    index - CampaignCollaborationService.MaxCampaignTeardownReceipts);
+                string key = $"seed-teardown-key-{index:D4}";
+                fixture.Store.CampaignTeardownsByIdempotencyKey[key] = new CampaignTeardownIdempotencyState(
+                    Key: key,
+                    UserId: fixture.Gm.UserId,
+                    IdempotencyKey: $"seed-teardown-{index:D4}",
+                    RequestSha256: new string('a', 64),
+                    Response: new CampaignTeardownReceipt(
+                        ReceiptId: $"seed-teardown-receipt-{index:D4}",
+                        CampaignId: $"deleted-seed-campaign-{index:D4}",
+                        CampaignNameSha256: new string('b', 64),
+                        PreviousUpdatedAtUtc: createdAtUtc.AddMinutes(-1),
+                        Removed: emptyCounts,
+                        CleanupSha256: new string('c', 64),
+                        DeletedAtUtc: createdAtUtc),
+                    CreatedAtUtc: createdAtUtc);
+            }
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, campaign.CampaignId));
+        CampaignTeardownReceipt receipt = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            campaign.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                current.Name,
+                current.UpdatedAtUtc,
+                "capacity-teardown"));
+
+        Assert.Equal(
+            CampaignCollaborationService.MaxCampaignTeardownReceipts,
+            fixture.Store.CampaignTeardownsByIdempotencyKey.Count);
+        Assert.False(fixture.Store.CampaignTeardownsByIdempotencyKey.ContainsKey("seed-teardown-key-0000"));
+        Assert.True(fixture.Store.CampaignTeardownsByIdempotencyKey.ContainsKey("seed-teardown-key-0001"));
+        Assert.Contains(
+            fixture.Store.CampaignTeardownsByIdempotencyKey.Values,
+            item => item.Response.ReceiptId == receipt.ReceiptId);
+    }
+
+    [Fact]
+    public void CampaignTeardownPersistenceFailureRollsBackResourcesUsersAndReplayLedger()
+    {
+        var projectionSync = new RecordingUserProjectionSyncQueue();
+        using var fixture = new CampaignFixture(projectionSync);
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign("Rollback Teardown");
+        HubUserDto player = fixture.CreateUser("subject.teardown-rollback", "Rollback Player");
+        fixture.Join(campaign, player, "Razor", "Alex Razor");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        string campaignWorkspaceId = "workspace-" + Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(campaign.CampaignId)))[..12]
+            .ToLowerInvariant();
+        const string preservedWorkspaceId = "workspace-preserved-after-rollback";
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.RestoreByUserId[fixture.Gm.UserId] = new WorkspaceRestoreProjection(
+                RestoreId: "restore-rollback",
+                UserId: fixture.Gm.UserId,
+                RecentDossiers: [],
+                RecentCampaigns: [fixture.Store.CampaignSpinesById[campaign.CampaignId]],
+                RecentRuleEnvironments: [],
+                RecentArtifacts: [],
+                Entitlements: [],
+                ClaimedDevices: [],
+                ConflictSummaries: [],
+                LocalOnlyNotes: ["preserve until the transaction commits"],
+                GeneratedAtUtc: now);
+            fixture.Store.UserExperienceByUserId[player.UserId] = new HubUserExperienceDto(
+                UserId: player.UserId,
+                LaneInterests: ["living_world"],
+                FollowHorizons: true,
+                BetaInterest: true,
+                OnboardingCompleted: true,
+                OnboardingCompletedAtUtc: now,
+                UpdatedAtUtc: now,
+                WorkspacePrepLibrarySearchHistory:
+                [
+                    new WorkspacePrepLibrarySearchHistoryItem(campaignWorkspaceId, "runsite", now),
+                    new WorkspacePrepLibrarySearchHistoryItem(preservedWorkspaceId, "prep", now)
+                ]);
+            fixture.Store.PersistLocked();
+        }
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, campaign.CampaignId));
+        var request = new DeleteCampaignCollaborationRequest(
+            current.Name,
+            current.UpdatedAtUtc,
+            "rollback-teardown");
+        string durableBefore = File.ReadAllText(fixture.StorePath);
+        string campaignBefore = JsonSerializer.Serialize(current);
+        string[] gmGroupsBefore = fixture.Store.UsersById[fixture.Gm.UserId].GroupIds.ToArray();
+        string[] playerGroupsBefore = fixture.Store.UsersById[player.UserId].GroupIds.ToArray();
+        string restoreBefore = JsonSerializer.Serialize(
+            fixture.Store.RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase));
+        string experienceBefore = JsonSerializer.Serialize(
+            fixture.Store.UserExperienceByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase));
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("injected teardown persistence failure");
+
+        Assert.Throws<IOException>(() =>
+            fixture.Service.DeleteCampaign(fixture.Gm, campaign.CampaignId, request));
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
+
+        Assert.Equal(durableBefore, File.ReadAllText(fixture.StorePath));
+        Assert.Equal(campaignBefore, JsonSerializer.Serialize(
+            fixture.Service.GetCampaign(fixture.Gm, campaign.CampaignId)));
+        Assert.Equal(gmGroupsBefore, fixture.Store.UsersById[fixture.Gm.UserId].GroupIds);
+        Assert.Equal(playerGroupsBefore, fixture.Store.UsersById[player.UserId].GroupIds);
+        Assert.Equal(restoreBefore, JsonSerializer.Serialize(
+            fixture.Store.RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)));
+        Assert.Equal(experienceBefore, JsonSerializer.Serialize(
+            fixture.Store.UserExperienceByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)));
+        Assert.True(fixture.Store.GroupsById.ContainsKey(campaign.GroupId));
+        Assert.True(fixture.Store.CrewsById.ContainsKey(campaign.CrewId));
+        Assert.True(fixture.Store.RunsById.ContainsKey(Assert.Single(campaign.RunIds)));
+        Assert.NotEmpty(fixture.Store.CampaignCharacterBindings);
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+        Assert.Empty(projectionSync.Users);
+
+        CampaignTeardownReceipt retry = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            campaign.CampaignId,
+            request);
+        Assert.Equal(campaign.CampaignId, retry.CampaignId);
+        Assert.Equal(1, retry.Removed.RestoreProjections);
+        Assert.Equal(1, retry.Removed.WorkspacePrepLibrarySearchHistoryItems);
+        Assert.False(fixture.Store.RestoreByUserId.ContainsKey(fixture.Gm.UserId));
+        HubUserExperienceDto experience = fixture.Store.UserExperienceByUserId[player.UserId];
+        WorkspacePrepLibrarySearchHistoryItem remainingHistory = Assert.Single(
+            experience.WorkspacePrepLibrarySearchHistory ?? []);
+        Assert.Equal(preservedWorkspaceId, remainingHistory.WorkspaceId);
+        Assert.Equal(retry.DeletedAtUtc, experience.UpdatedAtUtc);
+        Assert.Equal(2, projectionSync.Users.Select(static user => user.UserId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count());
+        Assert.Contains(projectionSync.Users, user => user.UserId == fixture.Gm.UserId);
+        Assert.Contains(projectionSync.Users, user => user.UserId == player.UserId);
+    }
+
+    [Theory]
+    [InlineData("group")]
+    [InlineData("crew")]
+    [InlineData("run")]
+    public void CampaignTeardownFailsClosedWhenUnrelatedCampaignReferencesSelectedResource(string coupling)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Coupling Target");
+        CampaignCollaborationProjection unrelated = fixture.CreateCampaign("Coupling Unrelated");
+        lock (fixture.Store.Gate)
+        {
+            CampaignProjection state = fixture.Store.CampaignSpinesById[unrelated.CampaignId];
+            fixture.Store.CampaignSpinesById[unrelated.CampaignId] = coupling switch
+            {
+                "group" => state with { GroupId = target.GroupId },
+                "crew" => state with { CrewIds = state.CrewIds.Append(target.CrewId).ToArray() },
+                "run" => state with { RunIds = state.RunIds.Append(Assert.Single(target.RunIds)).ToArray() },
+                _ => throw new InvalidOperationException("Unknown coupling test case.")
+            };
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        Assert.Throws<CampaignTeardownConflictException>(() => fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            target.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                current.Name,
+                current.UpdatedAtUtc,
+                $"coupled-{coupling}")));
+
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(unrelated.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Theory]
+    [InlineData("campaign")]
+    [InlineData("crew")]
+    [InlineData("run")]
+    public void CampaignTeardownFailsClosedWhenPreservedDossierReferencesSelectedResource(string coupling)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Dossier Coupling Target");
+        RunnerDossierProjection dossier = fixture.CreateCharacter(
+            fixture.Gm,
+            "Archive",
+            "Preserved Archive");
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.DossiersById[dossier.DossierId] = coupling switch
+            {
+                "campaign" => dossier with { CampaignId = target.CampaignId },
+                "crew" => dossier with { CrewId = target.CrewId },
+                "run" => dossier with { CurrentRunId = Assert.Single(target.RunIds) },
+                _ => throw new InvalidOperationException("Unknown dossier coupling test case.")
+            };
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        Assert.Throws<CampaignTeardownConflictException>(() => fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            target.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                current.Name,
+                current.UpdatedAtUtc,
+                $"dossier-coupled-{coupling}")));
+
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.True(fixture.Store.DossiersById.ContainsKey(dossier.DossierId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Theory]
+    [InlineData("campaign")]
+    [InlineData("run")]
+    public void CampaignTeardownFailsClosedWhenOpenRunReferencesSelectedResource(string coupling)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Open Run Coupling Target");
+        string targetRunId = Assert.Single(target.RunIds);
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        var joinPolicy = new OpenRunJoinPolicyProjection(
+            AdmissionMode: "request_to_join",
+            SeatsTotal: 4,
+            ReservedSeatRoles: [],
+            RequireRunnerDossier: true,
+            AllowQuickstartRunner: false,
+            RuleEnvironmentFingerprint: "open-run-coupling-fingerprint",
+            SchedulingMode: "manual",
+            ExpectedDurationMinutes: 240,
+            CommunicationPlatform: "discord",
+            VoiceRequired: false,
+            ObserverMode: "manual_markers",
+            Summary: "Preserved open-run teardown guard fixture.");
+        var listing = new OpenRunListingProjection(
+            OpenRunId: $"open-run-coupling-{coupling}",
+            WorkspaceId: "workspace-preserved-open-run",
+            CampaignId: coupling == "campaign" ? target.CampaignId : "campaign-preserved-open-run",
+            RunId: coupling == "run" ? targetRunId : "run-preserved-open-run",
+            RunTitle: "Preserved Open Run",
+            ListingTitle: "Preserved Open Run",
+            Visibility: "public",
+            Status: "listed",
+            Summary: "This public listing must not outlive its campaign references.",
+            TableContractSummary: "Fail closed before campaign teardown.",
+            JoinPolicy: joinPolicy,
+            SchedulingPosture: "unscheduled",
+            QuickstartAllowed: false,
+            EvidenceLines: ["Preserved open-run teardown guard fixture."],
+            CreatedByUserId: fixture.Gm.UserId,
+            CreatedAtUtc: now,
+            UpdatedAtUtc: now);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.OpenRuns.Add(listing);
+            fixture.Store.PersistLocked();
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownConflictException error = Assert.Throws<CampaignTeardownConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                target.CampaignId,
+                new DeleteCampaignCollaborationRequest(
+                    current.Name,
+                    current.UpdatedAtUtc,
+                    $"open-run-coupled-{coupling}")));
+
+        Assert.Contains("open-run", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.Contains(fixture.Store.OpenRuns, item => item.OpenRunId == listing.OpenRunId);
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Theory]
+    [InlineData("join-code")]
+    [InlineData("boost-campaign")]
+    [InlineData("boost-code")]
+    [InlineData("sponsor-session")]
+    public void CampaignTeardownFailsClosedWhenSponsorshipStateReferencesItsGroup(
+        string stateKind)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Sponsorship Coupling Target");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        lock (fixture.Store.Gate)
+        {
+            switch (stateKind)
+            {
+                case "join-code":
+                    fixture.Store.JoinCodesByValue["TARGET-CODE"] = new JoinCodeDto(
+                        "join-code-target",
+                        "TARGET-CODE",
+                        target.GroupId,
+                        "member",
+                        now,
+                        now.AddHours(1),
+                        0);
+                    break;
+                case "boost-campaign":
+                    fixture.Store.CampaignsById["boost-campaign-target"] = new BoostCampaignDto(
+                        "boost-campaign-target",
+                        target.GroupId,
+                        "project-target",
+                        "Target Boost Campaign",
+                        "active",
+                        now);
+                    break;
+                case "boost-code":
+                    fixture.Store.BoostCodesByValue["BOOST-TARGET"] = new BoostCodeDto(
+                        "boost-code-target",
+                        "BOOST-TARGET",
+                        target.GroupId,
+                        "boost-campaign-target",
+                        fixture.Gm.UserId,
+                        "active",
+                        now,
+                        null,
+                        null);
+                    break;
+                case "sponsor-session":
+                    fixture.Store.SponsorSessionsById["sponsor-session-target"] = new SponsorSessionState
+                    {
+                        SponsorSessionId = "sponsor-session-target",
+                        UserId = fixture.Gm.UserId,
+                        GroupId = target.GroupId,
+                        ProjectId = "project-target",
+                        Status = "intent_created",
+                        CreatedAtUtc = now,
+                        UpdatedAtUtc = now
+                    };
+                    break;
+                default:
+                    throw new InvalidOperationException("Unknown sponsorship coupling test case.");
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownConflictException error = Assert.Throws<CampaignTeardownConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                target.CampaignId,
+                new DeleteCampaignCollaborationRequest(
+                    current.Name,
+                    current.UpdatedAtUtc,
+                    $"sponsorship-coupled-{stateKind}")));
+
+        Assert.Contains("sponsorship", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Theory]
+    [InlineData("contribution")]
+    [InlineData("ledger")]
+    [InlineData("reward")]
+    [InlineData("entitlement")]
+    public void CampaignTeardownFailsClosedWhenRecognitionStateReferencesItsGroup(
+        string stateKind)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Recognition Coupling Target");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        lock (fixture.Store.Gate)
+        {
+            switch (stateKind)
+            {
+                case "contribution":
+                    fixture.Store.Receipts.Add(new ContributionReceiptDto(
+                        ReceiptId: "contribution-target",
+                        EventKind: "slice_landed",
+                        LaneId: "lane-target",
+                        ProjectId: "project-target",
+                        UserId: fixture.Gm.UserId,
+                        GroupId: target.GroupId,
+                        SponsorSessionId: null,
+                        ParticipantCodexCode: null,
+                        AuthClass: "group",
+                        LaneType: "participant_burst"));
+                    break;
+                case "ledger":
+                    fixture.Store.LedgerEntries.Add(new LedgerEntryDto(
+                        "ledger-target",
+                        "contribution",
+                        fixture.Gm.UserId,
+                        target.GroupId,
+                        "source-target",
+                        1,
+                        "point",
+                        "Preserved group ledger fixture.",
+                        now));
+                    break;
+                case "reward":
+                    fixture.Store.RewardEntries.Add(new RewardJournalEntryDto(
+                        "reward-target",
+                        fixture.Gm.UserId,
+                        target.GroupId,
+                        "contribution",
+                        1,
+                        "source-target",
+                        "Preserved group reward fixture.",
+                        now));
+                    break;
+                case "entitlement":
+                    fixture.Store.EntitlementEntries.Add(new EntitlementGrantDto(
+                        "entitlement-target",
+                        "group",
+                        target.GroupId,
+                        "preview_access",
+                        "source-target",
+                        "Preserved group entitlement fixture.",
+                        now));
+                    break;
+                default:
+                    throw new InvalidOperationException("Unknown recognition coupling test case.");
+            }
+            fixture.Store.PersistLocked();
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownConflictException error = Assert.Throws<CampaignTeardownConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                target.CampaignId,
+                new DeleteCampaignCollaborationRequest(
+                    current.Name,
+                    current.UpdatedAtUtc,
+                    $"recognition-coupled-{stateKind}")));
+
+        Assert.Contains("sponsorship", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownFailsClosedWhenWorkspaceHistoryReferencesCampaign()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Workspace History Target");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.CampaignAdoptions.Add(new CampaignAdoptionProjection(
+                AdoptionId: "adoption-target",
+                WorkspaceId: "workspace-target",
+                CampaignId: target.CampaignId,
+                SafeToPlay: false,
+                ConfidencePercent: 50,
+                RunnerCount: 0,
+                ActiveJobCount: 0,
+                ContactCount: 0,
+                HouseRuleCount: 0,
+                ExplicitUnknowns: ["test fixture"],
+                RecommendedNextActions: ["preserve history"],
+                Summary: "Preserved workspace history teardown guard fixture.",
+                NextSafeAction: "Refuse teardown.",
+                EvidenceLines: ["Campaign reference remains live."],
+                UpdatedByUserId: fixture.Gm.UserId,
+                UpdatedAtUtc: now));
+            fixture.Store.PersistLocked();
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownConflictException error = Assert.Throws<CampaignTeardownConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                target.CampaignId,
+                new DeleteCampaignCollaborationRequest(
+                    current.Name,
+                    current.UpdatedAtUtc,
+                    "workspace-history-coupled")));
+
+        Assert.Contains("workspace history", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(fixture.Store.CampaignAdoptions, item => item.CampaignId == target.CampaignId);
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownFailsClosedWhenPlaySessionReferencesCampaignResources()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Play Session Target");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        string runId = Assert.Single(target.RunIds);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.PlaySessionsById["play-session-target"] = new PlaySessionBinding(
+                SessionId: "play-session-target",
+                CampaignId: target.CampaignId,
+                RunId: runId,
+                GroupId: target.GroupId,
+                Status: PlaySessionStatuses.Active,
+                AuthorizationVersion: 1,
+                CreatedByUserId: fixture.Gm.UserId,
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now);
+            fixture.Store.PersistLocked();
+        }
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownConflictException error = Assert.Throws<CampaignTeardownConflictException>(() =>
+            fixture.Service.DeleteCampaign(
+                fixture.Gm,
+                target.CampaignId,
+                new DeleteCampaignCollaborationRequest(
+                    current.Name,
+                    current.UpdatedAtUtc,
+                    "play-session-coupled")));
+
+        Assert.Contains("play session", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fixture.Store.PlaySessionsById.ContainsKey("play-session-target"));
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.Empty(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownRemovesDerivedRestoreProjectionsForAffectedUsersAndTargetReferences()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection target = fixture.CreateCampaign("Restore Projection Target");
+        CampaignCollaborationProjection unrelated = fixture.CreateCampaign("Restore Projection Preserved");
+        HubUserDto targetReferenceUser = fixture.CreateUser(
+            "subject.restore-target-reference",
+            "Target Restore Reference");
+        HubUserDto unrelatedReferenceUser = fixture.CreateUser(
+            "subject.restore-unrelated-reference",
+            "Unrelated Restore Reference");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.RestoreByUserId[fixture.Gm.UserId] = new WorkspaceRestoreProjection(
+                RestoreId: "restore-affected-owner",
+                UserId: fixture.Gm.UserId,
+                RecentDossiers: [],
+                RecentCampaigns: [fixture.Store.CampaignSpinesById[unrelated.CampaignId]],
+                RecentRuleEnvironments: [],
+                RecentArtifacts: [],
+                Entitlements: [],
+                ClaimedDevices: [],
+                ConflictSummaries: [],
+                LocalOnlyNotes: ["The whole projection belongs to an affected group member."],
+                GeneratedAtUtc: now);
+            fixture.Store.RestoreByUserId[targetReferenceUser.UserId] = new WorkspaceRestoreProjection(
+                RestoreId: "restore-target-reference",
+                UserId: targetReferenceUser.UserId,
+                RecentDossiers: [],
+                RecentCampaigns: [fixture.Store.CampaignSpinesById[target.CampaignId]],
+                RecentRuleEnvironments: [],
+                RecentArtifacts: [],
+                Entitlements: [],
+                ClaimedDevices: [],
+                ConflictSummaries: [],
+                LocalOnlyNotes: ["Derived target reference must be discarded."],
+                GeneratedAtUtc: now);
+            fixture.Store.RestoreByUserId[unrelatedReferenceUser.UserId] = new WorkspaceRestoreProjection(
+                RestoreId: "restore-unrelated-reference",
+                UserId: unrelatedReferenceUser.UserId,
+                RecentDossiers: [],
+                RecentCampaigns: [fixture.Store.CampaignSpinesById[unrelated.CampaignId]],
+                RecentRuleEnvironments: [],
+                RecentArtifacts: [],
+                Entitlements: [],
+                ClaimedDevices: [],
+                ConflictSummaries: [],
+                LocalOnlyNotes: ["Unrelated restore projection must survive."],
+                GeneratedAtUtc: now);
+            fixture.Store.PersistLocked();
+        }
+        string unrelatedRestoreBefore = JsonSerializer.Serialize(
+            fixture.Store.RestoreByUserId[unrelatedReferenceUser.UserId]);
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownReceipt receipt = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            target.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                current.Name,
+                current.UpdatedAtUtc,
+                "restore-projection-cleanup"));
+
+        Assert.Equal(2, receipt.Removed.RestoreProjections);
+        Assert.False(fixture.Store.RestoreByUserId.ContainsKey(fixture.Gm.UserId));
+        Assert.False(fixture.Store.RestoreByUserId.ContainsKey(targetReferenceUser.UserId));
+        Assert.Equal(unrelatedRestoreBefore, JsonSerializer.Serialize(
+            fixture.Store.RestoreByUserId[unrelatedReferenceUser.UserId]));
+        Assert.False(fixture.Store.CampaignSpinesById.ContainsKey(target.CampaignId));
+        Assert.True(fixture.Store.CampaignSpinesById.ContainsKey(unrelated.CampaignId));
+        Assert.Single(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CampaignTeardownScrubsOnlyTargetWorkspaceHistoryAndSyncsUxOnlyUsers()
+    {
+        var projectionSync = new RecordingUserProjectionSyncQueue();
+        using var fixture = new CampaignFixture(projectionSync);
+        CampaignCollaborationProjection target = fixture.CreateCampaign("User Experience Target");
+        HubUserDto uxOnlyUser = fixture.CreateUser("subject.ux-only-sync", "UX Only Sync");
+        HubUserDto unaffectedUser = fixture.CreateUser("subject.ux-unaffected", "UX Unaffected");
+        DateTimeOffset now = fixture.Clock.GetUtcNow();
+        string workspaceId = "workspace-" + Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(target.CampaignId)))[..12]
+            .ToLowerInvariant();
+        const string preservedOwnerWorkspaceId = "workspace-owner-preserved";
+        const string preservedUxOnlyWorkspaceId = "workspace-ux-only-preserved";
+        const string unaffectedWorkspaceId = "workspace-unaffected";
+        var ownerExperience = new HubUserExperienceDto(
+            UserId: fixture.Gm.UserId,
+            LaneInterests: ["gm_tools", "living_world"],
+            FollowHorizons: true,
+            BetaInterest: false,
+            OnboardingCompleted: true,
+            OnboardingCompletedAtUtc: now.AddDays(-2),
+            UpdatedAtUtc: now,
+            WorkspacePrepLibrarySearchHistory:
+            [
+                new WorkspacePrepLibrarySearchHistoryItem(workspaceId, "runsite", now.AddMinutes(-2)),
+                new WorkspacePrepLibrarySearchHistoryItem(preservedOwnerWorkspaceId, "prep", now.AddMinutes(-1))
+            ]);
+        var uxOnlyExperience = new HubUserExperienceDto(
+            UserId: uxOnlyUser.UserId,
+            LaneInterests: ["runner_tools"],
+            FollowHorizons: false,
+            BetaInterest: true,
+            OnboardingCompleted: false,
+            OnboardingCompletedAtUtc: null,
+            UpdatedAtUtc: now,
+            WorkspacePrepLibrarySearchHistory:
+            [
+                new WorkspacePrepLibrarySearchHistoryItem(workspaceId.ToUpperInvariant(), "recap", now.AddMinutes(-3)),
+                new WorkspacePrepLibrarySearchHistoryItem(preservedUxOnlyWorkspaceId, "prep", now.AddMinutes(-1))
+            ]);
+        var unaffectedExperience = new HubUserExperienceDto(
+            UserId: unaffectedUser.UserId,
+            LaneInterests: ["news"],
+            FollowHorizons: true,
+            BetaInterest: true,
+            OnboardingCompleted: true,
+            OnboardingCompletedAtUtc: now.AddDays(-1),
+            UpdatedAtUtc: now,
+            WorkspacePrepLibrarySearchHistory:
+            [
+                new WorkspacePrepLibrarySearchHistoryItem(unaffectedWorkspaceId, "news", now)
+            ]);
+        lock (fixture.Store.Gate)
+        {
+            fixture.Store.UserExperienceByUserId[fixture.Gm.UserId] = ownerExperience;
+            fixture.Store.UserExperienceByUserId[uxOnlyUser.UserId] = uxOnlyExperience;
+            fixture.Store.UserExperienceByUserId[unaffectedUser.UserId] = unaffectedExperience;
+            fixture.Store.PersistLocked();
+        }
+        string unaffectedBefore = JsonSerializer.Serialize(unaffectedExperience);
+
+        CampaignCollaborationProjection current = Assert.IsType<CampaignCollaborationProjection>(
+            fixture.Service.GetCampaign(fixture.Gm, target.CampaignId));
+        CampaignTeardownReceipt receipt = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            target.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                current.Name,
+                current.UpdatedAtUtc,
+                "user-experience-cleanup"));
+
+        Assert.Equal(2, receipt.Removed.WorkspacePrepLibrarySearchHistoryItems);
+        HubUserExperienceDto currentOwnerExperience = fixture.Store.UserExperienceByUserId[fixture.Gm.UserId];
+        WorkspacePrepLibrarySearchHistoryItem ownerHistory = Assert.Single(
+            currentOwnerExperience.WorkspacePrepLibrarySearchHistory ?? []);
+        Assert.Equal(preservedOwnerWorkspaceId, ownerHistory.WorkspaceId);
+        Assert.Equal(ownerExperience.LaneInterests, currentOwnerExperience.LaneInterests);
+        Assert.Equal(ownerExperience.FollowHorizons, currentOwnerExperience.FollowHorizons);
+        Assert.Equal(ownerExperience.BetaInterest, currentOwnerExperience.BetaInterest);
+        Assert.Equal(ownerExperience.OnboardingCompleted, currentOwnerExperience.OnboardingCompleted);
+        Assert.Equal(ownerExperience.OnboardingCompletedAtUtc, currentOwnerExperience.OnboardingCompletedAtUtc);
+        Assert.Equal(receipt.DeletedAtUtc, currentOwnerExperience.UpdatedAtUtc);
+
+        HubUserExperienceDto currentUxOnlyExperience = fixture.Store.UserExperienceByUserId[uxOnlyUser.UserId];
+        WorkspacePrepLibrarySearchHistoryItem uxOnlyHistory = Assert.Single(
+            currentUxOnlyExperience.WorkspacePrepLibrarySearchHistory ?? []);
+        Assert.Equal(preservedUxOnlyWorkspaceId, uxOnlyHistory.WorkspaceId);
+        Assert.Equal(uxOnlyExperience.LaneInterests, currentUxOnlyExperience.LaneInterests);
+        Assert.Equal(uxOnlyExperience.FollowHorizons, currentUxOnlyExperience.FollowHorizons);
+        Assert.Equal(uxOnlyExperience.BetaInterest, currentUxOnlyExperience.BetaInterest);
+        Assert.Equal(uxOnlyExperience.OnboardingCompleted, currentUxOnlyExperience.OnboardingCompleted);
+        Assert.Equal(uxOnlyExperience.OnboardingCompletedAtUtc, currentUxOnlyExperience.OnboardingCompletedAtUtc);
+        Assert.Equal(receipt.DeletedAtUtc, currentUxOnlyExperience.UpdatedAtUtc);
+
+        Assert.Equal(unaffectedBefore, JsonSerializer.Serialize(
+            fixture.Store.UserExperienceByUserId[unaffectedUser.UserId]));
+        Assert.Equal(2, projectionSync.Users.Select(static user => user.UserId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count());
+        Assert.Contains(projectionSync.Users, user => user.UserId == fixture.Gm.UserId);
+        Assert.Contains(projectionSync.Users, user => user.UserId == uxOnlyUser.UserId);
+        Assert.DoesNotContain(projectionSync.Users, user => user.UserId == unaffectedUser.UserId);
+        Assert.Empty(uxOnlyUser.GroupIds);
+        Assert.Single(fixture.Store.CampaignTeardownsByIdempotencyKey);
+    }
+
+    [Fact]
     public void RunsiteDraftIsGmOnlyAndPublishedSnapshotNeverContainsGmNotes()
     {
         using var fixture = new CampaignFixture();
@@ -1517,6 +2534,33 @@ public sealed class CampaignCollaborationServiceTests
             new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance));
     }
 
+    [Theory]
+    [InlineData("restoreProjections")]
+    [InlineData("workspacePrepLibrarySearchHistoryItems")]
+    public void CollaborationStateReloadRejectsNegativeDerivedCacheTeardownCount(string countProperty)
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign("Derived Cache Count Guard");
+        _ = fixture.Service.DeleteCampaign(
+            fixture.Gm,
+            campaign.CampaignId,
+            new DeleteCampaignCollaborationRequest(
+                campaign.Name,
+                campaign.UpdatedAtUtc,
+                $"negative-derived-cache-count-{countProperty}"));
+
+        JsonObject root = Assert.IsType<JsonObject>(JsonNode.Parse(File.ReadAllText(fixture.StorePath)));
+        JsonArray teardowns = Assert.IsType<JsonArray>(root["campaignTeardowns"]);
+        JsonObject teardown = Assert.IsType<JsonObject>(Assert.Single(teardowns));
+        JsonObject response = Assert.IsType<JsonObject>(teardown["response"]);
+        JsonObject removed = Assert.IsType<JsonObject>(response["removed"]);
+        removed[countProperty] = -1;
+        File.WriteAllText(fixture.StorePath, root.ToJsonString());
+
+        Assert.Throws<InvalidDataException>(() =>
+            new CommunityStore(fixture.Configuration, NullLogger<CommunityStore>.Instance));
+    }
+
     private static CreateCampaignCollaborationRequest CampaignRequest(
         string Name,
         string? Summary = null,
@@ -1564,7 +2608,7 @@ public sealed class CampaignCollaborationServiceTests
     {
         private readonly string _directory;
 
-        public CampaignFixture()
+        public CampaignFixture(IHubUserProjectionSyncQueue? userProjectionSync = null)
         {
             _directory = Path.Combine(Path.GetTempPath(), "chummer-campaign-collaboration-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_directory);
@@ -1579,7 +2623,12 @@ public sealed class CampaignCollaborationServiceTests
             CanonicalEdits = new RecordingCanonicalGmCharacterEditGateway(Store, Clock);
             DataProtection = DataProtectionProvider.Create(
                 new DirectoryInfo(DataProtectionPath));
-            Service = new CampaignCollaborationService(Store, CanonicalEdits, DataProtection, Clock);
+            Service = new CampaignCollaborationService(
+                Store,
+                CanonicalEdits,
+                DataProtection,
+                Clock,
+                userProjectionSync);
             Gm = CreateUser("subject.gm", "Game Master");
         }
 
@@ -1668,6 +2717,13 @@ public sealed class CampaignCollaborationServiceTests
             try { Directory.Delete(_directory, recursive: true); }
             catch { }
         }
+    }
+
+    private sealed class RecordingUserProjectionSyncQueue : IHubUserProjectionSyncQueue
+    {
+        public List<HubUserDto> Users { get; } = new();
+
+        public void QueueSyncUser(HubUserDto user) => Users.Add(user);
     }
 
     internal sealed class RecordingCanonicalGmCharacterEditGateway : ICoreGmCharacterEditGateway

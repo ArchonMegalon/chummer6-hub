@@ -70,9 +70,11 @@ jobs:
             scripts/materialize_staged_release_finalizer_handoff.py \
             scripts/finalize_staged_release.py \
             scripts/accept_live_campaign_release.py \
+            scripts/verify_governed_campaign_e2e_receipt.py \
             scripts/probe_horizon_live_readiness.py \
             scripts/verify_horizon_live_readiness.py \
             scripts/verify_post_activation_acceptance.py \
+            scripts/verify_public_edge_compose_operability.py \
             scripts/release/verify_public_projection.py \
             scripts/verify_live_public_windows_installer.py
           bash -n scripts/release/verify_public_projection.sh
@@ -87,9 +89,12 @@ jobs:
             tests/test_materialize_staged_release_finalizer_handoff.py \
             tests/test_finalize_staged_release.py \
             tests/test_accept_live_campaign_release.py \
+            tests/test_verify_governed_campaign_e2e_receipt.py \
             tests/test_probe_horizon_live_readiness.py \
             tests/test_verify_horizon_live_readiness.py \
             tests/test_verify_post_activation_acceptance.py \
+            tests/test_public_edge_volume_initializer.py \
+            tests/test_public_edge_compose_operability.py::PublicEdgeComposeOperabilityTests::test_missing_core_gm_workspace_root_fails_closed \
             tests/test_mac_release_bootstrap_authority_closure.py \
             tests/test_mac_release_stage_only.py \
             tests/test_final_gold_janitor.py \
@@ -147,9 +152,11 @@ jobs:
             scripts/materialize_staged_release_finalizer_handoff.py \
             scripts/finalize_staged_release.py \
             scripts/accept_live_campaign_release.py \
+            scripts/verify_governed_campaign_e2e_receipt.py \
             scripts/probe_horizon_live_readiness.py \
             scripts/verify_horizon_live_readiness.py \
             scripts/verify_post_activation_acceptance.py \
+            scripts/verify_public_edge_compose_operability.py \
             scripts/release/verify_public_projection.py \
             scripts/verify_live_public_windows_installer.py
           python3 -m pytest -q \
@@ -162,9 +169,12 @@ jobs:
             tests/test_materialize_staged_release_finalizer_handoff.py \
             tests/test_finalize_staged_release.py \
             tests/test_accept_live_campaign_release.py \
+            tests/test_verify_governed_campaign_e2e_receipt.py \
             tests/test_probe_horizon_live_readiness.py \
             tests/test_verify_horizon_live_readiness.py \
             tests/test_verify_post_activation_acceptance.py \
+            tests/test_public_edge_volume_initializer.py \
+            tests/test_public_edge_compose_operability.py::PublicEdgeComposeOperabilityTests::test_missing_core_gm_workspace_root_fails_closed \
             tests/test_mac_release_bootstrap_authority_closure.py \
             tests/test_mac_release_stage_only.py \
             tests/test_final_gold_janitor.py \

@@ -94,7 +94,10 @@ public sealed class CommunityStore
     internal Dictionary<string, CampaignSheetEditIdempotencyState> CampaignSheetEditsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal List<CampaignGmAuthorityAuditState> CampaignGmAuthorityAudit { get; } = new();
     internal Dictionary<string, CampaignGmAuthorityIdempotencyState> CampaignGmAuthorityCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignTeardownIdempotencyState> CampaignTeardownsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
     internal Action? CampaignCollaborationPersistenceFaultInjector { get; set; }
+    internal Action? LedgerPersistenceFaultInjector { get; set; }
+    internal Action? AftermathPersistenceFaultInjector { get; set; }
     public Dictionary<string, PlaySessionBinding> PlaySessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PlaySessionParticipant> PlayParticipantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PlaySessionInvite> PlayInvitesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -147,7 +150,10 @@ public sealed class CommunityStore
             CampaignRedemptionsByIdempotencyKey.ToArray(),
             CampaignSheetEditsByIdempotencyKey.ToArray(),
             CampaignGmAuthorityAudit.ToArray(),
-            CampaignGmAuthorityCommandsByIdempotencyKey.ToArray());
+            CampaignGmAuthorityCommandsByIdempotencyKey.ToArray(),
+            CampaignTeardownsByIdempotencyKey.ToArray(),
+            RestoreByUserId.ToArray(),
+            UserExperienceByUserId.ToArray());
 
     private void RestoreCampaignCollaborationTransactionLocked(CampaignCollaborationTransactionSnapshot snapshot)
     {
@@ -183,6 +189,9 @@ public sealed class CommunityStore
         ReplaceDictionary(CampaignSheetEditsByIdempotencyKey, snapshot.SheetEdits);
         ReplaceList(CampaignGmAuthorityAudit, snapshot.GmAuthorityAudit);
         ReplaceDictionary(CampaignGmAuthorityCommandsByIdempotencyKey, snapshot.GmAuthorityCommands);
+        ReplaceDictionary(CampaignTeardownsByIdempotencyKey, snapshot.Teardowns);
+        ReplaceDictionary(RestoreByUserId, snapshot.RestoreProjections);
+        ReplaceDictionary(UserExperienceByUserId, snapshot.UserExperience);
     }
 
     private static void ReplaceDictionary<TKey, TValue>(
@@ -375,6 +384,9 @@ public sealed class CommunityStore
                 .ToArray(),
             CampaignGmAuthorityCommands: CampaignGmAuthorityCommandsByIdempotencyKey.Values
                 .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignTeardowns: CampaignTeardownsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
                 .ToArray());
 
         CampaignCollaborationStateValidator.ValidateSnapshot(
@@ -390,6 +402,7 @@ public sealed class CommunityStore
             snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
             snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
             snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
+            snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>(),
             snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
             snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
 
@@ -479,6 +492,7 @@ public sealed class CommunityStore
             snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
             snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
             snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
+            snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>(),
             snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
             snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
 
@@ -547,6 +561,7 @@ public sealed class CommunityStore
         CampaignSheetEditsByIdempotencyKey.Clear();
         CampaignGmAuthorityAudit.Clear();
         CampaignGmAuthorityCommandsByIdempotencyKey.Clear();
+        CampaignTeardownsByIdempotencyKey.Clear();
         PlaySessionsById.Clear();
         PlayParticipantsById.Clear();
         PlayInvitesById.Clear();
@@ -711,6 +726,11 @@ public sealed class CommunityStore
         foreach (CampaignGmAuthorityIdempotencyState command in snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>())
         {
             CampaignGmAuthorityCommandsByIdempotencyKey[command.Key] = command;
+        }
+
+        foreach (CampaignTeardownIdempotencyState command in snapshot.CampaignTeardowns ?? Array.Empty<CampaignTeardownIdempotencyState>())
+        {
+            CampaignTeardownsByIdempotencyKey[command.Key] = command;
         }
 
         foreach (var session in snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>())
@@ -886,7 +906,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignRedemptionIdempotencyState>? CampaignRedemptions = null,
     IReadOnlyList<CampaignSheetEditIdempotencyState>? CampaignSheetEdits = null,
     IReadOnlyList<CampaignGmAuthorityAuditState>? CampaignGmAuthorityAudit = null,
-    IReadOnlyList<CampaignGmAuthorityIdempotencyState>? CampaignGmAuthorityCommands = null);
+    IReadOnlyList<CampaignGmAuthorityIdempotencyState>? CampaignGmAuthorityCommands = null,
+    IReadOnlyList<CampaignTeardownIdempotencyState>? CampaignTeardowns = null);
 
 internal sealed record CampaignCollaborationTransactionSnapshot(
     IReadOnlyList<HubUserDto> Users,
@@ -907,7 +928,10 @@ internal sealed record CampaignCollaborationTransactionSnapshot(
     IReadOnlyList<KeyValuePair<string, CampaignRedemptionIdempotencyState>> Redemptions,
     IReadOnlyList<KeyValuePair<string, CampaignSheetEditIdempotencyState>> SheetEdits,
     IReadOnlyList<CampaignGmAuthorityAuditState> GmAuthorityAudit,
-    IReadOnlyList<KeyValuePair<string, CampaignGmAuthorityIdempotencyState>> GmAuthorityCommands);
+    IReadOnlyList<KeyValuePair<string, CampaignGmAuthorityIdempotencyState>> GmAuthorityCommands,
+    IReadOnlyList<KeyValuePair<string, CampaignTeardownIdempotencyState>> Teardowns,
+    IReadOnlyList<KeyValuePair<string, WorkspaceRestoreProjection>> RestoreProjections,
+    IReadOnlyList<KeyValuePair<string, HubUserExperienceDto>> UserExperience);
 
 public sealed record ImportantWorkItemProjection(
     string ItemId,

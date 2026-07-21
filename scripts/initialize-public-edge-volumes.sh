@@ -104,6 +104,41 @@ migrate_mutable_root() {
   probe_as_portal_identity "$root"
 }
 
+ensure_private_directory_as_portal_identity() {
+  directory="$1"
+  case "$directory" in
+    /app/state/*) ;;
+    *) fail "$directory is outside the mutable application-state root" ;;
+  esac
+
+  # Core's store-backed delegated GM edit boundary deliberately refuses to
+  # create its state root. Provision and verify that root as the same non-root
+  # identity that runs the portal, after the volume ownership migration.
+  # shellcheck disable=SC2016
+  setpriv \
+    --reuid="$portal_uid" \
+    --regid="$portal_gid" \
+    --clear-groups \
+    /bin/sh -eu -c '
+      expected_uid="$1"
+      expected_gid="$2"
+      directory="$3"
+      [ ! -L "$directory" ] || exit 1
+      if [ -e "$directory" ]; then
+        [ -d "$directory" ] || exit 1
+      else
+        mkdir -m 700 -- "$directory"
+      fi
+      chmod 700 -- "$directory"
+      [ "$(stat -c %u -- "$directory")" = "$expected_uid" ] || exit 1
+      [ "$(stat -c %g -- "$directory")" = "$expected_gid" ] || exit 1
+      [ "$(stat -c %a -- "$directory")" = "700" ] || exit 1
+    ' private-directory-provisioner "$portal_uid" "$portal_gid" "$directory" \
+    || fail "$directory cannot be provisioned for ${portal_uid}:${portal_gid}"
+
+  probe_as_portal_identity "$directory"
+}
+
 portal_uid="${CHUMMER_PORTAL_UID:-1654}"
 portal_gid="${CHUMMER_PORTAL_GID:-1654}"
 validate_numeric_identity CHUMMER_PORTAL_UID "$portal_uid"
@@ -119,6 +154,8 @@ for mutable_root in \
 do
   migrate_mutable_root "$mutable_root"
 done
+
+ensure_private_directory_as_portal_identity /app/state/core-workspaces
 
 # /downloads-source is a host bind and remains operator-owned. Prove access as the
 # portal identity, but never change its ownership or modes from inside the container.

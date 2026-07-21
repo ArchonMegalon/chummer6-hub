@@ -21,6 +21,9 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 CAMPAIGN_PRODUCER = importlib.import_module("accept_live_campaign_release")
+CAMPAIGN_V2_PRODUCER = importlib.import_module(
+    "verify_governed_campaign_e2e_receipt"
+)
 HORIZON_PRODUCER = importlib.import_module("verify_horizon_live_readiness")
 
 OBSERVED_AT = dt.datetime(2026, 7, 21, 12, 2, tzinfo=dt.timezone.utc)
@@ -330,6 +333,269 @@ def _campaign_permit(now: dt.datetime) -> dict[str, object]:
     }
 
 
+def _opaque(label: str) -> str:
+    return hashlib.sha256(label.encode()).hexdigest()
+
+
+def _campaign_v2_permit(
+    now: dt.datetime,
+    *,
+    release_binding: dict[str, str],
+) -> dict[str, object]:
+    action_rows = []
+    forward_total = 0
+    cleanup_total = 0
+    for action_id in CAMPAIGN_V2_PRODUCER.ACTION_IDS:
+        catalog = CAMPAIGN_V2_PRODUCER.ACTION_CATALOG[action_id]
+        forward_total += catalog["forwardWriteLimit"]
+        cleanup_total += catalog["cleanupWriteLimit"]
+        action_rows.append(
+            {
+                "actionId": action_id,
+                "role": catalog["role"],
+                "attemptLimit": catalog["attemptLimit"],
+                "forwardWriteLimit": catalog["forwardWriteLimit"],
+                "cleanupWriteLimit": catalog["cleanupWriteLimit"],
+                "compensator": catalog["compensator"],
+            }
+        )
+    return {
+        "contractName": CAMPAIGN_V2_PRODUCER.PERMIT_CONTRACT,
+        "contractVersion": 2,
+        "status": "approved",
+        "secretRedacted": True,
+        "permitId": "campaign-v2-permit",
+        "issuedAtUtc": _utc(now - dt.timedelta(minutes=2)),
+        "forwardExpiresAtUtc": _utc(now + dt.timedelta(minutes=10)),
+        "cleanupExpiresAtUtc": _utc(now + dt.timedelta(minutes=30)),
+        "allowedOrigin": CAMPAIGN_V2_PRODUCER.PRODUCTION_ORIGIN,
+        "releaseBinding": dict(release_binding),
+        "ownerAuthorization": {
+            "authorizationRefHmac": _opaque("owner-authorization"),
+            "authorizedByRefHmac": _opaque("release-owner"),
+            "authorizedAtUtc": _utc(now - dt.timedelta(minutes=3)),
+            "producerIndependent": True,
+        },
+        "canaryCampaignRefHmac": _opaque("canary-campaign"),
+        "roleAccountRefHmacs": {
+            role: _opaque(f"account:{role}")
+            for role in CAMPAIGN_V2_PRODUCER.ROLES
+        },
+        "actions": action_rows,
+        "totalForwardWriteLimit": forward_total,
+        "totalCleanupWriteLimit": cleanup_total,
+        "nonceRefHmac": _opaque("permit-nonce"),
+        "replayLedgerRefHmac": _opaque("permit-replay-ledger"),
+        "irreversibleActionsAllowed": False,
+        "notificationsAllowed": False,
+    }
+
+
+def _campaign_v2_receipt(
+    permit: dict[str, object],
+    *,
+    permit_sha256: str,
+    status: str,
+    generated_at: dt.datetime,
+    input_bindings: dict[str, str],
+) -> dict[str, object]:
+    pass_run = status == "pass"
+    cleanup_required = status == "cleanup_required"
+    credentialed = status != "not_run"
+    release_binding = dict(permit["releaseBinding"])
+    steps: list[dict[str, object]] = []
+    for index, action_id in enumerate(CAMPAIGN_V2_PRODUCER.ACTION_IDS):
+        catalog = CAMPAIGN_V2_PRODUCER.ACTION_CATALOG[action_id]
+        mutating = catalog["mutating"]
+        compensator = catalog["compensator"]
+        attempted = pass_run or (cleanup_required and index == 0)
+        forward_writes = catalog["forwardWriteLimit"] if attempted else 0
+        cleanup_writes = (
+            catalog["cleanupWriteLimit"] if pass_run and forward_writes else 0
+        )
+        steps.append(
+            {
+                "actionId": action_id,
+                "role": catalog["role"],
+                "status": (
+                    "pass" if pass_run else ("blocked" if attempted else "not_run")
+                ),
+                "mutating": mutating,
+                "attempts": 1 if attempted else 0,
+                "forwardWrites": forward_writes,
+                "cleanupWrites": cleanup_writes,
+                "assertionPassed": pass_run,
+                "compensator": compensator,
+                "compensatorAvailableBeforeWrite": bool(
+                    forward_writes and compensator
+                ),
+                "serverIdempotencyKeyHmac": (
+                    _opaque(f"forward-idempotency:{action_id}")
+                    if forward_writes
+                    else None
+                ),
+                "revisionPreconditionHmac": (
+                    _opaque(f"forward-revision:{action_id}")
+                    if forward_writes
+                    else None
+                ),
+                "journalIntentSha256": (
+                    _opaque(f"forward-journal:{action_id}")
+                    if forward_writes
+                    else None
+                ),
+                "evidenceSha256": (
+                    _opaque(f"action-evidence:{action_id}") if attempted else None
+                ),
+            }
+        )
+
+    cleanup_entries = []
+    if pass_run:
+        written_steps = [step for step in steps if step["forwardWrites"] == 1]
+        for sequence, step in enumerate(reversed(written_steps), start=1):
+            action_id = str(step["actionId"])
+            cleanup_entries.append(
+                {
+                    "sequence": sequence,
+                    "actionId": action_id,
+                    "resourceRefHmac": (
+                        permit["canaryCampaignRefHmac"]
+                        if action_id == "campaign_create_or_join"
+                        else _opaque(f"resource:{action_id}")
+                    ),
+                    "idempotencyKeyHmac": _opaque(f"cleanup-idempotency:{action_id}"),
+                    "revisionPreconditionHmac": _opaque(f"cleanup-revision:{action_id}"),
+                    "intentEvidenceSha256": step["journalIntentSha256"],
+                    "responseEvidenceSha256": _opaque(f"cleanup-response:{action_id}"),
+                    "result": "cleaned",
+                    "acknowledged": True,
+                }
+            )
+
+    clean = status != "cleanup_required"
+    snapshot = {**release_binding, "responseSha256": _opaque("current-response")}
+    browser_policy = {
+        field: False for field in CAMPAIGN_V2_PRODUCER.BROWSER_POLICY_FIELDS
+    }
+    browser_policy.update(
+        {
+            "allowedOrigin": CAMPAIGN_V2_PRODUCER.PRODUCTION_ORIGIN,
+            "sameOriginOnly": True,
+            "stopOnApprovalBoundary": True,
+            "stopOnIdentityMismatch": True,
+            "stopOnMfa": True,
+            "stopOnCaptcha": True,
+            "stopOnCloudflare": True,
+        }
+    )
+    return {
+        "contractName": CAMPAIGN_V2_PRODUCER.RECEIPT_CONTRACT,
+        "contractVersion": 2,
+        "receiptId": f"campaign-v2-{status}",
+        "generatedAtUtc": _utc(generated_at),
+        "status": status,
+        "secretRedacted": True,
+        "operationalReadinessClaimAllowed": pass_run,
+        "releaseBinding": release_binding,
+        "inputBindings": {**input_bindings, "mutationPermitSha256": permit_sha256},
+        "browserPolicy": browser_policy,
+        "currentFence": (
+            {
+                "preCurrent": None,
+                "postCurrent": None,
+                "stable": False,
+            }
+            if status == "not_run"
+            else {
+                "preCurrent": dict(snapshot),
+                "postCurrent": dict(snapshot),
+                "stable": True,
+            }
+        ),
+        "accounts": [
+            {
+                "role": role,
+                "accountRefHmac": permit["roleAccountRefHmacs"][role],
+                "browserContextRefHmac": _opaque(f"browser-context:{role}"),
+                "browserSessionRefHmac": _opaque(f"browser-session:{role}"),
+                "visibleIdentityMatched": True,
+            }
+            for role in CAMPAIGN_V2_PRODUCER.ROLES
+        ],
+        "journey": {
+            "credentialedAttemptPerformed": credentialed,
+            "steps": steps,
+        },
+        "permit": {
+            "permitSha256": permit_sha256,
+            "permitId": permit["permitId"],
+            "nonceRefHmac": permit["nonceRefHmac"],
+            "replayLedgerRefHmac": permit["replayLedgerRefHmac"],
+            "nonceClaimed": credentialed,
+            "replayDetected": False,
+            "forwardStartedAtUtc": (
+                _utc(generated_at - dt.timedelta(seconds=30))
+                if credentialed
+                else None
+            ),
+            "cleanupCompletedAtUtc": (
+                _utc(generated_at - dt.timedelta(seconds=5)) if pass_run else None
+            ),
+        },
+        "cleanup": {
+            "journal": {
+                "pathRefHmac": _opaque("cleanup-journal"),
+                "mode": 0o600,
+                "appendOnly": True,
+                "intentBeforeWrite": True,
+                "resultAfterResponse": True,
+            },
+            "strategy": {
+                "reverseOrder": True,
+                "resumable": True,
+                "finallyGuaranteed": True,
+                "runOwnedIdsOnly": True,
+                "broadDeletesUsed": False,
+                "preExistingContentChanged": False,
+            },
+            "entries": cleanup_entries,
+            "postconditions": {
+                "compensatorsAcknowledged": clean,
+                "canonicalPostMatchesPre": clean,
+                "residualCampaignRows": 0 if clean else 1,
+                "residualAuditRows": 0,
+                "residualRequestReceiptRows": 0,
+                "quotaUnchanged": clean,
+                "providerCallCount": 0,
+                "notificationCount": 0,
+            },
+        },
+        "browserOoda": {
+            "site": CAMPAIGN_V2_PRODUCER.PRODUCTION_ORIGIN,
+            "requestedActions": list(CAMPAIGN_V2_PRODUCER.ACTION_IDS),
+            "completedActions": (
+                list(CAMPAIGN_V2_PRODUCER.ACTION_IDS) if pass_run else []
+            ),
+            "safeContext": "production_isolated_contexts",
+            "qualityGate": (
+                "pass" if pass_run else ("not_run" if status == "not_run" else "blocked")
+            ),
+            "finalUrl": "https://chummer.run/account" if pass_run else None,
+            "stopCondition": (
+                "none" if pass_run else ("not_started" if status == "not_run" else "blocker")
+            ),
+            "evidenceSha256s": (
+                [step["evidenceSha256"] for step in steps] if pass_run else []
+            ),
+            "notificationOutcome": "none",
+            "irreversibleAttemptCount": 0,
+        },
+        "blockers": ["governed_test_blocker"] if status == "blocked" else [],
+        "failures": [],
+    }
+
+
 def _manifest(release_truth: dict[str, object]) -> dict[str, object]:
     truth = json.loads(json.dumps(release_truth))
     return {
@@ -367,6 +633,7 @@ def _bundle(
         "multi_account_live_journey",
     ),
     observed_at: dt.datetime = OBSERVED_AT,
+    campaign_v2_status: str | None = None,
 ) -> dict[str, object]:
     workspace = tmp_path / "workspace"
     workspace.mkdir(mode=0o700, parents=True)
@@ -400,6 +667,8 @@ def _bundle(
         "evidence_payloads": {},
         "producer_receipts": {},
         "producer_receipt_payloads": {},
+        "producer_permits": {},
+        "producer_permit_payloads": {},
         "observed_at": observed_at,
     }
     for index, kind in enumerate(kinds):
@@ -426,6 +695,71 @@ def _bundle(
             )
             bundle["producer_receipt_payloads"][kind] = producer_payload  # type: ignore[index]
         elif kind == "multi_account_live_journey":
+            if campaign_v2_status is not None:
+                permit_path = workspace / "campaign-mutation-permit-v2.json"
+                permit_payload = _campaign_v2_permit(
+                    evidence_at,
+                    release_binding=dict(TARGET),
+                )
+                permit_digest = _write(permit_path, permit_payload)
+                producer_path = workspace / "campaign-e2e-receipt-v2.json"
+                producer_payload = _campaign_v2_receipt(
+                    permit_payload,
+                    permit_sha256=permit_digest,
+                    status=campaign_v2_status,
+                    generated_at=evidence_at,
+                    input_bindings={
+                        "ownerFinalizationReceiptSha256": bundle["finalization_sha"],
+                        "generationConvergenceSha256": bundle["generation_sha"],
+                        "generationManifestFileSha256": bundle["manifest_sha"],
+                    },
+                )
+                producer_digest = _write(producer_path, producer_payload)
+                if campaign_v2_status in {"pass", "cleanup_required"}:
+                    passed = campaign_v2_status == "pass"
+                    payload = {
+                        "contractName": CAMPAIGN_V2_PRODUCER.EVIDENCE_CONTRACT,
+                        "contractVersion": 1,
+                        "status": "pass" if passed else "attention_required",
+                        "secretRedacted": True,
+                        "evidenceId": producer_payload["receiptId"],
+                        "evidenceKind": CAMPAIGN_V2_PRODUCER.EVIDENCE_KIND,
+                        "generatedAtUtc": producer_payload["generatedAtUtc"],
+                        "releaseBinding": producer_payload["releaseBinding"],
+                        "claims": [
+                            {
+                                "claimId": CAMPAIGN_V2_PRODUCER.OUTER_CLAIM_ID,
+                                "status": "pass" if passed else "attention_required",
+                                "evidenceSha256": producer_digest,
+                            }
+                        ],
+                        "operationalReadinessClaimAllowed": passed,
+                    }
+                else:
+                    validation = CAMPAIGN_V2_PRODUCER.validate_payloads(
+                        producer_payload,
+                        permit_payload,
+                        permit_sha256=permit_digest,
+                        observed_at=observed_at,
+                    )
+                    payload = CAMPAIGN_V2_PRODUCER.build_outer_evidence(
+                        producer_payload,
+                        validation,
+                    )
+                digest = _write(path, payload)
+                bundle["producer_receipts"][kind] = (  # type: ignore[index]
+                    producer_path,
+                    producer_digest,
+                )
+                bundle["producer_receipt_payloads"][kind] = producer_payload  # type: ignore[index]
+                bundle["producer_permits"][kind] = (  # type: ignore[index]
+                    permit_path,
+                    permit_digest,
+                )
+                bundle["producer_permit_payloads"][kind] = permit_payload  # type: ignore[index]
+                bundle["evidence"][kind] = (path, digest)  # type: ignore[index]
+                bundle["evidence_payloads"][kind] = payload  # type: ignore[index]
+                continue
             storage_states: dict[str, tuple[Path, str]] = {}
             for role in sorted(CAMPAIGN_PRODUCER.ROLES):
                 state_path = workspace / f"storage-{role}.json"
@@ -480,6 +814,19 @@ def _rebind_horizon_producer_inputs(bundle: dict[str, object]) -> None:
     bundle["evidence"][kind] = (evidence_path, _write(evidence_path, evidence))
 
 
+def _rebind_campaign_v2_producer_receipt(bundle: dict[str, object]) -> None:
+    kind = "multi_account_live_journey"
+    producer_path, _ = bundle["producer_receipts"][kind]
+    producer_payload = bundle["producer_receipt_payloads"][kind]
+    producer_digest = _write(producer_path, producer_payload)
+    bundle["producer_receipts"][kind] = (producer_path, producer_digest)
+
+    evidence_path, _ = bundle["evidence"][kind]
+    evidence = bundle["evidence_payloads"][kind]
+    evidence["claims"][0]["evidenceSha256"] = producer_digest
+    bundle["evidence"][kind] = (evidence_path, _write(evidence_path, evidence))
+
+
 def _verify(bundle: dict[str, object], *, output: Path | None = None):
     workspace = bundle["workspace"]
     assert isinstance(workspace, Path)
@@ -495,6 +842,7 @@ def _verify(bundle: dict[str, object], *, output: Path | None = None):
         release_manifest_file_sha256=bundle["manifest_sha"],
         required_evidence=bundle["evidence"],
         producer_receipts=bundle["producer_receipts"],
+        producer_permits=bundle["producer_permits"],
         output=output or workspace / "acceptance.json",
         observed_at=bundle["observed_at"],
     )
@@ -503,8 +851,10 @@ def _verify(bundle: dict[str, object], *, output: Path | None = None):
 def _cli_args(bundle: dict[str, object], output: Path) -> list[str]:
     evidence = bundle["evidence"]
     producer_receipts = bundle["producer_receipts"]
+    producer_permits = bundle["producer_permits"]
     assert isinstance(evidence, dict)
     assert isinstance(producer_receipts, dict)
+    assert isinstance(producer_permits, dict)
     args = [
         "--workspace",
         str(bundle["workspace"]),
@@ -531,6 +881,9 @@ def _cli_args(bundle: dict[str, object], output: Path) -> list[str]:
     for kind, (path, digest) in producer_receipts.items():
         args.extend(["--producer-receipt", f"{kind}={path}"])
         args.extend(["--producer-receipt-sha256", f"{kind}={digest}"])
+    for kind, (path, digest) in producer_permits.items():
+        args.extend(["--producer-permit", f"{kind}={path}"])
+        args.extend(["--producer-permit-sha256", f"{kind}={digest}"])
     return [*args, "--output", str(output)]
 
 
@@ -589,6 +942,155 @@ def test_aggregate_horizon_schema_matches_canonical_verifier() -> None:
     assert MODULE.HORIZON_CATALOG_OBSERVATION_FIELDS == (
         HORIZON_PRODUCER.CATALOG_OBSERVATION_FIELDS
     )
+
+
+def test_governed_campaign_v2_pass_is_rejected_while_producer_authority_is_disabled(
+    tmp_path: Path,
+):
+    assert CAMPAIGN_V2_PRODUCER.LIVE_PASS_AUTHORIZED is False
+    assert MODULE.CAMPAIGN_V2_LIVE_PASS_AUTHORIZED is False
+    bundle = _bundle(tmp_path, campaign_v2_status="pass")
+
+    with pytest.raises(
+        MODULE.AcceptanceError,
+        match="native pass is disabled by producer authority",
+    ):
+        _verify(bundle)
+
+
+@pytest.mark.parametrize("native_status", ["not_run", "blocked"])
+def test_governed_campaign_v2_non_pass_native_status_requires_attention(
+    tmp_path: Path,
+    native_status: str,
+):
+    bundle = _bundle(tmp_path, campaign_v2_status=native_status)
+
+    receipt = _verify(bundle)
+
+    campaign = next(
+        row
+        for row in receipt["evidence"]
+        if row["evidenceKind"] == "multi_account_live_journey"
+    )
+    assert receipt["status"] == "attention_required"
+    assert campaign["status"] == "attention_required"
+    assert campaign["accepted"] is False
+    assert campaign["provenanceStatus"] == (
+        f"governed_v2_{native_status}_receipt_and_permit_bound"
+    )
+
+
+def test_governed_campaign_v2_not_run_accepts_truthful_unobserved_fence(
+    tmp_path: Path,
+):
+    bundle = _bundle(tmp_path, campaign_v2_status="not_run")
+    producer = bundle["producer_receipt_payloads"]["multi_account_live_journey"]
+    assert producer["currentFence"] == {
+        "preCurrent": None,
+        "postCurrent": None,
+        "stable": False,
+    }
+
+    receipt = _verify(bundle)
+
+    campaign = next(
+        row
+        for row in receipt["evidence"]
+        if row["evidenceKind"] == "multi_account_live_journey"
+    )
+    assert campaign["status"] == "attention_required"
+    assert campaign["accepted"] is False
+    assert campaign["provenanceStatus"] == (
+        "governed_v2_not_run_receipt_and_permit_bound"
+    )
+
+
+def test_governed_campaign_v2_outer_id_must_bind_native_receipt_id(tmp_path: Path):
+    bundle = _bundle(tmp_path, campaign_v2_status="not_run")
+    kind = "multi_account_live_journey"
+    path, _ = bundle["evidence"][kind]
+    envelope = bundle["evidence_payloads"][kind]
+    envelope["evidenceId"] = "unbound-receipt-alias"
+    bundle["evidence"][kind] = (path, _write(path, envelope))
+
+    with pytest.raises(MODULE.AcceptanceError, match="producer receipt identity"):
+        _verify(bundle)
+
+
+def test_governed_campaign_v2_synthetic_cleanup_required_is_rejected(
+    tmp_path: Path,
+):
+    bundle = _bundle(tmp_path, campaign_v2_status="cleanup_required")
+
+    with pytest.raises(
+        MODULE.AcceptanceError,
+        match="failed authoritative validation",
+    ):
+        _verify(bundle)
+
+
+@pytest.mark.parametrize(
+    ("mapping_name", "label"),
+    [
+        ("producer_receipts", "producer receipt"),
+        ("producer_permits", "producer permit"),
+    ],
+)
+def test_governed_campaign_v2_receipt_and_permit_digest_tamper_is_rejected(
+    tmp_path: Path,
+    mapping_name: str,
+    label: str,
+):
+    bundle = _bundle(tmp_path, campaign_v2_status="not_run")
+    path, _ = bundle[mapping_name]["multi_account_live_journey"]
+    path.write_bytes(path.read_bytes() + b" ")
+
+    with pytest.raises(MODULE.AcceptanceError, match=rf"{label} SHA-256 mismatch"):
+        _verify(bundle)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "ownerFinalizationReceiptSha256",
+        "generationConvergenceSha256",
+        "generationManifestFileSha256",
+    ],
+)
+def test_governed_campaign_v2_input_bindings_must_match_aggregate_bytes(
+    tmp_path: Path,
+    field: str,
+):
+    bundle = _bundle(tmp_path, campaign_v2_status="not_run")
+    producer = bundle["producer_receipt_payloads"]["multi_account_live_journey"]
+    producer["inputBindings"][field] = "f" * 64
+    _rebind_campaign_v2_producer_receipt(bundle)
+
+    with pytest.raises(
+        MODULE.AcceptanceError,
+        match="inputBindings do not bind aggregate bytes",
+    ):
+        _verify(bundle)
+
+
+def test_governed_campaign_v2_current_fence_drift_is_rejected(tmp_path: Path):
+    bundle = _bundle(tmp_path, campaign_v2_status="pass")
+    producer = bundle["producer_receipt_payloads"]["multi_account_live_journey"]
+    producer["currentFence"]["postCurrent"]["responseSha256"] = "f" * 64
+    _rebind_campaign_v2_producer_receipt(bundle)
+
+    with pytest.raises(MODULE.AcceptanceError, match="CURRENT fence is not stable"):
+        _verify(bundle)
+
+
+def test_governed_campaign_v2_schema_drift_is_rejected(tmp_path: Path):
+    bundle = _bundle(tmp_path, campaign_v2_status="not_run")
+    producer = bundle["producer_receipt_payloads"]["multi_account_live_journey"]
+    producer["unexpected"] = True
+    _rebind_campaign_v2_producer_receipt(bundle)
+
+    with pytest.raises(MODULE.AcceptanceError, match="unexpected field set"):
+        _verify(bundle)
 
 
 @pytest.mark.parametrize(
@@ -1194,3 +1696,49 @@ def test_cli_returns_attention_and_fail_without_partial_output(tmp_path: Path, c
     assert MODULE.main(args) == 1
     assert not fail_output.exists()
     assert "post_activation_acceptance:fail:" in capsys.readouterr().err
+
+
+def test_cli_maps_accepted_status_to_success(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
+    bundle = _bundle(
+        tmp_path,
+        observed_at=dt.datetime.now(dt.timezone.utc),
+    )
+    output = bundle["workspace"] / "accepted.json"
+    monkeypatch.setattr(MODULE, "verify", lambda **_kwargs: {"status": "accepted"})
+
+    assert MODULE.main(_cli_args(bundle, output)) == 0
+    streams = capsys.readouterr()
+    assert streams.out == "post_activation_acceptance:accepted\n"
+    assert streams.err == ""
+
+
+def test_governed_campaign_v2_cli_keeps_non_pass_attention_and_rejects_pass(
+    tmp_path: Path,
+    capsys,
+):
+    bundle = _bundle(
+        tmp_path / "non-pass",
+        observed_at=dt.datetime.now(dt.timezone.utc),
+        campaign_v2_status="blocked",
+    )
+    attention_output = bundle["workspace"] / "v2-attention.json"
+
+    assert MODULE.main(_cli_args(bundle, attention_output)) == 2
+    assert json.loads(attention_output.read_text())["status"] == "attention_required"
+    assert "post_activation_acceptance:attention_required" in capsys.readouterr().out
+
+    pass_bundle = _bundle(
+        tmp_path / "pass",
+        observed_at=dt.datetime.now(dt.timezone.utc),
+        campaign_v2_status="pass",
+    )
+    fail_output = pass_bundle["workspace"] / "v2-pass.json"
+    assert MODULE.main(_cli_args(pass_bundle, fail_output)) == 1
+    assert not fail_output.exists()
+    assert (
+        "native pass is disabled by producer authority" in capsys.readouterr().err
+    )

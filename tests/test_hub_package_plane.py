@@ -539,9 +539,15 @@ def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> Non
     assert "scripts/materialize_release_authority_advance_request.py" in workflow
     assert "scripts/materialize_release_scorecard_handoff.py" in workflow
     assert "scripts/materialize_release_ready_receipt.py" in workflow
+    assert "scripts/verify_governed_campaign_e2e_receipt.py" in workflow
+    assert "scripts/verify_post_activation_acceptance.py" in workflow
+    assert "scripts/verify_public_edge_compose_operability.py" in workflow
     assert "tests/test_materialize_release_authority_advance_request.py" in workflow
     assert "tests/test_materialize_release_scorecard_handoff.py" in workflow
     assert "tests/test_materialize_release_ready_campaign_preview.py" in workflow
+    assert "tests/test_verify_governed_campaign_e2e_receipt.py" in workflow
+    assert "tests/test_verify_post_activation_acceptance.py" in workflow
+    assert "tests/test_public_edge_volume_initializer.py" in workflow
     assert "tests/public/ui-frame-candidate-binding.spec.ts" in workflow
 
 

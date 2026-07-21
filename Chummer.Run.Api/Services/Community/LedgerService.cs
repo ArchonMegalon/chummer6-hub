@@ -23,6 +23,12 @@ public sealed class LedgerService
         var canonicalReceipt = Canonicalize(receipt);
         lock (_store.Gate)
         {
+            if (canonicalReceipt.GroupId is { } groupId
+                && !_store.GroupsById.ContainsKey(groupId))
+            {
+                throw new KeyNotFoundException($"Unknown group: {groupId}");
+            }
+
             if (_store.Receipts.Any(existing => string.Equals(existing.ReceiptId, canonicalReceipt.ReceiptId, StringComparison.OrdinalIgnoreCase)))
             {
                 return new ReceiptIngestResultDto(
@@ -34,36 +40,51 @@ public sealed class LedgerService
                     IngestedAtUtc: DateTimeOffset.UtcNow);
             }
 
-            _store.Receipts.Add(canonicalReceipt);
-            if (!string.IsNullOrWhiteSpace(canonicalReceipt.UserId))
+            int receiptCount = _store.Receipts.Count;
+            int ledgerCount = _store.LedgerEntries.Count;
+            int rewardCount = _store.RewardEntries.Count;
+            int entitlementCount = _store.EntitlementEntries.Count;
+            int badgeCount = _store.Badges.Count;
+            try
             {
-                _store.LedgerEntries.Add(
-                    new LedgerEntryDto(
-                        EntryId: AccountService.NewId("led"),
-                        EntryKind: canonicalReceipt.EventKind,
-                        UserId: canonicalReceipt.UserId!,
-                        GroupId: AccountService.NormalizeOptional(canonicalReceipt.GroupId),
-                        SourceId: canonicalReceipt.ReceiptId,
-                        Units: 1,
-                        Unit: "receipt",
-                        Description: $"{canonicalReceipt.EventKind} receipt for {canonicalReceipt.ProjectId}.",
-                        CreatedAtUtc: DateTimeOffset.UtcNow));
+                _store.Receipts.Add(canonicalReceipt);
+                if (!string.IsNullOrWhiteSpace(canonicalReceipt.UserId))
+                {
+                    _store.LedgerEntries.Add(
+                        new LedgerEntryDto(
+                            EntryId: AccountService.NewId("led"),
+                            EntryKind: canonicalReceipt.EventKind,
+                            UserId: canonicalReceipt.UserId!,
+                            GroupId: AccountService.NormalizeOptional(canonicalReceipt.GroupId),
+                            SourceId: canonicalReceipt.ReceiptId,
+                            Units: 1,
+                            Unit: "receipt",
+                            Description: $"{canonicalReceipt.EventKind} receipt for {canonicalReceipt.ProjectId}.",
+                            CreatedAtUtc: DateTimeOffset.UtcNow));
+                }
+
+                var mintedPoints = _rewards.ApplyReceipt(canonicalReceipt);
+                var granted = _entitlements.ApplyReceipt(canonicalReceipt, mintedPoints);
+                _store.LedgerPersistenceFaultInjector?.Invoke();
+                _store.PersistLocked();
+                return new ReceiptIngestResultDto(
+                    ReceiptId: canonicalReceipt.ReceiptId,
+                    Status: "ingested",
+                    MintedPoints: mintedPoints,
+                    GrantedEntitlements: granted,
+                    ProjectionFingerprint: ProjectionFingerprint(canonicalReceipt),
+                    IngestedAtUtc: DateTimeOffset.UtcNow);
+            }
+            catch
+            {
+                RemoveAppended(_store.Receipts, receiptCount);
+                RemoveAppended(_store.LedgerEntries, ledgerCount);
+                RemoveAppended(_store.RewardEntries, rewardCount);
+                RemoveAppended(_store.EntitlementEntries, entitlementCount);
+                RemoveAppended(_store.Badges, badgeCount);
+                throw;
             }
         }
-
-        var mintedPoints = _rewards.ApplyReceipt(canonicalReceipt);
-        var granted = _entitlements.ApplyReceipt(canonicalReceipt, mintedPoints);
-        lock (_store.Gate)
-        {
-            _store.PersistLocked();
-        }
-        return new ReceiptIngestResultDto(
-            ReceiptId: canonicalReceipt.ReceiptId,
-            Status: "ingested",
-            MintedPoints: mintedPoints,
-            GrantedEntitlements: granted,
-            ProjectionFingerprint: ProjectionFingerprint(canonicalReceipt),
-            IngestedAtUtc: DateTimeOffset.UtcNow);
     }
 
     public IReadOnlyList<LedgerEntryDto> ListForUser(string userId)
@@ -132,5 +153,13 @@ public sealed class LedgerService
         var payload = $"{receipt.ReceiptId}|{receipt.EventKind}|{receipt.ProjectId}|{receipt.UserId}|{receipt.GroupId}|{receipt.SponsorSessionId}|{receipt.LandedSha}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexString(hash[..8]).ToLowerInvariant();
+    }
+
+    private static void RemoveAppended<T>(List<T> items, int originalCount)
+    {
+        if (items.Count > originalCount)
+        {
+            items.RemoveRange(originalCount, items.Count - originalCount);
+        }
     }
 }

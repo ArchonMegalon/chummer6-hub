@@ -89,6 +89,19 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
         failures = module.validate_compose(payload)
         self.assertTrue(any(failure.startswith("chummer-play-web mem_limit") for failure in failures))
 
+    def test_missing_core_gm_workspace_root_fails_closed(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        del payload["services"]["chummer-portal"]["environment"][
+            module.CORE_GM_WORKSPACE_CONFIGURATION_KEY
+        ]
+
+        self.assertIn(
+            "chummer-portal must provision Core delegated GM edits at "
+            "/app/state/core-workspaces",
+            module.validate_compose(payload),
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

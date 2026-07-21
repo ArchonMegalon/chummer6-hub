@@ -26,8 +26,10 @@ public sealed class CampaignCollaborationService
     private const int MaxCampaignRosterSize = 100;
     private const int MaxIdempotencyKeyLength = 128;
     private const int MaxInviteAttemptsPerWindow = 10;
+    internal const int MaxCampaignTeardownReceipts = 1024;
     private static readonly TimeSpan InviteAttemptWindow = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan InviteRetention = TimeSpan.FromDays(7);
+    internal static readonly TimeSpan CampaignTeardownRetention = TimeSpan.FromDays(30);
     private const string ShortCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private const string PlayerRole = "player";
     private const string OwnerRole = "owner";
@@ -47,6 +49,8 @@ public sealed class CampaignCollaborationService
     private readonly ICoreGmCharacterEditGateway _canonicalCharacterEdits;
     private readonly IDataProtector _inviteReplayProtector;
     private readonly TimeProvider _timeProvider;
+    private readonly IHubUserProjectionSyncQueue? _userProjectionSync;
+    private readonly ILogger<CampaignCollaborationService> _logger;
     private readonly Dictionary<string, CampaignInviteAttemptWindow> _inviteAttemptsByUserId = new(StringComparer.OrdinalIgnoreCase);
 
     public CampaignCollaborationService(CommunityStore store)
@@ -85,7 +89,9 @@ public sealed class CampaignCollaborationService
         CommunityStore store,
         ICoreGmCharacterEditGateway canonicalCharacterEdits,
         IDataProtectionProvider dataProtectionProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IHubUserProjectionSyncQueue? userProjectionSync = null,
+        ILogger<CampaignCollaborationService>? logger = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _canonicalCharacterEdits = canonicalCharacterEdits
@@ -93,6 +99,8 @@ public sealed class CampaignCollaborationService
         ArgumentNullException.ThrowIfNull(dataProtectionProvider);
         _inviteReplayProtector = dataProtectionProvider.CreateProtector(InviteReplayProtectionPurpose);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _userProjectionSync = userProjectionSync;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<CampaignCollaborationService>.Instance;
     }
 
     public IReadOnlyList<CampaignCollaborationProjection> ListCampaigns(HubUserDto user)
@@ -266,6 +274,553 @@ public sealed class CampaignCollaborationService
                     now);
                 return response;
             });
+        }
+    }
+
+    public CampaignTeardownReceipt DeleteCampaign(
+        HubUserDto owner,
+        string campaignId,
+        DeleteCampaignCollaborationRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(request);
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), 128);
+        string confirmedName = NormalizeRequired(
+            request.ConfirmCampaignName,
+            nameof(request.ConfirmCampaignName),
+            MaxNameLength);
+        if (!string.Equals(request.ConfirmCampaignName, confirmedName, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "campaign name confirmation must exactly match the stored normalized name.",
+                nameof(request));
+        }
+
+        if (request.ExpectedUpdatedAtUtc.Offset != TimeSpan.Zero)
+        {
+            throw new ArgumentException("expectedUpdatedAtUtc must use the UTC offset.", nameof(request));
+        }
+
+        DateTimeOffset expectedUpdatedAtUtc = request.ExpectedUpdatedAtUtc.ToUniversalTime();
+        string idempotencyKey = NormalizeIdempotencyKey(request.IdempotencyKey);
+        string commandKey = BuildCommandKey(owner.UserId, "campaign-teardown", idempotencyKey);
+        string requestSha256 = ComputeSha256(new
+        {
+            CampaignId = normalizedCampaignId.ToLowerInvariant(),
+            ConfirmCampaignName = confirmedName,
+            ExpectedUpdatedAtUtc = expectedUpdatedAtUtc
+        });
+
+        CampaignTeardownReceipt result;
+        HubUserDto[] usersToSync;
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
+            if (_store.CampaignTeardownsByIdempotencyKey.TryGetValue(
+                    commandKey,
+                    out CampaignTeardownIdempotencyState? replay)
+                && replay.CreatedAtUtc.Add(CampaignTeardownRetention) > now)
+            {
+                if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
+                {
+                    throw new CampaignIdempotencyConflictException();
+                }
+
+                return replay.Response;
+            }
+
+            (CampaignProjection campaign, GroupDto group, string role) =
+                RequireMemberCampaignLocked(owner, normalizedCampaignId);
+            if (!string.Equals(group.OwnerUserId, owner.UserId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(role, OwnerRole, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new CampaignCollaborationAccessDeniedException(
+                    "Campaign owner access is required for teardown.");
+            }
+
+            if (!string.Equals(campaign.Name, confirmedName, StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    "campaign name confirmation does not match the current campaign name.",
+                    nameof(request));
+            }
+
+            DateTimeOffset currentUpdatedAtUtc = campaign.UpdatedAtUtc.ToUniversalTime();
+            if (currentUpdatedAtUtc != expectedUpdatedAtUtc)
+            {
+                throw new CampaignUpdatedAtConflictException(currentUpdatedAtUtc);
+            }
+
+            string[] crewIds = _store.CrewsById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.CrewId)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (campaign.CrewIds.Any(campaignCrewId =>
+                    !crewIds.Contains(campaignCrewId, StringComparer.OrdinalIgnoreCase))
+                || crewIds.Any(crewId =>
+                    !_store.CrewsById.TryGetValue(crewId, out CrewProjection? crew)
+                    || !string.Equals(crew.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found an invalid campaign-owned crew reference.");
+            }
+
+            string[] runIds = _store.RunsById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.RunId)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (campaign.RunIds.Any(campaignRunId =>
+                !runIds.Contains(campaignRunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found an invalid campaign-owned run reference.");
+            }
+
+            CampaignProjection[] unrelatedCampaigns = _store.CampaignSpinesById.Values
+                .Where(item => !string.Equals(
+                    item.CampaignId,
+                    campaign.CampaignId,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (unrelatedCampaigns.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || unrelatedCampaigns.Any(item => item.CrewIds.Any(crewId =>
+                    crewIds.Contains(crewId, StringComparer.OrdinalIgnoreCase)))
+                || unrelatedCampaigns.Any(item => item.RunIds.Any(runId =>
+                    runIds.Contains(runId, StringComparer.OrdinalIgnoreCase))))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a group, crew, or run referenced by another campaign.");
+            }
+
+            if (_store.DossiersById.Values.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.CrewId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    || runIds.Contains(item.CurrentRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a campaign, crew, or run referenced by a preserved dossier.");
+            }
+
+            string[] sponsorSessionIds = _store.SponsorSessionsById.Values
+                .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.BoostCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.SponsorSessionId)
+                .ToArray();
+            string[] contributionReceiptIds = _store.Receipts
+                .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || sponsorSessionIds.Contains(item.SponsorSessionId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                .Select(static item => item.ReceiptId)
+                .ToArray();
+            if (_store.JoinCodesByValue.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || _store.CampaignsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.BoostCodesByValue.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.SponsorSessionsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.BoostCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || contributionReceiptIds.Length > 0
+                || _store.LedgerEntries.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                || _store.RewardEntries.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || contributionReceiptIds.Contains(item.SourceReceiptId, StringComparer.OrdinalIgnoreCase))
+                || _store.EntitlementEntries.Any(item =>
+                    (string.Equals(item.Scope, "group", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(item.ScopeId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                    || contributionReceiptIds.Contains(item.SourceReceiptId, StringComparer.OrdinalIgnoreCase))
+                || _store.Badges.Any(item => sponsorSessionIds.Contains(
+                    item.SourceSponsorSessionId ?? string.Empty,
+                    StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a group or campaign referenced by preserved sponsorship state.");
+            }
+
+            if (_store.RosterTransfers.Any(item =>
+                    string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.SourceCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.SourceCrewId, StringComparer.OrdinalIgnoreCase)
+                    || crewIds.Contains(item.TargetCrewId, StringComparer.OrdinalIgnoreCase))
+                || _store.DossierMovements.Any(item =>
+                    string.Equals(item.SourceGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetGroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.SourceCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetCampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.SourceRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    || runIds.Contains(item.TargetRunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused resources referenced by preserved movement history.");
+            }
+
+            if (_store.PrepLaunches.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.TargetRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                || _store.TravelPrefetchReceipts.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.AftermathPackages.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId ?? string.Empty, StringComparer.OrdinalIgnoreCase))
+                || _store.CampaignAdoptions.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.RunnerGoals.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                || _store.ResolutionReportApprovals.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase))
+                || _store.WorldTicks.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase))
+                || _store.PlayerSafeNews.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused campaign or run resources referenced by preserved workspace history.");
+            }
+
+            if (_store.OpenRuns.Any(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused a campaign or run referenced by a preserved open-run listing.");
+            }
+
+            if (_store.PlaySessionsById.Values.Any(item =>
+                    string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || runIds.Contains(item.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new CampaignTeardownConflictException(
+                    "Campaign teardown refused group, campaign, or run resources referenced by a preserved play session.");
+            }
+
+            HubUserDto[] affectedUsers = _store.UsersById.Values
+                .Where(user => user.GroupIds.Contains(group.GroupId, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(static user => user.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            HashSet<string> affectedUserIds = affectedUsers
+                .Select(static user => user.UserId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string[] restoreProjectionUserIds = _store.RestoreByUserId
+                .Where(item => affectedUserIds.Contains(item.Key)
+                    || item.Value.RecentCampaigns.Any(recent =>
+                        string.Equals(recent.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(recent.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                        || recent.CrewIds.Any(crewId => crewIds.Contains(crewId, StringComparer.OrdinalIgnoreCase))
+                        || recent.RunIds.Any(runId => runIds.Contains(runId, StringComparer.OrdinalIgnoreCase)))
+                    || item.Value.RecentDossiers.Any(recent =>
+                        string.Equals(recent.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                        || crewIds.Contains(recent.CrewId ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                        || runIds.Contains(recent.CurrentRunId ?? string.Empty, StringComparer.OrdinalIgnoreCase)))
+                .Select(static item => item.Key)
+                .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            string campaignWorkspaceId = BuildCampaignWorkspaceId(campaign.CampaignId);
+            var removedWorkspacePrepHistoryByUser = _store.UserExperienceByUserId
+                .Select(item => new
+                {
+                    UserId = item.Key,
+                    Items = (item.Value.WorkspacePrepLibrarySearchHistory
+                            ?? Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())
+                        .Where(history => string.Equals(
+                            history.WorkspaceId,
+                            campaignWorkspaceId,
+                            StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(static history => history.WorkspaceId, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(static history => history.Query, StringComparer.Ordinal)
+                        .ThenBy(static history => history.LastUsedUtc)
+                        .ToArray()
+                })
+                .Where(static item => item.Items.Length > 0)
+                .OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            CampaignCollaborationInviteState[] invites = _store.CampaignCollaborationInvitesById.Values
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            foreach (CampaignCollaborationInviteState invite in invites)
+            {
+                if (!_store.CampaignInviteIdByCodeLookupSha256.TryGetValue(
+                        invite.ShortCodeLookupSha256,
+                        out string? indexedInviteId)
+                    || !string.Equals(indexedInviteId, invite.InviteId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("Campaign teardown found an invalid invite code index.");
+                }
+            }
+
+            HashSet<string> inviteIds = invites
+                .Select(static item => item.InviteId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            string[] inviteCodeIndexKeys = _store.CampaignInviteIdByCodeLookupSha256
+                .Where(item => inviteIds.Contains(item.Value))
+                .Select(static item => item.Key)
+                .OrderBy(static value => value, StringComparer.Ordinal)
+                .ToArray();
+            CampaignCharacterBindingState[] bindings = _store.CampaignCharacterBindings
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.BindingId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.BindingRevision)
+                .ToArray();
+            KeyValuePair<string, CampaignRunsiteState>[] runsites = _store.CampaignRunsitesByRunId
+                .Where(item => string.Equals(item.Value.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (runsites.Any(item => !runIds.Contains(item.Value.RunId, StringComparer.OrdinalIgnoreCase)))
+            {
+                throw new InvalidDataException("Campaign teardown found a runsite outside the campaign run set.");
+            }
+
+            string[] campaignCreationKeys = _store.CampaignCreationsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] inviteCreationKeys = _store.CampaignInviteCreationsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] runsiteDraftKeys = _store.CampaignRunsiteDraftCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] runsitePublishKeys = _store.CampaignRunsitePublishCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] redemptionKeys = _store.CampaignRedemptionsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] sheetEditKeys = _store.CampaignSheetEditsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            string[] gmAuthorityCommandKeys = _store.CampaignGmAuthorityCommandsByIdempotencyKey
+                .Where(item => string.Equals(item.Value.Response.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .Select(static item => item.Key)
+                .ToArray();
+            CampaignSharedSheetAuditState[] sheetAudit = _store.CampaignSharedSheetAudit
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            CampaignGmAuthorityAuditState[] gmAuthorityAudit = _store.CampaignGmAuthorityAudit
+                .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            int removedUserGroupMemberships = affectedUsers.Sum(user =>
+                user.GroupIds.Count(groupId => string.Equals(
+                    groupId,
+                    group.GroupId,
+                    StringComparison.OrdinalIgnoreCase)));
+            int removedCommandRecords = campaignCreationKeys.Length
+                + inviteCreationKeys.Length
+                + runsiteDraftKeys.Length
+                + runsitePublishKeys.Length
+                + redemptionKeys.Length
+                + sheetEditKeys.Length
+                + gmAuthorityCommandKeys.Length;
+            int removedAuditRecords = sheetAudit.Length + gmAuthorityAudit.Length;
+            var removed = new CampaignTeardownCleanupCounts(
+                Campaigns: 1,
+                Groups: 1,
+                Crews: crewIds.Length,
+                Runs: runIds.Length,
+                Invites: invites.Length,
+                InviteCodeIndexes: inviteCodeIndexKeys.Length,
+                CharacterBindings: bindings.Length,
+                Runsites: runsites.Length,
+                CommandRecords: removedCommandRecords,
+                AuditRecords: removedAuditRecords,
+                UserGroupMemberships: removedUserGroupMemberships,
+                RestoreProjections: restoreProjectionUserIds.Length,
+                WorkspacePrepLibrarySearchHistoryItems: removedWorkspacePrepHistoryByUser.Sum(static item => item.Items.Length));
+            DateTimeOffset deletedAtUtc = now;
+            string campaignNameSha256 = ComputeCanonicalStringSha256(campaign.Name);
+            string cleanupSha256 = ComputeSha256(new
+            {
+                CampaignId = campaign.CampaignId,
+                CampaignNameSha256 = campaignNameSha256,
+                PreviousUpdatedAtUtc = currentUpdatedAtUtc,
+                Removed = removed,
+                GroupIds = new[] { group.GroupId },
+                CrewIds = crewIds,
+                RunIds = runIds,
+                InviteIds = invites.Select(static item => item.InviteId).ToArray(),
+                BindingIds = bindings.Select(static item => item.BindingId).Distinct(StringComparer.Ordinal).ToArray(),
+                RunsiteKeys = runsites.Select(static item => item.Key).ToArray(),
+                SheetAuditReceiptIds = sheetAudit.Select(static item => item.ReceiptId)
+                    .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                GmAuthorityAuditReceiptIds = gmAuthorityAudit.Select(static item => item.ReceiptId)
+                    .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+                RestoreProjectionUserIds = restoreProjectionUserIds,
+                WorkspacePrepLibrarySearchHistory = removedWorkspacePrepHistoryByUser
+                    .Select(item => new
+                    {
+                        item.UserId,
+                        Items = item.Items.Select(history => new
+                        {
+                            history.WorkspaceId,
+                            history.Query,
+                            history.LastUsedUtc,
+                            Sha256 = ComputeSha256(history)
+                        }).ToArray()
+                    })
+                    .ToArray()
+            });
+            var receipt = new CampaignTeardownReceipt(
+                ReceiptId: NewId("campaign-teardown"),
+                CampaignId: campaign.CampaignId,
+                CampaignNameSha256: campaignNameSha256,
+                PreviousUpdatedAtUtc: currentUpdatedAtUtc,
+                Removed: removed,
+                CleanupSha256: cleanupSha256,
+                DeletedAtUtc: deletedAtUtc);
+
+            result = _store.ExecuteCampaignCollaborationTransactionLocked(() =>
+            {
+                foreach (string key in campaignCreationKeys)
+                {
+                    _store.CampaignCreationsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in inviteCreationKeys)
+                {
+                    _store.CampaignInviteCreationsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in runsiteDraftKeys)
+                {
+                    _store.CampaignRunsiteDraftCommandsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in runsitePublishKeys)
+                {
+                    _store.CampaignRunsitePublishCommandsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in redemptionKeys)
+                {
+                    _store.CampaignRedemptionsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in sheetEditKeys)
+                {
+                    _store.CampaignSheetEditsByIdempotencyKey.Remove(key);
+                }
+                foreach (string key in gmAuthorityCommandKeys)
+                {
+                    _store.CampaignGmAuthorityCommandsByIdempotencyKey.Remove(key);
+                }
+
+                _store.CampaignSharedSheetAudit.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                _store.CampaignGmAuthorityAudit.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                _store.CampaignCharacterBindings.RemoveAll(item =>
+                    string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase));
+                foreach (KeyValuePair<string, CampaignRunsiteState> runsite in runsites)
+                {
+                    _store.CampaignRunsitesByRunId.Remove(runsite.Key);
+                }
+                foreach (string key in inviteCodeIndexKeys)
+                {
+                    _store.CampaignInviteIdByCodeLookupSha256.Remove(key);
+                }
+                foreach (CampaignCollaborationInviteState invite in invites)
+                {
+                    _store.CampaignCollaborationInvitesById.Remove(invite.InviteId);
+                }
+                foreach (string runId in runIds)
+                {
+                    _store.RunsById.Remove(runId);
+                }
+                foreach (string crewId in crewIds)
+                {
+                    _store.CrewsById.Remove(crewId);
+                }
+                _store.GroupsById.Remove(group.GroupId);
+                _store.CampaignSpinesById.Remove(campaign.CampaignId);
+                foreach (string restoreUserId in restoreProjectionUserIds)
+                {
+                    _store.RestoreByUserId.Remove(restoreUserId);
+                }
+                foreach (var removedHistory in removedWorkspacePrepHistoryByUser)
+                {
+                    HubUserExperienceDto experience = _store.UserExperienceByUserId[removedHistory.UserId];
+                    _store.UserExperienceByUserId[removedHistory.UserId] = experience with
+                    {
+                        WorkspacePrepLibrarySearchHistory =
+                            (experience.WorkspacePrepLibrarySearchHistory
+                                ?? Array.Empty<WorkspacePrepLibrarySearchHistoryItem>())
+                            .Where(history => !string.Equals(
+                                history.WorkspaceId,
+                                campaignWorkspaceId,
+                                StringComparison.OrdinalIgnoreCase))
+                            .ToArray(),
+                        UpdatedAtUtc = deletedAtUtc
+                    };
+                }
+                foreach (HubUserDto user in affectedUsers)
+                {
+                    _store.UsersById[user.UserId] = user with
+                    {
+                        GroupIds = user.GroupIds
+                            .Where(groupId => !string.Equals(
+                                groupId,
+                                group.GroupId,
+                                StringComparison.OrdinalIgnoreCase))
+                            .ToArray(),
+                        UpdatedAtUtc = deletedAtUtc
+                    };
+                }
+
+                PruneCampaignTeardownLedgerLocked(deletedAtUtc);
+                _store.CampaignTeardownsByIdempotencyKey[commandKey] = new CampaignTeardownIdempotencyState(
+                    commandKey,
+                    owner.UserId,
+                    idempotencyKey,
+                    requestSha256,
+                    receipt,
+                    deletedAtUtc);
+                return receipt;
+            });
+            usersToSync = affectedUsers
+                .Select(static user => user.UserId)
+                .Concat(removedWorkspacePrepHistoryByUser.Select(static item => item.UserId))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(_store.UsersById.ContainsKey)
+                .Select(userId => _store.UsersById[userId])
+                .ToArray();
+        }
+
+        foreach (HubUserDto user in usersToSync)
+        {
+            QueueUserProjectionSync(user);
+        }
+        return result;
+    }
+
+    private void QueueUserProjectionSync(HubUserDto user)
+    {
+        if (_userProjectionSync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _userProjectionSync.QueueSyncUser(user);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "campaign teardown persisted but user {UserId} could not be queued for projection reconciliation",
+                user.UserId);
         }
     }
 
@@ -2108,6 +2663,9 @@ public sealed class CampaignCollaborationService
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
             .ToLowerInvariant();
 
+    private static string BuildCampaignWorkspaceId(string campaignId)
+        => $"workspace-{ComputeCanonicalStringSha256(campaignId)[..12]}";
+
     private static string ComputeCodeLookupSha256(string normalizedCode)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"campaign-code\0{normalizedCode}")))
             .ToLowerInvariant();
@@ -2204,6 +2762,34 @@ public sealed class CampaignCollaborationService
                     _store.CampaignInviteCreationsByIdempotencyKey.Remove(replayKey);
                 }
             }
+        }
+    }
+
+    private void PruneCampaignTeardownLedgerLocked(DateTimeOffset now)
+    {
+        string[] expiredKeys = _store.CampaignTeardownsByIdempotencyKey.Values
+            .Where(item => item.CreatedAtUtc.Add(CampaignTeardownRetention) <= now)
+            .OrderBy(static item => item.CreatedAtUtc)
+            .ThenBy(static item => item.Key, StringComparer.Ordinal)
+            .Select(static item => item.Key)
+            .ToArray();
+        foreach (string key in expiredKeys)
+        {
+            _store.CampaignTeardownsByIdempotencyKey.Remove(key);
+        }
+
+        int receiptsToRemove = Math.Max(
+            0,
+            _store.CampaignTeardownsByIdempotencyKey.Count - MaxCampaignTeardownReceipts + 1);
+        string[] oldestKeys = _store.CampaignTeardownsByIdempotencyKey.Values
+            .OrderBy(static item => item.CreatedAtUtc)
+            .ThenBy(static item => item.Key, StringComparer.Ordinal)
+            .Take(receiptsToRemove)
+            .Select(static item => item.Key)
+            .ToArray();
+        foreach (string key in oldestKeys)
+        {
+            _store.CampaignTeardownsByIdempotencyKey.Remove(key);
         }
     }
 
@@ -2569,6 +3155,14 @@ internal sealed record CampaignGmAuthorityIdempotencyState(
     CampaignGmAuthorityUpdateReceipt Response,
     DateTimeOffset CreatedAtUtc);
 
+internal sealed record CampaignTeardownIdempotencyState(
+    string Key,
+    string UserId,
+    string IdempotencyKey,
+    string RequestSha256,
+    CampaignTeardownReceipt Response,
+    DateTimeOffset CreatedAtUtc);
+
 internal sealed record CampaignInviteAttemptWindow(
     DateTimeOffset WindowStartedAtUtc,
     int Failures);
@@ -2603,11 +3197,17 @@ internal static class CampaignCollaborationStateValidator
         IReadOnlyList<CampaignSheetEditIdempotencyState> edits,
         IReadOnlyList<CampaignGmAuthorityAuditState> gmAuthorityAudit,
         IReadOnlyList<CampaignGmAuthorityIdempotencyState> gmAuthorityCommands,
+        IReadOnlyList<CampaignTeardownIdempotencyState> teardowns,
         IReadOnlyList<RunnerDossierProjection> dossiers,
         IReadOnlyList<CampaignProjection> campaigns)
     {
         ArgumentNullException.ThrowIfNull(invites);
         ArgumentNullException.ThrowIfNull(bindings);
+        ArgumentNullException.ThrowIfNull(teardowns);
+        if (teardowns.Count > CampaignCollaborationService.MaxCampaignTeardownReceipts)
+        {
+            throw Invalid("campaign teardown replay ledger exceeds its deterministic bound");
+        }
         Dictionary<string, RunnerDossierProjection> dossiersById = dossiers
             .ToDictionary(static item => item.DossierId, StringComparer.OrdinalIgnoreCase);
         HashSet<string> campaignIds = campaigns
@@ -2950,6 +3550,44 @@ internal static class CampaignCollaborationStateValidator
                 throw Invalid("GM authority idempotency response is inconsistent");
             }
         }
+
+        var teardownReceiptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (CampaignTeardownIdempotencyState item in teardowns)
+        {
+            ValidateIdempotency(item.Key, item.UserId, item.IdempotencyKey, item.RequestSha256);
+            CampaignTeardownReceipt response = item.Response
+                ?? throw Invalid("campaign teardown idempotency response is missing");
+            Required(response.ReceiptId, nameof(response.ReceiptId));
+            Required(response.CampaignId, nameof(response.CampaignId));
+            HexDigest(response.CampaignNameSha256, nameof(response.CampaignNameSha256));
+            HexDigest(response.CleanupSha256, nameof(response.CleanupSha256));
+            CampaignTeardownCleanupCounts removed = response.Removed
+                ?? throw Invalid("campaign teardown cleanup counts are missing");
+            int[] nonNegativeCounts =
+            [
+                removed.Crews,
+                removed.Runs,
+                removed.Invites,
+                removed.InviteCodeIndexes,
+                removed.CharacterBindings,
+                removed.Runsites,
+                removed.CommandRecords,
+                removed.AuditRecords,
+                removed.UserGroupMemberships,
+                removed.RestoreProjections,
+                removed.WorkspacePrepLibrarySearchHistoryItems
+            ];
+            if (!teardownReceiptIds.Add(response.ReceiptId)
+                || campaignIds.Contains(response.CampaignId)
+                || removed.Campaigns != 1
+                || removed.Groups != 1
+                || nonNegativeCounts.Any(static count => count < 0)
+                || response.DeletedAtUtc != item.CreatedAtUtc
+                || response.DeletedAtUtc < response.PreviousUpdatedAtUtc)
+            {
+                throw Invalid("campaign teardown idempotency response is inconsistent");
+            }
+        }
     }
 
     private static void ValidateIdempotency(string key, string userId, string idempotencyKey, string requestSha256)
@@ -3038,6 +3676,25 @@ public sealed class CampaignRevisionConflictException : Exception
     }
 
     public long CurrentRevision { get; }
+}
+
+public sealed class CampaignUpdatedAtConflictException : Exception
+{
+    public CampaignUpdatedAtConflictException(DateTimeOffset currentUpdatedAtUtc)
+        : base("The campaign changed after the teardown precondition was captured.")
+    {
+        CurrentUpdatedAtUtc = currentUpdatedAtUtc;
+    }
+
+    public DateTimeOffset CurrentUpdatedAtUtc { get; }
+}
+
+public sealed class CampaignTeardownConflictException : Exception
+{
+    public CampaignTeardownConflictException(string message)
+        : base(message)
+    {
+    }
 }
 
 public sealed class CampaignIdempotencyConflictException : Exception

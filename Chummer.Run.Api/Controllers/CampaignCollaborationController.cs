@@ -101,6 +101,34 @@ public sealed class CampaignCollaborationController : ControllerBase
         }
     }
 
+    [HttpDelete("{campaignId}")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
+    [ProducesResponseType(typeof(CampaignTeardownReceipt), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<CampaignTeardownReceipt>> Delete(
+        [FromRoute] string campaignId,
+        [FromBody] DeleteCampaignCollaborationRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("campaign teardown payload is required.");
+        }
+
+        try
+        {
+            HubUserDto user = await RequireUserAsync(cancellationToken);
+            return Ok(_campaigns.DeleteCampaign(user, campaignId, request));
+        }
+        catch (Exception ex) when (IsMapped(ex))
+        {
+            return MapException(ex);
+        }
+    }
+
     [HttpGet("{campaignId}/roster")]
     [ProducesResponseType(typeof(IReadOnlyList<CampaignRosterEntryProjection>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -407,6 +435,8 @@ public sealed class CampaignCollaborationController : ControllerBase
             or CampaignInviteReplayUnavailableException
             or CampaignBindingRevisionConflictException
             or CampaignRevisionConflictException
+            or CampaignUpdatedAtConflictException
+            or CampaignTeardownConflictException
             or CampaignCanonicalEditConflictException
             or CampaignCanonicalEditUnavailableException
             or KeyNotFoundException
@@ -434,6 +464,12 @@ public sealed class CampaignCollaborationController : ControllerBase
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
             CampaignRevisionConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignUpdatedAtConflictException conflict => Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                detail: conflict.Message),
+            CampaignTeardownConflictException conflict => Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 detail: conflict.Message),
             CampaignCanonicalEditConflictException conflict => Problem(

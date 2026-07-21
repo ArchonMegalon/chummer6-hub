@@ -25,6 +25,10 @@ def test_initializer_is_fail_closed_and_never_chowns_downloads_bind() -> None:
     assert "rm -f -- \"$probe/write-test\"" in script
     assert "require_mount_root /downloads-source" in script
     assert "probe_as_portal_identity /downloads-source" in script
+    assert (
+        "ensure_private_directory_as_portal_identity /app/state/core-workspaces"
+        in script
+    )
     assert all(
         "/downloads-source" not in line
         for line in script.splitlines()
@@ -80,6 +84,9 @@ def test_initializer_service_is_root_only_and_portal_remains_nonroot() -> None:
     assert portal["user"] == "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
     assert portal["cap_drop"] == ["ALL"]
     assert "CHOWN" not in portal.get("cap_add", [])
+    assert portal["environment"][
+        "Chummer__CoreGmCharacterEdits__WorkspaceStorePath"
+    ] == "/app/state/core-workspaces"
 
 
 def test_portal_image_contains_initializer_and_setpriv_contract() -> None:

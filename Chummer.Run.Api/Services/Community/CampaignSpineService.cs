@@ -936,29 +936,31 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            (RunProjection? storedTargetRun, SceneProjection? storedTargetScene) =
+                RequireCurrentWorkspaceMutationLocked(user, workspace, targetRun, targetScene);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             var launch = new GovernedPrepLaunchProjection(
-                LaunchId: StableId("prep-launch", $"{workspace.WorkspaceId}:{normalizedPacketId}:{targetRun?.RunId ?? "campaign"}:{targetScene?.SceneId ?? "scene"}:{now.ToUnixTimeMilliseconds()}"),
+                LaunchId: StableId("prep-launch", $"{workspace.WorkspaceId}:{normalizedPacketId}:{storedTargetRun?.RunId ?? "campaign"}:{storedTargetScene?.SceneId ?? "scene"}:{now.ToUnixTimeMilliseconds()}"),
                 WorkspaceId: workspace.WorkspaceId,
                 CampaignId: workspace.CampaignId,
                 PacketId: normalizedPacketId,
                 PacketKind: normalizedPacketKind,
                 PacketTitle: normalizedPacketTitle,
-                TargetRunId: targetRun?.RunId,
-                TargetRunTitle: targetRun?.Title,
-                TargetSceneId: targetScene?.SceneId,
-                TargetSceneTitle: targetScene?.Title,
+                TargetRunId: storedTargetRun?.RunId,
+                TargetRunTitle: storedTargetRun?.Title,
+                TargetSceneId: storedTargetScene?.SceneId,
+                TargetSceneTitle: storedTargetScene?.Title,
                 InitiatedByUserId: user.UserId,
-                Summary: DescribePrepLaunchSummary(workspace, normalizedPacketTitle, targetRun, targetScene),
+                Summary: DescribePrepLaunchSummary(workspace, normalizedPacketTitle, storedTargetRun, storedTargetScene),
                 AuditLines: FinalizeLines(
                 [
                     $"Bound governed packet {normalizedPacketTitle} ({normalizedPacketKind}) from {workspace.CampaignName}.",
                     $"Packet summary: {normalizedPacketSummary}",
-                    targetRun is null
+                    storedTargetRun is null
                         ? $"Binding target stays campaign-wide on {workspace.CampaignName}."
-                        : targetScene is null
-                            ? $"Binding target: {targetRun.Title}."
-                            : $"Binding target: {targetRun.Title} / {targetScene.Title}.",
+                        : storedTargetScene is null
+                            ? $"Binding target: {storedTargetRun.Title}."
+                            : $"Binding target: {storedTargetRun.Title} / {storedTargetScene.Title}.",
                     $"Rule posture: {workspace.RuleEnvironment.CompatibilityFingerprint}.",
                     normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
                 ]),
@@ -993,6 +995,7 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             string receiptId = StableId("travel-prefetch", $"{workspace.WorkspaceId}:{device.InstallationId}:{now.ToUnixTimeMilliseconds()}");
             var receipt = new TravelPrefetchReceiptProjection(
@@ -1045,17 +1048,19 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            (RunProjection? storedRun, _) =
+                RequireCurrentWorkspaceMutationLocked(user, workspace, run, scene: null);
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            string packageId = StableId("aftermath", $"{workspace.WorkspaceId}:{run?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}");
+            string packageId = StableId("aftermath", $"{workspace.WorkspaceId}:{storedRun?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}");
             string rulesetId = ResolveArtifactRulesetId(workspace.RuleEnvironment);
             IReadOnlyList<string> finalizedEvidenceLines = FinalizeLines(NormalizeLines(evidenceLines, nameof(evidenceLines)));
-            CampaignArtifactRegistration artifact = _artifactRegistry.RegisterAftermathPackage(new AftermathArtifactRegistrationRequest(
+            var registrationRequest = new AftermathArtifactRegistrationRequest(
                 PackageId: packageId,
                 WorkspaceId: workspace.WorkspaceId,
                 CampaignId: workspace.CampaignId,
                 CampaignName: workspace.CampaignName,
-                RunId: run?.RunId,
-                RunTitle: run?.Title,
+                RunId: storedRun?.RunId,
+                RunTitle: storedRun?.Title,
                 PackageKind: normalizedPackageKind,
                 Title: normalizedTitle,
                 Summary: normalizedSummary,
@@ -1063,52 +1068,128 @@ public sealed class CampaignSpineService
                 RulesetId: rulesetId,
                 RuleEnvironmentFingerprint: workspace.RuleEnvironment.CompatibilityFingerprint,
                 GeneratedAtUtc: now,
-                EvidenceLines: finalizedEvidenceLines));
-            var package = new AftermathRecapPackageProjection(
-                PackageId: packageId,
-                WorkspaceId: workspace.WorkspaceId,
-                CampaignId: workspace.CampaignId,
-                RunId: run?.RunId,
-                RunTitle: run?.Title,
-                PackageKind: normalizedPackageKind,
-                Title: normalizedTitle,
-                Summary: normalizedSummary,
-                ArtifactId: artifact.ArtifactId,
-                EvidenceLines: finalizedEvidenceLines
-                    .Concat(
-                    [
-                        $"Registry artifact: {artifact.ArtifactId} ({artifact.ArtifactKind} {artifact.ArtifactVersion}, {artifact.ArtifactVisibility}, {artifact.ArtifactTrustTier}, {artifact.ArtifactRulesetId})."
-                    ])
-                    .ToArray(),
-                InitiatedByUserId: user.UserId,
-                GeneratedAtUtc: now,
-                ArtifactKind: artifact.ArtifactKind,
-                ArtifactVersion: artifact.ArtifactVersion,
-                ArtifactVisibility: artifact.ArtifactVisibility,
-                ArtifactTrustTier: artifact.ArtifactTrustTier,
-                ArtifactRulesetId: artifact.ArtifactRulesetId,
-                ProvenanceSummary: artifact.ProvenanceSummary,
-                AuditSummary: artifact.AuditSummary);
+                EvidenceLines: finalizedEvidenceLines);
+            AftermathRecapPackageProjection[] packagesBefore = _store.AftermathPackages.ToArray();
+            CampaignProjection campaignBefore = _store.CampaignSpinesById[workspace.CampaignId];
 
-            _store.AftermathPackages.Add(package);
-            if (_store.AftermathPackages.Count > 64)
+            try
             {
-                _store.AftermathPackages.RemoveRange(0, _store.AftermathPackages.Count - 64);
-            }
+                return _artifactRegistry.ExecuteAftermathRegistrationTransaction(
+                    registrationRequest,
+                    artifact =>
+                    {
+                        var package = new AftermathRecapPackageProjection(
+                            PackageId: packageId,
+                            WorkspaceId: workspace.WorkspaceId,
+                            CampaignId: workspace.CampaignId,
+                            RunId: storedRun?.RunId,
+                            RunTitle: storedRun?.Title,
+                            PackageKind: normalizedPackageKind,
+                            Title: normalizedTitle,
+                            Summary: normalizedSummary,
+                            ArtifactId: artifact.ArtifactId,
+                            EvidenceLines: finalizedEvidenceLines
+                                .Concat(
+                                [
+                                    $"Registry artifact: {artifact.ArtifactId} ({artifact.ArtifactKind} {artifact.ArtifactVersion}, {artifact.ArtifactVisibility}, {artifact.ArtifactTrustTier}, {artifact.ArtifactRulesetId})."
+                                ])
+                                .ToArray(),
+                            InitiatedByUserId: user.UserId,
+                            GeneratedAtUtc: now,
+                            ArtifactKind: artifact.ArtifactKind,
+                            ArtifactVersion: artifact.ArtifactVersion,
+                            ArtifactVisibility: artifact.ArtifactVisibility,
+                            ArtifactTrustTier: artifact.ArtifactTrustTier,
+                            ArtifactRulesetId: artifact.ArtifactRulesetId,
+                            ProvenanceSummary: artifact.ProvenanceSummary,
+                            AuditSummary: artifact.AuditSummary);
 
-            if (_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+                        _store.AftermathPackages.Add(package);
+                        if (_store.AftermathPackages.Count > 64)
+                        {
+                            _store.AftermathPackages.RemoveRange(0, _store.AftermathPackages.Count - 64);
+                        }
+
+                        CampaignConsequenceProjection? aftermathConsequence = BuildAftermathConsequenceProjection(workspace, storedRun, package);
+                        _store.CampaignSpinesById[campaignBefore.CampaignId] = campaignBefore with
+                        {
+                            UpdatedAtUtc = now,
+                            Consequences = UpsertGovernedCampaignConsequence(campaignBefore.Consequences, aftermathConsequence),
+                        };
+
+                        _store.AftermathPersistenceFaultInjector?.Invoke();
+                        _store.PersistLocked();
+                        return package;
+                    });
+            }
+            catch
             {
-                CampaignConsequenceProjection? aftermathConsequence = BuildAftermathConsequenceProjection(workspace, run, package);
-                _store.CampaignSpinesById[campaign.CampaignId] = campaign with
-                {
-                    UpdatedAtUtc = now,
-                    Consequences = UpsertGovernedCampaignConsequence(campaign.Consequences, aftermathConsequence),
-                };
+                _store.AftermathPackages.Clear();
+                _store.AftermathPackages.AddRange(packagesBefore);
+                _store.CampaignSpinesById[campaignBefore.CampaignId] = campaignBefore;
+                throw;
             }
-
-            _store.PersistLocked();
-            return package;
         }
+    }
+
+    private (RunProjection? Run, SceneProjection? Scene) RequireCurrentWorkspaceMutationLocked(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        RunProjection? run,
+        SceneProjection? scene)
+    {
+        if (!_store.UsersById.ContainsKey(user.UserId))
+        {
+            throw new CommunityAccessDeniedException("The workspace user is no longer active.");
+        }
+
+        if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out CampaignProjection? campaign))
+        {
+            throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+        }
+
+        if (!_store.GroupsById.TryGetValue(campaign.GroupId, out GroupDto? group))
+        {
+            throw new KeyNotFoundException($"Unknown group: {campaign.GroupId}");
+        }
+
+        bool ownsCampaignDossier = campaign.DossierIds.Any(dossierId =>
+            _store.DossiersById.TryGetValue(dossierId, out RunnerDossierProjection? dossier)
+            && string.Equals(dossier.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+        bool belongsToCampaignGroup = group.Memberships.Any(member =>
+            string.Equals(member.UserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+        if (!ownsCampaignDossier || !belongsToCampaignGroup)
+        {
+            throw new CommunityAccessDeniedException("The workspace user no longer has campaign authority.");
+        }
+
+        RunProjection? storedRun = null;
+        if (run is not null)
+        {
+            if (!_store.RunsById.TryGetValue(run.RunId, out storedRun)
+                || !string.Equals(storedRun.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException($"Unknown run {run.RunId} for workspace {workspace.WorkspaceId}.");
+            }
+        }
+
+        SceneProjection? storedScene = null;
+        if (scene is not null)
+        {
+            if (storedRun is null)
+            {
+                throw new InvalidOperationException("A scene-bound workspace mutation requires a current run.");
+            }
+
+            storedScene = storedRun.Scenes.FirstOrDefault(item =>
+                string.Equals(item.SceneId, scene.SceneId, StringComparison.OrdinalIgnoreCase));
+            if (storedScene is null)
+            {
+                throw new KeyNotFoundException($"Run {storedRun.RunId} does not contain scene {scene.SceneId}.");
+            }
+        }
+
+        return (storedRun, storedScene);
     }
 
     public CampaignConsequenceProjection UpsertCampaignConsequence(
@@ -1129,6 +1210,7 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
             {
                 throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
@@ -1181,11 +1263,15 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
-            if (!_store.RunsById.TryGetValue(normalizedRunId, out var storedRun)
-                || !string.Equals(storedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            if (!_store.RunsById.TryGetValue(normalizedRunId, out RunProjection? requestedRun)
+                || !string.Equals(requestedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
             }
+            (RunProjection? currentRun, _) =
+                RequireCurrentWorkspaceMutationLocked(user, workspace, requestedRun, scene: null);
+            RunProjection storedRun = currentRun
+                ?? throw new InvalidOperationException($"Run {normalizedRunId} was not resolved for workspace {workspace.WorkspaceId}.");
 
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
             {
@@ -1335,6 +1421,7 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
             {
                 throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
@@ -1419,6 +1506,7 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
+            RequireCurrentWorkspaceMutationLocked(user, workspace, run: null, scene: null);
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
             {
                 throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
@@ -1506,11 +1594,15 @@ public sealed class CampaignSpineService
 
         lock (_store.Gate)
         {
-            if (!_store.RunsById.TryGetValue(normalizedRunId, out var storedRun)
-                || !string.Equals(storedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            if (!_store.RunsById.TryGetValue(normalizedRunId, out RunProjection? requestedRun)
+                || !string.Equals(requestedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
             }
+            (RunProjection? currentRun, _) =
+                RequireCurrentWorkspaceMutationLocked(user, workspace, requestedRun, scene: null);
+            RunProjection storedRun = currentRun
+                ?? throw new InvalidOperationException($"Run {normalizedRunId} was not resolved for workspace {workspace.WorkspaceId}.");
 
             if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
             {

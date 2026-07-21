@@ -75,16 +75,22 @@ EVIDENCE_OPTIONAL_FIELDS: set[str] = set()
 REQUIRED_EVIDENCE_KINDS = frozenset(
     {"horizon_live_readiness", "multi_account_live_journey"}
 )
-PRODUCER_RECEIPT_KINDS = frozenset({"horizon_live_readiness"})
+PRODUCER_RECEIPT_KINDS = frozenset(
+    {"horizon_live_readiness", "multi_account_live_journey"}
+)
+PRODUCER_PERMIT_KINDS = frozenset({"multi_account_live_journey"})
+LEGACY_PRODUCER_RECEIPT_KINDS = frozenset({"horizon_live_readiness"})
+LEGACY_PRODUCER_PERMIT_KINDS: frozenset[str] = frozenset()
+CAMPAIGN_V1_CLAIM_POLICY = (
+    ("isolated_production_storage_states", "pass"),
+    ("mutation_permit_preflight", "pass"),
+    ("production_multi_account_journey", "attention_required"),
+)
 EVIDENCE_CLAIM_POLICIES: dict[str, tuple[tuple[str, str], ...]] = {
     "horizon_live_readiness": (
         ("horizon_live_readiness_v1", "attention_required"),
     ),
-    "multi_account_live_journey": (
-        ("isolated_production_storage_states", "pass"),
-        ("mutation_permit_preflight", "pass"),
-        ("production_multi_account_journey", "attention_required"),
-    ),
+    "multi_account_live_journey": CAMPAIGN_V1_CLAIM_POLICY,
 }
 CLAIM_FIELDS = {"claimId", "status", "evidenceSha256"}
 HORIZON_RECEIPT_CONTRACT = "chummer.horizon_live_readiness/v1"
@@ -272,6 +278,41 @@ def _convergence_helpers():
 CONVERGENCE_HELPERS = _convergence_helpers()
 
 
+def _campaign_v2_helpers():
+    path = Path(__file__).with_name("verify_governed_campaign_e2e_receipt.py")
+    spec = importlib.util.spec_from_file_location("_chummer_campaign_e2e_v2", path)
+    if spec is None or spec.loader is None:
+        raise AcceptanceError("governed campaign v2 verifier helpers are unavailable")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (ImportError, OSError) as error:
+        raise AcceptanceError("governed campaign v2 verifier helpers are unavailable") from error
+    return module
+
+
+CAMPAIGN_V2_HELPERS = _campaign_v2_helpers()
+CAMPAIGN_V2_RECEIPT_CONTRACT = CAMPAIGN_V2_HELPERS.RECEIPT_CONTRACT
+CAMPAIGN_V2_PERMIT_CONTRACT = CAMPAIGN_V2_HELPERS.PERMIT_CONTRACT
+CAMPAIGN_V2_OUTER_CLAIM_ID = CAMPAIGN_V2_HELPERS.OUTER_CLAIM_ID
+CAMPAIGN_V2_STATUSES = frozenset(CAMPAIGN_V2_HELPERS.STATUSES)
+CAMPAIGN_V2_RECEIPT_FIELDS = set(CAMPAIGN_V2_HELPERS.RECEIPT_FIELDS)
+CAMPAIGN_V2_RELEASE_BINDING_FIELDS = set(CAMPAIGN_V2_HELPERS.RELEASE_BINDING_FIELDS)
+CAMPAIGN_V2_INPUT_BINDING_FIELDS = set(CAMPAIGN_V2_HELPERS.INPUT_BINDING_FIELDS)
+CAMPAIGN_V2_CURRENT_FENCE_FIELDS = set(CAMPAIGN_V2_HELPERS.CURRENT_FENCE_FIELDS)
+CAMPAIGN_V2_CURRENT_SNAPSHOT_FIELDS = set(CAMPAIGN_V2_HELPERS.CURRENT_SNAPSHOT_FIELDS)
+try:
+    CAMPAIGN_V2_LIVE_PASS_AUTHORIZED = CAMPAIGN_V2_HELPERS.LIVE_PASS_AUTHORIZED
+except AttributeError as error:
+    raise AcceptanceError(
+        "governed campaign v2 live-pass authority policy is unavailable"
+    ) from error
+if type(CAMPAIGN_V2_LIVE_PASS_AUTHORIZED) is not bool:
+    raise AcceptanceError(
+        "governed campaign v2 live-pass authority policy must be boolean"
+    )
+
+
 def _args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Aggregate digest-pinned post-activation evidence without network access."
@@ -315,6 +356,23 @@ def _args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=[],
         metavar="KIND=SHA256",
         help="Digest pin corresponding to one --producer-receipt entry.",
+    )
+    parser.add_argument(
+        "--producer-permit",
+        action="append",
+        default=[],
+        metavar="KIND=PATH",
+        help=(
+            "Require the independently authorized permit consumed by a mutating "
+            "producer receipt; v1 requires exactly the governed campaign permit."
+        ),
+    )
+    parser.add_argument(
+        "--producer-permit-sha256",
+        action="append",
+        default=[],
+        metavar="KIND=SHA256",
+        help="Digest pin corresponding to one --producer-permit entry.",
     )
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
@@ -657,7 +715,12 @@ def _validate_convergence(
     return generated_at, release_truth
 
 
-def _parse_kind_map(values: Sequence[str], label: str) -> dict[str, str]:
+def _parse_kind_map(
+    values: Sequence[str],
+    label: str,
+    *,
+    allow_empty: bool = False,
+) -> dict[str, str]:
     result: dict[str, str] = {}
     for value in values:
         if value.count("=") != 1:
@@ -668,7 +731,7 @@ def _parse_kind_map(values: Sequence[str], label: str) -> dict[str, str]:
         if kind in result:
             raise AcceptanceError(f"{label} contains a duplicate kind")
         result[kind] = item
-    if not result:
+    if not result and not allow_empty:
         raise AcceptanceError("at least one --require-evidence entry is required")
     return result
 
@@ -922,6 +985,131 @@ def _validate_horizon_producer_receipt(
         raise AcceptanceError("Horizon producer receipt summary is invalid")
 
 
+def _validate_campaign_v2_producer_receipt(
+    payload: dict[str, Any],
+    raw: bytes,
+    permit_payload: dict[str, Any],
+    permit_raw: bytes,
+    target: dict[str, str],
+    envelope: dict[str, Any],
+    *,
+    observed_at: dt.datetime,
+    expected_finalization_sha256: str,
+    expected_convergence_sha256: str,
+    expected_manifest_file_sha256: str,
+) -> str:
+    """Validate the native governed real-account receipt and its prior permit.
+
+    The aggregate deliberately calls the producer's full receipt-plus-permit
+    validator.  A receipt that merely names a plausible permit digest is not
+    authority to claim a live journey passed.
+    """
+
+    _exact_object(
+        payload,
+        CAMPAIGN_V2_RECEIPT_FIELDS,
+        "campaign v2 producer receipt",
+    )
+    status = payload.get("status")
+    if (
+        raw != _canonical_bytes(payload)
+        or permit_raw != _canonical_bytes(permit_payload)
+        or payload.get("contractName") != CAMPAIGN_V2_RECEIPT_CONTRACT
+        or type(payload.get("contractVersion")) is not int
+        or payload.get("contractVersion") != 2
+        or status not in CAMPAIGN_V2_STATUSES
+        or payload.get("secretRedacted") is not True
+        or payload.get("generatedAtUtc") != envelope.get("generatedAtUtc")
+        or payload.get("receiptId") != envelope.get("evidenceId")
+    ):
+        raise AcceptanceError("campaign v2 producer receipt identity is invalid")
+
+    binding = _exact_object(
+        payload.get("releaseBinding"),
+        CAMPAIGN_V2_RELEASE_BINDING_FIELDS,
+        "campaign v2 producer receipt releaseBinding",
+    )
+    if binding != target:
+        raise AcceptanceError("campaign v2 producer receipt releaseBinding drifted")
+
+    input_bindings = _exact_object(
+        payload.get("inputBindings"),
+        CAMPAIGN_V2_INPUT_BINDING_FIELDS,
+        "campaign v2 producer receipt inputBindings",
+    )
+    permit_sha256 = _sha(permit_raw)
+    if input_bindings.get("mutationPermitSha256") != permit_sha256:
+        raise AcceptanceError(
+            "campaign v2 producer receipt does not bind the pinned permit bytes"
+        )
+    expected_input_bindings = {
+        "mutationPermitSha256": permit_sha256,
+        "ownerFinalizationReceiptSha256": expected_finalization_sha256,
+        "generationConvergenceSha256": expected_convergence_sha256,
+        "generationManifestFileSha256": expected_manifest_file_sha256,
+    }
+    if input_bindings != expected_input_bindings:
+        raise AcceptanceError(
+            "campaign v2 producer receipt inputBindings do not bind aggregate bytes"
+        )
+
+    fence = _exact_object(
+        payload.get("currentFence"),
+        CAMPAIGN_V2_CURRENT_FENCE_FIELDS,
+        "campaign v2 producer receipt currentFence",
+    )
+    if status == "pass":
+        if (
+            fence.get("stable") is not True
+            or fence.get("preCurrent") != fence.get("postCurrent")
+        ):
+            raise AcceptanceError(
+                "campaign v2 producer receipt CURRENT fence is not stable"
+            )
+        for name in ("preCurrent", "postCurrent"):
+            snapshot = _exact_object(
+                fence.get(name),
+                CAMPAIGN_V2_CURRENT_SNAPSHOT_FIELDS,
+                f"campaign v2 producer receipt {name}",
+            )
+            if any(
+                snapshot.get(field) != target[field]
+                for field in RELEASE_BINDING_FIELDS
+            ):
+                raise AcceptanceError(
+                    "campaign v2 producer receipt CURRENT fence drifted"
+                )
+            _require_sha(
+                snapshot.get("responseSha256"),
+                "campaign v2 producer receipt CURRENT responseSha256",
+            )
+
+    if status == "pass" and not CAMPAIGN_V2_LIVE_PASS_AUTHORIZED:
+        raise AcceptanceError(
+            "campaign v2 native pass is disabled by producer authority"
+        )
+
+    try:
+        validation = CAMPAIGN_V2_HELPERS.validate_payloads(
+            payload,
+            permit_payload,
+            permit_sha256=permit_sha256,
+            observed_at=observed_at,
+        )
+    except Exception as error:
+        raise AcceptanceError(
+            "campaign v2 producer receipt or permit failed authoritative validation"
+        ) from error
+    if (
+        not isinstance(validation, dict)
+        or validation.get("status") != status
+        or validation.get("operationalReadinessClaimAllowed") is not (status == "pass")
+        or validation.get("permitSha256") != permit_sha256
+    ):
+        raise AcceptanceError("campaign v2 producer validation result is invalid")
+    return status
+
+
 def _validate_evidence(
     payload: dict[str, Any],
     target: dict[str, str],
@@ -931,8 +1119,10 @@ def _validate_evidence(
     observed_at: dt.datetime,
     release_decision_status: str,
     producer_receipt: tuple[bytes, dict[str, Any]] | None,
+    producer_finalization_sha256: str,
     producer_convergence_sha256: str,
     producer_manifest_file_sha256: str,
+    producer_permit: tuple[bytes, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], bool, dt.datetime]:
     fields = set(payload)
     if not EVIDENCE_REQUIRED_FIELDS.issubset(fields) or not fields.issubset(
@@ -985,11 +1175,26 @@ def _validate_evidence(
                 "evidenceSha256": evidence_sha256,
             }
         )
-    expected_claims = EVIDENCE_CLAIM_POLICIES.get(expected_kind)
     observed_claims = tuple(
         (claim["claimId"], claim["status"]) for claim in normalized_claims
     )
-    if expected_claims is None or observed_claims != expected_claims:
+    legacy_campaign_preflight = (
+        expected_kind == "multi_account_live_journey"
+        and observed_claims == CAMPAIGN_V1_CLAIM_POLICY
+    )
+    governed_campaign_claim = (
+        expected_kind == "multi_account_live_journey"
+        and len(observed_claims) == 1
+        and observed_claims[0][0] == CAMPAIGN_V2_OUTER_CLAIM_ID
+        and observed_claims[0][1] in {"pass", "attention_required"}
+    )
+    expected_claims = EVIDENCE_CLAIM_POLICIES.get(expected_kind)
+    claims_are_exact = (
+        observed_claims == expected_claims
+        if expected_kind != "multi_account_live_journey"
+        else legacy_campaign_preflight or governed_campaign_claim
+    )
+    if expected_claims is None or not claims_are_exact:
         raise AcceptanceError(
             f"{expected_kind} evidence claim IDs/statuses are not producer-exact"
         )
@@ -1006,16 +1211,23 @@ def _validate_evidence(
     readiness = payload.get("operationalReadinessClaimAllowed")
     if not isinstance(readiness, bool):
         raise AcceptanceError("operationalReadinessClaimAllowed must be boolean")
-    if status != "attention_required" or readiness is not False:
+    if (
+        expected_kind == "horizon_live_readiness"
+        or legacy_campaign_preflight
+    ) and (status != "attention_required" or readiness is not False):
         raise AcceptanceError(
             f"{expected_kind} evidence exceeds its current producer authority"
         )
 
     provenance_status: str
     producer_receipt_sha256: str | None = None
+    producer_permit_sha256: str | None = None
+    ready = False
     if expected_kind == "horizon_live_readiness":
         if producer_receipt is None:
             raise AcceptanceError("Horizon producer receipt is required")
+        if producer_permit is not None:
+            raise AcceptanceError("Horizon producer receipt does not accept a permit")
         producer_raw, producer_payload = producer_receipt
         _validate_horizon_producer_receipt(
             producer_payload,
@@ -1033,20 +1245,66 @@ def _validate_evidence(
             )
         provenance_status = "structural_attention_receipt_bound_unverified"
     elif expected_kind == "multi_account_live_journey":
-        if producer_receipt is not None:
-            raise AcceptanceError("campaign preflight has no authoritative producer receipt")
-        if (
-            normalized_claims[-1]["evidenceSha256"]
-            != CAMPAIGN_DEFERRED_CLAIM_SHA256
-        ):
-            raise AcceptanceError("campaign deferred journey claim is not producer-exact")
-        provenance_status = "unverified_preflight_attention_only"
+        if legacy_campaign_preflight:
+            if producer_receipt is not None or producer_permit is not None:
+                raise AcceptanceError(
+                    "campaign v1 preflight cannot bind governed v2 authority"
+                )
+            if (
+                normalized_claims[-1]["evidenceSha256"]
+                != CAMPAIGN_DEFERRED_CLAIM_SHA256
+            ):
+                raise AcceptanceError("campaign deferred journey claim is not producer-exact")
+            provenance_status = "unverified_preflight_attention_only"
+        else:
+            if producer_receipt is None or producer_permit is None:
+                raise AcceptanceError(
+                    "campaign v2 producer receipt and permit are required"
+                )
+            producer_raw, producer_payload = producer_receipt
+            permit_raw, permit_payload = producer_permit
+            native_status = _validate_campaign_v2_producer_receipt(
+                producer_payload,
+                producer_raw,
+                permit_payload,
+                permit_raw,
+                target,
+                payload,
+                observed_at=observed_at,
+                expected_finalization_sha256=producer_finalization_sha256,
+                expected_convergence_sha256=producer_convergence_sha256,
+                expected_manifest_file_sha256=producer_manifest_file_sha256,
+            )
+            producer_receipt_sha256 = _sha(producer_raw)
+            producer_permit_sha256 = _sha(permit_raw)
+            if normalized_claims[0]["evidenceSha256"] != producer_receipt_sha256:
+                raise AcceptanceError(
+                    "campaign evidence claim does not bind the producer receipt bytes"
+                )
+            if native_status == "pass" and not CAMPAIGN_V2_LIVE_PASS_AUTHORIZED:
+                raise AcceptanceError(
+                    "campaign v2 native pass is disabled by producer authority"
+                )
+            producer_passed = native_status == "pass"
+            expected_outer_status = "pass" if producer_passed else "attention_required"
+            expected_claim_status = "pass" if producer_passed else "attention_required"
+            if (
+                status != expected_outer_status
+                or readiness is not producer_passed
+                or normalized_claims[0]["status"] != expected_claim_status
+            ):
+                raise AcceptanceError(
+                    "campaign evidence exceeds or contradicts producer authority"
+                )
+            ready = producer_passed
+            provenance_status = (
+                "governed_v2_pass_receipt_and_permit_bound"
+                if producer_passed
+                else f"governed_v2_{native_status}_receipt_and_permit_bound"
+            )
     else:
         raise AcceptanceError("evidence kind has no producer provenance policy")
 
-    # Both current producers are observation/preflight-only.  No combination
-    # of caller-authored status fields can widen this v1 aggregate to accepted.
-    ready = False
     row = {
         "evidenceId": evidence_id,
         "evidenceKind": expected_kind,
@@ -1060,6 +1318,8 @@ def _validate_evidence(
     }
     if producer_receipt_sha256 is not None:
         row["producerReceiptSha256"] = producer_receipt_sha256
+    if producer_permit_sha256 is not None:
+        row["producerPermitSha256"] = producer_permit_sha256
     return row, ready, generated_at
 
 
@@ -1076,6 +1336,7 @@ def verify(
     release_manifest_file_sha256: str,
     required_evidence: dict[str, tuple[Path, str]],
     producer_receipts: dict[str, tuple[Path, str]],
+    producer_permits: dict[str, tuple[Path, str]],
     output: Path,
     observed_at: dt.datetime | None = None,
 ) -> dict[str, Any]:
@@ -1109,9 +1370,14 @@ def verify(
         raise AcceptanceError(
             "required evidence kinds must exactly match the flagship v1 denominator"
         )
-    if set(producer_receipts) != PRODUCER_RECEIPT_KINDS:
+    producer_kind_policy = (frozenset(producer_receipts), frozenset(producer_permits))
+    allowed_producer_kind_policies = {
+        (LEGACY_PRODUCER_RECEIPT_KINDS, LEGACY_PRODUCER_PERMIT_KINDS),
+        (PRODUCER_RECEIPT_KINDS, PRODUCER_PERMIT_KINDS),
+    }
+    if producer_kind_policy not in allowed_producer_kind_policies:
         raise AcceptanceError(
-            "producer receipt kinds must exactly match the flagship v1 provenance policy"
+            "producer receipt and permit kinds must match one exact provenance policy"
         )
     now = observed_at or dt.datetime.now(dt.timezone.utc)
     if now.tzinfo is None or now.utcoffset() != dt.timedelta(0):
@@ -1174,6 +1440,16 @@ def verify(
             f"{kind} producer receipt",
             require_canonical=True,
         )
+    producer_permit_payloads: dict[str, tuple[bytes, dict[str, Any]]] = {}
+    for kind in sorted(producer_permits):
+        path, expected_digest = producer_permits[kind]
+        producer_permit_payloads[kind] = _pinned_json(
+            path,
+            expected_digest,
+            root,
+            f"{kind} producer permit",
+            require_canonical=True,
+        )
     for kind in sorted(required_evidence):
         if SAFE_KIND.fullmatch(kind) is None:
             raise AcceptanceError("required evidence kind is invalid")
@@ -1193,6 +1469,8 @@ def verify(
             observed_at=now,
             release_decision_status=finalization["status"],
             producer_receipt=producer_payloads.get(kind),
+            producer_permit=producer_permit_payloads.get(kind),
+            producer_finalization_sha256=_sha(final_raw),
             producer_convergence_sha256=_sha(generation_raw),
             producer_manifest_file_sha256=_sha(manifest_raw),
         )
@@ -1373,6 +1651,30 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             for kind in producer_paths
         }
+        permit_paths = _parse_kind_map(
+            args.producer_permit,
+            "--producer-permit",
+            allow_empty=True,
+        )
+        permit_digests = _parse_kind_map(
+            args.producer_permit_sha256,
+            "--producer-permit-sha256",
+            allow_empty=True,
+        )
+        if set(permit_paths) != set(permit_digests):
+            raise AcceptanceError(
+                "producer permit path and digest kinds must match exactly"
+            )
+        producer_permits = {
+            kind: (
+                Path(permit_paths[kind]),
+                _require_sha(
+                    permit_digests[kind],
+                    f"{kind} producer permit digest",
+                ),
+            )
+            for kind in permit_paths
+        }
         receipt = verify(
             workspace=args.workspace,
             finalization_receipt=args.finalization_receipt,
@@ -1385,6 +1687,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             release_manifest_file_sha256=args.expected_release_manifest_file_sha256,
             required_evidence=evidence,
             producer_receipts=producer_receipts,
+            producer_permits=producer_permits,
             output=args.output,
         )
     except AcceptanceError as error:

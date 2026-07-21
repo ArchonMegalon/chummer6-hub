@@ -89,6 +89,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PlayAuthorizationApiPolicy>();
         services.AddSingleton<PlayAuthorizationRequestLimiter>();
         services.AddSingleton<TeableUserProjectionService>();
+        services.AddSingleton<IHubUserProjectionSyncQueue>(serviceProvider =>
+            serviceProvider.GetRequiredService<TeableUserProjectionService>());
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddSingleton<TeableHeyyScamChatService>();
         services.AddSingleton<TeableExecutiveAssistantChannelService>();

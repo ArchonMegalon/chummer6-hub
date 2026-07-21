@@ -24,6 +24,10 @@ HEALTHCHECK_CONTRACTS: dict[str, tuple[str, ...]] = {
 
 CLOUDFLARED_DEFAULT_IMAGE = "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2026.7.0}"
 CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS = ("--metrics", "0.0.0.0:2000", "run")
+CORE_GM_WORKSPACE_CONFIGURATION_KEY = (
+    "Chummer__CoreGmCharacterEdits__WorkspaceStorePath"
+)
+CORE_GM_WORKSPACE_DIRECTORY = "/app/state/core-workspaces"
 
 DEPENDENCY_CONTRACTS = {
     "chummer-public-blazor": {"chummer-presentation-api"},
@@ -167,6 +171,17 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                         f"{fragment}"
                     )
 
+    portal = services.get("chummer-portal")
+    if isinstance(portal, dict):
+        environment = portal.get("environment")
+        if not isinstance(environment, dict):
+            failures.append("chummer-portal environment mapping is missing")
+        elif environment.get(CORE_GM_WORKSPACE_CONFIGURATION_KEY) != CORE_GM_WORKSPACE_DIRECTORY:
+            failures.append(
+                "chummer-portal must provision Core delegated GM edits at "
+                f"{CORE_GM_WORKSPACE_DIRECTORY}"
+            )
+
     return failures
 
 
@@ -190,6 +205,19 @@ def validate_runtime_sources() -> list[str]:
                 failures.append(
                     f"health route source {source_path} is missing required marker: {marker}"
                 )
+
+    volume_initializer = (
+        RUN_SERVICES_ROOT / "scripts" / "initialize-public-edge-volumes.sh"
+    )
+    initializer_marker = (
+        "ensure_private_directory_as_portal_identity /app/state/core-workspaces"
+    )
+    if not volume_initializer.is_file():
+        failures.append(f"public-edge volume initializer is missing: {volume_initializer}")
+    elif initializer_marker not in volume_initializer.read_text(encoding="utf-8"):
+        failures.append(
+            "public-edge volume initializer does not provision the Core GM workspace root"
+        )
     return failures
 
 

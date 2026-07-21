@@ -25,6 +25,35 @@ public sealed record CampaignCollaborationProjection(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record DeleteCampaignCollaborationRequest(
+    string ConfirmCampaignName,
+    DateTimeOffset ExpectedUpdatedAtUtc,
+    string IdempotencyKey);
+
+public sealed record CampaignTeardownCleanupCounts(
+    int Campaigns,
+    int Groups,
+    int Crews,
+    int Runs,
+    int Invites,
+    int InviteCodeIndexes,
+    int CharacterBindings,
+    int Runsites,
+    int CommandRecords,
+    int AuditRecords,
+    int UserGroupMemberships,
+    int RestoreProjections = 0,
+    int WorkspacePrepLibrarySearchHistoryItems = 0);
+
+public sealed record CampaignTeardownReceipt(
+    string ReceiptId,
+    string CampaignId,
+    string CampaignNameSha256,
+    DateTimeOffset PreviousUpdatedAtUtc,
+    CampaignTeardownCleanupCounts Removed,
+    string CleanupSha256,
+    DateTimeOffset DeletedAtUtc);
+
 public sealed record CampaignRosterEntryProjection(
     string DossierId,
     string AuthorityKind,
