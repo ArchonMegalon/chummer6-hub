@@ -462,6 +462,21 @@ UNSIGNED_PROVENANCE_PATHS = {
         "provenance/config/windows-native-bootstrap-toolchain.lock.json"
     ),
 }
+UNSIGNED_PACKAGE_PLANE_LOCK_BINDING_PATH = "config/package-plane.lock.json"
+UNSIGNED_RETAINED_POINTER_KEYS = {
+    "atomicallyRetained",
+    "authority",
+    "bundleInventoryCount",
+    "bundleInventorySha256",
+    "consumerCommit",
+    "contractName",
+    "contractVersion",
+    "manifest",
+    "manifestIsAuthoritative",
+    "release",
+    "status",
+    "targetPath",
+}
 UNSIGNED_SIGNATURE_POLICY = {
     "required": False,
     "status": "unsigned",
@@ -720,6 +735,23 @@ def _validate_relative_path(value: object, *, label: str) -> str:
     parts = value.split("/")
     if any(part in {"", ".", ".."} or ":" in part for part in parts):
         _fail(f"{label} is not a canonical relative path")
+    return value
+
+
+def _validate_absolute_posix_path(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or value.endswith("/")
+        or "\\" in value
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in value
+        )
+    ):
+        _fail(f"{label} is not a canonical absolute path")
+    if any(part in {"", ".", ".."} for part in value.split("/")[1:]):
+        _fail(f"{label} is not a canonical absolute path")
     return value
 
 
@@ -3440,32 +3472,37 @@ def _validate_unsigned_provenance_documents(
     ):
         _fail("unsigned retained-Windows manifest authority drifted")
 
-    def exact_opaque_binding(
+    def exact_byte_binding(
         value: object,
         raw: bytes,
         *,
+        path: str,
         label: str,
     ) -> None:
         expected = {
+            "path": path,
             "sha256": hashlib.sha256(raw).hexdigest(),
             "sizeBytes": len(raw),
         }
         if value != expected:
             _fail(f"{label} differs from exact held bytes")
 
-    exact_opaque_binding(
+    exact_byte_binding(
         package_receipt.get("consumerPackagePlaneLock"),
         package_lock_raw,
+        path=UNSIGNED_PACKAGE_PLANE_LOCK_BINDING_PATH,
         label="unsigned package receipt lock binding",
     )
-    exact_opaque_binding(
+    exact_byte_binding(
         retained.get("packagePlaneLock"),
         package_lock_raw,
+        path=UNSIGNED_PACKAGE_PLANE_LOCK_BINDING_PATH,
         label="unsigned retained manifest lock binding",
     )
     pointer = package_receipt.get("retainedWindowsBundle")
     if (
         not isinstance(pointer, dict)
+        or set(pointer) != UNSIGNED_RETAINED_POINTER_KEYS
         or pointer.get("contractName")
         != "chummer6-ui.retained-windows-publish-closure-pointer"
         or type(pointer.get("contractVersion")) is not int
@@ -3476,11 +3513,26 @@ def _validate_unsigned_provenance_documents(
         or pointer.get("atomicallyRetained") is not True
         or pointer.get("authority") is not False
         or pointer.get("manifestIsAuthoritative") is not True
+        or type(pointer.get("bundleInventoryCount")) is not int
+        or pointer["bundleInventoryCount"] < 1
+        or not isinstance(pointer.get("bundleInventorySha256"), str)
+        or SHA256_RE.fullmatch(pointer["bundleInventorySha256"]) is None
     ):
         _fail("unsigned retained bundle pointer authority drifted")
-    exact_opaque_binding(
+    pointer_target = _validate_absolute_posix_path(
+        pointer.get("targetPath"),
+        label="unsigned retained bundle pointer target path",
+    )
+    retained_target = _validate_absolute_posix_path(
+        retained.get("targetPath"),
+        label="unsigned retained manifest target path",
+    )
+    if pointer_target != retained_target:
+        _fail("unsigned retained bundle target path drifted")
+    exact_byte_binding(
         pointer.get("manifest"),
         retained_raw,
+        path=f"{pointer_target}/manifest.json",
         label="unsigned retained bundle pointer manifest binding",
     )
 

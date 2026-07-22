@@ -140,6 +140,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json";
     private const string CandidateUploadExportFileName =
         "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
+    private const string PackagePlaneLockBindingPath =
+        "config/package-plane.lock.json";
     private const string CaptureWorkflow =
         ".github/workflows/windows-native-evidence-capture.yml";
     private const string FinalizationWorkflow =
@@ -1363,11 +1365,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException("unsigned package-plane receipt source drifted");
         }
-        ValidateUnsignedOpaqueBinding(
-            RequireObject(receipt, "consumerPackagePlaneLock"),
-            documents[packageLockPath].Bytes,
-            "unsigned package receipt lock binding");
-
         JsonElement retained = documents[retainedManifestPath].Root;
         RequireExactString(
             retained,
@@ -1390,11 +1387,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             RequireObject(retained, "releaseEligibility"),
             "eligible",
             expected: false);
-        ValidateUnsignedOpaqueBinding(
-            RequireObject(retained, "packagePlaneLock"),
-            documents[packageLockPath].Bytes,
-            "unsigned retained manifest lock binding");
-
         JsonElement pointer = RequireObject(receipt, "retainedWindowsBundle");
         RequireExactString(
             pointer,
@@ -1409,10 +1401,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         JsonElement pointerRelease = RequireObject(pointer, "release");
         RequireExactString(pointerRelease, "channel", "preview");
         RequireExactString(pointerRelease, "version", version);
-        ValidateUnsignedOpaqueBinding(
-            RequireObject(pointer, "manifest"),
-            documents[retainedManifestPath].Bytes,
-            "unsigned retained pointer manifest binding");
+        ValidateUnsignedProducerBindings(
+            receipt,
+            retained,
+            documents[packageLockPath].Bytes,
+            documents[retainedManifestPath].Bytes);
 
         JsonElement native = documents[nativeLockPath].Root;
         if (!ExactPropertySet(
@@ -1463,6 +1456,66 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             _ = RequireString(package, "version");
             _ = RequireString(package, "architecture");
         }
+    }
+
+    internal static void ValidateUnsignedProducerBindings(
+        JsonElement receipt,
+        JsonElement retained,
+        byte[] packageLockBytes,
+        byte[] retainedManifestBytes)
+    {
+        ValidateUnsignedByteReference(
+            RequireObject(receipt, "consumerPackagePlaneLock"),
+            PackagePlaneLockBindingPath,
+            packageLockBytes,
+            "unsigned package receipt lock binding");
+        ValidateUnsignedByteReference(
+            RequireObject(retained, "packagePlaneLock"),
+            PackagePlaneLockBindingPath,
+            packageLockBytes,
+            "unsigned retained manifest lock binding");
+        JsonElement pointer = RequireObject(receipt, "retainedWindowsBundle");
+        if (!ExactPropertySet(
+                pointer,
+                new HashSet<string>(
+                    [
+                        "atomicallyRetained",
+                        "authority",
+                        "bundleInventoryCount",
+                        "bundleInventorySha256",
+                        "consumerCommit",
+                        "contractName",
+                        "contractVersion",
+                        "manifest",
+                        "manifestIsAuthoritative",
+                        "release",
+                        "status",
+                        "targetPath"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained bundle pointer property set drifted");
+        }
+        _ = RequirePositiveInt64(pointer, "bundleInventoryCount");
+        _ = RequireSha256(pointer, "bundleInventorySha256");
+        string pointerTarget = RequireCanonicalAbsolutePosixPath(
+            pointer,
+            "targetPath",
+            "unsigned retained pointer target path");
+        string retainedTarget = RequireCanonicalAbsolutePosixPath(
+            retained,
+            "targetPath",
+            "unsigned retained manifest target path");
+        if (!string.Equals(pointerTarget, retainedTarget, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned retained bundle target path drifted");
+        }
+        ValidateUnsignedByteReference(
+            RequireObject(pointer, "manifest"),
+            $"{pointerTarget}/manifest.json",
+            retainedManifestBytes,
+            "unsigned retained pointer manifest binding");
     }
 
     private static void ValidateUnsignedRegistry(
@@ -6016,6 +6069,25 @@ public sealed class ReleaseUploadSnapshotAuthorityService
            && !value.Contains('\\')
            && value.Split('/').All(static segment =>
                segment.Length > 0 && segment is not "." and not ".." && !segment.Contains(':'));
+
+    private static string RequireCanonicalAbsolutePosixPath(
+        JsonElement parent,
+        string property,
+        string label)
+    {
+        string value = RequireString(parent, property);
+        if (value.Length < 2
+            || !value.StartsWith("/", StringComparison.Ordinal)
+            || value.EndsWith("/", StringComparison.Ordinal)
+            || value.Contains("\\", StringComparison.Ordinal)
+            || value.Any(static character => character < ' ' || character == '\u007f')
+            || value.Split('/').Skip(1).Any(static segment =>
+                segment.Length == 0 || segment is "." or ".."))
+        {
+            throw new InvalidDataException($"{label} is not a canonical absolute path");
+        }
+        return value;
+    }
 
     private static void RequireDigest(byte[] payload, string expected, string label)
     {

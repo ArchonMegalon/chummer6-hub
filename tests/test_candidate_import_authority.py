@@ -25,6 +25,24 @@ UNSIGNED_V3_AUTHORITY_FIXTURE = (
     / "unsigned_candidate_import_authority_v3.json.gz.b64"
 )
 DEFAULT_HEADS = ("avalonia",)
+UNSIGNED_RETAINED_POINTER_KEYS = {
+    "atomicallyRetained",
+    "authority",
+    "bundleInventoryCount",
+    "bundleInventorySha256",
+    "consumerCommit",
+    "contractName",
+    "contractVersion",
+    "manifest",
+    "manifestIsAuthoritative",
+    "release",
+    "status",
+    "targetPath",
+}
+UNSIGNED_BUNDLE_INVENTORY_COUNT = 344
+UNSIGNED_BUNDLE_INVENTORY_SHA256 = (
+    "0f26e227d658d3986bd54969d8b994fa89046807325f5367f1a5b23572eb6026"
+)
 
 
 def write_json(path: Path, value: object) -> bytes:
@@ -1900,6 +1918,64 @@ def load_unsigned_v3_authority_fixture() -> dict[str, object]:
     return authority
 
 
+def unsigned_provenance_documents() -> tuple[dict[str, bytes], str, str]:
+    authority = load_unsigned_v3_authority_fixture()
+    evidence = authority["custody"]["unsignedPublicationEvidence"]
+    documents = {
+        entry["path"]: base64.b64decode(entry["base64"])
+        for entry in evidence["files"]
+    }
+    lock_path = "provenance/config/package-plane.lock.json"
+    receipt_path = "provenance/UI_FRESH_PACKAGE_PLANE.generated.json"
+    retained_path = "provenance/retained-windows-publish-closure/manifest.json"
+    target_path = "/tmp/chummer-preview/retained-windows-bundle"
+    lock_binding = {
+        "path": "config/package-plane.lock.json",
+        "sha256": hashlib.sha256(documents[lock_path]).hexdigest(),
+        "sizeBytes": len(documents[lock_path]),
+    }
+    retained = json.loads(documents[retained_path])
+    retained["packagePlaneLock"] = lock_binding
+    retained["targetPath"] = target_path
+    retained_raw = (
+        json.dumps(retained, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    documents[retained_path] = retained_raw
+    receipt = json.loads(documents[receipt_path])
+    receipt["consumerPackagePlaneLock"] = lock_binding
+    pointer = receipt["retainedWindowsBundle"]
+    pointer["bundleInventoryCount"] = UNSIGNED_BUNDLE_INVENTORY_COUNT
+    pointer["bundleInventorySha256"] = UNSIGNED_BUNDLE_INVENTORY_SHA256
+    pointer["targetPath"] = target_path
+    pointer["manifest"] = {
+        "path": f"{target_path}/manifest.json",
+        "sha256": hashlib.sha256(retained_raw).hexdigest(),
+        "sizeBytes": len(retained_raw),
+    }
+    documents[receipt_path] = (
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    return documents, evidence["sourceSha"], authority["candidate"]["version"]
+
+
+def validate_unsigned_provenance(layer: str, documents: dict[str, bytes]) -> None:
+    _, source_sha, version = unsigned_provenance_documents()
+    if layer == "materializer":
+        materializer = load_script(MATERIALIZER, "unsigned_binding_materializer_test")
+        materializer._validate_unsigned_provenance_documents(
+            list(documents.items()),
+            source_sha=source_sha,
+            release_version=version,
+        )
+        return
+    projection = load_projection()
+    projection._candidate_unsigned_provenance(
+        documents,
+        source_sha=source_sha,
+        version=version,
+    )
+
+
 def decode_unsigned_custody_entry(entry: dict[str, object]) -> dict[str, object]:
     return json.loads(base64.b64decode(entry["base64"]))
 
@@ -2165,16 +2241,138 @@ def test_unsigned_projection_rejects_rehashed_fractional_registry_contract_versi
         projection._validate_candidate_import_authority_v3(authority)
 
 
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_provenance_accepts_actual_producer_binding_paths(layer: str) -> None:
+    documents, _, _ = unsigned_provenance_documents()
+    receipt = json.loads(
+        documents["provenance/UI_FRESH_PACKAGE_PLANE.generated.json"]
+    )
+    pointer = receipt["retainedWindowsBundle"]
+    scope = json.loads(documents["PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json"])
+
+    assert set(pointer) == UNSIGNED_RETAINED_POINTER_KEYS
+    assert pointer["bundleInventoryCount"] == UNSIGNED_BUNDLE_INVENTORY_COUNT
+    assert pointer["bundleInventorySha256"] == UNSIGNED_BUNDLE_INVENTORY_SHA256
+    assert all(
+        set(binding) == {"sha256", "sizeBytes"}
+        for binding in scope["provenance"].values()
+    )
+
+    validate_unsigned_provenance(layer, documents)
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "package_lock_path_traversal",
+        "package_lock_property_smuggling",
+        "retained_manifest_path_traversal",
+        "retained_manifest_property_smuggling",
+        "target_path_traversal",
+        "target_path_unit_separator",
+        "target_path_del",
+        "pointer_property_smuggling",
+        "missing_bundle_inventory_count",
+        "bundle_inventory_count_zero",
+        "bundle_inventory_count_bool",
+        "bundle_inventory_count_fractional",
+        "missing_bundle_inventory_sha256",
+        "bundle_inventory_sha256_uppercase",
+    ],
+)
+def test_unsigned_provenance_rejects_binding_path_or_property_smuggling(
+    layer: str,
+    tamper: str,
+) -> None:
+    documents, _, _ = unsigned_provenance_documents()
+    receipt_path = "provenance/UI_FRESH_PACKAGE_PLANE.generated.json"
+    retained_path = "provenance/retained-windows-publish-closure/manifest.json"
+    receipt = json.loads(documents[receipt_path])
+    retained = json.loads(documents[retained_path])
+    pointer = receipt["retainedWindowsBundle"]
+    rebind_manifest = False
+
+    if tamper == "package_lock_path_traversal":
+        receipt["consumerPackagePlaneLock"]["path"] = (
+            "config/nested/../package-plane.lock.json"
+        )
+    elif tamper == "package_lock_property_smuggling":
+        retained["packagePlaneLock"]["unexpectedProperty"] = True
+    elif tamper == "retained_manifest_path_traversal":
+        pointer["manifest"]["path"] = (
+            f"{pointer['targetPath']}/nested/../manifest.json"
+        )
+    elif tamper == "retained_manifest_property_smuggling":
+        pointer["manifest"]["unexpectedProperty"] = True
+    elif tamper == "target_path_traversal":
+        target = "/tmp/chummer-preview/nested/../retained-windows-bundle"
+        pointer["targetPath"] = target
+        pointer["manifest"]["path"] = f"{target}/manifest.json"
+        retained["targetPath"] = target
+        rebind_manifest = True
+    elif tamper == "target_path_unit_separator":
+        target = "/tmp/chummer-preview/unit\x1fseparator/retained-windows-bundle"
+        pointer["targetPath"] = target
+        pointer["manifest"]["path"] = f"{target}/manifest.json"
+        retained["targetPath"] = target
+        rebind_manifest = True
+    elif tamper == "target_path_del":
+        target = "/tmp/chummer-preview/del\x7fsegment/retained-windows-bundle"
+        pointer["targetPath"] = target
+        pointer["manifest"]["path"] = f"{target}/manifest.json"
+        retained["targetPath"] = target
+        rebind_manifest = True
+    elif tamper == "pointer_property_smuggling":
+        pointer["publicationAuthorized"] = False
+    elif tamper == "missing_bundle_inventory_count":
+        del pointer["bundleInventoryCount"]
+    elif tamper == "bundle_inventory_count_zero":
+        pointer["bundleInventoryCount"] = 0
+    elif tamper == "bundle_inventory_count_bool":
+        pointer["bundleInventoryCount"] = True
+    elif tamper == "bundle_inventory_count_fractional":
+        pointer["bundleInventoryCount"] = 1.0
+    elif tamper == "missing_bundle_inventory_sha256":
+        del pointer["bundleInventorySha256"]
+    elif tamper == "bundle_inventory_sha256_uppercase":
+        pointer["bundleInventorySha256"] = pointer[
+            "bundleInventorySha256"
+        ].upper()
+    else:
+        raise AssertionError(f"unknown tamper: {tamper}")
+
+    retained_raw = (
+        json.dumps(retained, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    documents[retained_path] = retained_raw
+    if rebind_manifest:
+        pointer["manifest"] = {
+            "path": f"{pointer['targetPath']}/manifest.json",
+            "sha256": hashlib.sha256(retained_raw).hexdigest(),
+            "sizeBytes": len(retained_raw),
+        }
+    documents[receipt_path] = (
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    ).encode()
+
+    with pytest.raises(Exception) as rejected:
+        validate_unsigned_provenance(layer, documents)
+    assert rejected.type.__name__ in {
+        "CandidateAuthorityBlocked",
+        "ProjectionBlocked",
+    }
+    assert any(
+        fragment in str(rejected.value).lower()
+        for fragment in ("binding", "drifted", "exact held bytes", "target path")
+    )
+
+
 @pytest.mark.parametrize("tamper", ["package_lock_extra", "native_package_extra"])
 def test_unsigned_projection_rejects_provenance_property_shape_drift(
     tamper: str,
 ) -> None:
-    authority = load_unsigned_v3_authority_fixture()
-    evidence = authority["custody"]["unsignedPublicationEvidence"]
-    documents = {
-        entry["path"]: base64.b64decode(entry["base64"])
-        for entry in evidence["files"]
-    }
+    documents, source_sha, version = unsigned_provenance_documents()
     path = (
         "provenance/config/package-plane.lock.json"
         if tamper == "package_lock_extra"
@@ -2193,8 +2391,8 @@ def test_unsigned_projection_rejects_provenance_property_shape_drift(
     with pytest.raises(projection.ProjectionBlocked, match="package-plane lock|toolchain package"):
         projection._candidate_unsigned_provenance(
             documents,
-            source_sha=evidence["sourceSha"],
-            version=authority["candidate"]["version"],
+            source_sha=source_sha,
+            version=version,
         )
 
 
