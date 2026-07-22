@@ -909,6 +909,14 @@ public sealed class InternalReleaseBundlesController : ControllerBase
             completion.MarkStaged(staged);
             return Ok(staged);
         }
+        catch (ReleaseShelfMutationConcurrencyException exception)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Upload session stage conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/stage-conflict");
+        }
         catch (Exception exception) when (exception is InvalidDataException
                                            or InvalidOperationException
                                            or JsonException
