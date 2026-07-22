@@ -78,6 +78,21 @@ CANDIDATE_UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 CANDIDATE_UI_REF = "refs/heads/main"
 CANDIDATE_RID = "win-x64"
 CANDIDATE_EXACT_SCOPE = "avalonia:windows:win-x64"
+CANDIDATE_PACKAGE_PLANE_LOCK_BINDING_PATH = "config/package-plane.lock.json"
+CANDIDATE_RETAINED_POINTER_KEYS = {
+    "atomicallyRetained",
+    "authority",
+    "bundleInventoryCount",
+    "bundleInventorySha256",
+    "consumerCommit",
+    "contractName",
+    "contractVersion",
+    "manifest",
+    "manifestIsAuthoritative",
+    "release",
+    "status",
+    "targetPath",
+}
 CANDIDATE_AUTHORITY_CONTRACT_V2 = "chummer.release-upload.candidate-import-authority/v2"
 CANDIDATE_AUTHORITY_CONTRACT_V3 = "chummer.release-upload.candidate-import-authority/v3"
 CANDIDATE_PUBLICATION_SCOPE_FILE = "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
@@ -1337,6 +1352,23 @@ def _candidate_relative_path(value: object, *, label: str) -> str:
         raise ProjectionBlocked(f"{label} is invalid")
     parts = value.split("/")
     if any(not part or part in {".", ".."} or ":" in part for part in parts):
+        raise ProjectionBlocked(f"{label} is invalid")
+    return value
+
+
+def _candidate_absolute_posix_path(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or value.endswith("/")
+        or "\\" in value
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in value
+        )
+    ):
+        raise ProjectionBlocked(f"{label} is invalid")
+    if any(part in {"", ".", ".."} for part in value.split("/")[1:]):
         raise ProjectionBlocked(f"{label} is invalid")
     return value
 
@@ -3514,6 +3546,7 @@ def _candidate_unsigned_provenance(
         raise ProjectionBlocked("candidate unsigned package-plane receipt drifted")
     lock_raw = documents[paths["packagePlaneLock"]]
     lock_binding = {
+        "path": CANDIDATE_PACKAGE_PLANE_LOCK_BINDING_PATH,
         "sha256": hashlib.sha256(lock_raw).hexdigest(),
         "sizeBytes": len(lock_raw),
     }
@@ -3544,8 +3577,17 @@ def _candidate_unsigned_provenance(
         raise ProjectionBlocked("candidate unsigned retained manifest drifted")
     pointer = receipt.get("retainedWindowsBundle")
     retained_raw = documents[paths["retainedManifest"]]
+    pointer_target = _candidate_absolute_posix_path(
+        pointer.get("targetPath") if isinstance(pointer, dict) else None,
+        label="candidate unsigned retained pointer target path",
+    )
+    retained_target = _candidate_absolute_posix_path(
+        retained.get("targetPath"),
+        label="candidate unsigned retained manifest target path",
+    )
     if (
         not isinstance(pointer, dict)
+        or set(pointer) != CANDIDATE_RETAINED_POINTER_KEYS
         or pointer.get("contractName")
         != "chummer6-ui.retained-windows-publish-closure-pointer"
         or type(pointer.get("contractVersion")) is not int
@@ -3556,8 +3598,14 @@ def _candidate_unsigned_provenance(
         or pointer.get("atomicallyRetained") is not True
         or pointer.get("authority") is not False
         or pointer.get("manifestIsAuthoritative") is not True
+        or type(pointer.get("bundleInventoryCount")) is not int
+        or pointer["bundleInventoryCount"] < 1
+        or not isinstance(pointer.get("bundleInventorySha256"), str)
+        or SHA256_RE.fullmatch(pointer["bundleInventorySha256"]) is None
+        or pointer_target != retained_target
         or pointer.get("manifest")
         != {
+            "path": f"{pointer_target}/manifest.json",
             "sha256": hashlib.sha256(retained_raw).hexdigest(),
             "sizeBytes": len(retained_raw),
         }

@@ -15,6 +15,25 @@ namespace Chummer.Tests;
 
 public sealed class ReleaseUploadSnapshotAuthorityTests
 {
+    private const long UnsignedBundleInventoryCount = 344;
+    private const string UnsignedBundleInventorySha256 =
+        "0f26e227d658d3986bd54969d8b994fa89046807325f5367f1a5b23572eb6026";
+    private static readonly string[] UnsignedRetainedPointerKeys =
+    [
+        "atomicallyRetained",
+        "authority",
+        "bundleInventoryCount",
+        "bundleInventorySha256",
+        "consumerCommit",
+        "contractName",
+        "contractVersion",
+        "manifest",
+        "manifestIsAuthoritative",
+        "release",
+        "status",
+        "targetPath"
+    ];
+
     [Fact]
     public void RawFleetCredentialCannotBypassMissingOrReviewOnlySnapshotPolicy()
     {
@@ -175,6 +194,160 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             File.ReadAllText(Path.Combine(bundle, "operator-note.txt")));
     }
 
+    [Theory]
+    [InlineData("package_lock_path_traversal", "path drifted")]
+    [InlineData("package_lock_property_smuggling", "lock binding property set drifted")]
+    [InlineData("retained_manifest_path_traversal", "path drifted")]
+    [InlineData("retained_manifest_property_smuggling", "manifest binding property set drifted")]
+    [InlineData("target_path_traversal", "target path is not a canonical absolute path")]
+    [InlineData("target_path_unit_separator", "target path is not a canonical absolute path")]
+    [InlineData("target_path_del", "target path is not a canonical absolute path")]
+    [InlineData("pointer_property_smuggling", "pointer property set drifted")]
+    [InlineData("missing_bundle_inventory_count", "pointer property set drifted")]
+    [InlineData("bundle_inventory_count_zero", "bundleInventoryCount is invalid")]
+    [InlineData("bundle_inventory_count_bool", "bundleInventoryCount is invalid")]
+    [InlineData("bundle_inventory_count_fractional", "bundleInventoryCount is invalid")]
+    [InlineData("missing_bundle_inventory_sha256", "pointer property set drifted")]
+    [InlineData("bundle_inventory_sha256_uppercase", "bundleInventorySha256 is invalid")]
+    public void RuntimeBindingValidatorRejectsUnsignedProducerPathOrPropertySmuggling(
+        string tamper,
+        string expectedFailure)
+    {
+        (JsonObject receipt, JsonObject retained, byte[] packageLock, byte[] retainedBytes) =
+            LoadUnsignedProducerDocuments();
+        JsonObject pointer = receipt["retainedWindowsBundle"]!.AsObject();
+        bool rebindManifest = false;
+
+        switch (tamper)
+        {
+            case "package_lock_path_traversal":
+                receipt["consumerPackagePlaneLock"]!.AsObject()["path"] =
+                    "config/nested/../package-plane.lock.json";
+                break;
+            case "package_lock_property_smuggling":
+                retained["packagePlaneLock"]!.AsObject()["unexpectedProperty"] = true;
+                break;
+            case "retained_manifest_path_traversal":
+                pointer["manifest"]!.AsObject()["path"] =
+                    $"{pointer["targetPath"]!.GetValue<string>()}/nested/../manifest.json";
+                break;
+            case "retained_manifest_property_smuggling":
+                pointer["manifest"]!.AsObject()["unexpectedProperty"] = true;
+                break;
+            case "target_path_traversal":
+            {
+                const string target =
+                    "/tmp/chummer-preview/nested/../retained-windows-bundle";
+                pointer["targetPath"] = target;
+                pointer["manifest"]!.AsObject()["path"] = $"{target}/manifest.json";
+                retained["targetPath"] = target;
+                rebindManifest = true;
+                break;
+            }
+            case "target_path_unit_separator":
+            {
+                const string target =
+                    "/tmp/chummer-preview/unit\u001fseparator/retained-windows-bundle";
+                pointer["targetPath"] = target;
+                pointer["manifest"]!.AsObject()["path"] = $"{target}/manifest.json";
+                retained["targetPath"] = target;
+                rebindManifest = true;
+                break;
+            }
+            case "target_path_del":
+            {
+                const string target =
+                    "/tmp/chummer-preview/del\u007fsegment/retained-windows-bundle";
+                pointer["targetPath"] = target;
+                pointer["manifest"]!.AsObject()["path"] = $"{target}/manifest.json";
+                retained["targetPath"] = target;
+                rebindManifest = true;
+                break;
+            }
+            case "pointer_property_smuggling":
+                pointer["publicationAuthorized"] = false;
+                break;
+            case "missing_bundle_inventory_count":
+                pointer.Remove("bundleInventoryCount");
+                break;
+            case "bundle_inventory_count_zero":
+                pointer["bundleInventoryCount"] = 0;
+                break;
+            case "bundle_inventory_count_bool":
+                pointer["bundleInventoryCount"] = true;
+                break;
+            case "bundle_inventory_count_fractional":
+                pointer["bundleInventoryCount"] = 1.0;
+                break;
+            case "missing_bundle_inventory_sha256":
+                pointer.Remove("bundleInventorySha256");
+                break;
+            case "bundle_inventory_sha256_uppercase":
+                pointer["bundleInventorySha256"] = pointer["bundleInventorySha256"]!
+                    .GetValue<string>()
+                    .ToUpperInvariant();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(tamper));
+        }
+
+        if (rebindManifest)
+        {
+            retainedBytes = JsonSerializer.SerializeToUtf8Bytes(retained);
+            JsonObject manifest = pointer["manifest"]!.AsObject();
+            manifest["sha256"] = Convert.ToHexStringLower(
+                SHA256.HashData(retainedBytes));
+            manifest["sizeBytes"] = retainedBytes.LongLength;
+        }
+
+        JsonElement receiptElement = JsonSerializer.SerializeToElement(receipt);
+        if (tamper == "bundle_inventory_count_fractional")
+        {
+            string fractionalReceipt = receiptElement.GetRawText().Replace(
+                "\"bundleInventoryCount\":1",
+                "\"bundleInventoryCount\":1.0",
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "\"bundleInventoryCount\":1.0",
+                fractionalReceipt,
+                StringComparison.Ordinal);
+            receiptElement = JsonDocument.Parse(fractionalReceipt).RootElement.Clone();
+        }
+        InvalidDataException rejected = Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedProducerBindings(
+                receiptElement,
+                JsonSerializer.SerializeToElement(retained),
+                packageLock,
+                retainedBytes));
+
+        Assert.Contains(expectedFailure, rejected.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeBindingValidatorAcceptsActualUnsignedProducerShape()
+    {
+        (JsonObject receipt, JsonObject retained, byte[] packageLock, byte[] retainedBytes) =
+            LoadUnsignedProducerDocuments();
+        JsonObject pointer = receipt["retainedWindowsBundle"]!.AsObject();
+
+        Assert.Equal(
+            UnsignedRetainedPointerKeys.OrderBy(static value => value, StringComparer.Ordinal),
+            pointer.Select(static property => property.Key)
+                .OrderBy(static value => value, StringComparer.Ordinal));
+        Assert.Equal(
+            UnsignedBundleInventoryCount,
+            pointer["bundleInventoryCount"]!.GetValue<long>());
+        Assert.Equal(
+            UnsignedBundleInventorySha256,
+            pointer["bundleInventorySha256"]!.GetValue<string>());
+
+        ReleaseUploadSnapshotAuthorityService.ValidateUnsignedProducerBindings(
+            JsonSerializer.SerializeToElement(receipt),
+            JsonSerializer.SerializeToElement(retained),
+            packageLock,
+            retainedBytes);
+    }
+
     [Fact]
     public void RuntimeRejectsRehashedUnsignedV3AuthorityPostureTamper()
     {
@@ -314,6 +487,45 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             registryReceiptEntry["sha256"]!.GetValue<string>();
         return JsonSerializer.SerializeToUtf8Bytes(authority);
     }
+
+    private static (
+        JsonObject Receipt,
+        JsonObject Retained,
+        byte[] PackageLock,
+        byte[] RetainedBytes) LoadUnsignedProducerDocuments()
+    {
+        JsonObject authority = JsonNode.Parse(LoadUnsignedCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+        JsonArray files = authority["custody"]!
+            .AsObject()["unsignedPublicationEvidence"]!
+            .AsObject()["files"]!
+            .AsArray();
+        JsonObject packageLock = UnsignedEvidenceEntry(
+            files,
+            "provenance/config/package-plane.lock.json");
+        JsonObject receipt = UnsignedEvidenceEntry(
+            files,
+            "provenance/UI_FRESH_PACKAGE_PLANE.generated.json");
+        JsonObject retained = UnsignedEvidenceEntry(
+            files,
+            "provenance/retained-windows-publish-closure/manifest.json");
+        byte[] retainedBytes = Convert.FromBase64String(
+            retained["base64"]!.GetValue<string>());
+        return (
+            DecodeUnsignedEmbedded(receipt),
+            JsonNode.Parse(retainedBytes)?.AsObject()
+                ?? throw new InvalidDataException("unsigned retained fixture is invalid"),
+            Convert.FromBase64String(packageLock["base64"]!.GetValue<string>()),
+            retainedBytes);
+    }
+
+    private static JsonObject UnsignedEvidenceEntry(JsonArray files, string path)
+        => files
+            .Select(static node => node!.AsObject())
+            .Single(entry => string.Equals(
+                entry["path"]!.GetValue<string>(),
+                path,
+                StringComparison.Ordinal));
 
     private static JsonObject DecodeUnsignedEmbedded(JsonObject entry)
     {
