@@ -760,6 +760,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         using JsonDocument canonicalDocument = ParseStrictObject(
             canonicalManifest,
             "unsigned candidate canonical manifest");
+        ValidateUnsignedManifestIdentity(
+            canonicalDocument.RootElement,
+            candidate.Version,
+            "unsigned candidate canonical manifest");
+        ValidateUnsignedManifestIdentity(
+            compatibilityDocument.RootElement,
+            candidate.Version,
+            "unsigned candidate compatibility manifest");
         ValidateUnsignedPublicationAndRegistry(
             custody,
             canonicalDocument.RootElement,
@@ -1192,14 +1200,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
         JsonElement fresh)
     {
-        if (canonical.TryGetProperty("version", out JsonElement manifestVersion))
-        {
-            RequireExactString(canonical, "version", version);
-        }
-        if (canonical.TryGetProperty("releaseVersion", out JsonElement releaseVersion))
-        {
-            RequireExactString(canonical, "releaseVersion", version);
-        }
         int windowsCount = 0;
         foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
         {
@@ -1249,6 +1249,31 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         if (windowsCount != 1)
         {
             throw new InvalidDataException("unsigned canonical Windows scope drifted");
+        }
+    }
+
+    internal static void ValidateUnsignedManifestIdentity(
+        JsonElement canonical,
+        string version,
+        string label)
+    {
+        string manifestVersion = RequireMatchingAlias(
+            canonical,
+            "version",
+            "releaseVersion",
+            $"{label} release version");
+        if (!string.Equals(manifestVersion, version, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} release version drifted");
+        }
+        string channel = RequireMatchingAlias(
+            canonical,
+            "channel",
+            "channelId",
+            $"{label} release channel");
+        if (!string.Equals(channel, "preview", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} release channel drifted");
         }
     }
 

@@ -1399,6 +1399,7 @@ def _candidate_windows_scope(
     candidate: dict[str, object],
     *,
     allow_ancillary_files: bool = False,
+    expected_channel: str | None = None,
 ) -> dict[str, object]:
     version = _candidate_version(
         _candidate_manifest_alias(
@@ -1411,6 +1412,8 @@ def _candidate_windows_scope(
     )
     if version != candidate["version"]:
         raise ProjectionBlocked("candidate release version differs from its authority identity")
+    if expected_channel is not None and channel != expected_channel:
+        raise ProjectionBlocked("candidate release channel differs from its authority identity")
     coverage = canonical.get("desktopTupleCoverage")
     heads_value = coverage.get("requiredDesktopHeads") if isinstance(coverage, dict) else None
     if heads_value != list(CANDIDATE_PROMOTED_HEADS) or any(
@@ -3716,7 +3719,7 @@ def _validate_candidate_import_authority_v3(
     canonical = _strict_json_object(
         canonical_raw, label="unsigned candidate canonical manifest"
     )
-    _strict_json_object(
+    compatibility = _strict_json_object(
         compatibility_raw, label="unsigned candidate compatibility manifest"
     )
     if hashlib.sha256(canonical_raw).hexdigest() != candidate.get(
@@ -3773,7 +3776,30 @@ def _validate_candidate_import_authority_v3(
         candidate_rows,
         candidate,
         allow_ancillary_files=True,
+        expected_channel="preview",
     )
+    compatibility_version = _candidate_version(
+        _candidate_manifest_alias(
+            compatibility,
+            "version",
+            "releaseVersion",
+            label="unsigned candidate compatibility release version",
+        ),
+        label="unsigned candidate compatibility release version",
+    )
+    compatibility_channel = _candidate_manifest_alias(
+        compatibility,
+        "channelId",
+        "channel",
+        label="unsigned candidate compatibility release channel",
+    )
+    if (
+        compatibility_version != candidate["version"]
+        or compatibility_channel != "preview"
+    ):
+        raise ProjectionBlocked(
+            "unsigned candidate compatibility release identity drifted"
+        )
 
     evidence = custody.get("unsignedPublicationEvidence")
     evidence_keys = {

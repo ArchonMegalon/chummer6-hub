@@ -2057,6 +2057,45 @@ def test_alias_helpers_reject_present_null(
         )
 
 
+def test_unsigned_candidate_scope_rejects_rehashed_non_preview_canonical_channel(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    _, canonical_path, summary_path, inventory_path, _ = fixture
+    canonical = json.loads(canonical_path.read_text())
+    canonical["channel"] = "stable"
+    canonical["channelId"] = "stable"
+    write_json(canonical_path, canonical)
+    resummarize_fixture(fixture)
+    candidate = json.loads(summary_path.read_text())
+    rows = json.loads(inventory_path.read_text())["files"]
+
+    materializer = load_script(MATERIALIZER, "unsigned_channel_materializer_test")
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="channel differs from its authority identity",
+    ):
+        materializer._canonical_windows_scope(
+            canonical,
+            rows,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+
+    projection = load_projection()
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="channel differs from its authority identity",
+    ):
+        projection._candidate_windows_scope(
+            canonical,
+            rows,
+            candidate,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+
+
 def publish_review_snapshot(module, root: Path) -> None:
     payloads = {
         name: (

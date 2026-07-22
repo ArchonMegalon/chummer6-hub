@@ -1028,6 +1028,7 @@ def _canonical_windows_scope(
     candidate_rows: list[dict[str, Any]],
     *,
     allow_ancillary_files: bool = False,
+    expected_channel: str | None = None,
 ) -> dict[str, Any]:
     version = _matching_alias(
         manifest, "version", "releaseVersion", label="candidate release version"
@@ -1035,6 +1036,8 @@ def _canonical_windows_scope(
     channel = _matching_alias(
         manifest, "channelId", "channel", label="candidate release channel"
     )
+    if expected_channel is not None and channel != expected_channel:
+        _fail("candidate release channel differs from its authority identity")
     coverage = manifest.get("desktopTupleCoverage")
     heads_value = coverage.get("requiredDesktopHeads") if isinstance(coverage, dict) else None
     if heads_value != list(PROMOTED_HEADS) or any(
@@ -5113,7 +5116,7 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
     compatibility_bytes = captured_bundle_files.get("releases.json")
     if compatibility_bytes is None:
         _fail("candidate compatibility manifest is absent from exact tree custody")
-    _compatibility = _strict_json_bytes(
+    compatibility = _strict_json_bytes(
         compatibility_bytes, label="candidate compatibility manifest"
     )
     _scope_relative, publication_scope, publication_scope_bytes = _read_stage_input(
@@ -5131,9 +5134,27 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         canonical,
         candidate_rows,
         allow_ancillary_files=unsigned_preview,
+        expected_channel="preview" if unsigned_preview else None,
     )
     if scope["version"] != candidate["version"]:
         _fail("candidate release version differs from its upload summary")
+    compatibility_version = _matching_alias(
+        compatibility,
+        "version",
+        "releaseVersion",
+        label="candidate compatibility release version",
+    )
+    compatibility_channel = _matching_alias(
+        compatibility,
+        "channelId",
+        "channel",
+        label="candidate compatibility release channel",
+    )
+    if (
+        compatibility_version != scope["version"]
+        or compatibility_channel != scope["channel"]
+    ):
+        _fail("candidate compatibility release identity differs from canonical custody")
 
     now = (
         _timestamp(args.now, label="materialization time")
