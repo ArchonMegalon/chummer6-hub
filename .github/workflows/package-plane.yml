@@ -75,6 +75,7 @@ jobs:
             scripts/verify_horizon_live_readiness.py \
             scripts/verify_post_activation_acceptance.py \
             scripts/verify_public_edge_compose_operability.py \
+            scripts/release/materialize_candidate_import_authority.py \
             scripts/release/verify_public_projection.py \
             scripts/verify_live_public_windows_installer.py
           bash -n scripts/release/verify_public_projection.sh
@@ -85,6 +86,7 @@ jobs:
             tests/test_materialize_release_authority_advance_request.py \
             tests/test_materialize_release_scorecard_handoff.py \
             tests/test_materialize_release_ready_campaign_preview.py \
+            tests/test_candidate_import_authority.py \
             tests/test_verify_release_scope_decision.py \
             tests/test_materialize_staged_release_finalizer_handoff.py \
             tests/test_finalize_staged_release.py \
@@ -157,6 +159,7 @@ jobs:
             scripts/verify_horizon_live_readiness.py \
             scripts/verify_post_activation_acceptance.py \
             scripts/verify_public_edge_compose_operability.py \
+            scripts/release/materialize_candidate_import_authority.py \
             scripts/release/verify_public_projection.py \
             scripts/verify_live_public_windows_installer.py
           python3 -m pytest -q \

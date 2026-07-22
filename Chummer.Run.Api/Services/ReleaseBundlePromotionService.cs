@@ -7006,7 +7006,15 @@ public sealed class ReleaseBundlePromotionService
         {
             bool previewUnsignedAllowed =
                 string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+                && artifactEvidence.SigningStatus is not null
+                && (string.Equals(
+                        artifactEvidence.SigningStatus,
+                        "unsigned",
+                        StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        artifactEvidence.SigningStatus,
+                        "skipped_preview",
+                        StringComparison.OrdinalIgnoreCase));
             bool explicitUnsignedReleaseAllowed =
                 !string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(artifactEvidence.SigningStatus, "unsigned_public_release", StringComparison.OrdinalIgnoreCase);
@@ -7021,8 +7029,14 @@ public sealed class ReleaseBundlePromotionService
         {
             bool previewUnsignedAllowed =
                 string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.NotarizationStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+                && string.Equals(
+                    artifactEvidence.SigningStatus,
+                    "skipped_preview",
+                    StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    artifactEvidence.NotarizationStatus,
+                    "skipped_preview",
+                    StringComparison.OrdinalIgnoreCase);
 
             if (previewUnsignedAllowed)
             {

@@ -46,6 +46,7 @@ LOCAL_PROJECT_PACKAGE_IDS = frozenset(
     }
 )
 RELEASE_CONTROL_PYTHON_TESTS = (
+    "tests/test_candidate_import_authority.py",
     "tests/test_verify_release_scope_decision.py",
     "tests/test_materialize_staged_release_finalizer_handoff.py",
     "tests/test_finalize_staged_release.py",

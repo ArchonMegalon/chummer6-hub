@@ -76,6 +76,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private const string SnapshotContractName = "chummer.public_projection_snapshot/v1";
     private const string CandidateContractName =
         "chummer.release-upload.candidate-import-authority/v2";
+    private const string UnsignedCandidateContractName =
+        "chummer.release-upload.candidate-import-authority/v3";
     private const string CandidateInventoryContractName =
         "chummer.release-upload.candidate-inventory/v1";
     private const int MaximumPointerBytes = 256 * 1024;
@@ -387,6 +389,19 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     {
         using JsonDocument document = ParseStrictObject(payload, "candidate import authority");
         JsonElement root = document.RootElement;
+        if (root.TryGetProperty("contractName", out JsonElement contractName)
+            && contractName.ValueKind == JsonValueKind.String
+            && string.Equals(
+                contractName.GetString(),
+                UnsignedCandidateContractName,
+                StringComparison.Ordinal))
+        {
+            return ParseUnsignedCandidateAuthority(
+                snapshotId,
+                snapshotSha256,
+                authoritySha256,
+                root);
+        }
         if (!ExactPropertySet(
                 root,
                 new HashSet<string>(
@@ -567,6 +582,2095 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             candidate,
             canonicalManifest,
             inventory);
+    }
+
+    private static ReleaseUploadCandidateAuthority ParseUnsignedCandidateAuthority(
+        string snapshotId,
+        string snapshotSha256,
+        string authoritySha256,
+        JsonElement root)
+    {
+        if (!ExactPropertySet(
+                root,
+                new HashSet<string>(
+                    [
+                        "candidate",
+                        "candidateImportAuthority",
+                        "candidateReviewAuthority",
+                        "codeDeploymentAuthority",
+                        "contractName",
+                        "contractVersion",
+                        "crossRunBitReproducible",
+                        "custody",
+                        "deployAuthority",
+                        "exactIncomingDesktopScope",
+                        "expiresAtUtc",
+                        "generatedAtUtc",
+                        "platformScope",
+                        "publicationAuthorized",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "routeAuthority",
+                        "signaturePolicy",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned candidate import authority property set drifted");
+        }
+        RequireExactString(root, "contractName", UnsignedCandidateContractName);
+        RequireExactInt32(root, "contractVersion", 3);
+        RequireExactString(root, "status", "candidate_import_ready");
+        RequireBoolean(root, "candidateImportAuthority", expected: true);
+        RequireBoolean(root, "candidateReviewAuthority", expected: true);
+        RequireBoolean(root, "publicationAuthorized", expected: false);
+        RequireBoolean(root, "publicationEligible", expected: false);
+        RequireBoolean(root, "releaseUploadAuthority", expected: false);
+        RequireBoolean(root, "deployAuthority", expected: false);
+        RequireBoolean(root, "routeAuthority", expected: false);
+        RequireBoolean(root, "codeDeploymentAuthority", expected: false);
+        RequireBoolean(root, "crossRunBitReproducible", expected: false);
+        RequireExactString(root, "platformScope", "windows_only");
+        RequireExactString(
+            root,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        ValidateUnsignedSignaturePolicy(RequireObject(root, "signaturePolicy"));
+
+        DateTimeOffset generatedAt = RequireUtcTimestamp(root, "generatedAtUtc");
+        DateTimeOffset expiresAt = RequireUtcTimestamp(root, "expiresAtUtc");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (generatedAt > now.AddMinutes(5)
+            || generatedAt < now.AddHours(-6).AddMinutes(-5)
+            || expiresAt <= now
+            || expiresAt > now.AddHours(6).AddMinutes(5)
+            || expiresAt <= generatedAt
+            || expiresAt > generatedAt.AddHours(6))
+        {
+            throw new InvalidDataException(
+                "unsigned candidate import authority is expired or future-dated");
+        }
+
+        JsonElement candidateElement = RequireObject(root, "candidate");
+        if (!ExactPropertySet(
+                candidateElement,
+                new HashSet<string>(
+                    [
+                        "version",
+                        "canonicalManifestSha256",
+                        "inventorySha256",
+                        "fileCount",
+                        "totalBytes",
+                        "bundleIdentitySha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned candidate identity property set drifted");
+        }
+        string version = RequireString(candidateElement, "version");
+        if (!VersionPattern.IsMatch(version))
+        {
+            throw new InvalidDataException("unsigned candidate version is invalid");
+        }
+        var candidate = new ReleaseUploadCandidateIdentity(
+            version,
+            RequireSha256(candidateElement, "canonicalManifestSha256"),
+            RequireSha256(candidateElement, "inventorySha256"),
+            RequirePositiveInt32(candidateElement, "fileCount"),
+            RequireNonNegativeInt64(candidateElement, "totalBytes"),
+            RequireSha256(candidateElement, "bundleIdentitySha256"));
+        if (!string.Equals(
+                ComputeBundleIdentity(candidate),
+                candidate.BundleIdentitySha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned candidate bundle identity drifted");
+        }
+
+        JsonElement custody = RequireObject(root, "custody");
+        if (!ExactPropertySet(
+                custody,
+                new HashSet<string>(
+                    [
+                        "canonicalManifest",
+                        "compatibilityManifest",
+                        "inventory",
+                        "registryFinalization",
+                        "registryFinalizeAuthority",
+                        "registryFinalizeReceipt",
+                        "registryPrepareCandidateReceipt",
+                        "unsignedPublicationEvidence"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned candidate custody property set drifted");
+        }
+        byte[] canonicalManifest = DecodeEmbedded(
+            RequireObject(custody, "canonicalManifest"),
+            "unsigned candidate canonical manifest",
+            "RELEASE_CHANNEL.generated.json");
+        if (!string.Equals(
+                Sha256(canonicalManifest),
+                candidate.CanonicalManifestSha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned candidate canonical custody drifted");
+        }
+        byte[] compatibilityManifest = DecodeEmbedded(
+            RequireObject(custody, "compatibilityManifest"),
+            "unsigned candidate compatibility manifest",
+            "releases.json");
+        using JsonDocument compatibilityDocument = ParseStrictObject(
+            compatibilityManifest,
+            "unsigned candidate compatibility manifest");
+        byte[] inventoryBytes = DecodeEmbedded(
+            RequireObject(custody, "inventory"),
+            "unsigned candidate upload inventory",
+            "CANDIDATE_UPLOAD_INVENTORY.generated.json");
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory =
+            ParseCandidateInventory(inventoryBytes);
+        if (inventory.Count != candidate.FileCount
+            || inventory.Sum(static row => row.SizeBytes) != candidate.TotalBytes
+            || !string.Equals(
+                ComputeInventoryDigest(inventory),
+                candidate.InventorySha256,
+                StringComparison.Ordinal)
+            || !inventory.Any(row =>
+                string.Equals(
+                    row.Path,
+                    "RELEASE_CHANNEL.generated.json",
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    row.Sha256,
+                    candidate.CanonicalManifestSha256,
+                    StringComparison.Ordinal)
+                && row.SizeBytes == canonicalManifest.LongLength)
+            || !inventory.Any(row =>
+                string.Equals(row.Path, "releases.json", StringComparison.Ordinal)
+                && string.Equals(
+                    row.Sha256,
+                    Sha256(compatibilityManifest),
+                    StringComparison.Ordinal)
+                && row.SizeBytes == compatibilityManifest.LongLength))
+        {
+            throw new InvalidDataException("unsigned candidate inventory summary drifted");
+        }
+
+        using JsonDocument canonicalDocument = ParseStrictObject(
+            canonicalManifest,
+            "unsigned candidate canonical manifest");
+        ValidateUnsignedPublicationAndRegistry(
+            custody,
+            canonicalDocument.RootElement,
+            canonicalManifest,
+            compatibilityManifest,
+            candidate,
+            inventory);
+        return new ReleaseUploadCandidateAuthority(
+            snapshotId,
+            snapshotSha256,
+            authoritySha256,
+            expiresAt,
+            candidate,
+            canonicalManifest,
+            inventory);
+    }
+
+    private static void ValidateUnsignedSignaturePolicy(JsonElement policy)
+    {
+        if (!ExactPropertySet(
+                policy,
+                new HashSet<string>(
+                    ["signatureStatus", "signingRequired", "unsignedReason"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned candidate signature policy drifted");
+        }
+        RequireExactString(policy, "signatureStatus", "unsigned");
+        RequireBoolean(policy, "signingRequired", expected: false);
+        RequireExactString(policy, "unsignedReason", "preview_policy");
+    }
+
+    private static void ValidateUnsignedPublicationAndRegistry(
+        JsonElement custody,
+        JsonElement canonical,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory)
+    {
+        JsonElement evidence = RequireObject(custody, "unsignedPublicationEvidence");
+        if (!ExactPropertySet(
+                evidence,
+                new HashSet<string>(
+                    [
+                        "crossRunBitReproducible",
+                        "exactIncomingDesktopScope",
+                        "files",
+                        "freshDeltaSha256",
+                        "fullShelfInventorySha256",
+                        "incumbentInventorySha256",
+                        "platformScope",
+                        "provenance",
+                        "publicationScopeSha256",
+                        "retainedInventorySha256",
+                        "signaturePolicy",
+                        "sourceSha",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned publication evidence property set drifted");
+        }
+        RequireExactString(evidence, "status", "passed");
+        RequireExactString(
+            evidence,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        RequireExactString(evidence, "platformScope", "windows_only");
+        RequireBoolean(evidence, "crossRunBitReproducible", expected: false);
+        ValidateUnsignedSignaturePolicy(RequireObject(evidence, "signaturePolicy"));
+        string sourceSha = RequireString(evidence, "sourceSha");
+        if (!CommitPattern.IsMatch(sourceSha))
+        {
+            throw new InvalidDataException("unsigned publication source revision drifted");
+        }
+        _ = RequireSha256(evidence, "publicationScopeSha256");
+        _ = RequireSha256(evidence, "incumbentInventorySha256");
+        _ = RequireSha256(evidence, "fullShelfInventorySha256");
+        _ = RequireSha256(evidence, "retainedInventorySha256");
+        _ = RequireSha256(evidence, "freshDeltaSha256");
+
+        var documents = new Dictionary<string, CandidateEvidenceDocument>(
+            StringComparer.Ordinal);
+        try
+        {
+            foreach (JsonElement entry in RequireArray(evidence, "files").EnumerateArray())
+            {
+                string path = RequireString(entry, "path");
+                if (!IsCanonicalRelativePath(path) || documents.ContainsKey(path))
+                {
+                    throw new InvalidDataException("unsigned publication evidence path drifted");
+                }
+                byte[] bytes = DecodeEmbedded(entry, $"unsigned publication {path}", path);
+                documents.Add(
+                    path,
+                    new CandidateEvidenceDocument(
+                        ParseStrictObject(bytes, $"unsigned publication {path}"),
+                        bytes,
+                        RequireSha256(entry, "sha256"),
+                        RequireNonNegativeInt64(entry, "sizeBytes")));
+            }
+            const string scopePath = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json";
+            const string packageLockPath = "provenance/config/package-plane.lock.json";
+            const string packageReceiptPath =
+                "provenance/UI_FRESH_PACKAGE_PLANE.generated.json";
+            const string retainedManifestPath =
+                "provenance/retained-windows-publish-closure/manifest.json";
+            const string nativeLockPath =
+                "provenance/config/windows-native-bootstrap-toolchain.lock.json";
+            var expectedPaths = new HashSet<string>(
+                [
+                    scopePath,
+                    "RELEASE_CHANNEL.generated.json",
+                    "releases.json",
+                    packageLockPath,
+                    packageReceiptPath,
+                    retainedManifestPath,
+                    nativeLockPath
+                ],
+                StringComparer.Ordinal);
+            if (!expectedPaths.SetEquals(documents.Keys)
+                || !CryptographicOperations.FixedTimeEquals(
+                    documents["RELEASE_CHANNEL.generated.json"].Bytes,
+                    canonicalBytes)
+                || !CryptographicOperations.FixedTimeEquals(
+                    documents["releases.json"].Bytes,
+                    compatibilityBytes))
+            {
+                throw new InvalidDataException("unsigned publication evidence custody drifted");
+            }
+            CandidateEvidenceDocument scopeDocument = documents[scopePath];
+            RequireExactString(evidence, "publicationScopeSha256", scopeDocument.Sha256);
+            JsonElement scope = scopeDocument.Root;
+            ValidateUnsignedScope(
+                scope,
+                sourceSha,
+                candidate,
+                inventory,
+                canonical,
+                canonicalBytes,
+                compatibilityBytes,
+                documents,
+                packageLockPath,
+                packageReceiptPath,
+                retainedManifestPath,
+                nativeLockPath);
+            ValidateUnsignedRegistry(
+                custody,
+                scope,
+                scopeDocument.Bytes,
+                evidence,
+                canonical,
+                canonicalBytes,
+                compatibilityBytes,
+                candidate,
+                documents,
+                packageLockPath,
+                packageReceiptPath,
+                retainedManifestPath,
+                nativeLockPath);
+        }
+        finally
+        {
+            foreach (CandidateEvidenceDocument document in documents.Values)
+            {
+                document.Dispose();
+            }
+        }
+    }
+
+    private static void ValidateUnsignedScope(
+        JsonElement scope,
+        string sourceSha,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
+        JsonElement canonical,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        string packageLockPath,
+        string packageReceiptPath,
+        string retainedManifestPath,
+        string nativeLockPath)
+    {
+        if (!ExactPropertySet(
+                scope,
+                new HashSet<string>(
+                    [
+                        "compatibilityManifest",
+                        "contractName",
+                        "contractVersion",
+                        "crossRunBitReproducible",
+                        "deployAuthorized",
+                        "freshDelta",
+                        "fullShelfInventory",
+                        "fullShelfInventorySha256",
+                        "incumbentInventorySha256",
+                        "platformScope",
+                        "provenance",
+                        "publicationAuthorized",
+                        "publicationManifest",
+                        "release",
+                        "retainedFromIncumbent",
+                        "signature",
+                        "sourceSha",
+                        "status",
+                        "uploadAuthorized"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned UI scope property set drifted");
+        }
+        RequireExactString(
+            scope,
+            "contractName",
+            "chummer6-ui.preview-nightly-unsigned-publication-scope");
+        RequireExactInt32(scope, "contractVersion", 3);
+        RequireExactString(scope, "status", "prepared");
+        RequireExactString(scope, "platformScope", "windows_only");
+        RequireBoolean(scope, "crossRunBitReproducible", expected: false);
+        RequireBoolean(scope, "publicationAuthorized", expected: false);
+        RequireBoolean(scope, "uploadAuthorized", expected: false);
+        RequireBoolean(scope, "deployAuthorized", expected: false);
+        RequireExactString(scope, "sourceSha", sourceSha);
+        JsonElement release = RequireObject(scope, "release");
+        if (!ExactPropertySet(
+                release,
+                new HashSet<string>(["channel", "version"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned UI release property set drifted");
+        }
+        RequireExactString(release, "channel", "preview");
+        RequireExactString(release, "version", candidate.Version);
+        JsonElement signature = RequireObject(scope, "signature");
+        if (!ExactPropertySet(
+                signature,
+                new HashSet<string>(["policy", "required", "status"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned UI signature property set drifted");
+        }
+        RequireExactString(signature, "policy", "preview_policy");
+        RequireBoolean(signature, "required", expected: false);
+        RequireExactString(signature, "status", "unsigned");
+        ValidateUnsignedByteReference(
+            RequireObject(scope, "publicationManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes,
+            "unsigned UI publication manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(scope, "compatibilityManifest"),
+            "releases.json",
+            compatibilityBytes,
+            "unsigned UI compatibility manifest");
+
+        var inventoryByPath = inventory.ToDictionary(
+            static row => row.Path,
+            StringComparer.Ordinal);
+        JsonElement fullInventory = RequireArray(scope, "fullShelfInventory");
+        if (fullInventory.GetArrayLength() != inventory.Count)
+        {
+            throw new InvalidDataException("unsigned UI full shelf inventory count drifted");
+        }
+        var modeByPath = new Dictionary<string, int>(StringComparer.Ordinal);
+        string? previous = null;
+        foreach (JsonElement row in fullInventory.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["mode", "path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("unsigned UI inventory row drifted");
+            }
+            string path = RequireString(row, "path");
+            long mode = RequireNonNegativeInt64(row, "mode");
+            long size = RequireNonNegativeInt64(row, "sizeBytes");
+            string digest = RequireSha256(row, "sha256");
+            if (!IsCanonicalRelativePath(path)
+                || previous is not null && string.CompareOrdinal(previous, path) >= 0
+                || mode > 0x1ff
+                || !inventoryByPath.TryGetValue(
+                    path,
+                    out ReleaseUploadCandidateInventoryRow? held)
+                || held.SizeBytes != size
+                || !string.Equals(held.Sha256, digest, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("unsigned UI inventory byte binding drifted");
+            }
+            modeByPath.Add(path, checked((int)mode));
+            previous = path;
+        }
+        RequireExactString(
+            scope,
+            "fullShelfInventorySha256",
+            UnsignedCompactSha256(fullInventory));
+        _ = RequireSha256(scope, "incumbentInventorySha256");
+
+        JsonElement fresh = RequireArray(scope, "freshDelta");
+        if (fresh.GetArrayLength() != 2)
+        {
+            throw new InvalidDataException("unsigned UI fresh delta cardinality drifted");
+        }
+        string[] roles = ["installer", "bootstrap_payload"];
+        string[] names =
+        [
+            "chummer-avalonia-win-x64-installer.exe",
+            "chummer-avalonia-win-x64-payload.zip"
+        ];
+        var freshPaths = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < roles.Length; index++)
+        {
+            JsonElement row = fresh[index];
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        [
+                            "artifactRole",
+                            "fileName",
+                            "head",
+                            "mode",
+                            "path",
+                            "platform",
+                            "rid",
+                            "sha256",
+                            "sizeBytes"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("unsigned UI fresh delta row drifted");
+            }
+            RequireExactString(row, "artifactRole", roles[index]);
+            RequireExactString(row, "fileName", names[index]);
+            RequireExactString(row, "head", "avalonia");
+            RequireExactString(row, "platform", "windows");
+            RequireExactString(row, "rid", WindowsRid);
+            string path = RequireString(row, "path");
+            if (!string.Equals(path, $"files/{names[index]}", StringComparison.Ordinal)
+                || !freshPaths.Add(path)
+                || !inventoryByPath.TryGetValue(
+                    path,
+                    out ReleaseUploadCandidateInventoryRow? held)
+                || RequireNonNegativeInt64(row, "mode") != modeByPath[path]
+                || RequireNonNegativeInt64(row, "sizeBytes") != held.SizeBytes
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    held.Sha256,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("unsigned UI fresh delta bytes drifted");
+            }
+        }
+        ValidateUnsignedCanonicalWindows(canonical, candidate.Version, inventoryByPath, fresh);
+
+        var expectedPaths = new HashSet<string>(
+            ["RELEASE_CHANNEL.generated.json", "releases.json", .. freshPaths],
+            StringComparer.Ordinal);
+        JsonElement retained = RequireArray(scope, "retainedFromIncumbent");
+        previous = null;
+        foreach (JsonElement row in retained.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["mode", "path", "retentionKind", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("unsigned UI retained row drifted");
+            }
+            string path = RequireString(row, "path");
+            string kind = RequireString(row, "retentionKind");
+            if (!IsCanonicalRelativePath(path)
+                || previous is not null && string.CompareOrdinal(previous, path) >= 0
+                || !expectedPaths.Add(path)
+                || kind is not "managed_artifact" and not "ancillary"
+                || !inventoryByPath.TryGetValue(
+                    path,
+                    out ReleaseUploadCandidateInventoryRow? held)
+                || RequireNonNegativeInt64(row, "mode") != modeByPath[path]
+                || RequireNonNegativeInt64(row, "sizeBytes") != held.SizeBytes
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    held.Sha256,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("unsigned UI retained bytes drifted");
+            }
+            previous = path;
+        }
+        if (!expectedPaths.SetEquals(inventoryByPath.Keys))
+        {
+            throw new InvalidDataException("unsigned UI retained/fresh partition drifted");
+        }
+
+        JsonElement provenance = RequireObject(scope, "provenance");
+        var provenancePaths = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["packagePlaneLock"] = packageLockPath,
+            ["packagePlaneReceipt"] = packageReceiptPath,
+            ["retainedManifest"] = retainedManifestPath,
+            ["nativeToolchainLock"] = nativeLockPath
+        };
+        if (!ExactPropertySet(
+                provenance,
+                new HashSet<string>(provenancePaths.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned UI provenance property set drifted");
+        }
+        foreach ((string name, string path) in provenancePaths)
+        {
+            ValidateUnsignedOpaqueBinding(
+                RequireObject(provenance, name),
+                documents[path].Bytes,
+                $"unsigned UI provenance {name}");
+        }
+        ValidateUnsignedProvenanceSemantics(
+            documents,
+            sourceSha,
+            candidate.Version,
+            packageLockPath,
+            packageReceiptPath,
+            retainedManifestPath,
+            nativeLockPath);
+    }
+
+    private static void ValidateUnsignedCanonicalWindows(
+        JsonElement canonical,
+        string version,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
+        JsonElement fresh)
+    {
+        if (canonical.TryGetProperty("version", out JsonElement manifestVersion))
+        {
+            RequireExactString(canonical, "version", version);
+        }
+        if (canonical.TryGetProperty("releaseVersion", out JsonElement releaseVersion))
+        {
+            RequireExactString(canonical, "releaseVersion", version);
+        }
+        int windowsCount = 0;
+        foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
+        {
+            if (!string.Equals(
+                    RequireString(artifact, "platform"),
+                    "windows",
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+            windowsCount++;
+            RequireExactString(artifact, "head", "avalonia");
+            RequireExactString(artifact, "rid", WindowsRid);
+            RequireExactString(artifact, "kind", "installer");
+            RequireExactString(artifact, "installerMode", "bootstrap");
+            RequireExactString(artifact, "payloadAcquisitionMode", "download");
+            string installerPath = $"files/{RequireString(artifact, "fileName")}";
+            string payloadPath = $"files/{RequireString(artifact, "payloadFileName")}";
+            if (!inventory.TryGetValue(
+                    installerPath,
+                    out ReleaseUploadCandidateInventoryRow? installer)
+                || !inventory.TryGetValue(
+                    payloadPath,
+                    out ReleaseUploadCandidateInventoryRow? payload)
+                || !string.Equals(
+                    RequireSha256(artifact, "sha256"),
+                    installer.Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(artifact, "sizeBytes") != installer.SizeBytes
+                || !string.Equals(
+                    RequireSha256(artifact, "payloadSha256"),
+                    payload.Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(artifact, "payloadSizeBytes") != payload.SizeBytes
+                || !string.Equals(
+                    RequireString(fresh[0], "path"),
+                    installerPath,
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireString(fresh[1], "path"),
+                    payloadPath,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("unsigned canonical Windows bytes drifted");
+            }
+        }
+        if (windowsCount != 1)
+        {
+            throw new InvalidDataException("unsigned canonical Windows scope drifted");
+        }
+    }
+
+    private static void ValidateUnsignedByteReference(
+        JsonElement reference,
+        string path,
+        byte[] bytes,
+        string label)
+    {
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+        RequireExactString(reference, "path", path);
+        RequireExactString(reference, "sha256", Sha256(bytes));
+        if (RequireNonNegativeInt64(reference, "sizeBytes") != bytes.LongLength)
+        {
+            throw new InvalidDataException($"{label} size drifted");
+        }
+    }
+
+    private static void ValidateUnsignedOpaqueBinding(
+        JsonElement reference,
+        byte[] bytes,
+        string label)
+    {
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(["sha256", "sizeBytes"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+        RequireExactString(reference, "sha256", Sha256(bytes));
+        if (RequireNonNegativeInt64(reference, "sizeBytes") != bytes.LongLength)
+        {
+            throw new InvalidDataException($"{label} size drifted");
+        }
+    }
+
+    private static void ValidateUnsignedProvenanceSemantics(
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        string sourceSha,
+        string version,
+        string packageLockPath,
+        string packageReceiptPath,
+        string retainedManifestPath,
+        string nativeLockPath)
+    {
+        JsonElement packageLock = documents[packageLockPath].Root;
+        RequireExactString(
+            packageLock,
+            "contractName",
+            "chummer6-ui.fresh-package-plane-lock");
+        RequireExactInt32(packageLock, "contractVersion", 8);
+        JsonElement approvedSources = RequireArray(packageLock, "approvedPackageSources");
+        if (approvedSources.GetArrayLength() != 1
+            || !string.Equals(
+                approvedSources[0].GetString(),
+                "same-run-local-feed",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned package-plane source policy drifted");
+        }
+
+        JsonElement receipt = documents[packageReceiptPath].Root;
+        RequireExactString(
+            receipt,
+            "contractName",
+            "chummer6-ui.fresh-package-plane-verification");
+        RequireExactInt32(receipt, "contractVersion", 8);
+        RequireExactString(receipt, "status", "passed");
+        RequireExactString(receipt, "consumerCommit", sourceSha);
+        RequireExactString(receipt, "mode", "integration");
+        RequireBoolean(receipt, "localCompatibilityTree", expected: false);
+        RequireBoolean(receipt, "packageCacheWasFresh", expected: true);
+        RequireBoolean(receipt, "stubPackagesAllowed", expected: false);
+        JsonElement packageSources = RequireArray(receipt, "packageSources");
+        if (packageSources.GetArrayLength() != 1
+            || !string.Equals(
+                packageSources[0].GetString(),
+                "same-run-local-feed",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned package-plane receipt source drifted");
+        }
+        ValidateUnsignedOpaqueBinding(
+            RequireObject(receipt, "consumerPackagePlaneLock"),
+            documents[packageLockPath].Bytes,
+            "unsigned package receipt lock binding");
+
+        JsonElement retained = documents[retainedManifestPath].Root;
+        RequireExactString(
+            retained,
+            "contractName",
+            "chummer6-ui.retained-windows-publish-closure");
+        RequireExactInt32(retained, "contractVersion", 2);
+        RequireExactString(retained, "status", "passed");
+        RequireExactString(retained, "consumerCommit", sourceSha);
+        RequireBoolean(retained, "atomicallyRetained", expected: true);
+        RequireBoolean(retained, "authoritative", expected: true);
+        RequireBoolean(retained, "deterministicRepacking", expected: false);
+        JsonElement retainedRelease = RequireObject(retained, "release");
+        RequireExactString(retainedRelease, "channel", "preview");
+        RequireExactString(retainedRelease, "version", version);
+        JsonElement publish = RequireObject(retained, "publish");
+        RequireExactString(publish, "status", "passed");
+        RequireExactString(publish, "releaseChannel", "preview");
+        RequireExactString(publish, "releaseVersion", version);
+        RequireBoolean(
+            RequireObject(retained, "releaseEligibility"),
+            "eligible",
+            expected: false);
+        ValidateUnsignedOpaqueBinding(
+            RequireObject(retained, "packagePlaneLock"),
+            documents[packageLockPath].Bytes,
+            "unsigned retained manifest lock binding");
+
+        JsonElement pointer = RequireObject(receipt, "retainedWindowsBundle");
+        RequireExactString(
+            pointer,
+            "contractName",
+            "chummer6-ui.retained-windows-publish-closure-pointer");
+        RequireExactInt32(pointer, "contractVersion", 2);
+        RequireExactString(pointer, "status", "passed");
+        RequireExactString(pointer, "consumerCommit", sourceSha);
+        RequireBoolean(pointer, "atomicallyRetained", expected: true);
+        RequireBoolean(pointer, "authority", expected: false);
+        RequireBoolean(pointer, "manifestIsAuthoritative", expected: true);
+        JsonElement pointerRelease = RequireObject(pointer, "release");
+        RequireExactString(pointerRelease, "channel", "preview");
+        RequireExactString(pointerRelease, "version", version);
+        ValidateUnsignedOpaqueBinding(
+            RequireObject(pointer, "manifest"),
+            documents[retainedManifestPath].Bytes,
+            "unsigned retained pointer manifest binding");
+
+        JsonElement native = documents[nativeLockPath].Root;
+        if (!ExactPropertySet(
+                native,
+                new HashSet<string>(
+                    [
+                        "container_image",
+                        "contract_name",
+                        "debian_snapshot",
+                        "packages",
+                        "platform",
+                        "schema_version"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned native toolchain property set drifted");
+        }
+        RequireExactString(
+            native,
+            "contract_name",
+            "chummer6-ui.windows_native_bootstrap_toolchain_lock");
+        RequireExactInt32(native, "schema_version", 1);
+        JsonElement platform = RequireObject(native, "platform");
+        RequireExactString(platform, "os", "linux");
+        RequireExactString(platform, "architecture", "amd64");
+        JsonElement snapshot = RequireObject(native, "debian_snapshot");
+        RequireBoolean(snapshot, "include_recommends", expected: false);
+        JsonElement installRoots = RequireArray(snapshot, "install_roots");
+        if (installRoots.GetArrayLength() != 2
+            || !string.Equals(installRoots[0].GetString(), "nsis", StringComparison.Ordinal)
+            || !string.Equals(
+                installRoots[1].GetString(),
+                "p7zip-full",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("unsigned native toolchain roots drifted");
+        }
+        JsonElement packages = RequireArray(native, "packages");
+        if (packages.GetArrayLength() == 0)
+        {
+            throw new InvalidDataException("unsigned native toolchain package set is empty");
+        }
+        foreach (JsonElement package in packages.EnumerateArray())
+        {
+            _ = RequireSha256(package, "sha256");
+            _ = RequirePositiveInt64(package, "size");
+            _ = RequireString(package, "name");
+            _ = RequireString(package, "version");
+            _ = RequireString(package, "architecture");
+        }
+    }
+
+    private static void ValidateUnsignedRegistry(
+        JsonElement custody,
+        JsonElement scope,
+        byte[] scopeBytes,
+        JsonElement evidence,
+        JsonElement canonical,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        string packageLockPath,
+        string packageReceiptPath,
+        string retainedManifestPath,
+        string nativeLockPath)
+    {
+        if (!CryptographicOperations.FixedTimeEquals(
+                scopeBytes,
+                RenderUnsignedJson(scope, indented: true, trailingLf: true)))
+        {
+            throw new InvalidDataException(
+                "unsigned UI scope is not pretty sorted JSON plus LF");
+        }
+        JsonElement scopeFull = RequireArray(scope, "fullShelfInventory");
+        JsonElement scopeFresh = RequireArray(scope, "freshDelta");
+        JsonElement scopeRetained = RequireArray(scope, "retainedFromIncumbent");
+        RequireExactString(
+            evidence,
+            "fullShelfInventorySha256",
+            RequireSha256(scope, "fullShelfInventorySha256"));
+        RequireExactString(
+            evidence,
+            "incumbentInventorySha256",
+            RequireSha256(scope, "incumbentInventorySha256"));
+        RequireExactString(
+            evidence,
+            "freshDeltaSha256",
+            UnsignedCompactSha256(scopeFresh));
+        RequireExactString(
+            evidence,
+            "retainedInventorySha256",
+            UnsignedCompactSha256(scopeRetained));
+        if (!JsonSemanticEquals(
+                RequireObject(evidence, "provenance"),
+                RequireObject(scope, "provenance")))
+        {
+            throw new InvalidDataException(
+                "unsigned publication evidence provenance drifted");
+        }
+
+        const string candidatePath = "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json";
+        const string authorityPath = "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json";
+        const string finalizePath = "PREVIEW_PUBLICATION_DELTA_FINALIZE.json";
+        const string compositionPath =
+            "PREVIEW_NIGHTLY_UNSIGNED_COMPOSITION.proposed.json";
+        const string scopePath = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json";
+        byte[] candidateBytes = DecodeEmbedded(
+            RequireObject(custody, "registryPrepareCandidateReceipt"),
+            "unsigned Registry PREPARE candidate",
+            candidatePath);
+        byte[] authorityBytes = DecodeEmbedded(
+            RequireObject(custody, "registryFinalizeAuthority"),
+            "unsigned Registry FINALIZE authority",
+            authorityPath);
+        byte[] finalizeBytes = DecodeEmbedded(
+            RequireObject(custody, "registryFinalizeReceipt"),
+            "unsigned Registry FINALIZE receipt",
+            finalizePath);
+        using JsonDocument candidateDocument = ParseStrictObject(
+            candidateBytes,
+            "unsigned Registry PREPARE candidate");
+        using JsonDocument authorityDocument = ParseStrictObject(
+            authorityBytes,
+            "unsigned Registry FINALIZE authority");
+        using JsonDocument finalizeDocument = ParseStrictObject(
+            finalizeBytes,
+            "unsigned Registry FINALIZE receipt");
+        JsonElement registryCandidate = candidateDocument.RootElement;
+        JsonElement registryAuthority = authorityDocument.RootElement;
+        JsonElement registryFinalize = finalizeDocument.RootElement;
+        RequireUnsignedCanonicalDocument(
+            candidateBytes,
+            registryCandidate,
+            "unsigned Registry PREPARE candidate");
+        RequireUnsignedCanonicalDocument(
+            authorityBytes,
+            registryAuthority,
+            "unsigned Registry FINALIZE authority");
+        RequireUnsignedCanonicalDocument(
+            finalizeBytes,
+            registryFinalize,
+            "unsigned Registry FINALIZE receipt");
+
+        var candidateKeys = new HashSet<string>(
+            [
+                "canonicalManifest",
+                "channel",
+                "codeDeploymentAuthority",
+                "compatibilityManifest",
+                "compositionInput",
+                "compositionInputDocument",
+                "contractName",
+                "contractVersion",
+                "crossRunBitReproducible",
+                "deltaPlatforms",
+                "deployAuthority",
+                "evidencePlatforms",
+                "fullShelfInventory",
+                "fullShelfInventorySha256",
+                "incumbentDirectoryModesSha256",
+                "incumbentInventorySha256",
+                "incumbentSnapshotSha256",
+                "platformScope",
+                "projectionInputs",
+                "proposedDirectoryModesSha256",
+                "provenance",
+                "publicationAuthorized",
+                "publicationEligible",
+                "publicationStatus",
+                "releaseUploadAuthority",
+                "releaseVersion",
+                "retainedInventorySha256",
+                "retainedPlatforms",
+                "routeAuthority",
+                "shelfPlatforms",
+                "signaturePolicy",
+                "sourceSha",
+                "windowsDelta"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(registryCandidate, candidateKeys))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry PREPARE candidate property set drifted");
+        }
+        RequireExactString(
+            registryCandidate,
+            "contractName",
+            "chummer.registry.preview-publication-delta-candidate");
+        RequireExactInt32(registryCandidate, "contractVersion", 2);
+        RequireExactString(registryCandidate, "channel", "preview");
+        RequireExactString(registryCandidate, "releaseVersion", candidate.Version);
+        RequireExactString(registryCandidate, "publicationStatus", "review_required");
+        RequireExactString(registryCandidate, "platformScope", "windows_only");
+        RequireBoolean(registryCandidate, "crossRunBitReproducible", expected: false);
+        ValidateUnsignedSignaturePolicy(
+            RequireObject(registryCandidate, "signaturePolicy"));
+        RequireExactString(
+            registryCandidate,
+            "sourceSha",
+            RequireString(scope, "sourceSha"));
+        RequireBoolean(registryCandidate, "publicationAuthorized", expected: false);
+        RequireBoolean(registryCandidate, "publicationEligible", expected: false);
+        RequireBoolean(registryCandidate, "releaseUploadAuthority", expected: false);
+        RequireBoolean(registryCandidate, "deployAuthority", expected: false);
+        RequireBoolean(registryCandidate, "routeAuthority", expected: false);
+        RequireBoolean(registryCandidate, "codeDeploymentAuthority", expected: false);
+        RequireUnsignedStringArray(registryCandidate, "deltaPlatforms", ["windows"]);
+        RequireUnsignedStringArray(registryCandidate, "evidencePlatforms", []);
+        ValidateUnsignedByteReference(
+            RequireObject(registryCandidate, "canonicalManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes,
+            "unsigned Registry candidate canonical manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(registryCandidate, "compatibilityManifest"),
+            "releases.json",
+            compatibilityBytes,
+            "unsigned Registry candidate compatibility manifest");
+        JsonElement registryFull = RequireArray(
+            registryCandidate,
+            "fullShelfInventory");
+        _ = ValidateUnsignedInventory(
+            registryFull,
+            "unsigned Registry full shelf",
+            allowEmpty: false,
+            retained: false);
+        if (!JsonSemanticEquals(registryFull, scopeFull)
+            || !string.Equals(
+                RequireSha256(registryCandidate, "fullShelfInventorySha256"),
+                UnsignedCompactSha256(registryFull),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry PREPARE inventory graph drifted");
+        }
+
+        JsonElement composition = RequireObject(
+            registryCandidate,
+            "compositionInputDocument");
+        var compositionKeys = new HashSet<string>(
+            [
+                "contractName",
+                "contractVersion",
+                "crossRunBitReproducible",
+                "deployAuthorized",
+                "freshDelta",
+                "incumbentSnapshot",
+                "platformScope",
+                "proposedCanonicalManifest",
+                "proposedCompatibilityManifest",
+                "proposedDirectoryModes",
+                "proposedDirectoryModesSha256",
+                "proposedShelfInventory",
+                "proposedShelfInventorySha256",
+                "provenance",
+                "publicationAuthorized",
+                "release",
+                "retainedFromIncumbent",
+                "signature",
+                "sourceSha",
+                "status",
+                "uploadAuthorized"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(composition, compositionKeys))
+        {
+            throw new InvalidDataException(
+                "unsigned composition request property set drifted");
+        }
+        RequireExactString(
+            composition,
+            "contractName",
+            "chummer6-ui.preview-nightly-unsigned-composition-request");
+        RequireExactInt32(composition, "contractVersion", 3);
+        RequireExactString(composition, "status", "prepared");
+        RequireExactString(composition, "platformScope", "windows_only");
+        RequireBoolean(composition, "crossRunBitReproducible", expected: false);
+        RequireBoolean(composition, "publicationAuthorized", expected: false);
+        RequireBoolean(composition, "uploadAuthorized", expected: false);
+        RequireBoolean(composition, "deployAuthorized", expected: false);
+        RequireExactString(
+            composition,
+            "sourceSha",
+            RequireString(scope, "sourceSha"));
+        if (!JsonSemanticEquals(
+                RequireObject(composition, "signature"),
+                RequireObject(scope, "signature")))
+        {
+            throw new InvalidDataException("unsigned composition signature drifted");
+        }
+        JsonElement compositionRelease = RequireObject(composition, "release");
+        if (!ExactPropertySet(
+                compositionRelease,
+                new HashSet<string>(["channel", "version"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned composition release property set drifted");
+        }
+        RequireExactString(compositionRelease, "channel", "preview");
+        RequireExactString(compositionRelease, "version", candidate.Version);
+        byte[] compositionBytes = RenderUnsignedJson(
+            composition,
+            indented: true,
+            trailingLf: true);
+        ValidateUnsignedByteReference(
+            RequireObject(registryCandidate, "compositionInput"),
+            compositionPath,
+            compositionBytes,
+            "unsigned Registry composition request");
+        ValidateUnsignedByteReference(
+            RequireObject(composition, "proposedCanonicalManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes,
+            "unsigned composition canonical manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(composition, "proposedCompatibilityManifest"),
+            "releases.json",
+            compatibilityBytes,
+            "unsigned composition compatibility manifest");
+        JsonElement proposedInventory = RequireArray(
+            composition,
+            "proposedShelfInventory");
+        _ = ValidateUnsignedInventory(
+            proposedInventory,
+            "unsigned composition proposed shelf",
+            allowEmpty: false,
+            retained: false);
+        JsonElement proposedModes = RequireArray(
+            composition,
+            "proposedDirectoryModes");
+        ValidateUnsignedDirectoryModes(
+            proposedModes,
+            "unsigned composition proposed");
+        if (!JsonSemanticEquals(proposedInventory, scopeFull)
+            || !string.Equals(
+                RequireSha256(composition, "proposedShelfInventorySha256"),
+                UnsignedCompactSha256(proposedInventory),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(composition, "proposedDirectoryModesSha256"),
+                UnsignedCompactSha256(proposedModes),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned composition proposed shelf graph drifted");
+        }
+
+        JsonElement incumbent = RequireObject(composition, "incumbentSnapshot");
+        if (!ExactPropertySet(
+                incumbent,
+                new HashSet<string>(
+                    [
+                        "canonicalManifest",
+                        "compatibilityManifest",
+                        "directoryModes",
+                        "directoryModesSha256",
+                        "fullShelfInventory",
+                        "fullShelfInventorySha256",
+                        "snapshotSha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned composition incumbent snapshot property set drifted");
+        }
+        ValidateUnsignedUnheldReference(
+            RequireObject(incumbent, "canonicalManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            "unsigned incumbent canonical manifest");
+        ValidateUnsignedUnheldReference(
+            RequireObject(incumbent, "compatibilityManifest"),
+            "releases.json",
+            "unsigned incumbent compatibility manifest");
+        JsonElement incumbentInventory = RequireArray(
+            incumbent,
+            "fullShelfInventory");
+        IReadOnlyDictionary<string, JsonElement> incumbentByPath =
+            ValidateUnsignedInventory(
+                incumbentInventory,
+                "unsigned composition incumbent shelf",
+                allowEmpty: false,
+                retained: false);
+        JsonElement incumbentModes = RequireArray(incumbent, "directoryModes");
+        ValidateUnsignedDirectoryModes(
+            incumbentModes,
+            "unsigned composition incumbent");
+        if (!string.Equals(
+                RequireSha256(incumbent, "fullShelfInventorySha256"),
+                UnsignedCompactSha256(incumbentInventory),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(incumbent, "directoryModesSha256"),
+                UnsignedCompactSha256(incumbentModes),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(incumbent, "snapshotSha256"),
+                UnsignedCompactSha256WithoutProperty(incumbent, "snapshotSha256"),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(incumbent, "fullShelfInventorySha256"),
+                RequireSha256(scope, "incumbentInventorySha256"),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned composition incumbent digest graph drifted");
+        }
+        JsonElement compositionRetained = RequireArray(
+            composition,
+            "retainedFromIncumbent");
+        if (!JsonSemanticEquals(compositionRetained, scopeRetained))
+        {
+            throw new InvalidDataException(
+                "unsigned composition retained inventory drifted");
+        }
+        IReadOnlyDictionary<string, JsonElement> proposedByPath =
+            ValidateUnsignedInventory(
+                proposedInventory,
+                "unsigned composition proposed shelf",
+                allowEmpty: false,
+                retained: false);
+        foreach (JsonElement retainedRow in scopeRetained.EnumerateArray())
+        {
+            string path = RequireString(retainedRow, "path");
+            if (!incumbentByPath.TryGetValue(path, out JsonElement incumbentRow)
+                || !proposedByPath.TryGetValue(path, out JsonElement proposedRow)
+                || RequireNonNegativeInt64(retainedRow, "mode")
+                   != RequireNonNegativeInt64(incumbentRow, "mode")
+                || RequireNonNegativeInt64(retainedRow, "mode")
+                   != RequireNonNegativeInt64(proposedRow, "mode")
+                || RequireNonNegativeInt64(retainedRow, "sizeBytes")
+                   != RequireNonNegativeInt64(incumbentRow, "sizeBytes")
+                || RequireNonNegativeInt64(retainedRow, "sizeBytes")
+                   != RequireNonNegativeInt64(proposedRow, "sizeBytes")
+                || !string.Equals(
+                    RequireSha256(retainedRow, "sha256"),
+                    RequireSha256(incumbentRow, "sha256"),
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireSha256(retainedRow, "sha256"),
+                    RequireSha256(proposedRow, "sha256"),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "unsigned retained bytes differ across shelves");
+            }
+        }
+
+        JsonElement compositionFresh = RequireArray(composition, "freshDelta");
+        if (compositionFresh.GetArrayLength() != scopeFresh.GetArrayLength())
+        {
+            throw new InvalidDataException(
+                "unsigned composition fresh delta cardinality drifted");
+        }
+        JsonElement? windowsArtifact = null;
+        var shelfPlatforms = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
+        {
+            string platform = RequireString(artifact, "platform");
+            if (platform is not "linux" and not "macos" and not "windows")
+            {
+                throw new InvalidDataException(
+                    "unsigned canonical artifact platform drifted");
+            }
+            shelfPlatforms.Add(platform);
+            if (platform == "windows"
+                && string.Equals(
+                    RequireString(artifact, "head"),
+                    "avalonia",
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    RequireString(artifact, "rid"),
+                    WindowsRid,
+                    StringComparison.Ordinal))
+            {
+                if (windowsArtifact is not null)
+                {
+                    throw new InvalidDataException(
+                        "unsigned canonical Windows artifact is duplicated");
+                }
+                windowsArtifact = artifact;
+            }
+        }
+        if (windowsArtifact is null)
+        {
+            throw new InvalidDataException(
+                "unsigned canonical Windows artifact is missing");
+        }
+        string manifestRowSha256 = UnsignedCompactSha256(windowsArtifact.Value);
+        string[] freshKeys =
+        [
+            "artifactRole",
+            "fileName",
+            "head",
+            "mode",
+            "path",
+            "platform",
+            "rid",
+            "sha256",
+            "sizeBytes"
+        ];
+        for (int index = 0; index < scopeFresh.GetArrayLength(); index++)
+        {
+            JsonElement held = scopeFresh[index];
+            JsonElement row = compositionFresh[index];
+            var keys = new HashSet<string>(freshKeys, StringComparer.Ordinal)
+            {
+                "manifestRowSha256"
+            };
+            if (!ExactPropertySet(row, keys)
+                || !string.Equals(
+                    RequireSha256(row, "manifestRowSha256"),
+                    manifestRowSha256,
+                    StringComparison.Ordinal)
+                || freshKeys.Any(key =>
+                    !row.TryGetProperty(key, out JsonElement value)
+                    || !held.TryGetProperty(key, out JsonElement expected)
+                    || !JsonSemanticEquals(value, expected)))
+            {
+                throw new InvalidDataException(
+                    "unsigned composition fresh byte graph drifted");
+            }
+        }
+
+        var provenancePaths = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["packagePlaneLock"] = packageLockPath,
+            ["packagePlaneReceipt"] = packageReceiptPath,
+            ["retainedManifest"] = retainedManifestPath,
+            ["nativeToolchainLock"] = nativeLockPath
+        };
+        JsonElement compositionProvenance = RequireObject(
+            composition,
+            "provenance");
+        if (!ExactPropertySet(
+                compositionProvenance,
+                new HashSet<string>(provenancePaths.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned composition provenance property set drifted");
+        }
+        foreach ((string name, string path) in provenancePaths)
+        {
+            ValidateUnsignedByteReference(
+                RequireObject(compositionProvenance, name),
+                path,
+                documents[path].Bytes,
+                $"unsigned composition provenance ${name}");
+        }
+        JsonElement candidateProvenance = RequireObject(
+            registryCandidate,
+            "provenance");
+        if (!JsonSemanticEquals(candidateProvenance, compositionProvenance))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry PREPARE provenance graph drifted");
+        }
+        ValidateUnsignedProjectionInputs(
+            RequireObject(registryCandidate, "projectionInputs"));
+        RequireExactString(
+            registryCandidate,
+            "incumbentInventorySha256",
+            RequireSha256(incumbent, "fullShelfInventorySha256"));
+        RequireExactString(
+            registryCandidate,
+            "incumbentSnapshotSha256",
+            RequireSha256(incumbent, "snapshotSha256"));
+        RequireExactString(
+            registryCandidate,
+            "incumbentDirectoryModesSha256",
+            RequireSha256(incumbent, "directoryModesSha256"));
+        RequireExactString(
+            registryCandidate,
+            "proposedDirectoryModesSha256",
+            RequireSha256(composition, "proposedDirectoryModesSha256"));
+        RequireExactString(
+            registryCandidate,
+            "retainedInventorySha256",
+            UnsignedCompactSha256(scopeRetained));
+        RequireUnsignedStringArray(
+            registryCandidate,
+            "retainedPlatforms",
+            shelfPlatforms.Where(static platform => platform != "windows").ToArray());
+        RequireUnsignedStringArray(
+            registryCandidate,
+            "shelfPlatforms",
+            shelfPlatforms.ToArray());
+        ValidateUnsignedWindowsDelta(
+            RequireObject(registryCandidate, "windowsDelta"),
+            scopeFresh);
+
+        var mixedGraph = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["authorityContractVersion"] = 2,
+            ["candidateReceiptContractVersion"] = 2,
+            ["compositionRequestContractVersion"] = 3,
+            ["finalizeReceiptContractVersion"] = 2,
+            ["sourceScopeContractVersion"] = 3
+        };
+        var authorityKeys = new HashSet<string>(
+            [
+                "candidateImportAuthority",
+                "candidateReceipt",
+                "candidateReviewAuthority",
+                "canonicalManifest",
+                "channel",
+                "codeDeploymentAuthority",
+                "compatibilityManifest",
+                "compositionRequest",
+                "contractName",
+                "contractVersion",
+                "crossRunBitReproducible",
+                "deltaPlatforms",
+                "deployAuthority",
+                "evidencePlatforms",
+                "fullShelfInventorySha256",
+                "incumbentInventorySha256",
+                "incumbentSnapshotSha256",
+                "mixedVersionGraph",
+                "platformScope",
+                "projectionInputs",
+                "proposedDirectoryModesSha256",
+                "provenance",
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "releaseVersion",
+                "retainedInventorySha256",
+                "retainedPlatforms",
+                "routeAuthority",
+                "shelfPlatforms",
+                "signaturePolicy",
+                "sourceScope",
+                "sourceSha",
+                "windowsDelta"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(registryAuthority, authorityKeys))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry FINALIZE authority property set drifted");
+        }
+        RequireExactString(
+            registryAuthority,
+            "contractName",
+            "chummer.registry.preview-publication-delta-authority");
+        RequireExactInt32(registryAuthority, "contractVersion", 2);
+        ValidateUnsignedRegistryPosture(
+            registryAuthority,
+            candidate.Version,
+            scope,
+            mixedGraph,
+            includeReviewAuthority: true);
+        ValidateUnsignedByteReference(
+            RequireObject(registryAuthority, "candidateReceipt"),
+            candidatePath,
+            candidateBytes,
+            "unsigned Registry authority candidate receipt");
+        ValidateUnsignedByteReference(
+            RequireObject(registryAuthority, "canonicalManifest"),
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes,
+            "unsigned Registry authority canonical manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(registryAuthority, "compatibilityManifest"),
+            "releases.json",
+            compatibilityBytes,
+            "unsigned Registry authority compatibility manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(registryAuthority, "compositionRequest"),
+            compositionPath,
+            compositionBytes,
+            "unsigned Registry authority composition request");
+        ValidateUnsignedByteReference(
+            RequireObject(registryAuthority, "sourceScope"),
+            scopePath,
+            scopeBytes,
+            "unsigned Registry authority source scope");
+        foreach (string name in new[]
+                 {
+                     "fullShelfInventorySha256",
+                     "incumbentInventorySha256",
+                     "incumbentSnapshotSha256",
+                     "proposedDirectoryModesSha256",
+                     "retainedInventorySha256"
+                 })
+        {
+            RequireExactString(
+                registryAuthority,
+                name,
+                RequireSha256(registryCandidate, name));
+        }
+        if (!JsonSemanticEquals(
+                RequireArray(registryAuthority, "retainedPlatforms"),
+                RequireArray(registryCandidate, "retainedPlatforms"))
+            || !JsonSemanticEquals(
+                RequireArray(registryAuthority, "shelfPlatforms"),
+                RequireArray(registryCandidate, "shelfPlatforms"))
+            || !JsonSemanticEquals(
+                RequireObject(registryAuthority, "projectionInputs"),
+                RequireObject(registryCandidate, "projectionInputs"))
+            || !JsonSemanticEquals(
+                RequireObject(registryAuthority, "provenance"),
+                candidateProvenance)
+            || !JsonSemanticEquals(
+                RequireObject(registryAuthority, "windowsDelta"),
+                RequireObject(registryCandidate, "windowsDelta")))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry FINALIZE/PREPARE custody graph drifted");
+        }
+        ValidateUnsignedProjectionInputs(
+            RequireObject(registryAuthority, "projectionInputs"));
+
+        var finalizeKeys = new HashSet<string>(
+            [
+                "authority",
+                "candidateBytesMutated",
+                "candidateImportAuthority",
+                "candidateReceipt",
+                "candidateReviewAuthority",
+                "canonicalManifest",
+                "channel",
+                "codeDeploymentAuthority",
+                "compatibilityManifest",
+                "compositionRequest",
+                "contractName",
+                "contractVersion",
+                "deployAuthority",
+                "fullShelfInventorySha256",
+                "mixedVersionGraph",
+                "platformScope",
+                "provenance",
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "releaseVersion",
+                "routeAuthority",
+                "signaturePolicy",
+                "sourceScope",
+                "verificationStatus",
+                "windowsDelta"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(registryFinalize, finalizeKeys))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry FINALIZE receipt property set drifted");
+        }
+        RequireExactString(
+            registryFinalize,
+            "contractName",
+            "chummer.registry.preview-publication-delta-finalize");
+        RequireExactInt32(registryFinalize, "contractVersion", 2);
+        RequireExactString(registryFinalize, "verificationStatus", "finalized");
+        RequireBoolean(registryFinalize, "candidateBytesMutated", expected: false);
+        ValidateUnsignedRegistryPosture(
+            registryFinalize,
+            candidate.Version,
+            scope,
+            mixedGraph,
+            includeReviewAuthority: true);
+        RequireExactString(
+            registryFinalize,
+            "fullShelfInventorySha256",
+            RequireSha256(registryCandidate, "fullShelfInventorySha256"));
+        if (!JsonSemanticEquals(
+                RequireObject(registryFinalize, "provenance"),
+                candidateProvenance)
+            || !JsonSemanticEquals(
+                RequireObject(registryFinalize, "windowsDelta"),
+                RequireObject(registryCandidate, "windowsDelta")))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry FINALIZE receipt custody graph drifted");
+        }
+        foreach ((string name, string path, byte[] bytes) in new[]
+                 {
+                     ("authority", authorityPath, authorityBytes),
+                     ("candidateReceipt", candidatePath, candidateBytes),
+                     ("canonicalManifest", "RELEASE_CHANNEL.generated.json", canonicalBytes),
+                     ("compatibilityManifest", "releases.json", compatibilityBytes),
+                     ("compositionRequest", compositionPath, compositionBytes),
+                     ("sourceScope", scopePath, scopeBytes)
+                 })
+        {
+            ValidateUnsignedByteReference(
+                RequireObject(registryFinalize, name),
+                path,
+                bytes,
+                $"unsigned Registry finalize ${name}");
+        }
+        ValidateUnsignedRegistrySummary(
+            RequireObject(custody, "registryFinalization"),
+            candidateBytes,
+            authorityBytes,
+            finalizeBytes);
+    }
+
+    private static void ValidateUnsignedWindowsDelta(
+        JsonElement value,
+        JsonElement fresh)
+    {
+        string[] roles = ["installer", "bootstrap_payload"];
+        if (!ExactPropertySet(
+                value,
+                new HashSet<string>(roles, StringComparer.Ordinal))
+            || fresh.GetArrayLength() != roles.Length)
+        {
+            throw new InvalidDataException("unsigned Registry Windows delta drifted");
+        }
+        for (int index = 0; index < roles.Length; index++)
+        {
+            JsonElement reference = RequireObject(value, roles[index]);
+            JsonElement row = fresh[index];
+            if (!ExactPropertySet(
+                    reference,
+                    new HashSet<string>(
+                        ["path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "unsigned Registry Windows delta reference drifted");
+            }
+            RequireExactString(reference, "path", RequireString(row, "path"));
+            RequireExactString(reference, "sha256", RequireSha256(row, "sha256"));
+            if (RequireNonNegativeInt64(reference, "sizeBytes")
+                != RequireNonNegativeInt64(row, "sizeBytes"))
+            {
+                throw new InvalidDataException(
+                    "unsigned Registry Windows delta bytes drifted");
+            }
+        }
+    }
+
+    private static void ValidateUnsignedRegistryPosture(
+        JsonElement value,
+        string version,
+        JsonElement scope,
+        IReadOnlyDictionary<string, int> mixedGraph,
+        bool includeReviewAuthority)
+    {
+        RequireExactString(value, "channel", "preview");
+        RequireExactString(value, "releaseVersion", version);
+        RequireExactString(value, "platformScope", "windows_only");
+        RequireBoolean(value, "candidateImportAuthority", expected: true);
+        if (includeReviewAuthority)
+        {
+            RequireBoolean(value, "candidateReviewAuthority", expected: true);
+        }
+        RequireBoolean(value, "publicationAuthorized", expected: false);
+        RequireBoolean(value, "publicationEligible", expected: false);
+        RequireBoolean(value, "releaseUploadAuthority", expected: false);
+        RequireBoolean(value, "deployAuthority", expected: false);
+        RequireBoolean(value, "routeAuthority", expected: false);
+        RequireBoolean(value, "codeDeploymentAuthority", expected: false);
+        ValidateUnsignedSignaturePolicy(RequireObject(value, "signaturePolicy"));
+        JsonElement graph = RequireObject(value, "mixedVersionGraph");
+        if (!ExactPropertySet(
+                graph,
+                new HashSet<string>(mixedGraph.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry mixed-version graph drifted");
+        }
+        foreach ((string name, int expected) in mixedGraph)
+        {
+            RequireExactInt32(graph, name, expected);
+        }
+        if (value.TryGetProperty("crossRunBitReproducible", out _))
+        {
+            RequireBoolean(value, "crossRunBitReproducible", expected: false);
+            RequireExactString(
+                value,
+                "sourceSha",
+                RequireString(scope, "sourceSha"));
+            RequireUnsignedStringArray(value, "deltaPlatforms", ["windows"]);
+            RequireUnsignedStringArray(value, "evidencePlatforms", []);
+        }
+    }
+
+    private static void ValidateUnsignedRegistrySummary(
+        JsonElement summary,
+        byte[] candidateBytes,
+        byte[] authorityBytes,
+        byte[] finalizeBytes)
+    {
+        if (!ExactPropertySet(
+                summary,
+                new HashSet<string>(
+                    [
+                        "authoritySha256",
+                        "candidateImportAuthority",
+                        "candidateReceiptSha256",
+                        "candidateReviewAuthority",
+                        "codeDeploymentAuthority",
+                        "deployAuthority",
+                        "exactIncomingDesktopScope",
+                        "finalizeReceiptSha256",
+                        "publicationAuthorized",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "routeAuthority",
+                        "scope",
+                        "signaturePolicy",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry finalization summary property set drifted");
+        }
+        RequireExactString(summary, "status", "finalized");
+        RequireExactString(summary, "scope", "windows_only");
+        RequireExactString(
+            summary,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        RequireBoolean(summary, "candidateImportAuthority", expected: true);
+        RequireBoolean(summary, "candidateReviewAuthority", expected: true);
+        RequireBoolean(summary, "publicationAuthorized", expected: false);
+        RequireBoolean(summary, "publicationEligible", expected: false);
+        RequireBoolean(summary, "releaseUploadAuthority", expected: false);
+        RequireBoolean(summary, "deployAuthority", expected: false);
+        RequireBoolean(summary, "routeAuthority", expected: false);
+        RequireBoolean(summary, "codeDeploymentAuthority", expected: false);
+        ValidateUnsignedSignaturePolicy(RequireObject(summary, "signaturePolicy"));
+        RequireExactString(summary, "candidateReceiptSha256", Sha256(candidateBytes));
+        RequireExactString(summary, "authoritySha256", Sha256(authorityBytes));
+        RequireExactString(summary, "finalizeReceiptSha256", Sha256(finalizeBytes));
+    }
+
+    private static byte[] RenderUnsignedJson(
+        JsonElement value,
+        bool indented,
+        bool trailingLf)
+    {
+        var builder = new StringBuilder();
+        AppendUnsignedJson(builder, value, indented, 0);
+        if (trailingLf)
+        {
+            builder.Append('\n');
+        }
+        return Encoding.UTF8.GetBytes(builder.ToString());
+    }
+
+    private static void AppendUnsignedJson(
+        StringBuilder builder,
+        JsonElement value,
+        bool indented,
+        int depth)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+            {
+                JsonProperty[] properties = value.EnumerateObject()
+                    .OrderBy(static property => property.Name, StringComparer.Ordinal)
+                    .ToArray();
+                builder.Append('{');
+                if (properties.Length > 0)
+                {
+                    if (indented)
+                    {
+                        builder.Append('\n');
+                    }
+                    for (int index = 0; index < properties.Length; index++)
+                    {
+                        if (indented)
+                        {
+                            builder.Append(' ', checked((depth + 1) * 2));
+                        }
+                        AppendUnsignedJsonString(builder, properties[index].Name);
+                        builder.Append(indented ? ": " : ":");
+                        AppendUnsignedJson(
+                            builder,
+                            properties[index].Value,
+                            indented,
+                            depth + 1);
+                        if (index + 1 < properties.Length)
+                        {
+                            builder.Append(',');
+                        }
+                        if (indented)
+                        {
+                            builder.Append('\n');
+                        }
+                    }
+                    if (indented)
+                    {
+                        builder.Append(' ', checked(depth * 2));
+                    }
+                }
+                builder.Append('}');
+                break;
+            }
+            case JsonValueKind.Array:
+            {
+                JsonElement[] items = value.EnumerateArray().ToArray();
+                builder.Append('[');
+                if (items.Length > 0)
+                {
+                    if (indented)
+                    {
+                        builder.Append('\n');
+                    }
+                    for (int index = 0; index < items.Length; index++)
+                    {
+                        if (indented)
+                        {
+                            builder.Append(' ', checked((depth + 1) * 2));
+                        }
+                        AppendUnsignedJson(builder, items[index], indented, depth + 1);
+                        if (index + 1 < items.Length)
+                        {
+                            builder.Append(',');
+                        }
+                        if (indented)
+                        {
+                            builder.Append('\n');
+                        }
+                    }
+                    if (indented)
+                    {
+                        builder.Append(' ', checked(depth * 2));
+                    }
+                }
+                builder.Append(']');
+                break;
+            }
+            case JsonValueKind.String:
+                AppendUnsignedJsonString(builder, value.GetString()!);
+                break;
+            case JsonValueKind.Number:
+                builder.Append(value.GetRawText());
+                break;
+            case JsonValueKind.True:
+                builder.Append("true");
+                break;
+            case JsonValueKind.False:
+                builder.Append("false");
+                break;
+            case JsonValueKind.Null:
+                builder.Append("null");
+                break;
+            default:
+                throw new InvalidDataException("unsigned JSON contains an invalid value");
+        }
+    }
+
+    private static void AppendUnsignedJsonString(StringBuilder builder, string value)
+    {
+        builder.Append('"');
+        foreach (char character in value)
+        {
+            switch (character)
+            {
+                case '"':
+                    builder.Append("\\\"");
+                    break;
+                case '\\':
+                    builder.Append("\\\\");
+                    break;
+                case '\b':
+                    builder.Append("\\b");
+                    break;
+                case '\f':
+                    builder.Append("\\f");
+                    break;
+                case '\n':
+                    builder.Append("\\n");
+                    break;
+                case '\r':
+                    builder.Append("\\r");
+                    break;
+                case '\t':
+                    builder.Append("\\t");
+                    break;
+                default:
+                    if (character < 0x20 || character > 0x7e)
+                    {
+                        builder.Append("\\u");
+                        builder.Append(((int)character).ToString(
+                            "x4",
+                            System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        builder.Append(character);
+                    }
+                    break;
+            }
+        }
+        builder.Append('"');
+    }
+
+    private static string UnsignedCompactSha256(JsonElement value)
+        => Sha256(RenderUnsignedJson(value, indented: false, trailingLf: false));
+
+    private static string UnsignedCompactSha256WithoutProperty(
+        JsonElement value,
+        string excludedProperty)
+    {
+        JsonProperty[] properties = value.EnumerateObject()
+            .Where(property => !string.Equals(
+                property.Name,
+                excludedProperty,
+                StringComparison.Ordinal))
+            .OrderBy(static property => property.Name, StringComparer.Ordinal)
+            .ToArray();
+        var builder = new StringBuilder();
+        builder.Append('{');
+        for (int index = 0; index < properties.Length; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append(',');
+            }
+            AppendUnsignedJsonString(builder, properties[index].Name);
+            builder.Append(':');
+            AppendUnsignedJson(builder, properties[index].Value, indented: false, depth: 1);
+        }
+        builder.Append('}');
+        return Sha256(Encoding.UTF8.GetBytes(builder.ToString()));
+    }
+
+    private static void RequireUnsignedCanonicalDocument(
+        byte[] bytes,
+        JsonElement value,
+        string label)
+    {
+        if (!CryptographicOperations.FixedTimeEquals(
+                bytes,
+                RenderUnsignedJson(value, indented: false, trailingLf: true)))
+        {
+            throw new InvalidDataException($"${label} is not canonical compact JSON plus LF");
+        }
+    }
+
+    private static void ValidateUnsignedProjectionInputs(JsonElement value)
+    {
+        var paths = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["materializer"] = "scripts/materialize_unsigned_preview_publication_delta.py",
+            ["schema"] = "contracts/preview-publication-delta-v2.schema.json"
+        };
+        if (!ExactPropertySet(
+                value,
+                new HashSet<string>(paths.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned Registry projection inputs drifted");
+        }
+        foreach ((string name, string path) in paths)
+        {
+            JsonElement reference = RequireObject(value, name);
+            if (!ExactPropertySet(
+                    reference,
+                    new HashSet<string>(
+                        ["path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    $"unsigned Registry projection input ${name} drifted");
+            }
+            RequireExactString(reference, "path", path);
+            _ = RequireSha256(reference, "sha256");
+            _ = RequirePositiveInt64(reference, "sizeBytes");
+        }
+    }
+
+    private static void ValidateUnsignedUnheldReference(
+        JsonElement reference,
+        string path,
+        string label)
+    {
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(
+                    ["path", "sha256", "sizeBytes"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"${label} property set drifted");
+        }
+        RequireExactString(reference, "path", path);
+        _ = RequireSha256(reference, "sha256");
+        _ = RequirePositiveInt64(reference, "sizeBytes");
+    }
+
+    private static void RequireUnsignedStringArray(
+        JsonElement parent,
+        string property,
+        IReadOnlyList<string> expected)
+    {
+        JsonElement value = RequireArray(parent, property);
+        string[] actual = value.EnumerateArray()
+            .Select(static item => item.ValueKind == JsonValueKind.String
+                ? item.GetString()
+                : null)
+            .Where(static item => item is not null)
+            .Cast<string>()
+            .ToArray();
+        if (actual.Length != value.GetArrayLength()
+            || !actual.SequenceEqual(expected, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException($"unsigned Registry ${property} drifted");
+        }
+    }
+
+    private static IReadOnlyDictionary<string, JsonElement> ValidateUnsignedInventory(
+        JsonElement value,
+        string label,
+        bool allowEmpty,
+        bool retained)
+    {
+        if (value.ValueKind != JsonValueKind.Array
+            || !allowEmpty && value.GetArrayLength() == 0
+            || value.GetArrayLength() > 100_000)
+        {
+            throw new InvalidDataException($"${label} inventory is invalid");
+        }
+        var rows = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        string? previous = null;
+        foreach (JsonElement row in value.EnumerateArray())
+        {
+            var keys = new HashSet<string>(
+                ["mode", "path", "sha256", "sizeBytes"],
+                StringComparer.Ordinal);
+            if (retained)
+            {
+                keys.Add("retentionKind");
+            }
+            string path = RequireString(row, "path");
+            long mode = RequireNonNegativeInt64(row, "mode");
+            if (!ExactPropertySet(row, keys)
+                || !IsCanonicalRelativePath(path)
+                || previous is not null && string.CompareOrdinal(previous, path) >= 0
+                || mode > 0x1ff
+                || !rows.TryAdd(path, row))
+            {
+                throw new InvalidDataException($"${label} inventory row drifted");
+            }
+            _ = RequireSha256(row, "sha256");
+            _ = RequireNonNegativeInt64(row, "sizeBytes");
+            if (retained
+                && RequireString(row, "retentionKind")
+                    is not "managed_artifact" and not "ancillary")
+            {
+                throw new InvalidDataException(
+                    $"${label} retention classification drifted");
+            }
+            previous = path;
+        }
+        return rows;
+    }
+
+    private static void ValidateUnsignedDirectoryModes(JsonElement value, string label)
+    {
+        if (value.ValueKind != JsonValueKind.Array
+            || value.GetArrayLength() == 0
+            || value.GetArrayLength() > 100_000)
+        {
+            throw new InvalidDataException($"${label} directory modes are invalid");
+        }
+        string? previous = null;
+        foreach (JsonElement row in value.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(["mode", "path"], StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    $"${label} directory mode row drifted");
+            }
+            string path = RequireString(row, "path");
+            long mode = RequireNonNegativeInt64(row, "mode");
+            if (!IsCanonicalRelativePath(path)
+                || previous is not null && string.CompareOrdinal(previous, path) >= 0
+                || mode > 0x1ff)
+            {
+                throw new InvalidDataException(
+                    $"${label} directory mode row is invalid");
+            }
+            previous = path;
+        }
     }
 
     private static void ValidateFinalizedPublicationAndRegistry(
@@ -4133,29 +6237,119 @@ public static class ReleaseUploadCandidateBundleValidator
         {
             throw new InvalidDataException("candidate upload bundle root is invalid");
         }
-        var rows = new List<ReleaseUploadCandidateInventoryRow>();
-        foreach (string path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        var expectedDirectories = new HashSet<string>(StringComparer.Ordinal);
+        foreach (ReleaseUploadCandidateInventoryRow row in authority.Inventory)
         {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            string? parent = Path.GetDirectoryName(row.Path.Replace('/', Path.DirectorySeparatorChar));
+            while (!string.IsNullOrEmpty(parent))
             {
-                throw new InvalidDataException("candidate upload bundle contains a forbidden link");
+                expectedDirectories.Add(parent.Replace('\\', '/'));
+                parent = Path.GetDirectoryName(parent);
             }
-            string relative = Path.GetRelativePath(root, path).Replace('\\', '/');
-            FileInfo before = new(path);
-            string sha256;
-            using (FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        }
+        var actualDirectories = new HashSet<string>(StringComparer.Ordinal);
+        var rows = new List<ReleaseUploadCandidateInventoryRow>();
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.TryPop(out string? directory))
+        {
+            var directoryBefore = new DirectoryInfo(directory);
+            directoryBefore.Refresh();
+            if (!directoryBefore.Exists
+                || (directoryBefore.Attributes & FileAttributes.ReparsePoint) != 0)
             {
-                sha256 = Convert.ToHexStringLower(SHA256.HashData(stream));
+                throw new InvalidDataException(
+                    "candidate upload bundle contains a forbidden directory link");
             }
-            FileInfo after = new(path);
-            if (before.Length != after.Length || before.LastWriteTimeUtc != after.LastWriteTimeUtc)
+            string[] entries = Directory.EnumerateFileSystemEntries(
+                    directory,
+                    "*",
+                    SearchOption.TopDirectoryOnly)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            foreach (string path in entries)
             {
-                throw new InvalidDataException("candidate upload bundle changed during validation");
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidDataException(
+                        "candidate upload bundle contains a forbidden link");
+                }
+                string relative = Path.GetRelativePath(root, path).Replace('\\', '/');
+                if (relative.Length == 0
+                    || relative.StartsWith("/", StringComparison.Ordinal)
+                    || relative.Contains('\\')
+                    || relative.Split('/').Any(static segment =>
+                        segment.Length == 0
+                        || segment is "." or ".."
+                        || segment.Contains(':')))
+                {
+                    throw new InvalidDataException(
+                        "candidate upload bundle contains a non-canonical path");
+                }
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    if (!actualDirectories.Add(relative))
+                    {
+                        throw new InvalidDataException(
+                            "candidate upload bundle directory is duplicated");
+                    }
+                    pending.Push(path);
+                    continue;
+                }
+                var before = new FileInfo(path);
+                before.Refresh();
+                string sha256;
+                using (FileStream stream = new(
+                           path,
+                           FileMode.Open,
+                           FileAccess.Read,
+                           FileShare.Read))
+                {
+                    sha256 = Convert.ToHexStringLower(SHA256.HashData(stream));
+                }
+                var after = new FileInfo(path);
+                after.Refresh();
+                if (!after.Exists
+                    || (after.Attributes & FileAttributes.ReparsePoint) != 0
+                    || before.Length != after.Length
+                    || before.LastWriteTimeUtc != after.LastWriteTimeUtc)
+                {
+                    throw new InvalidDataException(
+                        "candidate upload bundle changed during validation");
+                }
+                string pathSha256;
+                using (FileStream stream = new(
+                           path,
+                           FileMode.Open,
+                           FileAccess.Read,
+                           FileShare.Read))
+                {
+                    pathSha256 = Convert.ToHexStringLower(SHA256.HashData(stream));
+                }
+                if (!string.Equals(sha256, pathSha256, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "candidate upload bundle changed during validation");
+                }
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    relative,
+                    after.Length,
+                    sha256));
             }
-            rows.Add(new ReleaseUploadCandidateInventoryRow(relative, after.Length, sha256));
+            var directoryAfter = new DirectoryInfo(directory);
+            directoryAfter.Refresh();
+            if (!directoryAfter.Exists
+                || (directoryAfter.Attributes & FileAttributes.ReparsePoint) != 0
+                || directoryAfter.LastWriteTimeUtc != directoryBefore.LastWriteTimeUtc)
+            {
+                throw new InvalidDataException(
+                    "candidate upload bundle directory changed during validation");
+            }
         }
         rows.Sort(static (left, right) => string.CompareOrdinal(left.Path, right.Path));
-        if (!rows.SequenceEqual(authority.Inventory)
+        if (!actualDirectories.SetEquals(expectedDirectories)
+            || !rows.SequenceEqual(authority.Inventory)
             || rows.Count != authority.Candidate.FileCount
             || rows.Sum(static row => row.SizeBytes) != authority.Candidate.TotalBytes
             || !string.Equals(

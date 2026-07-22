@@ -1882,6 +1882,147 @@ def load_projection():
     return load_script(PROJECTION, "candidate_projection_test")
 
 
+def exact_tree_fixture(tmp_path: Path):
+    materializer = load_script(MATERIALIZER, "candidate_exact_tree_test")
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    write_json(bundle / "RELEASE_CHANNEL.generated.json", {"status": "held"})
+    write_json(bundle / "releases.json", {"status": "held"})
+    rows = [
+        {
+            "path": path.relative_to(bundle).as_posix(),
+            "sha256": sha(path),
+            "sizeBytes": path.stat().st_size,
+        }
+        for path in sorted(bundle.iterdir())
+    ]
+    candidate = {
+        "fileCount": len(rows),
+        "totalBytes": sum(row["sizeBytes"] for row in rows),
+        "inventorySha256": materializer._inventory_digest(rows),
+    }
+    inventory = {
+        "contractName": "chummer.release-upload.candidate-inventory/v1",
+        "contractVersion": 1,
+        "files": rows,
+    }
+    return materializer, bundle, inventory, candidate
+
+
+def test_candidate_inventory_rejects_unlisted_bundle_file(tmp_path: Path) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    (bundle / "unlisted.bin").write_bytes(b"not in the signed inventory")
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="exact bundle bytes",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+
+def test_candidate_inventory_allows_bound_root_ancillary_only_for_unsigned_v3(
+    tmp_path: Path,
+) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    ancillary = bundle / "operator-note.txt"
+    ancillary.write_bytes(b"retained incumbent ancillary")
+    ancillary.chmod(0o644)
+    row = {
+        "path": ancillary.name,
+        "sha256": sha(ancillary),
+        "sizeBytes": ancillary.stat().st_size,
+    }
+    inventory["files"].append(row)
+    inventory["files"].sort(key=lambda item: item["path"])
+    candidate["fileCount"] += 1
+    candidate["totalBytes"] += row["sizeBytes"]
+    candidate["inventorySha256"] = materializer._inventory_digest(
+        inventory["files"]
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="only the two finalized shelf manifests",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+    rows, modes, directory_modes, captured = materializer._validate_bundle_inventory(
+        bundle,
+        inventory,
+        candidate,
+        allow_root_ancillary_files=True,
+    )
+    assert rows == inventory["files"]
+    assert modes[ancillary.name] == 0o644
+    assert directory_modes == []
+    assert set(captured) == {
+        "RELEASE_CHANNEL.generated.json",
+        "releases.json",
+    }
+
+
+def test_candidate_inventory_rejects_symlinked_ancestor(tmp_path: Path) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    payload = outside / "payload.zip"
+    payload.write_bytes(b"outside custody")
+    (bundle / "files").symlink_to(outside, target_is_directory=True)
+    row = {
+        "path": "files/payload.zip",
+        "sha256": sha(payload),
+        "sizeBytes": payload.stat().st_size,
+    }
+    inventory["files"].append(row)
+    inventory["files"].sort(key=lambda item: item["path"])
+    candidate["fileCount"] += 1
+    candidate["totalBytes"] += row["sizeBytes"]
+    candidate["inventorySha256"] = materializer._inventory_digest(
+        inventory["files"]
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="symbolic link",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+
+def test_candidate_tree_rejects_file_mutation_during_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materializer, bundle, _inventory, _candidate = exact_tree_fixture(tmp_path)
+    files = bundle / "files"
+    files.mkdir()
+    payload = files / "payload.zip"
+    payload.write_bytes(b"x" * (2 * 1024 * 1024))
+    real_read = materializer.os.read
+    mutated = False
+
+    def racing_read(descriptor: int, count: int) -> bytes:
+        nonlocal mutated
+        chunk = real_read(descriptor, count)
+        descriptor_path = Path(f"/proc/self/fd/{descriptor}")
+        if (
+            not mutated
+            and chunk
+            and descriptor_path.exists()
+            and descriptor_path.resolve() == payload
+        ):
+            mutated = True
+            payload.write_bytes(payload.read_bytes() + b"race")
+        return chunk
+
+    monkeypatch.setattr(materializer.os, "read", racing_read)
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="changed during validation",
+    ):
+        materializer._scan_bundle_tree(bundle)
+    assert mutated is True
+
+
 @pytest.mark.parametrize(
     ("path", "module_name", "helper", "exception_name"),
     [

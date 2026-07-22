@@ -198,6 +198,54 @@ def test_rejects_access_or_signing_outside_approved_policy(tmp_path: Path) -> No
     assert not output.exists()
 
 
+def test_literal_unsigned_preview_policy_accepts_only_unsigned_evidence(
+    tmp_path: Path,
+) -> None:
+    scope = decision()
+    scope["platforms"][0]["signingRequirement"] = "unsigned_preview"  # type: ignore[index]
+    rows = [
+        artifact("avalonia-osx-arm64-installer", "avalonia"),
+        artifact("blazor-desktop-osx-arm64-installer", "blazor-desktop"),
+    ]
+    unsigned = [
+        {
+            "artifactId": row["artifactId"],
+            "promotionStatus": "pass",
+            "signingStatus": "unsigned",
+            "notarizationStatus": "not_applicable",
+        }
+        for row in rows
+    ]
+    result, output = invoke(
+        tmp_path,
+        scope=scope,
+        artifacts=rows,
+        evidence=unsigned,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(output.read_text())["status"] == "pass"
+
+    rejected = tmp_path / "skipped"
+    rejected.mkdir()
+    skipped = [
+        {
+            **row,
+            "signingStatus": "skipped_preview",
+            "notarizationStatus": "skipped_preview",
+        }
+        for row in unsigned
+    ]
+    result, output = invoke(
+        rejected,
+        scope=scope,
+        artifacts=rows,
+        evidence=skipped,
+    )
+    assert result.returncode == 1
+    assert "not literal unsigned preview evidence" in result.stderr
+    assert not output.exists()
+
+
 def test_rejects_multi_platform_scope_on_platform_specific_mac_builder(tmp_path: Path) -> None:
     scope = decision()
     scope["platforms"] = [
