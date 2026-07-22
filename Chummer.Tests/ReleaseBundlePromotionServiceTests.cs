@@ -209,6 +209,276 @@ public sealed class ReleaseBundlePromotionServiceTests
                 false, false, "skipped_preview", "skipped_preview")
         ];
 
+    private static IReadOnlyList<BundleArtifact> CandidateRetainedCrossPlatformArtifacts()
+        =>
+        [
+            new(
+                "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
+                "chummer-avalonia-linux-x64-installer.deb", "linux-retained"u8.ToArray(),
+                false, false, "not_applicable", "not_applicable"),
+            new(
+                "blazor-desktop-osx-arm64-installer", "blazor-desktop", "macos", "arm64", "installer",
+                "chummer-blazor-desktop-osx-arm64-installer.dmg", "blazor-mac-retained"u8.ToArray(),
+                false, false, "skipped_preview", "skipped_preview"),
+            new(
+                "blazor-desktop-osx-arm64-archive", "blazor-desktop", "macos", "arm64", "archive",
+                "chummer-blazor-desktop-osx-arm64.zip", "blazor-mac-archive"u8.ToArray(),
+                false, false, "not_applicable", "not_applicable"),
+            new(
+                "avalonia-osx-arm64-installer", "avalonia", "macos", "arm64", "installer",
+                "chummer-avalonia-osx-arm64-installer.dmg", "avalonia-mac-retained"u8.ToArray(),
+                false, false, "skipped_preview", "skipped_preview"),
+            new(
+                "avalonia-osx-arm64-archive", "avalonia", "macos", "arm64", "archive",
+                "chummer-avalonia-osx-arm64.zip", "avalonia-mac-archive"u8.ToArray(),
+                false, false, "not_applicable", "not_applicable"),
+            new(
+                "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
+                "chummer-avalonia-win-x64-installer.exe", "windows-fresh"u8.ToArray(),
+                false, false, "unsigned", "not_applicable",
+                InstallerMode: "bootstrap",
+                PayloadFileName: "chummer-avalonia-win-x64-payload.zip",
+                PayloadBytes: "windows-fresh-payload"u8.ToArray())
+        ];
+
+    [Fact]
+    public async Task CandidateFreshWindowsDeltaStagesWithRetainedCrossPlatformShelf()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-candidate-retained-cross-platform",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            "avalonia:windows:win-x64");
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: freshWindows,
+            exactDesktopScopeIsFreshDelta: true);
+
+        Assert.False(string.IsNullOrWhiteSpace(staged.GenerationId));
+        Assert.Equal(freshWindows.ToTransport(), staged.ExactIncomingDesktopScope);
+        Assert.True(staged.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.Contains(
+            "blazor-desktop-osx-arm64-archive",
+            staged.CandidateArtifactIds,
+            StringComparer.Ordinal);
+        string candidatePath = Path.Combine(
+            fixture.DownloadsRoot,
+            "generations",
+            staged.GenerationId,
+            "activation-candidate.json");
+        JsonObject candidate = JsonNode.Parse(File.ReadAllText(candidatePath))!.AsObject();
+        Assert.Equal(
+            freshWindows.ToTransport(),
+            candidate["exactIncomingDesktopScope"]!.GetValue<string>());
+        Assert.True(fixture.TryCaptureStageProbe(
+            staged.ProbeToken,
+            staged.GenerationId,
+            out ReleaseShelfSnapshot? stagedSnapshot,
+            evaluationInstant: DateTimeOffset.Parse("2026-04-01T20:00:00Z")));
+        Assert.Equal(staged.GenerationId, stagedSnapshot!.GenerationId);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+    }
+
+    [Fact]
+    public async Task CandidateFreshWindowsDeltaBindsStillActiveIncumbentAndPreviousPointer()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string incumbentBundle = fixture.CreateBundle(
+            "run-candidate-incumbent",
+            RequiredPreviewArtifacts());
+        await fixture.PromoteAsync(incumbentBundle);
+        ReleaseShelfSnapshot incumbent = fixture.CaptureActiveShelf();
+        Assert.False(incumbent.IsLegacy);
+
+        var incumbentBinding = new ReleaseUploadCandidateIncumbentBinding(
+            SnapshotSha256: new string('6', 64),
+            FullShelfInventorySha256: new string('7', 64),
+            ActiveInventorySha256: Assert.IsType<string>(incumbent.InventoryDigest),
+            CanonicalManifestSha256: Assert.IsType<string>(incumbent.CanonicalManifestSha256),
+            CompatibilityManifestSha256: Assert.IsType<string>(incumbent.CompatibilityManifestSha256));
+        var candidateBinding = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: incumbentBinding);
+        string candidateBundle = fixture.CreateBundle(
+            "run-candidate-incumbent-bound",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            candidateBundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: freshWindows,
+            candidateImportBinding: candidateBinding);
+
+        Assert.Equal(incumbent.GenerationId, staged.PreviousGenerationId);
+        Assert.Equal($"sha256:{incumbent.PointerDigest}", staged.PreviousPointerSha256);
+
+        ReleaseUploadCandidateSessionBinding staleBinding = candidateBinding with
+        {
+            IncumbentBinding = incumbentBinding with
+            {
+                ActiveInventorySha256 = new string('f', 64)
+            }
+        };
+        ReleaseShelfMutationConcurrencyException stale =
+            await Assert.ThrowsAsync<ReleaseShelfMutationConcurrencyException>(() =>
+                fixture.StageAsync(
+                    candidateBundle,
+                    Guid.NewGuid().ToString("N"),
+                    exactDesktopScope: freshWindows,
+                    candidateImportBinding: staleBinding));
+        Assert.Contains("still-active incumbent", stale.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CandidateFreshWindowsDeltaRejectsLegacyActiveShelf()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string candidateBundle = fixture.CreateBundle(
+            "run-candidate-legacy-incumbent",
+            CandidateRetainedCrossPlatformArtifacts());
+        var candidateBinding = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: new ReleaseUploadCandidateIncumbentBinding(
+                SnapshotSha256: new string('6', 64),
+                FullShelfInventorySha256: new string('7', 64),
+                ActiveInventorySha256: new string('8', 64),
+                CanonicalManifestSha256: new string('9', 64),
+                CompatibilityManifestSha256: new string('a', 64)));
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        ReleaseShelfMutationConcurrencyException rejected =
+            await Assert.ThrowsAsync<ReleaseShelfMutationConcurrencyException>(() =>
+                fixture.StageAsync(
+                    candidateBundle,
+                    Guid.NewGuid().ToString("N"),
+                    exactDesktopScope: freshWindows,
+                    candidateImportBinding: candidateBinding));
+
+        Assert.Contains("still-active incumbent", rejected.Message, StringComparison.Ordinal);
+        Assert.True(fixture.CaptureActiveShelf().IsLegacy);
+    }
+
+    [Fact]
+    public async Task LegacyExactScopeDoesNotInheritUnsignedV3FreshDeltaSemantics()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-legacy-candidate-retained-cross-platform",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope windowsOnly = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            fixture.ValidateBundleAsync(bundle, windowsOnly));
+
+        Assert.Contains("desktop", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StagedUnsignedV3CandidateRejectsFreshDeltaDiscriminatorTampering(
+        bool tamperStageReceipt)
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-candidate-fresh-delta-tamper",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+        string sessionId = Guid.NewGuid().ToString("N");
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundle,
+            sessionId,
+            exactDesktopScope: freshWindows,
+            exactDesktopScopeIsFreshDelta: true);
+        string candidatePath = tamperStageReceipt
+            ? Path.Combine(
+                fixture.DownloadsRoot,
+                ".release-shelf-stage-journal",
+                $"{staged.StageReceiptId}.json")
+            : Path.Combine(
+                fixture.DownloadsRoot,
+                "generations",
+                staged.GenerationId,
+                "activation-candidate.json");
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(candidatePath, FileAttributes.Normal);
+        }
+        else
+        {
+            File.SetUnixFileMode(
+                candidatePath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        JsonObject candidate = JsonNode.Parse(File.ReadAllText(candidatePath))!.AsObject();
+        candidate["exactIncomingDesktopScopeIsFreshDelta"] = false;
+        File.WriteAllText(candidatePath, candidate.ToJsonString(TestJsonOptions));
+
+        Assert.False(fixture.TryCaptureStageProbe(
+            staged.ProbeToken,
+            staged.GenerationId,
+            out _,
+            evaluationInstant: DateTimeOffset.Parse("2026-04-01T20:00:00Z")));
+    }
+
+    [Fact]
+    public async Task StagedUnsignedV3CandidateRejectsFreshDeltaScopeTampering()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-candidate-fresh-delta-scope-tamper",
+            CandidateRetainedCrossPlatformArtifacts());
+        ReleaseDesktopTupleScope freshWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: freshWindows,
+            exactDesktopScopeIsFreshDelta: true);
+        string candidatePath = Path.Combine(
+            fixture.DownloadsRoot,
+            "generations",
+            staged.GenerationId,
+            "activation-candidate.json");
+        if (OperatingSystem.IsWindows())
+        {
+            File.SetAttributes(candidatePath, FileAttributes.Normal);
+        }
+        else
+        {
+            File.SetUnixFileMode(
+                candidatePath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        JsonObject candidate = JsonNode.Parse(File.ReadAllText(candidatePath))!.AsObject();
+        candidate["exactIncomingDesktopScope"] = "avalonia:windows:win-arm64";
+        File.WriteAllText(candidatePath, candidate.ToJsonString(TestJsonOptions));
+
+        Assert.False(fixture.TryCaptureStageProbe(
+            staged.ProbeToken,
+            staged.GenerationId,
+            out _,
+            evaluationInstant: DateTimeOffset.Parse("2026-04-01T20:00:00Z")));
+    }
+
     [Fact]
     public async Task PreviewPromotionAcceptsLiteralUnsignedWindowsEvidence()
     {
@@ -3883,7 +4153,9 @@ public sealed class ReleaseBundlePromotionServiceTests
             string sessionId,
             Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
             ReleaseDesktopTupleScope? exactDesktopScope = null,
-            DateTimeOffset? evaluationInstant = null)
+            bool exactDesktopScopeIsFreshDelta = false,
+            DateTimeOffset? evaluationInstant = null,
+            ReleaseUploadCandidateSessionBinding? candidateImportBinding = null)
         {
             string extractRoot = Path.Combine(_root, "stage-" + Guid.NewGuid().ToString("N"));
             ZipFile.ExtractToDirectory(bundlePath, extractRoot);
@@ -3893,11 +4165,19 @@ public sealed class ReleaseBundlePromotionServiceTests
                 promotionCheckpoint,
                 new FixedTimeProvider(evaluationInstant ?? ReadBundlePublishedAt(bundlePath)),
                 PrivacyLaunchGate.ClearForTests);
-            return service.StageDirectoryAsync(
-                extractRoot,
-                exactDesktopScope,
-                sessionId,
-                CancellationToken.None);
+            return candidateImportBinding is null
+                ? service.StageDirectoryAsync(
+                    extractRoot,
+                    exactDesktopScope,
+                    exactDesktopScopeIsFreshDelta,
+                    sessionId,
+                    CancellationToken.None)
+                : service.StageDirectoryAsync(
+                    extractRoot,
+                    exactDesktopScope,
+                    candidateImportBinding,
+                    sessionId,
+                    CancellationToken.None);
         }
 
         public bool TryCaptureStageProbe(
@@ -3989,7 +4269,8 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         public async Task ValidateBundleAsync(
             string bundlePath,
-            ReleaseDesktopTupleScope? exactDesktopScope = null)
+            ReleaseDesktopTupleScope? exactDesktopScope = null,
+            bool exactDesktopScopeIsFreshDelta = false)
         {
             string extractRoot = Path.Combine(_root, "validate-" + Guid.NewGuid().ToString("N"));
             ZipFile.ExtractToDirectory(bundlePath, extractRoot);
@@ -4002,6 +4283,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             await service.ValidateDirectoryAsync(
                 extractRoot,
                 exactDesktopScope,
+                exactDesktopScopeIsFreshDelta,
                 CancellationToken.None);
         }
 

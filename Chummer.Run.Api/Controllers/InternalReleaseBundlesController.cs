@@ -871,10 +871,21 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                     completion.BundleRoot,
                     authorization.CandidateImportAuthority);
             }
-            await _promotionService.ValidateDirectoryAsync(
-                completion.BundleRoot,
-                completion.ExactIncomingDesktopScope,
-                cancellationToken);
+            if (completion.CandidateImportBinding is { } candidateImportBinding)
+            {
+                await _promotionService.ValidateDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    candidateImportBinding,
+                    cancellationToken);
+            }
+            else
+            {
+                await _promotionService.ValidateDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    cancellationToken);
+            }
             ObjectResult? admissionFailure = EvaluateFreshCompletionAdmission(
                 completion,
                 cancellationToken);
@@ -883,11 +894,18 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 return admissionFailure;
             }
 
-            ReleaseBundleStageResult staged = await _promotionService.StageDirectoryAsync(
-                completion.BundleRoot,
-                completion.ExactIncomingDesktopScope,
-                sessionId,
-                cancellationToken);
+            ReleaseBundleStageResult staged = completion.CandidateImportBinding is { } binding
+                ? await _promotionService.StageDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    binding,
+                    sessionId,
+                    cancellationToken)
+                : await _promotionService.StageDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    sessionId,
+                    cancellationToken);
             completion.MarkStaged(staged);
             return Ok(staged);
         }

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace Chummer.Run.Api.Services;
@@ -18,12 +19,23 @@ public sealed record ReleaseUploadCandidateInventoryRow(
     long SizeBytes,
     string Sha256);
 
+public sealed record ReleaseUploadCandidateIncumbentBinding(
+    string SnapshotSha256,
+    string FullShelfInventorySha256,
+    string ActiveInventorySha256,
+    string CanonicalManifestSha256,
+    string CompatibilityManifestSha256);
+
 public sealed record ReleaseUploadCandidateSessionBinding(
     string SnapshotSha256,
     string AuthoritySha256,
     string BundleIdentitySha256,
     string CanonicalManifestSha256,
-    string InventorySha256);
+    string InventorySha256,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    bool ExactIncomingDesktopScopeIsFreshDelta = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    ReleaseUploadCandidateIncumbentBinding? IncumbentBinding = null);
 
 public sealed record ReleaseUploadCandidateAuthority(
     string SnapshotId,
@@ -32,14 +44,20 @@ public sealed record ReleaseUploadCandidateAuthority(
     DateTimeOffset ExpiresAtUtc,
     ReleaseUploadCandidateIdentity Candidate,
     byte[] CanonicalManifestBytes,
-    IReadOnlyList<ReleaseUploadCandidateInventoryRow> Inventory)
+    IReadOnlyList<ReleaseUploadCandidateInventoryRow> Inventory,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    bool ExactIncomingDesktopScopeIsFreshDelta = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    ReleaseUploadCandidateIncumbentBinding? IncumbentBinding = null)
 {
     public ReleaseUploadCandidateSessionBinding SessionBinding => new(
         SnapshotSha256,
         AuthoritySha256,
         Candidate.BundleIdentitySha256,
         Candidate.CanonicalManifestSha256,
-        Candidate.InventorySha256);
+        Candidate.InventorySha256,
+        ExactIncomingDesktopScopeIsFreshDelta,
+        IncumbentBinding);
 }
 
 public sealed record ReleaseUploadSnapshotAuthority(
@@ -152,6 +170,9 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private const string UiRef = "refs/heads/main";
     private const string WindowsRid = "win-x64";
     private static readonly string[] PromotedHeads = ["avalonia"];
+    private static readonly HashSet<string> RetainedDesktopHeads = new(
+        ["avalonia", "blazor-desktop"],
+        StringComparer.Ordinal);
     private static readonly TimeSpan MaximumNativeProofAge = TimeSpan.FromHours(24);
 
     private readonly IConfiguration _configuration;
@@ -770,7 +791,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             compatibilityDocument.RootElement,
             candidate.Version,
             "unsigned candidate compatibility manifest");
-        ValidateUnsignedPublicationAndRegistry(
+        ReleaseUploadCandidateIncumbentBinding incumbentBinding =
+            ValidateUnsignedPublicationAndRegistry(
             custody,
             canonicalDocument.RootElement,
             canonicalManifest,
@@ -784,7 +806,9 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             expiresAt,
             candidate,
             canonicalManifest,
-            inventory);
+            inventory,
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: incumbentBinding);
     }
 
     private static void ValidateUnsignedSignaturePolicy(JsonElement policy)
@@ -802,7 +826,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireExactString(policy, "unsignedReason", "preview_policy");
     }
 
-    private static void ValidateUnsignedPublicationAndRegistry(
+    private static ReleaseUploadCandidateIncumbentBinding ValidateUnsignedPublicationAndRegistry(
         JsonElement custody,
         JsonElement canonical,
         byte[] canonicalBytes,
@@ -917,7 +941,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 packageReceiptPath,
                 retainedManifestPath,
                 nativeLockPath);
-            ValidateUnsignedRegistry(
+            return ValidateUnsignedRegistry(
                 custody,
                 scope,
                 scopeDocument.Bytes,
@@ -1123,11 +1147,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 throw new InvalidDataException("unsigned UI fresh delta bytes drifted");
             }
         }
-        ValidateUnsignedCanonicalWindows(canonical, inventoryByPath, fresh);
+        IReadOnlySet<string> managedRetainedPaths =
+            ValidateUnsignedCanonicalWindows(canonical, inventoryByPath, fresh);
 
         var expectedPaths = new HashSet<string>(
             ["RELEASE_CHANNEL.generated.json", "releases.json", .. freshPaths],
             StringComparer.Ordinal);
+        var retainedPaths = new HashSet<string>(StringComparer.Ordinal);
         JsonElement retained = RequireArray(scope, "retainedFromIncumbent");
         previous = null;
         foreach (JsonElement row in retained.EnumerateArray())
@@ -1145,7 +1171,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             if (!IsCanonicalRelativePath(path)
                 || previous is not null && string.CompareOrdinal(previous, path) >= 0
                 || !expectedPaths.Add(path)
-                || kind is not "managed_artifact" and not "ancillary"
+                || !retainedPaths.Add(path)
+                || !string.Equals(
+                    kind,
+                    managedRetainedPaths.Contains(path)
+                        ? "managed_artifact"
+                        : "ancillary",
+                    StringComparison.Ordinal)
                 || !inventoryByPath.TryGetValue(
                     path,
                     out ReleaseUploadCandidateInventoryRow? held)
@@ -1160,7 +1192,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
             previous = path;
         }
-        if (!expectedPaths.SetEquals(inventoryByPath.Keys))
+        if (!expectedPaths.SetEquals(inventoryByPath.Keys)
+            || !managedRetainedPaths.IsSubsetOf(retainedPaths))
         {
             throw new InvalidDataException("unsigned UI retained/fresh partition drifted");
         }
@@ -1196,17 +1229,54 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             nativeLockPath);
     }
 
-    internal static void ValidateUnsignedCanonicalWindows(
+    internal static IReadOnlySet<string> ValidateUnsignedCanonicalWindows(
         JsonElement canonical,
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
         JsonElement fresh)
     {
+        string[] requiredHeads = RequirePromotedDesktopHeads(canonical);
+        var requiredHeadSet = new HashSet<string>(requiredHeads, StringComparer.Ordinal);
+        var manifestPaths = new HashSet<string>(StringComparer.Ordinal);
+        var managedRetainedPaths = new HashSet<string>(StringComparer.Ordinal);
         int windowsCount = 0;
         foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
         {
+            string head = RequireString(artifact, "head");
             string platform = RequireString(artifact, "platform");
-            string artifactPath = $"files/{RequireString(artifact, "fileName")}";
-            if (!inventory.TryGetValue(
+            string rid = RequireString(artifact, "rid");
+            string kind = RequireString(artifact, "kind");
+            string fileName = RequireString(artifact, "fileName");
+            string artifactPath = $"files/{fileName}";
+            if (!HeadPattern.IsMatch(head) || !RetainedDesktopHeads.Contains(head))
+            {
+                throw new InvalidDataException(
+                    "unsigned canonical artifact head is invalid");
+            }
+            if (string.Equals(platform, "windows", StringComparison.Ordinal)
+                && !requiredHeadSet.Contains(head))
+            {
+                throw new InvalidDataException(
+                    "unsigned canonical Windows artifact is outside requiredDesktopHeads");
+            }
+            bool validTuple = platform switch
+            {
+                "windows" => string.Equals(rid, WindowsRid, StringComparison.Ordinal)
+                             && string.Equals(kind, "installer", StringComparison.Ordinal),
+                "linux" => string.Equals(rid, "linux-x64", StringComparison.Ordinal)
+                           && kind is "installer" or "archive",
+                "macos" => rid is "osx-arm64" or "osx-x64"
+                           && kind is "installer" or "archive",
+                _ => false
+            };
+            if (!validTuple)
+            {
+                throw new InvalidDataException(
+                    "unsigned canonical artifact is outside the exact desktop shelf scope");
+            }
+            if (fileName.Contains('/')
+                || fileName.Contains('\\')
+                || !manifestPaths.Add(artifactPath)
+                || !inventory.TryGetValue(
                     artifactPath,
                     out ReleaseUploadCandidateInventoryRow? artifactInventory)
                 || !string.Equals(
@@ -1214,16 +1284,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     artifactInventory.Sha256,
                     StringComparison.Ordinal)
                 || RequireNonNegativeInt64(artifact, "sizeBytes")
-                   != artifactInventory.SizeBytes)
+                   != artifactInventory.SizeBytes
+                || artifactInventory.SizeBytes <= 0)
             {
                 throw new InvalidDataException("unsigned canonical artifact bytes drifted");
             }
             if (!string.Equals(platform, "windows", StringComparison.Ordinal))
             {
+                managedRetainedPaths.Add(artifactPath);
                 continue;
             }
             windowsCount++;
-            RequireExactString(artifact, "head", "avalonia");
+            RequireExactString(artifact, "head", requiredHeads[0]);
             RequireExactString(artifact, "rid", WindowsRid);
             RequireExactString(artifact, "kind", "installer");
             RequireExactString(artifact, "installerMode", "bootstrap");
@@ -1254,6 +1326,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException("unsigned canonical Windows scope drifted");
         }
+        return managedRetainedPaths;
     }
 
     internal static void ValidateUnsignedManifestIdentity(
@@ -1518,7 +1591,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             "unsigned retained pointer manifest binding");
     }
 
-    private static void ValidateUnsignedRegistry(
+    private static ReleaseUploadCandidateIncumbentBinding ValidateUnsignedRegistry(
         JsonElement custody,
         JsonElement scope,
         byte[] scopeBytes,
@@ -1833,12 +1906,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException(
                 "unsigned composition incumbent snapshot property set drifted");
         }
+        JsonElement incumbentCanonical = RequireObject(
+            incumbent,
+            "canonicalManifest");
+        JsonElement incumbentCompatibility = RequireObject(
+            incumbent,
+            "compatibilityManifest");
         ValidateUnsignedUnheldReference(
-            RequireObject(incumbent, "canonicalManifest"),
+            incumbentCanonical,
             "RELEASE_CHANNEL.generated.json",
             "unsigned incumbent canonical manifest");
         ValidateUnsignedUnheldReference(
-            RequireObject(incumbent, "compatibilityManifest"),
+            incumbentCompatibility,
             "releases.json",
             "unsigned incumbent compatibility manifest");
         JsonElement incumbentInventory = RequireArray(
@@ -1850,6 +1929,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "unsigned composition incumbent shelf",
                 allowEmpty: false,
                 retained: false);
+        string incumbentActiveInventorySha256 =
+            ReleaseShelfGenerationStore.ComputeInventoryDigest(
+                incumbentByPath
+                    .Where(static row => row.Key is not
+                        "activation-candidate.json"
+                        and not "RELEASE_CHANNEL.generated.json"
+                        and not "releases.json")
+                    .OrderBy(static row => row.Key, StringComparer.Ordinal)
+                    .Select(row => new ReleaseShelfInventoryEntry(
+                        row.Key,
+                        RequireSha256(row.Value, "sha256"),
+                        RequireNonNegativeInt64(row.Value, "sizeBytes"))));
         JsonElement incumbentModes = RequireArray(incumbent, "directoryModes");
         ValidateUnsignedDirectoryModes(
             incumbentModes,
@@ -2264,6 +2355,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             candidateBytes,
             authorityBytes,
             finalizeBytes);
+        return new ReleaseUploadCandidateIncumbentBinding(
+            SnapshotSha256: RequireSha256(incumbent, "snapshotSha256"),
+            FullShelfInventorySha256: RequireSha256(
+                incumbent,
+                "fullShelfInventorySha256"),
+            ActiveInventorySha256: incumbentActiveInventorySha256,
+            CanonicalManifestSha256: RequireSha256(
+                incumbentCanonical,
+                "sha256"),
+            CompatibilityManifestSha256: RequireSha256(
+                incumbentCompatibility,
+                "sha256"));
     }
 
     private static void ValidateUnsignedWindowsDelta(
@@ -4938,27 +5041,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException("candidate release version differs from its identity");
         }
-        JsonElement headsElement = RequireArray(
-            RequireObject(canonical, "desktopTupleCoverage"),
-            "requiredDesktopHeads");
-        var heads = new List<string>();
-        var headSet = new HashSet<string>(StringComparer.Ordinal);
-        foreach (JsonElement headElement in headsElement.EnumerateArray())
-        {
-            if (headElement.ValueKind != JsonValueKind.String
-                || headElement.GetString() is not { } head
-                || !HeadPattern.IsMatch(head)
-                || !headSet.Add(head))
-            {
-                throw new InvalidDataException("candidate requiredDesktopHeads is invalid");
-            }
-            heads.Add(head);
-        }
-        if (!heads.SequenceEqual(PromotedHeads, StringComparer.Ordinal))
-        {
-            throw new InvalidDataException(
-                "candidate requiredDesktopHeads differs from the promoted Avalonia head");
-        }
+        string[] heads = RequirePromotedDesktopHeads(canonical);
+        var headSet = new HashSet<string>(heads, StringComparer.Ordinal);
         JsonElement artifactsElement = RequireArray(canonical, "artifacts");
         var candidateByPath = candidateInventory.ToDictionary(
             static row => row.Path,
@@ -4972,25 +5056,25 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 throw new InvalidDataException(
                     "candidate release manifest contains a non-object artifact");
             }
-            if (!artifact.TryGetProperty("head", out JsonElement artifactHead)
-                || artifactHead.ValueKind != JsonValueKind.String
-                || artifactHead.GetString() is not { } head
-                || !headSet.Contains(head))
+            string head = RequireString(artifact, "head");
+            string platform = RequireString(artifact, "platform");
+            string rid = RequireString(artifact, "rid");
+            string kind = RequireString(artifact, "kind");
+            if (!HeadPattern.IsMatch(head) || !headSet.Contains(head))
             {
                 throw new InvalidDataException(
                     "candidate release manifest contains a desktop artifact outside "
                     + "requiredDesktopHeads");
             }
-            string platform = RequireString(artifact, "platform");
-            string rid = RequireString(artifact, "rid");
-            if (!HasExactString(artifact, "kind", "installer")
-                || (platform switch
-                    {
-                        "windows" => !string.Equals(rid, WindowsRid, StringComparison.Ordinal),
-                        "linux" => !string.Equals(rid, "linux-x64", StringComparison.Ordinal),
-                        "macos" => rid is not "osx-arm64" and not "osx-x64",
-                        _ => true
-                    }))
+            bool validTuple = string.Equals(kind, "installer", StringComparison.Ordinal)
+                && (platform switch
+                {
+                    "windows" => string.Equals(rid, WindowsRid, StringComparison.Ordinal),
+                    "linux" => string.Equals(rid, "linux-x64", StringComparison.Ordinal),
+                    "macos" => rid is "osx-arm64" or "osx-x64",
+                    _ => false
+                });
+            if (!validTuple)
             {
                 throw new InvalidDataException(
                     "candidate release manifest contains an artifact outside "
@@ -5067,6 +5151,32 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "candidate upload inventory differs from the exact finalized desktop shelf");
         }
         return new CandidateWindowsScope(version, channel, heads, artifacts);
+    }
+
+    private static string[] RequirePromotedDesktopHeads(JsonElement canonical)
+    {
+        JsonElement headsElement = RequireArray(
+            RequireObject(canonical, "desktopTupleCoverage"),
+            "requiredDesktopHeads");
+        var heads = new List<string>();
+        var headSet = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement headElement in headsElement.EnumerateArray())
+        {
+            if (headElement.ValueKind != JsonValueKind.String
+                || headElement.GetString() is not { } head
+                || !HeadPattern.IsMatch(head)
+                || !headSet.Add(head))
+            {
+                throw new InvalidDataException("candidate requiredDesktopHeads is invalid");
+            }
+            heads.Add(head);
+        }
+        if (!heads.SequenceEqual(PromotedHeads, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "candidate requiredDesktopHeads differs from the promoted Avalonia head");
+        }
+        return heads.ToArray();
     }
 
     private static CandidateArtifact ParseCandidateArtifact(

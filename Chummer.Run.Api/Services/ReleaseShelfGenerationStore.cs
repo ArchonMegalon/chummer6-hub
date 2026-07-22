@@ -359,6 +359,25 @@ public sealed class ReleaseShelfGenerationStore
                 "Committed release activation receipt resolved a different generation.");
         }
 
+        string generationRoot = Path.Combine(
+            downloadsRoot,
+            GenerationsDirectoryName,
+            generationId);
+        JsonElement activationCandidate = ParseJsonObject(
+            ReadBoundedFile(
+                Path.Combine(generationRoot, "activation-candidate.json"),
+                MaximumActivationCandidateBytes,
+                "release shelf activation candidate"),
+            "release shelf activation candidate");
+        if (ReadOptionalBoolean(
+                activationCandidate,
+                "exactIncomingDesktopScopeIsFreshDelta")
+            != receipt.Journal.Intent.ExactIncomingDesktopScopeIsFreshDelta)
+        {
+            throw new InvalidDataException(
+                "Committed release activation receipt fresh-delta discriminator disagrees with its generation.");
+        }
+
         return snapshot.AsExplicitGeneration();
     }
 
@@ -402,21 +421,21 @@ public sealed class ReleaseShelfGenerationStore
             throw new InvalidDataException("Release activation journal identity is malformed.");
         }
 
-        string[] identityProperties = identity.TryGetProperty("exactIncomingDesktopScope", out _)
-            ?
-            [
-                "operation", "previousGenerationId", "previousPointerSha256", "generationId",
-                "activationReceiptId", "releaseVersion", "channel", "publishedAt",
-                "inventoryDigest", "pointerSha256", "preparedAtUtc",
-                "previousPointerBase64", "targetPointerBase64", "exactIncomingDesktopScope"
-            ]
-            :
-            [
-                "operation", "previousGenerationId", "previousPointerSha256", "generationId",
-                "activationReceiptId", "releaseVersion", "channel", "publishedAt",
-                "inventoryDigest", "pointerSha256", "preparedAtUtc",
-                "previousPointerBase64", "targetPointerBase64"
-            ];
+        var identityProperties = new List<string>
+        {
+            "operation", "previousGenerationId", "previousPointerSha256", "generationId",
+            "activationReceiptId", "releaseVersion", "channel", "publishedAt",
+            "inventoryDigest", "pointerSha256", "preparedAtUtc",
+            "previousPointerBase64", "targetPointerBase64"
+        };
+        if (identity.TryGetProperty("exactIncomingDesktopScope", out _))
+        {
+            identityProperties.Add("exactIncomingDesktopScope");
+        }
+        if (identity.TryGetProperty("exactIncomingDesktopScopeIsFreshDelta", out _))
+        {
+            identityProperties.Add("exactIncomingDesktopScopeIsFreshDelta");
+        }
         RequireExactProperties(
             identity,
             identityProperties,
@@ -554,6 +573,15 @@ public sealed class ReleaseShelfGenerationStore
         _ = RequireSha256Binding(intent.InventoryDigest, "inventoryDigest");
         _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
             intent.ExactIncomingDesktopScope);
+        if (intent.ExactIncomingDesktopScopeIsFreshDelta
+            && !string.Equals(
+                intent.ExactIncomingDesktopScope,
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Release activation journal fresh-delta scope is invalid.");
+        }
         if (intent.PreviousPointerSha256 is not null)
         {
             string previousDigest = RequireSha256Binding(
@@ -1129,6 +1157,23 @@ public sealed class ReleaseShelfGenerationStore
             throw new InvalidDataException("Release shelf activation-candidate.json does not match current.json.");
         }
 
+        bool exactIncomingDesktopScopeIsFreshDelta = ReadOptionalBoolean(
+            candidate,
+            "exactIncomingDesktopScopeIsFreshDelta");
+        string? exactIncomingDesktopScope = ReadOptionalString(
+            candidate,
+            "exactIncomingDesktopScope");
+        if (exactIncomingDesktopScopeIsFreshDelta
+            ? !string.Equals(
+                exactIncomingDesktopScope,
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                StringComparison.Ordinal)
+            : exactIncomingDesktopScope is not null)
+        {
+            throw new InvalidDataException(
+                "Release shelf activation candidate fresh-delta scope is invalid.");
+        }
+
         if (!string.Equals(RequireString(candidate, "releaseVersion"), releaseVersion, StringComparison.Ordinal)
             || !string.Equals(RequireString(candidate, "channel"), channel, StringComparison.Ordinal)
             || RequireTimestamp(candidate, "publishedAt").ToUniversalTime() != publishedAt.ToUniversalTime()
@@ -1561,6 +1606,22 @@ public sealed class ReleaseShelfGenerationStore
         return parsed;
     }
 
+    private static bool ReadOptionalBoolean(JsonElement source, string propertyName)
+    {
+        if (!source.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return false;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw new InvalidDataException(
+                $"Release shelf JSON {propertyName} must be a boolean when present.")
+        };
+    }
+
     private static void ValidateOptionalTimestamp(JsonElement source, string propertyName, DateTimeOffset expected)
     {
         DateTimeOffset? value = TryReadTimestamp(source, propertyName);
@@ -1977,7 +2038,9 @@ public sealed class ReleaseShelfGenerationStore
         DateTimeOffset PreparedAtUtc,
         string? PreviousPointerBase64,
         string? TargetPointerBase64,
-        string? ExactIncomingDesktopScope = null);
+        string? ExactIncomingDesktopScope = null,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        bool ExactIncomingDesktopScopeIsFreshDelta = false);
 
     private sealed record ReaderActivationOutcome(
         string SchemaVersion,
