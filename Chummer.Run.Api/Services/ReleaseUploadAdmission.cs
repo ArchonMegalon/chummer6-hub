@@ -362,6 +362,15 @@ public sealed class ReleaseUploadAuthorizationEvaluator
         {
             return false;
         }
+        if (request.Headers[
+                "X-Chummer-Release-Exact-Incoming-Scope"].Count != 1
+            || !string.Equals(
+                request.Headers["X-Chummer-Release-Exact-Incoming-Scope"].ToString(),
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
         string manifest = request.Headers[CandidateManifestSha256Header].ToString();
         string inventory = request.Headers[CandidateInventorySha256Header].ToString();
         string identity = request.Headers[CandidateBundleIdentitySha256Header].ToString();
@@ -580,8 +589,11 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return;
         }
 
-        if (route == ReleaseUploadRoute.AuthorityAdvance
-            && authorization.CandidateImportAuthority is not null)
+        if (authorization.CandidateImportAuthority is not null
+            && route is (ReleaseUploadRoute.AuthorityAdvance
+                or ReleaseUploadRoute.Complete
+                or ReleaseUploadRoute.Reconcile
+                or ReleaseUploadRoute.ActivateStaged))
         {
             await WriteProblemAsync(
                 context,
@@ -606,7 +618,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
         }
 
         bool hasMultipartBody = HasMultipartBody(route);
-        bool hasAuthorityJsonBody = route == ReleaseUploadRoute.AuthorityAdvance;
+        bool hasAuthorityJsonBody = route is ReleaseUploadRoute.AuthorityAdvance
+            or ReleaseUploadRoute.ActivateStaged;
         if (!hasMultipartBody
             && !hasAuthorityJsonBody
             && route is not ReleaseUploadRoute.Complete and not ReleaseUploadRoute.Reconcile)
@@ -745,6 +758,24 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return false;
         }
 
+        const string stagePrefix = "/api/internal/releases/stages/";
+        if (path.StartsWith(stagePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string[] stageSuffix = path[stagePrefix.Length..]
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (stageSuffix.Length == 2
+                && stageSuffix[0].Length > 0
+                && stageSuffix[1].Equals(
+                    "authority-advances",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                route = ReleaseUploadRoute.AuthorityAdvance;
+                return true;
+            }
+
+            return false;
+        }
+
         const string prefix = "/api/internal/releases/upload-sessions/";
         if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -762,6 +793,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
             "files" => ReleaseUploadRoute.File,
             "chunks" => ReleaseUploadRoute.Chunk,
             "complete" => ReleaseUploadRoute.Complete,
+            "stage" => ReleaseUploadRoute.Stage,
+            "activate-staged" => ReleaseUploadRoute.ActivateStaged,
             "reconcile" => ReleaseUploadRoute.Reconcile,
             _ => default
         };
@@ -802,6 +835,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
         File,
         Chunk,
         Complete,
+        Stage,
+        ActivateStaged,
         Reconcile,
         AuthorityAdvance
     }

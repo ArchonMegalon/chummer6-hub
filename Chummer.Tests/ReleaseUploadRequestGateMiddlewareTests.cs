@@ -127,6 +127,9 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         context.Request.Headers[
             ReleaseUploadAuthorizationEvaluator.CandidateBundleIdentitySha256Header] =
             candidate.Candidate.BundleIdentitySha256;
+        context.Request.Headers[
+            "X-Chummer-Release-Exact-Incoming-Scope"] =
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope;
         using var body = new CountingStream(new byte[256]);
         context.Request.Body = body;
 
@@ -136,6 +139,63 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         Assert.Equal(0, body.ReadCount);
         Assert.False(nextCalled);
         Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(context));
+    }
+
+    [Fact]
+    public async Task CandidateImportAuthorityCanStageButCannotInvokeLegacyCompletion()
+    {
+        using var snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+        snapshot.Publish("candidate_import_ready");
+        ReleaseUploadCandidateAuthority candidate = Assert.IsType<ReleaseUploadCandidateAuthority>(
+            snapshot.Authority.Load().Candidate);
+        ReleaseUploadQuotaOptions options = ReleaseUploadQuotaOptions.FromConfiguration(
+            snapshot.Configuration);
+        var admission = new ReleaseUploadAdmissionService(snapshot.Configuration, options);
+        bool nextCalled = false;
+        var middleware = new ReleaseUploadRequestGateMiddleware(context =>
+        {
+            nextCalled = true;
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        });
+
+        DefaultHttpContext Request(string operation)
+        {
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path =
+                $"/api/internal/releases/upload-sessions/{Guid.NewGuid():N}/{operation}";
+            context.Request.Headers.Authorization = "Bearer fleet-test-token";
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateManifestSha256Header] =
+                candidate.Candidate.CanonicalManifestSha256;
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateInventorySha256Header] =
+                candidate.Candidate.InventorySha256;
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateBundleIdentitySha256Header] =
+                candidate.Candidate.BundleIdentitySha256;
+            context.Request.Headers[
+                "X-Chummer-Release-Exact-Incoming-Scope"] =
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope;
+            return context;
+        }
+
+        DefaultHttpContext stage = Request("stage");
+        await middleware.InvokeAsync(stage, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status200OK, stage.Response.StatusCode);
+        Assert.True(nextCalled);
+        Assert.NotNull(ReleaseUploadRequestGateMiddleware.RequireAuthorization(stage));
+
+        nextCalled = false;
+        DefaultHttpContext complete = Request("complete");
+        await middleware.InvokeAsync(complete, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, complete.Response.StatusCode);
+        Assert.False(nextCalled);
+        Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(complete));
     }
 
     [Fact]

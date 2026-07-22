@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -26,6 +27,13 @@ def write_json(path: Path, value: object) -> bytes:
     return payload
 
 
+def write_canonical_json(path: Path, value: object) -> bytes:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    path.write_bytes(payload)
+    return payload
+
+
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -40,6 +48,19 @@ def rewrite_embedded_document(
     document = json.loads(base64.b64decode(entry["base64"]))
     replacement = mutate(document)
     payload = (json.dumps(replacement, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    entry["base64"] = base64.b64encode(payload).decode()
+    entry["sha256"] = hashlib.sha256(payload).hexdigest()
+    entry["sizeBytes"] = len(payload)
+
+
+def rewrite_embedded_document_raw(
+    authority: dict[str, object],
+    path: str,
+    mutate,
+) -> None:
+    native = authority["custody"]["nativeWindowsFinalizedEvidence"]
+    entry = next(item for item in native["files"] if item["path"] == path)
+    payload = mutate(base64.b64decode(entry["base64"]))
     entry["base64"] = base64.b64encode(payload).decode()
     entry["sha256"] = hashlib.sha256(payload).hexdigest()
     entry["sizeBytes"] = len(payload)
@@ -406,6 +427,14 @@ def candidate_fixture(
             },
         },
     )
+    write_json(
+        bundle / "releases.json",
+        {
+            "channel": "preview",
+            "releaseVersion": "run-candidate",
+            "artifacts": artifacts,
+        },
+    )
 
     summary = tmp_path / "candidate-summary.json"
     inventory = tmp_path / "candidate-inventory.json"
@@ -429,13 +458,21 @@ def candidate_fixture(
 
     finalized = tmp_path / "finalized"
     finalized.mkdir()
+    provenance_paths = {
+        canonical,
+        *(
+            files / f"chummer-{head}-win-x64-{role}.{suffix}"
+            for head in evidence_heads
+            for role, suffix in (("installer", "exe"), ("payload", "zip"))
+        ),
+    }
     provenance_rows = [
         {
             "path": path.relative_to(bundle).as_posix(),
             "sha256": sha(path),
             "sizeBytes": path.stat().st_size,
         }
-        for path in sorted(path for path in bundle.rglob("*") if path.is_file())
+        for path in sorted(provenance_paths)
     ]
     provenance = finalized / "candidate-provenance" / "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
     write_json(
@@ -505,31 +542,6 @@ def candidate_fixture(
             "heads": export_heads,
         },
     )
-    # The genuine UI candidate artifact contains five files.  Preserve the two
-    # generated provenance documents at its root as well as their identical
-    # copies carried forward by the native-Windows evidence artifact.
-    (bundle / provenance.name).write_bytes(provenance.read_bytes())
-    (bundle / export_receipt.name).write_bytes(export_receipt.read_bytes())
-    summary.unlink()
-    inventory.unlink()
-    command = [
-        sys.executable,
-        str(SUMMARY),
-        "summarize",
-        "--bundle-root",
-        str(bundle),
-        "--canonical-manifest",
-        str(canonical),
-        "--output",
-        str(summary),
-        "--inventory-output",
-        str(inventory),
-    ]
-    for path in sorted(path for path in bundle.rglob("*") if path.is_file()):
-        command.extend(("--file", str(path)))
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    assert completed.returncode == 0, completed.stderr
-
     capture_source = source(
         ".github/workflows/windows-native-evidence-capture.yml",
         "github-actions[bot]",
@@ -773,6 +785,993 @@ def candidate_fixture(
     return bundle, canonical, summary, inventory, finalized
 
 
+def canonical_sha256(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def byte_reference(path: str, raw: bytes) -> dict[str, object]:
+    return {
+        "path": path,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sizeBytes": len(raw),
+    }
+
+
+def publication_tuple(
+    *,
+    role: str,
+    platform: str,
+    rid: str,
+    file_name: str,
+    digest: str,
+    size: int,
+    evidence_only: bool = False,
+) -> dict[str, object]:
+    path = f"files/{file_name}"
+    if evidence_only:
+        path = f"release-evidence/non-published/files/{file_name}"
+    return {
+        "artifactRole": role,
+        "consumerCommit": "a" * 40,
+        "fileName": file_name,
+        "head": "avalonia",
+        "manifestRowSha256": hashlib.sha256(
+            f"{role}:{platform}:{rid}:{file_name}".encode()
+        ).hexdigest(),
+        "path": path,
+        "platform": platform,
+        "rid": rid,
+        "sha256": digest,
+        "sizeBytes": size,
+        "sourceReceipt": {
+            "contractName": "fixture.desktop-source",
+            "contractVersion": 1,
+            "path": "receipts/fixture.json",
+            "sha256": "e" * 64,
+        },
+    }
+
+
+def upgrade_finalized_root_to_windows_only_v2(
+    *,
+    finalized: Path,
+    bundle: Path,
+    canonical_raw: bytes,
+    compatibility_raw: bytes,
+    signing_raw: bytes,
+    registry_prepare_sha256: str,
+    approval: dict[str, object],
+    approval_raw: bytes,
+    authenticode_raw: bytes,
+    raw_authenticode_binding: dict[str, object],
+    scope_decision_sha256: str,
+    capture_supply_chain: dict[str, object] | None = None,
+    export_supply_chain: dict[str, object] | None = None,
+    export_numeric_lexeme: str | None = None,
+) -> dict[str, object]:
+    capture_path = finalized / "WINDOWS_NATIVE_CAPTURE.generated.json"
+    capture = json.loads(capture_path.read_text())
+    finalization_path = finalized / "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+    finalization = json.loads(finalization_path.read_text())
+    capture_source = capture["source"]
+    finalization_source = dict(finalization["finalizationSource"])
+    if finalization_source.get("actor") == "accountable-reviewer":
+        finalization_source["actor"] = "scope-approver"
+
+    provenance_root = finalized / "candidate-provenance"
+    provenance_copies = {
+        "RELEASE_CHANNEL.generated.json": canonical_raw,
+        "releases.json": compatibility_raw,
+        "signing/signing-avalonia-win-x64.receipt.json": signing_raw,
+    }
+    proposal_relative = (
+        "publication-scope/"
+        "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_PROPOSAL.generated.json"
+    )
+    proposal_raw = (
+        json.dumps(
+            {
+                "registryPrepare": {"sha256": registry_prepare_sha256},
+                "registryPrepareSha256": registry_prepare_sha256,
+                "scopeDecisionSha256": scope_decision_sha256,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode()
+    provenance_copies[proposal_relative] = proposal_raw
+    for source_path in sorted(path for path in bundle.rglob("*") if path.is_file()):
+        provenance_copies[source_path.relative_to(bundle).as_posix()] = source_path.read_bytes()
+    for relative, payload in provenance_copies.items():
+        target = provenance_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+
+    inventory_path = (
+        provenance_root
+        / "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+    )
+    inventory = json.loads(inventory_path.read_text())
+    if type(inventory.get("contractVersion")) is int and inventory["contractVersion"] == 1:
+        inventory["contractVersion"] = 2
+    existing_rows = {
+        row.get("path"): row
+        for row in inventory.get("files", [])
+        if isinstance(row, dict) and isinstance(row.get("path"), str)
+    }
+    for relative, payload in provenance_copies.items():
+        row = existing_rows.setdefault(relative, {"path": relative})
+        row["sha256"] = hashlib.sha256(payload).hexdigest()
+        row["sizeBytes"] = len(payload)
+    inventory["files"] = [existing_rows[path] for path in sorted(existing_rows)]
+    inventory_raw = write_json(inventory_path, inventory)
+
+    export_path = provenance_root / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    export = json.loads(export_path.read_text())
+    if type(export.get("contractVersion")) is int and export["contractVersion"] == 1:
+        export["contractVersion"] = 2
+    export["contentInventory"] = {
+        "path": inventory_path.name,
+        "sha256": hashlib.sha256(inventory_raw).hexdigest(),
+    }
+    export.setdefault(
+        "publicationScope", {"registryPrepareSha256": registry_prepare_sha256}
+    )
+    if export_supply_chain is None:
+        export.setdefault("supplyChain", {})
+    else:
+        export["supplyChain"] = export_supply_chain
+    export.setdefault(
+        "supplyChainVerification",
+        {"mode": "release_authoritative", "releaseAuthoritative": True},
+    )
+    export_raw = write_json(export_path, export)
+    if export_numeric_lexeme is not None:
+        numeric_marker = b'"typedValue": 1.0'
+        assert export_raw.count(numeric_marker) == 1
+        export_raw = export_raw.replace(
+            numeric_marker,
+            f'"typedValue": {export_numeric_lexeme}'.encode(),
+        )
+        export_path.write_bytes(export_raw)
+
+    candidate = capture["candidate"]
+    candidate.update(
+        {
+            "contentInventory": byte_reference(
+                inventory_path.relative_to(finalized).as_posix(), inventory_raw
+            ),
+            "contentInventorySha256": hashlib.sha256(inventory_raw).hexdigest(),
+            "exportReceipt": byte_reference(
+                export_path.relative_to(finalized).as_posix(), export_raw
+            ),
+            "exportReceiptSha256": hashlib.sha256(export_raw).hexdigest(),
+            "fullShelfCompatibilityManifest": byte_reference(
+                "candidate-provenance/releases.json", compatibility_raw
+            ),
+            "fullShelfCompatibilityManifestPath": "releases.json",
+            "fullShelfCompatibilityManifestSha256": hashlib.sha256(
+                compatibility_raw
+            ).hexdigest(),
+            "fullShelfManifest": byte_reference(
+                "candidate-provenance/RELEASE_CHANNEL.generated.json", canonical_raw
+            ),
+            "fullShelfManifestPath": "RELEASE_CHANNEL.generated.json",
+            "fullShelfManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+            "publicationScope": byte_reference(
+                f"candidate-provenance/{proposal_relative}", proposal_raw
+            ),
+            "publicationScopePath": proposal_relative,
+            "publicationScopeSha256": hashlib.sha256(proposal_raw).hexdigest(),
+            "registryPrepareFiles": [],
+            "registryPrepareSha256": registry_prepare_sha256,
+            "scopeDecisionSha256": scope_decision_sha256,
+            "signingReceipt": byte_reference(
+                "candidate-provenance/signing/signing-avalonia-win-x64.receipt.json",
+                signing_raw,
+            ),
+            "signingReceiptPath": "signing/signing-avalonia-win-x64.receipt.json",
+            "signingReceiptSha256": hashlib.sha256(signing_raw).hexdigest(),
+            "supplyChain": (
+                {} if capture_supply_chain is None else capture_supply_chain
+            ),
+        }
+    )
+    auth_path = (
+        finalized
+        / "authenticode"
+        / "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+    )
+    auth_path.parent.mkdir(parents=True, exist_ok=True)
+    auth_path.write_bytes(authenticode_raw)
+    for head in capture.get("heads", []):
+        if isinstance(head, dict):
+            head.setdefault("authenticodeVerification", raw_authenticode_binding)
+    capture["authenticodeVerification"] = raw_authenticode_binding
+    if type(capture.get("contractVersion")) is int and capture["contractVersion"] == 1:
+        capture["contractVersion"] = 2
+    capture_raw = write_json(capture_path, capture)
+
+    capture_inventory_path = (
+        finalized / "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
+    )
+    capture_inventory = json.loads(capture_inventory_path.read_text())
+    if (
+        type(capture_inventory.get("contractVersion")) is int
+        and capture_inventory["contractVersion"] == 1
+    ):
+        capture_inventory["contractVersion"] = 2
+    existing_capture_rows = {
+        row.get("path"): row
+        for row in capture_inventory.get("files", [])
+        if isinstance(row, dict) and isinstance(row.get("path"), str)
+    }
+    capture_paths = {
+        *existing_capture_rows,
+        "WINDOWS_NATIVE_CAPTURE.generated.json",
+        "authenticode/AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json",
+        *(f"candidate-provenance/{relative}" for relative in provenance_copies),
+    }
+    for relative in capture_paths:
+        path = finalized / relative
+        row = existing_capture_rows.setdefault(relative, {"path": relative})
+        row["sha256"] = sha(path)
+        row["sizeBytes"] = path.stat().st_size
+    capture_inventory["captureManifestSha256"] = hashlib.sha256(capture_raw).hexdigest()
+    capture_inventory["files"] = [
+        existing_capture_rows[path] for path in sorted(capture_paths)
+    ]
+    capture_inventory_raw = write_json(capture_inventory_path, capture_inventory)
+
+    proof_bindings = finalization["proofs"]
+    for proof_binding in proof_bindings:
+        proof_path = finalized / proof_binding["path"]
+        proof = json.loads(proof_path.read_text())
+        proof["authenticodeVerification"] = raw_authenticode_binding
+        proof["finalizationBinding"] = finalization_source
+        for name in ("readabilityReview", "contrastReview", "clippingReview"):
+            if proof.get(name, {}).get("reviewer") == "accountable-reviewer":
+                proof[name]["reviewer"] = "scope-approver"
+        review = proof.get("review")
+        if isinstance(review, dict):
+            if review.get("authenticatedReviewer") == "accountable-reviewer":
+                review["authenticatedReviewer"] = "scope-approver"
+            review["captureActor"] = capture_source["actor"]
+        proof["captureBinding"] = {
+            key: capture_source[key]
+            for key in (
+                "repository",
+                "workflow",
+                "runId",
+                "runAttempt",
+                "ref",
+                "sha",
+                "artifactName",
+            )
+        }
+        proof["captureBinding"]["inventorySha256"] = hashlib.sha256(
+            capture_inventory_raw
+        ).hexdigest()
+        proof_raw = write_json(proof_path, proof)
+        proof_binding["sha256"] = hashlib.sha256(proof_raw).hexdigest()
+
+    approval_path = finalized / "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json"
+    approval_path.write_bytes(approval_raw)
+    if (
+        type(finalization.get("contractVersion")) is int
+        and finalization["contractVersion"] == 1
+    ):
+        finalization["contractVersion"] = 2
+    if finalization.get("reviewer") == "accountable-reviewer":
+        finalization["reviewer"] = "scope-approver"
+    finalization.update(
+        {
+            "authenticodeVerification": raw_authenticode_binding,
+            "captureInventorySha256": hashlib.sha256(capture_inventory_raw).hexdigest(),
+            "captureSource": capture_source,
+            "finalizationSource": finalization_source,
+            "scopeApproval": {
+                "approver": approval["approver"],
+                "path": approval_path.name,
+                "scopeDecisionSha256": scope_decision_sha256,
+                "sha256": hashlib.sha256(approval_raw).hexdigest(),
+            },
+        }
+    )
+    finalization_raw = write_json(finalization_path, finalization)
+    refresh_finalized_inventory(finalized)
+    finalized_inventory_path = (
+        finalized / "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json"
+    )
+    finalized_inventory = json.loads(finalized_inventory_path.read_text())
+    return {
+        "candidateProvenance": {
+            "candidate": candidate,
+            "contentInventory": inventory,
+            "exportReceipt": export,
+            "githubActionsProvenance": {},
+            "localCandidateFiles": [],
+            "publicationScope": export["publicationScope"],
+            "registryPrepareFiles": [],
+            "registryPrepareSha256": registry_prepare_sha256,
+            "scopeBindings": {},
+            "supplyChain": (
+                {} if capture_supply_chain is None else capture_supply_chain
+            ),
+        },
+        "captureInventorySha256": hashlib.sha256(capture_inventory_raw).hexdigest(),
+        "captureSource": capture_source,
+        "finalizationRaw": finalization_raw,
+        "finalizationSource": finalization_source,
+        "finalizedInventorySha256": sha(finalized_inventory_path),
+        "fileCount": len(finalized_inventory["files"]),
+    }
+
+
+def write_publication_stage(
+    fixture: tuple[Path, Path, Path, Path, Path],
+    *,
+    capture_supply_chain: dict[str, object] | None = None,
+    export_supply_chain: dict[str, object] | None = None,
+    export_numeric_lexeme: str | None = None,
+) -> dict[str, Path]:
+    bundle, canonical_path, _summary, _inventory, finalized = fixture
+    stage = bundle.parent / "publication-stage"
+    stage.mkdir(exist_ok=True)
+    canonical = json.loads(canonical_path.read_text())
+    canonical_raw = canonical_path.read_bytes()
+    compatibility_path = bundle / "releases.json"
+    compatibility_raw = compatibility_path.read_bytes()
+    artifact = canonical["artifacts"][0]
+    installer_path = bundle / "files" / artifact["fileName"]
+    payload_path = bundle / "files" / artifact["payloadFileName"]
+    installer = publication_tuple(
+        role="installer",
+        platform="windows",
+        rid="win-x64",
+        file_name=installer_path.name,
+        digest=sha(installer_path),
+        size=installer_path.stat().st_size,
+    )
+    payload = publication_tuple(
+        role="payload",
+        platform="windows",
+        rid="win-x64",
+        file_name=payload_path.name,
+        digest=sha(payload_path),
+        size=payload_path.stat().st_size,
+    )
+    delta = [installer, payload]
+    linux_evidence = publication_tuple(
+        role="installer",
+        platform="linux",
+        rid="linux-x64",
+        file_name="chummer-avalonia-linux-x64-installer.deb",
+        digest="6" * 64,
+        size=17,
+        evidence_only=True,
+    )
+    build = [linux_evidence, *delta]
+    retained: list[dict[str, object]] = []
+    post = list(delta)
+    full_inventory = [
+        {
+            "mode": 0o644,
+            "path": path.relative_to(bundle).as_posix(),
+            "sha256": sha(path),
+            "sizeBytes": path.stat().st_size,
+        }
+        for path in sorted(path for path in bundle.rglob("*") if path.is_file())
+    ]
+    registry_inventory = [
+        {**row, "mode": f"{row['mode']:04o}"} for row in full_inventory
+    ]
+    incumbent_raw = b'{"releaseVersion":"run-incumbent"}\n'
+    incumbent_tuple = publication_tuple(
+        role="installer",
+        platform="windows",
+        rid="win-x64",
+        file_name="chummer-avalonia-win-x64-incumbent.exe",
+        digest="7" * 64,
+        size=19,
+    )
+    incumbent_inventory = [
+        {
+            "mode": "0644",
+            "path": "RELEASE_CHANNEL.generated.json",
+            "sha256": hashlib.sha256(incumbent_raw).hexdigest(),
+            "sizeBytes": len(incumbent_raw),
+        }
+    ]
+    ui_incumbent_inventory = [{**incumbent_inventory[0], "mode": 0o644}]
+    ui_incumbent = {
+        "canonicalManifestSha256": hashlib.sha256(incumbent_raw).hexdigest(),
+        "compatibilityManifestSha256": "8" * 64,
+        "desktopTupleSetSha256": canonical_sha256([incumbent_tuple]),
+        "desktopTuples": [incumbent_tuple],
+        "inventory": ui_incumbent_inventory,
+        "inventorySha256": canonical_sha256(ui_incumbent_inventory),
+        "managedPaths": [
+            "RELEASE_CHANNEL.generated.json",
+            "files/chummer-avalonia-win-x64-incumbent.exe",
+            "releases.json",
+        ],
+        "platforms": ["windows"],
+    }
+    incumbent_snapshot_sha = canonical_sha256(ui_incumbent)
+    registry_incumbent = {
+        "canonicalManifest": byte_reference(
+            "RELEASE_CHANNEL.generated.json", incumbent_raw
+        ),
+        "compatibilityManifest": {
+            "path": "releases.json",
+            "sha256": "8" * 64,
+            "sizeBytes": 11,
+        },
+        "desktopTuples": [incumbent_tuple],
+        "desktopTupleSetSha256": canonical_sha256([incumbent_tuple]),
+        "fullInventory": incumbent_inventory,
+        "fullInventorySha256": canonical_sha256(incumbent_inventory),
+        "managedPaths": ui_incumbent["managedPaths"],
+        "platforms": ["windows"],
+        "snapshotSha256": incumbent_snapshot_sha,
+    }
+    projection_inputs = {
+        name: {"path": path, "sha256": digest, "sizeBytes": 1}
+        for name, path, digest in (
+            (
+                "materializer",
+                "scripts/materialize_preview_publication_delta.py",
+                "1" * 64,
+            ),
+            (
+                "releaseChannelMaterializer",
+                "scripts/materialize_public_release_channel.py",
+                "2" * 64,
+            ),
+            (
+                "schema",
+                "contracts/preview-publication-delta-v1.schema.json",
+                "3" * 64,
+            ),
+            (
+                "verifier",
+                "scripts/verify_public_release_channel.py",
+                "4" * 64,
+            ),
+        )
+    }
+    composition = {
+        "channel": "preview",
+        "contractName": "chummer.registry.preview-publication-delta-composition",
+        "contractVersion": 1,
+        "incumbentSnapshot": registry_incumbent,
+        "nonPublishedEvidenceTupleSetSha256": canonical_sha256([linux_evidence]),
+        "nonPublishedEvidenceTuples": [linux_evidence],
+        "policy": {
+            "allowIncumbentRemoval": False,
+            "deltaPlatforms": ["windows"],
+            "evidencePlatforms": ["linux"],
+            "producerDeployAuthority": False,
+            "producerReleaseUploadAuthority": False,
+            "retainAllIncumbent": True,
+            "scope": "windows_only",
+        },
+        "producerCommits": {
+            "desktop": "a" * 40,
+            "registry": "b" * 40,
+            "ui": "c" * 40,
+        },
+        "publicationDeltaTupleSetSha256": canonical_sha256(delta),
+        "publicationDeltaTuples": delta,
+        "releaseVersion": "run-candidate",
+    }
+    composition_raw = (
+        json.dumps(composition, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+    registry_candidate = {
+        "canonicalManifest": byte_reference(
+            "RELEASE_CHANNEL.generated.json", canonical_raw
+        ),
+        "channel": "preview",
+        "compatibilityManifest": byte_reference("releases.json", compatibility_raw),
+        "compositionInput": byte_reference("composition.json", composition_raw),
+        "compositionInputDocument": composition,
+        "contractName": "chummer.registry.preview-publication-delta-candidate",
+        "contractVersion": 1,
+        "deltaPlatforms": ["windows"],
+        "deployAuthority": False,
+        "evidencePlatforms": ["linux"],
+        "fullShelfInventory": registry_inventory,
+        "fullShelfInventorySha256": canonical_sha256(registry_inventory),
+        "incumbentDesktopTupleSetSha256": canonical_sha256([incumbent_tuple]),
+        "incumbentCanonicalManifestBytesBase64": base64.b64encode(
+            incumbent_raw
+        ).decode(),
+        "incumbentSnapshotSha256": incumbent_snapshot_sha,
+        "nonPublishedEvidenceTupleSetSha256": canonical_sha256([linux_evidence]),
+        "postPublicationTupleSetSha256": canonical_sha256(post),
+        "publicationDeltaTupleSetSha256": canonical_sha256(delta),
+        "publicationEligible": False,
+        "publicationStatus": "review_required",
+        "registryProjectionInputs": projection_inputs,
+        "releaseUploadAuthority": False,
+        "routeAuthority": False,
+        "releaseVersion": "run-candidate",
+        "retainedPlatforms": [],
+        "retainedTupleSetSha256": canonical_sha256(retained),
+        "shelfPlatforms": ["windows"],
+    }
+    registry_prepare_dir = stage / "registry-prepare"
+    registry_candidate_path = registry_prepare_dir / "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json"
+    registry_candidate_raw = write_canonical_json(
+        registry_candidate_path, registry_candidate
+    )
+    prepare_inventory = sorted(
+        [
+            {**byte_reference("RELEASE_CHANNEL.generated.json", canonical_raw), "mode": "0644"},
+            {**byte_reference("releases.json", compatibility_raw), "mode": "0644"},
+            {
+                **byte_reference(
+                    "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json",
+                    registry_candidate_raw,
+                ),
+                "mode": "0644",
+            },
+        ],
+        key=lambda row: row["path"],
+    )
+    registry_prepare = {
+        "candidateReceiptSha256": hashlib.sha256(registry_candidate_raw).hexdigest(),
+        "composition": {**byte_reference("composition.json", composition_raw), "mode": "0644"},
+        "contractName": "chummer6-ui.registry-preview-prepare-binding",
+        "contractVersion": 1,
+        "deployAuthority": False,
+        "finalizeAvailable": True,
+        "finalizeReceipt": None,
+        "inputRoots": {
+            name: {"fileCount": 1, "inventorySha256": digest, "path": name}
+            for name, digest in (
+                ("incumbent", "9" * 64),
+                ("delta", "a" * 64),
+                ("evidence", "b" * 64),
+            )
+        },
+        "outputInventory": prepare_inventory,
+        "outputInventorySha256": canonical_sha256(prepare_inventory),
+        "projectionInputs": projection_inputs,
+        "publicationEligible": False,
+        "registryCommit": "b" * 40,
+        "releaseUploadAuthority": False,
+        "routeAuthority": False,
+        "status": "review_required",
+        "wholeDirectoryVerified": True,
+    }
+
+    signing_path = stage / "signing" / "signing-avalonia-win-x64.receipt.json"
+    signing_raw = write_json(
+        signing_path,
+        {
+            "contractName": "chummer6-ui.desktop_artifact_signing",
+            "contractVersion": 2,
+            "platform": "windows",
+            "app": "avalonia",
+            "rid": "win-x64",
+            "releaseChannel": "preview",
+            "releaseVersion": "run-candidate",
+            "signingStatus": "pass",
+            "candidateBindings": [
+                {
+                    "artifactRole": row["artifactRole"],
+                    "authenticodeStatus": (
+                        "pass"
+                        if row["artifactRole"] == "installer"
+                        else "not_applicable_payload"
+                    ),
+                    "fileName": row["fileName"],
+                    "sha256": row["sha256"],
+                    "sizeBytes": row["sizeBytes"],
+                }
+                for row in delta
+            ],
+            "artifacts": [
+                {
+                    "fileName": installer["fileName"],
+                    "sha256": installer["sha256"],
+                    "signingStatus": "pass",
+                }
+            ],
+        },
+    )
+    chain = {
+        "trusted": True,
+        "status": [],
+        "revocationFlag": "entire_chain",
+        "revocationMode": "online",
+        "verificationFlags": "no_flag",
+    }
+    capture_source = json.loads(
+        (finalized / "WINDOWS_NATIVE_CAPTURE.generated.json").read_text()
+    )["source"]
+    authenticode_path = (
+        stage
+        / "proof"
+        / "windows-native"
+        / "authenticode"
+        / "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+    )
+    authenticode_raw = write_json(
+        authenticode_path,
+        {
+            "artifact": {
+                "fileName": installer["fileName"],
+                "sha256": installer["sha256"],
+                "sizeBytes": installer["sizeBytes"],
+            },
+            "contractName": "chummer6-ui.windows-authenticode-verification",
+            "contractVersion": 1,
+            "generatedAt": "2026-07-22T00:00:00Z",
+            "policy": {
+                "signerCertificateSha256": "c" * 64,
+                "signerSpkiSha256": "d" * 64,
+            },
+            "signature": {
+                "codeSigningEkuOid": "1.3.6.1.5.5.7.3.3",
+                "cryptographicVerification": "passed",
+                "status": "valid",
+                "type": "authenticode",
+            },
+            "signer": {
+                "certificateSha256": "c" * 64,
+                "spkiSha256": "d" * 64,
+                "chain": chain,
+            },
+            "source": capture_source,
+            "status": "verified",
+            "timestamp": {
+                "attributeOid": "1.2.840.113549.1.9.16.2.14",
+                "format": "rfc3161",
+                "messageImprintAlgorithmOid": "2.16.840.1.101.3.4.2.1",
+                "status": "verified",
+                "timestampingEkuOid": "1.3.6.1.5.5.7.3.8",
+                "chain": chain,
+            },
+            "verifier": {"platform": "windows"},
+        },
+    )
+    full_inventory_sha = canonical_sha256(full_inventory)
+    decision = {
+        "channel": "preview",
+        "fullShelfCompatibilityManifestSha256": hashlib.sha256(
+            compatibility_raw
+        ).hexdigest(),
+        "fullShelfInventorySha256": full_inventory_sha,
+        "fullShelfManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "incumbentSnapshotSha256": incumbent_snapshot_sha,
+        "publicationDeltaSha256": canonical_sha256(delta),
+        "releaseVersion": "run-candidate",
+        "scope": "windows_only",
+    }
+    approval_path = (
+        stage
+        / "proof"
+        / "windows-native"
+        / "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json"
+    )
+    approval = {
+        "approvedAt": "2026-07-22T00:00:00Z",
+        "approver": "scope-approver",
+        "authenticodeVerificationSha256": hashlib.sha256(authenticode_raw).hexdigest(),
+        "contractName": "chummer6-ui.preview-nightly-windows-publication-approval",
+        "contractVersion": 2,
+        "fullShelfCompatibilityManifestSha256": decision[
+            "fullShelfCompatibilityManifestSha256"
+        ],
+        "fullShelfInventorySha256": full_inventory_sha,
+        "fullShelfManifestSha256": decision["fullShelfManifestSha256"],
+        "incumbentSnapshotSha256": incumbent_snapshot_sha,
+        "publicationDeltaSha256": canonical_sha256(delta),
+        "publicationScopeProposalSha256": "5" * 64,
+        "registryPrepareSha256": canonical_sha256(registry_prepare),
+        "scopeDecisionSha256": canonical_sha256(decision),
+        "signingReceiptSha256": hashlib.sha256(signing_raw).hexdigest(),
+        "status": "approved",
+    }
+    approval_raw = write_json(approval_path, approval)
+    registry_prepare_sha = canonical_sha256(registry_prepare)
+    finalization_source = dict(
+        json.loads(
+            (
+                finalized
+                / "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+            ).read_text()
+        )["finalizationSource"]
+    )
+    if finalization_source.get("actor") == "accountable-reviewer":
+        finalization_source["actor"] = "scope-approver"
+    authenticode_binding = {
+        "path": "proof/windows-native/authenticode/AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json",
+        "sha256": hashlib.sha256(authenticode_raw).hexdigest(),
+        "signerCertificateSha256": "c" * 64,
+        "signerSpkiSha256": "d" * 64,
+        "sizeBytes": len(authenticode_raw),
+        "timestampUtc": "2026-07-22T00:00:00Z",
+    }
+    raw_scope_approval = {
+        "approver": "scope-approver",
+        "path": "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json",
+        "scopeDecisionSha256": canonical_sha256(decision),
+        "sha256": hashlib.sha256(approval_raw).hexdigest(),
+    }
+    raw_authenticode_binding = {
+        **authenticode_binding,
+        "path": "authenticode/AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json",
+    }
+    upgraded_native = upgrade_finalized_root_to_windows_only_v2(
+        finalized=finalized,
+        bundle=bundle,
+        canonical_raw=canonical_raw,
+        compatibility_raw=compatibility_raw,
+        signing_raw=signing_raw,
+        registry_prepare_sha256=registry_prepare_sha,
+        approval=approval,
+        approval_raw=approval_raw,
+        authenticode_raw=authenticode_raw,
+        raw_authenticode_binding=raw_authenticode_binding,
+        scope_decision_sha256=canonical_sha256(decision),
+        capture_supply_chain=capture_supply_chain,
+        export_supply_chain=export_supply_chain,
+        export_numeric_lexeme=export_numeric_lexeme,
+    )
+    native_stage_root = stage / "proof" / "windows-native"
+    shutil.copytree(finalized, native_stage_root, dirs_exist_ok=True)
+    capture_source = upgraded_native["captureSource"]
+    finalization_source = upgraded_native["finalizationSource"]
+    raw_visual = json.loads(
+        (
+            finalized
+            / "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json"
+        ).read_text()
+    )
+    portable_visual = json.loads(json.dumps(raw_visual))
+    portable_visual["authenticodeVerification"] = authenticode_binding
+    for screenshot in portable_visual["screenshots"]:
+        screenshot["path"] = f"proof/windows-native/{screenshot['path']}"
+    visual_path = stage / "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json"
+    visual_raw = write_json(visual_path, portable_visual)
+    finalization_path = stage / "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+    finalization_raw = upgraded_native["finalizationRaw"]
+    finalization_path.write_bytes(finalization_raw)
+    native_path = stage / "NATIVE_WINDOWS_EVIDENCE.generated.json"
+    native_raw = write_json(
+        native_path,
+        {
+            "archivePath": "proof/windows-native/windows-native-evidence-finalized.zip",
+            "archiveSha256": "1" * 64,
+            "authenticodeVerification": authenticode_binding,
+            "candidateProvenance": upgraded_native["candidateProvenance"],
+            "captureInventorySha256": upgraded_native["captureInventorySha256"],
+            "captureSource": capture_source,
+            "contractName": "chummer6-ui.preview-nightly-native-windows-evidence",
+            "contractVersion": 1,
+            "fileCount": upgraded_native["fileCount"],
+            "finalizationSha256": hashlib.sha256(finalization_raw).hexdigest(),
+            "finalizationSource": finalization_source,
+            "finalizedInventorySha256": upgraded_native[
+                "finalizedInventorySha256"
+            ],
+            "githubActionsProvenance": {},
+            "nativeFinalization": {
+                "path": finalization_path.name,
+                "sha256": hashlib.sha256(finalization_raw).hexdigest(),
+                "sizeBytes": len(finalization_raw),
+            },
+            "progressLogSha256": {"avalonia": "3" * 64},
+            "release": {"channel": "preview", "version": "run-candidate"},
+            "scopeApproval": {
+                **raw_scope_approval,
+                "payload": approval,
+            },
+            "startupReceiptSha256": {"avalonia": "4" * 64},
+            "status": "passed",
+            "treeSha256": "5" * 64,
+            "visualProof": {
+                "path": visual_path.name,
+                "sha256": hashlib.sha256(visual_raw).hexdigest(),
+                "sizeBytes": len(visual_raw),
+            },
+            "visualProofSha256": {
+                "avalonia": hashlib.sha256(visual_raw).hexdigest()
+            },
+            "visualReviewers": {"avalonia": "scope-approver"},
+        },
+    )
+    empty_sha = canonical_sha256([])
+    scope = {
+        "approval": {
+            "approver": "scope-approver",
+            "path": approval_path.relative_to(stage).as_posix(),
+            "sha256": hashlib.sha256(approval_raw).hexdigest(),
+        },
+        "approvalIndependent": True,
+        "authenticodeRequired": True,
+        "authenticodeVerificationSha256": hashlib.sha256(authenticode_raw).hexdigest(),
+        "buildEvidenceTuples": build,
+        "contractName": "chummer6-ui.preview-nightly-windows-publication-scope",
+        "contractVersion": 2,
+        "deployAuthorized": False,
+        "fullShelfCompatibilityManifestSha256": hashlib.sha256(
+            compatibility_raw
+        ).hexdigest(),
+        "fullShelfInventory": full_inventory,
+        "fullShelfInventorySha256": full_inventory_sha,
+        "fullShelfManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "incumbentSnapshot": ui_incumbent,
+        "incumbentSnapshotSha256": incumbent_snapshot_sha,
+        "macosSoak": {
+            "byteIdentical": False,
+            "incumbentTupleSetSha256": empty_sha,
+            "postPublicationTupleSetSha256": empty_sha,
+            "reason": "not_applicable_no_incumbent_tuple",
+            "required": False,
+        },
+        "nativeEvidenceComposite": {
+            "authenticodeVerification": {
+                "contractName": "chummer6-ui.windows-authenticode-verification",
+                "contractVersion": 1,
+                "path": authenticode_path.relative_to(stage).as_posix(),
+                "sha256": hashlib.sha256(authenticode_raw).hexdigest(),
+                "sizeBytes": len(authenticode_raw),
+            },
+            "nativeFinalization": {
+                "contractName": "chummer6-ui.preview-nightly-native-windows-finalization",
+                "contractVersion": 2,
+                "path": finalization_path.name,
+                "sha256": hashlib.sha256(finalization_raw).hexdigest(),
+                "sizeBytes": len(finalization_raw),
+            },
+            "visualProof": {
+                "contractName": "chummer6-ui.windows_installer_visual_proof",
+                "contractVersion": 1,
+                "path": visual_path.name,
+                "sha256": hashlib.sha256(visual_raw).hexdigest(),
+                "sizeBytes": len(visual_raw),
+            },
+            "wrapper": {
+                "contractName": "chummer6-ui.preview-nightly-native-windows-evidence",
+                "contractVersion": 1,
+                "path": native_path.name,
+                "sha256": hashlib.sha256(native_raw).hexdigest(),
+                "sizeBytes": len(native_raw),
+            },
+        },
+        "nativeEvidenceSha256": hashlib.sha256(native_raw).hexdigest(),
+        "nonPublishedEvidenceTuples": [linux_evidence],
+        "postPublicationShelfTuples": post,
+        "publicationDeltaTuples": delta,
+        "publicationEligible": False,
+        "registryPrepare": registry_prepare,
+        "registryFinalizeEligible": True,
+        "release": {"channel": "preview", "version": "run-candidate"},
+        "retainedTuples": retained,
+        "scopeDecision": decision,
+        "scopeDecisionSha256": canonical_sha256(decision),
+        "signingReceipt": {
+            "path": signing_path.relative_to(stage).as_posix(),
+            "sha256": hashlib.sha256(signing_raw).hexdigest(),
+        },
+        "signingReceiptSha256": hashlib.sha256(signing_raw).hexdigest(),
+        "status": "validated",
+        "uploadAuthorized": False,
+        "visualApprovalSha256": [hashlib.sha256(visual_raw).hexdigest()],
+    }
+    scope_path = stage / "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
+    scope_raw = write_json(scope_path, scope)
+    disposition = {
+        "artifactId": artifact["artifactId"],
+        "disposition": "delta",
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "sha256": artifact["sha256"],
+        "sizeBytes": artifact["sizeBytes"],
+        "sourceManifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "sourceReleaseVersion": "run-candidate",
+        "sourceSnapshotSha256": registry_candidate["fullShelfInventorySha256"],
+    }
+    registry_authority = {
+        "candidateImportAuthority": True,
+        "candidateReceipt": byte_reference(
+            "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json", registry_candidate_raw
+        ),
+        "candidateReviewAuthority": True,
+        "canonicalManifest": byte_reference(
+            "RELEASE_CHANNEL.generated.json", canonical_raw
+        ),
+        "channel": "preview",
+        "compatibilityManifest": byte_reference("releases.json", compatibility_raw),
+        "compositionInputSha256": hashlib.sha256(composition_raw).hexdigest(),
+        "contractName": "chummer.registry.preview-publication-delta-authority",
+        "contractVersion": 1,
+        "deltaPlatforms": ["windows"],
+        "deployAuthority": False,
+        "dispositions": [disposition],
+        "evidence": {
+            "approval": byte_reference(
+                approval_path.relative_to(stage).as_posix(), approval_raw
+            ),
+            "nativeEvidence": byte_reference(native_path.name, native_raw),
+            "signingReceipt": byte_reference(
+                signing_path.relative_to(stage).as_posix(), signing_raw
+            ),
+            "visualEvidence": [byte_reference(visual_path.name, visual_raw)],
+        },
+        "evidencePlatforms": ["linux"],
+        "fullShelfInventorySha256": registry_candidate["fullShelfInventorySha256"],
+        "incumbentSnapshotSha256": incumbent_snapshot_sha,
+        "nonPublishedEvidenceTupleSetSha256": canonical_sha256([linux_evidence]),
+        "postPublicationTupleSetSha256": canonical_sha256(post),
+        "publicationDeltaTupleSetSha256": canonical_sha256(delta),
+        "publicationEligible": False,
+        "releaseUploadAuthority": False,
+        "releaseVersion": "run-candidate",
+        "retainedPlatforms": [],
+        "retainedTupleSetSha256": canonical_sha256(retained),
+        "routeAuthority": False,
+        "scope": "windows_only",
+        "shelfPlatforms": ["windows"],
+        "sourceScope": byte_reference(scope_path.name, scope_raw),
+    }
+    registry_finalize_dir = stage / "registry-finalize"
+    registry_authority_path = (
+        registry_finalize_dir / "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json"
+    )
+    registry_authority_raw = write_canonical_json(
+        registry_authority_path, registry_authority
+    )
+    registry_finalize = {
+        "authority": byte_reference(
+            "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json", registry_authority_raw
+        ),
+        "candidateBytesMutated": False,
+        "candidateImportAuthority": True,
+        "candidateReceipt": byte_reference(
+            "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json", registry_candidate_raw
+        ),
+        "candidateReviewAuthority": True,
+        "canonicalManifest": byte_reference(
+            "RELEASE_CHANNEL.generated.json", canonical_raw
+        ),
+        "channel": "preview",
+        "compatibilityManifest": byte_reference("releases.json", compatibility_raw),
+        "contractName": "chummer.registry.preview-publication-delta-finalize",
+        "contractVersion": 1,
+        "deployAuthority": False,
+        "fullShelfInventorySha256": registry_candidate["fullShelfInventorySha256"],
+        "publicationEligible": False,
+        "releaseUploadAuthority": False,
+        "releaseVersion": "run-candidate",
+        "routeAuthority": False,
+        "sourceScope": byte_reference(scope_path.name, scope_raw),
+        "verificationStatus": "finalized",
+    }
+    registry_finalize_path = (
+        registry_finalize_dir / "PREVIEW_PUBLICATION_DELTA_FINALIZE.json"
+    )
+    write_canonical_json(registry_finalize_path, registry_finalize)
+    return {
+        "root": stage,
+        "native": native_stage_root,
+        "scope": scope_path,
+        "candidate": registry_candidate_path,
+        "authority": registry_authority_path,
+        "finalize": registry_finalize_path,
+    }
+
+
 def run_materializer(
     tmp_path: Path,
     *,
@@ -798,8 +1797,19 @@ def run_materializer(
 def invoke_materializer(
     fixture: tuple[Path, Path, Path, Path, Path],
     output: Path,
+    *,
+    windows_finalized_root: Path | None = None,
+    capture_supply_chain: dict[str, object] | None = None,
+    export_supply_chain: dict[str, object] | None = None,
+    export_numeric_lexeme: str | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], Path, tuple[Path, Path, Path, Path, Path]]:
     bundle, canonical, summary, inventory, finalized = fixture
+    stage = write_publication_stage(
+        fixture,
+        capture_supply_chain=capture_supply_chain,
+        export_supply_chain=export_supply_chain,
+        export_numeric_lexeme=export_numeric_lexeme,
+    )
     completed = subprocess.run(
         [
             sys.executable,
@@ -813,7 +1823,17 @@ def invoke_materializer(
             "--candidate-inventory",
             str(inventory),
             "--windows-finalized-root",
-            str(finalized),
+            str(windows_finalized_root or stage["native"]),
+            "--publication-stage-root",
+            str(stage["root"]),
+            "--publication-scope",
+            str(stage["scope"]),
+            "--registry-candidate-receipt",
+            str(stage["candidate"]),
+            "--registry-finalize-authority",
+            str(stage["authority"]),
+            "--registry-finalize-receipt",
+            str(stage["finalize"]),
             "--output",
             str(output),
         ],
@@ -965,10 +1985,12 @@ def test_fresh_native_finalization_materializes_exact_custody(tmp_path: Path) ->
     assert completed.returncode == 0, completed.stderr
     authority = json.loads(output.read_text())
     assert authority["status"] == "candidate_import_ready"
-    assert authority["candidate"]["fileCount"] == 5
+    assert authority["contractVersion"] == 2
+    assert authority["exactIncomingDesktopScope"] == "avalonia:windows:win-x64"
+    assert authority["candidate"]["fileCount"] == 4
     assert authority["custody"]["canonicalManifest"]["base64"]
     evidence = authority["custody"]["nativeWindowsFinalizedEvidence"]
-    assert evidence["reviewer"] == "accountable-reviewer"
+    assert evidence["reviewer"] == "scope-approver"
     assert len(evidence["files"]) >= 8
     capture_entry = next(
         row
@@ -984,6 +2006,161 @@ def test_fresh_native_finalization_materializes_exact_custody(tmp_path: Path) ->
     )
     assert output.stat().st_mode & 0o777 == 0o600
     assert authority["candidate"]["canonicalManifestSha256"] == sha(fixture[1])
+    assert authority["custody"]["registryFinalization"]["status"] == "finalized"
+
+
+def test_materializer_rejects_independent_windows_finalized_root(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    completed, output, _ = invoke_materializer(
+        fixture,
+        tmp_path / "candidate-authority.json",
+        windows_finalized_root=fixture[4],
+    )
+
+    assert completed.returncode != 0
+    assert "publication-stage proof/windows-native" in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("actor_field", ["candidateProducer", "nativeCapture"])
+def test_projection_requires_independent_final_review_owner(
+    tmp_path: Path,
+    actor_field: str,
+) -> None:
+    completed, authority_path, _ = run_materializer(tmp_path)
+    assert completed.returncode == 0, completed.stderr
+    authority = json.loads(authority_path.read_text())
+    actors = authority["custody"]["finalizedPublicationEvidence"]["actors"]
+    actors[actor_field] = actors["scopeApprover"]
+
+    module = load_projection()
+    with pytest.raises(
+        module.ProjectionBlocked,
+        match="candidate finalized publication review owner is not independent",
+    ):
+        module._validate_candidate_import_authority(
+            json.dumps(authority, separators=(",", ":"), sort_keys=True).encode()
+        )
+
+
+def test_projection_rejects_legacy_candidate_authority_v1(tmp_path: Path) -> None:
+    completed, authority_path, _ = run_materializer(tmp_path)
+    assert completed.returncode == 0, completed.stderr
+    authority = json.loads(authority_path.read_text())
+    authority["contractName"] = "chummer.release-upload.candidate-import-authority/v1"
+    authority["contractVersion"] = 1
+
+    module = load_projection()
+    with pytest.raises(module.ProjectionBlocked):
+        module._validate_candidate_import_authority(
+            json.dumps(authority, separators=(",", ":"), sort_keys=True).encode()
+        )
+
+
+@pytest.mark.parametrize(
+    ("reference_name", "contract_name", "contract_version", "reference_path"),
+    [
+        (
+            "wrapper",
+            "chummer6-ui.preview-nightly-native-windows-evidence",
+            1,
+            "NATIVE_WINDOWS_EVIDENCE.generated.json",
+        ),
+        (
+            "nativeFinalization",
+            "chummer6-ui.preview-nightly-native-windows-finalization",
+            2,
+            "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+        ),
+        (
+            "visualProof",
+            "chummer6-ui.windows_installer_visual_proof",
+            1,
+            "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json",
+        ),
+        (
+            "authenticodeVerification",
+            "chummer6-ui.windows-authenticode-verification",
+            1,
+            (
+                "proof/windows-native/authenticode/"
+                "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "numeric_drift",
+    ["boolean_contract_version", "float_contract_version", "float_size"],
+)
+def test_native_composite_rejects_python_numeric_equality_aliases(
+    tmp_path: Path,
+    reference_name: str,
+    contract_name: str,
+    contract_version: int,
+    reference_path: str,
+    numeric_drift: str,
+) -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "candidate_materializer_composite_numeric_test",
+    )
+    held = b"held-native-reference"
+    reference = {
+        "contractName": contract_name,
+        "contractVersion": contract_version,
+        "path": reference_path,
+        "sha256": hashlib.sha256(held).hexdigest(),
+        "sizeBytes": len(held),
+    }
+    if numeric_drift == "boolean_contract_version":
+        reference["contractVersion"] = True
+    elif numeric_drift == "float_contract_version":
+        reference["contractVersion"] = float(contract_version)
+    else:
+        reference["sizeBytes"] = float(len(held))
+    with pytest.raises(materializer.CandidateAuthorityBlocked):
+        materializer._native_contract_reference(
+            reference,
+            label=reference_name,
+            contract_name=contract_name,
+            contract_version=contract_version,
+            path=reference_path,
+            raw=held,
+        )
+
+    completed, authority_path, _ = run_materializer(tmp_path)
+    assert completed.returncode == 0, completed.stderr
+    authority = json.loads(authority_path.read_text())
+    finalized = authority["custody"]["finalizedPublicationEvidence"]
+    scope_entry = next(
+        entry
+        for entry in finalized["files"]
+        if entry["path"] == "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
+    )
+    scope = json.loads(base64.b64decode(scope_entry["base64"]))
+    scope_reference = scope["nativeEvidenceComposite"][reference_name]
+    if numeric_drift == "boolean_contract_version":
+        scope_reference["contractVersion"] = True
+    elif numeric_drift == "float_contract_version":
+        scope_reference["contractVersion"] = float(scope_reference["contractVersion"])
+    else:
+        scope_reference["sizeBytes"] = float(scope_reference["sizeBytes"])
+    scope_raw = (
+        json.dumps(scope, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+    scope_entry["base64"] = base64.b64encode(scope_raw).decode()
+    scope_entry["sha256"] = hashlib.sha256(scope_raw).hexdigest()
+    scope_entry["sizeBytes"] = len(scope_raw)
+    finalized["publicationScopeSha256"] = scope_entry["sha256"]
+
+    verifier = load_projection()
+    with pytest.raises(verifier.ProjectionBlocked):
+        verifier._validate_candidate_import_authority(
+            json.dumps(authority, separators=(",", ":"), sort_keys=True).encode()
+        )
 
 
 @pytest.mark.parametrize(
@@ -1091,11 +2268,11 @@ def test_candidate_inventory_rejects_extra_root_level_row(
     )
 
     assert completed.returncode != 0
-    assert "exact three UI provenance rows" in completed.stderr
+    assert "only the two finalized shelf manifests" in completed.stderr
     assert not output.exists()
 
     module = load_projection()
-    with pytest.raises(module.ProjectionBlocked, match="exact Avalonia UI export tree"):
+    with pytest.raises(module.ProjectionBlocked, match="exact finalized desktop shelf"):
         module._candidate_windows_scope(
             json.loads(canonical_path.read_text()),
             json.loads(inventory_path.read_text())["files"],
@@ -1103,7 +2280,7 @@ def test_candidate_inventory_rejects_extra_root_level_row(
         )
 
 
-def test_uploaded_ui_provenance_must_equal_native_preserved_bytes(
+def test_native_preserved_provenance_must_retain_release_binding(
     tmp_path: Path,
 ) -> None:
     fixture = candidate_fixture(tmp_path)
@@ -1122,7 +2299,7 @@ def test_uploaded_ui_provenance_must_equal_native_preserved_bytes(
     )
 
     assert completed.returncode != 0
-    assert "differs from the uploaded UI inventory" in completed.stderr
+    assert "provenance inventory release binding drifted" in completed.stderr
     assert not output.exists()
 
 
@@ -1138,14 +2315,14 @@ def test_allowed_head_windows_scope_cannot_widen_by_rid_kind_or_file(
     )
 
     assert completed.returncode != 0
-    assert "exact Avalonia UI export tree" in completed.stderr or "desktop tuple" in completed.stderr
+    assert "exact finalized desktop shelf" in completed.stderr or "desktop tuple" in completed.stderr
     assert not output.exists()
 
     _, canonical_path, summary_path, inventory_path, _ = fixture
     module = load_projection()
     with pytest.raises(
         module.ProjectionBlocked,
-        match="required desktop tuple|exact Avalonia UI export tree",
+        match="required desktop tuple|exact finalized desktop shelf",
     ):
         module._candidate_windows_scope(
             json.loads(canonical_path.read_text()),
@@ -1175,7 +2352,87 @@ def test_materializer_rejects_fully_rehashed_exporter_source_tamper(
     )
 
     assert completed.returncode != 0
-    assert "export receipt" in completed.stderr
+    assert "candidate export source differs" in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "publication_scope_extra",
+        "supply_chain_divergent",
+        "verification_non_authoritative",
+    ],
+)
+def test_materializer_rejects_fully_rehashed_windows_only_export_authority_tamper(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    write_publication_stage(fixture)
+    finalized = fixture[-1]
+    export_path = (
+        finalized
+        / "candidate-provenance"
+        / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    )
+    export = json.loads(export_path.read_text())
+    if tamper == "publication_scope_extra":
+        export["publicationScope"]["unexpected"] = True
+    elif tamper == "supply_chain_divergent":
+        export["supplyChain"] = {"divergent": True}
+    else:
+        export["supplyChainVerification"] = {
+            "mode": "advisory",
+            "releaseAuthoritative": False,
+        }
+    write_json(export_path, export)
+    refresh_directory_evidence_bindings(finalized)
+
+    completed, output, _ = invoke_materializer(
+        fixture,
+        tmp_path / "candidate-authority.json",
+    )
+
+    assert completed.returncode != 0
+    assert "candidate export Windows-only authority drifted" in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("mismatch", ["bool_number", "numeric_lexeme"])
+def test_materializer_rejects_fully_rehashed_supply_chain_json_kind_mismatch(
+    tmp_path: Path,
+    mismatch: str,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    capture_supply_chain = {
+        "typedValue": True if mismatch == "bool_number" else 1.0
+    }
+    export_supply_chain = {"typedValue": 1 if mismatch == "bool_number" else 1.0}
+
+    completed, output, _ = invoke_materializer(
+        fixture,
+        tmp_path / "candidate-authority.json",
+        capture_supply_chain=capture_supply_chain,
+        export_supply_chain=export_supply_chain,
+        export_numeric_lexeme="1e0" if mismatch == "numeric_lexeme" else None,
+    )
+
+    finalized = fixture[-1]
+    capture = json.loads(
+        (finalized / "WINDOWS_NATIVE_CAPTURE.generated.json").read_text()
+    )
+    export_path = (
+        finalized
+        / "candidate-provenance"
+        / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    )
+    export = json.loads(export_path.read_text())
+    assert capture["candidate"]["supplyChain"] == export["supplyChain"]
+    if mismatch == "numeric_lexeme":
+        assert b'"typedValue": 1e0' in export_path.read_bytes()
+    assert completed.returncode != 0
+    assert "candidate export Windows-only authority drifted" in completed.stderr
     assert not output.exists()
 
 
@@ -1567,6 +2824,11 @@ def test_candidate_publication_rejects_replaced_authenticated_source_manifest(
         "artifact_digest",
         "candidate_artifact_name",
         "export_source",
+        "export_publication_scope_extra",
+        "export_supply_chain_divergent",
+        "export_verification_non_authoritative",
+        "export_supply_chain_bool_number",
+        "export_supply_chain_numeric_lexeme",
         "export_heads",
         "capture_heads_empty",
         "capture_heads_extra",
@@ -1812,6 +3074,75 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
                 "source": {**value["source"], "actor": "different-producer"},
             },
         )
+    elif tamper == "export_publication_scope_extra":
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {
+                **value,
+                "publicationScope": {
+                    **value["publicationScope"],
+                    "unexpected": True,
+                },
+            },
+        )
+    elif tamper == "export_supply_chain_divergent":
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {**value, "supplyChain": {"divergent": True}},
+        )
+    elif tamper == "export_verification_non_authoritative":
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {
+                **value,
+                "supplyChainVerification": {
+                    "mode": "advisory",
+                    "releaseAuthoritative": False,
+                },
+            },
+        )
+    elif tamper in {
+        "export_supply_chain_bool_number",
+        "export_supply_chain_numeric_lexeme",
+    }:
+        numeric_lexeme = tamper == "export_supply_chain_numeric_lexeme"
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda value: {
+                **value,
+                "candidate": {
+                    **value["candidate"],
+                    "supplyChain": {
+                        "typedValue": 1.0 if numeric_lexeme else True,
+                    },
+                },
+            },
+        )
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {
+                **value,
+                "supplyChain": {
+                    "typedValue": 1.0 if numeric_lexeme else 1,
+                },
+            },
+        )
+        if numeric_lexeme:
+            def replace_numeric_lexeme(payload: bytes) -> bytes:
+                marker = b'"typedValue":1.0'
+                assert payload.count(marker) == 1
+                return payload.replace(marker, b'"typedValue":1e0')
+
+            rewrite_embedded_document_raw(
+                authority,
+                export_path,
+                replace_numeric_lexeme,
+            )
     elif tamper == "export_heads":
         rewrite_embedded_document(
             authority,
@@ -1839,9 +3170,9 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
                 value["contractVersion"] = True
                 return value
             target = (
-                "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"
+                "releases.json"
                 if tamper == "candidate_root_inventory_digest"
-                else "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+                else "files/chummer-avalonia-win-x64-installer.exe"
             )
             row = next(row for row in value["files"] if row["path"] == target)
             row["sha256"] = "f" * 64
@@ -1888,12 +3219,20 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
     snapshot_root.mkdir(mode=0o700)
     publish_review_snapshot(module, snapshot_root)
 
-    with pytest.raises(module.ProjectionBlocked):
+    with pytest.raises(module.ProjectionBlocked) as blocked:
         module.publish_candidate_import_snapshot(
             snapshot_root,
             authority_path=tampered,
             expected_authority_sha256=sha(tampered),
         )
+    if tamper in {
+        "export_publication_scope_extra",
+        "export_supply_chain_divergent",
+        "export_verification_non_authoritative",
+        "export_supply_chain_bool_number",
+        "export_supply_chain_numeric_lexeme",
+    }:
+        assert str(blocked.value) == "candidate export Windows-only authority drifted"
 
 
 @pytest.mark.parametrize(

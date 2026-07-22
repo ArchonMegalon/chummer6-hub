@@ -67,13 +67,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
 {
     public const string CandidateAuthorityFileName =
         "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json";
+    public const string CandidateExactIncomingDesktopScope =
+        "avalonia:windows:win-x64";
 
     private const string CurrentFileName = "CURRENT.json";
     private const string ManifestFileName = "PUBLIC_PROJECTION_SNAPSHOT.generated.json";
     private const string CurrentContractName = "chummer.public_projection_current/v1";
     private const string SnapshotContractName = "chummer.public_projection_snapshot/v1";
     private const string CandidateContractName =
-        "chummer.release-upload.candidate-import-authority/v1";
+        "chummer.release-upload.candidate-import-authority/v2";
     private const string CandidateInventoryContractName =
         "chummer.release-upload.candidate-inventory/v1";
     private const int MaximumPointerBytes = 256 * 1024;
@@ -392,6 +394,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "contractName",
                         "contractVersion",
                         "status",
+                        "candidateImportAuthority",
+                        "candidateReviewAuthority",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "deployAuthority",
+                        "routeAuthority",
+                        "exactIncomingDesktopScope",
                         "generatedAtUtc",
                         "expiresAtUtc",
                         "candidate",
@@ -402,8 +411,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException("candidate import authority property set drifted");
         }
         RequireExactString(root, "contractName", CandidateContractName);
-        RequireExactInt32(root, "contractVersion", 1);
+        RequireExactInt32(root, "contractVersion", 2);
         RequireExactString(root, "status", "candidate_import_ready");
+        RequireBoolean(root, "candidateImportAuthority", expected: true);
+        RequireBoolean(root, "candidateReviewAuthority", expected: true);
+        RequireBoolean(root, "publicationEligible", expected: false);
+        RequireBoolean(root, "releaseUploadAuthority", expected: false);
+        RequireBoolean(root, "deployAuthority", expected: false);
+        RequireBoolean(root, "routeAuthority", expected: false);
+        RequireExactString(
+            root,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
         DateTimeOffset generatedAt = RequireUtcTimestamp(root, "generatedAtUtc");
         DateTimeOffset expiresAt = RequireUtcTimestamp(root, "expiresAtUtc");
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -459,8 +478,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 new HashSet<string>(
                     [
                         "canonicalManifest",
+                        "compatibilityManifest",
                         "inventory",
-                        "nativeWindowsFinalizedEvidence"
+                        "nativeWindowsFinalizedEvidence",
+                        "finalizedPublicationEvidence",
+                        "registryPrepareCandidateReceipt",
+                        "registryFinalizeAuthority",
+                        "registryFinalizeReceipt",
+                        "registryFinalization"
                     ],
                     StringComparer.Ordinal)))
         {
@@ -477,6 +502,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException("candidate canonical manifest custody drifted");
         }
+        byte[] compatibilityManifest = DecodeEmbedded(
+            RequireObject(custody, "compatibilityManifest"),
+            "candidate compatibility manifest",
+            "releases.json");
+        using JsonDocument compatibilityDocument = ParseStrictObject(
+            compatibilityManifest,
+            "candidate compatibility release manifest");
         byte[] inventoryBytes = DecodeEmbedded(
             RequireObject(custody, "inventory"),
             "candidate upload inventory",
@@ -497,7 +529,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 && string.Equals(
                     row.Sha256,
                     candidate.CanonicalManifestSha256,
-                    StringComparison.Ordinal)))
+                    StringComparison.Ordinal))
+            || !inventory.Any(row =>
+                string.Equals(row.Path, "releases.json", StringComparison.Ordinal)
+                && string.Equals(
+                    row.Sha256,
+                    Sha256(compatibilityManifest),
+                    StringComparison.Ordinal)
+                && row.SizeBytes == compatibilityManifest.LongLength))
         {
             throw new InvalidDataException("candidate upload inventory summary drifted");
         }
@@ -505,12 +544,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         using JsonDocument canonicalDocument = ParseStrictObject(
             canonicalManifest,
             "candidate canonical release manifest");
-        ValidateCandidateNativeEvidence(
+        CandidateNativePackage nativePackage = ValidateCandidateNativeEvidence(
             RequireObject(custody, "nativeWindowsFinalizedEvidence"),
             canonicalDocument.RootElement,
             candidate,
             inventory,
             now);
+        ValidateFinalizedPublicationAndRegistry(
+            custody,
+            canonicalDocument.RootElement,
+            canonicalManifest,
+            compatibilityManifest,
+            candidate,
+            inventory,
+            nativePackage);
 
         return new ReleaseUploadCandidateAuthority(
             snapshotId,
@@ -522,7 +569,1473 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             inventory);
     }
 
-    private static void ValidateCandidateNativeEvidence(
+    private static void ValidateFinalizedPublicationAndRegistry(
+        JsonElement custody,
+        JsonElement canonical,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
+        CandidateNativePackage nativePackage)
+    {
+        JsonElement finalized = RequireObject(custody, "finalizedPublicationEvidence");
+        if (!ExactPropertySet(
+                finalized,
+                new HashSet<string>(
+                    [
+                        "status",
+                        "exactIncomingDesktopScope",
+                        "publicationScopeSha256",
+                        "scopeDecisionSha256",
+                        "signingReceiptSha256",
+                        "nativeEvidenceSha256",
+                        "authenticodeVerificationSha256",
+                        "approvalSha256",
+                        "visualApprovalSha256",
+                        "actors",
+                        "files"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate finalized publication evidence property set drifted");
+        }
+        RequireExactString(finalized, "status", "passed");
+        RequireExactString(
+            finalized,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        var documents = new Dictionary<string, CandidateEvidenceDocument>(StringComparer.Ordinal);
+        try
+        {
+            foreach (JsonElement entry in RequireArray(finalized, "files").EnumerateArray())
+            {
+                string path = RequireString(entry, "path");
+                if (!IsCanonicalRelativePath(path) || documents.ContainsKey(path))
+                {
+                    throw new InvalidDataException(
+                        "candidate finalized publication evidence path drifted");
+                }
+                byte[] bytes = DecodeEmbedded(
+                    entry,
+                    $"candidate finalized publication {path}",
+                    path);
+                documents.Add(
+                    path,
+                    new CandidateEvidenceDocument(
+                        ParseStrictObject(bytes, $"candidate finalized publication {path}"),
+                        bytes,
+                        RequireSha256(entry, "sha256"),
+                        RequireNonNegativeInt64(entry, "sizeBytes")));
+            }
+
+            const string scopePath = "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json";
+            if (!documents.TryGetValue(scopePath, out CandidateEvidenceDocument? scopeDocument))
+            {
+                throw new InvalidDataException("candidate finalized publication scope is absent");
+            }
+            RequireExactString(finalized, "publicationScopeSha256", scopeDocument.Sha256);
+            JsonElement scope = scopeDocument.Root;
+            if (!ExactPropertySet(
+                    scope,
+                    new HashSet<string>(
+                        [
+                            "approval",
+                            "approvalIndependent",
+                            "authenticodeRequired",
+                            "authenticodeVerificationSha256",
+                            "buildEvidenceTuples",
+                            "contractName",
+                            "contractVersion",
+                            "deployAuthorized",
+                            "fullShelfCompatibilityManifestSha256",
+                            "fullShelfInventory",
+                            "fullShelfInventorySha256",
+                            "fullShelfManifestSha256",
+                            "incumbentSnapshot",
+                            "incumbentSnapshotSha256",
+                            "macosSoak",
+                            "nativeEvidenceComposite",
+                            "nativeEvidenceSha256",
+                            "nonPublishedEvidenceTuples",
+                            "postPublicationShelfTuples",
+                            "publicationDeltaTuples",
+                            "publicationEligible",
+                            "registryPrepare",
+                            "registryFinalizeEligible",
+                            "release",
+                            "retainedTuples",
+                            "scopeDecision",
+                            "scopeDecisionSha256",
+                            "signingReceipt",
+                            "signingReceiptSha256",
+                            "status",
+                            "uploadAuthorized",
+                            "visualApprovalSha256"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized publication scope property set drifted");
+            }
+            RequireExactString(
+                scope,
+                "contractName",
+                "chummer6-ui.preview-nightly-windows-publication-scope");
+            RequireExactInt32(scope, "contractVersion", 2);
+            RequireExactString(scope, "status", "validated");
+            RequireBoolean(scope, "approvalIndependent", expected: true);
+            RequireBoolean(scope, "authenticodeRequired", expected: true);
+            RequireBoolean(scope, "registryFinalizeEligible", expected: true);
+            RequireBoolean(scope, "publicationEligible", expected: false);
+            RequireBoolean(scope, "uploadAuthorized", expected: false);
+            RequireBoolean(scope, "deployAuthorized", expected: false);
+            JsonElement release = RequireObject(scope, "release");
+            RequireExactString(release, "channel", "preview");
+            RequireExactString(release, "version", candidate.Version);
+            RequireExactString(scope, "fullShelfManifestSha256", Sha256(canonicalBytes));
+            RequireExactString(
+                scope,
+                "fullShelfCompatibilityManifestSha256",
+                Sha256(compatibilityBytes));
+            RequireExactString(
+                finalized,
+                "scopeDecisionSha256",
+                RequireSha256(scope, "scopeDecisionSha256"));
+
+            JsonElement delta = RequireArray(scope, "publicationDeltaTuples");
+            if (delta.GetArrayLength() != 2)
+            {
+                throw new InvalidDataException(
+                    "candidate publication delta is not the exact Windows pair");
+            }
+            ValidateFinalScopeTuple(delta[0], "installer", "windows", WindowsRid);
+            ValidateFinalScopeTuple(delta[1], "payload", "windows", WindowsRid);
+            CandidateWindowsScope canonicalScope = ParseCandidateWindowsScope(
+                canonical,
+                candidate,
+                inventory);
+            CandidateHeadArtifacts expectedWindows = canonicalScope.Artifacts["avalonia"];
+            ValidateFinalScopeArtifact(delta[0], expectedWindows.Installer);
+            ValidateFinalScopeArtifact(delta[1], expectedWindows.Payload);
+
+            var expectedUploadPaths = new HashSet<string>(
+                ["RELEASE_CHANNEL.generated.json", "releases.json"],
+                StringComparer.Ordinal);
+            foreach (JsonElement row in RequireArray(
+                         scope,
+                         "postPublicationShelfTuples").EnumerateArray())
+            {
+                ValidateFinalScopeTuple(
+                    row,
+                    RequireString(row, "artifactRole"),
+                    RequireString(row, "platform"),
+                    RequireString(row, "rid"));
+                expectedUploadPaths.Add(RequireString(row, "path"));
+            }
+            if (!expectedUploadPaths.SetEquals(
+                    inventory.Select(static row => row.Path)))
+            {
+                throw new InvalidDataException(
+                    "candidate inventory differs from the finalized Run upload allowlist");
+            }
+            ValidateFinalScopeInventory(scope, inventory);
+
+            JsonElement signingReference = RequireObject(scope, "signingReceipt");
+            string signingPath = RequireString(signingReference, "path");
+            string approvalPath = RequireString(RequireObject(scope, "approval"), "path");
+            string visualPath =
+                $"WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-{WindowsRid}.generated.json";
+            const string nativePath = "NATIVE_WINDOWS_EVIDENCE.generated.json";
+            const string nativeFinalizationPath =
+                "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json";
+            const string authenticodePath =
+                "proof/windows-native/authenticode/"
+                + "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json";
+            var expectedEvidencePaths = new HashSet<string>(
+                [
+                    scopePath,
+                    signingPath,
+                    approvalPath,
+                    visualPath,
+                    nativePath,
+                    nativeFinalizationPath,
+                    authenticodePath
+                ],
+                StringComparer.Ordinal);
+            if (!expectedEvidencePaths.SetEquals(documents.Keys))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized publication evidence file scope drifted");
+            }
+            JsonElement composite = RequireObject(scope, "nativeEvidenceComposite");
+            if (!ExactPropertySet(
+                    composite,
+                    new HashSet<string>(
+                        [
+                            "authenticodeVerification",
+                            "nativeFinalization",
+                            "visualProof",
+                            "wrapper"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate native evidence composite property set drifted");
+            }
+            ValidateNativeContractReference(
+                composite,
+                "wrapper",
+                "chummer6-ui.preview-nightly-native-windows-evidence",
+                1,
+                nativePath,
+                documents[nativePath]);
+            ValidateNativeContractReference(
+                composite,
+                "nativeFinalization",
+                "chummer6-ui.preview-nightly-native-windows-finalization",
+                2,
+                nativeFinalizationPath,
+                documents[nativeFinalizationPath]);
+            ValidateNativeContractReference(
+                composite,
+                "visualProof",
+                "chummer6-ui.windows_installer_visual_proof",
+                1,
+                visualPath,
+                documents[visualPath]);
+            ValidateNativeContractReference(
+                composite,
+                "authenticodeVerification",
+                "chummer6-ui.windows-authenticode-verification",
+                1,
+                authenticodePath,
+                documents[authenticodePath]);
+            ValidatePublicationDigestAlias(
+                finalized,
+                scope,
+                "signingReceiptSha256",
+                documents[signingPath]);
+            ValidatePublicationDigestAlias(
+                finalized,
+                scope,
+                "nativeEvidenceSha256",
+                documents[nativePath]);
+            ValidatePublicationDigestAlias(
+                finalized,
+                scope,
+                "authenticodeVerificationSha256",
+                documents[authenticodePath]);
+            RequireExactString(finalized, "approvalSha256", documents[approvalPath].Sha256);
+            JsonElement visualDigests = RequireArray(finalized, "visualApprovalSha256");
+            if (visualDigests.GetArrayLength() != 1
+                || visualDigests[0].ValueKind != JsonValueKind.String
+                || !string.Equals(
+                    visualDigests[0].GetString(),
+                    documents[visualPath].Sha256,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized visual evidence digest drifted");
+            }
+            JsonElement actors = RequireObject(finalized, "actors");
+            string[] actorNames =
+                ["candidateProducer", "nativeCapture", "visualReviewer", "scopeApprover"];
+            if (!ExactPropertySet(
+                    actors,
+                    new HashSet<string>(actorNames, StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized publication actor property set drifted");
+            }
+            string[] actorValues = actorNames.Select(name => RequireString(actors, name)).ToArray();
+            string candidateActor = RequireString(actors, "candidateProducer");
+            string captureActor = RequireString(actors, "nativeCapture");
+            string visualActor = RequireString(actors, "visualReviewer");
+            string scopeActor = RequireString(actors, "scopeApprover");
+            if (actorValues.Any(actor => !GitHubLoginPattern.IsMatch(actor))
+                || !string.Equals(visualActor, scopeActor, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(candidateActor, scopeActor, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(captureActor, scopeActor, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    "candidate finalized publication review owner is not independent");
+            }
+            ValidateFinalNativeEvidenceDocuments(
+                documents,
+                candidate,
+                actors,
+                expectedWindows.Installer,
+                nativePackage,
+                nativePath,
+                nativeFinalizationPath,
+                visualPath,
+                authenticodePath);
+
+            byte[] candidateReceiptBytes = DecodeEmbedded(
+                RequireObject(custody, "registryPrepareCandidateReceipt"),
+                "Registry PREPARE candidate receipt",
+                "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json");
+            byte[] registryAuthorityBytes = DecodeEmbedded(
+                RequireObject(custody, "registryFinalizeAuthority"),
+                "Registry FINALIZE authority",
+                "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json");
+            byte[] finalizeBytes = DecodeEmbedded(
+                RequireObject(custody, "registryFinalizeReceipt"),
+                "Registry FINALIZE receipt",
+                "PREVIEW_PUBLICATION_DELTA_FINALIZE.json");
+            using JsonDocument candidateReceiptDocument = ParseStrictObject(
+                candidateReceiptBytes,
+                "Registry PREPARE candidate receipt");
+            using JsonDocument registryAuthorityDocument = ParseStrictObject(
+                registryAuthorityBytes,
+                "Registry FINALIZE authority");
+            using JsonDocument finalizeDocument = ParseStrictObject(
+                finalizeBytes,
+                "Registry FINALIZE receipt");
+            ValidateRegistryCandidateReceipt(
+                candidateReceiptDocument.RootElement,
+                candidateReceiptBytes,
+                canonicalBytes,
+                compatibilityBytes,
+                candidate,
+                scope);
+            ValidateRegistryFinalizeAuthority(
+                registryAuthorityDocument.RootElement,
+                candidateReceiptBytes,
+                canonicalBytes,
+                compatibilityBytes,
+                scopeDocument.Bytes,
+                candidate,
+                documents);
+            ValidateRegistryFinalizeReceipt(
+                finalizeDocument.RootElement,
+                registryAuthorityBytes,
+                candidateReceiptBytes,
+                canonicalBytes,
+                compatibilityBytes,
+                scopeDocument.Bytes,
+                candidate);
+            ValidateRegistryFinalizationSummary(
+                RequireObject(custody, "registryFinalization"),
+                candidateReceiptBytes,
+                registryAuthorityBytes,
+                finalizeBytes);
+        }
+        finally
+        {
+            foreach (CandidateEvidenceDocument evidence in documents.Values)
+            {
+                evidence.Dispose();
+            }
+        }
+    }
+
+    private static void ValidateFinalScopeTuple(
+        JsonElement row,
+        string role,
+        string platform,
+        string rid)
+    {
+        var keys = new HashSet<string>(
+            [
+                "artifactRole",
+                "consumerCommit",
+                "fileName",
+                "head",
+                "manifestRowSha256",
+                "path",
+                "platform",
+                "rid",
+                "sha256",
+                "sizeBytes",
+                "sourceReceipt"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(row, keys))
+        {
+            throw new InvalidDataException("candidate final scope tuple property set drifted");
+        }
+        RequireExactString(row, "head", "avalonia");
+        RequireExactString(row, "artifactRole", role);
+        RequireExactString(row, "platform", platform);
+        RequireExactString(row, "rid", rid);
+        if (!CommitPattern.IsMatch(RequireString(row, "consumerCommit")))
+        {
+            throw new InvalidDataException("candidate final scope tuple commit drifted");
+        }
+        _ = RequireSha256(row, "manifestRowSha256");
+        _ = RequireSha256(row, "sha256");
+        long size = RequireNonNegativeInt64(row, "sizeBytes");
+        string fileName = RequireString(row, "fileName");
+        string path = RequireString(row, "path");
+        if (size <= 0
+            || !IsCanonicalRelativePath(path)
+            || !string.Equals(path, $"files/{fileName}", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("candidate final scope tuple byte binding drifted");
+        }
+        JsonElement source = RequireObject(row, "sourceReceipt");
+        if (!ExactPropertySet(
+                source,
+                new HashSet<string>(
+                    ["contractName", "contractVersion", "path", "sha256"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate final scope source receipt drifted");
+        }
+        _ = RequireString(source, "contractName");
+        _ = RequirePositiveInt32(source, "contractVersion");
+        if (!IsCanonicalRelativePath(RequireString(source, "path")))
+        {
+            throw new InvalidDataException("candidate final scope source path drifted");
+        }
+        _ = RequireSha256(source, "sha256");
+    }
+
+    private static void ValidateFinalScopeArtifact(JsonElement row, CandidateArtifact expected)
+    {
+        if (!string.Equals(RequireString(row, "path"), expected.Path, StringComparison.Ordinal)
+            || !string.Equals(
+                RequireString(row, "fileName"),
+                expected.FileName,
+                StringComparison.Ordinal)
+            || !string.Equals(RequireSha256(row, "sha256"), expected.Sha256, StringComparison.Ordinal)
+            || RequireNonNegativeInt64(row, "sizeBytes") != expected.SizeBytes)
+        {
+            throw new InvalidDataException(
+                "candidate final scope Windows tuple differs from canonical manifest");
+        }
+    }
+
+    private static void ValidateFinalScopeInventory(
+        JsonElement scope,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory)
+    {
+        JsonElement rows = RequireArray(scope, "fullShelfInventory");
+        if (rows.GetArrayLength() != inventory.Count)
+        {
+            throw new InvalidDataException("candidate final scope inventory count drifted");
+        }
+        var expected = inventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
+        foreach (JsonElement row in rows.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["mode", "path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("candidate final scope inventory row drifted");
+            }
+            string path = RequireString(row, "path");
+            if (row.GetProperty("mode").ValueKind != JsonValueKind.Number
+                || !expected.TryGetValue(path, out ReleaseUploadCandidateInventoryRow? exact)
+                || exact != new ReleaseUploadCandidateInventoryRow(
+                    path,
+                    RequireNonNegativeInt64(row, "sizeBytes"),
+                    RequireSha256(row, "sha256")))
+            {
+                throw new InvalidDataException("candidate final scope inventory byte drifted");
+            }
+        }
+        _ = RequireSha256(scope, "fullShelfInventorySha256");
+    }
+
+    private static void ValidatePublicationDigestAlias(
+        JsonElement summary,
+        JsonElement scope,
+        string property,
+        CandidateEvidenceDocument document)
+    {
+        RequireExactString(summary, property, document.Sha256);
+        RequireExactString(scope, property, document.Sha256);
+    }
+
+    private static void ValidateNativeContractReference(
+        JsonElement composite,
+        string property,
+        string contractName,
+        int contractVersion,
+        string path,
+        CandidateEvidenceDocument document)
+    {
+        JsonElement reference = RequireObject(composite, property);
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(
+                    ["contractName", "contractVersion", "path", "sha256", "sizeBytes"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                $"candidate native evidence {property} reference property set drifted");
+        }
+        RequireExactString(reference, "contractName", contractName);
+        RequireExactInt32(reference, "contractVersion", contractVersion);
+        RequireExactString(reference, "path", path);
+        RequireExactString(reference, "sha256", document.Sha256);
+        if (RequirePositiveInt64(reference, "sizeBytes") != document.SizeBytes)
+        {
+            throw new InvalidDataException(
+                $"candidate native evidence {property} reference size drifted");
+        }
+    }
+
+    private static void ValidateFinalNativeEvidenceDocuments(
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        ReleaseUploadCandidateIdentity candidate,
+        JsonElement actors,
+        CandidateArtifact installer,
+        CandidateNativePackage nativePackage,
+        string nativePath,
+        string finalizationPath,
+        string visualPath,
+        string authenticodePath)
+    {
+        CandidateEvidenceDocument nativeDocument = documents[nativePath];
+        CandidateEvidenceDocument finalizationDocument = documents[finalizationPath];
+        CandidateEvidenceDocument visualDocument = documents[visualPath];
+        CandidateEvidenceDocument authenticodeDocument = documents[authenticodePath];
+        JsonElement native = nativeDocument.Root;
+        if (!ExactPropertySet(
+                native,
+                new HashSet<string>(
+                    [
+                        "archivePath",
+                        "archiveSha256",
+                        "authenticodeVerification",
+                        "candidateProvenance",
+                        "captureInventorySha256",
+                        "captureSource",
+                        "contractName",
+                        "contractVersion",
+                        "fileCount",
+                        "finalizationSha256",
+                        "finalizationSource",
+                        "finalizedInventorySha256",
+                        "githubActionsProvenance",
+                        "nativeFinalization",
+                        "progressLogSha256",
+                        "release",
+                        "scopeApproval",
+                        "startupReceiptSha256",
+                        "status",
+                        "treeSha256",
+                        "visualProof",
+                        "visualProofSha256",
+                        "visualReviewers"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final native wrapper property set drifted");
+        }
+        RequireExactString(
+            native,
+            "contractName",
+            "chummer6-ui.preview-nightly-native-windows-evidence");
+        RequireExactInt32(native, "contractVersion", 1);
+        RequireExactString(native, "status", "passed");
+        JsonElement release = RequireObject(native, "release");
+        RequireExactString(release, "channel", "preview");
+        RequireExactString(release, "version", candidate.Version);
+        _ = RequireSha256(native, "archiveSha256");
+        RequireExactString(
+            native,
+            "captureInventorySha256",
+            nativePackage.CaptureInventorySha256);
+        RequireExactString(native, "finalizationSha256", finalizationDocument.Sha256);
+        _ = RequireSha256(native, "finalizedInventorySha256");
+        _ = RequireSha256(native, "treeSha256");
+        _ = RequirePositiveInt64(native, "fileCount");
+        if (!IsCanonicalRelativePath(RequireString(native, "archivePath")))
+        {
+            throw new InvalidDataException("candidate final native archive path drifted");
+        }
+        ValidateByteReference(
+            native,
+            "nativeFinalization",
+            finalizationPath,
+            finalizationDocument.Bytes);
+        if (!CryptographicOperations.FixedTimeEquals(
+                finalizationDocument.Bytes,
+                nativePackage.FinalizationBytes))
+        {
+            throw new InvalidDataException(
+                "candidate final native finalization differs from raw v2 custody");
+        }
+        ValidateByteReference(native, "visualProof", visualPath, visualDocument.Bytes);
+
+        JsonElement candidateProvenance = RequireObject(native, "candidateProvenance");
+        JsonElement nativeCandidate = RequireObject(candidateProvenance, "candidate");
+        if (!JsonSemanticEquals(nativeCandidate, nativePackage.Candidate))
+        {
+            throw new InvalidDataException(
+                "candidate final native provenance differs from raw v2 capture");
+        }
+        RequireExactString(
+            nativeCandidate,
+            "actor",
+            RequireString(actors, "candidateProducer"));
+        JsonElement captureSource = RequireObject(native, "captureSource");
+        if (!JsonSemanticEquals(captureSource, nativePackage.CaptureSource))
+        {
+            throw new InvalidDataException(
+                "candidate final native capture source differs from raw v2 custody");
+        }
+        RequireExactString(captureSource, "actor", RequireString(actors, "nativeCapture"));
+        JsonElement finalizationSource = RequireObject(native, "finalizationSource");
+        if (!JsonSemanticEquals(finalizationSource, nativePackage.FinalizationSource))
+        {
+            throw new InvalidDataException(
+                "candidate final native finalization source differs from raw v2 custody");
+        }
+        RequireExactString(
+            finalizationSource,
+            "actor",
+            RequireString(actors, "scopeApprover"));
+        JsonElement visualDigests = RequireObject(native, "visualProofSha256");
+        JsonElement visualReviewers = RequireObject(native, "visualReviewers");
+        if (!ExactPropertySet(
+                visualDigests,
+                new HashSet<string>(["avalonia"], StringComparer.Ordinal))
+            || !ExactPropertySet(
+                visualReviewers,
+                new HashSet<string>(["avalonia"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate final native visual map drifted");
+        }
+        RequireExactString(visualDigests, "avalonia", visualDocument.Sha256);
+        RequireExactString(
+            visualReviewers,
+            "avalonia",
+            RequireString(actors, "visualReviewer"));
+        JsonElement nativeAuthenticode = RequireObject(native, "authenticodeVerification");
+        if (!ExactPropertySet(
+                nativeAuthenticode,
+                new HashSet<string>(
+                    [
+                        "path",
+                        "sha256",
+                        "signerCertificateSha256",
+                        "signerSpkiSha256",
+                        "sizeBytes",
+                        "timestampUtc"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final native Authenticode binding drifted");
+        }
+        RequireExactString(nativeAuthenticode, "path", authenticodePath);
+        RequireExactString(nativeAuthenticode, "sha256", authenticodeDocument.Sha256);
+        if (RequirePositiveInt64(nativeAuthenticode, "sizeBytes")
+            != authenticodeDocument.SizeBytes)
+        {
+            throw new InvalidDataException(
+                "candidate final native Authenticode size drifted");
+        }
+        _ = RequireSha256(nativeAuthenticode, "signerCertificateSha256");
+        _ = RequireSha256(nativeAuthenticode, "signerSpkiSha256");
+        _ = RequireUtcTimestamp(nativeAuthenticode, "timestampUtc");
+        if (!JsonSemanticEquals(
+                nativeAuthenticode,
+                RequireObject(
+                    visualDocument.Root,
+                    "authenticodeVerification")))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual Authenticode binding drifted");
+        }
+
+        JsonElement finalization = finalizationDocument.Root;
+        if (!ExactPropertySet(
+                finalization,
+                new HashSet<string>(
+                    [
+                        "authenticodeVerification",
+                        "captureInventorySha256",
+                        "captureSource",
+                        "contractName",
+                        "contractVersion",
+                        "finalizationSource",
+                        "generatedAt",
+                        "humanReviewConfirmed",
+                        "proofs",
+                        "reviewer",
+                        "reviewerWasCaptureActor",
+                        "scopeApproval",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final native finalization property set drifted");
+        }
+        RequireExactString(
+            finalization,
+            "contractName",
+            "chummer6-ui.preview-nightly-native-windows-finalization");
+        RequireExactInt32(finalization, "contractVersion", 2);
+        RequireExactString(finalization, "status", "passed");
+        RequireBoolean(finalization, "humanReviewConfirmed", expected: true);
+        RequireBoolean(finalization, "reviewerWasCaptureActor", expected: false);
+        RequireExactString(
+            finalization,
+            "reviewer",
+            RequireString(actors, "scopeApprover"));
+        RequireExactString(
+            finalization,
+            "captureInventorySha256",
+            RequireSha256(native, "captureInventorySha256"));
+        if (!JsonSemanticEquals(RequireObject(finalization, "captureSource"), captureSource)
+            || !JsonSemanticEquals(
+                RequireObject(finalization, "finalizationSource"),
+                finalizationSource))
+        {
+            throw new InvalidDataException(
+                "candidate final native workflow sources drifted");
+        }
+        _ = RequireUtcTimestamp(finalization, "generatedAt");
+        JsonElement proofs = RequireArray(finalization, "proofs");
+        if (proofs.GetArrayLength() != 1
+            || !ExactPropertySet(
+                proofs[0],
+                new HashSet<string>(["headId", "path", "sha256"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final native visual proof binding drifted");
+        }
+        RequireExactString(proofs[0], "headId", "avalonia");
+        RequireExactString(proofs[0], "path", visualPath);
+        _ = RequireSha256(proofs[0], "sha256");
+        JsonElement finalizationScope = RequireObject(finalization, "scopeApproval");
+        if (!ExactPropertySet(
+                finalizationScope,
+                new HashSet<string>(
+                    ["approver", "path", "scopeDecisionSha256", "sha256"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final native scope approval property set drifted");
+        }
+        RequireExactString(
+            finalizationScope,
+            "approver",
+            RequireString(actors, "scopeApprover"));
+        RequireExactString(
+            finalizationScope,
+            "path",
+            "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json");
+        _ = RequireSha256(finalizationScope, "scopeDecisionSha256");
+        _ = RequireSha256(finalizationScope, "sha256");
+
+        JsonElement visual = visualDocument.Root;
+        if (!ExactPropertySet(
+                visual,
+                new HashSet<string>(
+                    [
+                        "artifactDigest",
+                        "artifactFileName",
+                        "authenticodeVerification",
+                        "captureBinding",
+                        "channel",
+                        "channelId",
+                        "checks",
+                        "clippingReview",
+                        "contractName",
+                        "contractVersion",
+                        "contrastReview",
+                        "finalizationBinding",
+                        "generatedAt",
+                        "head",
+                        "headId",
+                        "platform",
+                        "readabilityReview",
+                        "releaseVersion",
+                        "review",
+                        "rid",
+                        "screenshots",
+                        "status",
+                        "version"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual proof property set drifted");
+        }
+        RequireExactString(
+            visual,
+            "contractName",
+            "chummer6-ui.windows_installer_visual_proof");
+        RequireExactInt32(visual, "contractVersion", 1);
+        RequireExactString(visual, "status", "passed");
+        RequireExactString(visual, "version", candidate.Version);
+        RequireExactString(visual, "releaseVersion", candidate.Version);
+        RequireExactString(visual, "channel", "preview");
+        RequireExactString(visual, "channelId", "preview");
+        RequireExactString(visual, "head", "avalonia");
+        RequireExactString(visual, "headId", "avalonia");
+        RequireExactString(visual, "platform", "windows");
+        RequireExactString(visual, "rid", WindowsRid);
+        RequireExactString(visual, "artifactFileName", installer.FileName);
+        RequireExactString(
+            visual,
+            "artifactDigest",
+            $"sha256:{installer.Sha256}");
+        _ = RequireUtcTimestamp(visual, "generatedAt");
+        JsonElement checks = RequireObject(visual, "checks");
+        if (!ExactPropertySet(
+                checks,
+                new HashSet<string>(
+                    ["capture_mode", "human_review_confirmed"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual checks property set drifted");
+        }
+        RequireExactString(checks, "capture_mode", "interactive");
+        RequireBoolean(checks, "human_review_confirmed", expected: true);
+        string visualReviewer = RequireString(actors, "visualReviewer");
+        ValidatePassedReview(visual, "readabilityReview", visualReviewer);
+        ValidatePassedReview(visual, "contrastReview", visualReviewer);
+        ValidatePassedReview(visual, "clippingReview", visualReviewer);
+        JsonElement review = RequireObject(visual, "review");
+        if (!ExactPropertySet(
+                review,
+                new HashSet<string>(
+                    [
+                        "allowlistSource",
+                        "authenticatedReviewer",
+                        "captureActor",
+                        "explicitConfirmations"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual review property set drifted");
+        }
+        RequireExactString(
+            review,
+            "authenticatedReviewer",
+            visualReviewer);
+        RequireExactString(
+            review,
+            "captureActor",
+            RequireString(actors, "nativeCapture"));
+        RequireExactString(
+            review,
+            "allowlistSource",
+            "repository variable plus protected environment");
+        JsonElement confirmations = RequireObject(review, "explicitConfirmations");
+        if (!ExactPropertySet(
+                confirmations,
+                new HashSet<string>(
+                    ["clipping", "contrast", "readability"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual confirmations property set drifted");
+        }
+        foreach (string confirmation in new[] { "clipping", "contrast", "readability" })
+        {
+            RequireExactString(confirmations, confirmation, "passed");
+        }
+        JsonElement captureBinding = RequireObject(visual, "captureBinding");
+        var captureBindingKeys = new HashSet<string>(
+            [
+                "artifactName",
+                "inventorySha256",
+                "ref",
+                "repository",
+                "runAttempt",
+                "runId",
+                "sha",
+                "workflow"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(captureBinding, captureBindingKeys))
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual capture binding property set drifted");
+        }
+        foreach (string property in captureBindingKeys.Where(
+                     static name => name != "inventorySha256"))
+        {
+            RequireExactString(
+                captureBinding,
+                property,
+                RequireString(nativePackage.CaptureSource, property));
+        }
+        RequireExactString(
+            captureBinding,
+            "inventorySha256",
+            nativePackage.CaptureInventorySha256);
+        if (!JsonSemanticEquals(
+                RequireObject(visual, "finalizationBinding"),
+                finalizationSource))
+        {
+            throw new InvalidDataException(
+                "candidate final native visual finalization binding drifted");
+        }
+        JsonElement screenshots = RequireArray(visual, "screenshots");
+        if (screenshots.GetArrayLength() != nativePackage.Screenshots.Count)
+        {
+            throw new InvalidDataException(
+                "candidate final portable visual screenshot count drifted");
+        }
+        string? previousDigest = null;
+        for (int index = 0; index < nativePackage.Screenshots.Count; index++)
+        {
+            JsonElement screenshot = screenshots[index];
+            CandidateScreenshotBinding rawScreenshot = nativePackage.Screenshots[index];
+            if (!ExactPropertySet(
+                    screenshot,
+                    new HashSet<string>(["path", "role", "sha256"], StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate final portable visual screenshot property set drifted");
+            }
+            RequireExactString(screenshot, "role", rawScreenshot.Role);
+            RequireExactString(
+                screenshot,
+                "path",
+                $"proof/windows-native/{rawScreenshot.Path}");
+            string digest = RequireSha256(screenshot, "sha256");
+            if (!string.Equals(digest, rawScreenshot.Sha256, StringComparison.Ordinal)
+                || string.Equals(previousDigest, digest, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "candidate final portable visual screenshot digest drifted");
+            }
+            previousDigest = digest;
+        }
+
+        foreach (string property in new[]
+                 {
+                     "sha256",
+                     "signerCertificateSha256",
+                     "signerSpkiSha256",
+                     "timestampUtc"
+                 })
+        {
+            RequireExactString(
+                nativeAuthenticode,
+                property,
+                RequireString(nativePackage.AuthenticodeVerification, property));
+        }
+        if (RequirePositiveInt64(nativeAuthenticode, "sizeBytes")
+            != RequirePositiveInt64(nativePackage.AuthenticodeVerification, "sizeBytes"))
+        {
+            throw new InvalidDataException(
+                "candidate final portable Authenticode size differs from raw v2 custody");
+        }
+    }
+
+    private static void ValidateRegistryCandidateReceipt(
+        JsonElement receipt,
+        byte[] receiptBytes,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        JsonElement scope)
+    {
+        if (!ExactPropertySet(
+                receipt,
+                new HashSet<string>(
+                    [
+                        "canonicalManifest",
+                        "channel",
+                        "compatibilityManifest",
+                        "compositionInput",
+                        "compositionInputDocument",
+                        "contractName",
+                        "contractVersion",
+                        "deltaPlatforms",
+                        "deployAuthority",
+                        "evidencePlatforms",
+                        "fullShelfInventory",
+                        "fullShelfInventorySha256",
+                        "incumbentDesktopTupleSetSha256",
+                        "incumbentCanonicalManifestBytesBase64",
+                        "incumbentSnapshotSha256",
+                        "nonPublishedEvidenceTupleSetSha256",
+                        "postPublicationTupleSetSha256",
+                        "publicationDeltaTupleSetSha256",
+                        "publicationEligible",
+                        "publicationStatus",
+                        "registryProjectionInputs",
+                        "releaseUploadAuthority",
+                        "routeAuthority",
+                        "releaseVersion",
+                        "retainedPlatforms",
+                        "retainedTupleSetSha256",
+                        "shelfPlatforms"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "Registry PREPARE candidate property set drifted");
+        }
+        RequireExactString(
+            receipt,
+            "contractName",
+            "chummer.registry.preview-publication-delta-candidate");
+        RequireExactInt32(receipt, "contractVersion", 1);
+        RequireExactString(receipt, "channel", "preview");
+        RequireExactString(receipt, "releaseVersion", candidate.Version);
+        RequireExactString(receipt, "publicationStatus", "review_required");
+        RequireBoolean(receipt, "publicationEligible", expected: false);
+        RequireBoolean(receipt, "releaseUploadAuthority", expected: false);
+        RequireBoolean(receipt, "deployAuthority", expected: false);
+        RequireBoolean(receipt, "routeAuthority", expected: false);
+        ValidateExactStringArray(receipt, "deltaPlatforms", ["windows"]);
+        ValidateExactStringArray(receipt, "evidencePlatforms", ["linux"]);
+        ValidateByteReference(
+            receipt,
+            "canonicalManifest",
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes);
+        ValidateByteReference(
+            receipt,
+            "compatibilityManifest",
+            "releases.json",
+            compatibilityBytes);
+        _ = RequireSha256(receipt, "fullShelfInventorySha256");
+        _ = RequireSha256(receipt, "incumbentDesktopTupleSetSha256");
+        _ = RequireSha256(receipt, "incumbentSnapshotSha256");
+        _ = RequireSha256(receipt, "nonPublishedEvidenceTupleSetSha256");
+        _ = RequireSha256(receipt, "postPublicationTupleSetSha256");
+        _ = RequireSha256(receipt, "publicationDeltaTupleSetSha256");
+        _ = RequireSha256(receipt, "retainedTupleSetSha256");
+        JsonElement projectionInputs = RequireObject(receipt, "registryProjectionInputs");
+        var projectionPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["materializer"] = "scripts/materialize_preview_publication_delta.py",
+            ["releaseChannelMaterializer"] = "scripts/materialize_public_release_channel.py",
+            ["schema"] = "contracts/preview-publication-delta-v1.schema.json",
+            ["verifier"] = "scripts/verify_public_release_channel.py"
+        };
+        if (!ExactPropertySet(
+                projectionInputs,
+                new HashSet<string>(projectionPaths.Keys, StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("Registry projection input property set drifted");
+        }
+        foreach ((string name, string path) in projectionPaths)
+        {
+            ValidateByteReferenceShape(
+                RequireObject(projectionInputs, name),
+                path,
+                $"Registry projection {name}");
+        }
+        JsonElement prepare = RequireObject(scope, "registryPrepare");
+        RequireExactString(prepare, "candidateReceiptSha256", Sha256(receiptBytes));
+        RequireExactString(prepare, "status", "review_required");
+        RequireBoolean(prepare, "wholeDirectoryVerified", expected: true);
+        RequireBoolean(prepare, "finalizeAvailable", expected: true);
+        if (!prepare.TryGetProperty("finalizeReceipt", out JsonElement unavailableFinalize)
+            || unavailableFinalize.ValueKind != JsonValueKind.Null)
+        {
+            throw new InvalidDataException(
+                "Registry PREPARE binding claims an early finalize receipt");
+        }
+        foreach (string name in new[]
+                 {
+                     "publicationEligible",
+                     "releaseUploadAuthority",
+                     "deployAuthority",
+                     "routeAuthority"
+                 })
+        {
+            RequireBoolean(prepare, name, expected: false);
+        }
+    }
+
+    private static void ValidateRegistryFinalizeAuthority(
+        JsonElement authority,
+        byte[] candidateReceiptBytes,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        byte[] scopeBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> evidenceDocuments)
+    {
+        if (!ExactPropertySet(
+                authority,
+                new HashSet<string>(
+                    [
+                        "candidateImportAuthority",
+                        "candidateReceipt",
+                        "candidateReviewAuthority",
+                        "canonicalManifest",
+                        "channel",
+                        "compatibilityManifest",
+                        "compositionInputSha256",
+                        "contractName",
+                        "contractVersion",
+                        "deltaPlatforms",
+                        "deployAuthority",
+                        "dispositions",
+                        "evidence",
+                        "evidencePlatforms",
+                        "fullShelfInventorySha256",
+                        "incumbentSnapshotSha256",
+                        "nonPublishedEvidenceTupleSetSha256",
+                        "postPublicationTupleSetSha256",
+                        "publicationDeltaTupleSetSha256",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "releaseVersion",
+                        "retainedPlatforms",
+                        "retainedTupleSetSha256",
+                        "routeAuthority",
+                        "scope",
+                        "shelfPlatforms",
+                        "sourceScope"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("Registry FINALIZE authority property set drifted");
+        }
+        RequireExactString(
+            authority,
+            "contractName",
+            "chummer.registry.preview-publication-delta-authority");
+        RequireExactInt32(authority, "contractVersion", 1);
+        RequireExactString(authority, "channel", "preview");
+        RequireExactString(authority, "releaseVersion", candidate.Version);
+        RequireExactString(authority, "scope", "windows_only");
+        RequireBoolean(authority, "candidateImportAuthority", expected: true);
+        RequireBoolean(authority, "candidateReviewAuthority", expected: true);
+        RequireBoolean(authority, "publicationEligible", expected: false);
+        RequireBoolean(authority, "releaseUploadAuthority", expected: false);
+        RequireBoolean(authority, "deployAuthority", expected: false);
+        RequireBoolean(authority, "routeAuthority", expected: false);
+        ValidateExactStringArray(authority, "deltaPlatforms", ["windows"]);
+        ValidateExactStringArray(authority, "evidencePlatforms", ["linux"]);
+        ValidateByteReference(
+            authority,
+            "candidateReceipt",
+            "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json",
+            candidateReceiptBytes);
+        ValidateByteReference(
+            authority,
+            "canonicalManifest",
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes);
+        ValidateByteReference(
+            authority,
+            "compatibilityManifest",
+            "releases.json",
+            compatibilityBytes);
+        ValidateByteReference(
+            authority,
+            "sourceScope",
+            "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json",
+            scopeBytes);
+        _ = RequireSha256(authority, "compositionInputSha256");
+        foreach (string property in new[]
+                 {
+                     "fullShelfInventorySha256",
+                     "incumbentSnapshotSha256",
+                     "nonPublishedEvidenceTupleSetSha256",
+                     "postPublicationTupleSetSha256",
+                     "publicationDeltaTupleSetSha256",
+                     "retainedTupleSetSha256"
+                 })
+        {
+            _ = RequireSha256(authority, property);
+        }
+        JsonElement dispositions = RequireArray(authority, "dispositions");
+        int deltaCount = 0;
+        foreach (JsonElement row in dispositions.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        [
+                            "artifactId",
+                            "disposition",
+                            "head",
+                            "platform",
+                            "rid",
+                            "sha256",
+                            "sizeBytes",
+                            "sourceManifestSha256",
+                            "sourceReleaseVersion",
+                            "sourceSnapshotSha256"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "Registry FINALIZE disposition property set drifted");
+            }
+            string disposition = RequireString(row, "disposition");
+            if (disposition == "delta")
+            {
+                deltaCount++;
+                RequireExactString(row, "platform", "windows");
+                RequireExactString(row, "rid", WindowsRid);
+            }
+            else if (disposition == "retained_incumbent")
+            {
+                string platform = RequireString(row, "platform");
+                if (platform is not "linux" and not "macos")
+                {
+                    throw new InvalidDataException(
+                        "Registry retained disposition is not non-Windows");
+                }
+            }
+            else
+            {
+                throw new InvalidDataException("Registry disposition is invalid");
+            }
+            RequireExactString(row, "head", "avalonia");
+            _ = RequireString(row, "artifactId");
+            _ = RequireSha256(row, "sha256");
+            _ = RequirePositiveInt64(row, "sizeBytes");
+            _ = RequireSha256(row, "sourceManifestSha256");
+            _ = RequireString(row, "sourceReleaseVersion");
+            _ = RequireSha256(row, "sourceSnapshotSha256");
+        }
+        if (dispositions.GetArrayLength() == 0 || deltaCount != 1)
+        {
+            throw new InvalidDataException(
+                "Registry FINALIZE authority lacks one Windows delta");
+        }
+        JsonElement evidence = RequireObject(authority, "evidence");
+        if (!ExactPropertySet(
+                evidence,
+                new HashSet<string>(
+                    ["approval", "nativeEvidence", "signingReceipt", "visualEvidence"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("Registry FINALIZE evidence set drifted");
+        }
+        ValidateEvidenceByteReference(
+            evidence,
+            "approval",
+            evidenceDocuments);
+        ValidateEvidenceByteReference(
+            evidence,
+            "nativeEvidence",
+            evidenceDocuments);
+        ValidateEvidenceByteReference(
+            evidence,
+            "signingReceipt",
+            evidenceDocuments);
+        JsonElement visuals = RequireArray(evidence, "visualEvidence");
+        if (visuals.GetArrayLength() != 1)
+        {
+            throw new InvalidDataException("Registry FINALIZE visual evidence set drifted");
+        }
+        ValidateEvidenceByteReference(visuals[0], evidenceDocuments, "Registry visual evidence");
+    }
+
+    private static void ValidateRegistryFinalizeReceipt(
+        JsonElement receipt,
+        byte[] authorityBytes,
+        byte[] candidateReceiptBytes,
+        byte[] canonicalBytes,
+        byte[] compatibilityBytes,
+        byte[] scopeBytes,
+        ReleaseUploadCandidateIdentity candidate)
+    {
+        if (!ExactPropertySet(
+                receipt,
+                new HashSet<string>(
+                    [
+                        "authority",
+                        "candidateBytesMutated",
+                        "candidateImportAuthority",
+                        "candidateReceipt",
+                        "candidateReviewAuthority",
+                        "canonicalManifest",
+                        "channel",
+                        "compatibilityManifest",
+                        "contractName",
+                        "contractVersion",
+                        "deployAuthority",
+                        "fullShelfInventorySha256",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "releaseVersion",
+                        "routeAuthority",
+                        "sourceScope",
+                        "verificationStatus"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("Registry FINALIZE receipt property set drifted");
+        }
+        RequireExactString(
+            receipt,
+            "contractName",
+            "chummer.registry.preview-publication-delta-finalize");
+        RequireExactInt32(receipt, "contractVersion", 1);
+        RequireExactString(receipt, "channel", "preview");
+        RequireExactString(receipt, "releaseVersion", candidate.Version);
+        RequireExactString(receipt, "verificationStatus", "finalized");
+        RequireBoolean(receipt, "candidateBytesMutated", expected: false);
+        RequireBoolean(receipt, "candidateImportAuthority", expected: true);
+        RequireBoolean(receipt, "candidateReviewAuthority", expected: true);
+        RequireBoolean(receipt, "publicationEligible", expected: false);
+        RequireBoolean(receipt, "releaseUploadAuthority", expected: false);
+        RequireBoolean(receipt, "deployAuthority", expected: false);
+        RequireBoolean(receipt, "routeAuthority", expected: false);
+        _ = RequireSha256(receipt, "fullShelfInventorySha256");
+        ValidateByteReference(
+            receipt,
+            "authority",
+            "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json",
+            authorityBytes);
+        ValidateByteReference(
+            receipt,
+            "candidateReceipt",
+            "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json",
+            candidateReceiptBytes);
+        ValidateByteReference(
+            receipt,
+            "canonicalManifest",
+            "RELEASE_CHANNEL.generated.json",
+            canonicalBytes);
+        ValidateByteReference(
+            receipt,
+            "compatibilityManifest",
+            "releases.json",
+            compatibilityBytes);
+        ValidateByteReference(
+            receipt,
+            "sourceScope",
+            "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json",
+            scopeBytes);
+    }
+
+    private static void ValidateRegistryFinalizationSummary(
+        JsonElement summary,
+        byte[] candidateReceiptBytes,
+        byte[] authorityBytes,
+        byte[] finalizeBytes)
+    {
+        if (!ExactPropertySet(
+                summary,
+                new HashSet<string>(
+                    [
+                        "status",
+                        "candidateImportAuthority",
+                        "candidateReviewAuthority",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "deployAuthority",
+                        "routeAuthority",
+                        "scope",
+                        "exactIncomingDesktopScope",
+                        "candidateReceiptSha256",
+                        "authoritySha256",
+                        "finalizeReceiptSha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("Registry finalization summary property set drifted");
+        }
+        RequireExactString(summary, "status", "finalized");
+        RequireExactString(summary, "scope", "windows_only");
+        RequireExactString(
+            summary,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        RequireBoolean(summary, "candidateImportAuthority", expected: true);
+        RequireBoolean(summary, "candidateReviewAuthority", expected: true);
+        RequireBoolean(summary, "publicationEligible", expected: false);
+        RequireBoolean(summary, "releaseUploadAuthority", expected: false);
+        RequireBoolean(summary, "deployAuthority", expected: false);
+        RequireBoolean(summary, "routeAuthority", expected: false);
+        RequireExactString(summary, "candidateReceiptSha256", Sha256(candidateReceiptBytes));
+        RequireExactString(summary, "authoritySha256", Sha256(authorityBytes));
+        RequireExactString(summary, "finalizeReceiptSha256", Sha256(finalizeBytes));
+    }
+
+    private static void ValidateExactStringArray(
+        JsonElement parent,
+        string property,
+        IReadOnlyList<string> expected)
+    {
+        JsonElement values = RequireArray(parent, property);
+        string[] actual = values.EnumerateArray().Select(value =>
+            value.ValueKind == JsonValueKind.String && value.GetString() is { } text
+                ? text
+                : throw new InvalidDataException($"{property} contains a non-string")).ToArray();
+        if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException($"{property} scope drifted");
+        }
+    }
+
+    private static void ValidateByteReference(
+        JsonElement parent,
+        string property,
+        string expectedPath,
+        byte[] expectedBytes)
+    {
+        JsonElement reference = RequireObject(parent, property);
+        ValidateByteReferenceShape(reference, expectedPath, property);
+        RequireExactString(reference, "sha256", Sha256(expectedBytes));
+        if (RequirePositiveInt64(reference, "sizeBytes") != expectedBytes.LongLength)
+        {
+            throw new InvalidDataException($"{property} byte-reference size drifted");
+        }
+    }
+
+    private static void ValidateByteReferenceShape(
+        JsonElement reference,
+        string expectedPath,
+        string label)
+    {
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} byte-reference property set drifted");
+        }
+        RequireExactString(reference, "path", expectedPath);
+        _ = RequireSha256(reference, "sha256");
+        _ = RequirePositiveInt64(reference, "sizeBytes");
+    }
+
+    private static void ValidateEvidenceByteReference(
+        JsonElement parent,
+        string property,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents)
+        => ValidateEvidenceByteReference(
+            RequireObject(parent, property),
+            documents,
+            $"Registry evidence {property}");
+
+    private static void ValidateEvidenceByteReference(
+        JsonElement reference,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        string label)
+    {
+        if (!ExactPropertySet(
+                reference,
+                new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} byte-reference property set drifted");
+        }
+        string path = RequireString(reference, "path");
+        if (!documents.TryGetValue(path, out CandidateEvidenceDocument? document))
+        {
+            throw new InvalidDataException($"{label} is absent from final UI custody");
+        }
+        RequireExactString(reference, "sha256", document.Sha256);
+        if (RequirePositiveInt64(reference, "sizeBytes") != document.SizeBytes)
+        {
+            throw new InvalidDataException($"{label} size drifted");
+        }
+    }
+
+    private static CandidateNativePackage ValidateCandidateNativeEvidence(
         JsonElement native,
         JsonElement canonical,
         ReleaseUploadCandidateIdentity candidate,
@@ -674,7 +2187,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 provenance,
                 "contractName",
                 "chummer6-ui.preview-nightly-candidate-content-inventory");
-            RequireExactInt32(provenance, "contractVersion", 1);
+            RequireExactInt32(provenance, "contractVersion", 2);
             JsonElement release = RequireObject(provenance, "release");
             RequireExactString(release, "channel", scope.Channel);
             RequireExactString(release, "version", scope.Version);
@@ -686,17 +2199,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     RequireArray(provenance, "files"),
                     "candidate native-Windows content inventory",
                     allowEmpty: false);
-            string[] expectedContentPaths =
-            [
-                "RELEASE_CHANNEL.generated.json",
-                .. scope.Heads.SelectMany(head => new[]
-                {
-                    scope.Artifacts[head].Installer.Path,
-                    scope.Artifacts[head].Payload.Path
-                }).Order(StringComparer.Ordinal)
-            ];
-            if (!provenanceRows.Select(static row => row.Path).SequenceEqual(expectedContentPaths)
-                || !JsonSemanticEquals(
+            if (!JsonSemanticEquals(
                     provenance,
                     RequireObject(native, "candidateContentInventory"))
                 || !string.Equals(
@@ -708,31 +2211,45 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     "candidate native-Windows content inventory binding drifted");
             }
             var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
-            if (provenanceRows.Any(row =>
-                    !candidateByPath.TryGetValue(row.Path, out ReleaseUploadCandidateInventoryRow? exact)
-                    || exact != row))
+            var provenanceByPath = provenanceRows.ToDictionary(
+                static row => row.Path,
+                StringComparer.Ordinal);
+            if (candidateByPath.Any(pair =>
+                    !provenanceByPath.TryGetValue(
+                        pair.Key,
+                        out ReleaseUploadCandidateInventoryRow? exact)
+                    || exact != pair.Value))
             {
                 throw new InvalidDataException("candidate native-Windows content bytes drifted");
             }
-            if (!candidateByPath.TryGetValue(
-                    CandidateUploadContentInventoryFileName,
-                    out ReleaseUploadCandidateInventoryRow? uploadedInventory)
-                || uploadedInventory != new ReleaseUploadCandidateInventoryRow(
-                    CandidateUploadContentInventoryFileName,
-                    provenanceDocument.SizeBytes,
-                    provenanceDocument.Sha256))
-            {
-                throw new InvalidDataException(
-                    "candidate uploaded content inventory differs from native-Windows provenance");
-            }
-
             CandidateEvidenceDocument captureDocument = documents[CaptureFileName];
             JsonElement capture = captureDocument.Root;
+            if (!ExactPropertySet(
+                    capture,
+                    new HashSet<string>(
+                        [
+                            "authenticodeVerification",
+                            "candidate",
+                            "captureMode",
+                            "channelId",
+                            "contractName",
+                            "contractVersion",
+                            "generatedAt",
+                            "heads",
+                            "source",
+                            "status",
+                            "version"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate Windows-only native capture property set drifted");
+            }
             RequireExactString(
                 capture,
                 "contractName",
                 "chummer6-ui.preview-nightly-native-windows-capture");
-            RequireExactInt32(capture, "contractVersion", 1);
+            RequireExactInt32(capture, "contractVersion", 2);
             RequireExactString(capture, "status", "captured");
             RequireExactString(capture, "captureMode", "interactive");
             RequireExactString(capture, "version", scope.Version);
@@ -746,13 +2263,23 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 RequireObject(capture, "candidate"),
                 captureSource,
                 documents,
+                finalizedByPath,
                 candidate.CanonicalManifestSha256,
                 summaryCaptureAt);
+            JsonElement captureAuthenticode = RequireObject(
+                capture,
+                "authenticodeVerification");
+            ValidateAuthenticodeInventoryBinding(
+                captureAuthenticode,
+                "authenticode/AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json",
+                finalizedByPath,
+                "candidate capture Authenticode verification");
             IReadOnlyDictionary<string, IReadOnlyList<CandidateScreenshotBinding>>
                 captureScreenshots = ValidateCaptureHeads(
                 RequireArray(capture, "heads"),
                 scope,
-                finalizedByPath);
+                finalizedByPath,
+                captureAuthenticode);
 
             CandidateEvidenceDocument captureInventoryDocument =
                 documents[CaptureInventoryFileName];
@@ -776,7 +2303,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 captureInventory,
                 "contractName",
                 "chummer6-ui.preview-nightly-native-windows-capture-inventory");
-            RequireExactInt32(captureInventory, "contractVersion", 1);
+            RequireExactInt32(captureInventory, "contractVersion", 2);
             RequireExactString(
                 captureInventory,
                 "captureContract",
@@ -790,20 +2317,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 RequireArray(captureInventory, "files"),
                 "candidate native-Windows capture inventory",
                 allowEmpty: false);
-            string[] expectedCapturePaths =
-            [
-                CaptureFileName,
-                CandidateProvenanceInventoryFileName,
-                CandidateProvenanceExportFileName,
-                .. scope.Heads.SelectMany(head => new[]
-                {
-                    $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json",
-                    $"startup-smoke/windows-installer-progress-{head}-{WindowsRid}.log",
-                    $"screenshots/windows-installer-{head}-{WindowsRid}-progress.png",
-                    $"screenshots/windows-installer-{head}-{WindowsRid}-completion.png"
-                })
-            ];
-            Array.Sort(expectedCapturePaths, StringComparer.Ordinal);
+            string[] expectedCapturePaths = finalizedByPath.Keys
+                .Where(path => path is not CaptureInventoryFileName
+                    and not FinalizationFileName
+                    and not "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json"
+                    && !path.StartsWith(
+                        "WINDOWS_INSTALLER_VISUAL_PROOF-",
+                        StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
             if (!captureRows.Select(static row => row.Path).SequenceEqual(expectedCapturePaths)
                 || captureRows.Any(row =>
                     !finalizedByPath.TryGetValue(
@@ -821,11 +2343,34 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 captureInventorySha256);
 
             JsonElement finalization = documents[FinalizationFileName].Root;
+            if (!ExactPropertySet(
+                    finalization,
+                    new HashSet<string>(
+                        [
+                            "authenticodeVerification",
+                            "captureInventorySha256",
+                            "captureSource",
+                            "contractName",
+                            "contractVersion",
+                            "finalizationSource",
+                            "generatedAt",
+                            "humanReviewConfirmed",
+                            "proofs",
+                            "reviewer",
+                            "reviewerWasCaptureActor",
+                            "scopeApproval",
+                            "status"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate Windows-only native finalization property set drifted");
+            }
             RequireExactString(
                 finalization,
                 "contractName",
                 "chummer6-ui.preview-nightly-native-windows-finalization");
-            RequireExactInt32(finalization, "contractVersion", 1);
+            RequireExactInt32(finalization, "contractVersion", 2);
             RequireExactString(finalization, "status", "passed");
             RequireBoolean(finalization, "humanReviewConfirmed", expected: true);
             RequireBoolean(finalization, "reviewerWasCaptureActor", expected: false);
@@ -843,6 +2388,30 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             {
                 throw new InvalidDataException("candidate native-Windows finalization receipt drifted");
             }
+            if (!JsonSemanticEquals(
+                    RequireObject(finalization, "authenticodeVerification"),
+                    captureAuthenticode))
+            {
+                throw new InvalidDataException(
+                    "candidate native-Windows Authenticode finalization binding drifted");
+            }
+            JsonElement scopeApproval = RequireObject(finalization, "scopeApproval");
+            if (!ExactPropertySet(
+                    scopeApproval,
+                    new HashSet<string>(
+                        ["approver", "path", "scopeDecisionSha256", "sha256"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    "candidate native-Windows scope approval binding drifted");
+            }
+            RequireExactString(scopeApproval, "approver", reviewer);
+            RequireExactString(
+                scopeApproval,
+                "path",
+                "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json");
+            _ = RequireSha256(scopeApproval, "scopeDecisionSha256");
+            _ = RequireSha256(scopeApproval, "sha256");
             JsonElement proofs = RequireArray(finalization, "proofs");
             if (proofs.GetArrayLength() != scope.Heads.Count)
             {
@@ -878,7 +2447,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 StringComparer.Ordinal)
             {
                 CaptureInventoryFileName,
-                FinalizationFileName
+                FinalizationFileName,
+                "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json"
             };
             expectedFinalizedPaths.UnionWith(
                 proofsByHead.Values.Select(static proof => proof.Path));
@@ -894,19 +2464,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
 
             JsonElement export = documents[CandidateProvenanceExportFileName].Root;
-            CandidateEvidenceDocument exportDocument =
-                documents[CandidateProvenanceExportFileName];
-            if (!candidateByPath.TryGetValue(
-                    CandidateUploadExportFileName,
-                    out ReleaseUploadCandidateInventoryRow? uploadedExport)
-                || uploadedExport != new ReleaseUploadCandidateInventoryRow(
-                    CandidateUploadExportFileName,
-                    exportDocument.SizeBytes,
-                    exportDocument.Sha256))
-            {
-                throw new InvalidDataException(
-                    "candidate uploaded export receipt differs from native-Windows provenance");
-            }
             ValidateCandidateExportReceipt(
                 export,
                 captureCandidate,
@@ -965,6 +2522,39 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 }
 
                 JsonElement proof = proofsByHead[head].Root;
+                if (!ExactPropertySet(
+                        proof,
+                        new HashSet<string>(
+                            [
+                                "artifactDigest",
+                                "artifactFileName",
+                                "authenticodeVerification",
+                                "captureBinding",
+                                "channel",
+                                "channelId",
+                                "checks",
+                                "clippingReview",
+                                "contractName",
+                                "contractVersion",
+                                "contrastReview",
+                                "finalizationBinding",
+                                "generatedAt",
+                                "head",
+                                "headId",
+                                "platform",
+                                "readabilityReview",
+                                "releaseVersion",
+                                "review",
+                                "rid",
+                                "screenshots",
+                                "status",
+                                "version"
+                            ],
+                            StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException(
+                        "candidate raw visual proof property set drifted");
+                }
                 RequireExactString(
                     proof,
                     "contractName",
@@ -1082,6 +2672,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 {
                     throw new InvalidDataException("candidate visual finalization binding drifted");
                 }
+                if (!JsonSemanticEquals(
+                        RequireObject(proof, "authenticodeVerification"),
+                        captureAuthenticode))
+                {
+                    throw new InvalidDataException(
+                        "candidate visual Authenticode binding drifted");
+                }
                 JsonElement screenshots = RequireArray(proof, "screenshots");
                 if (screenshots.GetArrayLength() != 2)
                 {
@@ -1119,6 +2716,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "candidate visual screenshots differ from the capture head");
                 }
             }
+
+            return new CandidateNativePackage(
+                captureInventorySha256,
+                documents[FinalizationFileName].Bytes.ToArray(),
+                captureCandidate.Clone(),
+                captureSource.Clone(),
+                finalizationSource.Clone(),
+                captureAuthenticode.Clone(),
+                captureScreenshots["avalonia"].ToArray());
         }
         finally
         {
@@ -1170,13 +2776,17 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "candidate requiredDesktopHeads differs from the promoted Avalonia head");
         }
         JsonElement artifactsElement = RequireArray(canonical, "artifacts");
+        var candidateByPath = candidateInventory.ToDictionary(
+            static row => row.Path,
+            StringComparer.Ordinal);
+        var expectedFilePaths = new HashSet<string>(StringComparer.Ordinal);
         var windowsArtifacts = new List<JsonElement>();
         foreach (JsonElement artifact in artifactsElement.EnumerateArray())
         {
-            if (artifact.ValueKind != JsonValueKind.Object
-                || !HasExactString(artifact, "platform", "windows"))
+            if (artifact.ValueKind != JsonValueKind.Object)
             {
-                continue;
+                throw new InvalidDataException(
+                    "candidate release manifest contains a non-object artifact");
             }
             if (!artifact.TryGetProperty("head", out JsonElement artifactHead)
                 || artifactHead.ValueKind != JsonValueKind.String
@@ -1184,19 +2794,45 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 || !headSet.Contains(head))
             {
                 throw new InvalidDataException(
-                    "candidate release manifest contains a Windows artifact outside "
+                    "candidate release manifest contains a desktop artifact outside "
                     + "requiredDesktopHeads");
             }
-            if (!HasExactString(artifact, "rid", WindowsRid)
-                || !HasExactString(artifact, "kind", "installer"))
+            string platform = RequireString(artifact, "platform");
+            string rid = RequireString(artifact, "rid");
+            if (!HasExactString(artifact, "kind", "installer")
+                || (platform switch
+                    {
+                        "windows" => !string.Equals(rid, WindowsRid, StringComparison.Ordinal),
+                        "linux" => !string.Equals(rid, "linux-x64", StringComparison.Ordinal),
+                        "macos" => rid is not "osx-arm64" and not "osx-x64",
+                        _ => true
+                    }))
             {
                 throw new InvalidDataException(
-                    "candidate release manifest contains a Windows artifact outside "
-                    + "the exact required desktop tuple scope");
+                    "candidate release manifest contains an artifact outside "
+                    + "the exact finalized desktop shelf scope");
             }
-            windowsArtifacts.Add(artifact);
+            string fileName = RequireString(artifact, "fileName");
+            string digest = RequireSha256(artifact, "sha256");
+            long size = RequireNonNegativeInt64(artifact, "sizeBytes");
+            string path = $"files/{fileName}";
+            if (fileName.Contains('/')
+                || fileName.Contains('\\')
+                || size <= 0
+                || !expectedFilePaths.Add(path)
+                || !candidateByPath.TryGetValue(
+                    path,
+                    out ReleaseUploadCandidateInventoryRow? exact)
+                || exact != new ReleaseUploadCandidateInventoryRow(path, size, digest))
+            {
+                throw new InvalidDataException(
+                    "candidate desktop artifact differs from upload inventory");
+            }
+            if (string.Equals(platform, "windows", StringComparison.Ordinal))
+            {
+                windowsArtifacts.Add(artifact);
+            }
         }
-        var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
         var artifacts = new Dictionary<string, CandidateHeadArtifacts>(StringComparer.Ordinal);
         foreach (string head in heads)
         {
@@ -1231,13 +2867,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "payloadSizeBytes",
                         candidateByPath)));
         }
-        var expectedFilePaths = artifacts.Values
-            .SelectMany(static value => new[] { value.Installer.Path, value.Payload.Path })
-            .ToHashSet(StringComparer.Ordinal);
+        expectedFilePaths.UnionWith(
+            artifacts.Values.SelectMany(
+                static value => new[] { value.Installer.Path, value.Payload.Path }));
         var expectedCandidatePaths = expectedFilePaths
             .Append("RELEASE_CHANNEL.generated.json")
-            .Append(CandidateUploadContentInventoryFileName)
-            .Append(CandidateUploadExportFileName)
+            .Append("releases.json")
             .ToHashSet(StringComparer.Ordinal);
         var actualCandidatePaths = candidateInventory
             .Select(static row => row.Path)
@@ -1245,7 +2880,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         if (!actualCandidatePaths.SetEquals(expectedCandidatePaths))
         {
             throw new InvalidDataException(
-                "candidate upload inventory differs from the exact Avalonia UI export tree");
+                "candidate upload inventory differs from the exact finalized desktop shelf");
         }
         return new CandidateWindowsScope(version, channel, heads, artifacts);
     }
@@ -1283,7 +2918,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         ValidateCaptureHeads(
         JsonElement heads,
         CandidateWindowsScope scope,
-        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath)
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath,
+        JsonElement authenticodeVerification)
     {
         if (heads.GetArrayLength() != PromotedHeads.Length)
         {
@@ -1306,7 +2942,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                             "payload",
                             "receipt",
                             "progressLog",
-                            "screenshots"
+                            "screenshots",
+                            "authenticodeVerification"
                         ],
                         StringComparer.Ordinal)))
             {
@@ -1317,6 +2954,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             CandidateHeadArtifacts artifacts = scope.Artifacts[head];
             ValidateExportArtifactBinding(RequireObject(row, "installer"), artifacts.Installer);
             ValidateExportArtifactBinding(RequireObject(row, "payload"), artifacts.Payload);
+            if (!JsonSemanticEquals(
+                    RequireObject(row, "authenticodeVerification"),
+                    authenticodeVerification))
+            {
+                throw new InvalidDataException(
+                    "candidate capture head Authenticode binding drifted");
+            }
 
             ValidateCaptureEvidenceBinding(
                 RequireObject(row, "receipt"),
@@ -1376,6 +3020,43 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         return result;
     }
 
+    private static void ValidateAuthenticodeInventoryBinding(
+        JsonElement binding,
+        string expectedPath,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath,
+        string label)
+    {
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(
+                    [
+                        "path",
+                        "sha256",
+                        "signerCertificateSha256",
+                        "signerSpkiSha256",
+                        "sizeBytes",
+                        "timestampUtc"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+        RequireExactString(binding, "path", expectedPath);
+        string digest = RequireSha256(binding, "sha256");
+        long size = RequirePositiveInt64(binding, "sizeBytes");
+        _ = RequireSha256(binding, "signerCertificateSha256");
+        _ = RequireSha256(binding, "signerSpkiSha256");
+        _ = RequireUtcTimestamp(binding, "timestampUtc");
+        if (!finalizedByPath.TryGetValue(
+                expectedPath,
+                out ReleaseUploadCandidateInventoryRow? inventoryRow)
+            || inventoryRow.SizeBytes != size
+            || !string.Equals(inventoryRow.Sha256, digest, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} differs from finalized inventory");
+        }
+    }
+
     private static void ValidateCaptureEvidenceBinding(
         JsonElement binding,
         string expectedPath,
@@ -1404,6 +3085,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         JsonElement captureCandidate,
         JsonElement captureSource,
         IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath,
         string canonicalManifestSha256,
         DateTimeOffset captureGeneratedAt)
     {
@@ -1420,14 +3102,30 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "contentInventorySha256",
                 "exportReceipt",
                 "exportReceiptSha256",
+                "fullShelfCompatibilityManifest",
+                "fullShelfCompatibilityManifestPath",
+                "fullShelfCompatibilityManifestSha256",
+                "fullShelfManifest",
+                "fullShelfManifestPath",
+                "fullShelfManifestSha256",
                 "handoffSha256",
                 "manifestPath",
                 "manifestSha256",
+                "publicationScope",
+                "publicationScopePath",
+                "publicationScopeSha256",
                 "ref",
+                "registryPrepareFiles",
+                "registryPrepareSha256",
                 "repository",
                 "runAttempt",
                 "runId",
+                "scopeDecisionSha256",
                 "sha",
+                "signingReceipt",
+                "signingReceiptPath",
+                "signingReceiptSha256",
+                "supplyChain",
                 "workflow"
             ],
             StringComparer.Ordinal);
@@ -1456,8 +3154,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                      "authenticatedApiSha256",
                      "contentInventorySha256",
                      "exportReceiptSha256",
+                     "fullShelfCompatibilityManifestSha256",
+                     "fullShelfManifestSha256",
                      "handoffSha256",
-                     "manifestSha256"
+                     "manifestSha256",
+                     "publicationScopeSha256",
+                     "registryPrepareSha256",
+                     "scopeDecisionSha256",
+                     "signingReceiptSha256"
                  })
         {
             _ = RequireSha256(captureCandidate, property);
@@ -1506,7 +3210,75 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             "exportReceiptSha256",
             CandidateProvenanceExportFileName,
             documents);
+        ValidateCaptureInventoryBinding(
+            captureCandidate,
+            "fullShelfManifest",
+            "fullShelfManifestPath",
+            "fullShelfManifestSha256",
+            "RELEASE_CHANNEL.generated.json",
+            "candidate-provenance/RELEASE_CHANNEL.generated.json",
+            finalizedByPath);
+        RequireExactString(
+            captureCandidate,
+            "fullShelfManifestSha256",
+            canonicalManifestSha256);
+        ValidateCaptureInventoryBinding(
+            captureCandidate,
+            "fullShelfCompatibilityManifest",
+            "fullShelfCompatibilityManifestPath",
+            "fullShelfCompatibilityManifestSha256",
+            "releases.json",
+            "candidate-provenance/releases.json",
+            finalizedByPath);
+        ValidateCaptureInventoryBinding(
+            captureCandidate,
+            "publicationScope",
+            "publicationScopePath",
+            "publicationScopeSha256",
+            "publication-scope/PREVIEW_NIGHTLY_PUBLICATION_SCOPE_PROPOSAL.generated.json",
+            "candidate-provenance/publication-scope/"
+                + "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_PROPOSAL.generated.json",
+            finalizedByPath);
+        ValidateCaptureInventoryBinding(
+            captureCandidate,
+            "signingReceipt",
+            "signingReceiptPath",
+            "signingReceiptSha256",
+            "signing/signing-avalonia-win-x64.receipt.json",
+            "candidate-provenance/signing/signing-avalonia-win-x64.receipt.json",
+            finalizedByPath);
+        _ = RequireArray(captureCandidate, "registryPrepareFiles");
+        _ = RequireObject(captureCandidate, "supplyChain");
         return captureCandidate;
+    }
+
+    private static void ValidateCaptureInventoryBinding(
+        JsonElement captureCandidate,
+        string property,
+        string pathProperty,
+        string digestProperty,
+        string shelfPath,
+        string custodyPath,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> finalizedByPath)
+    {
+        JsonElement binding = RequireObject(captureCandidate, property);
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal))
+            || !finalizedByPath.TryGetValue(
+                custodyPath,
+                out ReleaseUploadCandidateInventoryRow? inventoryRow))
+        {
+            throw new InvalidDataException($"candidate capture {property} custody drifted");
+        }
+        RequireExactString(captureCandidate, pathProperty, shelfPath);
+        RequireExactString(binding, "path", custodyPath);
+        RequireExactString(binding, "sha256", inventoryRow.Sha256);
+        RequireExactString(captureCandidate, digestProperty, inventoryRow.Sha256);
+        if (RequirePositiveInt64(binding, "sizeBytes") != inventoryRow.SizeBytes)
+        {
+            throw new InvalidDataException($"candidate capture {property} size drifted");
+        }
     }
 
     private static void ValidateCaptureDocumentBinding(
@@ -1547,9 +3319,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "contractName",
                 "contractVersion",
                 "heads",
+                "publicationScope",
                 "release",
                 "source",
-                "status"
+                "status",
+                "supplyChain",
+                "supplyChainVerification"
             ],
             StringComparer.Ordinal);
         if (!ExactPropertySet(export, required))
@@ -1560,8 +3335,47 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             export,
             "contractName",
             "chummer6-ui.preview-nightly-candidate-export");
-        RequireExactInt32(export, "contractVersion", 1);
+        RequireExactInt32(export, "contractVersion", 2);
         RequireExactString(export, "status", "exported");
+
+        JsonElement publicationScope = RequireObject(export, "publicationScope");
+        if (!ExactPropertySet(
+                publicationScope,
+                new HashSet<string>(["registryPrepareSha256"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate export publication scope property set drifted");
+        }
+        RequireExactString(
+            publicationScope,
+            "registryPrepareSha256",
+            RequireSha256(captureCandidate, "registryPrepareSha256"));
+        if (!JsonSemanticEquals(
+                RequireObject(export, "supplyChain"),
+                RequireObject(captureCandidate, "supplyChain")))
+        {
+            throw new InvalidDataException("candidate export supply-chain binding drifted");
+        }
+        JsonElement supplyChainVerification = RequireObject(
+            export,
+            "supplyChainVerification");
+        if (!ExactPropertySet(
+                supplyChainVerification,
+                new HashSet<string>(
+                    ["mode", "releaseAuthoritative"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "candidate export supply-chain verification property set drifted");
+        }
+        RequireExactString(
+            supplyChainVerification,
+            "mode",
+            "release_authoritative");
+        RequireBoolean(
+            supplyChainVerification,
+            "releaseAuthoritative",
+            expected: true);
 
         JsonElement release = RequireObject(export, "release");
         if (!ExactPropertySet(
@@ -2109,14 +3923,24 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static long RequireNonNegativeInt64(JsonElement parent, string property)
         => parent.TryGetProperty(property, out JsonElement value)
            && value.ValueKind == JsonValueKind.Number
+           && HasCanonicalNonNegativeIntegerToken(value)
            && value.TryGetInt64(out long parsed)
            && parsed >= 0
             ? parsed
             : throw new InvalidDataException($"release upload {property} is invalid");
 
+    private static long RequirePositiveInt64(JsonElement parent, string property)
+    {
+        long value = RequireNonNegativeInt64(parent, property);
+        return value > 0
+            ? value
+            : throw new InvalidDataException($"release upload {property} is invalid");
+    }
+
     private static int RequirePositiveInt32(JsonElement parent, string property)
         => parent.TryGetProperty(property, out JsonElement value)
            && value.ValueKind == JsonValueKind.Number
+           && HasCanonicalNonNegativeIntegerToken(value)
            && value.TryGetInt32(out int parsed)
            && parsed > 0
             ? parsed
@@ -2145,11 +3969,24 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     {
         if (!parent.TryGetProperty(property, out JsonElement value)
             || value.ValueKind != JsonValueKind.Number
+            || !HasCanonicalNonNegativeIntegerToken(value)
             || !value.TryGetInt32(out int parsed)
             || parsed != expected)
         {
             throw new InvalidDataException($"release upload {property} drifted");
         }
+    }
+
+    private static bool HasCanonicalNonNegativeIntegerToken(JsonElement value)
+    {
+        string raw = value.GetRawText();
+        if (raw.Length == 1)
+        {
+            return raw[0] is >= '0' and <= '9';
+        }
+        return raw.Length > 1
+               && raw[0] is >= '1' and <= '9'
+               && raw.AsSpan(1).IndexOfAnyExceptInRange('0', '9') < 0;
     }
 
     private static DateTimeOffset RequireUtcTimestamp(JsonElement parent, string property)
@@ -2239,6 +4076,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string Role,
         string Path,
         string Sha256);
+
+    private sealed record CandidateNativePackage(
+        string CaptureInventorySha256,
+        byte[] FinalizationBytes,
+        JsonElement Candidate,
+        JsonElement CaptureSource,
+        JsonElement FinalizationSource,
+        JsonElement AuthenticodeVerification,
+        IReadOnlyList<CandidateScreenshotBinding> Screenshots);
 
     private sealed class CandidateEvidenceDocument : IDisposable
     {

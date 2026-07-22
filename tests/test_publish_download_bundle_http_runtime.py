@@ -285,12 +285,16 @@ class UploadRecorder:
     session_posts: int = 0
     file_posts: int = 0
     complete_posts: int = 0
+    stage_posts: int = 0
     paths: list[str] = field(default_factory=list)
     file_request_bodies: list[bytes] = field(default_factory=list)
     session_payload_overrides: dict[str, object] = field(default_factory=dict)
     completion_response_body: bytes | None = None
     completion_status: int = 200
     completion_response_headers: dict[str, str] = field(default_factory=dict)
+    stage_response_body: bytes | None = None
+    stage_status: int = 200
+    request_headers: list[dict[str, str]] = field(default_factory=list)
 
 
 @contextlib.contextmanager
@@ -298,6 +302,7 @@ def serve_upload_api(recorder: UploadRecorder):
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802
             recorder.paths.append(self.path)
+            recorder.request_headers.append({key: value for key, value in self.headers.items()})
             body_length = int(self.headers.get("Content-Length", "0") or "0")
             request_body = self.rfile.read(body_length) if body_length > 0 else b""
 
@@ -352,6 +357,36 @@ def serve_upload_api(recorder: UploadRecorder):
                             "apiKey": "proof-future-api-key",
                             "handoffCode": "proof-future-handoff-code",
                             "value": "eyJhbGciOiJIUzI1NiJ9.proof-future-jwt.signature",
+                        }
+                    ).encode("utf-8")
+                self.wfile.write(response_body)
+                return
+
+            if self.path.endswith("/stage"):
+                recorder.stage_posts += 1
+                self.send_response(recorder.stage_status)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                response_body = recorder.stage_response_body
+                if response_body is None:
+                    response_body = json.dumps(
+                        {
+                            "version": "run-test",
+                            "channel": "preview",
+                            "publishedAt": "2026-07-22T00:00:00Z",
+                            "candidateArtifactIds": ["avalonia-win-x64-installer"],
+                            "generationId": "gen-stage-proof",
+                            "stageReceiptId": "stage-proof",
+                            "stagedAtUtc": "2026-07-22T00:00:01Z",
+                            "inventoryDigest": "sha256:" + "1" * 64,
+                            "canonicalManifestSha256": "2" * 64,
+                            "compatibilityManifestSha256": "3" * 64,
+                            "targetPointerSha256": "4" * 64,
+                            "previousGenerationId": "gen-incumbent",
+                            "previousPointerSha256": "sha256:" + "5" * 64,
+                            "exactIncomingDesktopScope": "avalonia:windows:win-x64",
+                            "probeToken": "must-never-survive-sanitization",
+                            "probeTokenExpiresAtUtc": "2026-07-22T00:15:00Z",
                         }
                     ).encode("utf-8")
                 self.wfile.write(response_body)
@@ -661,6 +696,87 @@ def test_publish_download_bundle_http_canonicalizes_release_truth_before_upload(
         assert "review-required" in payload["supportabilitySummary"]
         assert "stale or incomplete proof receipts" in payload["supportabilitySummary"]
         assert "stale or incomplete proof receipts" in payload["knownIssueSummary"]
+
+
+def test_publish_download_bundle_http_stages_exact_windows_scope_without_completion(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    registry_root = write_registry(tmp_path / "registry")
+    recorder = UploadRecorder()
+
+    with serve_upload_api(recorder) as base_url:
+        result = run_publish_with_script(
+            SCRIPT,
+            bundle_root,
+            base_url,
+            registry_root,
+            extra_env={"CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1"},
+        )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert recorder.session_posts == 1
+    assert recorder.stage_posts == 1
+    assert recorder.complete_posts == 0
+    assert recorder.paths[-1].endswith(f"/{SESSION_ID}/stage")
+    assert all(not path.endswith("/complete") for path in recorder.paths)
+    assert {
+        headers.get("X-Chummer-Release-Exact-Incoming-Scope")
+        for headers in recorder.request_headers
+        if headers.get("X-Chummer-Release-Exact-Incoming-Scope")
+    } == {"avalonia:windows:win-x64"}
+    receipt = json.loads(
+        (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
+    )
+    assert receipt["completion"]["state"] == "staged"
+    assert receipt["stageResponse"]["exactIncomingDesktopScope"] == (
+        "avalonia:windows:win-x64"
+    )
+    stage_response = json.loads(
+        (bundle_root / "release-stage-response.json").read_text(encoding="utf-8")
+    )
+    assert stage_response["responseSanitized"] is True
+    assert stage_response["exactIncomingDesktopScope"] == "avalonia:windows:win-x64"
+    assert stage_response["inventoryDigest"] == "sha256:" + "1" * 64
+    assert stage_response["previousGenerationId"] == "gen-incumbent"
+    assert stage_response["previousPointerSha256"] == "sha256:" + "5" * 64
+    assert "probeToken" not in stage_response
+    assert "must-never-survive-sanitization" not in result.stdout
+    assert "must-never-survive-sanitization" not in result.stderr
+    assert "owner-only finalize_staged_release.py" in result.stdout
+
+
+def test_publish_download_bundle_http_retains_ambiguous_stage_handoff(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    registry_root = write_registry(tmp_path / "registry")
+    recorder = UploadRecorder(
+        stage_status=503,
+        stage_response_body=b'{"type":"stage-outcome-unknown","token":"must-not-leak"}',
+    )
+
+    with serve_upload_api(recorder) as base_url:
+        result = run_publish_with_script(
+            SCRIPT,
+            bundle_root,
+            base_url,
+            registry_root,
+            extra_env={"CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1"},
+        )
+
+    assert result.returncode != 0
+    assert recorder.stage_posts == 1
+    assert recorder.complete_posts == 0
+    assert "stage outcome is unknown" in result.stderr
+    assert "Do not create another session" in result.stderr
+    assert "must-not-leak" not in result.stdout
+    assert "must-not-leak" not in result.stderr
+    receipt = json.loads(
+        (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
+    )
+    assert receipt["completion"]["state"] == "stage_outcome_unknown"
+    assert not (bundle_root / "release-stage-response.json").exists()
 
 
 def test_publish_download_bundle_http_does_not_fail_after_publish_on_deep_response(tmp_path: Path) -> None:
