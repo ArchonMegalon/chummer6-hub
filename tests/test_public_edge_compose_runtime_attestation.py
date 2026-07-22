@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 
@@ -27,8 +28,16 @@ def load_module():
 
 
 def rendered_compose(
-    *, source_root: Path, build_context: Path, overlay_root: Path
+    *,
+    source_root: Path,
+    build_context: Path,
+    overlay_root: Path,
+    projection_root: Path,
+    runtime_proof_bind_source: Path | None = None,
 ) -> dict[str, object]:
+    if runtime_proof_bind_source is None:
+        runtime_proof_bind_source = fixture_runtime_proof(projection_root)
+
     def build(*, tool: bool = False) -> dict[str, object]:
         payload: dict[str, object] = {
             "context": str(build_context),
@@ -74,10 +83,6 @@ def rendered_compose(
     }
     downloads_source = (
         "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
-    )
-    hub_proof_source = (
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/"
-        "HUB_LOCAL_RELEASE_PROOF.generated.json"
     )
     return {
         "name": "chummer6-hub",
@@ -188,14 +193,13 @@ def rendered_compose(
                         "/windows-proof-upload-sessions",
                     ),
                     bind(
-                        hub_proof_source,
+                        str(runtime_proof_bind_source),
                         "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json",
                         read_only=True,
                     ),
                     bind(
-                        hub_proof_source,
-                        "/app/wwwroot/proofs/mac-codex-release/"
-                        "HUB_LOCAL_RELEASE_PROOF.generated.json",
+                        str(projection_root),
+                        "/public-projection",
                         read_only=True,
                     ),
                     bind(
@@ -319,28 +323,42 @@ def rendered_compose(
     }
 
 
-def fixture_roots(tmp_path: Path) -> tuple[Path, Path, Path]:
+def fixture_runtime_proof(projection_root: Path) -> Path:
+    return (
+        projection_root
+        / f"public-projection-{'a' * 64}"
+        / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+
+
+def fixture_roots(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     source_root = tmp_path / "source"
     build_context = tmp_path / "workspace"
     overlay_root = tmp_path / "overlay" / "app"
+    projection_root = tmp_path / "projection"
+    runtime_proof_bind_source = fixture_runtime_proof(projection_root)
     (source_root / "Chummer.Run.Api").mkdir(parents=True)
     build_context.mkdir()
     overlay_root.mkdir(parents=True)
+    runtime_proof_bind_source.parent.mkdir(parents=True)
+    runtime_proof_bind_source.write_text("{}\n", encoding="utf-8")
+    runtime_proof_bind_source.chmod(0o644)
     (source_root / "Chummer.Run.Api" / "Dockerfile").write_text(
         "FROM scratch\n", encoding="utf-8"
     )
-    return source_root, build_context, overlay_root
+    return source_root, build_context, overlay_root, projection_root
 
 
 def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environment(
     tmp_path: Path,
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
 
     receipt = module.validate_runtime(
@@ -349,12 +367,23 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=fixture_runtime_proof(projection_root),
         published_port=8091,
     )
     output = tmp_path / "receipt.json"
     module.atomic_write_json(output, receipt)
 
     assert receipt["status"] == "pass"
+    assert receipt["projectionRoot"] == str(projection_root)
+    assert receipt["projectionRootReadOnly"] is True
+    assert receipt["runtimeProofBindSource"] == str(
+        fixture_runtime_proof(projection_root)
+    )
+    assert receipt["runtimeProofBindSourceReadOnly"] is True
+    assert (
+        stat.S_IMODE(fixture_runtime_proof(projection_root).stat().st_mode) == 0o644
+    )
     assert receipt["operation"] == "deploy"
     assert receipt["releaseShelfPosture"] == {
         "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
@@ -373,6 +402,254 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
 
 
 @pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        ("obsolete-target", "mount targets are not canonical"),
+        ("wrong-source", "source is not canonical"),
+        ("read-write", "must be read-only"),
+        ("duplicate-target", "mount targets must be unique strings"),
+        ("missing", "mount set is not canonical"),
+        ("wrong-source-kind", "type policy drifted"),
+        ("propagation", "type policy drifted"),
+    ],
+)
+def test_compose_attestation_rejects_projection_mount_drift(
+    tmp_path: Path,
+    drift: str,
+    message: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+    )
+    volumes = payload["services"]["chummer-portal"]["volumes"]
+    projection_mount = next(
+        mount for mount in volumes if mount["target"] == "/public-projection"
+    )
+
+    if drift == "obsolete-target":
+        projection_mount["target"] = (
+            "/app/wwwroot/proofs/mac-codex-release/"
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+    elif drift == "wrong-source":
+        projection_mount["source"] = "/attacker/projection"
+    elif drift == "read-write":
+        projection_mount["read_only"] = False
+    elif drift == "duplicate-target":
+        volumes[-1] = copy.deepcopy(projection_mount)
+    elif drift == "missing":
+        volumes.remove(projection_mount)
+    elif drift == "wrong-source-kind":
+        projection_mount["type"] = "volume"
+    elif drift == "propagation":
+        projection_mount["bind"]["propagation"] = "rshared"
+    else:  # pragma: no cover - the parameter list is the closed authority.
+        raise AssertionError(f"unhandled projection drift: {drift}")
+
+    with pytest.raises(ValueError, match=message):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
+            published_port=8091,
+        )
+
+
+@pytest.mark.parametrize(
+    ("authority", "message"),
+    [
+        ("relative", "must be absolute"),
+        ("symlink", "canonical non-symlink"),
+        ("writable", "must not be group- or world-writable"),
+    ],
+)
+def test_compose_attestation_rejects_untrusted_projection_root_authority(
+    tmp_path: Path,
+    authority: str,
+    message: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    supplied_root = projection_root
+    if authority == "relative":
+        supplied_root = Path("projection")
+    elif authority == "symlink":
+        supplied_root = tmp_path / "projection-link"
+        supplied_root.symlink_to(projection_root, target_is_directory=True)
+    elif authority == "writable":
+        projection_root.chmod(0o775)
+    else:  # pragma: no cover - the parameter list is the closed authority.
+        raise AssertionError(f"unhandled projection authority: {authority}")
+
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=supplied_root,
+    )
+    with pytest.raises((OSError, ValueError), match=message):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            projection_root=supplied_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
+            published_port=8091,
+        )
+
+
+@pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        ("wrong-target", "mount targets are not canonical"),
+        ("wrong-source", "source is not canonical"),
+        ("read-write", "must be read-only"),
+        ("duplicate-target", "mount targets must be unique strings"),
+        ("missing", "mount set is not canonical"),
+        ("wrong-source-kind", "type policy drifted"),
+        ("propagation", "type policy drifted"),
+    ],
+)
+def test_compose_attestation_rejects_runtime_proof_mount_drift(
+    tmp_path: Path,
+    drift: str,
+    message: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    runtime_proof_bind_source = fixture_runtime_proof(projection_root)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=runtime_proof_bind_source,
+    )
+    volumes = payload["services"]["chummer-portal"]["volumes"]
+    proof_mount = next(
+        mount
+        for mount in volumes
+        if mount["target"] == "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+
+    if drift == "wrong-target":
+        proof_mount["target"] = "/proofs/unapproved.json"
+    elif drift == "wrong-source":
+        proof_mount["source"] = "/attacker/proof.json"
+    elif drift == "read-write":
+        proof_mount["read_only"] = False
+    elif drift == "duplicate-target":
+        volumes[-1] = copy.deepcopy(proof_mount)
+    elif drift == "missing":
+        volumes.remove(proof_mount)
+    elif drift == "wrong-source-kind":
+        proof_mount["type"] = "volume"
+    elif drift == "propagation":
+        proof_mount["bind"]["propagation"] = "rshared"
+    else:  # pragma: no cover - the parameter list is the closed authority.
+        raise AssertionError(f"unhandled runtime proof drift: {drift}")
+
+    with pytest.raises(ValueError, match=message):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=runtime_proof_bind_source,
+            published_port=8091,
+        )
+
+
+@pytest.mark.parametrize(
+    ("authority", "message"),
+    [
+        ("relative", "must be absolute"),
+        ("symlink", "canonical non-symlink"),
+        ("hardlink", "exactly one hard link"),
+        ("mode-0600", "exact mode 0644"),
+        ("mode-0640", "exact mode 0644"),
+        ("writable", "must not be group- or world-writable"),
+        ("writable-parent", "snapshot directory must not be group- or world-writable"),
+        ("missing", "No such file"),
+        ("outside-projection", "canonical projection snapshot proof"),
+    ],
+)
+def test_compose_attestation_rejects_untrusted_runtime_proof_authority(
+    tmp_path: Path,
+    authority: str,
+    message: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    runtime_proof_bind_source = fixture_runtime_proof(projection_root)
+    supplied_source = runtime_proof_bind_source
+    if authority == "relative":
+        supplied_source = Path("HUB_LOCAL_RELEASE_PROOF.generated.json")
+    elif authority == "symlink":
+        supplied_source = (
+            projection_root
+            / f"public-projection-{'b' * 64}"
+            / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+        supplied_source.parent.mkdir()
+        supplied_source.symlink_to(runtime_proof_bind_source)
+    elif authority == "hardlink":
+        os.link(runtime_proof_bind_source, tmp_path / "runtime-proof-hardlink")
+    elif authority == "mode-0600":
+        runtime_proof_bind_source.chmod(0o600)
+    elif authority == "mode-0640":
+        runtime_proof_bind_source.chmod(0o640)
+    elif authority == "writable":
+        runtime_proof_bind_source.chmod(0o664)
+    elif authority == "writable-parent":
+        runtime_proof_bind_source.parent.chmod(0o775)
+    elif authority == "missing":
+        supplied_source = (
+            projection_root
+            / f"public-projection-{'b' * 64}"
+            / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+    elif authority == "outside-projection":
+        supplied_source = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        supplied_source.write_text("{}\n", encoding="utf-8")
+        supplied_source.chmod(0o644)
+    else:  # pragma: no cover - the parameter list is the closed authority.
+        raise AssertionError(f"unhandled runtime proof authority: {authority}")
+
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=supplied_source,
+    )
+    with pytest.raises((OSError, ValueError), match=message):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=supplied_source,
+            published_port=8091,
+        )
+
+
+@pytest.mark.parametrize(
     ("operation", "layout_required", "migration_allowed"),
     [
         ("deploy", "true", "false"),
@@ -387,11 +664,12 @@ def test_compose_attestation_accepts_only_exact_operation_posture(
     migration_allowed: str,
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     environment = payload["services"]["chummer-portal"]["environment"]
     environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
@@ -403,6 +681,8 @@ def test_compose_attestation_accepts_only_exact_operation_posture(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=fixture_runtime_proof(projection_root),
         published_port=8091,
         operation=operation,
     )
@@ -439,11 +719,12 @@ def test_compose_attestation_rejects_every_other_operation_posture(
     migration_allowed: str,
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     environment = payload["services"]["chummer-portal"]["environment"]
     environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
@@ -456,6 +737,8 @@ def test_compose_attestation_rejects_every_other_operation_posture(
             source_root=source_root,
             build_context=build_context,
             overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
             published_port=8091,
             operation=operation,
         )
@@ -474,11 +757,12 @@ def test_compose_attestation_accepts_postgres_tool_runtime_role_contract(
     runtime_role: str,
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     payload["services"]["chummer-install-linking-postgres-admin"][
         "environment"
@@ -490,6 +774,8 @@ def test_compose_attestation_accepts_postgres_tool_runtime_role_contract(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=fixture_runtime_proof(projection_root),
         published_port=8091,
     )
 
@@ -512,11 +798,12 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
     runtime_role: str,
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     payload["services"]["chummer-install-linking-postgres-admin"][
         "environment"
@@ -529,6 +816,8 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
             source_root=source_root,
             build_context=build_context,
             overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
             published_port=8091,
         )
 
@@ -846,12 +1135,13 @@ def test_compose_attestation_rejects_runtime_authority_drift(
     tmp_path: Path, mutation, message: str
 ) -> None:
     module = load_module()
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = copy.deepcopy(
         rendered_compose(
             source_root=source_root,
             build_context=build_context,
             overlay_root=overlay_root,
+            projection_root=projection_root,
         )
     )
     mutation(payload)
@@ -863,16 +1153,19 @@ def test_compose_attestation_rejects_runtime_authority_drift(
             source_root=source_root,
             build_context=build_context,
             overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
             published_port=8091,
         )
 
 
 def test_compose_attestation_runs_under_isolated_python(tmp_path: Path) -> None:
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     output = tmp_path / "receipt.json"
     result = subprocess.run(
@@ -888,6 +1181,10 @@ def test_compose_attestation_runs_under_isolated_python(tmp_path: Path) -> None:
             str(build_context),
             "--overlay-root",
             str(overlay_root),
+            "--projection-root",
+            str(projection_root),
+            "--runtime-proof-bind-source",
+            str(fixture_runtime_proof(projection_root)),
             "--published-port",
             "8091",
             "--operation",
@@ -909,11 +1206,12 @@ def test_compose_attestation_runs_under_isolated_python(tmp_path: Path) -> None:
 def test_compose_attestation_cli_rejects_ambiguous_missing_operation(
     tmp_path: Path,
 ) -> None:
-    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
     payload = rendered_compose(
         source_root=source_root,
         build_context=build_context,
         overlay_root=overlay_root,
+        projection_root=projection_root,
     )
     result = subprocess.run(
         [
@@ -928,6 +1226,10 @@ def test_compose_attestation_cli_rejects_ambiguous_missing_operation(
             str(build_context),
             "--overlay-root",
             str(overlay_root),
+            "--projection-root",
+            str(projection_root),
+            "--runtime-proof-bind-source",
+            str(fixture_runtime_proof(projection_root)),
             "--published-port",
             "8091",
             "--output",

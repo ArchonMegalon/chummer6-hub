@@ -1302,6 +1302,8 @@ compose_cli --profile install-linking-postgres-admin config --format json \
       --source-root "$SOURCE_ROOT" \
       --build-context "$BUILD_CONTEXT" \
       --overlay-root "$OVERLAY_ROOT" \
+      --projection-root "$PROJECTION_SNAPSHOT_ROOT" \
+      --runtime-proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
       --published-port "$PUBLIC_EDGE_PORT" \
       --output "$COMPOSE_ATTESTATION_OUTPUT"
 if ((CUTOVER_STEADY_HANDOFF == 1)); then
@@ -1920,6 +1922,8 @@ print(classification, end="")
         --source-root "$SOURCE_ROOT" \
         --build-context "$BUILD_CONTEXT" \
         --overlay-root "$OVERLAY_ROOT" \
+        --projection-root "$PROJECTION_SNAPSHOT_ROOT" \
+        --runtime-proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
         --published-port "$PUBLIC_EDGE_PORT" \
         --output "$STEADY_COMPOSE_ATTESTATION_OUTPUT"; then
     abort_portal_recreate "steady release-shelf Compose attestation" 1
