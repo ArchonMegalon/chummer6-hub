@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Xunit;
 
 namespace Chummer.Tests;
 
