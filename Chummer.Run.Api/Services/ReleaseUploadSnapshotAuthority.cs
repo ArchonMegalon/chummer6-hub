@@ -1121,7 +1121,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 throw new InvalidDataException("unsigned UI fresh delta bytes drifted");
             }
         }
-        ValidateUnsignedCanonicalWindows(canonical, candidate.Version, inventoryByPath, fresh);
+        ValidateUnsignedCanonicalWindows(canonical, inventoryByPath, fresh);
 
         var expectedPaths = new HashSet<string>(
             ["RELEASE_CHANNEL.generated.json", "releases.json", .. freshPaths],
@@ -1194,19 +1194,29 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             nativeLockPath);
     }
 
-    private static void ValidateUnsignedCanonicalWindows(
+    internal static void ValidateUnsignedCanonicalWindows(
         JsonElement canonical,
-        string version,
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
         JsonElement fresh)
     {
         int windowsCount = 0;
         foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
         {
-            if (!string.Equals(
-                    RequireString(artifact, "platform"),
-                    "windows",
-                    StringComparison.Ordinal))
+            string platform = RequireString(artifact, "platform");
+            string artifactPath = $"files/{RequireString(artifact, "fileName")}";
+            if (!inventory.TryGetValue(
+                    artifactPath,
+                    out ReleaseUploadCandidateInventoryRow? artifactInventory)
+                || !string.Equals(
+                    RequireSha256(artifact, "sha256"),
+                    artifactInventory.Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(artifact, "sizeBytes")
+                   != artifactInventory.SizeBytes)
+            {
+                throw new InvalidDataException("unsigned canonical artifact bytes drifted");
+            }
+            if (!string.Equals(platform, "windows", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -1216,19 +1226,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             RequireExactString(artifact, "kind", "installer");
             RequireExactString(artifact, "installerMode", "bootstrap");
             RequireExactString(artifact, "payloadAcquisitionMode", "download");
-            string installerPath = $"files/{RequireString(artifact, "fileName")}";
+            string installerPath = artifactPath;
             string payloadPath = $"files/{RequireString(artifact, "payloadFileName")}";
             if (!inventory.TryGetValue(
-                    installerPath,
-                    out ReleaseUploadCandidateInventoryRow? installer)
-                || !inventory.TryGetValue(
                     payloadPath,
                     out ReleaseUploadCandidateInventoryRow? payload)
-                || !string.Equals(
-                    RequireSha256(artifact, "sha256"),
-                    installer.Sha256,
-                    StringComparison.Ordinal)
-                || RequireNonNegativeInt64(artifact, "sizeBytes") != installer.SizeBytes
                 || !string.Equals(
                     RequireSha256(artifact, "payloadSha256"),
                     payload.Sha256,

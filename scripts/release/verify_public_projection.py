@@ -3471,10 +3471,30 @@ def _candidate_unsigned_provenance(
     }
     lock = parsed["packagePlaneLock"]
     if (
-        lock.get("contractName") != "chummer6-ui.fresh-package-plane-lock"
+        set(lock)
+        != {
+            "approvedPackageSources",
+            "canonicalOwnerFeed",
+            "consumer",
+            "contractName",
+            "contractVersion",
+            "currentOwnerContractFeed",
+            "externalPackages",
+            "owners",
+            "packages",
+            "sdkArchive",
+            "sdkVersion",
+        }
+        or lock.get("contractName") != "chummer6-ui.fresh-package-plane-lock"
         or type(lock.get("contractVersion")) is not int
         or lock.get("contractVersion") != 8
         or lock.get("approvedPackageSources") != ["same-run-local-feed"]
+        or not isinstance(lock.get("consumer"), dict)
+        or set(lock["consumer"])
+        != {"buildProjects", "sourceFiles", "testProjects"}
+        or not isinstance(lock.get("externalPackages"), list)
+        or not isinstance(lock.get("packages"), list)
+        or not isinstance(lock.get("sdkArchive"), dict)
     ):
         raise ProjectionBlocked("candidate unsigned package-plane lock drifted")
     receipt = parsed["packagePlaneReceipt"]
@@ -3544,6 +3564,7 @@ def _candidate_unsigned_provenance(
     ):
         raise ProjectionBlocked("candidate unsigned retained pointer drifted")
     native = parsed["nativeToolchainLock"]
+    container_image = native.get("container_image")
     snapshot = native.get("debian_snapshot")
     packages = native.get("packages")
     if (
@@ -3561,21 +3582,65 @@ def _candidate_unsigned_provenance(
         or type(native.get("schema_version")) is not int
         or native.get("schema_version") != 1
         or native.get("platform") != {"architecture": "amd64", "os": "linux"}
+        or not isinstance(container_image, dict)
+        or set(container_image)
+        != {"index_digest", "platform_manifest_digest", "reference"}
         or not isinstance(snapshot, dict)
+        or set(snapshot)
+        != {
+            "archive_base_url",
+            "component",
+            "include_recommends",
+            "install_roots",
+            "metadata_url",
+            "suite",
+            "timestamp",
+        }
         or snapshot.get("install_roots") != ["nsis", "p7zip-full"]
         or snapshot.get("include_recommends") is not False
         or not isinstance(packages, list)
         or not packages
-        or any(
-            not isinstance(row, dict)
-            or SHA256_RE.fullmatch(str(row.get("sha256") or "")) is None
-            or isinstance(row.get("size"), bool)
-            or not isinstance(row.get("size"), int)
-            or row["size"] < 1
-            for row in packages
-        )
     ):
         raise ProjectionBlocked("candidate unsigned native toolchain lock drifted")
+    prefixed_sha256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+    if (
+        prefixed_sha256.fullmatch(str(container_image.get("index_digest") or ""))
+        is None
+        or prefixed_sha256.fullmatch(
+            str(container_image.get("platform_manifest_digest") or "")
+        )
+        is None
+        or not isinstance(container_image.get("reference"), str)
+        or "@sha256:" not in container_image["reference"]
+    ):
+        raise ProjectionBlocked("candidate unsigned native toolchain image drifted")
+    package_keys = {
+        "architecture",
+        "dependencies",
+        "name",
+        "path",
+        "sha256",
+        "size",
+        "url",
+        "version",
+    }
+    for index, package in enumerate(packages):
+        if (
+            not isinstance(package, dict)
+            or set(package) != package_keys
+            or SHA256_RE.fullmatch(str(package.get("sha256") or "")) is None
+            or isinstance(package.get("size"), bool)
+            or not isinstance(package.get("size"), int)
+            or package["size"] < 1
+            or not isinstance(package.get("dependencies"), list)
+            or any(
+                not isinstance(package.get(key), str) or not package[key]
+                for key in ("architecture", "name", "path", "url", "version")
+            )
+        ):
+            raise ProjectionBlocked(
+                f"candidate unsigned native toolchain package {index} drifted"
+            )
 
 
 def _validate_candidate_import_authority_v3(
@@ -4412,6 +4477,7 @@ def _validate_candidate_import_authority_v3(
         set(registry_authority) != authority_keys
         or registry_authority.get("contractName")
         != "chummer.registry.preview-publication-delta-authority"
+        or type(registry_authority.get("contractVersion")) is not int
         or registry_authority.get("contractVersion") != 2
         or registry_authority.get("candidateImportAuthority") is not True
         or registry_authority.get("candidateReviewAuthority") is not True
@@ -4491,6 +4557,7 @@ def _validate_candidate_import_authority_v3(
         set(registry_finalize) != finalize_keys
         or registry_finalize.get("contractName")
         != "chummer.registry.preview-publication-delta-finalize"
+        or type(registry_finalize.get("contractVersion")) is not int
         or registry_finalize.get("contractVersion") != 2
         or registry_finalize.get("verificationStatus") != "finalized"
         or registry_finalize.get("candidateBytesMutated") is not False
