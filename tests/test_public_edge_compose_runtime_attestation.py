@@ -355,6 +355,11 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
     module.atomic_write_json(output, receipt)
 
     assert receipt["status"] == "pass"
+    assert receipt["operation"] == "deploy"
+    assert receipt["releaseShelfPosture"] == {
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+    }
     assert receipt["proxyGates"] == {
         "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED": "false",
         "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED": "false",
@@ -365,6 +370,95 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
     assert "environment" not in receipt
     assert "volumes" not in receipt
     assert os.stat(output).st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize(
+    ("operation", "layout_required", "migration_allowed"),
+    [
+        ("deploy", "true", "false"),
+        ("initial-release-shelf-cutover", "false", "true"),
+        ("initial-release-shelf-cutover-recover", "false", "false"),
+    ],
+)
+def test_compose_attestation_accepts_only_exact_operation_posture(
+    tmp_path: Path,
+    operation: str,
+    layout_required: str,
+    migration_allowed: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+    )
+    environment = payload["services"]["chummer-portal"]["environment"]
+    environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
+    environment["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = migration_allowed
+
+    receipt = module.validate_runtime(
+        payload,
+        project_name="chummer6-hub",
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        published_port=8091,
+        operation=operation,
+    )
+
+    assert receipt["operation"] == operation
+    assert receipt["releaseShelfPosture"] == {
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": layout_required,
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": migration_allowed,
+    }
+
+
+@pytest.mark.parametrize(
+    ("operation", "layout_required", "migration_allowed"),
+    [
+        (operation, layout_required, migration_allowed)
+        for operation, accepted in (
+            ("deploy", ("true", "false")),
+            ("initial-release-shelf-cutover", ("false", "true")),
+            ("initial-release-shelf-cutover-recover", ("false", "false")),
+        )
+        for layout_required, migration_allowed in (
+            ("true", "true"),
+            ("true", "false"),
+            ("false", "true"),
+            ("false", "false"),
+        )
+        if (layout_required, migration_allowed) != accepted
+    ],
+)
+def test_compose_attestation_rejects_every_other_operation_posture(
+    tmp_path: Path,
+    operation: str,
+    layout_required: str,
+    migration_allowed: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+    )
+    environment = payload["services"]["chummer-portal"]["environment"]
+    environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
+    environment["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = migration_allowed
+
+    with pytest.raises(ValueError, match="exact .* literal value"):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            published_port=8091,
+            operation=operation,
+        )
 
 
 @pytest.mark.parametrize(
@@ -720,7 +814,7 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
             lambda payload: payload["services"]["chummer-portal"]["environment"].update(
                 CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED="false"
             ),
-            "SHELF_LAYOUT_V1_REQUIRED is not the canonical literal value",
+            "SHELF_LAYOUT_V1_REQUIRED is not the exact deploy literal value",
         ),
         (
             lambda payload: payload["services"]["chummer-portal"]["environment"].update(
@@ -796,6 +890,8 @@ def test_compose_attestation_runs_under_isolated_python(tmp_path: Path) -> None:
             str(overlay_root),
             "--published-port",
             "8091",
+            "--operation",
+            "deploy",
             "--output",
             str(output),
         ],
@@ -808,3 +904,41 @@ def test_compose_attestation_runs_under_isolated_python(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert json.loads(output.read_text(encoding="utf-8"))["status"] == "pass"
+
+
+def test_compose_attestation_cli_rejects_ambiguous_missing_operation(
+    tmp_path: Path,
+) -> None:
+    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+    )
+    result = subprocess.run(
+        [
+            "/usr/bin/python3",
+            "-I",
+            str(SCRIPT),
+            "--project-name",
+            "chummer6-hub",
+            "--source-root",
+            str(source_root),
+            "--build-context",
+            str(build_context),
+            "--overlay-root",
+            str(overlay_root),
+            "--published-port",
+            "8091",
+            "--output",
+            str(tmp_path / "receipt.json"),
+        ],
+        input=json.dumps(payload),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "--operation" in result.stderr

@@ -550,23 +550,25 @@ public sealed class ReleaseBundlePromotionService
     public async Task<ReleaseBundlePromotionResult?> EnsureInitialLegacyMigrationAsync(
         CancellationToken cancellationToken)
     {
+        string downloadsRoot = ResolveDownloadsRoot();
+        string activeIntentPath = Path.Combine(downloadsRoot, ActivationIntentName);
+        if (File.Exists(activeIntentPath))
+        {
+            ReleaseActivationJournalDocument active = LoadActivationJournalFile(activeIntentPath);
+            ValidateInitialLegacyMigrationRecoveryIntent(active.Intent);
+            _ = TryReconcileActivation(
+                active.Intent,
+                ensureInitialLayoutMarker: true,
+                out ReleaseBundlePromotionResult? reconciled);
+            return reconciled;
+        }
+
         if (!_configuration.GetValue(InitialMigrationAllowedKey, false))
         {
             return null;
         }
 
-        string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
-        string activeIntentPath = Path.Combine(downloadsRoot, ActivationIntentName);
-        if (File.Exists(activeIntentPath))
-        {
-            ReleaseActivationJournalDocument active = LoadActivationJournalFile(activeIntentPath);
-            if (TryReconcileActivation(active.Intent, out ReleaseBundlePromotionResult? reconciled))
-            {
-                return reconciled;
-            }
-        }
-
         ReleaseShelfSnapshot snapshot = new ReleaseShelfGenerationStore(_configuration).Capture();
         if (!snapshot.IsLegacy)
         {
@@ -652,6 +654,15 @@ public sealed class ReleaseBundlePromotionService
     public bool TryReconcileActivation(
         ReleaseActivationIntent intent,
         out ReleaseBundlePromotionResult? result)
+        => TryReconcileActivation(
+            intent,
+            ensureInitialLayoutMarker: false,
+            out result);
+
+    private bool TryReconcileActivation(
+        ReleaseActivationIntent intent,
+        bool ensureInitialLayoutMarker,
+        out ReleaseBundlePromotionResult? result)
     {
         ArgumentNullException.ThrowIfNull(intent);
         ValidateActivationIntent(intent);
@@ -732,6 +743,10 @@ public sealed class ReleaseBundlePromotionService
             }
 
             result = BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
+            if (ensureInitialLayoutMarker)
+            {
+                EnsureInitialLayoutMarkerDurably(downloadsRoot);
+            }
             AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
             return true;
         }
@@ -754,6 +769,10 @@ public sealed class ReleaseBundlePromotionService
             {
                 _ = BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
                 _postActivationDirectoryFlush(downloadsRoot);
+                if (ensureInitialLayoutMarker)
+                {
+                    EnsureInitialLayoutMarkerDurably(downloadsRoot);
+                }
                 ResolveActivationIntentDurably(downloadsRoot, journal, state: "committed");
                 AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
             }
@@ -797,6 +816,20 @@ public sealed class ReleaseBundlePromotionService
         throw new ReleaseActivationOutcomeUnknownException(
             intent,
             new InvalidDataException("current.json matches neither the previous nor target activation pointer digest."));
+    }
+
+    private static void ValidateInitialLegacyMigrationRecoveryIntent(
+        ReleaseActivationIntent intent)
+    {
+        if (!string.Equals(intent.Operation, "promotion", StringComparison.Ordinal)
+            || intent.PreviousGenerationId is not null
+            || intent.PreviousPointerSha256 is not null
+            || intent.PreviousPointerBase64 is not null
+            || intent.ExactIncomingDesktopScope is not null)
+        {
+            throw new InvalidDataException(
+                "initial release shelf recovery requires an unscoped promotion with no predecessor pointer or generation.");
+        }
     }
 
     private void RemoveNeverActivatedGenerationDurably(
@@ -3249,6 +3282,31 @@ public sealed class ReleaseBundlePromotionService
         {
             TryDeleteFile(tempPath);
         }
+    }
+
+    private static void EnsureInitialLayoutMarkerDurably(string downloadsRoot)
+    {
+        string markerPath = Path.Combine(downloadsRoot, LayoutMarkerName);
+        byte[] expected = Encoding.UTF8.GetBytes(LayoutMarkerContents);
+        byte[]? actual = ReadRegularFileBytesOrNull(
+            markerPath,
+            "release shelf layout marker");
+        if (actual is null)
+        {
+            CreateLayoutMarkerDurably(downloadsRoot);
+            actual = ReadRequiredRegularFileBytes(
+                markerPath,
+                "release shelf layout marker");
+        }
+
+        if (actual.Length != expected.Length
+            || !CryptographicOperations.FixedTimeEquals(actual, expected))
+        {
+            throw new InvalidDataException(
+                "release shelf layout marker bytes do not match the layout-v1 contract.");
+        }
+
+        FlushDirectoryDurably(downloadsRoot);
     }
 
     private void TryRemoveUnactivatedLayoutMarker(string downloadsRoot)

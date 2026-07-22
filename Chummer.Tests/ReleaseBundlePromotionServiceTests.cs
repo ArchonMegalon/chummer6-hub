@@ -345,6 +345,261 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task InitialLegacyMigrationDisabledWithoutActiveIntentHasZeroShelfMutation()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        IReadOnlyDictionary<string, byte[]> before = fixture.SnapshotEntireShelf();
+
+        Assert.Null(await fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: false));
+        Assert.Null(await fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: false));
+
+        AssertManagedShelfMatches(before, fixture.SnapshotEntireShelf());
+        Assert.Empty(fixture.FindGenerationDirectories());
+        Assert.False(File.Exists(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-writer-policy.json")));
+        Assert.False(File.Exists(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-promotion.lock")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialLegacyMigrationAbortedRecoveryNeverStartsSecondPromotion(
+        bool initialMigrationAllowed)
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            "run-20260722-initial-abort-recovery");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+
+        await Assert.ThrowsAsync<ReleaseActivationProcessTerminationSimulationException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                promotionCheckpoint: checkpoint =>
+                {
+                    if (checkpoint == ReleaseBundlePromotionService.PromotionCheckpoint.GenerationDirectoryDurable)
+                    {
+                        throw new ReleaseActivationProcessTerminationSimulationException(
+                            "simulated death before initial pointer activation");
+                    }
+                }));
+
+        Assert.Single(fixture.FindGenerationDirectories());
+        Assert.True(fixture.HasActiveActivationIntent);
+
+        ReleaseBundlePromotionResult? recovered = await fixture.EnsureInitialLegacyMigrationAsync(
+            initialMigrationAllowed: initialMigrationAllowed);
+
+        Assert.Null(recovered);
+        Assert.Empty(fixture.FindGenerationDirectories());
+        Assert.False(fixture.HasActiveActivationIntent);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+        Assert.Single(fixture.FindActivationOutcomeFiles());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialLegacyMigrationTargetPointerRecoveryCreatesMarkerWithoutSecondGeneration(
+        bool initialMigrationAllowed)
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            "run-20260722-initial-commit-recovery");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+
+        await Assert.ThrowsAsync<ReleaseActivationOutcomeUnknownException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                postActivationDirectoryFlush: _ =>
+                    throw new ReleaseActivationProcessTerminationSimulationException(
+                        "simulated death after initial pointer activation")));
+
+        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+        Assert.False(File.Exists(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-layout-v1")));
+        Assert.True(fixture.HasActiveActivationIntent);
+        Assert.Single(fixture.FindGenerationDirectories());
+
+        ReleaseBundlePromotionResult? recovered = await fixture.EnsureInitialLegacyMigrationAsync(
+            initialMigrationAllowed: initialMigrationAllowed);
+
+        Assert.NotNull(recovered);
+        Assert.Equal("chummer.release-shelf-layout/v1\n", File.ReadAllText(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-layout-v1")));
+        Assert.False(fixture.HasActiveActivationIntent);
+        Assert.Single(fixture.FindGenerationDirectories());
+
+        Assert.Null(await fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: true));
+        Assert.Single(fixture.FindGenerationDirectories());
+    }
+
+    [Theory]
+    [InlineData("rollback")]
+    [InlineData("predecessor")]
+    [InlineData("desktop_scope")]
+    public async Task InitialLegacyMigrationRejectsNonInitialActiveIntentBeforeReconciliation(
+        string mutation)
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            $"run-20260722-reject-{mutation}");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+        await Assert.ThrowsAsync<ReleaseActivationProcessTerminationSimulationException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                activationJournalCheckpoint: checkpoint =>
+                {
+                    if (checkpoint == ReleaseBundlePromotionService.ActivationJournalCheckpoint.ActiveIntentDurable)
+                    {
+                        throw new ReleaseActivationProcessTerminationSimulationException(
+                            "seed exact active initial intent");
+                    }
+                }));
+
+        fixture.RewriteActiveActivationJournal(journal =>
+        {
+            JsonObject intent = journal["intent"]!.AsObject();
+            switch (mutation)
+            {
+                case "rollback":
+                    intent["operation"] = "rollback";
+                    break;
+                case "predecessor":
+                    byte[] previousPointer = "{\"prior\":true}\n"u8.ToArray();
+                    string previousPointerBase64 = Convert.ToBase64String(previousPointer);
+                    intent["previousGenerationId"] = "prior-generation";
+                    intent["previousPointerSha256"] =
+                        $"sha256:{Convert.ToHexStringLower(SHA256.HashData(previousPointer))}";
+                    intent["previousPointerBase64"] = previousPointerBase64;
+                    journal["previousPointerBase64"] = previousPointerBase64;
+                    break;
+                case "desktop_scope":
+                    intent["exactIncomingDesktopScope"] = "avalonia:windows:win-x64";
+                    break;
+                default:
+                    throw new InvalidOperationException("unknown initial intent mutation");
+            }
+        });
+        IReadOnlyDictionary<string, byte[]> before = fixture.SnapshotEntireShelf();
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: false));
+
+        Assert.Contains("initial release shelf recovery", error.Message, StringComparison.Ordinal);
+        Assert.True(fixture.HasActiveActivationIntent);
+        AssertManagedShelfMatches(before, fixture.SnapshotEntireShelf());
+    }
+
+    [Fact]
+    public async Task InitialLegacyMigrationCommittedOutcomeRecreatesMarkerBeforeAcknowledgement()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            "run-20260722-committed-outcome-marker-recovery");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+        await Assert.ThrowsAsync<ReleaseActivationOutcomeUnknownException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                postActivationDirectoryFlush: _ =>
+                    throw new ReleaseActivationProcessTerminationSimulationException(
+                        "seed unresolved target pointer")));
+        fixture.WriteCommittedOutcomeForActiveActivation();
+
+        Assert.True(fixture.HasActiveActivationIntent);
+        Assert.False(File.Exists(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-layout-v1")));
+
+        ReleaseBundlePromotionResult? recovered = await fixture.EnsureInitialLegacyMigrationAsync(
+            initialMigrationAllowed: false);
+
+        Assert.NotNull(recovered);
+        Assert.Equal("chummer.release-shelf-layout/v1\n", File.ReadAllText(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-layout-v1")));
+        Assert.False(fixture.HasActiveActivationIntent);
+        Assert.Single(fixture.FindGenerationDirectories());
+    }
+
+    [Fact]
+    public async Task InitialLegacyMigrationCommittedOutcomeMarkerFailureRetainsBarrierForRetry()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            "run-20260722-committed-marker-failure-retry");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+        await Assert.ThrowsAsync<ReleaseActivationOutcomeUnknownException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                postActivationDirectoryFlush: _ =>
+                    throw new ReleaseActivationProcessTerminationSimulationException(
+                        "seed unresolved target pointer")));
+        fixture.WriteCommittedOutcomeForActiveActivation();
+        string markerPath = Path.Combine(fixture.DownloadsRoot, ".release-shelf-layout-v1");
+        Directory.CreateDirectory(markerPath);
+
+        await Assert.ThrowsAnyAsync<IOException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: false));
+
+        Assert.True(fixture.HasActiveActivationIntent);
+        Assert.Single(fixture.FindActivationOutcomeFiles());
+        Assert.True(Directory.Exists(markerPath));
+        Assert.Single(fixture.FindGenerationDirectories());
+
+        Directory.Delete(markerPath);
+        Assert.NotNull(await fixture.EnsureInitialLegacyMigrationAsync(
+            initialMigrationAllowed: false));
+        Assert.False(fixture.HasActiveActivationIntent);
+        Assert.Single(fixture.FindActivationOutcomeFiles());
+        Assert.Equal("chummer.release-shelf-layout/v1\n", File.ReadAllText(markerPath));
+        Assert.Single(fixture.FindGenerationDirectories());
+    }
+
+    [Fact]
+    public async Task InitialLegacyMigrationMarkerFailureRetainsActiveBarrierForRetry()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = CreateInitialMigrationBundle(
+            fixture,
+            "run-20260722-marker-failure-retry");
+        fixture.ExtractBundleAsLegacyShelf(bundlePath);
+        await Assert.ThrowsAsync<ReleaseActivationOutcomeUnknownException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(
+                postActivationDirectoryFlush: _ =>
+                    throw new ReleaseActivationProcessTerminationSimulationException(
+                        "seed unresolved target pointer")));
+        string markerPath = Path.Combine(fixture.DownloadsRoot, ".release-shelf-layout-v1");
+        Directory.CreateDirectory(markerPath);
+
+        await Assert.ThrowsAnyAsync<IOException>(() =>
+            fixture.EnsureInitialLegacyMigrationAsync(initialMigrationAllowed: false));
+
+        Assert.True(fixture.HasActiveActivationIntent);
+        Assert.Empty(fixture.FindActivationOutcomeFiles());
+        Assert.True(Directory.Exists(markerPath));
+
+        Directory.Delete(markerPath);
+        Assert.NotNull(await fixture.EnsureInitialLegacyMigrationAsync(
+            initialMigrationAllowed: false));
+        Assert.False(fixture.HasActiveActivationIntent);
+        Assert.Equal("chummer.release-shelf-layout/v1\n", File.ReadAllText(markerPath));
+    }
+
+    private static string CreateInitialMigrationBundle(
+        ReleaseBundlePromotionFixture fixture,
+        string version)
+        => fixture.CreateBundle(
+            version,
+            RequiredPreviewArtifacts(),
+            publishedAt: "2026-07-17T20:00:00Z",
+            proofGeneratedAt: "2026-07-17T19:55:00Z");
+
+    [Fact]
     public async Task PromoteAsyncRejectsShelfReplacementThatDropsExistingDesktopInstallTuple()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -3569,6 +3824,11 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         public string DownloadsRoot => _downloadsRoot;
 
+        public bool HasActiveActivationIntent
+            => File.Exists(Path.Combine(
+                _downloadsRoot,
+                ".release-shelf-activation-intent.json"));
+
         public async Task<ReleaseBundlePromotionResult> PromoteAsync(
             string bundlePath,
             Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
@@ -3740,15 +4000,106 @@ public sealed class ReleaseBundlePromotionServiceTests
         public void ExtractBundleAsLegacyShelf(string bundlePath)
             => ZipFile.ExtractToDirectory(bundlePath, _downloadsRoot, overwriteFiles: true);
 
-        public Task<ReleaseBundlePromotionResult?> EnsureInitialLegacyMigrationAsync()
+        public Task<ReleaseBundlePromotionResult?> EnsureInitialLegacyMigrationAsync(
+            bool initialMigrationAllowed = true,
+            Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
+            Action<string>? postActivationDirectoryFlush = null,
+            Action<ReleaseBundlePromotionService.ActivationJournalCheckpoint>? activationJournalCheckpoint = null)
         {
             var service = new ReleaseBundlePromotionService(
-                CreateConfiguration(initialMigrationAllowed: true),
+                CreateConfiguration(initialMigrationAllowed),
                 NullLogger<ReleaseBundlePromotionService>.Instance,
-                promotionCheckpoint: null,
+                promotionCheckpoint,
                 new FixedTimeProvider(DateTimeOffset.Parse("2026-07-17T20:00:00Z")),
-                PrivacyLaunchGate.ClearForTests);
+                PrivacyLaunchGate.ClearForTests,
+                postActivationDirectoryFlush,
+                activationJournalCheckpoint);
             return service.EnsureInitialLegacyMigrationAsync(CancellationToken.None);
+        }
+
+        public IReadOnlyDictionary<string, byte[]> SnapshotEntireShelf()
+        {
+            var snapshot = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            foreach (string path in Directory.GetFiles(
+                         _downloadsRoot,
+                         "*",
+                         SearchOption.AllDirectories))
+            {
+                string relativePath = Path.GetRelativePath(_downloadsRoot, path)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                snapshot.Add(relativePath, File.ReadAllBytes(path));
+            }
+
+            return snapshot;
+        }
+
+        public IReadOnlyList<string> FindActivationOutcomeFiles()
+        {
+            string historyRoot = Path.Combine(
+                _downloadsRoot,
+                ".release-shelf-activation-journal");
+            return Directory.Exists(historyRoot)
+                ? Directory.GetFiles(
+                    historyRoot,
+                    "outcome.json",
+                    SearchOption.AllDirectories)
+                : [];
+        }
+
+        public void RewriteActiveActivationJournal(Action<JsonObject> rewrite)
+        {
+            string path = Path.Combine(
+                _downloadsRoot,
+                ".release-shelf-activation-intent.json");
+            JsonObject journal = JsonNode.Parse(File.ReadAllText(path))?.AsObject()
+                ?? throw new InvalidDataException("active activation journal is malformed.");
+            rewrite(journal);
+            File.WriteAllText(
+                path,
+                journal.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                {
+                    WriteIndented = true
+                }));
+        }
+
+        public void WriteCommittedOutcomeForActiveActivation()
+        {
+            string activePath = Path.Combine(
+                _downloadsRoot,
+                ".release-shelf-activation-intent.json");
+            JsonObject active = JsonNode.Parse(File.ReadAllText(activePath))?.AsObject()
+                ?? throw new InvalidDataException("active activation journal is malformed.");
+            string activationReceiptId = active["intent"]?["activationReceiptId"]?.GetValue<string>()
+                ?? throw new InvalidDataException("active activation receipt ID is missing.");
+            string receiptRoot = ActivationJournalReceiptRoot(activationReceiptId);
+            byte[] journalBytes = File.ReadAllBytes(Path.Combine(receiptRoot, "intent.json"));
+            int digestLength = journalBytes.Length > 0 && journalBytes[^1] == (byte)'\n'
+                ? journalBytes.Length - 1
+                : journalBytes.Length;
+            string intentSha256 = $"sha256:{Convert.ToHexStringLower(
+                SHA256.HashData(journalBytes.AsSpan(0, digestLength)))}";
+            string outcomePath = Path.Combine(receiptRoot, "outcome.json");
+            File.WriteAllText(
+                outcomePath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        schemaVersion = "chummer.release-shelf.activation-outcome/v1",
+                        state = "committed",
+                        activationReceiptId,
+                        intentSha256,
+                        resolvedAtUtc = DateTimeOffset.Parse("2026-07-17T20:01:00Z")
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    {
+                        WriteIndented = true
+                    }));
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(
+                    outcomePath,
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
         }
 
         public byte[] ReadGenerationBytes(string generationId, string relativePath)

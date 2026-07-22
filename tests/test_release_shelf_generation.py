@@ -1459,12 +1459,13 @@ def test_runtime_generation_routes_and_production_downgrade_sentinel_are_wired()
     assert 'CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED: "${CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED:?' in compose
     assert 'CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED: "${CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED:?' in compose
     assert appsettings["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] is False
-    assert "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=false" in env_example
+    assert "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=true" in env_example
     assert "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false" in env_example
     assert "downgrade sentinel" in runbook
-    assert "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true" in runbook
+    assert "initial-release-shelf-cutover" in runbook
+    assert "explicit first-shelf cutover uses `false/true`" in runbook
     assert "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false" in runbook
-    assert "matching committed activation receipt" in runbook
+    assert "matching committed intent/outcome receipt" in runbook
 
 
 def test_runtime_bounded_reader_uses_one_descriptor_and_checks_for_growth() -> None:

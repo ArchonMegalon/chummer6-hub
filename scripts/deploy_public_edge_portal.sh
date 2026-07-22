@@ -14,13 +14,20 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover]" >&2; exit 2 ;;
+  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2; exit 2 ;;
 esac
+INITIAL_RELEASE_SHELF_CUTOVER=0
+INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
+if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
+  INITIAL_RELEASE_SHELF_CUTOVER=1
+elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
+  INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=1
+fi
 
 readonly TRUSTED_GIT="/usr/bin/git"
 readonly TRUSTED_PYTHON="/usr/bin/python3"
@@ -174,6 +181,11 @@ CANONICAL_DEPLOY_LOCK_AUTH_ROOT="$DEPLOY_LOCK_ROOT/public-edge-lock-recovery-rec
 CANONICAL_DEPLOY_RECEIPT_ROOT="$DEPLOY_LOCK_ROOT/public-edge-deploy-receipts"
 CANONICAL_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-runtime-authority.json"
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
+CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-cutover"
+CANONICAL_RELEASE_SHELF_ROOT="/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
+CUTOVER_RECOVERY_REEXEC=0
+CUTOVER_STEADY_HANDOFF=0
+CUTOVER_STATE_CLASSIFICATION=""
 RECOVERY_ROUTE_REQUESTED=0
 if [[ "$DEPLOY_OPERATION" == recover \
   || -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
@@ -182,6 +194,20 @@ fi
 
 if [[ "$COMPOSE_FILE_INPUT" != /* ]]; then
   COMPOSE_FILE_INPUT="$SOURCE_ROOT/$COMPOSE_FILE_INPUT"
+fi
+EXPECTED_COMPOSE_FILE_INPUT="$SOURCE_ROOT/docker-compose.public-edge.yml"
+if [[ "$COMPOSE_FILE_INPUT" != "$EXPECTED_COMPOSE_FILE_INPUT" \
+  || ! -f "$COMPOSE_FILE_INPUT" || -L "$COMPOSE_FILE_INPUT" \
+  || ! -O "$COMPOSE_FILE_INPUT" \
+  || "$("$TRUSTED_STAT" -c '%h' -- "$COMPOSE_FILE_INPUT")" != 1 ]]; then
+  echo "public edge deploy requires the exact owner-controlled single-link Compose input" >&2
+  exit 2
+fi
+if ! COMPOSE_FILE_MODE="$("$TRUSTED_STAT" -c '%a' -- "$COMPOSE_FILE_INPUT")" \
+  || [[ ! "$COMPOSE_FILE_MODE" =~ ^[0-7]{3,4}$ ]] \
+  || (( (8#$COMPOSE_FILE_MODE & 8#022) != 0 )); then
+  echo "public edge deploy refuses a group- or world-writable Compose input" >&2
+  exit 2
 fi
 if ! COMPOSE_FILE="$("$TRUSTED_REALPATH" -e -- "$COMPOSE_FILE_INPUT")"; then
   echo "public edge Compose file does not exist: $COMPOSE_FILE_INPUT" >&2
@@ -776,6 +802,15 @@ OVERLAY_ROLLBACK_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-rollback.json"
 OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.json"
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
 DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
+STEADY_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/steady-compose-runtime-attestation.json"
+COMPOSE_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/docker-compose.public-edge.snapshot.yml"
+COMPOSE_SOURCE_BINDING_RECEIPT="$DEPLOY_RECEIPT_DIR/compose-source-binding.json"
+FINAL_COMPOSE_ATTESTATION_OUTPUT="$COMPOSE_ATTESTATION_OUTPUT"
+FINAL_COMPOSE_ATTESTATION_SNAPSHOT="$DEPLOY_RECEIPT_DIR/cutover-final-compose-attestation.json"
+PUBLICATION_READINESS_ATTESTATION="$DEPLOY_RECEIPT_DIR/cutover-final-publication-readiness.json"
+FINAL_POSTDEPLOY_ATTESTATION_SNAPSHOT="$DEPLOY_RECEIPT_DIR/cutover-final-postdeploy-attestation.json"
+FINAL_POSTDEPLOY_ATTESTATION_OUTPUT="$POSTDEPLOY_OUTPUT"
+ACTIVE_RUNTIME_AUTHORITY_SNAPSHOT="$DEPLOY_RECEIPT_DIR/cutover-final-active-runtime-authority.json"
 CANDIDATE_PROOF_BIND_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/candidate-proof-bind-source.json"
 PRIOR_PROOF_AUTHORITY_SNAPSHOT="$DEPLOY_RECEIPT_DIR/prior-proof-authority-mount.json"
 PRIOR_PROOF_PUBLIC_SNAPSHOT="$DEPLOY_RECEIPT_DIR/prior-proof-public-mount.json"
@@ -783,6 +818,18 @@ CANDIDATE_PORTAL_CONTAINER_NAME="chummer-public-edge-candidate-${DEPLOY_RECEIPT_
 if [[ ! "$CANDIDATE_PORTAL_CONTAINER_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{7,127}$ ]]; then
   echo "generated public-edge candidate container name is invalid" >&2
   exit 70
+fi
+CUTOVER_ATTESTOR="$SOURCE_ROOT/scripts/attest_initial_release_shelf_cutover.py"
+if [[ ! -f "$CUTOVER_ATTESTOR" || -L "$CUTOVER_ATTESTOR" ]]; then
+  echo "audited initial release-shelf cutover attestor is missing or symlinked" >&2
+  exit 2
+fi
+COMPOSE_SOURCE_ATTESTOR="$SOURCE_ROOT/scripts/attest_public_edge_compose_source.py"
+if [[ ! -f "$COMPOSE_SOURCE_ATTESTOR" || -L "$COMPOSE_SOURCE_ATTESTOR" \
+  || ! -O "$COMPOSE_SOURCE_ATTESTOR" \
+  || "$("$TRUSTED_STAT" -c '%h' -- "$COMPOSE_SOURCE_ATTESTOR")" != 1 ]]; then
+  echo "audited public-edge Compose source attestor is unsafe" >&2
+  exit 2
 fi
 
 if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
@@ -820,25 +867,61 @@ docker_cli() {
   "${docker_command[@]}" "$@"
 }
 
-compose_command=(
-  "$TRUSTED_ENV" -i
-  PATH=/usr/bin:/bin
-  HOME="$CANONICAL_DOCKER_CONFIG_ROOT/home"
-  DOCKER_CONFIG="$CANONICAL_DOCKER_CONFIG_ROOT/config"
-  LANG=C LC_ALL=C
-  CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$BUILD_CONTEXT"
-  CHUMMER_RUN_SERVICES_CONTEXT_DIR="$SOURCE_ROOT"
-  CHUMMER_RUN_SERVICES_SOURCE="$SOURCE_ROOT"
-  CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$OVERLAY_ROOT"
-  CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="$PROJECTION_SNAPSHOT_ROOT"
-  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE="$RUNTIME_PROOF_BIND_SOURCE"
-  CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT"
-  "$TRUSTED_DOCKER" --context "$CANONICAL_DOCKER_CONTEXT" compose
-  --env-file "$ENV_FILE" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE"
-)
+compose_command=()
+COMPOSE_ATTESTATION_OPERATION=""
+configure_compose_operation() {
+  local operation="$1"
+  local layout_v1_required initial_migration_allowed
+  case "$operation" in
+    deploy)
+      layout_v1_required=true
+      initial_migration_allowed=false
+      ;;
+    initial-release-shelf-cutover)
+      layout_v1_required=false
+      initial_migration_allowed=true
+      ;;
+    initial-release-shelf-cutover-recover)
+      layout_v1_required=false
+      initial_migration_allowed=false
+      ;;
+    *)
+      echo "public edge Compose operation is not an audited literal" >&2
+      return 2
+      ;;
+  esac
+  COMPOSE_ATTESTATION_OPERATION="$operation"
+  compose_command=(
+    "$TRUSTED_ENV" -i
+    PATH=/usr/bin:/bin
+    HOME="$CANONICAL_DOCKER_CONFIG_ROOT/home"
+    DOCKER_CONFIG="$CANONICAL_DOCKER_CONFIG_ROOT/config"
+    LANG=C LC_ALL=C
+    CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$BUILD_CONTEXT"
+    CHUMMER_RUN_SERVICES_CONTEXT_DIR="$SOURCE_ROOT"
+    CHUMMER_RUN_SERVICES_SOURCE="$SOURCE_ROOT"
+    CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$OVERLAY_ROOT"
+    CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="$PROJECTION_SNAPSHOT_ROOT"
+    CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE="$RUNTIME_PROOF_BIND_SOURCE"
+    CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT"
+    CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED="$layout_v1_required"
+    CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED="$initial_migration_allowed"
+    "$TRUSTED_DOCKER" --context "$CANONICAL_DOCKER_CONTEXT" compose
+    --env-file "$ENV_FILE" -p "$COMPOSE_PROJECT"
+    -f "$COMPOSE_SOURCE_SNAPSHOT" --project-directory "$SOURCE_ROOT"
+  )
+}
+
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1)); then
+  configure_compose_operation initial-release-shelf-cutover
+elif ((INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY == 1)); then
+  configure_compose_operation initial-release-shelf-cutover-recover
+else
+  configure_compose_operation deploy
+fi
 
 compose_cli() {
-  "${compose_command[@]}" "$@"
+  run_compose_source_guarded "${compose_command[@]}" "$@"
 }
 
 trusted_source_python() {
@@ -853,6 +936,112 @@ trusted_source_python() {
     CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT" \
     "$TRUSTED_PYTHON" -I "$@"
 }
+
+if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" capture \
+  --source "$COMPOSE_FILE" \
+  --snapshot "$COMPOSE_SOURCE_SNAPSHOT" \
+  --receipt "$COMPOSE_SOURCE_BINDING_RECEIPT" >/dev/null; then
+  echo "failed to capture the immutable public-edge Compose source" >&2
+  exit 2
+fi
+
+verify_compose_source_binding() {
+  trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" verify \
+    --source "$COMPOSE_FILE" \
+    --snapshot "$COMPOSE_SOURCE_SNAPSHOT" \
+    --receipt "$COMPOSE_SOURCE_BINDING_RECEIPT" >/dev/null
+}
+
+run_compose_source_guarded() {
+  local command_status=0
+  if ! verify_compose_source_binding; then
+    echo "public-edge Compose source changed before a guarded read" >&2
+    return 2
+  fi
+  "$@" || command_status=$?
+  if ! verify_compose_source_binding; then
+    echo "public-edge Compose source changed during a guarded read" >&2
+    return 2
+  fi
+  return "$command_status"
+}
+
+if ! cutover_state_json="$(
+  trusted_source_python "$CUTOVER_ATTESTOR" inspect-deploy-state \
+    --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+    --state-root "$CUTOVER_STATE_ROOT" \
+    --source-head "${EXPECTED_HEAD,,}"
+)"; then
+  echo "initial release-shelf cutover state is malformed or unstable" >&2
+  exit 2
+fi
+if ! CUTOVER_STATE_CLASSIFICATION="$(
+  printf '%s' "$cutover_state_json" \
+    | trusted_source_python -c '
+import json, sys
+
+def reject_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise SystemExit(1)
+        result[key] = value
+    return result
+
+payload = json.load(sys.stdin, object_pairs_hook=reject_duplicates)
+classification = payload.get("classification")
+if (
+    set(payload) != {"contractName", "status", "classification"}
+    or payload.get("contractName")
+    != "chummer.initial-release-shelf-cutover-deploy-state/v1"
+    or payload.get("status") != "pass"
+    or classification
+    not in {
+        "absent", "prestate-resumable", "unknown-outcome", "aborted",
+        "steady-handoff", "complete",
+    }
+):
+    raise SystemExit(1)
+print(classification, end="")
+'
+)"; then
+  echo "initial release-shelf cutover state classification is invalid" >&2
+  exit 2
+fi
+case "$DEPLOY_OPERATION" in
+  initial-release-shelf-cutover)
+    if [[ "$CUTOVER_STATE_CLASSIFICATION" != absent \
+      && "$CUTOVER_STATE_CLASSIFICATION" != prestate-resumable ]]; then
+      echo "initial release-shelf cutover state is not an exact resumable prestate" >&2
+      exit 2
+    fi
+    ;;
+  deploy)
+    if [[ "$CUTOVER_STATE_CLASSIFICATION" == steady-handoff ]]; then
+      CUTOVER_STEADY_HANDOFF=1
+    elif [[ "$CUTOVER_STATE_CLASSIFICATION" == unknown-outcome ]]; then
+      echo "initial release-shelf cutover outcome is unknown; run recover before deploy" >&2
+      exit 2
+    fi
+    ;;
+  recover)
+    if [[ "$CUTOVER_STATE_CLASSIFICATION" == unknown-outcome ]]; then
+      CUTOVER_RECOVERY_REEXEC=1
+    fi
+    ;;
+  initial-release-shelf-cutover-recover)
+    if [[ "$CUTOVER_STATE_CLASSIFICATION" != unknown-outcome ]]; then
+      echo "initial release-shelf recovery requires one unresolved candidate-start receipt" >&2
+      exit 2
+    fi
+    ;;
+esac
+CUTOVER_FINALIZE_REQUIRED=0
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1 \
+  || INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY == 1 \
+  || CUTOVER_STEADY_HANDOFF == 1)); then
+  CUTOVER_FINALIZE_REQUIRED=1
+fi
 
 container_proof_sha256_by_id() {
   local container_id="$1"
@@ -985,7 +1174,8 @@ print(
 }
 
 run_deploy_recovery() {
-  trusted_source_python "$SOURCE_ROOT/scripts/public_edge_deploy_recovery.py" \
+  run_compose_source_guarded \
+    trusted_source_python "$SOURCE_ROOT/scripts/public_edge_deploy_recovery.py" \
     --source-root "$SOURCE_ROOT" \
     --active-root "$OVERLAY_ROOT" \
     --backup-root "$OVERLAY_BACKUP_ROOT" \
@@ -997,7 +1187,7 @@ run_deploy_recovery() {
     --shared-mutation-lock-token "$deploy_lock_owner_token" \
     --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT" \
     --docker-context "$CANONICAL_DOCKER_CONTEXT" \
-    --compose-file "$COMPOSE_FILE" \
+    --compose-file "$COMPOSE_SOURCE_SNAPSHOT" \
     --env-file "$ENV_FILE" \
     --project-name "$COMPOSE_PROJECT" \
     --build-context "$BUILD_CONTEXT" \
@@ -1028,9 +1218,17 @@ if ((RECOVERY_ROUTE_REQUESTED == 1)); then
     exit 70
   fi
   trap - EXIT HUP INT TERM
+  if ((CUTOVER_RECOVERY_REEXEC == 1)); then
+    echo "public_edge_deploy_runtime_recovery_complete; entering release-shelf recovery-only posture"
+    exec "$SCRIPT_PATH" initial-release-shelf-cutover-recover
+  fi
   if [[ "$DEPLOY_OPERATION" == deploy ]]; then
     echo "public_edge_deploy_recovered_interrupted_transaction; rerun deploy explicitly"
   else
+    if [[ "$CUTOVER_STATE_CLASSIFICATION" == steady-handoff ]]; then
+      echo "initial_release_shelf_cutover_committed_safe_handoff; run deploy for canonical true/false steady state"
+      exit 0
+    fi
     echo "public_edge_deploy_recovery_complete"
   fi
   exit 0
@@ -1084,8 +1282,9 @@ if [[ "${CHUMMER_PUBLIC_EDGE_IGNORE_GENERATED_PROOF_DRIFT:-0}" =~ ^(1|true|TRUE|
   source_gate_args+=(--ignore-generated-proof-drift)
 fi
 
-trusted_source_python "$ROOT_DIR/scripts/verify_public_edge_deploy_source.py" \
-  "${source_gate_args[@]}"
+run_compose_source_guarded \
+  trusted_source_python "$ROOT_DIR/scripts/verify_public_edge_deploy_source.py" \
+    "${source_gate_args[@]}"
 # Combined-branch test requirement: proof hardening must provide both receipt flags
 # and runtimeProofBindSource.sha256 before this deployment command is executable.
 trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
@@ -1098,12 +1297,35 @@ trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.p
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
 compose_cli --profile install-linking-postgres-admin config --format json \
   | trusted_source_python "$SOURCE_ROOT/scripts/validate_public_edge_compose_runtime.py" \
+      --operation "$COMPOSE_ATTESTATION_OPERATION" \
       --project-name "$COMPOSE_PROJECT" \
       --source-root "$SOURCE_ROOT" \
       --build-context "$BUILD_CONTEXT" \
       --overlay-root "$OVERLAY_ROOT" \
       --published-port "$PUBLIC_EDGE_PORT" \
       --output "$COMPOSE_ATTESTATION_OUTPUT"
+if ((CUTOVER_STEADY_HANDOFF == 1)); then
+  if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
+    --kind compose \
+    --source "$COMPOSE_ATTESTATION_OUTPUT" \
+    --output "$FINAL_COMPOSE_ATTESTATION_SNAPSHOT" >/dev/null; then
+    echo "failed to snapshot the final steady Compose attestation" >&2
+    exit 2
+  fi
+fi
+
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1)); then
+  trusted_source_python "$CUTOVER_ATTESTOR" prepare \
+    --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+    --state-root "$CUTOVER_STATE_ROOT" \
+    --source-head "${EXPECTED_HEAD,,}" >/dev/null
+elif ((INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY == 1)); then
+  if [[ ! -d "$CUTOVER_STATE_ROOT" || -L "$CUTOVER_STATE_ROOT" \
+    || ! -O "$CUTOVER_STATE_ROOT" ]]; then
+    echo "initial release-shelf recovery state root is unsafe" >&2
+    exit 2
+  fi
+fi
 
 # Materialize and locally verify the replacement bind-mounted payload before either
 # the image tag or live runtime is touched. The independent release-receipt digest
@@ -1507,27 +1729,6 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_prefli
   abort_portal_recreate "active overlay preflight" 1
 fi
 
-# The candidate remains recoverable until commit. Do not add --rm here: Docker
-# refuses restart-policy promotion for AutoRemove containers, and the durable
-# reconciliation journal already owns exact candidate cleanup on every failure.
-if ! candidate_portal_create_output="$(
-  compose_cli run -T -d --no-deps --service-ports --use-aliases \
-    --name "$CANDIDATE_PORTAL_CONTAINER_NAME" chummer-portal
-)"; then
-  abort_portal_recreate "blue-green candidate creation" 1
-fi
-candidate_portal_container_id="$(
-  docker_cli container inspect --format '{{.Id}}' \
-    "$CANDIDATE_PORTAL_CONTAINER_NAME"
-)" || abort_portal_recreate "candidate identity" 1
-if [[ ! "$candidate_portal_container_id" =~ ^[0-9a-f]{64}$ \
-  || -z "$candidate_portal_create_output" ]]; then
-  abort_portal_recreate "candidate creation receipt" 1
-fi
-if ! mark_deploy_phase portal_candidate_started; then
-  abort_portal_recreate "candidate start journal" 1
-fi
-
 wait_for_candidate_portal_runtime() {
   local deadline=$((SECONDS + PORTAL_READY_TIMEOUT_SECONDS))
   local running health
@@ -1548,19 +1749,205 @@ wait_for_candidate_portal_runtime() {
   return 1
 }
 
+start_candidate_portal() {
+  local candidate_portal_create_output
+  # Do not add --rm: the durable outer reconciliation journal owns exact
+  # candidate cleanup on every failure.
+  candidate_portal_create_output="$(
+    compose_cli run -T -d --no-deps --service-ports --use-aliases \
+      --name "$CANDIDATE_PORTAL_CONTAINER_NAME" chummer-portal
+  )" || return 1
+  candidate_portal_container_id="$(
+    docker_cli container inspect --format '{{.Id}}' \
+      "$CANDIDATE_PORTAL_CONTAINER_NAME"
+  )" || return 1
+  [[ "$candidate_portal_container_id" =~ ^[0-9a-f]{64}$ \
+    && -n "$candidate_portal_create_output" ]]
+}
+
+verify_candidate_publication_readiness() {
+  "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
+    "${docker_command[@]}" container exec "$candidate_portal_container_id" \
+      /usr/bin/curl --fail --silent --show-error --max-time 20 \
+        --output /dev/null --header 'Host: chummer.run' \
+        http://127.0.0.1:8080/api/ready/publication
+}
+
+capture_candidate_publication_readiness() {
+  local body_file status_file readiness_http_status response_sha256
+  local observed_id observed_name observed_image observed_running observed_health
+  body_file="$($TRUSTED_MKTEMP -- "$DEPLOY_RECEIPT_DIR/.publication-readiness-body.XXXXXXXX")" \
+    || return 1
+  status_file="$($TRUSTED_MKTEMP -- "$DEPLOY_RECEIPT_DIR/.publication-readiness-status.XXXXXXXX")" \
+    || {
+      "$TRUSTED_RM" -f -- "$body_file"
+      return 1
+    }
+  "$TRUSTED_CHMOD" 0600 -- "$body_file" "$status_file" || {
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  }
+  if ! "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
+    "${docker_command[@]}" container exec "$candidate_portal_container_id" \
+      /usr/bin/curl --fail --silent --show-error --max-time 20 \
+        --output - --write-out '%{stderr}%{http_code}' \
+        --header 'Host: chummer.run' \
+        http://127.0.0.1:8080/api/ready/publication \
+        >"$body_file" 2>"$status_file"; then
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  fi
+  readiness_http_status="$(trusted_source_python -c '
+import pathlib, sys
+raw = pathlib.Path(sys.argv[1]).read_bytes()
+if raw != b"200":
+    raise SystemExit(1)
+print("200", end="")
+' "$status_file")" || {
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  }
+  response_sha256="$($TRUSTED_SHA256SUM -- "$body_file")"
+  response_sha256="${response_sha256%% *}"
+  [[ "$response_sha256" =~ ^[0-9a-f]{64}$ ]] || {
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  }
+  if ! observed_id="$(docker_cli container inspect --format '{{.Id}}' \
+    "$candidate_portal_container_id")" \
+    || ! observed_name="$(docker_cli container inspect --format '{{.Name}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_image="$(docker_cli container inspect --format '{{.Image}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_running="$(docker_cli container inspect --format '{{.State.Running}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_health="$(docker_cli container inspect \
+      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+      "$candidate_portal_container_id")"; then
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  fi
+  observed_name="${observed_name#/}"
+  if [[ "$observed_id" != "$candidate_portal_container_id" \
+    || "$observed_name" != "$CANDIDATE_PORTAL_CONTAINER_NAME" \
+    || "$observed_image" != "$image_id" \
+    || "$observed_running" != true \
+    || "$observed_health" != healthy ]]; then
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  fi
+  if ! trusted_source_python "$CUTOVER_ATTESTOR" record-readiness \
+    --output "$PUBLICATION_READINESS_ATTESTATION" \
+    --candidate-container-id "$observed_id" \
+    --candidate-container-name "$observed_name" \
+    --candidate-image-id "$observed_image" \
+    --http-status "$readiness_http_status" \
+    --response-sha256 "$response_sha256" \
+    --running "$observed_running" \
+    --health "$observed_health" >/dev/null; then
+    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    return 1
+  fi
+  "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+}
+
+# This receipt is durable before Docker receives the first instruction that can
+# start the migration-enabled candidate. From this boundary forward a failed CLI
+# return is an unknown shelf outcome and a blind cutover retry is forbidden.
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1)); then
+  trusted_source_python "$CUTOVER_ATTESTOR" request-start \
+    --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+    --state-root "$CUTOVER_STATE_ROOT" >/dev/null
+fi
+
+if ! start_candidate_portal; then
+  abort_portal_recreate "blue-green candidate creation" 1
+fi
+if ! mark_deploy_phase portal_candidate_started; then
+  abort_portal_recreate "candidate start journal" 1
+fi
+
 if ! wait_for_candidate_portal_runtime; then
   abort_portal_recreate "candidate readiness" 1
+fi
+
+# A migration or recovery candidate is never accepted as the steady deployment.
+# First bind the server-owned journal/current/marker result, then recreate the
+# candidate under the canonical true/false posture and rerun runtime attestation.
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1 \
+  || INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY == 1)); then
+  if ! cutover_outcome_json="$(
+    trusted_source_python "$CUTOVER_ATTESTOR" verify-outcome \
+      --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+      --state-root "$CUTOVER_STATE_ROOT"
+  )"; then
+    abort_portal_recreate "initial release-shelf outcome verification" 1
+  fi
+  if ! cutover_classification="$(
+    printf '%s' "$cutover_outcome_json" \
+      | trusted_source_python -c '
+import json, sys
+payload = json.load(sys.stdin)
+classification = payload.get("classification")
+expected_contract = {
+    "committed": "chummer.initial-release-shelf-cutover-poststate/v1",
+    "aborted": "chummer.initial-release-shelf-cutover-aborted/v1",
+}.get(classification)
+if payload.get("status") != "pass" or payload.get("contractName") != expected_contract:
+    raise SystemExit(1)
+print(classification, end="")
+'
+  )"; then
+    abort_portal_recreate "initial release-shelf outcome classification" 1
+  fi
+  if [[ "$cutover_classification" == aborted ]]; then
+    echo "initial_release_shelf_cutover_recovered_aborted; no new migration was started" >&2
+    abort_portal_recreate "initial release-shelf recovered abort" 78
+  fi
+  if ! verify_candidate_publication_readiness; then
+    abort_portal_recreate "cutover publication readiness" 1
+  fi
+  if ! docker_cli container stop "$candidate_portal_container_id" >/dev/null \
+    || ! docker_cli container rm "$candidate_portal_container_id" >/dev/null; then
+    abort_portal_recreate "cutover candidate retirement" 1
+  fi
+  candidate_portal_container_id=""
+  configure_compose_operation deploy
+  if ! compose_cli --profile install-linking-postgres-admin config --format json \
+    | trusted_source_python "$SOURCE_ROOT/scripts/validate_public_edge_compose_runtime.py" \
+        --operation "$COMPOSE_ATTESTATION_OPERATION" \
+        --project-name "$COMPOSE_PROJECT" \
+        --source-root "$SOURCE_ROOT" \
+        --build-context "$BUILD_CONTEXT" \
+        --overlay-root "$OVERLAY_ROOT" \
+        --published-port "$PUBLIC_EDGE_PORT" \
+        --output "$STEADY_COMPOSE_ATTESTATION_OUTPUT"; then
+    abort_portal_recreate "steady release-shelf Compose attestation" 1
+  fi
+  FINAL_COMPOSE_ATTESTATION_OUTPUT="$STEADY_COMPOSE_ATTESTATION_OUTPUT"
+  if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
+    --kind compose \
+    --source "$FINAL_COMPOSE_ATTESTATION_OUTPUT" \
+    --output "$FINAL_COMPOSE_ATTESTATION_SNAPSHOT" >/dev/null; then
+    abort_portal_recreate "steady Compose evidence snapshot" 1
+  fi
+  if ! start_candidate_portal; then
+    abort_portal_recreate "steady blue-green candidate creation" 1
+  fi
+  if ! wait_for_candidate_portal_runtime; then
+    abort_portal_recreate "steady candidate readiness" 1
+  fi
 fi
 
 # `/api/ready` is the container healthcheck and covers data-protection custody,
 # PostgreSQL install-linking authority, and canonical shelf serving. Publication
 # readiness additionally proves layout-v1 activation and the release-storage free-space
 # admission gate before a replacement portal can be accepted.
-if ! "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
-  "${docker_command[@]}" container exec "$candidate_portal_container_id" \
-    /usr/bin/curl --fail --silent --show-error --max-time 20 \
-      --output /dev/null --header 'Host: chummer.run' \
-      http://127.0.0.1:8080/api/ready/publication; then
+if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
+  if ! capture_candidate_publication_readiness; then
+    abort_portal_recreate "publication readiness" 1
+  fi
+elif ! verify_candidate_publication_readiness; then
   abort_portal_recreate "publication readiness" 1
 fi
 
@@ -1716,6 +2103,15 @@ postdeploy_command=(
 
 for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++)); do
   if "${postdeploy_command[@]}"; then
+    if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
+      if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
+        --kind postdeploy \
+        --source "$POSTDEPLOY_OUTPUT" \
+        --output "$FINAL_POSTDEPLOY_ATTESTATION_SNAPSHOT" >/dev/null; then
+        abort_portal_recreate "postdeploy evidence snapshot" 1
+      fi
+      FINAL_POSTDEPLOY_ATTESTATION_OUTPUT="$FINAL_POSTDEPLOY_ATTESTATION_SNAPSHOT"
+    fi
     break
   fi
   if ((attempt == POSTDEPLOY_ATTEMPTS)); then
@@ -1739,7 +2135,7 @@ if (
     or payload.get("codeDeployReviewRequiredAuthoritySatisfied") is not True
 ):
     raise SystemExit(1)
-' "$POSTDEPLOY_OUTPUT"; then
+' "$FINAL_POSTDEPLOY_ATTESTATION_OUTPUT"; then
   abort_portal_recreate "postdeploy code-deploy authority" 1
 fi
 
@@ -1752,6 +2148,35 @@ fi
 if ! docker_cli container update --restart unless-stopped \
   "$candidate_portal_container_id" >/dev/null; then
   abort_portal_recreate "candidate restart policy" 1
+fi
+
+if ((INITIAL_RELEASE_SHELF_CUTOVER == 1 \
+  || INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY == 1 \
+  || CUTOVER_STEADY_HANDOFF == 1)); then
+  if ! cutover_final_poststate="$(
+    trusted_source_python "$CUTOVER_ATTESTOR" verify-handoff \
+      --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT" \
+      --state-root "$CUTOVER_STATE_ROOT"
+  )"; then
+    abort_portal_recreate "final initial release-shelf poststate" 1
+  fi
+  if ! cutover_final_classification="$(
+    printf '%s' "$cutover_final_poststate" \
+      | trusted_source_python -c '
+import json, sys
+payload = json.load(sys.stdin)
+if (
+    payload.get("contractName")
+    != "chummer.initial-release-shelf-cutover-poststate/v1"
+    or payload.get("status") != "pass"
+    or payload.get("classification") != "committed"
+):
+    raise SystemExit(1)
+print("committed", end="")
+'
+  )" || [[ "$cutover_final_classification" != committed ]]; then
+    abort_portal_recreate "final initial release-shelf committed classification" 1
+  fi
 fi
 
 if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" complete \
@@ -1767,6 +2192,27 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction
   exit 70
 fi
 deployment_transaction_active=0
+if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
+  if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
+    --kind active-runtime \
+    --source "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
+    --output "$ACTIVE_RUNTIME_AUTHORITY_SNAPSHOT" >/dev/null; then
+    echo "steady public edge is deployed, but active runtime evidence snapshot failed; inspect before retry" >&2
+    exit 70
+  fi
+fi
+if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
+  if ! trusted_source_python "$CUTOVER_ATTESTOR" finalize \
+    --state-root "$CUTOVER_STATE_ROOT" \
+    --compose-attestation "$FINAL_COMPOSE_ATTESTATION_SNAPSHOT" \
+    --publication-readiness-attestation "$PUBLICATION_READINESS_ATTESTATION" \
+    --postdeploy-attestation "$FINAL_POSTDEPLOY_ATTESTATION_SNAPSHOT" \
+    --active-runtime-authority "$ACTIVE_RUNTIME_AUTHORITY_SNAPSHOT" \
+    --candidate-image-id "$image_id" >/dev/null; then
+    echo "steady public edge is deployed, but cutover completion receipt failed; inspect before retry" >&2
+    exit 70
+  fi
+fi
 if ((prior_portal_existed == 1)) \
   && [[ "$prior_portal_container_id" != "$candidate_portal_container_id" ]]; then
   prior_portal_postcommit_running="$(
