@@ -29,6 +29,10 @@ public static class InstallLinkingPostgresConnectionConfiguration
         "CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE";
     public const string MigratorConnectionStringFileEnvironmentVariable =
         "CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE";
+    public const string ExpectedHostConfigurationKey =
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST";
+    public const string ExpectedRootCertificatePath =
+        "/run/chummer-secrets/install-linking-postgres-server-ca.pem";
     public const string RejectedRuntimeInlineConnectionStringConfigurationKey =
         "CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING";
     public const string RejectedMigratorInlineConnectionStringEnvironmentVariable =
@@ -51,7 +55,15 @@ public static class InstallLinkingPostgresConnectionConfiguration
         string path = RequirePath(
             configuration[RuntimeConnectionStringFileConfigurationKey],
             RuntimeConnectionStringFileConfigurationKey);
-        return ReadConnectionStringFile(path, requireLinuxSecurity: environment.IsProduction());
+        bool production = environment.IsProduction();
+        string? expectedHost = production
+            ? RequireExpectedHost(configuration[ExpectedHostConfigurationKey])
+            : NormalizeOptionalExpectedHost(configuration[ExpectedHostConfigurationKey]);
+        return ReadConnectionStringFile(
+            path,
+            requireLinuxSecurity: production,
+            expectedHost: expectedHost,
+            expectedRootCertificatePath: production ? ExpectedRootCertificatePath : null);
     }
 
     public static string LoadMigratorConnectionStringFromEnvironment()
@@ -68,12 +80,19 @@ public static class InstallLinkingPostgresConnectionConfiguration
             Environment.GetEnvironmentVariable(
                 MigratorConnectionStringFileEnvironmentVariable),
             MigratorConnectionStringFileEnvironmentVariable);
-        return ReadConnectionStringFile(path, requireLinuxSecurity: true);
+        return ReadConnectionStringFile(
+            path,
+            requireLinuxSecurity: true,
+            expectedHost: RequireExpectedHost(
+                Environment.GetEnvironmentVariable(ExpectedHostConfigurationKey)),
+            expectedRootCertificatePath: ExpectedRootCertificatePath);
     }
 
     public static string ReadConnectionStringFile(
         string path,
-        bool requireLinuxSecurity)
+        bool requireLinuxSecurity,
+        string? expectedHost = null,
+        string? expectedRootCertificatePath = null)
     {
         string fullPath = Path.GetFullPath(
             string.IsNullOrWhiteSpace(path)
@@ -163,6 +182,23 @@ public static class InstallLinkingPostgresConnectionConfiguration
                     "The PostgreSQL credential file must require full TLS server identity verification.");
             }
 
+            if (expectedHost is not null
+                && !string.Equals(builder.Host, expectedHost, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    "The PostgreSQL credential Host does not match the reviewed certificate identity.");
+            }
+
+            if (expectedRootCertificatePath is not null
+                && !string.Equals(
+                    builder.RootCertificate,
+                    expectedRootCertificatePath,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "The PostgreSQL credential file must use the reviewed mounted server CA bundle.");
+            }
+
             return builder.ConnectionString;
         }
         finally
@@ -175,6 +211,30 @@ public static class InstallLinkingPostgresConnectionConfiguration
         => string.IsNullOrWhiteSpace(path)
             ? throw new InvalidOperationException($"{key} is required; its value is never printed.")
             : path;
+
+    private static string RequireExpectedHost(string? value)
+        => NormalizeOptionalExpectedHost(value)
+            ?? throw new InvalidOperationException(
+                $"{ExpectedHostConfigurationKey} is required; its value is never printed.");
+
+    private static string? NormalizeOptionalExpectedHost(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string host = value.Trim();
+        if (host.EndsWith(".", StringComparison.Ordinal)
+            || host.Length > 253
+            || Uri.CheckHostName(host) != UriHostNameType.Dns)
+        {
+            throw new InvalidOperationException(
+                $"{ExpectedHostConfigurationKey} must be one DNS name without a trailing dot.");
+        }
+
+        return host;
+    }
 }
 
 public sealed class InstallLinkingAuthoritativeEnvelope : IDisposable

@@ -242,6 +242,9 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # VerifyFull authenticates this provider-issued DNS identity while the explicit
+      # address keeps resolution deterministic on the external Docker network.
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
@@ -262,6 +265,7 @@ services:
       # treats a compare-and-swap conflict as terminal. Keep one portal writer until reload/retry exists.
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
       CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
       CHUMMER_PUBLIC_CONCIERGE_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_ENABLED:-true}
       CHUMMER_PUBLIC_CONCIERGE_STORE_PATH: /app/state/public-concierge-store.json
       CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED:-true}
@@ -594,6 +598,9 @@ services:
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
       # This runtime-only credential must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+      # Public CA material is mounted separately so the connection file can use
+      # Root Certificate with SslMode=VerifyFull without modifying image trust.
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA bundle}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
       - chummer-release-upload-sessions:/release-upload-sessions
@@ -641,6 +648,8 @@ services:
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
         CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
     user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
     read_only: true
     cap_drop:
       - ALL
@@ -652,10 +661,12 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,mode=1777
     environment:
       CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
       CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
     volumes:
       # The migrator credential is never mounted into the long-running portal or the import job.
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL migrator connection file}:/run/chummer-secrets/install-linking-postgres-migrator.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA bundle}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
     # Safe default: validate only. Operators must explicitly override this with `prepare <runtime-role>`.
     command: ["validate"]
     networks:
@@ -678,6 +689,8 @@ services:
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
         CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
     user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
     read_only: true
     cap_drop:
       - ALL
@@ -694,12 +707,14 @@ services:
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
       CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
     volumes:
       # The import job shares only the state and cryptographic material needed to decrypt the local snapshot.
       - chummer-run-api-state:/app/state
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA bundle}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
     # Deliberately invalid/non-mutating: import requires an explicit command and confirmation flag.
     command: ["refuse-import-without-explicit-command"]
     networks:

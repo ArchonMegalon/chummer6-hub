@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -107,6 +108,10 @@ EXPECTED_CORE_ULIMIT = {"core": {}}
 EXPECTED_TOOL_PROFILE = ["install-linking-postgres-admin"]
 EXPECTED_TOOL_TMPFS = ["/tmp:rw,noexec,nosuid,nodev,mode=1777"]
 POSTGRES_RUNTIME_ROLE_PATTERN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+POSTGRES_DNS_NAME_PATTERN = re.compile(
+    r"(?=.{1,253}\Z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z"
+)
 EXPECTED_PORTAL_RESOURCES = {
     "cpu_shares": 256,
     "cpus": 1,
@@ -156,6 +161,7 @@ EXPECTED_SERVICE_FIELDS = {
         "command",
         "entrypoint",
         "environment",
+        "extra_hosts",
         "image",
         "networks",
         "profiles",
@@ -173,6 +179,7 @@ EXPECTED_SERVICE_FIELDS = {
         "command",
         "entrypoint",
         "environment",
+        "extra_hosts",
         "image",
         "networks",
         "profiles",
@@ -213,6 +220,87 @@ def require_empty_sequence(value: object, *, label: str) -> None:
 def require_empty_mapping(value: object, *, label: str) -> None:
     if value not in (None, {}):
         raise ValueError(f"rendered {label} must be empty")
+
+
+def require_postgres_server_identity(
+    portal: dict[str, Any],
+    admin: dict[str, Any],
+    importer: dict[str, Any],
+) -> tuple[str, str]:
+    portal_environment = mapping(
+        portal.get("environment"), label="rendered portal environment"
+    )
+    expected_host = portal_environment.get(
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+    )
+    if (
+        not isinstance(expected_host, str)
+        or POSTGRES_DNS_NAME_PATTERN.fullmatch(expected_host) is None
+    ):
+        raise ValueError(
+            "rendered PostgreSQL expected host must be one canonical lowercase DNS name"
+        )
+    try:
+        ipaddress.ip_address(expected_host)
+    except ValueError:
+        pass
+    else:
+        raise ValueError(
+            "rendered PostgreSQL expected host must be one canonical lowercase DNS name"
+        )
+
+    portal_extra_hosts = portal.get("extra_hosts")
+    if not isinstance(portal_extra_hosts, list) or len(portal_extra_hosts) != 2:
+        raise ValueError("rendered portal extra_hosts drifted from PostgreSQL identity policy")
+    if portal_extra_hosts[1] != "host.docker.internal=host-gateway":
+        raise ValueError("rendered portal extra_hosts drifted from PostgreSQL identity policy")
+    postgres_host_mapping = portal_extra_hosts[0]
+    if not isinstance(postgres_host_mapping, str):
+        raise ValueError("rendered PostgreSQL host mapping must be a string")
+    mapped_host, separator, mapped_address = postgres_host_mapping.partition("=")
+    if separator != "=" or mapped_host != expected_host or not mapped_address:
+        raise ValueError(
+            "rendered PostgreSQL host mapping must bind the reviewed expected host"
+        )
+    try:
+        address = ipaddress.ip_address(mapped_address)
+    except ValueError as exc:
+        raise ValueError("rendered PostgreSQL host mapping address is invalid") from exc
+    if (
+        address.version != 4
+        or address.is_unspecified
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+    ):
+        raise ValueError(
+            "rendered PostgreSQL host mapping must use a routable IPv4 address"
+        )
+
+    for service_name, service in (
+        ("chummer-install-linking-postgres-admin", admin),
+        ("chummer-install-linking-postgres-import", importer),
+    ):
+        require_exact_sequence(
+            service.get("extra_hosts"),
+            expected=[postgres_host_mapping],
+            label=f"{service_name} extra_hosts",
+        )
+        service_environment = mapping(
+            service.get("environment"),
+            label=f"rendered {service_name} environment",
+        )
+        if (
+            service_environment.get(
+                "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+            )
+            != expected_host
+        ):
+            raise ValueError(
+                f"rendered {service_name} PostgreSQL expected host drifted"
+            )
+
+    return expected_host, str(address)
 
 
 def require_exact_service_fields(
@@ -703,6 +791,9 @@ def validate_runtime(
             opaque_read_only_bind_policy(
                 "/run/chummer-secrets/install-linking-postgres-runtime.connection-string"
             ),
+            opaque_read_only_bind_policy(
+                "/run/chummer-secrets/install-linking-postgres-server-ca.pem"
+            ),
             bind_mount_policy(
                 EXPECTED_FLEET_ARTIFACT_ROOT, "/fleet-artifacts", read_only=True
             ),
@@ -738,7 +829,10 @@ def validate_runtime(
         policies=[
             opaque_read_only_bind_policy(
                 "/run/chummer-secrets/install-linking-postgres-migrator.connection-string"
-            )
+            ),
+            opaque_read_only_bind_policy(
+                "/run/chummer-secrets/install-linking-postgres-server-ca.pem"
+            ),
         ],
     )
     require_exact_mounts(
@@ -754,6 +848,9 @@ def validate_runtime(
             ),
             opaque_read_only_bind_policy(
                 "/run/chummer-secrets/install-linking-postgres-runtime.connection-string"
+            ),
+            opaque_read_only_bind_policy(
+                "/run/chummer-secrets/install-linking-postgres-server-ca.pem"
             ),
         ],
     )
@@ -780,10 +877,8 @@ def validate_runtime(
         expected=EXPECTED_PORTAL_DEPENDENCIES,
         label="portal dependencies",
     )
-    require_exact_sequence(
-        portal.get("extra_hosts"),
-        expected=["host.docker.internal=host-gateway"],
-        label="portal extra_hosts",
+    postgres_expected_host, _postgres_address = require_postgres_server_identity(
+        portal, admin, importer
     )
     require_exact_mapping(
         portal.get("networks"),
@@ -805,9 +900,10 @@ def validate_runtime(
         require_empty_mapping(
             service.get("depends_on"), label=f"{service_name} dependencies"
         )
-        require_empty_sequence(
-            service.get("extra_hosts"), label=f"{service_name} extra_hosts"
-        )
+        if service_name == "chummer-portal-volume-init":
+            require_empty_sequence(
+                service.get("extra_hosts"), label=f"{service_name} extra_hosts"
+            )
     for service_name, service in (
         ("chummer-install-linking-postgres-admin", admin),
         ("chummer-install-linking-postgres-import", importer),
@@ -847,6 +943,7 @@ def validate_runtime(
     )
     if set(admin_environment) != {
         "CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST",
         "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE",
     }:
         raise ValueError("rendered PostgreSQL admin environment fields drifted")
@@ -881,6 +978,7 @@ def validate_runtime(
             "CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE": (
                 "/run/chummer-secrets/install-linking-postgres-runtime.connection-string"
             ),
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": postgres_expected_host,
         },
         label="PostgreSQL import environment",
     )

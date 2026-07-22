@@ -34,15 +34,16 @@ but deliberately never creates a LOGIN role.
 Each credential file contains exactly one non-empty UTF-8 connection-string line. Inline
 connection-string environment values are rejected. Production files must be regular, owner-only,
 single-link files owned by `CHUMMER_PORTAL_UID:CHUMMER_PORTAL_GID` (default `1654:1654`). Require
-full server identity verification and a certificate that chains to the container system trust store:
+full server identity verification against the separately mounted, reviewed provider CA:
 
 ```text
-Host=db.example.net;Port=5432;Database=chummer;Username=chummer_install_linking_runtime;Password=...;SSL Mode=VerifyFull;Timeout=5;Command Timeout=15;Keepalive=30
+Host=db.example.net;Port=5432;Database=chummer;Username=chummer_install_linking_runtime;Password=...;SSL Mode=VerifyFull;Root Certificate=/run/chummer-secrets/install-linking-postgres-server-ca.pem;Timeout=5;Command Timeout=15;Keepalive=30
 ```
 
-Use the same TLS policy with the distinct migrator identity. If the provider uses a private CA,
-install that CA into the image trust store through the governed image build; never weaken the file
-to `SSL Mode=Require` or `Trust Server Certificate=true`.
+Use the same TLS policy with the distinct migrator identity. Set
+`Root Certificate=/run/chummer-secrets/install-linking-postgres-server-ca.pem` in both files and
+mount the reviewed provider CA with `CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE`; never weaken
+the file to `SSL Mode=Require` or `Trust Server Certificate=true`.
 
 Configure host paths, not secret contents:
 
@@ -50,6 +51,12 @@ Configure host paths, not secret contents:
   explicit import job.
 - `CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE` is mounted only into the profile-only
   prepare/validate job.
+- `CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE` is public CA material mounted read-only into the
+  portal, prepare/validate, and import containers. It must contain no private key or client secret.
+- `CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME` must exactly match a server-certificate SAN and the
+  `Host` in both connection files. `CHUMMER_INSTALL_LINKING_POSTGRES_IP` is the separately reviewed
+  address mapped to that name inside each container; the runtime and migrator enforce the expected
+  host independently, and raw-IP `Host` values are not acceptable.
 - Prepare/validate and import use the separate `install-linking-postgres-tool-final` image target.
   The long-running public API image does not contain the migration/import executable.
 - Snapshot, envelope, digest, and compare-exchange request byte buffers are cleared after each
@@ -67,12 +74,14 @@ sudo chown 1654:1654 \
   /secure/path/data-protection-key-encryption.pfx \
   /secure/path/data-protection-key-encryption.password \
   /secure/path/install-linking-postgres-runtime.connection-string \
-  /secure/path/install-linking-postgres-migrator.connection-string
+  /secure/path/install-linking-postgres-migrator.connection-string \
+  /secure/path/install-linking-postgres-server-ca.pem
 sudo chmod 0400 \
   /secure/path/data-protection-key-encryption.pfx \
   /secure/path/data-protection-key-encryption.password \
   /secure/path/install-linking-postgres-runtime.connection-string \
-  /secure/path/install-linking-postgres-migrator.connection-string
+  /secure/path/install-linking-postgres-migrator.connection-string \
+  /secure/path/install-linking-postgres-server-ca.pem
 ```
 
 Use the configured numeric IDs when overridden. Never mount the migrator credential into the
