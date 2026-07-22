@@ -7004,9 +7004,9 @@ public sealed class ReleaseBundlePromotionService
         if (string.Equals(platform, "windows", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactEvidence.SigningStatus, "pass", StringComparison.OrdinalIgnoreCase))
         {
-            bool previewUnsignedAllowed =
-                string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+            bool previewUnsignedAllowed = IsUnsignedWindowsPreviewEvidence(
+                channel,
+                artifactEvidence.SigningStatus);
             bool explicitUnsignedReleaseAllowed =
                 !string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(artifactEvidence.SigningStatus, "unsigned_public_release", StringComparison.OrdinalIgnoreCase);
@@ -7021,8 +7021,14 @@ public sealed class ReleaseBundlePromotionService
         {
             bool previewUnsignedAllowed =
                 string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.SigningStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(artifactEvidence.NotarizationStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase);
+                && string.Equals(
+                    artifactEvidence.SigningStatus,
+                    "skipped_preview",
+                    StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    artifactEvidence.NotarizationStatus,
+                    "skipped_preview",
+                    StringComparison.OrdinalIgnoreCase);
 
             if (previewUnsignedAllowed)
             {
@@ -7040,6 +7046,12 @@ public sealed class ReleaseBundlePromotionService
             }
         }
     }
+
+    internal static bool IsUnsignedWindowsPreviewEvidence(string? channel, string? signingStatus)
+        => string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
+           && signingStatus is not null
+           && (string.Equals(signingStatus, "unsigned", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(signingStatus, "skipped_preview", StringComparison.OrdinalIgnoreCase));
 
     private static PublicReleaseManifestDto MergeCompatibilityManifest(
         PublicReleaseManifestDto? existingManifest,

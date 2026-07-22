@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Reflection;
 using System.Text;
@@ -142,6 +143,265 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         InvalidDataException rejected = Assert.Throws<InvalidDataException>(() =>
             ReleaseUploadCandidateBundleValidator.Validate(bundle, candidate));
         Assert.Contains("exact candidate authority inventory", rejected.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeLoadsUnsignedV3AndValidatesExactBundleWithRetainedAncillaryFile()
+    {
+        using var fixture = new SnapshotFixture();
+        byte[] authorityBytes = LoadUnsignedCandidateAuthorityV3();
+
+        fixture.Publish("candidate_import_ready", authorityBytes);
+
+        ReleaseUploadSnapshotAuthority loaded = fixture.Authority.Load();
+        Assert.True(loaded.IsValid, loaded.FailureReason);
+        Assert.True(loaded.CandidateImportAuthority);
+        Assert.False(loaded.ReleaseUploadAuthority);
+        ReleaseUploadCandidateAuthority candidate =
+            Assert.IsType<ReleaseUploadCandidateAuthority>(loaded.Candidate);
+        Assert.Equal(6, candidate.Inventory.Count);
+        Assert.Contains(
+            candidate.Inventory,
+            static row => string.Equals(
+                row.Path,
+                "operator-note.txt",
+                StringComparison.Ordinal));
+
+        string bundle = fixture.CreateUnsignedExactBundle(candidate, authorityBytes);
+        ReleaseUploadCandidateBundleValidator.Validate(bundle, candidate);
+        Assert.True(Directory.Exists(Path.Combine(bundle, "files")));
+        Assert.Equal(
+            "ancillary-retained",
+            File.ReadAllText(Path.Combine(bundle, "operator-note.txt")));
+    }
+
+    [Fact]
+    public void RuntimeRejectsRehashedUnsignedV3AuthorityPostureTamper()
+    {
+        using var fixture = new SnapshotFixture();
+        JsonObject authority = JsonNode.Parse(LoadUnsignedCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+        authority["publicationAuthorized"] = true;
+
+        fixture.Publish(
+            "candidate_import_ready",
+            JsonSerializer.SerializeToUtf8Bytes(authority));
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    [Theory]
+    [InlineData("full_inventory_digest")]
+    [InlineData("release_property_set")]
+    public void RuntimeRejectsCoordinatedRehashedUnsignedV3ScopeTamper(
+        string tamper)
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish(
+            "candidate_import_ready",
+            TamperUnsignedCandidateAuthorityV3Scope(tamper));
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    [Fact]
+    public void RuntimeRejectsCoordinatedRehashedUnsignedV3CompositionReleasePropertySet()
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish(
+            "candidate_import_ready",
+            TamperUnsignedCandidateAuthorityV3CompositionRelease());
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    private static byte[] LoadUnsignedCandidateAuthorityV3()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_candidate_import_authority_v3.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        JsonObject authority = JsonNode.Parse(output.ToArray())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        authority["generatedAtUtc"] = now;
+        authority["expiresAtUtc"] = now.AddHours(2);
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static byte[] TamperUnsignedCandidateAuthorityV3Scope(string tamper)
+    {
+        JsonObject authority = JsonNode.Parse(LoadUnsignedCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+        JsonObject custody = authority["custody"]!.AsObject();
+        JsonObject evidence = custody["unsignedPublicationEvidence"]!.AsObject();
+        const string scopePath = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json";
+        JsonObject scopeEntry = evidence["files"]!.AsArray()
+            .Select(static node => node!.AsObject())
+            .Single(entry => string.Equals(
+                entry["path"]!.GetValue<string>(),
+                scopePath,
+                StringComparison.Ordinal));
+        JsonObject scope = DecodeUnsignedEmbedded(scopeEntry);
+
+        switch (tamper)
+        {
+            case "full_inventory_digest":
+                scope["fullShelfInventorySha256"] = new string('f', 64);
+                evidence["fullShelfInventorySha256"] = new string('f', 64);
+                break;
+            case "release_property_set":
+            {
+                JsonObject release = scope["release"]!.AsObject();
+                scope["release"] = new JsonObject
+                {
+                    ["channel"] = release["channel"]!.DeepClone(),
+                    ["smuggled"] = true,
+                    ["version"] = release["version"]!.DeepClone()
+                };
+                break;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(tamper));
+        }
+
+        byte[] scopeBytes = Encoding.UTF8.GetBytes(
+            scope.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
+        RewriteUnsignedEmbedded(scopeEntry, scopeBytes);
+        evidence["publicationScopeSha256"] = scopeEntry["sha256"]!.GetValue<string>();
+
+        JsonObject registryAuthorityEntry =
+            custody["registryFinalizeAuthority"]!.AsObject();
+        JsonObject registryAuthority = DecodeUnsignedEmbedded(registryAuthorityEntry);
+        RebindUnsignedReference(
+            registryAuthority["sourceScope"]!.AsObject(),
+            scopeEntry);
+        RewriteUnsignedEmbedded(
+            registryAuthorityEntry,
+            Encoding.UTF8.GetBytes(registryAuthority.ToJsonString() + "\n"));
+
+        JsonObject registryReceiptEntry =
+            custody["registryFinalizeReceipt"]!.AsObject();
+        JsonObject registryReceipt = DecodeUnsignedEmbedded(registryReceiptEntry);
+        RebindUnsignedReference(
+            registryReceipt["sourceScope"]!.AsObject(),
+            scopeEntry);
+        RebindUnsignedReference(
+            registryReceipt["authority"]!.AsObject(),
+            registryAuthorityEntry);
+        RewriteUnsignedEmbedded(
+            registryReceiptEntry,
+            Encoding.UTF8.GetBytes(registryReceipt.ToJsonString() + "\n"));
+
+        JsonObject finalization = custody["registryFinalization"]!.AsObject();
+        finalization["authoritySha256"] =
+            registryAuthorityEntry["sha256"]!.GetValue<string>();
+        finalization["finalizeReceiptSha256"] =
+            registryReceiptEntry["sha256"]!.GetValue<string>();
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static JsonObject DecodeUnsignedEmbedded(JsonObject entry)
+    {
+        byte[] bytes = Convert.FromBase64String(
+            entry["base64"]!.GetValue<string>());
+        return JsonNode.Parse(bytes)?.AsObject()
+            ?? throw new InvalidDataException("unsigned embedded fixture is invalid");
+    }
+
+    private static void RewriteUnsignedEmbedded(JsonObject entry, byte[] bytes)
+    {
+        entry["base64"] = Convert.ToBase64String(bytes);
+        entry["sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        entry["sizeBytes"] = bytes.LongLength;
+    }
+
+    private static void RebindUnsignedReference(
+        JsonObject reference,
+        JsonObject entry)
+    {
+        reference["sha256"] = entry["sha256"]!.GetValue<string>();
+        reference["sizeBytes"] = entry["sizeBytes"]!.GetValue<long>();
+    }
+
+    private static byte[] TamperUnsignedCandidateAuthorityV3CompositionRelease()
+    {
+        JsonObject authority = JsonNode.Parse(LoadUnsignedCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+        JsonObject custody = authority["custody"]!.AsObject();
+        JsonObject candidateEntry =
+            custody["registryPrepareCandidateReceipt"]!.AsObject();
+        JsonObject candidate = DecodeUnsignedEmbedded(candidateEntry);
+        JsonObject composition = candidate["compositionInputDocument"]!.AsObject();
+        JsonObject release = composition["release"]!.AsObject();
+        composition["release"] = new JsonObject
+        {
+            ["channel"] = release["channel"]!.DeepClone(),
+            ["smuggled"] = true,
+            ["version"] = release["version"]!.DeepClone()
+        };
+        byte[] compositionBytes = Encoding.UTF8.GetBytes(
+            composition.ToJsonString(
+                new JsonSerializerOptions { WriteIndented = true }) + "\n");
+        JsonObject compositionReference = candidate["compositionInput"]!.AsObject();
+        compositionReference["sha256"] =
+            Convert.ToHexStringLower(SHA256.HashData(compositionBytes));
+        compositionReference["sizeBytes"] = compositionBytes.LongLength;
+        RewriteUnsignedEmbedded(
+            candidateEntry,
+            Encoding.UTF8.GetBytes(candidate.ToJsonString() + "\n"));
+
+        JsonObject registryAuthorityEntry =
+            custody["registryFinalizeAuthority"]!.AsObject();
+        JsonObject registryAuthority = DecodeUnsignedEmbedded(registryAuthorityEntry);
+        RebindUnsignedReference(
+            registryAuthority["candidateReceipt"]!.AsObject(),
+            candidateEntry);
+        RebindUnsignedReference(
+            registryAuthority["compositionRequest"]!.AsObject(),
+            compositionReference);
+        RewriteUnsignedEmbedded(
+            registryAuthorityEntry,
+            Encoding.UTF8.GetBytes(registryAuthority.ToJsonString() + "\n"));
+
+        JsonObject registryReceiptEntry =
+            custody["registryFinalizeReceipt"]!.AsObject();
+        JsonObject registryReceipt = DecodeUnsignedEmbedded(registryReceiptEntry);
+        RebindUnsignedReference(
+            registryReceipt["candidateReceipt"]!.AsObject(),
+            candidateEntry);
+        RebindUnsignedReference(
+            registryReceipt["compositionRequest"]!.AsObject(),
+            compositionReference);
+        RebindUnsignedReference(
+            registryReceipt["authority"]!.AsObject(),
+            registryAuthorityEntry);
+        RewriteUnsignedEmbedded(
+            registryReceiptEntry,
+            Encoding.UTF8.GetBytes(registryReceipt.ToJsonString() + "\n"));
+
+        JsonObject finalization = custody["registryFinalization"]!.AsObject();
+        finalization["candidateReceiptSha256"] =
+            candidateEntry["sha256"]!.GetValue<string>();
+        finalization["authoritySha256"] =
+            registryAuthorityEntry["sha256"]!.GetValue<string>();
+        finalization["finalizeReceiptSha256"] =
+            registryReceiptEntry["sha256"]!.GetValue<string>();
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
     }
 
     [Theory]
@@ -1099,6 +1359,59 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 File.WriteAllBytes(path, bytes);
             }
             return root;
+        }
+
+        public string CreateUnsignedExactBundle(
+            ReleaseUploadCandidateAuthority authority,
+            byte[] authorityBytes)
+        {
+            string root = Path.Combine(_root, "unsigned-exact-bundle");
+            Directory.CreateDirectory(root);
+            JsonObject document = JsonNode.Parse(authorityBytes)?.AsObject()
+                ?? throw new InvalidDataException("unsigned v3 authority fixture is invalid");
+            JsonObject custody = document["custody"]!.AsObject();
+            byte[] canonicalBytes = Convert.FromBase64String(
+                custody["canonicalManifest"]!["base64"]!.GetValue<string>());
+            byte[] compatibilityBytes = Convert.FromBase64String(
+                custody["compatibilityManifest"]!["base64"]!.GetValue<string>());
+            foreach (ReleaseUploadCandidateInventoryRow row in authority.Inventory)
+            {
+                string path = Path.Combine(
+                    root,
+                    row.Path.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                byte[] bytes = row.Path switch
+                {
+                    "RELEASE_CHANNEL.generated.json" => canonicalBytes,
+                    "releases.json" => compatibilityBytes,
+                    "files/chummer-avalonia-linux-x64-installer.deb" =>
+                        Convert.FromBase64String("bGludXgtcmV0YWluZWQ="),
+                    "files/chummer-avalonia-win-x64-installer.exe" =>
+                        BuildUnsignedPreviewInstallerBytes(),
+                    "files/chummer-avalonia-win-x64-payload.zip" =>
+                        Convert.FromBase64String("ZnJlc2gtcGF5bG9hZA=="),
+                    "operator-note.txt" =>
+                        Convert.FromBase64String("YW5jaWxsYXJ5LXJldGFpbmVk"),
+                    _ => throw new InvalidDataException(
+                        $"unexpected unsigned candidate fixture path: {row.Path}")
+                };
+                File.WriteAllBytes(path, bytes);
+            }
+            return root;
+        }
+
+        private static byte[] BuildUnsignedPreviewInstallerBytes()
+        {
+            byte[] bytes = new byte[512];
+            bytes[0] = (byte)'M';
+            bytes[1] = (byte)'Z';
+            bytes[60] = 0x80;
+            bytes[128] = (byte)'P';
+            bytes[129] = (byte)'E';
+            bytes[148] = 0xe0;
+            bytes[152] = 0x0b;
+            bytes[153] = 0x01;
+            return bytes;
         }
 
         public static byte[] BuildCandidateAuthority(

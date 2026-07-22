@@ -210,6 +210,35 @@ public sealed class ReleaseBundlePromotionServiceTests
         ];
 
     [Fact]
+    public async Task PreviewPromotionAcceptsLiteralUnsignedWindowsEvidence()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-preview-literal-unsigned-windows",
+            [
+                new(
+                    "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
+                    "chummer-avalonia-linux-x64-installer.deb", "linux-stage"u8.ToArray(),
+                    false, false, "not_applicable", "not_applicable"),
+                new(
+                    "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
+                    "chummer-avalonia-win-x64-installer.exe", "windows-stage"u8.ToArray(),
+                    false, false, "unsigned", "not_applicable"),
+                new(
+                    "avalonia-osx-arm64-installer", "avalonia", "macos", "arm64", "dmg",
+                    "chummer-avalonia-osx-arm64-installer.dmg", "mac-stage"u8.ToArray(),
+                    false, false, "skipped_preview", "skipped_preview")
+            ]);
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundle,
+            Guid.NewGuid().ToString("N"));
+
+        Assert.False(string.IsNullOrWhiteSpace(staged.GenerationId));
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+    }
+
+    [Fact]
     public void RegistryGenerationProjectionMatchesCrossLanguageGoldenBytes()
     {
         const string source = """

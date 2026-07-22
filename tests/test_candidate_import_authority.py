@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime, timedelta, timezone
+import gzip
 import hashlib
 import importlib.util
 import json
@@ -17,6 +18,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SUMMARY = REPO_ROOT / "scripts" / "release" / "release_upload_attempt_receipt.py"
 MATERIALIZER = REPO_ROOT / "scripts" / "release" / "materialize_candidate_import_authority.py"
 PROJECTION = REPO_ROOT / "scripts" / "release" / "verify_public_projection.py"
+UNSIGNED_V3_AUTHORITY_FIXTURE = (
+    REPO_ROOT
+    / "Chummer.Tests"
+    / "Fixtures"
+    / "unsigned_candidate_import_authority_v3.json.gz.b64"
+)
 DEFAULT_HEADS = ("avalonia",)
 
 
@@ -1882,6 +1889,173 @@ def load_projection():
     return load_script(PROJECTION, "candidate_projection_test")
 
 
+def load_unsigned_v3_authority_fixture() -> dict[str, object]:
+    encoded = "".join(UNSIGNED_V3_AUTHORITY_FIXTURE.read_text().splitlines())
+    authority = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    authority["generatedAtUtc"] = now.isoformat().replace("+00:00", "Z")
+    authority["expiresAtUtc"] = (now + timedelta(hours=2)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    return authority
+
+
+def decode_unsigned_custody_entry(entry: dict[str, object]) -> dict[str, object]:
+    return json.loads(base64.b64decode(entry["base64"]))
+
+
+def rewrite_unsigned_custody_entry(
+    entry: dict[str, object], document: dict[str, object]
+) -> None:
+    payload = (
+        json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+    entry["base64"] = base64.b64encode(payload).decode()
+    entry["sha256"] = hashlib.sha256(payload).hexdigest()
+    entry["sizeBytes"] = len(payload)
+
+
+def exact_tree_fixture(tmp_path: Path):
+    materializer = load_script(MATERIALIZER, "candidate_exact_tree_test")
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    write_json(bundle / "RELEASE_CHANNEL.generated.json", {"status": "held"})
+    write_json(bundle / "releases.json", {"status": "held"})
+    rows = [
+        {
+            "path": path.relative_to(bundle).as_posix(),
+            "sha256": sha(path),
+            "sizeBytes": path.stat().st_size,
+        }
+        for path in sorted(bundle.iterdir())
+    ]
+    candidate = {
+        "fileCount": len(rows),
+        "totalBytes": sum(row["sizeBytes"] for row in rows),
+        "inventorySha256": materializer._inventory_digest(rows),
+    }
+    inventory = {
+        "contractName": "chummer.release-upload.candidate-inventory/v1",
+        "contractVersion": 1,
+        "files": rows,
+    }
+    return materializer, bundle, inventory, candidate
+
+
+def test_candidate_inventory_rejects_unlisted_bundle_file(tmp_path: Path) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    (bundle / "unlisted.bin").write_bytes(b"not in the signed inventory")
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="exact bundle bytes",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+
+def test_candidate_inventory_allows_bound_root_ancillary_only_for_unsigned_v3(
+    tmp_path: Path,
+) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    ancillary = bundle / "operator-note.txt"
+    ancillary.write_bytes(b"retained incumbent ancillary")
+    ancillary.chmod(0o644)
+    row = {
+        "path": ancillary.name,
+        "sha256": sha(ancillary),
+        "sizeBytes": ancillary.stat().st_size,
+    }
+    inventory["files"].append(row)
+    inventory["files"].sort(key=lambda item: item["path"])
+    candidate["fileCount"] += 1
+    candidate["totalBytes"] += row["sizeBytes"]
+    candidate["inventorySha256"] = materializer._inventory_digest(
+        inventory["files"]
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="only the two finalized shelf manifests",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+    rows, modes, directory_modes, captured = materializer._validate_bundle_inventory(
+        bundle,
+        inventory,
+        candidate,
+        allow_root_ancillary_files=True,
+    )
+    assert rows == inventory["files"]
+    assert modes[ancillary.name] == 0o644
+    assert directory_modes == []
+    assert set(captured) == {
+        "RELEASE_CHANNEL.generated.json",
+        "releases.json",
+    }
+
+
+def test_candidate_inventory_rejects_symlinked_ancestor(tmp_path: Path) -> None:
+    materializer, bundle, inventory, candidate = exact_tree_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    payload = outside / "payload.zip"
+    payload.write_bytes(b"outside custody")
+    (bundle / "files").symlink_to(outside, target_is_directory=True)
+    row = {
+        "path": "files/payload.zip",
+        "sha256": sha(payload),
+        "sizeBytes": payload.stat().st_size,
+    }
+    inventory["files"].append(row)
+    inventory["files"].sort(key=lambda item: item["path"])
+    candidate["fileCount"] += 1
+    candidate["totalBytes"] += row["sizeBytes"]
+    candidate["inventorySha256"] = materializer._inventory_digest(
+        inventory["files"]
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="symbolic link",
+    ):
+        materializer._validate_bundle_inventory(bundle, inventory, candidate)
+
+
+def test_candidate_tree_rejects_file_mutation_during_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materializer, bundle, _inventory, _candidate = exact_tree_fixture(tmp_path)
+    files = bundle / "files"
+    files.mkdir()
+    payload = files / "payload.zip"
+    payload.write_bytes(b"x" * (2 * 1024 * 1024))
+    real_read = materializer.os.read
+    mutated = False
+
+    def racing_read(descriptor: int, count: int) -> bytes:
+        nonlocal mutated
+        chunk = real_read(descriptor, count)
+        descriptor_path = Path(f"/proc/self/fd/{descriptor}")
+        if (
+            not mutated
+            and chunk
+            and descriptor_path.exists()
+            and descriptor_path.resolve() == payload
+        ):
+            mutated = True
+            payload.write_bytes(payload.read_bytes() + b"race")
+        return chunk
+
+    monkeypatch.setattr(materializer.os, "read", racing_read)
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="changed during validation",
+    ):
+        materializer._scan_bundle_tree(bundle)
+    assert mutated is True
+
+
 @pytest.mark.parametrize(
     ("path", "module_name", "helper", "exception_name"),
     [
@@ -1913,6 +2087,114 @@ def test_alias_helpers_reject_present_null(
             "version",
             "releaseVersion",
             label="candidate release version",
+        )
+
+
+def test_unsigned_candidate_scope_rejects_rehashed_non_preview_canonical_channel(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    _, canonical_path, summary_path, inventory_path, _ = fixture
+    canonical = json.loads(canonical_path.read_text())
+    canonical["channel"] = "stable"
+    canonical["channelId"] = "stable"
+    write_json(canonical_path, canonical)
+    resummarize_fixture(fixture)
+    candidate = json.loads(summary_path.read_text())
+    rows = json.loads(inventory_path.read_text())["files"]
+
+    materializer = load_script(MATERIALIZER, "unsigned_channel_materializer_test")
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="channel differs from its authority identity",
+    ):
+        materializer._canonical_windows_scope(
+            canonical,
+            rows,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+
+    projection = load_projection()
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="channel differs from its authority identity",
+    ):
+        projection._candidate_windows_scope(
+            canonical,
+            rows,
+            candidate,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+
+
+@pytest.mark.parametrize(
+    ("entry_name", "expected_message"),
+    [
+        ("registryFinalizeAuthority", "Registry authority v2 posture drifted"),
+        ("registryFinalizeReceipt", "Registry finalize v2 posture drifted"),
+    ],
+)
+def test_unsigned_projection_rejects_rehashed_fractional_registry_contract_version(
+    entry_name: str,
+    expected_message: str,
+) -> None:
+    authority = load_unsigned_v3_authority_fixture()
+    custody = authority["custody"]
+    entry = custody[entry_name]
+    document = decode_unsigned_custody_entry(entry)
+    document["contractVersion"] = 2.0
+    rewrite_unsigned_custody_entry(entry, document)
+
+    if entry_name == "registryFinalizeAuthority":
+        finalize_entry = custody["registryFinalizeReceipt"]
+        finalize = decode_unsigned_custody_entry(finalize_entry)
+        finalize["authority"]["sha256"] = entry["sha256"]
+        finalize["authority"]["sizeBytes"] = entry["sizeBytes"]
+        rewrite_unsigned_custody_entry(finalize_entry, finalize)
+        custody["registryFinalization"]["authoritySha256"] = entry["sha256"]
+        custody["registryFinalization"]["finalizeReceiptSha256"] = finalize_entry[
+            "sha256"
+        ]
+    else:
+        custody["registryFinalization"]["finalizeReceiptSha256"] = entry["sha256"]
+
+    projection = load_projection()
+    with pytest.raises(projection.ProjectionBlocked, match=expected_message):
+        projection._validate_candidate_import_authority_v3(authority)
+
+
+@pytest.mark.parametrize("tamper", ["package_lock_extra", "native_package_extra"])
+def test_unsigned_projection_rejects_provenance_property_shape_drift(
+    tamper: str,
+) -> None:
+    authority = load_unsigned_v3_authority_fixture()
+    evidence = authority["custody"]["unsignedPublicationEvidence"]
+    documents = {
+        entry["path"]: base64.b64decode(entry["base64"])
+        for entry in evidence["files"]
+    }
+    path = (
+        "provenance/config/package-plane.lock.json"
+        if tamper == "package_lock_extra"
+        else "provenance/config/windows-native-bootstrap-toolchain.lock.json"
+    )
+    document = json.loads(documents[path])
+    if tamper == "package_lock_extra":
+        document["unexpectedProperty"] = True
+    else:
+        document["packages"][0]["unexpectedProperty"] = True
+    documents[path] = (
+        json.dumps(document, indent=2, sort_keys=True) + "\n"
+    ).encode()
+
+    projection = load_projection()
+    with pytest.raises(projection.ProjectionBlocked, match="package-plane lock|toolchain package"):
+        projection._candidate_unsigned_provenance(
+            documents,
+            source_sha=evidence["sourceSha"],
+            version=authority["candidate"]["version"],
         )
 
 

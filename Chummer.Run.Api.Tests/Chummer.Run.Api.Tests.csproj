@@ -68,6 +68,7 @@
           CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadRequestGateMiddlewareTests.cs" Link="ReleaseUploadRequestGateMiddlewareTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadSnapshotAuthorityTests.cs" Link="ReleaseUploadSnapshotAuthorityTests.cs" />
+    <Compile Include="ReleaseBundlePromotionUnsignedPreviewTests.cs" />
     <Compile Include="ReleaseAuthorityEndpointContractTests.cs" />
   </ItemGroup>
 

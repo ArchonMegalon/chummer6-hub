@@ -53,7 +53,12 @@ PLATFORM_ALIASES = {
     "linux": "linux",
 }
 ACCESS_CLASSES = {"open_public", "account_required", "support_directed"}
-SIGNING_REQUIREMENTS = {"signed", "preview_unsigned_allowed", "not_applicable"}
+SIGNING_REQUIREMENTS = {
+    "signed",
+    "preview_unsigned_allowed",
+    "unsigned_preview",
+    "not_applicable",
+}
 SUPPORTED_HEADS = {"avalonia", "blazor-desktop"}
 INSTALLER_KINDS = {"installer", "dmg", "pkg", "msix"}
 INVALID_TEXT = {"", "none", "null", "pending", "review_required", "tbd", "unknown"}
@@ -284,7 +289,7 @@ def _parse_decision(payload: dict[str, Any]) -> tuple[dict[str, Any], list[dict[
         )
         if signing not in SIGNING_REQUIREMENTS:
             raise ScopeError(f"platforms[{index}].signingRequirement is unsupported")
-        if signing == "preview_unsigned_allowed" and target != "preview":
+        if signing in {"preview_unsigned_allowed", "unsigned_preview"} and target != "preview":
             raise ScopeError("unsigned artifacts may only be approved for a preview target")
         if signing == "not_applicable" and platform in {"windows", "macos"}:
             raise ScopeError(f"{platform} cannot use signingRequirement=not_applicable")
@@ -423,10 +428,18 @@ def _verify_inventory(
             if signing != "pass" or (platform == "macos" and notarization != "pass"):
                 raise ScopeError(f"candidate artifact {artifact_id} lacks required signing proof")
         elif requirement == "preview_unsigned_allowed":
-            if signing not in {"pass", "skipped_preview"} or (
-                platform == "macos" and notarization not in {"pass", "skipped_preview"}
+            if signing not in {"pass", "skipped_preview", "unsigned"} or (
+                platform == "macos"
+                and notarization not in {"pass", "skipped_preview", "not_applicable"}
             ):
                 raise ScopeError(f"candidate artifact {artifact_id} has signing proof outside preview policy")
+        elif requirement == "unsigned_preview":
+            if signing != "unsigned" or (
+                platform == "macos" and notarization != "not_applicable"
+            ):
+                raise ScopeError(
+                    f"candidate artifact {artifact_id} is not literal unsigned preview evidence"
+                )
         elif signing or notarization:
             raise ScopeError(f"candidate artifact {artifact_id} unexpectedly carries signing posture")
     return sorted(ids)
