@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 import tempfile
 from typing import Any
@@ -46,10 +47,7 @@ EXPECTED_DOWNLOADS_SOURCE = (
     "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 )
 EXPECTED_FLEET_ARTIFACT_ROOT = "/docker/fleet/.codex-studio/published"
-EXPECTED_HUB_PROOF_SOURCE = (
-    "/docker/chummercomplete/chummer.run-services/.codex-studio/published/"
-    "HUB_LOCAL_RELEASE_PROOF.generated.json"
-)
+EXPECTED_HUB_PROOF_FILENAME = "HUB_LOCAL_RELEASE_PROOF.generated.json"
 EXPECTED_FINAL_GOLD_SOURCE = (
     "/docker/chummercomplete/chummer.run-services/.codex-studio/published/"
     "FINAL_GOLD_JANITOR.generated.json"
@@ -383,6 +381,71 @@ def opaque_read_only_bind_policy(target: str) -> dict[str, Any]:
     }
 
 
+def authenticated_projection_directory(value: Path) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError("projection root must be absolute")
+    normalized = Path(os.path.normpath(path))
+    if normalized != path:
+        raise ValueError("projection root must be a normalized path")
+    metadata = path.lstat()
+    resolved = path.resolve(strict=True)
+    if path.is_symlink() or resolved != path:
+        raise ValueError("projection root must be a canonical non-symlink path")
+    if not path.is_dir():
+        raise ValueError("projection root must be an existing directory")
+    if metadata.st_uid != os.geteuid():
+        raise ValueError("projection root must be owned by the current user")
+    if metadata.st_mode & 0o022:
+        raise ValueError("projection root must not be group- or world-writable")
+    return path
+
+
+def authenticated_runtime_proof_file(value: Path, *, projection_root: Path) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError("runtime proof bind source must be absolute")
+    normalized = Path(os.path.normpath(path))
+    if normalized != path:
+        raise ValueError("runtime proof bind source must be a normalized path")
+    metadata = path.lstat()
+    resolved = path.resolve(strict=True)
+    if path.is_symlink() or resolved != path:
+        raise ValueError(
+            "runtime proof bind source must be a canonical non-symlink path"
+        )
+    if not path.is_file():
+        raise ValueError("runtime proof bind source must be an existing regular file")
+    if metadata.st_uid != os.geteuid():
+        raise ValueError("runtime proof bind source must be owned by the current user")
+    if metadata.st_mode & 0o022:
+        raise ValueError(
+            "runtime proof bind source must not be group- or world-writable"
+        )
+    if stat.S_IMODE(metadata.st_mode) != 0o644:
+        raise ValueError("runtime proof bind source must have exact mode 0644")
+    if metadata.st_nlink != 1:
+        raise ValueError("runtime proof bind source must have exactly one hard link")
+    if (
+        path.name != EXPECTED_HUB_PROOF_FILENAME
+        or path.parent.parent != projection_root
+        or re.fullmatch(r"public-projection-[0-9a-f]{64}", path.parent.name) is None
+    ):
+        raise ValueError(
+            "runtime proof bind source must be the canonical projection snapshot proof"
+        )
+    snapshot_metadata = path.parent.lstat()
+    if snapshot_metadata.st_uid != os.geteuid():
+        raise ValueError(
+            "runtime proof snapshot directory must be owned by the current user"
+        )
+    if snapshot_metadata.st_mode & 0o022:
+        raise ValueError(
+            "runtime proof snapshot directory must not be group- or world-writable"
+        )
+    return path
+
+
 def read_rendered_compose() -> dict[str, Any]:
     payload = sys.stdin.buffer.read(MAX_RENDERED_COMPOSE_BYTES + 1)
     if len(payload) > MAX_RENDERED_COMPOSE_BYTES:
@@ -455,9 +518,16 @@ def validate_runtime(
     source_root: Path,
     build_context: Path,
     overlay_root: Path,
+    projection_root: Path,
+    runtime_proof_bind_source: Path,
     published_port: int,
     operation: str = "deploy",
 ) -> dict[str, Any]:
+    projection_root = authenticated_projection_directory(projection_root)
+    runtime_proof_bind_source = authenticated_runtime_proof_file(
+        runtime_proof_bind_source,
+        projection_root=projection_root,
+    )
     expected_release_shelf_posture = RELEASE_SHELF_POSTURES.get(operation)
     if expected_release_shelf_posture is None:
         raise ValueError("public-edge operation is not an audited literal")
@@ -646,14 +716,13 @@ def validate_runtime(
                 "/windows-proof-upload-sessions",
             ),
             bind_mount_policy(
-                EXPECTED_HUB_PROOF_SOURCE,
+                str(runtime_proof_bind_source),
                 "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json",
                 read_only=True,
             ),
             bind_mount_policy(
-                EXPECTED_HUB_PROOF_SOURCE,
-                "/app/wwwroot/proofs/mac-codex-release/"
-                "HUB_LOCAL_RELEASE_PROOF.generated.json",
+                str(projection_root),
+                "/public-projection",
                 read_only=True,
             ),
             bind_mount_policy(
@@ -827,6 +896,10 @@ def validate_runtime(
         "buildContext": str(build_context),
         "overlayRoot": str(overlay_root),
         "overlayReadOnly": True,
+        "projectionRoot": str(projection_root),
+        "projectionRootReadOnly": True,
+        "runtimeProofBindSource": str(runtime_proof_bind_source),
+        "runtimeProofBindSourceReadOnly": True,
         "publishedPort": published_port,
         "proxyGates": {key: "false" for key in PROXY_GATE_KEYS},
         "retiredProxyKeysAbsent": True,
@@ -838,6 +911,8 @@ def validate_runtime(
             "resource-limits",
             "command-entrypoint",
             "mounts",
+            "authenticated-projection-root",
+            "authenticated-runtime-proof-bind-source",
             "ports-health",
             "dependency-network",
             "profiles-tmpfs-restart",
@@ -893,6 +968,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-root", required=True)
     parser.add_argument("--build-context", required=True)
     parser.add_argument("--overlay-root", required=True)
+    parser.add_argument("--projection-root", required=True)
+    parser.add_argument("--runtime-proof-bind-source", required=True)
     parser.add_argument("--published-port", required=True, type=int)
     parser.add_argument(
         "--operation",
@@ -918,6 +995,8 @@ def main(argv: list[str] | None = None) -> int:
             source_root=source_root,
             build_context=build_context,
             overlay_root=overlay_root,
+            projection_root=Path(args.projection_root),
+            runtime_proof_bind_source=Path(args.runtime_proof_bind_source),
             published_port=args.published_port,
             operation=args.operation,
         )
