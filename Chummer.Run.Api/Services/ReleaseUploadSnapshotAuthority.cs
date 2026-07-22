@@ -1234,12 +1234,35 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
         JsonElement fresh)
     {
+        JsonElement artifacts = RequireArray(canonical, "artifacts");
+        var manifestPaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement artifact in artifacts.EnumerateArray())
+        {
+            string fileName = RequireString(artifact, "fileName");
+            string artifactPath = $"files/{fileName}";
+            if (fileName.Contains('/')
+                || fileName.Contains('\\')
+                || !manifestPaths.Add(artifactPath)
+                || !inventory.TryGetValue(
+                    artifactPath,
+                    out ReleaseUploadCandidateInventoryRow? artifactInventory)
+                || !string.Equals(
+                    RequireSha256(artifact, "sha256"),
+                    artifactInventory.Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(artifact, "sizeBytes")
+                   != artifactInventory.SizeBytes
+                || artifactInventory.SizeBytes <= 0)
+            {
+                throw new InvalidDataException("unsigned canonical artifact bytes drifted");
+            }
+        }
+
         string[] requiredHeads = RequirePromotedDesktopHeads(canonical);
         var requiredHeadSet = new HashSet<string>(requiredHeads, StringComparer.Ordinal);
-        var manifestPaths = new HashSet<string>(StringComparer.Ordinal);
         var managedRetainedPaths = new HashSet<string>(StringComparer.Ordinal);
         int windowsCount = 0;
-        foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
+        foreach (JsonElement artifact in artifacts.EnumerateArray())
         {
             string head = RequireString(artifact, "head");
             string platform = RequireString(artifact, "platform");
@@ -1272,22 +1295,6 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             {
                 throw new InvalidDataException(
                     "unsigned canonical artifact is outside the exact desktop shelf scope");
-            }
-            if (fileName.Contains('/')
-                || fileName.Contains('\\')
-                || !manifestPaths.Add(artifactPath)
-                || !inventory.TryGetValue(
-                    artifactPath,
-                    out ReleaseUploadCandidateInventoryRow? artifactInventory)
-                || !string.Equals(
-                    RequireSha256(artifact, "sha256"),
-                    artifactInventory.Sha256,
-                    StringComparison.Ordinal)
-                || RequireNonNegativeInt64(artifact, "sizeBytes")
-                   != artifactInventory.SizeBytes
-                || artifactInventory.SizeBytes <= 0)
-            {
-                throw new InvalidDataException("unsigned canonical artifact bytes drifted");
             }
             if (!string.Equals(platform, "windows", StringComparison.Ordinal))
             {
