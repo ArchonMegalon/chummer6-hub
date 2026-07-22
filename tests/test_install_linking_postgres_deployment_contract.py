@@ -30,10 +30,27 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             "/run/chummer-secrets/install-linking-postgres-runtime.connection-string",
             environment["CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE"],
         )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            environment["CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"],
+        )
         self.assertIn("CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE", volumes)
         self.assertIn(
             ":/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro",
             volumes,
+        )
+        self.assertIn("CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE", volumes)
+        self.assertIn(
+            ":/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro",
+            volumes,
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            "\n".join(portal["extra_hosts"]),
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_IP",
+            "\n".join(portal["extra_hosts"]),
         )
         self.assertNotIn("MIGRATOR", volumes.upper())
         self.assertNotIn(
@@ -104,12 +121,29 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             ":/run/chummer-secrets/install-linking-postgres-migrator.connection-string:ro",
             volumes,
         )
+        self.assertIn("CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE", volumes)
+        self.assertIn(
+            ":/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro",
+            volumes,
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            "\n".join(service["extra_hosts"]),
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_IP",
+            "\n".join(service["extra_hosts"]),
+        )
         self.assertNotIn("CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE", volumes)
         self.assertNotIn("chummer-run-api-state:/app/state", volumes)
         self.assertNotIn(":/app:ro", volumes)
         self.assertIn(
             "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE",
             service["environment"],
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            service["environment"]["CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"],
         )
 
     def test_profile_import_job_requires_explicit_override_and_minimal_state(self) -> None:
@@ -129,8 +163,25 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             ":/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro",
             volumes,
         )
+        self.assertIn("CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE", volumes)
+        self.assertIn(
+            ":/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro",
+            volumes,
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            "\n".join(service["extra_hosts"]),
+        )
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_IP",
+            "\n".join(service["extra_hosts"]),
+        )
         self.assertNotIn("MIGRATOR", volumes.upper())
         self.assertNotIn(":/app:ro", volumes)
+        self.assertIn(
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            service["environment"]["CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"],
+        )
 
     def test_public_api_image_excludes_the_operator_tool(self) -> None:
         dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
@@ -163,11 +214,17 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         for name in (
             "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE",
             "CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE",
+            "CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE",
+            "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME",
+            "CHUMMER_INSTALL_LINKING_POSTGRES_IP",
             "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE",
         ):
             self.assertIn(name, env_example)
         self.assertIn("managed or externally operated", security_doc)
         self.assertIn("SSL Mode=VerifyFull", security_doc)
+        self.assertIn("Root Certificate=/run/chummer-secrets/install-linking-postgres-server-ca.pem", security_doc)
+        self.assertIn("must exactly match a server-certificate SAN", security_doc)
+        self.assertIn("raw-IP `Host` values are not acceptable", security_doc)
         self.assertIn("must already exist", security_doc)
         self.assertIn("point-in-time recovery", security_doc)
         self.assertNotIn("external_rollback_authority_unimplemented", security_doc)

@@ -146,7 +146,10 @@ def rendered_compose(
                         "required": True,
                     },
                 },
-                "extra_hosts": ["host.docker.internal=host-gateway"],
+                "extra_hosts": [
+                    "db.example.net=34.107.1.2",
+                    "host.docker.internal=host-gateway",
+                ],
                 "environment": {
                     "AllowedHosts": "chummer.run",
                     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
@@ -158,6 +161,7 @@ def rendered_compose(
                     "CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED": "false",
                     "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED": "false",
                     "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED": "false",
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
                     "SECRET_NOT_ALLOWED_IN_RECEIPT": "do-not-copy",
                 },
                 "volumes": [
@@ -176,6 +180,11 @@ def rendered_compose(
                     bind(
                         "/runbook/credentials/postgres-runtime.connection-string",
                         "/run/chummer-secrets/install-linking-postgres-runtime.connection-string",
+                        read_only=True,
+                    ),
+                    bind(
+                        "/runbook/credentials/postgres-server-ca.pem",
+                        "/run/chummer-secrets/install-linking-postgres-server-ca.pem",
                         read_only=True,
                     ),
                     bind(
@@ -252,11 +261,13 @@ def rendered_compose(
                 "command": ["validate"],
                 "entrypoint": None,
                 "tmpfs": ["/tmp:rw,noexec,nosuid,nodev,mode=1777"],
+                "extra_hosts": ["db.example.net=34.107.1.2"],
                 "environment": {
                     "CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE": (
                         "/run/chummer-secrets/"
                         "install-linking-postgres-migrator.connection-string"
                     ),
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
                     "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE": "chummer_runtime",
                 },
                 "volumes": [
@@ -265,7 +276,12 @@ def rendered_compose(
                         "/run/chummer-secrets/"
                         "install-linking-postgres-migrator.connection-string",
                         read_only=True,
-                    )
+                    ),
+                    bind(
+                        "/runbook/credentials/postgres-server-ca.pem",
+                        "/run/chummer-secrets/install-linking-postgres-server-ca.pem",
+                        read_only=True,
+                    ),
                 ],
                 "networks": {"public-origin": {}},
             },
@@ -280,6 +296,7 @@ def rendered_compose(
                 "command": ["refuse-import-without-explicit-command"],
                 "entrypoint": None,
                 "tmpfs": ["/tmp:rw,noexec,nosuid,nodev,mode=1777"],
+                "extra_hosts": ["db.example.net=34.107.1.2"],
                 "environment": {
                     "ASPNETCORE_ENVIRONMENT": "Production",
                     "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys",
@@ -297,6 +314,7 @@ def rendered_compose(
                         "/run/chummer-secrets/"
                         "install-linking-postgres-runtime.connection-string"
                     ),
+                    "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST": "db.example.net",
                 },
                 "volumes": [
                     volume("chummer-run-api-state", "/app/state"),
@@ -314,6 +332,11 @@ def rendered_compose(
                         "/runbook/credentials/postgres-runtime.connection-string",
                         "/run/chummer-secrets/"
                         "install-linking-postgres-runtime.connection-string",
+                        read_only=True,
+                    ),
+                    bind(
+                        "/runbook/credentials/postgres-server-ca.pem",
+                        "/run/chummer-secrets/install-linking-postgres-server-ca.pem",
                         read_only=True,
                     ),
                 ],
@@ -399,6 +422,77 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
     assert "environment" not in receipt
     assert "volumes" not in receipt
     assert os.stat(output).st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        ("ip-host", "canonical lowercase DNS name"),
+        ("uppercase-host", "canonical lowercase DNS name"),
+        ("invalid-address", "address is invalid"),
+        ("loopback-address", "routable IPv4 address"),
+        ("admin-mapping", "admin extra_hosts"),
+        ("import-host", "import PostgreSQL expected host drifted"),
+        ("missing-ca", "mount set is not canonical"),
+    ],
+)
+def test_compose_attestation_rejects_postgres_identity_or_ca_drift(
+    tmp_path: Path,
+    drift: str,
+    message: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+    )
+    services = payload["services"]
+    portal = services["chummer-portal"]
+    admin = services["chummer-install-linking-postgres-admin"]
+    importer = services["chummer-install-linking-postgres-import"]
+
+    if drift == "ip-host":
+        portal["environment"][
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+        ] = "34.107.1.2"
+    elif drift == "uppercase-host":
+        portal["environment"][
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+        ] = "DB.example.net"
+    elif drift == "invalid-address":
+        portal["extra_hosts"][0] = "db.example.net=not-an-address"
+    elif drift == "loopback-address":
+        portal["extra_hosts"][0] = "db.example.net=127.0.0.1"
+    elif drift == "admin-mapping":
+        admin["extra_hosts"] = ["db.example.net=34.107.1.3"]
+    elif drift == "import-host":
+        importer["environment"][
+            "CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST"
+        ] = "other.example.net"
+    elif drift == "missing-ca":
+        portal["volumes"] = [
+            mount
+            for mount in portal["volumes"]
+            if mount["target"]
+            != "/run/chummer-secrets/install-linking-postgres-server-ca.pem"
+        ]
+    else:  # pragma: no cover - the parameter list is the closed authority.
+        raise AssertionError(f"unhandled PostgreSQL identity drift: {drift}")
+
+    with pytest.raises(ValueError, match=message):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            projection_root=projection_root,
+            runtime_proof_bind_source=fixture_runtime_proof(projection_root),
+            published_port=8091,
+        )
 
 
 @pytest.mark.parametrize(

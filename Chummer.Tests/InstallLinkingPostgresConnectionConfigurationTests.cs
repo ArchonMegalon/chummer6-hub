@@ -11,6 +11,9 @@ namespace Chummer.Tests;
 
 public sealed class InstallLinkingPostgresConnectionConfigurationTests
 {
+    private const string ExpectedHost = "db.example.net";
+    private const string ExpectedRootCertificate =
+        InstallLinkingPostgresConnectionConfiguration.ExpectedRootCertificatePath;
     private const UnixFileMode OwnerFileMode =
         UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
@@ -59,7 +62,9 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         IConfiguration configuration = Configuration(
             (InstallLinkingPostgresConnectionConfiguration
                 .RuntimeConnectionStringFileConfigurationKey,
-                fixture.Path));
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+                ExpectedHost));
 
         Assert.ThrowsAny<IOException>(() =>
             InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
@@ -110,12 +115,15 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         fixture.Write(
             "Host=db.example.net;Database=chummer;Username=runtime;Password=secret;"
             + "SSL Mode=VerifyFull;Timeout=120;Command Timeout=0;"
+            + $"Root Certificate={ExpectedRootCertificate};"
             + "Include Error Detail=true;Persist Security Info=true;Application Name=untrusted",
             OwnerFileMode);
         IConfiguration configuration = Configuration(
             (InstallLinkingPostgresConnectionConfiguration
                 .RuntimeConnectionStringFileConfigurationKey,
-                fixture.Path));
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+                ExpectedHost));
 
         string normalized =
             InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
@@ -130,6 +138,7 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         Assert.False(builder.PersistSecurityInfo);
         Assert.Equal("chummer-run-install-linking", builder.ApplicationName);
         Assert.Equal(SslMode.VerifyFull, builder.SslMode);
+        Assert.Equal(ExpectedRootCertificate, builder.RootCertificate);
         Assert.Equal(
             InstallLinkingPostgresDurabilityInvariants.ConnectionTimeoutSeconds,
             builder.Timeout);
@@ -149,7 +158,9 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         IConfiguration configuration = Configuration(
             (InstallLinkingPostgresConnectionConfiguration
                 .RuntimeConnectionStringFileConfigurationKey,
-                fixture.Path));
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+                ExpectedHost));
 
         InvalidDataException failure = Assert.Throws<InvalidDataException>(() =>
             InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
@@ -158,6 +169,88 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
 
         Assert.DoesNotContain(secret, failure.ToString(), StringComparison.Ordinal);
         Assert.Contains("full TLS", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Production_runtime_requires_reviewed_host_without_disclosure()
+    {
+        using CredentialFileFixture fixture = new();
+        fixture.Write(
+            $"Host={ExpectedHost};Database=chummer;Username=runtime;Password=secret;"
+            + $"SSL Mode=VerifyFull;Root Certificate={ExpectedRootCertificate}",
+            OwnerFileMode);
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .RuntimeConnectionStringFileConfigurationKey,
+                fixture.Path));
+
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
+                configuration,
+                new ProductionHostEnvironment()));
+
+        Assert.Contains(
+            InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+            failure.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("Password=secret", failure.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("203.0.113.7")]
+    [InlineData("db.example.net.")]
+    [InlineData("db..example.net")]
+    public void Production_runtime_rejects_non_dns_expected_host(string expectedHost)
+    {
+        using CredentialFileFixture fixture = new();
+        fixture.Write(
+            $"Host={ExpectedHost};Database=chummer;Username=runtime;Password=secret;"
+            + $"SSL Mode=VerifyFull;Root Certificate={ExpectedRootCertificate}",
+            OwnerFileMode);
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .RuntimeConnectionStringFileConfigurationKey,
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+                expectedHost));
+
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
+                configuration,
+                new ProductionHostEnvironment()));
+
+        Assert.Contains("DNS name", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Password=secret", failure.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("other.example.net", "/run/chummer-secrets/install-linking-postgres-server-ca.pem", "certificate identity")]
+    [InlineData("db.example.net", "/tmp/unreviewed-ca.pem", "mounted server CA")]
+    public void Production_runtime_rejects_host_or_ca_substitution(
+        string host,
+        string rootCertificate,
+        string expectedMessage)
+    {
+        const string secret = "substitution-secret-must-not-be-disclosed";
+        using CredentialFileFixture fixture = new();
+        fixture.Write(
+            $"Host={host};Database=chummer;Username=runtime;Password={secret};"
+            + $"SSL Mode=VerifyFull;Root Certificate={rootCertificate}",
+            OwnerFileMode);
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .RuntimeConnectionStringFileConfigurationKey,
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration.ExpectedHostConfigurationKey,
+                ExpectedHost));
+
+        InvalidDataException failure = Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
+                configuration,
+                new ProductionHostEnvironment()));
+
+        Assert.Contains(expectedMessage, failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, failure.ToString(), StringComparison.Ordinal);
     }
 
     private static IConfiguration Configuration(
