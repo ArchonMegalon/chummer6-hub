@@ -932,6 +932,25 @@ def manifest_identity_at(
     }
 
 
+def legacy_manifest_utc_instants_equal(left: object, right: object) -> bool:
+    """Compare validated UTC spellings at the contract's full 100ns precision."""
+
+    try:
+        left_text = require_utc_timestamp(left, "canonical legacy manifest publishedAt")
+        right_text = require_utc_timestamp(
+            right, "compatibility legacy manifest publishedAt"
+        )
+    except CutoverAttestationError:
+        return False
+
+    def instant_key(value: str) -> tuple[str, str]:
+        without_zone = value[:-1] if value.endswith("Z") else value[:-6]
+        whole_seconds, separator, fraction = without_zone.partition(".")
+        return whole_seconds, fraction.ljust(7, "0") if separator else "0" * 7
+
+    return instant_key(left_text) == instant_key(right_text)
+
+
 def generation_rewritten_metadata_paths(path: Path) -> list[str]:
     """Identify payload sidecars that layout-v1 intentionally route-projects."""
     payload, _ = read_json(path, maximum_bytes=4 * 1024 * 1024)
@@ -1528,7 +1547,15 @@ def capture_legacy_snapshot_fd(
     compatibility_identity = manifest_identity_at(
         root.fd, COMPATIBILITY_MANIFEST, canonical=False
     )
-    if canonical_identity != compatibility_identity:
+    if (
+        canonical_identity["releaseVersion"]
+        != compatibility_identity["releaseVersion"]
+        or canonical_identity["channel"] != compatibility_identity["channel"]
+        or not legacy_manifest_utc_instants_equal(
+            canonical_identity["publishedAt"],
+            compatibility_identity["publishedAt"],
+        )
+    ):
         raise CutoverAttestationError("legacy release manifests expose different identities")
     result = {
         "markerAbsent": True,

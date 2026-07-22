@@ -655,6 +655,152 @@ def test_prepare_and_request_start_bind_complete_legacy_inventory(tmp_path: Path
     assert not (shelf / ".release-shelf-writer-policy.json").exists()
 
 
+def test_legacy_capture_accepts_equivalent_live_utc_timestamp_spellings_without_rewriting_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    canonical_path = shelf / module.CANONICAL_MANIFEST
+    compatibility_path = shelf / module.COMPATIBILITY_MANIFEST
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    canonical.update(
+        version="run-20260715-140426",
+        publishedAt="2026-07-15T14:06:48Z",
+    )
+    compatibility.update(
+        version="run-20260715-140426",
+        publishedAt="2026-07-15T14:06:48+00:00",
+    )
+    canonical_raw = write_json(canonical_path, canonical)
+    compatibility_raw = write_json(compatibility_path, compatibility)
+
+    snapshot = module.capture_legacy_snapshot(
+        shelf,
+        allow_aborted_history=False,
+    )
+
+    assert snapshot["manifestIdentity"] == {
+        "releaseVersion": "run-20260715-140426",
+        "channel": "preview",
+        "publishedAt": "2026-07-15T14:06:48Z",
+    }
+    inventory = {
+        row["path"]: row for row in snapshot["legacyInventory"]["files"]
+    }
+    assert inventory[module.CANONICAL_MANIFEST]["sha256"] == sha256(canonical_raw)
+    assert inventory[module.COMPATIBILITY_MANIFEST]["sha256"] == sha256(
+        compatibility_raw
+    )
+    assert canonical_path.read_bytes() == canonical_raw
+    assert compatibility_path.read_bytes() == compatibility_raw
+
+
+@pytest.mark.parametrize(
+    "published_at",
+    [
+        "2026-07-15T14:06:49+00:00",
+        "2026-07-15T14:06:48.0000001+00:00",
+        "2026-07-15T14:06:48",
+        "2026-07-15T16:06:48+02:00",
+        "2026-07-15T14:06:99Z",
+        123,
+        float("nan"),
+        float("inf"),
+    ],
+    ids=[
+        "different-instant",
+        "different-100ns-instant",
+        "naive",
+        "non-utc-offset",
+        "malformed",
+        "wrong-type",
+        "non-finite",
+        "positive-infinity",
+    ],
+)
+def test_legacy_capture_rejects_non_equivalent_or_noncanonical_manifest_timestamps(
+    tmp_path: Path,
+    published_at: object,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    canonical_path = shelf / module.CANONICAL_MANIFEST
+    compatibility_path = shelf / module.COMPATIBILITY_MANIFEST
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    canonical["publishedAt"] = "2026-07-15T14:06:48Z"
+    compatibility["publishedAt"] = published_at
+    write_json(canonical_path, canonical)
+    write_json(compatibility_path, compatibility)
+
+    with pytest.raises(module.CutoverAttestationError):
+        module.capture_legacy_snapshot(shelf, allow_aborted_history=False)
+
+
+def test_legacy_capture_preserves_seventh_fractional_digit_semantics(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    canonical_path = shelf / module.CANONICAL_MANIFEST
+    compatibility_path = shelf / module.COMPATIBILITY_MANIFEST
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    canonical["publishedAt"] = "2026-07-15T14:06:48.1234567Z"
+    compatibility["publishedAt"] = "2026-07-15T14:06:48.1234568+00:00"
+    write_json(canonical_path, canonical)
+    write_json(compatibility_path, compatibility)
+
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="legacy release manifests expose different identities",
+    ):
+        module.capture_legacy_snapshot(shelf, allow_aborted_history=False)
+
+    compatibility["publishedAt"] = "2026-07-15T14:06:48.1234567+00:00"
+    write_json(compatibility_path, compatibility)
+    snapshot = module.capture_legacy_snapshot(shelf, allow_aborted_history=False)
+    assert snapshot["manifestIdentity"]["publishedAt"] == (
+        "2026-07-15T14:06:48.1234567Z"
+    )
+
+    canonical["publishedAt"] = "2026-07-15T14:06:48.1Z"
+    compatibility["publishedAt"] = "2026-07-15T14:06:48.1000000+00:00"
+    write_json(canonical_path, canonical)
+    write_json(compatibility_path, compatibility)
+    snapshot = module.capture_legacy_snapshot(shelf, allow_aborted_history=False)
+    assert snapshot["manifestIdentity"]["publishedAt"] == "2026-07-15T14:06:48.1Z"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("version", "run-other"), ("channel", "stable")],
+)
+def test_legacy_capture_still_rejects_other_manifest_identity_mismatches(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    compatibility_path = shelf / module.COMPATIBILITY_MANIFEST
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    compatibility["publishedAt"] = "2026-07-22T01:00:00+00:00"
+    compatibility[field] = value
+    write_json(compatibility_path, compatibility)
+
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="legacy release manifests expose different identities",
+    ):
+        module.capture_legacy_snapshot(shelf, allow_aborted_history=False)
+
+
 def test_prepare_recovers_only_exact_empty_state_directory(tmp_path: Path) -> None:
     module = load_module()
     shelf = tmp_path / "downloads"
