@@ -59,12 +59,24 @@ EXPECTED_PORTAL_ENVIRONMENT = {
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
-    "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
-    "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
     "CHUMMER_RELEASE_UPLOAD_SESSION_ROOT": "/release-upload-sessions",
     "CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED": "false",
     "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED": "false",
     "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED": "false",
+}
+RELEASE_SHELF_POSTURES = {
+    "deploy": {
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+    },
+    "initial-release-shelf-cutover": {
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "false",
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "true",
+    },
+    "initial-release-shelf-cutover-recover": {
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "false",
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+    },
 }
 EXPECTED_PORTAL_HEALTHCHECK = {
     "test": [
@@ -444,7 +456,11 @@ def validate_runtime(
     build_context: Path,
     overlay_root: Path,
     published_port: int,
+    operation: str = "deploy",
 ) -> dict[str, Any]:
+    expected_release_shelf_posture = RELEASE_SHELF_POSTURES.get(operation)
+    if expected_release_shelf_posture is None:
+        raise ValueError("public-edge operation is not an audited literal")
     if payload.get("name") != project_name:
         raise ValueError("rendered Compose project name is not the canonical deployment authority")
     services = mapping(payload.get("services"), label="rendered Compose services")
@@ -742,6 +758,11 @@ def validate_runtime(
             continue
         if environment.get(key) != expected_value:
             raise ValueError(f"rendered portal {key} is not the canonical literal value")
+    for key, expected_value in expected_release_shelf_posture.items():
+        if environment.get(key) != expected_value:
+            raise ValueError(
+                f"rendered portal {key} is not the exact {operation} literal value"
+            )
     for key in FORBIDDEN_PROXY_KEYS:
         if key in environment:
             raise ValueError(f"rendered portal contains forbidden retired proxy key {key}")
@@ -798,6 +819,7 @@ def validate_runtime(
     return {
         "contractName": "chummer.public_edge_compose_runtime_attestation.v1",
         "status": "pass",
+        "operation": operation,
         "projectName": project_name,
         "portalImage": EXPECTED_PORTAL_IMAGE,
         "toolImage": EXPECTED_TOOL_IMAGE,
@@ -808,6 +830,7 @@ def validate_runtime(
         "publishedPort": published_port,
         "proxyGates": {key: "false" for key in PROXY_GATE_KEYS},
         "retiredProxyKeysAbsent": True,
+        "releaseShelfPosture": expected_release_shelf_posture,
         "runtimePolicyChecks": [
             "closed-service-fields",
             "identity",
@@ -819,6 +842,7 @@ def validate_runtime(
             "dependency-network",
             "profiles-tmpfs-restart",
             "critical-environment",
+            "release-shelf-operation-posture",
         ],
         "mountCounts": {
             service_name: len(selected[service_name]["volumes"])
@@ -870,6 +894,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--build-context", required=True)
     parser.add_argument("--overlay-root", required=True)
     parser.add_argument("--published-port", required=True, type=int)
+    parser.add_argument(
+        "--operation",
+        required=True,
+        choices=tuple(RELEASE_SHELF_POSTURES),
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", args.project_name) is None:
@@ -890,6 +919,7 @@ def main(argv: list[str] | None = None) -> int:
             build_context=build_context,
             overlay_root=overlay_root,
             published_port=args.published_port,
+            operation=args.operation,
         )
         atomic_write_json(args.output, receipt)
     except (OSError, ValueError, StrictJsonContractError) as exc:

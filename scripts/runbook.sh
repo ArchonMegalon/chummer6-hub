@@ -25,13 +25,13 @@ UPSTREAM_HOST_INTERNAL="${UPSTREAM_HOST_INTERNAL:-http://host.docker.internal:80
 
 print_release_shelf_cutover_runbook() {
   echo "Controlled first release-shelf activation:"
-  echo "  1. Explicitly set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=false."
-  echo "  2. Explicitly set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true."
-  echo "  3. Perform exactly one governed activation; do not retry an unknown outcome."
-  echo "  4. Verify current.json, .release-shelf-layout-v1, and the matching committed activation receipt."
-  echo "  5. Permanently set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=true."
-  echo "  6. Permanently set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false."
-  echo "  7. Restart the public edge and verify /api/ready/publication before serving downloads."
+  echo "  1. Keep the canonical environment at layout-v1-required=true and initial-migration-allowed=false."
+  echo "  2. Run the guarded wrapper's explicit initial-release-shelf-cutover operation exactly once."
+  echo "  3. The wrapper alone selects false/true, inventories the legacy shelf, and records candidate_start_requested before Docker."
+  echo "  4. Never retry after that receipt; run the wrapper's recover operation to reconcile the server journal first."
+  echo "  5. Require exact current.json, marker bytes, writer policy, committed receipt, generation inventory, and legacy preservation."
+  echo "  6. The wrapper recreates the candidate under canonical true/false and reruns publication plus browser gates."
+  echo "  7. If automatic transition cannot finish, retain the receipt and run ordinary governed deploy from the safe handoff."
 }
 
 if [[ "$RUNBOOK_MODE" == "release-shelf-cutover-help" ]]; then

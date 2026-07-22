@@ -19,6 +19,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "check_public_edge_deploy_preflight.py"
 MATERIALIZER_SCRIPT = REPO_ROOT / "scripts/materialize_hub_local_release_proof.py"
+COMPOSE_SOURCE_ATTESTOR = (
+    REPO_ROOT / "scripts/attest_public_edge_compose_source.py"
+)
 REGISTRY_RELEASE_PROOF_CONSUMER = (
     REPO_ROOT.parent
     / "chummer-hub-registry/scripts/materialize_public_release_channel.py"
@@ -50,6 +53,18 @@ def load_materializer_module():
     spec = importlib.util.spec_from_file_location(
         "chummer_runtime_proof_materializer_lock_test",
         MATERIALIZER_SCRIPT,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_compose_source_attestor():
+    spec = importlib.util.spec_from_file_location(
+        "public_edge_compose_source_attestor_test",
+        COMPOSE_SOURCE_ATTESTOR,
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -152,6 +167,7 @@ def write_public_projection_snapshot(
         "projectionStage": "release_upload_ready",
         "codeDeploymentAuthority": True,
         "releaseUploadAuthority": True,
+        "candidateImportAuthority": False,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "authorityInputs": {},
@@ -176,6 +192,7 @@ def write_public_projection_snapshot(
         "projectionStage": "release_upload_ready",
         "codeDeploymentAuthority": True,
         "releaseUploadAuthority": True,
+        "candidateImportAuthority": False,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
@@ -2553,8 +2570,13 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     assert symlink_receipt["checks"]["regularFile"] is False
 
 
+@pytest.mark.parametrize(
+    "current_mutation",
+    ("empty", "candidate-import-missing", "candidate-import-true"),
+)
 def test_full_preflight_rejects_tampered_current_without_legacy_fallback(
     tmp_path: Path,
+    current_mutation: str,
 ) -> None:
     module = load_module()
     module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
@@ -2568,7 +2590,19 @@ def test_full_preflight_rejects_tampered_current_without_legacy_fallback(
         release_receipt,
         proof_text,
     )
-    (snapshot_root / "CURRENT.json").write_text("{}\n", encoding="utf-8")
+    current_path = snapshot_root / "CURRENT.json"
+    if current_mutation == "empty":
+        current: dict[str, object] = {}
+    else:
+        current = json.loads(current_path.read_text(encoding="utf-8"))
+        if current_mutation == "candidate-import-missing":
+            del current["candidateImportAuthority"]
+        else:
+            current["candidateImportAuthority"] = True
+    current_path.write_text(
+        json.dumps(current, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
     runtime_check_called = False
 
     def reject_legacy_fallback(*_args: object, **_kwargs: object) -> dict[str, object]:
@@ -3239,6 +3273,173 @@ def test_deploy_wires_one_snapshot_to_code_deploy_and_release_receipt() -> None:
         "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/"
         "RELEASE_CHANNEL.generated.json"
     ) not in deploy
+
+
+def test_compose_source_capture_rejects_group_or_world_write(tmp_path: Path) -> None:
+    attestor = load_compose_source_attestor()
+    source = tmp_path / "docker-compose.public-edge.yml"
+    source.write_text("services: {}\n", encoding="utf-8")
+    source.chmod(0o666)
+    receipt_root = tmp_path / "receipts"
+    receipt_root.mkdir(mode=0o700)
+
+    with pytest.raises(attestor.ComposeSourceError, match="owner-controlled"):
+        attestor.capture(
+            source,
+            receipt_root / "compose.snapshot.yml",
+            receipt_root / "compose-source.json",
+        )
+
+
+@pytest.mark.parametrize("mutation", ["same-inode", "exchange"])
+def test_compose_source_guard_rejects_change_after_capture(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    attestor = load_compose_source_attestor()
+    source = tmp_path / "docker-compose.public-edge.yml"
+    source.write_text("services: {}\n", encoding="utf-8")
+    source.chmod(0o644)
+    receipt_root = tmp_path / "receipts"
+    receipt_root.mkdir(mode=0o700)
+    snapshot = receipt_root / "compose.snapshot.yml"
+    receipt = receipt_root / "compose-source.json"
+    attestor.capture(source, snapshot, receipt)
+    if mutation == "same-inode":
+        original = source.stat()
+        source.write_bytes(source.read_bytes())
+        os.utime(
+            source,
+            ns=(original.st_atime_ns, original.st_mtime_ns + 1_000_000_000),
+        )
+    else:
+        retired = tmp_path / "retired-compose.yml"
+        source.rename(retired)
+        source.write_bytes(retired.read_bytes())
+        source.chmod(0o644)
+
+    with pytest.raises(attestor.ComposeSourceError, match="changed"):
+        attestor.verify(source, snapshot, receipt)
+
+
+def test_deploy_seals_every_compose_read_to_one_guarded_snapshot() -> None:
+    deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
+    recovery = (REPO_ROOT / "scripts/public_edge_deploy_recovery.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "(8#$COMPOSE_FILE_MODE & 8#022)" in deploy
+    assert '"$COMPOSE_SOURCE_ATTESTOR" capture' in deploy
+    assert '"$COMPOSE_SOURCE_ATTESTOR" verify' in deploy
+    assert '-f "$COMPOSE_SOURCE_SNAPSHOT" --project-directory "$SOURCE_ROOT"' in deploy
+    assert (
+        'compose_cli() {\n  run_compose_source_guarded "${compose_command[@]}" "$@"\n}'
+        in deploy
+    )
+    assert deploy.count('"${compose_command[@]}"') == 1
+    assert "docker_cli compose" not in deploy
+    assert '--compose-file "$COMPOSE_SOURCE_SNAPSHOT"' in deploy
+    assert (
+        'run_compose_source_guarded \\\n'
+        '  trusted_source_python "$ROOT_DIR/scripts/verify_public_edge_deploy_source.py"'
+        in deploy
+    )
+    assert '"--project-directory",\n            str(source_root),' in recovery
+
+
+def test_deploy_bounds_initial_release_shelf_cutover_and_returns_to_steady() -> None:
+    deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "deploy|recover|initial-release-shelf-cutover" in deploy
+    assert "configure_compose_operation initial-release-shelf-cutover" in deploy
+    assert "configure_compose_operation initial-release-shelf-cutover-recover" in deploy
+    assert 'CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED="$layout_v1_required"' in deploy
+    assert (
+        'CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED="$initial_migration_allowed"'
+        in deploy
+    )
+    assert deploy.count('--operation "$COMPOSE_ATTESTATION_OPERATION"') == 2
+    request_start = deploy.index(
+        'trusted_source_python "$CUTOVER_ATTESTOR" request-start'
+    )
+    first_candidate_instruction = deploy.index("if ! start_candidate_portal;", request_start)
+    assert request_start < first_candidate_instruction
+    retirement = deploy.index("cutover candidate retirement", first_candidate_instruction)
+    steady_posture = deploy.index("configure_compose_operation deploy", retirement)
+    second_candidate_instruction = deploy.index(
+        'abort_portal_recreate "steady blue-green candidate creation"',
+        steady_posture,
+    )
+    assert retirement < steady_posture < second_candidate_instruction
+    assert 'exec "$SCRIPT_PATH" initial-release-shelf-cutover-recover' in deploy
+    assert "initial_release_shelf_cutover_committed_safe_handoff" in deploy
+    assert "chummer.initial-release-shelf-cutover-poststate/v1" in deploy
+    assert deploy.count('"$CUTOVER_ATTESTOR" verify-outcome') == 1
+    assert deploy.count('"$CUTOVER_ATTESTOR" verify-handoff') == 1
+
+
+def test_cutover_finalize_consumes_only_immediate_owner_only_gate_snapshots() -> None:
+    deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert deploy.count('--kind compose') == 2
+    assert deploy.count('--kind postdeploy') == 1
+    assert deploy.count('--kind active-runtime') == 1
+    assert '--output "$PUBLICATION_READINESS_ATTESTATION"' in deploy
+    assert '--compose-attestation "$FINAL_COMPOSE_ATTESTATION_SNAPSHOT"' in deploy
+    assert (
+        '--publication-readiness-attestation "$PUBLICATION_READINESS_ATTESTATION"'
+        in deploy
+    )
+    assert (
+        '--postdeploy-attestation "$FINAL_POSTDEPLOY_ATTESTATION_SNAPSHOT"'
+        in deploy
+    )
+    assert '--active-runtime-authority "$ACTIVE_RUNTIME_AUTHORITY_SNAPSHOT"' in deploy
+    assert '--candidate-image-id "$image_id"' in deploy
+    assert '--image-id "$image_id"' not in deploy
+
+    postdeploy_success = deploy.index('if "${postdeploy_command[@]}"; then')
+    postdeploy_snapshot = deploy.index('--kind postdeploy', postdeploy_success)
+    postdeploy_break = deploy.index("    break", postdeploy_success)
+    assert postdeploy_success < postdeploy_snapshot < postdeploy_break
+
+    overlay_complete = deploy.index(
+        'public_edge_overlay_transaction.py" complete'
+    )
+    transaction_retired = deploy.index("deployment_transaction_active=0", overlay_complete)
+    runtime_snapshot = deploy.index('--kind active-runtime', transaction_retired)
+    finalize = deploy.index('"$CUTOVER_ATTESTOR" finalize', runtime_snapshot)
+    assert overlay_complete < transaction_retired < runtime_snapshot < finalize
+
+    migration_readiness = deploy.index(
+        'if ! verify_candidate_publication_readiness; then'
+    )
+    final_readiness = deploy.index(
+        'if ! capture_candidate_publication_readiness; then',
+        migration_readiness,
+    )
+    readiness_record = deploy.index('"$CUTOVER_ATTESTOR" record-readiness')
+    assert readiness_record < migration_readiness < final_readiness
+
+
+def test_completed_cutover_state_stays_on_ordinary_deploy_path() -> None:
+    deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
+
+    operation_case = deploy[
+        deploy.index('case "$DEPLOY_OPERATION" in', deploy.index("inspect-deploy-state")) :
+        deploy.index("container_proof_sha256_by_id()")
+    ]
+    assert '"$CUTOVER_STATE_CLASSIFICATION" == steady-handoff' in operation_case
+    assert '"$CUTOVER_STATE_CLASSIFICATION" == complete' not in operation_case
+    assert deploy.count("CUTOVER_STEADY_HANDOFF=1") == 1
 
 
 def test_lock_only_cli_remains_available_without_runtime_proof_pins(

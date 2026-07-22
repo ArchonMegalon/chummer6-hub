@@ -137,6 +137,8 @@ class DockerRuntime:
             project_name,
             "-f",
             str(compose_file),
+            "--project-directory",
+            str(source_root),
         ]
         self.project_name = project_name
 
