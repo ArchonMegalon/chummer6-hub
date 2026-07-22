@@ -28,6 +28,8 @@ ARTIFACT_FACTORY_AUDIENCE="${CHUMMER_ARTIFACT_FACTORY_AUDIENCE:-}"
 ARTIFACT_FACTORY_LOCALE="${CHUMMER_ARTIFACT_FACTORY_LOCALE:-}"
 ALLOW_DIRECT_FALLBACK="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0}"
 DRY_RUN="${CHUMMER_RELEASE_UPLOAD_DRY_RUN:-0}"
+STAGE_ONLY="${CHUMMER_RELEASE_UPLOAD_STAGE_ONLY:-0}"
+EXACT_WINDOWS_STAGE_SCOPE="avalonia:windows:win-x64"
 VERIFY_MANIFEST="${CHUMMER_RELEASE_UPLOAD_VERIFY_MANIFEST:-1}"
 VERIFY_ROUTES="${CHUMMER_RELEASE_UPLOAD_VERIFY_ROUTES:-1}"
 VERIFY_SHELF_TRUTH="${CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH:-1}"
@@ -46,6 +48,7 @@ ARTIFACT_FACTORY_REQUEST_MATERIALIZER="$SCRIPT_DIR/materialize_artifact_factory_
 ARTIFACT_FACTORY_LAUNCHER="$SCRIPT_DIR/launch_artifact_factory_source_pack_batch.py"
 UPLOAD_ATTEMPT_RECEIPT_HELPER="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_HELPER:-$SCRIPT_DIR/release/release_upload_attempt_receipt.py}"
 UPLOAD_ATTEMPT_RECEIPT_PATH="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$BUNDLE_DIR/release-upload-handoff.json}"
+STAGE_RESPONSE_PATH="${CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH:-$BUNDLE_DIR/release-stage-response.json}"
 
 # Keep inherited bearer credentials out of every preflight/materializer child.
 # Bash preserves an inherited export attribute across ordinary assignment, so
@@ -157,6 +160,15 @@ to_bool() {
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
+
+case "$(printf '%s' "$STAGE_ONLY" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|on) STAGE_ONLY=1 ;;
+  0|false|no|off|"") STAGE_ONLY=0 ;;
+  *)
+    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY must be an explicit boolean." >&2
+    exit 1
+    ;;
+esac
 
 array_count() {
   local array_name="${1:-}"
@@ -741,6 +753,10 @@ scalar_fields = (
     *sorted(endpoint_fields), "status", "state", "version", "channel",
     "publishedAt", "supportabilityState", "compatibilityState",
     "traceId", "requestId", "success", "fileCount", "totalBytes",
+    "generationId", "stageReceiptId", "stagedAtUtc", "inventoryDigest",
+    "canonicalManifestSha256", "compatibilityManifestSha256",
+    "targetPointerSha256", "previousGenerationId", "previousPointerSha256",
+    "exactIncomingDesktopScope", "probeTokenExpiresAtUtc",
 )
 
 def safe_url(value: object, *, allow_relative: bool) -> str | None:
@@ -792,6 +808,12 @@ if isinstance(payload, dict):
     if isinstance(promoted_ids, list):
         summary["promotedArtifactIds"] = [
             item for item in promoted_ids[:512]
+            if isinstance(item, str) and safe_identifier.fullmatch(item)
+        ]
+    candidate_ids = payload.get("candidateArtifactIds")
+    if isinstance(candidate_ids, list):
+        summary["candidateArtifactIds"] = [
+            item for item in candidate_ids[:512]
             if isinstance(item, str) and safe_identifier.fullmatch(item)
         ]
     summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 2)
@@ -976,8 +998,13 @@ if to_bool "$DRY_RUN"; then
   echo "Upload sessions URL: $SESSIONS_URL"
   echo "Files staged: $file_count"
   echo
-  echo "Exact live publish command:"
-  echo "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='$VERIFY_URL' CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+  if (( STAGE_ONLY == 1 )); then
+    echo "Exact inert stage command:"
+    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY=1 CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+  else
+    echo "Exact live publish command:"
+    echo "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='$VERIFY_URL' CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+  fi
   echo "If CHUMMER_RELEASE_UPLOAD_TOKEN is unset, set CHUMMER_RELEASE_UPLOAD_TOKEN_FILE or CHUMMER_RELEASE_UPLOAD_NON_INTERACTIVE=1."
   exit 0
 fi
@@ -1078,8 +1105,17 @@ request_common+=(
   -H "X-Chummer-Candidate-Inventory-Sha256: $candidate_inventory_sha256"
   -H "X-Chummer-Candidate-Bundle-Identity-Sha256: $candidate_bundle_identity_sha256"
 )
+if (( STAGE_ONLY == 1 )); then
+  request_common+=(
+    -H "X-Chummer-Release-Exact-Incoming-Scope: $EXACT_WINDOWS_STAGE_SCOPE"
+  )
+fi
 
-echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
+if (( STAGE_ONLY == 1 )); then
+  echo "Uploading ${upload_file_count} candidate files for an inert Windows-only stage from $BUNDLE_DIR"
+else
+  echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
+fi
 
 session_json="$tmp_root/session.json"
 response_json="$tmp_root/response.json"
@@ -1132,6 +1168,12 @@ expected_complete_url="$(join_url "$SESSIONS_URL" "${session_id}/complete")"
   echo "Upload session response endpoints do not match the created session." >&2
   exit 1
 }
+stage_url="$(join_url "$SESSIONS_URL" "${session_id}/stage")"
+expected_stage_url="$(join_url "$SESSIONS_URL" "${session_id}/stage")"
+[[ "$stage_url" == "$expected_stage_url" ]] || {
+  echo "Upload session stage endpoint does not match the created session." >&2
+  exit 1
+}
 
 while IFS= read -r -d '' file_path; do
   relative_path="${file_path#$BUNDLE_DIR/}"
@@ -1144,16 +1186,38 @@ while IFS= read -r -d '' file_path; do
 done < <(array_values_nul upload_files)
 
 record_upload_attempt_state uploaded
-record_upload_attempt_state request_started
-if ! request_json "$response_json" "complete upload session" "$complete_url" "${request_common[@]}" -X POST; then
-  echo "Release completion outcome is unknown. Do not create another session; reconcile the request_started handoff at $UPLOAD_ATTEMPT_RECEIPT_PATH." >&2
-  exit 1
-fi
-UPLOAD_COMPLETION_ACCEPTED=1
-python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" fsync-file --path "$response_json"
-if ! record_upload_attempt_state completed; then
-  echo "Upload completion returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release." >&2
-  exit 1
+if (( STAGE_ONLY == 1 )); then
+  record_upload_attempt_state stage_request_started
+  if ! request_json "$response_json" "stage upload session" "$stage_url" "${request_common[@]}" -X POST; then
+    record_upload_attempt_state stage_outcome_unknown || true
+    echo "Release stage outcome is unknown. Do not create another session and do not invoke /complete; reconcile the stage_outcome_unknown handoff at $UPLOAD_ATTEMPT_RECEIPT_PATH against the same /stage endpoint." >&2
+    exit 1
+  fi
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" fsync-file --path "$response_json"
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" persist-stage-response \
+    --source "$response_json" \
+    --output "$STAGE_RESPONSE_PATH"
+  if ! record_upload_attempt_state staged --stage-response "$STAGE_RESPONSE_PATH"; then
+    echo "Stage returned success, but its durable handoff could not be acknowledged. Reconcile session $session_id against /stage; never create another session or invoke /complete." >&2
+    exit 1
+  fi
+  echo "Candidate staged inertly for exact scope $EXACT_WINDOWS_STAGE_SCOPE."
+  echo "Durable stage response: $STAGE_RESPONSE_PATH"
+  echo "Use materialize_staged_release_finalizer_handoff.py and the owner-only finalize_staged_release.py lane for any later authority advance or activation. This command grants neither."
+  print_sanitized_response "$response_json" || echo "(stage response display suppressed)"
+  exit 0
+else
+  record_upload_attempt_state request_started
+  if ! request_json "$response_json" "complete upload session" "$complete_url" "${request_common[@]}" -X POST; then
+    echo "Release completion outcome is unknown. Do not create another session; reconcile the request_started handoff at $UPLOAD_ATTEMPT_RECEIPT_PATH." >&2
+    exit 1
+  fi
+  UPLOAD_COMPLETION_ACCEPTED=1
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" fsync-file --path "$response_json"
+  if ! record_upload_attempt_state completed; then
+    echo "Upload completion returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release." >&2
+    exit 1
+  fi
 fi
 
 echo "Upload accepted."

@@ -597,7 +597,17 @@ public sealed class InternalReleaseBundlesController : ControllerBase
             return denied;
         }
 
-        if (authorization!.UploadTicketClaims is not null)
+        if (authorization!.CandidateImportAuthority is not null)
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+            return BuildProblem(
+                StatusCodes.Status403Forbidden,
+                "Inert candidate stage required",
+                "candidate-import authority may stage its exact Windows tuple but cannot invoke release completion.",
+                "https://chummer.run/problems/release-bundle/candidate-stage-required");
+        }
+
+        if (authorization.UploadTicketClaims is not null)
         {
             ApplyCredentialResponseNoStoreHeaders(Response.Headers);
         }

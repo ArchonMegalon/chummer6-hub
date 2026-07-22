@@ -77,6 +77,16 @@ CANDIDATE_PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-expor
 CANDIDATE_UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 CANDIDATE_UI_REF = "refs/heads/main"
 CANDIDATE_RID = "win-x64"
+CANDIDATE_EXACT_SCOPE = "avalonia:windows:win-x64"
+CANDIDATE_AUTHORITY_CONTRACT_V2 = "chummer.release-upload.candidate-import-authority/v2"
+CANDIDATE_PUBLICATION_SCOPE_FILE = "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
+CANDIDATE_REGISTRY_RECEIPT_FILE = "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json"
+CANDIDATE_REGISTRY_AUTHORITY_FILE = "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json"
+CANDIDATE_REGISTRY_FINALIZE_FILE = "PREVIEW_PUBLICATION_DELTA_FINALIZE.json"
+CANDIDATE_AUTHENTICODE_PATH = (
+    "proof/windows-native/authenticode/"
+    "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+)
 CANDIDATE_HEAD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 CANDIDATE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 CANDIDATE_REVIEWER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$")
@@ -488,6 +498,67 @@ def _strict_json_object(payload: bytes, *, label: str) -> dict[str, object]:
     if not isinstance(value, dict):
         raise ProjectionBlocked(f"{label} must be a JSON object")
     return value
+
+
+class _JsonNumber:
+    __slots__ = ("raw",)
+
+    def __init__(self, raw: str) -> None:
+        self.raw = raw
+
+
+def _json_semantic_object(payload: bytes, *, label: str) -> dict[str, object]:
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"non-JSON numeric constant {value!r}")
+
+    try:
+        value = json.loads(
+            payload.decode("utf-8"),
+            parse_int=_JsonNumber,
+            parse_float=_JsonNumber,
+            parse_constant=reject_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        raise ProjectionBlocked(f"{label} is not canonical JSON") from exc
+    if not isinstance(value, dict):
+        raise ProjectionBlocked(f"{label} must be a JSON object")
+    return value
+
+
+def _json_semantic_equal(left: object, right: object) -> bool:
+    if isinstance(left, dict) or isinstance(right, dict):
+        return (
+            isinstance(left, dict)
+            and isinstance(right, dict)
+            and set(left) == set(right)
+            and all(
+                _json_semantic_equal(left[key], right[key])
+                for key in left
+            )
+        )
+    if isinstance(left, list) or isinstance(right, list):
+        return (
+            isinstance(left, list)
+            and isinstance(right, list)
+            and len(left) == len(right)
+            and all(
+                _json_semantic_equal(left_item, right_item)
+                for left_item, right_item in zip(left, right)
+            )
+        )
+    if isinstance(left, _JsonNumber) or isinstance(right, _JsonNumber):
+        return (
+            isinstance(left, _JsonNumber)
+            and isinstance(right, _JsonNumber)
+            and left.raw == right.raw
+        )
+    if left is None or right is None:
+        return left is None and right is None
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is bool and type(right) is bool and left is right
+    if isinstance(left, str) or isinstance(right, str):
+        return isinstance(left, str) and isinstance(right, str) and left == right
+    return False
 
 
 def _require_real_directory(path: Path, *, label: str) -> None:
@@ -1347,21 +1418,53 @@ def _candidate_windows_scope(
     if not isinstance(artifacts_value, list) or not artifacts_value:
         raise ProjectionBlocked("candidate release manifest has no artifacts")
     windows_artifacts: list[dict[str, object]] = []
+    candidate_by_path = {str(row["path"]): row for row in candidate_rows}
+    expected_file_paths: set[str] = set()
     for artifact in artifacts_value:
-        if not isinstance(artifact, dict) or artifact.get("platform") != "windows":
-            continue
+        if not isinstance(artifact, dict):
+            raise ProjectionBlocked("candidate release manifest contains a non-object artifact")
         if artifact.get("head") not in heads:
             raise ProjectionBlocked(
-                "candidate release manifest contains a Windows artifact outside "
+                "candidate release manifest contains a desktop artifact outside "
                 "requiredDesktopHeads"
             )
-        if artifact.get("rid") != CANDIDATE_RID or artifact.get("kind") != "installer":
+        platform = artifact.get("platform")
+        rid = artifact.get("rid")
+        if (
+            artifact.get("kind") != "installer"
+            or platform not in {"linux", "macos", "windows"}
+            or platform == "windows"
+            and rid != CANDIDATE_RID
+            or platform == "linux"
+            and rid != "linux-x64"
+            or platform == "macos"
+            and rid not in {"osx-arm64", "osx-x64"}
+        ):
             raise ProjectionBlocked(
-                "candidate release manifest contains a Windows artifact outside "
-                "the exact required desktop tuple scope"
+                "candidate release manifest contains an artifact outside the exact "
+                "finalized desktop shelf scope"
             )
-        windows_artifacts.append(artifact)
-    candidate_by_path = {str(row["path"]): row for row in candidate_rows}
+        file_name = artifact.get("fileName")
+        digest = artifact.get("sha256")
+        size = artifact.get("sizeBytes")
+        path = f"files/{file_name}"
+        if (
+            not isinstance(file_name, str)
+            or not file_name
+            or "/" in file_name
+            or "\\" in file_name
+            or SHA256_RE.fullmatch(str(digest or "")) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size < 1
+            or path in expected_file_paths
+            or candidate_by_path.get(path)
+            != {"path": path, "sha256": digest, "sizeBytes": size}
+        ):
+            raise ProjectionBlocked("candidate desktop artifact differs from upload inventory")
+        expected_file_paths.add(path)
+        if platform == "windows":
+            windows_artifacts.append(artifact)
     artifacts: dict[str, dict[str, dict[str, object]]] = {}
     for head in heads:
         matching = [artifact for artifact in windows_artifacts if artifact.get("head") == head]
@@ -1406,21 +1509,20 @@ def _candidate_windows_scope(
                 **expected_row,
                 "fileName": file_name,
             }
-    expected_file_paths = {
+    expected_file_paths.update(
         str(artifacts[head][role]["path"])
         for head in heads
         for role in ("installer", "payload")
-    }
+    )
     expected_candidate_paths = {
         "RELEASE_CHANNEL.generated.json",
-        CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE,
-        CANDIDATE_UPLOAD_EXPORT_FILE,
+        "releases.json",
         *expected_file_paths,
     }
     actual_candidate_paths = {str(row["path"]) for row in candidate_rows}
     if actual_candidate_paths != expected_candidate_paths:
         raise ProjectionBlocked(
-            "candidate upload inventory differs from the exact Avalonia UI export tree"
+            "candidate upload inventory differs from the exact finalized desktop shelf"
         )
     return {"version": version, "channel": channel, "heads": heads, "artifacts": artifacts}
 
@@ -1540,6 +1642,7 @@ def _validate_candidate_capture_heads(
     result: dict[str, dict[str, object]] = {}
     for index, raw in enumerate(value):
         if not isinstance(raw, dict) or set(raw) != {
+            "authenticodeVerification",
             "headId",
             "rid",
             "installer",
@@ -1637,6 +1740,31 @@ def _validate_candidate_capture_heads(
                 {"role": role, "path": expected_path, "sha256": digest}
             )
         result[head] = {"screenshots": expected_screenshots}
+        authenticode = raw.get("authenticodeVerification")
+        auth_path = (
+            "authenticode/"
+            "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+        )
+        if (
+            not isinstance(authenticode, dict)
+            or set(authenticode)
+            != {
+                "path",
+                "sha256",
+                "signerCertificateSha256",
+                "signerSpkiSha256",
+                "sizeBytes",
+                "timestampUtc",
+            }
+            or authenticode.get("path") != auth_path
+            or finalized_by_path.get(auth_path)
+            != {
+                "path": auth_path,
+                "sha256": authenticode.get("sha256"),
+                "sizeBytes": authenticode.get("sizeBytes"),
+            }
+        ):
+            raise ProjectionBlocked("candidate capture Authenticode binding drifted")
     return result
 
 
@@ -1669,6 +1797,22 @@ def _validate_capture_candidate_binding(
         "runId",
         "sha",
         "workflow",
+        "fullShelfCompatibilityManifest",
+        "fullShelfCompatibilityManifestPath",
+        "fullShelfCompatibilityManifestSha256",
+        "fullShelfManifest",
+        "fullShelfManifestPath",
+        "fullShelfManifestSha256",
+        "publicationScope",
+        "publicationScopePath",
+        "publicationScopeSha256",
+        "registryPrepareFiles",
+        "registryPrepareSha256",
+        "scopeDecisionSha256",
+        "signingReceipt",
+        "signingReceiptPath",
+        "signingReceiptSha256",
+        "supplyChain",
     }
     if not isinstance(value, dict) or set(value) != required:
         raise ProjectionBlocked("candidate capture binding property set drifted")
@@ -1693,9 +1837,39 @@ def _validate_capture_candidate_binding(
         "exportReceiptSha256",
         "handoffSha256",
         "manifestSha256",
+        "fullShelfCompatibilityManifestSha256",
+        "fullShelfManifestSha256",
+        "publicationScopeSha256",
+        "registryPrepareSha256",
+        "scopeDecisionSha256",
+        "signingReceiptSha256",
     ):
         if SHA256_RE.fullmatch(str(value.get(name) or "")) is None:
             raise ProjectionBlocked(f"candidate capture {name} is invalid")
+    for name in (
+        "fullShelfCompatibilityManifest",
+        "fullShelfManifest",
+        "publicationScope",
+        "signingReceipt",
+    ):
+        binding = value.get(name)
+        path_name = f"{name}Path"
+        digest_name = f"{name}Sha256"
+        if (
+            not isinstance(binding, dict)
+            or set(binding) != {"path", "sha256", "sizeBytes"}
+            or binding.get("path")
+            != f"candidate-provenance/{value.get(path_name)}"
+            or binding.get("sha256") != value.get(digest_name)
+            or isinstance(binding.get("sizeBytes"), bool)
+            or not isinstance(binding.get("sizeBytes"), int)
+            or binding["sizeBytes"] < 1
+        ):
+            raise ProjectionBlocked(f"candidate capture {name} binding drifted")
+    if not isinstance(value.get("registryPrepareFiles"), list) or not isinstance(
+        value.get("supplyChain"), dict
+    ):
+        raise ProjectionBlocked("candidate capture Windows-only provenance drifted")
     if (
         value.get("manifestPath") != "RELEASE_CHANNEL.generated.json"
         or value.get("manifestSha256") != canonical_manifest_sha256
@@ -1746,7 +1920,9 @@ def _validate_capture_candidate_binding(
 def _validate_candidate_export_receipt(
     receipt: dict[str, object],
     *,
+    receipt_semantic: dict[str, object],
     candidate_binding: dict[str, object],
+    candidate_binding_semantic: dict[str, object],
     canonical_manifest_sha256: str,
     scope: dict[str, object],
 ) -> None:
@@ -1759,28 +1935,59 @@ def _validate_candidate_export_receipt(
         "release",
         "source",
         "status",
+        "publicationScope",
+        "supplyChain",
+        "supplyChainVerification",
     }
     if not isinstance(receipt, dict) or set(receipt) != required:
         raise ProjectionBlocked("candidate export receipt property set drifted")
     if (
         receipt.get("contractName") != "chummer6-ui.preview-nightly-candidate-export"
         or type(receipt.get("contractVersion")) is not int
-        or receipt.get("contractVersion") != 1
+        or receipt.get("contractVersion") != 2
         or receipt.get("status") != "exported"
-        or receipt.get("release")
-        != {"channel": scope["channel"], "version": scope["version"]}
-        or receipt.get("candidateManifest")
-        != {
-            "path": "RELEASE_CHANNEL.generated.json",
-            "sha256": canonical_manifest_sha256,
-        }
-        or receipt.get("contentInventory")
-        != {
-            "path": CANDIDATE_PROVENANCE_INVENTORY_FILE.rsplit("/", 1)[-1],
-            "sha256": candidate_binding["contentInventorySha256"],
-        }
+        or not _json_semantic_equal(
+            receipt_semantic.get("release"),
+            {"channel": scope["channel"], "version": scope["version"]},
+        )
+        or not _json_semantic_equal(
+            receipt_semantic.get("candidateManifest"),
+            {
+                "path": "RELEASE_CHANNEL.generated.json",
+                "sha256": canonical_manifest_sha256,
+            },
+        )
+        or not _json_semantic_equal(
+            receipt_semantic.get("contentInventory"),
+            {
+                "path": CANDIDATE_PROVENANCE_INVENTORY_FILE.rsplit("/", 1)[-1],
+                "sha256": candidate_binding["contentInventorySha256"],
+            },
+        )
     ):
         raise ProjectionBlocked("candidate export release or byte binding drifted")
+    if (
+        not _json_semantic_equal(
+            receipt_semantic.get("publicationScope"),
+            {
+                "registryPrepareSha256": candidate_binding[
+                    "registryPrepareSha256"
+                ]
+            },
+        )
+        or not _json_semantic_equal(
+            receipt_semantic.get("supplyChain"),
+            candidate_binding_semantic.get("supplyChain"),
+        )
+        or not _json_semantic_equal(
+            receipt_semantic.get("supplyChainVerification"),
+            {
+                "mode": "release_authoritative",
+                "releaseAuthoritative": True,
+            },
+        )
+    ):
+        raise ProjectionBlocked("candidate export Windows-only authority drifted")
     _validate_candidate_export_heads(
         receipt.get("heads"),
         scope=scope,
@@ -1826,7 +2033,7 @@ def _validate_candidate_native_evidence(
     candidate_rows: list[dict[str, object]],
     candidate: dict[str, object],
     now: datetime,
-) -> None:
+) -> dict[str, object]:
     required_native = {
         "status",
         "captureGeneratedAtUtc",
@@ -1940,6 +2147,7 @@ def _validate_candidate_native_evidence(
     provenance, provenance_bytes, _ = documents[CANDIDATE_PROVENANCE_INVENTORY_FILE]
     expected_content_paths = [
         "RELEASE_CHANNEL.generated.json",
+        "releases.json",
         *[
             str(artifacts[head][role]["path"])
             for head in heads
@@ -1953,7 +2161,7 @@ def _validate_candidate_native_evidence(
         provenance.get("contractName")
         != "chummer6-ui.preview-nightly-candidate-content-inventory"
         or type(provenance.get("contractVersion")) is not int
-        or provenance.get("contractVersion") != 1
+        or provenance.get("contractVersion") != 2
         or provenance.get("release")
         != {"channel": scope["channel"], "version": scope["version"]}
         or provenance.get("manifest")
@@ -1961,33 +2169,44 @@ def _validate_candidate_native_evidence(
             "path": "RELEASE_CHANNEL.generated.json",
             "sha256": candidate["canonicalManifestSha256"],
         }
-        or [row["path"] for row in provenance_rows] != sorted(expected_content_paths)
+        or not set(expected_content_paths).issubset(
+            {str(row["path"]) for row in provenance_rows}
+        )
         or provenance != native.get("candidateContentInventory")
         or hashlib.sha256(provenance_bytes).hexdigest()
         != native.get("candidateContentInventorySha256")
     ):
         raise ProjectionBlocked("candidate native-Windows content inventory binding drifted")
     candidate_by_path = {str(row["path"]): row for row in candidate_rows}
-    if any(candidate_by_path.get(str(row["path"])) != row for row in provenance_rows):
+    provenance_by_path = {str(row["path"]): row for row in provenance_rows}
+    if any(
+        candidate_by_path.get(path) != provenance_by_path.get(path)
+        for path in expected_content_paths
+    ):
         raise ProjectionBlocked("candidate native-Windows content bytes drifted")
-    if candidate_by_path.get(CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE) != {
-        "path": CANDIDATE_UPLOAD_CONTENT_INVENTORY_FILE,
-        "sha256": hashlib.sha256(provenance_bytes).hexdigest(),
-        "sizeBytes": len(provenance_bytes),
-    }:
-        raise ProjectionBlocked(
-            "candidate uploaded content inventory differs from native-Windows provenance"
-        )
-
     capture, capture_bytes, _ = documents[CANDIDATE_CAPTURE_FILE]
     capture_at = _candidate_timestamp(
         capture.get("generatedAt"), label="candidate capture timestamp", now=now
     )
     if (
-        capture.get("contractName")
+        set(capture)
+        != {
+            "authenticodeVerification",
+            "candidate",
+            "captureMode",
+            "channelId",
+            "contractName",
+            "contractVersion",
+            "generatedAt",
+            "heads",
+            "source",
+            "status",
+            "version",
+        }
+        or capture.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-capture"
         or type(capture.get("contractVersion")) is not int
-        or capture.get("contractVersion") != 1
+        or capture.get("contractVersion") != 2
         or capture.get("status") != "captured"
         or capture.get("captureMode") != "interactive"
         or capture.get("version") != scope["version"]
@@ -2020,7 +2239,7 @@ def _validate_candidate_native_evidence(
         or capture_inventory.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-capture-inventory"
         or type(capture_inventory.get("contractVersion")) is not int
-        or capture_inventory.get("contractVersion") != 1
+        or capture_inventory.get("contractVersion") != 2
         or capture_inventory.get("captureContract")
         != "chummer6-ui.preview-nightly-native-windows-capture"
         or capture_inventory.get("captureManifestSha256")
@@ -2031,24 +2250,7 @@ def _validate_candidate_native_evidence(
         capture_inventory.get("files"),
         label="candidate native-Windows capture inventory",
     )
-    expected_capture_paths = sorted(
-        [
-            CANDIDATE_CAPTURE_FILE,
-            CANDIDATE_PROVENANCE_INVENTORY_FILE,
-            CANDIDATE_PROVENANCE_EXPORT_FILE,
-            *[
-                path
-                for head in heads
-                for path in (
-                    f"startup-smoke/startup-smoke-{head}-{CANDIDATE_RID}.receipt.json",
-                    f"startup-smoke/windows-installer-progress-{head}-{CANDIDATE_RID}.log",
-                    f"screenshots/windows-installer-{head}-{CANDIDATE_RID}-progress.png",
-                    f"screenshots/windows-installer-{head}-{CANDIDATE_RID}-completion.png",
-                )
-            ],
-        ]
-    )
-    if [str(row["path"]) for row in capture_rows] != expected_capture_paths or any(
+    if any(
         finalized_by_path.get(str(row["path"])) != row for row in capture_rows
     ):
         raise ProjectionBlocked(
@@ -2060,7 +2262,7 @@ def _validate_candidate_native_evidence(
             "candidate finalized inventory capture binding drifted"
         )
 
-    finalization, _, _ = documents[CANDIDATE_FINALIZATION_FILE]
+    finalization, finalization_bytes, _ = documents[CANDIDATE_FINALIZATION_FILE]
     finalization_at = _candidate_timestamp(
         finalization.get("generatedAt"),
         label="candidate finalization timestamp",
@@ -2068,10 +2270,26 @@ def _validate_candidate_native_evidence(
     )
     proof_rows = finalization.get("proofs")
     if (
-        finalization.get("contractName")
+        set(finalization)
+        != {
+            "authenticodeVerification",
+            "captureInventorySha256",
+            "captureSource",
+            "contractName",
+            "contractVersion",
+            "finalizationSource",
+            "generatedAt",
+            "humanReviewConfirmed",
+            "proofs",
+            "reviewer",
+            "reviewerWasCaptureActor",
+            "scopeApproval",
+            "status",
+        }
+        or finalization.get("contractName")
         != "chummer6-ui.preview-nightly-native-windows-finalization"
         or type(finalization.get("contractVersion")) is not int
-        or finalization.get("contractVersion") != 1
+        or finalization.get("contractVersion") != 2
         or finalization.get("status") != "passed"
         or finalization.get("humanReviewConfirmed") is not True
         or finalization.get("reviewerWasCaptureActor") is not False
@@ -2106,24 +2324,38 @@ def _validate_candidate_native_evidence(
         CANDIDATE_CAPTURE_INVENTORY_FILE,
         CANDIDATE_FINALIZATION_FILE,
         *(path for path, _, _ in proofs_by_head.values()),
+        "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json",
     }
     if set(finalized_by_path) != expected_finalized_paths:
         raise ProjectionBlocked(
             "candidate finalized native-Windows inventory file scope drifted"
         )
+    non_capture_paths = {
+        CANDIDATE_CAPTURE_INVENTORY_FILE,
+        CANDIDATE_FINALIZATION_FILE,
+        "PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json",
+        *(path for path, _, _ in proofs_by_head.values()),
+    }
+    expected_capture_rows = [
+        row for row in finalized_rows if str(row["path"]) not in non_capture_paths
+    ]
+    if capture_rows != expected_capture_rows:
+        raise ProjectionBlocked(
+            "candidate native-Windows capture inventory differs from its exact pre-finalization tree"
+        )
 
     export, export_bytes, _ = documents[CANDIDATE_PROVENANCE_EXPORT_FILE]
-    if candidate_by_path.get(CANDIDATE_UPLOAD_EXPORT_FILE) != {
-        "path": CANDIDATE_UPLOAD_EXPORT_FILE,
-        "sha256": hashlib.sha256(export_bytes).hexdigest(),
-        "sizeBytes": len(export_bytes),
-    }:
-        raise ProjectionBlocked(
-            "candidate uploaded export receipt differs from native-Windows provenance"
-        )
     _validate_candidate_export_receipt(
         export,
+        receipt_semantic=_json_semantic_object(
+            export_bytes,
+            label="candidate export receipt",
+        ),
         candidate_binding=capture_candidate,
+        candidate_binding_semantic=_json_semantic_object(
+            capture_bytes,
+            label="candidate capture receipt",
+        )["candidate"],
         canonical_manifest_sha256=str(candidate["canonicalManifestSha256"]),
         scope=scope,
     )
@@ -2209,6 +2441,33 @@ def _validate_candidate_native_evidence(
             capture_inventory_bytes
         ).hexdigest()
         if (
+            set(proof)
+            != {
+                "artifactDigest",
+                "artifactFileName",
+                "authenticodeVerification",
+                "captureBinding",
+                "channel",
+                "channelId",
+                "checks",
+                "clippingReview",
+                "contractName",
+                "contractVersion",
+                "contrastReview",
+                "finalizationBinding",
+                "generatedAt",
+                "head",
+                "headId",
+                "platform",
+                "readabilityReview",
+                "releaseVersion",
+                "review",
+                "rid",
+                "screenshots",
+                "status",
+                "version",
+            }
+            or
             proof.get("contractName") != "chummer6-ui.windows_installer_visual_proof"
             or type(proof.get("contractVersion")) is not int
             or proof["contractVersion"] != 1
@@ -2243,8 +2502,805 @@ def _validate_candidate_native_evidence(
             }
             or capture_binding != expected_capture_binding
             or proof.get("finalizationBinding") != finalization_source
+            or proof.get("authenticodeVerification")
+            != finalization.get("authenticodeVerification")
         ):
             raise ProjectionBlocked(f"candidate {head} visual proof is not a finalized human pass")
+    return {
+        "candidate": capture_candidate,
+        "captureInventorySha256": capture_inventory_sha256,
+        "finalizationBytes": finalization_bytes,
+        "visualProofs": {
+            head: proof for head, (_path, proof, _raw) in proofs_by_head.items()
+        },
+    }
+
+
+def _candidate_canonical_sha256(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _candidate_reference(
+    value: object,
+    *,
+    path: str,
+    raw: bytes,
+    label: str,
+) -> None:
+    if not isinstance(value, dict) or set(value) != {"path", "sha256", "sizeBytes"}:
+        raise ProjectionBlocked(f"{label} byte reference drifted")
+    if value != {
+        "path": path,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sizeBytes": len(raw),
+    }:
+        raise ProjectionBlocked(f"{label} byte reference differs from held bytes")
+
+
+def _candidate_embedded_documents(
+    value: object,
+    *,
+    label: str,
+) -> dict[str, tuple[dict[str, object], bytes]]:
+    if not isinstance(value, list) or not value:
+        raise ProjectionBlocked(f"{label} embedded file inventory is empty")
+    documents: dict[str, tuple[dict[str, object], bytes]] = {}
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ProjectionBlocked(f"{label} embedded file entry drifted")
+        path = _candidate_relative_path(entry.get("path"), label=f"{label} path")
+        if path in documents:
+            raise ProjectionBlocked(f"{label} embedded file path is duplicated")
+        raw = _candidate_embedded_bytes(entry, label=f"{label} {path}", expected_path=path)
+        documents[path] = (
+            _strict_json_object(raw, label=f"{label} {path}"),
+            raw,
+        )
+    return documents
+
+
+def _validate_candidate_finalized_publication(
+    value: object,
+    *,
+    canonical_raw: bytes,
+    compatibility_raw: bytes,
+    candidate: dict[str, object],
+    native_package: dict[str, object],
+) -> tuple[dict[str, object], bytes, dict[str, tuple[dict[str, object], bytes]]]:
+    summary_keys = {
+        "status",
+        "exactIncomingDesktopScope",
+        "publicationScopeSha256",
+        "scopeDecisionSha256",
+        "signingReceiptSha256",
+        "nativeEvidenceSha256",
+        "authenticodeVerificationSha256",
+        "approvalSha256",
+        "visualApprovalSha256",
+        "actors",
+        "files",
+    }
+    if not isinstance(value, dict) or set(value) != summary_keys:
+        raise ProjectionBlocked("candidate finalized publication evidence custody drifted")
+    if (
+        value.get("status") != "passed"
+        or value.get("exactIncomingDesktopScope") != CANDIDATE_EXACT_SCOPE
+    ):
+        raise ProjectionBlocked("candidate finalized publication evidence scope drifted")
+    documents = _candidate_embedded_documents(
+        value.get("files"), label="candidate finalized publication evidence"
+    )
+    if CANDIDATE_PUBLICATION_SCOPE_FILE not in documents:
+        raise ProjectionBlocked("candidate finalized publication scope is absent")
+    scope, scope_raw = documents[CANDIDATE_PUBLICATION_SCOPE_FILE]
+    scope_keys = {
+        "approval",
+        "approvalIndependent",
+        "authenticodeRequired",
+        "authenticodeVerificationSha256",
+        "buildEvidenceTuples",
+        "contractName",
+        "contractVersion",
+        "deployAuthorized",
+        "fullShelfCompatibilityManifestSha256",
+        "fullShelfInventory",
+        "fullShelfInventorySha256",
+        "fullShelfManifestSha256",
+        "incumbentSnapshot",
+        "incumbentSnapshotSha256",
+        "macosSoak",
+        "nativeEvidenceComposite",
+        "nativeEvidenceSha256",
+        "nonPublishedEvidenceTuples",
+        "postPublicationShelfTuples",
+        "publicationDeltaTuples",
+        "publicationEligible",
+        "registryPrepare",
+        "registryFinalizeEligible",
+        "release",
+        "retainedTuples",
+        "scopeDecision",
+        "scopeDecisionSha256",
+        "signingReceipt",
+        "signingReceiptSha256",
+        "status",
+        "uploadAuthorized",
+        "visualApprovalSha256",
+    }
+    if (
+        set(scope) != scope_keys
+        or scope.get("contractName")
+        != "chummer6-ui.preview-nightly-windows-publication-scope"
+        or type(scope.get("contractVersion")) is not int
+        or scope.get("contractVersion") != 2
+        or scope.get("status") != "validated"
+        or scope.get("release")
+        != {"channel": "preview", "version": candidate["version"]}
+        or scope.get("approvalIndependent") is not True
+        or scope.get("authenticodeRequired") is not True
+        or scope.get("registryFinalizeEligible") is not True
+        or any(
+            scope.get(key) is not False
+            for key in ("publicationEligible", "uploadAuthorized", "deployAuthorized")
+        )
+        or scope.get("fullShelfManifestSha256")
+        != hashlib.sha256(canonical_raw).hexdigest()
+        or scope.get("fullShelfCompatibilityManifestSha256")
+        != hashlib.sha256(compatibility_raw).hexdigest()
+    ):
+        raise ProjectionBlocked("candidate finalized publication scope contract drifted")
+    delta = scope.get("publicationDeltaTuples")
+    retained = scope.get("retainedTuples")
+    post = scope.get("postPublicationShelfTuples")
+    evidence_rows = scope.get("nonPublishedEvidenceTuples")
+    if (
+        not isinstance(delta, list)
+        or [
+            (row.get("head"), row.get("platform"), row.get("rid"), row.get("artifactRole"))
+            if isinstance(row, dict)
+            else None
+            for row in delta
+        ]
+        != [
+            ("avalonia", "windows", CANDIDATE_RID, "installer"),
+            ("avalonia", "windows", CANDIDATE_RID, "payload"),
+        ]
+        or not isinstance(retained, list)
+        or any(not isinstance(row, dict) or row.get("platform") == "windows" for row in retained)
+        or not isinstance(post, list)
+        or post
+        != sorted(
+            [*retained, *delta],
+            key=lambda row: (
+                row["platform"],
+                row["rid"],
+                row["head"],
+                row["artifactRole"],
+                row["path"],
+            ),
+        )
+        or not isinstance(evidence_rows, list)
+        or len(evidence_rows) != 1
+        or (
+            evidence_rows[0].get("platform"),
+            evidence_rows[0].get("rid"),
+            evidence_rows[0].get("artifactRole"),
+        )
+        != ("linux", "linux-x64", "installer")
+    ):
+        raise ProjectionBlocked("candidate finalized publication tuple partition drifted")
+    full_inventory = scope.get("fullShelfInventory")
+    if (
+        not isinstance(full_inventory, list)
+        or scope.get("fullShelfInventorySha256")
+        != _candidate_canonical_sha256(full_inventory)
+        or scope.get("scopeDecisionSha256")
+        != _candidate_canonical_sha256(scope.get("scopeDecision"))
+    ):
+        raise ProjectionBlocked("candidate finalized publication shelf digest graph drifted")
+    signing = scope.get("signingReceipt")
+    approval = scope.get("approval")
+    if (
+        not isinstance(signing, dict)
+        or set(signing) != {"path", "sha256"}
+        or not isinstance(approval, dict)
+        or set(approval) != {"approver", "path", "sha256"}
+    ):
+        raise ProjectionBlocked("candidate finalized publication evidence references drifted")
+    visual_path = (
+        f"WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-{CANDIDATE_RID}.generated.json"
+    )
+    native_finalization_path = "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+    composite = scope.get("nativeEvidenceComposite")
+    composite_contracts = {
+        "wrapper": (
+            "chummer6-ui.preview-nightly-native-windows-evidence",
+            1,
+            "NATIVE_WINDOWS_EVIDENCE.generated.json",
+        ),
+        "nativeFinalization": (
+            "chummer6-ui.preview-nightly-native-windows-finalization",
+            2,
+            native_finalization_path,
+        ),
+        "visualProof": (
+            "chummer6-ui.windows_installer_visual_proof",
+            1,
+            visual_path,
+        ),
+        "authenticodeVerification": (
+            "chummer6-ui.windows-authenticode-verification",
+            1,
+            CANDIDATE_AUTHENTICODE_PATH,
+        ),
+    }
+    if not isinstance(composite, dict) or set(composite) != set(composite_contracts):
+        raise ProjectionBlocked("candidate native evidence composite scope drifted")
+    expected_paths = {
+        CANDIDATE_PUBLICATION_SCOPE_FILE,
+        str(signing["path"]),
+        "NATIVE_WINDOWS_EVIDENCE.generated.json",
+        native_finalization_path,
+        CANDIDATE_AUTHENTICODE_PATH,
+        str(approval["path"]),
+        visual_path,
+    }
+    if set(documents) != expected_paths:
+        raise ProjectionBlocked("candidate finalized publication evidence file scope drifted")
+    for key, (contract_name, contract_version, path) in composite_contracts.items():
+        reference = composite.get(key)
+        raw = documents[path][1]
+        if (
+            not isinstance(reference, dict)
+            or set(reference)
+            != {"contractName", "contractVersion", "path", "sha256", "sizeBytes"}
+            or type(reference.get("contractVersion")) is not int
+            or type(reference.get("sizeBytes")) is not int
+            or reference
+            != {
+                "contractName": contract_name,
+                "contractVersion": contract_version,
+                "path": path,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "sizeBytes": len(raw),
+            }
+        ):
+            raise ProjectionBlocked(
+                f"candidate native evidence composite {key} reference drifted"
+            )
+    digest_bindings = {
+        CANDIDATE_PUBLICATION_SCOPE_FILE: value.get("publicationScopeSha256"),
+        str(signing["path"]): value.get("signingReceiptSha256"),
+        "NATIVE_WINDOWS_EVIDENCE.generated.json": value.get("nativeEvidenceSha256"),
+        CANDIDATE_AUTHENTICODE_PATH: value.get("authenticodeVerificationSha256"),
+        str(approval["path"]): value.get("approvalSha256"),
+        visual_path: (
+            value.get("visualApprovalSha256", [None])[0]
+            if isinstance(value.get("visualApprovalSha256"), list)
+            and len(value["visualApprovalSha256"]) == 1
+            else None
+        ),
+    }
+    if any(
+        digest != hashlib.sha256(documents[path][1]).hexdigest()
+        for path, digest in digest_bindings.items()
+    ) or any(
+        scope.get(key) != value.get(key)
+        for key in (
+            "scopeDecisionSha256",
+            "signingReceiptSha256",
+            "nativeEvidenceSha256",
+            "authenticodeVerificationSha256",
+            "visualApprovalSha256",
+        )
+    ):
+        raise ProjectionBlocked("candidate finalized publication evidence digest aliases drifted")
+    if approval.get("sha256") != value.get("approvalSha256"):
+        raise ProjectionBlocked("candidate finalized publication approval digest drifted")
+    actors = value.get("actors")
+    if not isinstance(actors, dict) or set(actors) != {
+        "candidateProducer",
+        "nativeCapture",
+        "visualReviewer",
+        "scopeApprover",
+    }:
+        raise ProjectionBlocked("candidate finalized publication actor set drifted")
+    actor_values = list(actors.values())
+    if any(
+        not isinstance(actor, str) or CANDIDATE_GITHUB_LOGIN_RE.fullmatch(actor) is None
+        for actor in actor_values
+    ):
+        raise ProjectionBlocked("candidate finalized publication actors are invalid")
+    review_owner = str(actors["scopeApprover"]).lower()
+    if (
+        str(actors["visualReviewer"]).lower() != review_owner
+        or str(actors["candidateProducer"]).lower() == review_owner
+        or str(actors["nativeCapture"]).lower() == review_owner
+    ):
+        raise ProjectionBlocked(
+            "candidate finalized publication review owner is not independent"
+        )
+    native = documents["NATIVE_WINDOWS_EVIDENCE.generated.json"][0]
+    native_candidate = native.get("candidateProvenance")
+    native_candidate = (
+        native_candidate.get("candidate") if isinstance(native_candidate, dict) else None
+    )
+    native_capture = native.get("captureSource")
+    approval_document = documents[str(approval["path"])][0]
+    visual_document = documents[visual_path][0]
+    visual_review = visual_document.get("review")
+    signing_document = documents[str(signing["path"])][0]
+    authenticode_document = documents[CANDIDATE_AUTHENTICODE_PATH][0]
+    finalization_document = documents[native_finalization_path][0]
+    portable_visual_keys = {
+        "artifactDigest",
+        "artifactFileName",
+        "authenticodeVerification",
+        "captureBinding",
+        "channel",
+        "channelId",
+        "checks",
+        "clippingReview",
+        "contractName",
+        "contractVersion",
+        "contrastReview",
+        "finalizationBinding",
+        "generatedAt",
+        "head",
+        "headId",
+        "platform",
+        "readabilityReview",
+        "releaseVersion",
+        "review",
+        "rid",
+        "screenshots",
+        "status",
+        "version",
+    }
+    native_wrapper_keys = {
+        "archivePath",
+        "archiveSha256",
+        "authenticodeVerification",
+        "candidateProvenance",
+        "captureInventorySha256",
+        "captureSource",
+        "contractName",
+        "contractVersion",
+        "fileCount",
+        "finalizationSha256",
+        "finalizationSource",
+        "finalizedInventorySha256",
+        "githubActionsProvenance",
+        "nativeFinalization",
+        "progressLogSha256",
+        "release",
+        "scopeApproval",
+        "startupReceiptSha256",
+        "status",
+        "treeSha256",
+        "visualProof",
+        "visualProofSha256",
+        "visualReviewers",
+    }
+    if (
+        set(native) != native_wrapper_keys
+        or native.get("contractName")
+        != "chummer6-ui.preview-nightly-native-windows-evidence"
+        or native.get("contractVersion") != 1
+        or native.get("status") != "passed"
+        or native.get("release")
+        != {"channel": "preview", "version": candidate["version"]}
+        or native.get("captureInventorySha256")
+        != native_package.get("captureInventorySha256")
+        or documents[native_finalization_path][1]
+        != native_package.get("finalizationBytes")
+        or not isinstance(native_candidate, dict)
+        or native_candidate != native_package.get("candidate")
+        or native_candidate.get("actor") != actors["candidateProducer"]
+        or not isinstance(native_capture, dict)
+        or native_capture.get("actor") != actors["nativeCapture"]
+        or native.get("nativeFinalization")
+        != {
+            "path": native_finalization_path,
+            "sha256": hashlib.sha256(documents[native_finalization_path][1]).hexdigest(),
+            "sizeBytes": len(documents[native_finalization_path][1]),
+        }
+        or native.get("visualProof")
+        != {
+            "path": visual_path,
+            "sha256": hashlib.sha256(documents[visual_path][1]).hexdigest(),
+            "sizeBytes": len(documents[visual_path][1]),
+        }
+        or native.get("visualProofSha256")
+        != {"avalonia": hashlib.sha256(documents[visual_path][1]).hexdigest()}
+        or native.get("visualReviewers")
+        != {"avalonia": actors["visualReviewer"]}
+        or finalization_document.get("contractName")
+        != "chummer6-ui.preview-nightly-native-windows-finalization"
+        or finalization_document.get("contractVersion") != 2
+        or finalization_document.get("status") != "passed"
+        or finalization_document.get("reviewer") != actors["scopeApprover"]
+        or approval_document.get("contractName")
+        != "chummer6-ui.preview-nightly-windows-publication-approval"
+        or approval_document.get("contractVersion") != 2
+        or approval_document.get("status") != "approved"
+        or approval_document.get("approver") != actors["scopeApprover"]
+        or not isinstance(visual_review, dict)
+        or visual_document.get("status") != "passed"
+        or visual_review.get("authenticatedReviewer") != actors["visualReviewer"]
+        or signing_document.get("contractName")
+        != "chummer6-ui.desktop_artifact_signing"
+        or signing_document.get("contractVersion") != 2
+        or signing_document.get("signingStatus") != "pass"
+        or authenticode_document.get("contractName")
+        != "chummer6-ui.windows-authenticode-verification"
+        or authenticode_document.get("contractVersion") != 1
+        or authenticode_document.get("status") != "verified"
+    ):
+        raise ProjectionBlocked("candidate finalized native/signing/approval evidence drifted")
+
+    wrapper_auth = native.get("authenticodeVerification")
+    wrapper_finalization = native.get("finalizationSource")
+    wrapper_capture_inventory = native.get("captureInventorySha256")
+    expected_capture_binding = (
+        {
+            key: native_capture[key]
+            for key in (
+                "repository",
+                "workflow",
+                "runId",
+                "runAttempt",
+                "ref",
+                "sha",
+                "artifactName",
+            )
+        }
+        if isinstance(native_capture, dict)
+        else None
+    )
+    if isinstance(expected_capture_binding, dict):
+        expected_capture_binding["inventorySha256"] = wrapper_capture_inventory
+    expected_review = {
+        "allowlistSource": "repository variable plus protected environment",
+        "authenticatedReviewer": actors["visualReviewer"],
+        "captureActor": actors["nativeCapture"],
+        "explicitConfirmations": {
+            "clipping": "passed",
+            "contrast": "passed",
+            "readability": "passed",
+        },
+    }
+    expected_review_result = {
+        "reviewer": actors["visualReviewer"],
+        "status": "passed",
+    }
+    installer = delta[0]
+    screenshots = visual_document.get("screenshots")
+    if (
+        set(visual_document) != portable_visual_keys
+        or visual_document.get("contractName")
+        != "chummer6-ui.windows_installer_visual_proof"
+        or type(visual_document.get("contractVersion")) is not int
+        or visual_document.get("contractVersion") != 1
+        or visual_document.get("status") != "passed"
+        or visual_document.get("version") != candidate["version"]
+        or visual_document.get("releaseVersion") != candidate["version"]
+        or visual_document.get("channel") != "preview"
+        or visual_document.get("channelId") != "preview"
+        or visual_document.get("platform") != "windows"
+        or visual_document.get("head") != "avalonia"
+        or visual_document.get("headId") != "avalonia"
+        or visual_document.get("rid") != CANDIDATE_RID
+        or visual_document.get("artifactFileName") != installer.get("fileName")
+        or visual_document.get("artifactDigest")
+        != f"sha256:{installer.get('sha256')}"
+        or visual_document.get("checks")
+        != {"capture_mode": "interactive", "human_review_confirmed": True}
+        or visual_document.get("readabilityReview") != expected_review_result
+        or visual_document.get("contrastReview") != expected_review_result
+        or visual_document.get("clippingReview") != expected_review_result
+        or visual_document.get("review") != expected_review
+        or visual_document.get("captureBinding") != expected_capture_binding
+        or visual_document.get("finalizationBinding") != wrapper_finalization
+        or visual_document.get("authenticodeVerification") != wrapper_auth
+        or not isinstance(visual_document.get("generatedAt"), str)
+        or not str(visual_document["generatedAt"]).endswith("Z")
+        or not isinstance(screenshots, list)
+        or len(screenshots) != 2
+    ):
+        raise ProjectionBlocked("candidate portable Windows visual proof drifted")
+    screenshot_digests: set[str] = set()
+    raw_visuals = native_package.get("visualProofs")
+    raw_visual = raw_visuals.get("avalonia") if isinstance(raw_visuals, dict) else None
+    raw_screenshots = raw_visual.get("screenshots") if isinstance(raw_visual, dict) else None
+    if not isinstance(raw_screenshots, list) or len(raw_screenshots) != 2:
+        raise ProjectionBlocked("candidate raw Windows visual screenshot set drifted")
+    for screenshot, role in zip(screenshots, ("progress", "completion"), strict=True):
+        expected_path = (
+            "proof/windows-native/screenshots/"
+            f"windows-installer-avalonia-{CANDIDATE_RID}-{role}.png"
+        )
+        if (
+            not isinstance(screenshot, dict)
+            or set(screenshot) != {"path", "role", "sha256"}
+            or screenshot.get("role") != role
+            or screenshot.get("path") != expected_path
+            or not isinstance(screenshot.get("sha256"), str)
+            or SHA256_RE.fullmatch(screenshot["sha256"]) is None
+            or screenshot["sha256"] in screenshot_digests
+            or not isinstance(raw_screenshots[0 if role == "progress" else 1], dict)
+            or raw_screenshots[0 if role == "progress" else 1].get("role") != role
+            or raw_screenshots[0 if role == "progress" else 1].get("sha256")
+            != screenshot.get("sha256")
+        ):
+            raise ProjectionBlocked(
+                "candidate portable Windows visual screenshot binding drifted"
+            )
+        screenshot_digests.add(screenshot["sha256"])
+    return scope, scope_raw, documents
+
+
+def _validate_candidate_registry_graph(
+    *,
+    candidate_receipt: dict[str, object],
+    candidate_receipt_raw: bytes,
+    registry_authority: dict[str, object],
+    registry_authority_raw: bytes,
+    finalize: dict[str, object],
+    finalize_raw: bytes,
+    registry_summary: object,
+    canonical_raw: bytes,
+    compatibility_raw: bytes,
+    scope: dict[str, object],
+    scope_raw: bytes,
+    evidence_documents: dict[str, tuple[dict[str, object], bytes]],
+    candidate: dict[str, object],
+) -> None:
+    candidate_keys = {
+        "canonicalManifest", "channel", "compatibilityManifest", "compositionInput",
+        "compositionInputDocument", "contractName", "contractVersion", "deltaPlatforms",
+        "deployAuthority", "evidencePlatforms", "fullShelfInventory",
+        "fullShelfInventorySha256", "incumbentDesktopTupleSetSha256",
+        "incumbentCanonicalManifestBytesBase64", "incumbentSnapshotSha256",
+        "nonPublishedEvidenceTupleSetSha256", "postPublicationTupleSetSha256",
+        "publicationDeltaTupleSetSha256", "publicationEligible", "publicationStatus",
+        "registryProjectionInputs", "releaseUploadAuthority", "routeAuthority",
+        "releaseVersion", "retainedPlatforms", "retainedTupleSetSha256", "shelfPlatforms",
+    }
+    if (
+        set(candidate_receipt) != candidate_keys
+        or candidate_receipt_raw != _canonical_json_bytes(candidate_receipt)
+        or candidate_receipt.get("contractName")
+        != "chummer.registry.preview-publication-delta-candidate"
+        or type(candidate_receipt.get("contractVersion")) is not int
+        or candidate_receipt.get("contractVersion") != 1
+        or candidate_receipt.get("channel") != "preview"
+        or candidate_receipt.get("releaseVersion") != candidate["version"]
+        or candidate_receipt.get("publicationStatus") != "review_required"
+        or candidate_receipt.get("deltaPlatforms") != ["windows"]
+        or candidate_receipt.get("evidencePlatforms") != ["linux"]
+        or any(
+            candidate_receipt.get(key) is not False
+            for key in (
+                "publicationEligible", "releaseUploadAuthority", "deployAuthority", "routeAuthority"
+            )
+        )
+    ):
+        raise ProjectionBlocked("Registry PREPARE candidate receipt contract drifted")
+    _candidate_reference(
+        candidate_receipt.get("canonicalManifest"),
+        path="RELEASE_CHANNEL.generated.json",
+        raw=canonical_raw,
+        label="Registry candidate canonical manifest",
+    )
+    _candidate_reference(
+        candidate_receipt.get("compatibilityManifest"),
+        path="releases.json",
+        raw=compatibility_raw,
+        label="Registry candidate compatibility manifest",
+    )
+    full_inventory = candidate_receipt.get("fullShelfInventory")
+    if (
+        not isinstance(full_inventory, list)
+        or candidate_receipt.get("fullShelfInventorySha256")
+        != _candidate_canonical_sha256(full_inventory)
+        or full_inventory
+        != [
+            {
+                "mode": f"{row['mode']:04o}",
+                "path": row["path"],
+                "sha256": row["sha256"],
+                "sizeBytes": row["sizeBytes"],
+            }
+            for row in scope.get("fullShelfInventory", [])
+        ]
+    ):
+        raise ProjectionBlocked("Registry PREPARE candidate shelf inventory drifted")
+    prepare = scope.get("registryPrepare")
+    if (
+        not isinstance(prepare, dict)
+        or prepare.get("candidateReceiptSha256")
+        != hashlib.sha256(candidate_receipt_raw).hexdigest()
+        or prepare.get("status") != "review_required"
+        or prepare.get("finalizeAvailable") is not True
+        or prepare.get("finalizeReceipt") is not None
+        or prepare.get("wholeDirectoryVerified") is not True
+        or any(
+            prepare.get(key) is not False
+            for key in (
+                "publicationEligible", "releaseUploadAuthority", "deployAuthority", "routeAuthority"
+            )
+        )
+    ):
+        raise ProjectionBlocked("final UI scope Registry PREPARE binding drifted")
+
+    authority_keys = {
+        "candidateImportAuthority", "candidateReceipt", "candidateReviewAuthority",
+        "canonicalManifest", "channel", "compatibilityManifest", "compositionInputSha256",
+        "contractName", "contractVersion", "deltaPlatforms", "deployAuthority",
+        "dispositions", "evidence", "evidencePlatforms", "fullShelfInventorySha256",
+        "incumbentSnapshotSha256", "nonPublishedEvidenceTupleSetSha256",
+        "postPublicationTupleSetSha256", "publicationDeltaTupleSetSha256",
+        "publicationEligible", "releaseUploadAuthority", "releaseVersion",
+        "retainedPlatforms", "retainedTupleSetSha256", "routeAuthority", "scope",
+        "shelfPlatforms", "sourceScope",
+    }
+    if (
+        set(registry_authority) != authority_keys
+        or registry_authority_raw != _canonical_json_bytes(registry_authority)
+        or registry_authority.get("contractName")
+        != "chummer.registry.preview-publication-delta-authority"
+        or type(registry_authority.get("contractVersion")) is not int
+        or registry_authority.get("contractVersion") != 1
+        or registry_authority.get("candidateImportAuthority") is not True
+        or registry_authority.get("candidateReviewAuthority") is not True
+        or registry_authority.get("channel") != "preview"
+        or registry_authority.get("releaseVersion") != candidate["version"]
+        or registry_authority.get("deltaPlatforms") != ["windows"]
+        or registry_authority.get("evidencePlatforms") != ["linux"]
+        or registry_authority.get("scope") != "windows_only"
+        or any(
+            registry_authority.get(key) is not False
+            for key in (
+                "publicationEligible", "releaseUploadAuthority", "deployAuthority", "routeAuthority"
+            )
+        )
+    ):
+        raise ProjectionBlocked("Registry FINALIZE candidate authority contract drifted")
+    for key in (
+        "fullShelfInventorySha256", "incumbentSnapshotSha256",
+        "nonPublishedEvidenceTupleSetSha256", "postPublicationTupleSetSha256",
+        "publicationDeltaTupleSetSha256", "retainedPlatforms", "retainedTupleSetSha256",
+        "shelfPlatforms",
+    ):
+        if registry_authority.get(key) != candidate_receipt.get(key):
+            raise ProjectionBlocked("Registry FINALIZE/PREPARE digest graph drifted")
+    _candidate_reference(
+        registry_authority.get("candidateReceipt"),
+        path=CANDIDATE_REGISTRY_RECEIPT_FILE,
+        raw=candidate_receipt_raw,
+        label="Registry authority candidate receipt",
+    )
+    _candidate_reference(
+        registry_authority.get("canonicalManifest"),
+        path="RELEASE_CHANNEL.generated.json",
+        raw=canonical_raw,
+        label="Registry authority canonical manifest",
+    )
+    _candidate_reference(
+        registry_authority.get("compatibilityManifest"),
+        path="releases.json",
+        raw=compatibility_raw,
+        label="Registry authority compatibility manifest",
+    )
+    _candidate_reference(
+        registry_authority.get("sourceScope"),
+        path=CANDIDATE_PUBLICATION_SCOPE_FILE,
+        raw=scope_raw,
+        label="Registry authority final scope",
+    )
+    dispositions = registry_authority.get("dispositions")
+    if (
+        not isinstance(dispositions, list)
+        or not dispositions
+        or sum(
+            isinstance(row, dict)
+            and row.get("disposition") == "delta"
+            and row.get("platform") == "windows"
+            and row.get("rid") == CANDIDATE_RID
+            for row in dispositions
+        )
+        != 1
+        or any(
+            not isinstance(row, dict)
+            or row.get("disposition") not in {"delta", "retained_incumbent"}
+            or row.get("disposition") == "retained_incumbent"
+            and row.get("platform") not in {"linux", "macos"}
+            for row in dispositions
+        )
+    ):
+        raise ProjectionBlocked("Registry FINALIZE artifact dispositions drifted")
+    evidence = registry_authority.get("evidence")
+    if not isinstance(evidence, dict) or set(evidence) != {
+        "approval", "nativeEvidence", "signingReceipt", "visualEvidence"
+    }:
+        raise ProjectionBlocked("Registry FINALIZE evidence set drifted")
+    evidence_paths = {
+        "approval": scope["approval"]["path"],
+        "nativeEvidence": "NATIVE_WINDOWS_EVIDENCE.generated.json",
+        "signingReceipt": scope["signingReceipt"]["path"],
+    }
+    for key, path in evidence_paths.items():
+        _candidate_reference(
+            evidence.get(key), path=path, raw=evidence_documents[path][1],
+            label=f"Registry evidence {key}",
+        )
+    visual_path = f"WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-{CANDIDATE_RID}.generated.json"
+    visual_refs = evidence.get("visualEvidence")
+    if not isinstance(visual_refs, list) or len(visual_refs) != 1:
+        raise ProjectionBlocked("Registry FINALIZE visual evidence set drifted")
+    _candidate_reference(
+        visual_refs[0], path=visual_path, raw=evidence_documents[visual_path][1],
+        label="Registry visual evidence",
+    )
+
+    finalize_keys = {
+        "authority", "candidateBytesMutated", "candidateImportAuthority",
+        "candidateReceipt", "candidateReviewAuthority", "canonicalManifest", "channel",
+        "compatibilityManifest", "contractName", "contractVersion", "deployAuthority",
+        "fullShelfInventorySha256", "publicationEligible", "releaseUploadAuthority",
+        "releaseVersion", "routeAuthority", "sourceScope", "verificationStatus",
+    }
+    if (
+        set(finalize) != finalize_keys
+        or finalize_raw != _canonical_json_bytes(finalize)
+        or finalize.get("contractName") != "chummer.registry.preview-publication-delta-finalize"
+        or type(finalize.get("contractVersion")) is not int
+        or finalize.get("contractVersion") != 1
+        or finalize.get("candidateBytesMutated") is not False
+        or finalize.get("candidateImportAuthority") is not True
+        or finalize.get("candidateReviewAuthority") is not True
+        or finalize.get("channel") != "preview"
+        or finalize.get("releaseVersion") != candidate["version"]
+        or finalize.get("verificationStatus") != "finalized"
+        or finalize.get("fullShelfInventorySha256")
+        != candidate_receipt.get("fullShelfInventorySha256")
+        or any(
+            finalize.get(key) is not False
+            for key in (
+                "publicationEligible", "releaseUploadAuthority", "deployAuthority", "routeAuthority"
+            )
+        )
+    ):
+        raise ProjectionBlocked("Registry FINALIZE receipt contract drifted")
+    for key, path, raw in (
+        ("authority", CANDIDATE_REGISTRY_AUTHORITY_FILE, registry_authority_raw),
+        ("candidateReceipt", CANDIDATE_REGISTRY_RECEIPT_FILE, candidate_receipt_raw),
+        ("canonicalManifest", "RELEASE_CHANNEL.generated.json", canonical_raw),
+        ("compatibilityManifest", "releases.json", compatibility_raw),
+        ("sourceScope", CANDIDATE_PUBLICATION_SCOPE_FILE, scope_raw),
+    ):
+        _candidate_reference(finalize.get(key), path=path, raw=raw, label=f"Registry finalize {key}")
+    expected_summary = {
+        "status": "finalized",
+        "candidateImportAuthority": True,
+        "candidateReviewAuthority": True,
+        "publicationEligible": False,
+        "releaseUploadAuthority": False,
+        "deployAuthority": False,
+        "routeAuthority": False,
+        "scope": "windows_only",
+        "exactIncomingDesktopScope": CANDIDATE_EXACT_SCOPE,
+        "candidateReceiptSha256": hashlib.sha256(candidate_receipt_raw).hexdigest(),
+        "authoritySha256": hashlib.sha256(registry_authority_raw).hexdigest(),
+        "finalizeReceiptSha256": hashlib.sha256(finalize_raw).hexdigest(),
+    }
+    if registry_summary != expected_summary:
+        raise ProjectionBlocked("Registry finalization custody summary drifted")
 
 
 def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
@@ -2253,16 +3309,35 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
         "contractName",
         "contractVersion",
         "status",
+        "candidateImportAuthority",
+        "candidateReviewAuthority",
+        "publicationEligible",
+        "releaseUploadAuthority",
+        "deployAuthority",
+        "routeAuthority",
+        "exactIncomingDesktopScope",
         "generatedAtUtc",
         "expiresAtUtc",
         "candidate",
         "custody",
     } or (
         authority.get("contractName")
-        != "chummer.release-upload.candidate-import-authority/v1"
+        != CANDIDATE_AUTHORITY_CONTRACT_V2
         or type(authority.get("contractVersion")) is not int
-        or authority.get("contractVersion") != 1
+        or authority.get("contractVersion") != 2
         or authority.get("status") != PROJECTION_STATUS_CANDIDATE_IMPORT_READY
+        or authority.get("candidateImportAuthority") is not True
+        or authority.get("candidateReviewAuthority") is not True
+        or authority.get("exactIncomingDesktopScope") != CANDIDATE_EXACT_SCOPE
+        or any(
+            authority.get(key) is not False
+            for key in (
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "deployAuthority",
+                "routeAuthority",
+            )
+        )
     ):
         raise ProjectionBlocked("candidate import authority contract drifted")
     try:
@@ -2338,8 +3413,14 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     custody = authority.get("custody")
     if not isinstance(custody, dict) or set(custody) != {
         "canonicalManifest",
+        "compatibilityManifest",
         "inventory",
         "nativeWindowsFinalizedEvidence",
+        "finalizedPublicationEvidence",
+        "registryPrepareCandidateReceipt",
+        "registryFinalizeAuthority",
+        "registryFinalizeReceipt",
+        "registryFinalization",
     }:
         raise ProjectionBlocked("candidate import custody property set drifted")
     canonical_bytes = _candidate_embedded_bytes(
@@ -2349,6 +3430,14 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     )
     if hashlib.sha256(canonical_bytes).hexdigest() != candidate["canonicalManifestSha256"]:
         raise ProjectionBlocked("candidate canonical manifest custody digest drifted")
+    compatibility_bytes = _candidate_embedded_bytes(
+        custody.get("compatibilityManifest"),
+        label="candidate compatibility manifest",
+        expected_path="releases.json",
+    )
+    _strict_json_object(
+        compatibility_bytes, label="candidate compatibility release manifest custody"
+    )
     inventory_bytes = _candidate_embedded_bytes(
         custody.get("inventory"),
         label="candidate upload inventory",
@@ -2375,6 +3464,7 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     total_bytes = 0
     previous_path = ""
     canonical_row_seen = False
+    compatibility_row_seen = False
     for row in candidate_rows:
         if not isinstance(row, dict) or set(row) != {"path", "sha256", "sizeBytes"}:
             raise ProjectionBlocked("candidate upload inventory row drifted")
@@ -2399,9 +3489,18 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
         inventory_digest.update(bytes.fromhex(str(digest)))
         total_bytes += size
         if path == "RELEASE_CHANNEL.generated.json":
-            canonical_row_seen = digest == candidate["canonicalManifestSha256"]
+            canonical_row_seen = (
+                digest == candidate["canonicalManifestSha256"]
+                and size == len(canonical_bytes)
+            )
+        elif path == "releases.json":
+            compatibility_row_seen = (
+                digest == hashlib.sha256(compatibility_bytes).hexdigest()
+                and size == len(compatibility_bytes)
+            )
     if (
         not canonical_row_seen
+        or not compatibility_row_seen
         or total_bytes != candidate["totalBytes"]
         or inventory_digest.hexdigest() != candidate["inventorySha256"]
     ):
@@ -2410,12 +3509,57 @@ def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     canonical = _strict_json_object(
         canonical_bytes, label="candidate canonical release manifest custody"
     )
-    _validate_candidate_native_evidence(
+    native_package = _validate_candidate_native_evidence(
         custody.get("nativeWindowsFinalizedEvidence"),
         canonical=canonical,
         candidate_rows=candidate_rows,
         candidate=candidate,
         now=now,
+    )
+    publication_scope, publication_scope_raw, publication_documents = (
+        _validate_candidate_finalized_publication(
+            custody.get("finalizedPublicationEvidence"),
+            canonical_raw=canonical_bytes,
+            compatibility_raw=compatibility_bytes,
+            candidate=candidate,
+            native_package=native_package,
+        )
+    )
+    registry_candidate_raw = _candidate_embedded_bytes(
+        custody.get("registryPrepareCandidateReceipt"),
+        label="Registry PREPARE candidate receipt",
+        expected_path=CANDIDATE_REGISTRY_RECEIPT_FILE,
+    )
+    registry_authority_raw = _candidate_embedded_bytes(
+        custody.get("registryFinalizeAuthority"),
+        label="Registry FINALIZE authority",
+        expected_path=CANDIDATE_REGISTRY_AUTHORITY_FILE,
+    )
+    registry_finalize_raw = _candidate_embedded_bytes(
+        custody.get("registryFinalizeReceipt"),
+        label="Registry FINALIZE receipt",
+        expected_path=CANDIDATE_REGISTRY_FINALIZE_FILE,
+    )
+    _validate_candidate_registry_graph(
+        candidate_receipt=_strict_json_object(
+            registry_candidate_raw, label="Registry PREPARE candidate receipt"
+        ),
+        candidate_receipt_raw=registry_candidate_raw,
+        registry_authority=_strict_json_object(
+            registry_authority_raw, label="Registry FINALIZE authority"
+        ),
+        registry_authority_raw=registry_authority_raw,
+        finalize=_strict_json_object(
+            registry_finalize_raw, label="Registry FINALIZE receipt"
+        ),
+        finalize_raw=registry_finalize_raw,
+        registry_summary=custody.get("registryFinalization"),
+        canonical_raw=canonical_bytes,
+        compatibility_raw=compatibility_bytes,
+        scope=publication_scope,
+        scope_raw=publication_scope_raw,
+        evidence_documents=publication_documents,
+        candidate=candidate,
     )
     return authority
 

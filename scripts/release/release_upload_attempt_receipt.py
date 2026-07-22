@@ -26,15 +26,45 @@ VALID_STATES = {
     "request_started",
     "outcome_unknown",
     "completed",
+    "stage_request_started",
+    "stage_outcome_unknown",
+    "staged",
     "durably_aborted",
 }
 ALLOWED_TRANSITIONS = {
     "created": {"uploaded", "durably_aborted"},
-    "uploaded": {"request_started", "durably_aborted"},
+    "uploaded": {"request_started", "stage_request_started", "durably_aborted"},
     "request_started": {"outcome_unknown", "completed", "durably_aborted"},
     "outcome_unknown": {"outcome_unknown", "completed", "durably_aborted"},
+    "stage_request_started": {"stage_outcome_unknown", "staged", "durably_aborted"},
+    "stage_outcome_unknown": {"stage_outcome_unknown", "staged", "durably_aborted"},
     "completed": set(),
+    "staged": set(),
     "durably_aborted": set(),
+}
+EXACT_WINDOWS_STAGE_SCOPE = "avalonia:windows:win-x64"
+STAGE_RESPONSE_FIELDS = {
+    "candidateArtifactIds",
+    "canonicalManifestSha256",
+    "channel",
+    "compatibilityManifestSha256",
+    "exactIncomingDesktopScope",
+    "generationId",
+    "inventoryDigest",
+    "previousGenerationId",
+    "previousPointerSha256",
+    "publishedAt",
+    "probeTokenExpiresAtUtc",
+    "responseSanitized",
+    "stageReceiptId",
+    "stagedAtUtc",
+    "targetPointerSha256",
+    "version",
+    "suppressedFieldCount",
+}
+STAGE_RESPONSE_REQUIRED_FIELDS = STAGE_RESPONSE_FIELDS - {
+    "previousGenerationId",
+    "previousPointerSha256",
 }
 
 
@@ -106,6 +136,98 @@ def read_json_object(path: Path, *, max_bytes: int = MAX_RECEIPT_BYTES) -> dict[
     if not isinstance(payload, dict):
         raise ValueError("receipt must contain a JSON object")
     return payload
+
+
+def read_stage_response(path: Path) -> tuple[dict[str, Any], bytes]:
+    resolved = require_plain_file(path, label="sanitized stage response")
+    metadata = resolved.stat()
+    if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) != 0o600:
+        raise ValueError(
+            "sanitized stage response must be owned by the current user with mode 0600"
+        )
+    if not 1 <= metadata.st_size <= MAX_RECEIPT_BYTES:
+        raise ValueError("sanitized stage response has an invalid size")
+    raw = resolved.read_bytes()
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(
+                    f"sanitized stage response contains duplicate field {key!r}"
+                )
+            result[key] = value
+        return result
+
+    payload = json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicates)
+    if (
+        not isinstance(payload, dict)
+        or not STAGE_RESPONSE_REQUIRED_FIELDS.issubset(payload)
+        or not set(payload).issubset(STAGE_RESPONSE_FIELDS)
+    ):
+        raise ValueError("sanitized stage response property set drifted")
+    if payload.get("responseSanitized") is not True or "probeToken" in payload:
+        raise ValueError("stage response is not a secret-redacted handoff")
+    suppressed = payload.get("suppressedFieldCount")
+    if isinstance(suppressed, bool) or not isinstance(suppressed, int) or suppressed < 1:
+        raise ValueError("sanitized stage response suppression count is invalid")
+    for field in (
+        "canonicalManifestSha256",
+        "compatibilityManifestSha256",
+        "targetPointerSha256",
+    ):
+        value = payload.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise ValueError(f"sanitized stage response {field} is invalid")
+    inventory_digest = payload.get("inventoryDigest")
+    if (
+        not isinstance(inventory_digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", inventory_digest) is None
+    ):
+        raise ValueError("sanitized stage response inventoryDigest is invalid")
+    previous_pointer = payload.get("previousPointerSha256")
+    if previous_pointer is not None and (
+        not isinstance(previous_pointer, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", previous_pointer) is None
+    ):
+        raise ValueError("sanitized stage response previousPointerSha256 is invalid")
+    for field in ("generationId", "stageReceiptId", "version"):
+        value = payload.get(field)
+        if (
+            not isinstance(value, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value) is None
+            or ".." in value
+        ):
+            raise ValueError(f"sanitized stage response {field} is invalid")
+    if payload.get("channel") != "preview":
+        raise ValueError("sanitized stage response channel is not preview")
+    if payload.get("exactIncomingDesktopScope") != EXACT_WINDOWS_STAGE_SCOPE:
+        raise ValueError("sanitized stage response exact Windows scope drifted")
+    candidate_ids = payload.get("candidateArtifactIds")
+    if (
+        not isinstance(candidate_ids, list)
+        or not candidate_ids
+        or len(candidate_ids) > 32
+        or any(
+            not isinstance(value, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}", value) is None
+            for value in candidate_ids
+        )
+        or candidate_ids != sorted(set(candidate_ids))
+    ):
+        raise ValueError("sanitized stage response candidate artifacts are invalid")
+    for field in ("publishedAt", "stagedAtUtc", "probeTokenExpiresAtUtc"):
+        if normalize_expiry(str(payload.get(field) or "")) is None:
+            raise ValueError(f"sanitized stage response {field} is invalid")
+    previous_generation = payload.get("previousGenerationId")
+    if previous_generation is not None and (
+        not isinstance(previous_generation, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", previous_generation)
+        is None
+        or ".." in previous_generation
+    ):
+        raise ValueError("sanitized stage response previous generation is invalid")
+    return payload, raw
 
 
 def normalized_api_origin(sessions_url: str) -> str:
@@ -318,7 +440,7 @@ def transition(args: argparse.Namespace) -> int:
             raise ValueError(f"invalid durable upload receipt transition: {previous_state!r} -> {state!r}")
         completion["state"] = state
         completion["lastUpdatedAtUtc"] = now
-        if state == "request_started":
+        if state in {"request_started", "stage_request_started"}:
             completion["requestStartedAtUtc"] = now
         if args.http_status:
             completion["lastHttpStatus"] = args.http_status
@@ -330,6 +452,25 @@ def transition(args: argparse.Namespace) -> int:
         if not isinstance(history, list) or len(history) > 32:
             raise ValueError("durable upload receipt state history is invalid")
         history.append({"state": state, "atUtc": now})
+
+        if state == "staged":
+            if not args.stage_response:
+                raise ValueError("staged transition requires a sanitized stage response")
+            stage_path = Path(args.stage_response)
+            if stage_path.parent.resolve(strict=True) != receipt.parent.resolve(strict=True):
+                raise ValueError(
+                    "sanitized stage response must share the durable handoff directory"
+                )
+            stage, stage_raw = read_stage_response(stage_path)
+            payload["stageResponse"] = {
+                "path": stage_path.name,
+                "sha256": hashlib.sha256(stage_raw).hexdigest(),
+                "generationId": stage["generationId"],
+                "stageReceiptId": stage["stageReceiptId"],
+                "exactIncomingDesktopScope": stage["exactIncomingDesktopScope"],
+            }
+        elif args.stage_response:
+            raise ValueError("sanitized stage response is valid only for staged transition")
 
     receipt.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     atomic_write_json(receipt, payload)
@@ -345,6 +486,16 @@ def fsync_file(args: argparse.Namespace) -> int:
     finally:
         os.close(descriptor)
     fsync_directory(path.parent)
+    return 0
+
+
+def persist_stage_response(args: argparse.Namespace) -> int:
+    payload, _raw = read_stage_response(Path(args.source))
+    output = Path(args.output)
+    if output.exists() or output.is_symlink():
+        raise ValueError("durable stage response target must be fresh")
+    output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    atomic_write_json(output, payload)
     return 0
 
 
@@ -374,11 +525,17 @@ def build_parser() -> argparse.ArgumentParser:
     transition_parser.add_argument("--http-status", default="")
     transition_parser.add_argument("--problem-type", default="")
     transition_parser.add_argument("--trace-id", default="")
+    transition_parser.add_argument("--stage-response", default="")
     transition_parser.set_defaults(handler=transition)
 
     fsync_parser = subparsers.add_parser("fsync-file")
     fsync_parser.add_argument("--path", required=True)
     fsync_parser.set_defaults(handler=fsync_file)
+
+    stage_response_parser = subparsers.add_parser("persist-stage-response")
+    stage_response_parser.add_argument("--source", required=True)
+    stage_response_parser.add_argument("--output", required=True)
+    stage_response_parser.set_defaults(handler=persist_stage_response)
     return parser
 
 
