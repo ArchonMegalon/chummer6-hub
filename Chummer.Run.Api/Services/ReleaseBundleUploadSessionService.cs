@@ -129,6 +129,15 @@ public sealed class ReleaseBundleUploadSessionService
             }
         }
         exactIncomingDesktopScope?.ValidateCanonical();
+        if (CandidateUsesFreshDesktopDelta(candidateImportBinding)
+            && !string.Equals(
+                exactIncomingDesktopScope?.ToTransport(),
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned-v3 candidate import requires its authority-bound fresh desktop delta scope.");
+        }
 
         using FileStream quotaLock = AcquireQuotaLock();
         PurgeExpiredSessionsUnderQuotaLock(sessionsRoot);
@@ -1394,7 +1403,9 @@ public sealed class ReleaseBundleUploadSessionService
         ValidateActivationIntent(intent);
         if (!ExactScopeMatches(
                 session.ExactIncomingDesktopScope,
-                intent.ExactIncomingDesktopScope))
+                intent.ExactIncomingDesktopScope)
+            || intent.ExactIncomingDesktopScopeIsFreshDelta
+               != CandidateUsesFreshDesktopDelta(session.CandidateImportBinding))
         {
             throw new InvalidDataException(
                 "release activation intent exact incoming desktop scope does not match its authenticated upload session.");
@@ -1513,7 +1524,9 @@ public sealed class ReleaseBundleUploadSessionService
             || !string.Equals(
                 session.StageResult.ExactIncomingDesktopScope,
                 result.ExactIncomingDesktopScope,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)
+            || session.StageResult.ExactIncomingDesktopScopeIsFreshDelta
+               != result.ExactIncomingDesktopScopeIsFreshDelta)
         {
             throw new InvalidDataException(
                 "staged activation result does not match its durable upload-session receipt.");
@@ -1554,7 +1567,9 @@ public sealed class ReleaseBundleUploadSessionService
             || result.CandidateArtifactIds.Any(static id => !IsSafeActivationIdentifier(id))
             || !ExactScopeMatches(
                 session.ExactIncomingDesktopScope,
-                result.ExactIncomingDesktopScope))
+                result.ExactIncomingDesktopScope)
+            || result.ExactIncomingDesktopScopeIsFreshDelta
+               != CandidateUsesFreshDesktopDelta(session.CandidateImportBinding))
         {
             throw new InvalidDataException(
                 "release stage result does not match its authenticated upload session.");
@@ -1583,8 +1598,14 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException("release activation intent is incomplete.");
         }
 
-        _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
-            intent.ExactIncomingDesktopScope);
+        ReleaseDesktopTupleScope? exactScope =
+            ReleaseDesktopTupleScope.ParseOptionalCanonical(
+                intent.ExactIncomingDesktopScope);
+        if (intent.ExactIncomingDesktopScopeIsFreshDelta && exactScope is null)
+        {
+            throw new InvalidDataException(
+                "fresh desktop delta activation intent is missing its exact scope.");
+        }
 
         byte[]? previousPointerBytes;
         byte[]? targetPointerBytes;
@@ -1653,7 +1674,9 @@ public sealed class ReleaseBundleUploadSessionService
             || !string.Equals(
                 result.ExactIncomingDesktopScope,
                 intent.ExactIncomingDesktopScope,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal)
+            || result.ExactIncomingDesktopScopeIsFreshDelta
+               != intent.ExactIncomingDesktopScopeIsFreshDelta)
         {
             throw new InvalidDataException("release promotion result does not match the durable activation intent.");
         }
@@ -1691,6 +1714,15 @@ public sealed class ReleaseBundleUploadSessionService
             {
                 throw new InvalidDataException("upload session candidate binding is invalid.");
             }
+            if (CandidateUsesFreshDesktopDelta(session.CandidateImportBinding)
+                && !string.Equals(
+                    session.ExactIncomingDesktopScope?.ToTransport(),
+                    ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "unsigned-v3 upload session fresh desktop delta scope is invalid.");
+            }
         }
         session.ExactIncomingDesktopScope?.ValidateCanonical();
 
@@ -1710,7 +1742,9 @@ public sealed class ReleaseBundleUploadSessionService
             ValidateActivationIntent(session.ActivationIntent);
             if (!ExactScopeMatches(
                     session.ExactIncomingDesktopScope,
-                    session.ActivationIntent.ExactIncomingDesktopScope))
+                    session.ActivationIntent.ExactIncomingDesktopScope)
+                || session.ActivationIntent.ExactIncomingDesktopScopeIsFreshDelta
+                   != CandidateUsesFreshDesktopDelta(session.CandidateImportBinding))
             {
                 throw new InvalidDataException(
                     "upload session activation scope does not match its authenticated exact incoming desktop scope.");
@@ -1744,11 +1778,23 @@ public sealed class ReleaseBundleUploadSessionService
             || !IsBareSha256(binding.AuthoritySha256)
             || !IsBareSha256(binding.BundleIdentitySha256)
             || !IsBareSha256(binding.CanonicalManifestSha256)
-            || !IsBareSha256(binding.InventorySha256))
+            || !IsBareSha256(binding.InventorySha256)
+            || binding.ExactIncomingDesktopScopeIsFreshDelta
+               != (binding.IncumbentBinding is not null)
+            || binding.IncumbentBinding is { } incumbent
+               && (!IsBareSha256(incumbent.SnapshotSha256)
+                   || !IsBareSha256(incumbent.FullShelfInventorySha256)
+                   || !IsBareSha256(incumbent.ActiveInventorySha256)
+                   || !IsBareSha256(incumbent.CanonicalManifestSha256)
+                   || !IsBareSha256(incumbent.CompatibilityManifestSha256)))
         {
             throw new InvalidDataException("upload session candidate binding is invalid.");
         }
     }
+
+    private static bool CandidateUsesFreshDesktopDelta(
+        ReleaseUploadCandidateSessionBinding? binding)
+        => binding?.ExactIncomingDesktopScopeIsFreshDelta is true;
 
     private static bool IsBareSha256(string? value)
         => value is { Length: 64 }

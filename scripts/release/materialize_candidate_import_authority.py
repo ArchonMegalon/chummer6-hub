@@ -48,6 +48,7 @@ CANDIDATE_UPLOAD_CONTENT_INVENTORY = (
 )
 CANDIDATE_UPLOAD_EXPORT = "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
 PROMOTED_HEADS = ("avalonia",)
+RETAINED_DESKTOP_HEADS = frozenset((*PROMOTED_HEADS, "blazor-desktop"))
 CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
 PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
@@ -1084,25 +1085,36 @@ def _canonical_windows_scope(
     windows_artifacts: list[dict[str, Any]] = []
     candidate_by_path = {row["path"]: row for row in candidate_rows}
     expected_file_paths: set[str] = set()
+    non_windows_kinds = (
+        {"installer", "archive"} if allow_ancillary_files else {"installer"}
+    )
     for artifact in artifacts_value:
         if not isinstance(artifact, dict):
             _fail("candidate release manifest contains a non-object artifact")
-        if artifact.get("head") not in heads:
+        head = artifact.get("head")
+        platform = artifact.get("platform")
+        rid = artifact.get("rid")
+        kind = artifact.get("kind")
+        if not isinstance(head, str) or HEAD_RE.fullmatch(head) is None:
+            _fail("candidate release manifest contains an invalid desktop artifact head")
+        if allow_ancillary_files and head not in RETAINED_DESKTOP_HEADS:
+            _fail("candidate release manifest contains an unknown retained desktop head")
+        if head not in heads and (platform == "windows" or not allow_ancillary_files):
             _fail(
                 "candidate release manifest contains a desktop artifact outside "
                 "requiredDesktopHeads"
             )
-        platform = artifact.get("platform")
-        rid = artifact.get("rid")
         if (
-            artifact.get("kind") != "installer"
-            or platform not in {"linux", "macos", "windows"}
-            or platform == "windows"
-            and rid != RID
+            platform == "windows"
+            and (rid != RID or kind != "installer")
             or platform == "linux"
-            and rid != "linux-x64"
+            and (rid != "linux-x64" or kind not in non_windows_kinds)
             or platform == "macos"
-            and rid not in {"osx-arm64", "osx-x64"}
+            and (
+                rid not in {"osx-arm64", "osx-x64"}
+                or kind not in non_windows_kinds
+            )
+            or platform not in {"linux", "macos", "windows"}
         ):
             _fail(
                 "candidate release manifest contains an artifact outside the exact "

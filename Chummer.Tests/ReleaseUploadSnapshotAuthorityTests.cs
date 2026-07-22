@@ -71,6 +71,9 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         fixture.Publish("candidate_import_ready");
         ReleaseUploadCandidateAuthority candidate = Assert.IsType<ReleaseUploadCandidateAuthority>(
             fixture.Authority.Load().Candidate);
+        Assert.False(candidate.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.False(candidate.SessionBinding.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.Null(candidate.IncumbentBinding);
 
         Assert.Null(fixture.Evaluate());
         Assert.Null(fixture.Evaluate(candidate.Candidate, includeExactScope: false));
@@ -178,6 +181,10 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         Assert.False(loaded.ReleaseUploadAuthority);
         ReleaseUploadCandidateAuthority candidate =
             Assert.IsType<ReleaseUploadCandidateAuthority>(loaded.Candidate);
+        Assert.True(candidate.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.True(candidate.SessionBinding.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.NotNull(candidate.IncumbentBinding);
+        Assert.Equal(candidate.IncumbentBinding, candidate.SessionBinding.IncumbentBinding);
         Assert.Equal(6, candidate.Inventory.Count);
         Assert.Contains(
             candidate.Inventory,
@@ -349,6 +356,177 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void UnsignedCanonicalValidatorAcceptsRealRetainedCrossPlatformShelf()
+    {
+        (JsonObject canonical,
+            Dictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
+            JsonArray fresh) = BuildUnsignedCrossPlatformShelf();
+
+        IReadOnlySet<string> managedRetainedPaths =
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedCanonicalWindows(
+                JsonSerializer.SerializeToElement(canonical),
+                inventory,
+                JsonSerializer.SerializeToElement(fresh));
+
+        Assert.Equal(
+            new[]
+            {
+                "files/chummer-avalonia-linux-x64-installer.deb",
+                "files/chummer-avalonia-osx-arm64-installer.dmg",
+                "files/chummer-avalonia-osx-arm64.zip",
+                "files/chummer-blazor-desktop-osx-arm64-installer.dmg",
+                "files/chummer-blazor-desktop-osx-arm64.zip"
+            },
+            managedRetainedPaths.OrderBy(static path => path, StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("required_head_widen", "requiredDesktopHeads")]
+    [InlineData("extra_windows_head", "outside requiredDesktopHeads")]
+    [InlineData("retained_head", "artifact head is invalid")]
+    [InlineData("retained_unknown_head", "artifact head is invalid")]
+    [InlineData("retained_platform", "outside the exact desktop shelf scope")]
+    [InlineData("retained_rid", "outside the exact desktop shelf scope")]
+    [InlineData("retained_linux_rid", "outside the exact desktop shelf scope")]
+    [InlineData("retained_kind", "outside the exact desktop shelf scope")]
+    [InlineData("retained_linux_kind", "outside the exact desktop shelf scope")]
+    [InlineData("retained_bytes", "artifact bytes drifted")]
+    [InlineData("duplicate_primary_path", "artifact bytes drifted")]
+    [InlineData("windows_archive", "outside the exact desktop shelf scope")]
+    public void UnsignedCanonicalValidatorRejectsInvalidRetainedShelfOrWindowsWidening(
+        string drift,
+        string expectedFailure)
+    {
+        (JsonObject canonical,
+            Dictionary<string, ReleaseUploadCandidateInventoryRow> inventory,
+            JsonArray fresh) = BuildUnsignedCrossPlatformShelf();
+        JsonArray artifacts = canonical["artifacts"]!.AsArray();
+        JsonObject retained = artifacts
+            .Select(static node => node!.AsObject())
+            .Single(artifact =>
+                string.Equals(
+                    artifact["head"]!.GetValue<string>(),
+                    "blazor-desktop",
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    artifact["kind"]!.GetValue<string>(),
+                    "archive",
+                    StringComparison.Ordinal));
+        JsonObject linux = artifacts
+            .Select(static node => node!.AsObject())
+            .Single(artifact => string.Equals(
+                artifact["platform"]!.GetValue<string>(),
+                "linux",
+                StringComparison.Ordinal));
+        JsonObject windows = artifacts
+            .Select(static node => node!.AsObject())
+            .Single(artifact => string.Equals(
+                artifact["platform"]!.GetValue<string>(),
+                "windows",
+                StringComparison.Ordinal));
+
+        switch (drift)
+        {
+            case "required_head_widen":
+                canonical["desktopTupleCoverage"]!
+                    .AsObject()["requiredDesktopHeads"]!
+                    .AsArray()
+                    .Add("blazor-desktop");
+                break;
+            case "extra_windows_head":
+            {
+                byte[] raw = "undeclared-blazor-windows-installer"u8.ToArray();
+                string digest = Convert.ToHexStringLower(SHA256.HashData(raw));
+                const string fileName =
+                    "chummer-blazor-desktop-win-x64-installer.exe";
+                artifacts.Add(new JsonObject
+                {
+                    ["artifactId"] = "blazor-desktop-win-x64-installer",
+                    ["head"] = "blazor-desktop",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["kind"] = "installer",
+                    ["installerMode"] = "bootstrap",
+                    ["payloadAcquisitionMode"] = "download",
+                    ["fileName"] = fileName,
+                    ["sha256"] = digest,
+                    ["sizeBytes"] = raw.LongLength,
+                    ["payloadFileName"] =
+                        "chummer-blazor-desktop-win-x64-payload.zip",
+                    ["payloadSha256"] = new string('e', 64),
+                    ["payloadSizeBytes"] = 1
+                });
+                inventory.Add(
+                    $"files/{fileName}",
+                    new ReleaseUploadCandidateInventoryRow(
+                        $"files/{fileName}",
+                        raw.LongLength,
+                        digest));
+                break;
+            }
+            case "retained_head":
+                retained["head"] = "Blazor Desktop";
+                break;
+            case "retained_unknown_head":
+                retained["head"] = "future-desktop";
+                break;
+            case "retained_platform":
+                retained["platform"] = "android";
+                break;
+            case "retained_rid":
+                retained["rid"] = "osx-ppc64";
+                break;
+            case "retained_linux_rid":
+                linux["rid"] = "linux-arm64";
+                break;
+            case "retained_kind":
+                retained["kind"] = "symbols";
+                break;
+            case "retained_linux_kind":
+                linux["kind"] = "symbols";
+                break;
+            case "retained_bytes":
+                retained["sha256"] = new string('f', 64);
+                break;
+            case "duplicate_primary_path":
+            {
+                JsonObject duplicate = artifacts
+                    .Select(static node => node!.AsObject())
+                    .Single(artifact =>
+                        string.Equals(
+                            artifact["head"]!.GetValue<string>(),
+                            "avalonia",
+                            StringComparison.Ordinal)
+                        && string.Equals(
+                            artifact["platform"]!.GetValue<string>(),
+                            "macos",
+                            StringComparison.Ordinal)
+                        && string.Equals(
+                            artifact["kind"]!.GetValue<string>(),
+                            "archive",
+                            StringComparison.Ordinal));
+                retained["fileName"] = duplicate["fileName"]!.DeepClone();
+                retained["sha256"] = duplicate["sha256"]!.DeepClone();
+                retained["sizeBytes"] = duplicate["sizeBytes"]!.DeepClone();
+                break;
+            }
+            case "windows_archive":
+                windows["kind"] = "archive";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(drift));
+        }
+
+        InvalidDataException rejected = Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedCanonicalWindows(
+                JsonSerializer.SerializeToElement(canonical),
+                inventory,
+                JsonSerializer.SerializeToElement(fresh)));
+
+        Assert.Contains(expectedFailure, rejected.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RuntimeRejectsRehashedUnsignedV3AuthorityPostureTamper()
     {
         using var fixture = new SnapshotFixture();
@@ -486,6 +664,120 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         finalization["finalizeReceiptSha256"] =
             registryReceiptEntry["sha256"]!.GetValue<string>();
         return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static (
+        JsonObject Canonical,
+        Dictionary<string, ReleaseUploadCandidateInventoryRow> Inventory,
+        JsonArray Fresh) BuildUnsignedCrossPlatformShelf()
+    {
+        var artifacts = new JsonArray();
+        var inventory = new Dictionary<string, ReleaseUploadCandidateInventoryRow>(
+            StringComparer.Ordinal);
+
+        JsonObject AddPrimary(
+            string head,
+            string platform,
+            string rid,
+            string kind,
+            string fileName)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(
+                $"{head}:{platform}:{rid}:{kind}:{fileName}");
+            string digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
+            var artifact = new JsonObject
+            {
+                ["artifactId"] = fileName,
+                ["head"] = head,
+                ["platform"] = platform,
+                ["rid"] = rid,
+                ["kind"] = kind,
+                ["fileName"] = fileName,
+                ["sha256"] = digest,
+                ["sizeBytes"] = bytes.LongLength
+            };
+            artifacts.Add(artifact);
+            string path = $"files/{fileName}";
+            inventory.Add(
+                path,
+                new ReleaseUploadCandidateInventoryRow(path, bytes.LongLength, digest));
+            return artifact;
+        }
+
+        foreach (string head in new[] { "blazor-desktop", "avalonia" })
+        {
+            AddPrimary(
+                head,
+                "macos",
+                "osx-arm64",
+                "installer",
+                $"chummer-{head}-osx-arm64-installer.dmg");
+            AddPrimary(
+                head,
+                "macos",
+                "osx-arm64",
+                "archive",
+                $"chummer-{head}-osx-arm64.zip");
+        }
+        AddPrimary(
+            "avalonia",
+            "linux",
+            "linux-x64",
+            "installer",
+            "chummer-avalonia-linux-x64-installer.deb");
+        JsonObject windows = AddPrimary(
+            "avalonia",
+            "windows",
+            "win-x64",
+            "installer",
+            "chummer-avalonia-win-x64-installer.exe");
+        byte[] payload = "fresh-avalonia-windows-bootstrap-payload"u8.ToArray();
+        string payloadDigest = Convert.ToHexStringLower(SHA256.HashData(payload));
+        const string payloadFileName = "chummer-avalonia-win-x64-payload.zip";
+        windows["installerMode"] = "bootstrap";
+        windows["payloadAcquisitionMode"] = "download";
+        windows["payloadFileName"] = payloadFileName;
+        windows["payloadSha256"] = payloadDigest;
+        windows["payloadSizeBytes"] = payload.LongLength;
+        inventory.Add(
+            $"files/{payloadFileName}",
+            new ReleaseUploadCandidateInventoryRow(
+                $"files/{payloadFileName}",
+                payload.LongLength,
+                payloadDigest));
+
+        var canonical = new JsonObject
+        {
+            ["version"] = "run-cross-platform-shelf",
+            ["releaseVersion"] = "run-cross-platform-shelf",
+            ["channel"] = "preview",
+            ["channelId"] = "preview",
+            ["desktopTupleCoverage"] = new JsonObject
+            {
+                ["requiredDesktopHeads"] = new JsonArray("avalonia")
+            },
+            ["artifacts"] = artifacts
+        };
+        var fresh = new JsonArray
+        {
+            new JsonObject
+            {
+                ["artifactRole"] = "installer",
+                ["head"] = "avalonia",
+                ["platform"] = "windows",
+                ["rid"] = "win-x64",
+                ["path"] = "files/chummer-avalonia-win-x64-installer.exe"
+            },
+            new JsonObject
+            {
+                ["artifactRole"] = "bootstrap_payload",
+                ["head"] = "avalonia",
+                ["platform"] = "windows",
+                ["rid"] = "win-x64",
+                ["path"] = $"files/{payloadFileName}"
+            }
+        };
+        return (canonical, inventory, fresh);
     }
 
     private static (

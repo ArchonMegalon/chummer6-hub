@@ -337,6 +337,75 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     }
 
     [Fact]
+    public void UnsignedV3FreshDeltaDiscriminatorIsScopeBoundDurableAndImmutable()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddHours(2);
+        var candidate = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: new ReleaseUploadCandidateIncumbentBinding(
+                SnapshotSha256: new string('6', 64),
+                FullShelfInventorySha256: new string('7', 64),
+                ActiveInventorySha256: new string('8', 64),
+                CanonicalManifestSha256: new string('9', 64),
+                CompatibilityManifestSha256: new string('a', 64)));
+        ReleaseDesktopTupleScope scope = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        InvalidDataException missingScope = Assert.Throws<InvalidDataException>(() =>
+            fixture.Service.CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidate));
+        Assert.Contains("authority-bound", missingScope.Message, StringComparison.OrdinalIgnoreCase);
+
+        ReleaseUploadSession created = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+        ReleaseUploadSession durable = fixture.CreateService().CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+        Assert.True(durable.CandidateImportBinding!.ExactIncomingDesktopScopeIsFreshDelta);
+
+        InvalidOperationException changedProfile = Assert.Throws<InvalidOperationException>(() =>
+            fixture.Service.CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidate with
+                {
+                    ExactIncomingDesktopScopeIsFreshDelta = false,
+                    IncumbentBinding = null
+                },
+                scope));
+        Assert.Contains("candidate binding changed", changedProfile.Message, StringComparison.OrdinalIgnoreCase);
+
+        ReleaseBundlePromotionResult result = BuildPromotionResult(
+            scope.ToTransport(),
+            exactIncomingDesktopScopeIsFreshDelta: true);
+        using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+            fixture.CreateService().BeginCompletion(created.SessionId, AuthorizationA);
+        InvalidDataException changedIntent = Assert.Throws<InvalidDataException>(() =>
+            completion.RecordActivationIntent(BuildActivationIntent(
+                result with { ExactIncomingDesktopScopeIsFreshDelta = false })));
+        Assert.Contains("scope", changedIntent.Message, StringComparison.OrdinalIgnoreCase);
+        completion.RecordActivationIntent(BuildActivationIntent(result));
+        completion.MarkCompleted(result);
+    }
+
+    [Fact]
     public async Task CompletedSessionRejectsFurtherWrites()
     {
         using Fixture fixture = new();
@@ -731,7 +800,8 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     private const UnixFileMode OwnerFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
     private static ReleaseBundlePromotionResult BuildPromotionResult(
-        string? exactIncomingDesktopScope = null)
+        string? exactIncomingDesktopScope = null,
+        bool exactIncomingDesktopScopeIsFreshDelta = false)
         => new(
             Version: "run-test",
             Channel: "preview",
@@ -743,7 +813,9 @@ public sealed class ReleaseBundleUploadSessionServiceTests
             GenerationId: "generation-test",
             ActivationReceiptId: "activation-test",
             InventoryDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            ExactIncomingDesktopScope: exactIncomingDesktopScope);
+            ExactIncomingDesktopScope: exactIncomingDesktopScope,
+            ExactIncomingDesktopScopeIsFreshDelta:
+                exactIncomingDesktopScopeIsFreshDelta);
 
     private static ReleaseActivationIntent BuildActivationIntent(ReleaseBundlePromotionResult result)
     {
@@ -762,7 +834,9 @@ public sealed class ReleaseBundleUploadSessionServiceTests
             PreparedAtUtc: DateTimeOffset.UtcNow,
             PreviousPointerBase64: null,
             TargetPointerBase64: Convert.ToBase64String(targetPointerBytes),
-            ExactIncomingDesktopScope: result.ExactIncomingDesktopScope);
+            ExactIncomingDesktopScope: result.ExactIncomingDesktopScope,
+            ExactIncomingDesktopScopeIsFreshDelta:
+                result.ExactIncomingDesktopScopeIsFreshDelta);
     }
 
     private sealed class Fixture : IDisposable

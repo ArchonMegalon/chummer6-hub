@@ -45,6 +45,117 @@ UNSIGNED_BUNDLE_INVENTORY_SHA256 = (
 )
 
 
+def real_unsigned_cross_platform_shelf() -> tuple[
+    dict[str, object],
+    list[dict[str, object]],
+    dict[str, object],
+]:
+    version = "run-cross-platform-shelf"
+    artifacts: list[dict[str, object]] = []
+    rows: list[dict[str, object]] = []
+
+    def add_primary(
+        *,
+        head: str,
+        platform: str,
+        rid: str,
+        kind: str,
+        file_name: str,
+    ) -> dict[str, object]:
+        raw = f"{head}:{platform}:{rid}:{kind}:{file_name}".encode()
+        artifact: dict[str, object] = {
+            "artifactId": file_name,
+            "head": head,
+            "platform": platform,
+            "rid": rid,
+            "kind": kind,
+            "fileName": file_name,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sizeBytes": len(raw),
+        }
+        artifacts.append(artifact)
+        rows.append(
+            {
+                "path": f"files/{file_name}",
+                "sha256": artifact["sha256"],
+                "sizeBytes": artifact["sizeBytes"],
+            }
+        )
+        return artifact
+
+    for head in ("blazor-desktop", "avalonia"):
+        add_primary(
+            head=head,
+            platform="macos",
+            rid="osx-arm64",
+            kind="installer",
+            file_name=f"chummer-{head}-osx-arm64-installer.dmg",
+        )
+        add_primary(
+            head=head,
+            platform="macos",
+            rid="osx-arm64",
+            kind="archive",
+            file_name=f"chummer-{head}-osx-arm64.zip",
+        )
+    add_primary(
+        head="avalonia",
+        platform="linux",
+        rid="linux-x64",
+        kind="installer",
+        file_name="chummer-avalonia-linux-x64-installer.deb",
+    )
+
+    windows = add_primary(
+        head="avalonia",
+        platform="windows",
+        rid="win-x64",
+        kind="installer",
+        file_name="chummer-avalonia-win-x64-installer.exe",
+    )
+    payload_raw = b"fresh-avalonia-windows-bootstrap-payload"
+    windows.update(
+        {
+            "installerMode": "bootstrap",
+            "payloadAcquisitionMode": "download",
+            "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+            "payloadSha256": hashlib.sha256(payload_raw).hexdigest(),
+            "payloadSizeBytes": len(payload_raw),
+        }
+    )
+    rows.append(
+        {
+            "path": "files/chummer-avalonia-win-x64-payload.zip",
+            "sha256": windows["payloadSha256"],
+            "sizeBytes": windows["payloadSizeBytes"],
+        }
+    )
+    rows.extend(
+        [
+            {
+                "path": "RELEASE_CHANNEL.generated.json",
+                "sha256": hashlib.sha256(b"canonical").hexdigest(),
+                "sizeBytes": len(b"canonical"),
+            },
+            {
+                "path": "releases.json",
+                "sha256": hashlib.sha256(b"compatibility").hexdigest(),
+                "sizeBytes": len(b"compatibility"),
+            },
+        ]
+    )
+    rows.sort(key=lambda row: str(row["path"]))
+    canonical: dict[str, object] = {
+        "version": version,
+        "releaseVersion": version,
+        "channel": "preview",
+        "channelId": "preview",
+        "desktopTupleCoverage": {"requiredDesktopHeads": ["avalonia"]},
+        "artifacts": artifacts,
+    }
+    return canonical, rows, {"version": version}
+
+
 def write_json(path: Path, value: object) -> bytes:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
@@ -2202,6 +2313,200 @@ def test_unsigned_candidate_scope_rejects_rehashed_non_preview_canonical_channel
             candidate,
             allow_ancillary_files=True,
             expected_channel="preview",
+        )
+
+
+def parse_candidate_scope(
+    layer: str,
+    canonical: dict[str, object],
+    rows: list[dict[str, object]],
+    candidate: dict[str, object],
+    *,
+    allow_retained_cross_platform: bool,
+) -> dict[str, object]:
+    if layer == "materializer":
+        module = load_script(MATERIALIZER, "cross_platform_shelf_materializer_test")
+        return module._canonical_windows_scope(
+            canonical,
+            rows,
+            allow_ancillary_files=allow_retained_cross_platform,
+            expected_channel="preview" if allow_retained_cross_platform else None,
+        )
+    module = load_projection()
+    return module._candidate_windows_scope(
+        canonical,
+        rows,
+        candidate,
+        allow_ancillary_files=allow_retained_cross_platform,
+        expected_channel="preview" if allow_retained_cross_platform else None,
+    )
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_scope_accepts_real_retained_macos_shelf_and_exact_windows_delta(
+    layer: str,
+) -> None:
+    canonical, rows, candidate = real_unsigned_cross_platform_shelf()
+
+    scope = parse_candidate_scope(
+        layer,
+        canonical,
+        rows,
+        candidate,
+        allow_retained_cross_platform=True,
+    )
+
+    assert scope["heads"] == ("avalonia",)
+    assert set(scope["artifacts"]) == {"avalonia"}
+    assert set(scope["artifacts"]["avalonia"]) == {"installer", "payload"}
+    assert scope["artifacts"]["avalonia"]["installer"]["path"] == (
+        "files/chummer-avalonia-win-x64-installer.exe"
+    )
+    assert scope["artifacts"]["avalonia"]["payload"]["path"] == (
+        "files/chummer-avalonia-win-x64-payload.zip"
+    )
+    inventory_by_path = {row["path"]: row for row in rows}
+    for artifact in canonical["artifacts"]:
+        path = f"files/{artifact['fileName']}"
+        assert inventory_by_path[path] == {
+            "path": path,
+            "sha256": artifact["sha256"],
+            "sizeBytes": artifact["sizeBytes"],
+        }
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize(
+    ("drift", "expected"),
+    [
+        ("extra_windows_head", "outside requiredDesktopHeads"),
+        ("retained_head", "invalid desktop artifact head"),
+        ("retained_unknown_head", "unknown retained desktop head"),
+        ("retained_platform", "outside the exact finalized desktop shelf scope"),
+        ("retained_rid", "outside the exact finalized desktop shelf scope"),
+        ("retained_linux_rid", "outside the exact finalized desktop shelf scope"),
+        ("retained_kind", "outside the exact finalized desktop shelf scope"),
+        ("retained_linux_kind", "outside the exact finalized desktop shelf scope"),
+        ("retained_bytes", "upload inventory"),
+        ("windows_archive", "outside the exact finalized desktop shelf scope"),
+    ],
+)
+def test_unsigned_scope_rejects_invalid_retained_shelf_or_windows_widening(
+    layer: str,
+    drift: str,
+    expected: str,
+) -> None:
+    canonical, rows, candidate = real_unsigned_cross_platform_shelf()
+    artifacts = canonical["artifacts"]
+    retained = next(
+        artifact
+        for artifact in artifacts
+        if artifact["head"] == "blazor-desktop" and artifact["kind"] == "archive"
+    )
+    windows = next(
+        artifact for artifact in artifacts if artifact["platform"] == "windows"
+    )
+    linux = next(
+        artifact for artifact in artifacts if artifact["platform"] == "linux"
+    )
+    if drift == "extra_windows_head":
+        raw = b"undeclared-blazor-windows-installer"
+        payload = b"undeclared-blazor-windows-payload"
+        artifacts.append(
+            {
+                "artifactId": "blazor-desktop-win-x64-installer",
+                "head": "blazor-desktop",
+                "platform": "windows",
+                "rid": "win-x64",
+                "kind": "installer",
+                "installerMode": "bootstrap",
+                "payloadAcquisitionMode": "download",
+                "fileName": "chummer-blazor-desktop-win-x64-installer.exe",
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "sizeBytes": len(raw),
+                "payloadFileName": "chummer-blazor-desktop-win-x64-payload.zip",
+                "payloadSha256": hashlib.sha256(payload).hexdigest(),
+                "payloadSizeBytes": len(payload),
+            }
+        )
+        rows.extend(
+            [
+                {
+                    "path": "files/chummer-blazor-desktop-win-x64-installer.exe",
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "sizeBytes": len(raw),
+                },
+                {
+                    "path": "files/chummer-blazor-desktop-win-x64-payload.zip",
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "sizeBytes": len(payload),
+                },
+            ]
+        )
+    elif drift == "retained_head":
+        retained["head"] = "Blazor Desktop"
+    elif drift == "retained_unknown_head":
+        retained["head"] = "future-desktop"
+    elif drift == "retained_platform":
+        retained["platform"] = "android"
+    elif drift == "retained_rid":
+        retained["rid"] = "osx-ppc64"
+    elif drift == "retained_linux_rid":
+        linux["rid"] = "linux-arm64"
+    elif drift == "retained_kind":
+        retained["kind"] = "symbols"
+    elif drift == "retained_linux_kind":
+        linux["kind"] = "symbols"
+    elif drift == "retained_bytes":
+        retained["sha256"] = "f" * 64
+    elif drift == "windows_archive":
+        windows["kind"] = "archive"
+    else:
+        raise AssertionError(f"unknown drift: {drift}")
+    rows.sort(key=lambda row: str(row["path"]))
+
+    with pytest.raises(Exception, match=expected):
+        parse_candidate_scope(
+            layer,
+            canonical,
+            rows,
+            candidate,
+            allow_retained_cross_platform=True,
+        )
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize("legacy_drift", ["fallback_head", "archive_kind"])
+def test_legacy_scope_does_not_inherit_unsigned_retained_shelf_relaxation(
+    layer: str,
+    legacy_drift: str,
+) -> None:
+    canonical, rows, candidate = real_unsigned_cross_platform_shelf()
+    if legacy_drift == "archive_kind":
+        canonical["artifacts"] = [
+            artifact
+            for artifact in canonical["artifacts"]
+            if artifact["head"] == "avalonia"
+        ]
+        retained_paths = {
+            f"files/{artifact['fileName']}" for artifact in canonical["artifacts"]
+        }
+        retained_paths.update(
+            {
+                "RELEASE_CHANNEL.generated.json",
+                "releases.json",
+                "files/chummer-avalonia-win-x64-payload.zip",
+            }
+        )
+        rows = [row for row in rows if row["path"] in retained_paths]
+
+    with pytest.raises(Exception):
+        parse_candidate_scope(
+            layer,
+            canonical,
+            rows,
+            candidate,
+            allow_retained_cross_platform=False,
         )
 
 

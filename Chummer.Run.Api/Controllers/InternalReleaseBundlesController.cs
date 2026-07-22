@@ -871,10 +871,21 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                     completion.BundleRoot,
                     authorization.CandidateImportAuthority);
             }
-            await _promotionService.ValidateDirectoryAsync(
-                completion.BundleRoot,
-                completion.ExactIncomingDesktopScope,
-                cancellationToken);
+            if (completion.CandidateImportBinding is { } candidateImportBinding)
+            {
+                await _promotionService.ValidateDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    candidateImportBinding,
+                    cancellationToken);
+            }
+            else
+            {
+                await _promotionService.ValidateDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    cancellationToken);
+            }
             ObjectResult? admissionFailure = EvaluateFreshCompletionAdmission(
                 completion,
                 cancellationToken);
@@ -883,13 +894,28 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 return admissionFailure;
             }
 
-            ReleaseBundleStageResult staged = await _promotionService.StageDirectoryAsync(
-                completion.BundleRoot,
-                completion.ExactIncomingDesktopScope,
-                sessionId,
-                cancellationToken);
+            ReleaseBundleStageResult staged = completion.CandidateImportBinding is { } binding
+                ? await _promotionService.StageDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    binding,
+                    sessionId,
+                    cancellationToken)
+                : await _promotionService.StageDirectoryAsync(
+                    completion.BundleRoot,
+                    completion.ExactIncomingDesktopScope,
+                    sessionId,
+                    cancellationToken);
             completion.MarkStaged(staged);
             return Ok(staged);
+        }
+        catch (ReleaseShelfMutationConcurrencyException exception)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Upload session stage conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/stage-conflict");
         }
         catch (Exception exception) when (exception is InvalidDataException
                                            or InvalidOperationException
