@@ -271,6 +271,14 @@ def materialize(
         "skipped_no_local_store",
     }:
         raise ValueError("cutover boundary import disposition is missing or invalid")
+    if (
+        phase == "public_acceptance_completed"
+        and import_disposition != "skipped_no_local_store"
+    ):
+        raise ValueError(
+            "isolated v2 Data Protection acceptance requires the explicit "
+            "no-local-store import checkpoint"
+        )
     accepted = phase == "public_acceptance_completed"
     payload: dict[str, Any] = {
         "contractName": CONTRACT_NAME,
@@ -294,6 +302,9 @@ def materialize(
         "importSkippedNoLocalStore": import_disposition == "skipped_no_local_store",
         "localStorePresentAtCutover": (
             None if import_disposition is None else import_disposition == "completed"
+        ),
+        "dataProtectionKeyRingPosture": (
+            "isolated_v2_requires_no_legacy_import"
         ),
         "validateCompleted": phase_index >= PHASE_SEQUENCE["validate_completed"],
         "publicAcceptanceCompleted": accepted,

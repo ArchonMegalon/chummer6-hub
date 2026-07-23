@@ -102,6 +102,13 @@ custody as separately protected assets. A database restore behind the local prot
 failed closed; restore the matching/newer PITR point or follow a governed recovery procedure. Never
 delete the floor or promote the local mirror to make readiness green.
 
+The flagship certificate cutover is a non-destructive path rotation. The candidate portal and
+import job use `/app/state/data-protection-keys-v2`, while the exact incumbent retains
+`/app/state/data-protection-keys` for rollback. Do not copy, rewrite, or delete the legacy XML during
+the release. Follow
+[`DATA_PROTECTION_KEY_RING_ROTATION.md`](DATA_PROTECTION_KEY_RING_ROTATION.md) for the consumer,
+readiness, rollback, and post-stability maintenance boundaries.
+
 For an existing `chummer-run-api-state` volume created by an older root-running image, migrate its
 ownership only while the portal is stopped, then verify it as the runtime identity:
 

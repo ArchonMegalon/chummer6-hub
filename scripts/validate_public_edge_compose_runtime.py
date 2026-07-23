@@ -55,6 +55,7 @@ EXPECTED_FINAL_GOLD_SOURCE = (
 )
 EXPECTED_PORTAL_ENVIRONMENT = {
     "AllowedHosts": "chummer.run",
+    "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys-v2",
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
@@ -965,7 +966,9 @@ def validate_runtime(
         importer.get("environment"),
         expected={
             "ASPNETCORE_ENVIRONMENT": "Production",
-            "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys",
+            "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
+                "/app/state/data-protection-keys-v2"
+            ),
             "CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH": (
                 "/run/chummer-secrets/data-protection-key-encryption.pfx"
             ),

@@ -43,6 +43,18 @@ The read-only data-protection certificate, certificate-password file, and Instal
 
 The guarded deploy wrapper runs the strict public-edge source preflight and closed Compose runtime attestation before `buildx` can retag the local image. The latter makes the required PKCS#12, password-file, PostgreSQL credential, runtime-role, and release-shelf posture inputs fail before any build or portal quiesce. The operation selects exactly one posture: ordinary deploy uses `true/false`, the explicit first-shelf cutover uses `false/true`, and recovery-only reconciliation uses `false/false`; every other pairing is rejected. After the one-shot initializer, the wrapper starts the blue/green candidate by exact name, waits for its `/api/ready` healthcheck, and then requires `/api/ready/publication`, which additionally proves layout-v1 activation and the configured release-storage free-space admission thresholds. The candidate stays transactional through the full browser-backed postdeploy gate. Any ordinary failure invokes the same idempotent recovery command used after a hard crash; an uncertain recovery exits with status `70` and preserves its journal.
 
+The flagship deploy also uses a non-destructive Data Protection path rotation. Runtime attestation
+pins the portal and InstallLinking import job to `/app/state/data-protection-keys-v2`; the
+initializer creates or revalidates that private directory for the configured non-root identity,
+and the certificate-configured candidate generates or validates its encrypted ring there. On the current flagship
+host, explicitly render `CHUMMER_PORTAL_UID=1000` and `CHUMMER_PORTAL_GID=1000` to match the
+owner-only certificate/password files, legacy state, and downloads bind; the closed runtime
+attestation requires the build, portal, tools, and initializer to agree on that identity. The
+incumbent's
+`/app/state/data-protection-keys` bytes remain untouched for exact-container rollback. See
+[`DATA_PROTECTION_KEY_RING_ROTATION.md`](DATA_PROTECTION_KEY_RING_ROTATION.md). Legacy ring archival
+or deletion is post-stability maintenance, never part of this deploy transaction.
+
 ## Recommended Production Topology
 
 1. The canonical local-production lane is Mode C: stage the complete bundle through the authenticated HTTP upload session, require the `server-journal-v1` writer policy, activate one immutable layout-v1 generation, and verify its committed `current.json` pointer and public truth.
@@ -70,15 +82,21 @@ The database-administration boundary is evidence, not application deployment orc
 1. Establish point-in-time recovery and keep data-protection key custody independent from the
    PostgreSQL backup. Record the approved recovery authority as
    `postgres_pitr_or_governed_recovery`.
-2. Run the governed `prepare` phase, then the non-mutating local-store presence probe. Run
-   `import-local --confirm-empty-authority` only when the remote authority is proven empty and the
-   probe proves a local store exists; otherwise record the explicit skipped-import outcome.
+2. Run the governed `prepare` phase, then the non-mutating local-store presence probe. The flagship
+   isolated-v2 Data Protection cutover requires the probe to prove no local store exists and the
+   boundary to record the `import_skipped_no_local_store` phase. Its accepted receipt must contain
+   `importSkippedNoLocalStore=true` and `localStorePresentAtCutover=false`. If a local store exists,
+   stop: `import-local --confirm-empty-authority` cannot decrypt a legacy snapshot with the new v2
+   ring and is not a supported flagship-release path.
 3. Run `validate` after prepare/import and retain its bounded operator receipt. Preserve the
    append-only phase journal, exact portal/tool image identities, operator container identities, and
    source/release/runtime-proof authority bindings.
 4. Materialize the boundary with
-   `scripts/materialize_install_linking_cutover_boundary.py`. That tool records the governed DBA
-   result; it is not a shell cutover shortcut and does not authorize direct Compose mutation.
+   `scripts/materialize_install_linking_cutover_boundary.py`. Public acceptance fails closed unless
+   the explicit no-local-store checkpoint is present and records
+   `dataProtectionKeyRingPosture=isolated_v2_requires_no_legacy_import`. The tool records the
+   governed DBA result; it is not a shell cutover shortcut and does not authorize direct Compose
+   mutation.
 5. Do not begin the application deployment until the boundary receipt is complete and independently
    reviewed. A failed prepare, import, or validation is recovered through PostgreSQL PITR or the
    governed recovery authority, never by replaying an ambiguous application cutover.
