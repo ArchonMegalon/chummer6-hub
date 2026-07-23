@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from typing import Any
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER_PATH = ROOT / "scripts" / "deploy_public_download_only_cutover.py"
@@ -127,3 +129,64 @@ def test_wrapper_operation_identity_is_not_source_head_only() -> None:
     assert "PUBLIC_DOWNLOAD_OPERATION_ID" in script
     assert "PUBLIC_DOWNLOAD_OPERATION_ID" in operation_root_lines[0]
     assert "${EXPECTED_HEAD,,}" not in operation_root_lines[0]
+
+
+@pytest.mark.parametrize(
+    "api_base",
+    (
+        "https://attacker.example/client/v4",
+        "http://api.cloudflare.com/client/v4",
+        "https://api.cloudflare.com/client/v4/",
+        "https://api.cloudflare.com/client/v4/extra",
+        "https://api.cloudflare.com/client/v4?redirect=attacker.example",
+    ),
+)
+def test_cloudflare_api_base_is_exact_before_any_credential_read(
+    api_base: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credential_touched = False
+
+    def reject_credential_read(*_args: Any, **_kwargs: Any) -> bytes:
+        nonlocal credential_touched
+        credential_touched = True
+        raise AssertionError("credential material was touched")
+
+    monkeypatch.setattr(
+        controller,
+        "stable_regular_bytes",
+        reject_credential_read,
+    )
+    config = SimpleNamespace(
+        operation=controller.CUTOVER_OPERATION,
+        source_head="a" * 40,
+        shared_lock_token="b" * 64,
+        project_name="chummer-public-download-api-test",
+        base_url="https://chummer.run",
+        cloudflare_account_id="c" * 32,
+        cloudflare_tunnel_id="d" * 8 + "-dddd-dddd-dddd-" + "d" * 12,
+        cloudflare_api_base=api_base,
+        ready_timeout_seconds=0,
+    )
+
+    with pytest.raises(controller.CutoverError, match="Cloudflare API base"):
+        controller._validate_sidecar_config(config)
+
+    assert credential_touched is False
+
+
+def test_exact_official_cloudflare_api_base_passes_the_api_boundary() -> None:
+    config = SimpleNamespace(
+        operation=controller.CUTOVER_OPERATION,
+        source_head="a" * 40,
+        shared_lock_token="b" * 64,
+        project_name="chummer-public-download-api-test",
+        base_url="https://chummer.run",
+        cloudflare_account_id="c" * 32,
+        cloudflare_tunnel_id="d" * 8 + "-dddd-dddd-dddd-" + "d" * 12,
+        cloudflare_api_base="https://api.cloudflare.com/client/v4",
+        ready_timeout_seconds=0,
+    )
+
+    with pytest.raises(controller.CutoverError, match="readiness timeout"):
+        controller._validate_sidecar_config(config)
