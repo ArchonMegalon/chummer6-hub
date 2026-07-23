@@ -18,6 +18,201 @@ public sealed class ReleaseBundlePromotionServiceTests
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
+    public void ProfileRegistryArtifactProjectionAcceptsExactRetainedCompatibilityRows()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+
+        ReleaseBundlePromotionService.ValidateRegistryArtifactProjection(
+            compatibility,
+            canonical);
+    }
+
+    [Fact]
+    public void ProfilePayloadSidecarRequiresExactDownloadAcquisitionMode()
+    {
+        const string installer = "chummer-avalonia-win-x64-installer.exe";
+        const string payload = "chummer-avalonia-win-x64-payload.zip";
+        const string url =
+            "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip";
+        const string digest =
+            "620820fd6ce4c5a9370d81f0794d426b8bd1a8decd1f28ff1497b431718188ae";
+        const long size = 51231797;
+        const string version = "run-20260722-165800";
+        byte[] exact = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            contractName = "chummer6-ui.windows_bootstrap_payload",
+            downloadUrl = url,
+            fileName = payload,
+            installerFileName = installer,
+            payloadAcquisitionMode = "download",
+            releaseVersion = version,
+            sha256 = digest,
+            sizeBytes = size
+        });
+
+        Assert.True(PayloadSidecarContractValidator.TryValidate(
+            exact,
+            installer,
+            payload,
+            url,
+            digest,
+            size,
+            version,
+            allowMutableIncomingUrl: true,
+            requirePayloadAcquisitionMode: true,
+            out string? failure), failure);
+        Assert.False(PayloadSidecarContractValidator.TryValidate(
+            exact,
+            installer,
+            payload,
+            url,
+            digest,
+            size,
+            version,
+            allowMutableIncomingUrl: true,
+            out _));
+    }
+
+    [Fact]
+    public void ProfilePreparedShelfOmitsUnboundAurCatalogAndFiles()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        PublicReleaseManifestDto manifest = compatibility.Deserialize<PublicReleaseManifestDto>(
+                TestJsonOptions)
+            ?? throw new InvalidDataException(
+                "unsigned fresh-delta compatibility fixture is invalid");
+        string testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "unsigned-profile-aur-policy-tests",
+            Guid.NewGuid().ToString("N"));
+        string filesRoot = Path.Combine(testRoot, "incoming", "files");
+        string stagedRoot = Path.Combine(testRoot, "staged");
+        Directory.CreateDirectory(filesRoot);
+        try
+        {
+            foreach (PublicReleaseArtifactDto artifact in manifest.Downloads)
+            {
+                string fileName = artifact.FileName
+                    ?? throw new InvalidDataException(
+                        "unsigned fresh-delta artifact fileName is missing");
+                File.WriteAllBytes(
+                    Path.Combine(filesRoot, fileName),
+                    "profile-artifact-placeholder"u8.ToArray());
+                if (string.IsNullOrWhiteSpace(artifact.PayloadFileName))
+                {
+                    continue;
+                }
+                string payloadFileName = artifact.PayloadFileName;
+                File.WriteAllBytes(
+                    Path.Combine(filesRoot, payloadFileName),
+                    "profile-payload-placeholder"u8.ToArray());
+                File.WriteAllBytes(
+                    Path.Combine(filesRoot, payloadFileName + ".json"),
+                    JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        contractName = "chummer6-ui.windows_bootstrap_payload",
+                        downloadUrl =
+                            "https://chummer.run/downloads/files/"
+                            + payloadFileName,
+                        fileName = payloadFileName,
+                        installerFileName = fileName,
+                        payloadAcquisitionMode = "download",
+                        releaseVersion = manifest.Version,
+                        sha256 = artifact.PayloadSha256,
+                        sizeBytes = artifact.PayloadSizeBytes
+                    }));
+            }
+
+            string[] aurFiles =
+            [
+                "chummer6-bin-aur-source.tar.gz",
+                "chummer6-bin.PKGBUILD",
+                "chummer6-bin.SRCINFO"
+            ];
+            foreach (string fileName in aurFiles)
+            {
+                File.WriteAllBytes(
+                    Path.Combine(filesRoot, fileName),
+                    "authority-bound-but-unpublishable-aur-input"u8.ToArray());
+            }
+            string aurPackagesPath = Path.Combine(testRoot, "incoming", "aur-packages.json");
+            File.WriteAllText(aurPackagesPath, "{\"packages\":[]}");
+
+            ReleaseBundlePromotionService.PrepareStagedShelf(
+                stagedRoot,
+                fixture.CaptureActiveShelf(),
+                filesRoot,
+                startupSmokeRoot: null,
+                signingRoot: null,
+                proofRoot: null,
+                releaseEvidenceRoot: null,
+                aurPackagesPath,
+                new HashSet<string>(aurFiles, StringComparer.Ordinal),
+                manifest,
+                compatibility,
+                canonical,
+                "gen-unsigned-windows-profile-aur-policy",
+                CancellationToken.None);
+
+            Assert.False(File.Exists(Path.Combine(stagedRoot, "aur-packages.json")));
+            foreach (string fileName in aurFiles)
+            {
+                Assert.False(File.Exists(Path.Combine(stagedRoot, "files", fileName)));
+            }
+
+            IConfiguration stagedConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = stagedRoot
+                })
+                .Build();
+            ReleaseShelfSnapshot stagedSnapshot =
+                new ReleaseShelfGenerationStore(stagedConfiguration).Capture();
+            var catalog = new AurPackageCatalogService(stagedConfiguration);
+            Assert.Empty(catalog.LoadCatalog(stagedSnapshot).Packages);
+            foreach (string fileName in aurFiles)
+            {
+                Assert.Null(catalog.FindByFileName(stagedSnapshot, fileName));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    private static (JsonObject Canonical, JsonObject Compatibility)
+        LoadUnsignedWindowsFreshDeltaManifestPair()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_windows_fresh_delta_manifest_pair.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        JsonObject pair = JsonNode.Parse(output.ToArray())?.AsObject()
+            ?? throw new InvalidDataException(
+                "unsigned fresh-delta manifest-pair fixture is invalid");
+        return (
+            pair["canonical"]?.AsObject()
+                ?? throw new InvalidDataException(
+                    "unsigned fresh-delta canonical fixture is invalid"),
+            pair["compatibility"]?.AsObject()
+                ?? throw new InvalidDataException(
+                    "unsigned fresh-delta compatibility fixture is invalid"));
+    }
+
+    [Fact]
     public void IncomingGenerationIdentityUsesExactSharedCandidateDeclaration()
     {
         var canonical = new JsonObject { ["generationId"] = "gen-run-20260720-abcdef0123456789" };

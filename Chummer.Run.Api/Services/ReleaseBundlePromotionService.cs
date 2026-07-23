@@ -158,6 +158,8 @@ public sealed class ReleaseBundlePromotionService
     private const string WriterPolicyMode = "server-journal-v1";
     private const string InitialMigrationAllowedKey = "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED";
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
+    private const string UnsignedWindowsFreshDeltaProjectionProfile =
+        "v3_unsigned_windows_fresh_delta";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
     private static readonly TimeSpan MaximumReleaseProofPublicationLag = TimeSpan.FromHours(24);
     private static readonly TimeSpan MaximumReleaseProofPublicationClockSkew = TimeSpan.FromMinutes(5);
@@ -1401,6 +1403,7 @@ public sealed class ReleaseBundlePromotionService
                 prepared.ProofRoot,
                 prepared.ReleaseEvidenceRoot,
                 prepared.AurPackagesPath,
+                prepared.ProfileAncillaryFiles,
                 prepared.CompatibilityManifest,
                 prepared.CompatibilityManifestObject,
                 prepared.CanonicalManifest,
@@ -1628,6 +1631,7 @@ public sealed class ReleaseBundlePromotionService
                 proofRoot,
                 releaseEvidenceRoot,
                 aurPackagesPath,
+                prepared.ProfileAncillaryFiles,
                 incomingCompatibilityManifest,
                 incomingCompatibilityManifestObject,
                 incomingCanonicalManifest,
@@ -1855,11 +1859,22 @@ public sealed class ReleaseBundlePromotionService
         JsonObject incomingCanonicalManifest = LoadJsonObject(
             incomingCanonicalBytes,
             canonicalManifestPath);
+        bool hasUnsignedWindowsFreshDeltaProfile =
+            HasExactUnsignedWindowsFreshDeltaProfile(
+                incomingCompatibilityManifestObject,
+                incomingCanonicalManifest);
+        if (hasUnsignedWindowsFreshDeltaProfile && !exactIncomingDesktopScopeIsFreshDelta)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows projectionProfile requires authenticated fresh-delta admission.");
+        }
+        bool unsignedWindowsFreshDeltaProfile = hasUnsignedWindowsFreshDeltaProfile;
         ValidateIncomingManifestIdentity(
             incomingCompatibilityManifestObject,
             incomingCompatibilityManifest,
             incomingCanonicalManifest,
-            allowReviewRequiredProof: true);
+            allowReviewRequiredProof: true,
+            allowExactUnsignedWindowsFreshDeltaProof: unsignedWindowsFreshDeltaProfile);
         ValidatePassedReleaseProofPublicationWindow(incomingCompatibilityManifest);
 
         IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
@@ -1875,14 +1890,22 @@ public sealed class ReleaseBundlePromotionService
             incomingCanonicalManifest,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta);
+        IReadOnlySet<string> profileAncillaryFiles = unsignedWindowsFreshDeltaProfile
+            ? ValidateAndCollectProfileAurFiles(aurPackagesPath, filesRoot)
+            : new HashSet<string>(StringComparer.Ordinal);
         ValidateIncomingBundle(
             incomingCompatibilityManifest,
             incomingCanonicalArtifacts,
             filesRoot,
             startupSmokeRoot,
             promotionEvidencePath,
-            _timeProvider.GetUtcNow());
-        ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
+            _timeProvider.GetUtcNow(),
+            unsignedWindowsFreshDeltaProfile,
+            profileAncillaryFiles);
+        if (!unsignedWindowsFreshDeltaProfile)
+        {
+            ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
+        }
 
         IReadOnlyList<string> promotedArtifactIds = incomingCompatibilityManifest.Downloads
             .Select(static artifact => artifact.Id)
@@ -1899,7 +1922,9 @@ public sealed class ReleaseBundlePromotionService
             proofRoot,
             releaseEvidenceRoot,
             aurPackagesPath,
-            promotedArtifactIds);
+            promotedArtifactIds,
+            unsignedWindowsFreshDeltaProfile,
+            profileAncillaryFiles);
     }
 
     private sealed record PreparedReleaseBundle(
@@ -1912,7 +1937,9 @@ public sealed class ReleaseBundlePromotionService
         string? ProofRoot,
         string? ReleaseEvidenceRoot,
         string? AurPackagesPath,
-        IReadOnlyList<string> PromotedArtifactIds);
+        IReadOnlyList<string> PromotedArtifactIds,
+        bool UnsignedWindowsFreshDeltaProfile,
+        IReadOnlySet<string> ProfileAncillaryFiles);
 
     private string ResolveDownloadsRoot()
         => _configuration[DownloadsRootKey]?.Trim() is { Length: > 0 } configured
@@ -1983,7 +2010,7 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private static void PrepareStagedShelf(
+    internal static void PrepareStagedShelf(
         string stagedRoot,
         ReleaseShelfSnapshot activeShelf,
         string filesRoot,
@@ -1992,6 +2019,7 @@ public sealed class ReleaseBundlePromotionService
         string? proofRoot,
         string? releaseEvidenceRoot,
         string? aurPackagesPath,
+        IReadOnlySet<string> profileAncillaryFiles,
         PublicReleaseManifestDto compatibilityManifest,
         JsonObject compatibilityManifestObject,
         JsonObject canonicalManifest,
@@ -2008,10 +2036,28 @@ public sealed class ReleaseBundlePromotionService
         Directory.CreateDirectory(stagedSigningRoot);
         Directory.CreateDirectory(stagedProofRoot);
 
+        bool unsignedWindowsFreshDeltaProfile = string.Equals(
+            GetJsonString(canonicalManifest["projectionProfile"]),
+            UnsignedWindowsFreshDeltaProjectionProfile,
+            StringComparison.Ordinal);
+        // This bounded profile does not carry the AUR package's upstream Linux
+        // artifact. Omit the catalog and its metadata files instead of exposing
+        // a catalog entry that generation-bound delivery must reject.
+        IReadOnlySet<string> publishedAncillaryFiles =
+            unsignedWindowsFreshDeltaProfile
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : profileAncillaryFiles;
+
         CopyDirectoryContents(filesRoot, stagedFilesRoot, cancellationToken);
         RejectCaseCollidingPaths(stagedFilesRoot, "release artifact shelf");
-        PruneUnreferencedArtifactFiles(stagedFilesRoot, compatibilityManifest);
-        ValidateFilesAreManifestBound(stagedFilesRoot, compatibilityManifest);
+        PruneUnreferencedArtifactFiles(
+            stagedFilesRoot,
+            compatibilityManifest,
+            publishedAncillaryFiles);
+        ValidateFilesAreManifestBound(
+            stagedFilesRoot,
+            compatibilityManifest,
+            publishedAncillaryFiles);
 
         if (!string.IsNullOrWhiteSpace(startupSmokeRoot) && Directory.Exists(startupSmokeRoot))
         {
@@ -2040,19 +2086,23 @@ public sealed class ReleaseBundlePromotionService
 
         string activeAurPackagesPath = Path.Combine(activeShelfRoot, "aur-packages.json");
         string stagedAurPackagesPath = Path.Combine(stagedRoot, "aur-packages.json");
-        if (!string.IsNullOrWhiteSpace(aurPackagesPath) && File.Exists(aurPackagesPath))
+        if (!unsignedWindowsFreshDeltaProfile)
         {
-            File.Copy(aurPackagesPath, stagedAurPackagesPath);
-        }
-        else if (File.Exists(activeAurPackagesPath))
-        {
-            File.Copy(activeAurPackagesPath, stagedAurPackagesPath);
+            if (!string.IsNullOrWhiteSpace(aurPackagesPath) && File.Exists(aurPackagesPath))
+            {
+                File.Copy(aurPackagesPath, stagedAurPackagesPath);
+            }
+            else if (File.Exists(activeAurPackagesPath))
+            {
+                File.Copy(activeAurPackagesPath, stagedAurPackagesPath);
+            }
         }
 
         RewritePayloadSidecarsForGeneration(
             stagedFilesRoot,
             compatibilityManifest,
-            generationId);
+            generationId,
+            unsignedWindowsFreshDeltaProfile);
 
         byte[] projectedCompatibilityBytes = ProjectRegistryManifestForGeneration(
             compatibilityManifestObject,
@@ -2077,7 +2127,8 @@ public sealed class ReleaseBundlePromotionService
     private static void RewritePayloadSidecarsForGeneration(
         string filesRoot,
         PublicReleaseManifestDto compatibilityManifest,
-        string generationId)
+        string generationId,
+        bool unsignedWindowsFreshDeltaProfile)
     {
         foreach (PublicReleaseArtifactDto artifact in compatibilityManifest.Downloads)
         {
@@ -2130,6 +2181,7 @@ public sealed class ReleaseBundlePromotionService
                     payloadSizeBytes,
                     compatibilityManifest.Version,
                     allowMutableIncomingUrl: true,
+                    requirePayloadAcquisitionMode: unsignedWindowsFreshDeltaProfile,
                     out string? failure))
             {
                 throw new InvalidDataException(
@@ -2158,8 +2210,14 @@ public sealed class ReleaseBundlePromotionService
     {
         string compatibilityPath = Path.Combine(stagedRoot, CompatibilityManifestName);
         PublicReleaseManifestDto manifest = LoadCompatibilityManifest(compatibilityPath);
-        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts = LoadCanonicalArtifacts(
-            LoadJsonObject(Path.Combine(stagedRoot, CanonicalManifestName)));
+        JsonObject canonicalManifest = LoadJsonObject(
+            Path.Combine(stagedRoot, CanonicalManifestName));
+        bool unsignedWindowsFreshDeltaProfile = string.Equals(
+            GetJsonString(canonicalManifest["projectionProfile"]),
+            UnsignedWindowsFreshDeltaProjectionProfile,
+            StringComparison.Ordinal);
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts =
+            LoadCanonicalArtifacts(canonicalManifest);
         Dictionary<string, PublicReleaseArtifactDto> compatibilityById =
             BuildUniqueCompatibilityArtifacts(manifest.Downloads);
         Dictionary<string, CanonicalArtifactRecord> canonicalById =
@@ -2178,7 +2236,10 @@ public sealed class ReleaseBundlePromotionService
                 requireIncomingUrls: false);
             NormalizedArtifactContract compatibilityContract = NormalizeCompatibilityArtifactContract(
                 compatibilityById[artifactId],
-                requireIncomingUrls: false);
+                requireIncomingUrls: false,
+                retainedProfileCanonical: unsignedWindowsFreshDeltaProfile
+                    ? canonicalArtifact
+                    : null);
             if (canonicalContract != compatibilityContract)
             {
                 throw new InvalidDataException(
@@ -2240,15 +2301,19 @@ public sealed class ReleaseBundlePromotionService
                 payloadSha256,
                 payloadSizeBytes,
                 manifest.Version,
-                allowMutableIncomingUrl: false);
+                allowMutableIncomingUrl: false,
+                requirePayloadAcquisitionMode: false);
         }
     }
 
     private static void PruneUnreferencedArtifactFiles(
         string filesRoot,
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlySet<string>? additionalBoundPaths = null)
     {
-        HashSet<string> retained = BuildManifestBoundArtifactPaths(compatibilityManifest);
+        HashSet<string> retained = BuildManifestBoundArtifactPaths(
+            compatibilityManifest,
+            additionalBoundPaths);
         foreach (string path in EnumerateRegularFilesWithoutLinks(filesRoot).ToArray())
         {
             string relativePath = Path.GetRelativePath(filesRoot, path)
@@ -2271,10 +2336,13 @@ public sealed class ReleaseBundlePromotionService
 
     private static void ValidateFilesAreManifestBound(
         string filesRoot,
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlySet<string>? additionalBoundPaths = null)
     {
         RejectCaseCollidingPaths(filesRoot, "release bundle files");
-        HashSet<string> retained = BuildManifestBoundArtifactPaths(compatibilityManifest);
+        HashSet<string> retained = BuildManifestBoundArtifactPaths(
+            compatibilityManifest,
+            additionalBoundPaths);
         foreach (string path in EnumerateRegularFilesWithoutLinks(filesRoot))
         {
             string relativePath = Path.GetRelativePath(filesRoot, path)
@@ -2288,7 +2356,8 @@ public sealed class ReleaseBundlePromotionService
     }
 
     private static HashSet<string> BuildManifestBoundArtifactPaths(
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlySet<string>? additionalBoundPaths = null)
     {
         var retained = new HashSet<string>(StringComparer.Ordinal);
         foreach (PublicReleaseArtifactDto artifact in compatibilityManifest.Downloads)
@@ -2304,6 +2373,94 @@ public sealed class ReleaseBundlePromotionService
             retained.Add(payloadFileName + ".json");
         }
 
+        if (additionalBoundPaths is not null)
+        {
+            foreach (string path in additionalBoundPaths)
+            {
+                retained.Add(path);
+            }
+        }
+
+        return retained;
+    }
+
+    private static IReadOnlySet<string> ValidateAndCollectProfileAurFiles(
+        string? aurPackagesPath,
+        string filesRoot)
+    {
+        if (string.IsNullOrWhiteSpace(aurPackagesPath) || !File.Exists(aurPackagesPath))
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows profile is missing authority-bound aur-packages.json.");
+        }
+        EnsureRegularFile(aurPackagesPath, "v3 unsigned Windows aur-packages.json");
+        JsonObject root = LoadStrictJsonObject(aurPackagesPath);
+        if (!string.Equals(
+                GetJsonString(root["contractName"]),
+                "chummer.downloads.aur_packages.v1",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                GetJsonString(root["contract_name"]),
+                "chummer.downloads.aur_packages.v1",
+                StringComparison.Ordinal)
+            || root["packages"] is not JsonArray packages
+            || packages.Count != 1
+            || packages[0] is not JsonObject package)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows aur-packages.json contract drifted.");
+        }
+
+        var retained = new HashSet<string>(StringComparer.Ordinal);
+        foreach ((string nameField, string digestField, string urlField, string expectedName) in new[]
+                 {
+                     (
+                         "sourceArchiveFileName",
+                         "sourceArchiveSha256",
+                         "sourceArchiveUrl",
+                         "chummer6-bin-aur-source.tar.gz"),
+                     (
+                         "pkgbuildFileName",
+                         "pkgbuildSha256",
+                         "pkgbuildUrl",
+                         "chummer6-bin.PKGBUILD"),
+                     (
+                         "srcinfoFileName",
+                         "srcinfoSha256",
+                         "srcinfoUrl",
+                         "chummer6-bin.SRCINFO")
+                 })
+        {
+            string fileName = RequirePortableArtifactFileName(
+                GetJsonString(package[nameField]),
+                "chummer6-bin",
+                $"AUR {nameField}");
+            string digest = RequireArtifactSha256(
+                GetJsonString(package[digestField]),
+                "chummer6-bin",
+                $"AUR {digestField}");
+            if (!string.Equals(fileName, expectedName, StringComparison.Ordinal)
+                || !string.Equals(
+                    GetJsonString(package[urlField]),
+                    $"https://chummer.run/downloads/files/{expectedName}",
+                    StringComparison.Ordinal)
+                || !retained.Add(fileName))
+            {
+                throw new InvalidDataException(
+                    "v3 unsigned Windows AUR file identity or route drifted.");
+            }
+            string path = Path.Combine(filesRoot, fileName);
+            EnsureRegularFile(path, $"v3 unsigned Windows retained AUR file {fileName}");
+            var info = new FileInfo(path);
+            if (info.Length <= 0
+                || !FixedTimeDigestEquals(Sha256For(path), digest)
+                || nameField == "sourceArchiveFileName"
+                && info.Length != GetJsonInt64(package["sourceArchiveSizeBytes"]))
+            {
+                throw new InvalidDataException(
+                    $"v3 unsigned Windows retained AUR bytes drifted for {fileName}.");
+            }
+        }
         return retained;
     }
 
@@ -5553,7 +5710,8 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto compatibilityManifest,
         JsonObject canonicalManifest,
         bool allowReviewRequiredProof = false,
-        bool releaseProofAlreadyValidatedBeforeGenerationBinding = false)
+        bool releaseProofAlreadyValidatedBeforeGenerationBinding = false,
+        bool allowExactUnsignedWindowsFreshDeltaProof = false)
     {
         string compatibilityVersion = (GetJsonString(compatibilityObject["version"]) ?? string.Empty).Trim();
         string canonicalVersion = (GetJsonString(canonicalManifest["version"]) ?? string.Empty).Trim();
@@ -5623,6 +5781,11 @@ public sealed class ReleaseBundlePromotionService
             && string.Equals(canonicalProofStatus, "review_required", StringComparison.Ordinal))
         {
             RequireReviewGatedSerializedProof(compatibilityObject, canonicalManifest);
+            if (allowExactUnsignedWindowsFreshDeltaProof)
+            {
+                ValidateExactUnsignedWindowsFreshDeltaProof(canonicalProof);
+                return;
+            }
             proofForTrust = canonicalProof.DeepClone().AsObject();
             proofForTrust["status"] = "passed";
         }
@@ -5636,6 +5799,66 @@ public sealed class ReleaseBundlePromotionService
         if (!proofTrust.IsValid)
         {
             throw new InvalidDataException($"bundle releaseProof is not Registry-compatible: {proofTrust.Reason}.");
+        }
+    }
+
+    private static bool HasExactUnsignedWindowsFreshDeltaProfile(
+        JsonObject compatibilityManifest,
+        JsonObject canonicalManifest)
+    {
+        string compatibilityProfile =
+            GetJsonString(compatibilityManifest["projectionProfile"])?.Trim()
+            ?? string.Empty;
+        string canonicalProfile =
+            GetJsonString(canonicalManifest["projectionProfile"])?.Trim()
+            ?? string.Empty;
+        if (compatibilityProfile.Length == 0 && canonicalProfile.Length == 0)
+        {
+            return false;
+        }
+        if (!string.Equals(
+                compatibilityProfile,
+                UnsignedWindowsFreshDeltaProjectionProfile,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                canonicalProfile,
+                UnsignedWindowsFreshDeltaProjectionProfile,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "bundle manifests publish a mismatched or unsupported projectionProfile.");
+        }
+        return true;
+    }
+
+    private static void ValidateExactUnsignedWindowsFreshDeltaProof(JsonObject proof)
+    {
+        string[] exactKeys =
+        [
+            "baseUrl",
+            "generatedAt",
+            "journeysPassed",
+            "proofRoutes",
+            "status"
+        ];
+        if (proof.Count != exactKeys.Length
+            || exactKeys.Any(key => !proof.ContainsKey(key))
+            || !string.Equals(
+                GetJsonString(proof["baseUrl"]),
+                "https://chummer.run",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                GetJsonString(proof["status"]),
+                "review_required",
+                StringComparison.Ordinal)
+            || proof["journeysPassed"] is not JsonArray journeys
+            || journeys.Count != 0
+            || proof["proofRoutes"] is not JsonArray routes
+            || routes.Count != 0
+            || TryGetJsonDateTimeOffset(proof["generatedAt"]) is null)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows releaseProof must remain the exact minimal review-required document.");
         }
     }
 
@@ -5899,7 +6122,7 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private static void ValidateRegistryArtifactProjection(JsonObject compatibility, JsonObject canonical)
+    internal static void ValidateRegistryArtifactProjection(JsonObject compatibility, JsonObject canonical)
     {
         if (compatibility["downloads"] is not JsonArray downloads
             || canonical["artifacts"] is not JsonArray artifacts)
@@ -5922,12 +6145,47 @@ public sealed class ReleaseBundlePromotionService
                 "Registry canonical and compatibility manifests expose different artifact ids.");
         }
 
+        bool unsignedWindowsFreshDeltaProfile = string.Equals(
+            GetJsonString(canonical["projectionProfile"]),
+            UnsignedWindowsFreshDeltaProjectionProfile,
+            StringComparison.Ordinal);
         foreach ((string artifactId, JsonObject canonicalArtifact) in canonicalById)
         {
             JsonObject compatibilityArtifact = compatibilityById[artifactId];
             RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "head", artifactId);
-            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "platform", artifactId);
-            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "rid", artifactId);
+            string canonicalPlatform = NormalizePlatform(
+                GetJsonString(canonicalArtifact["platform"]));
+            if (unsignedWindowsFreshDeltaProfile
+                && string.Equals(canonicalPlatform, "macos", StringComparison.Ordinal))
+            {
+                RequireArtifactAliasFieldEqual(
+                    canonicalArtifact,
+                    compatibilityArtifact,
+                    "platformLabel",
+                    "platform",
+                    artifactId,
+                    normalize: false);
+                string arch = NormalizeToken(GetJsonString(canonicalArtifact["arch"]));
+                if (!string.Equals(
+                        NormalizeToken(GetJsonString(compatibilityArtifact["platformId"])),
+                        $"macos-{arch}",
+                        StringComparison.Ordinal)
+                    || !string.Equals(
+                        NormalizeToken(GetJsonString(canonicalArtifact["rid"])),
+                        $"osx-{arch}",
+                        StringComparison.Ordinal)
+                    || !string.IsNullOrWhiteSpace(
+                        GetJsonString(compatibilityArtifact["rid"])))
+                {
+                    throw new InvalidDataException(
+                        $"Registry retained compatibility artifact {artifactId} macOS identity drifted.");
+                }
+            }
+            else
+            {
+                RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "platform", artifactId);
+                RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "rid", artifactId);
+            }
             RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "arch", artifactId);
             RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "kind", artifactId);
             RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "fileName", artifactId, normalize: false);
@@ -6029,6 +6287,18 @@ public sealed class ReleaseBundlePromotionService
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
         bool exactIncomingDesktopScopeIsFreshDelta)
     {
+        if (exactIncomingDesktopScopeIsFreshDelta
+            && string.Equals(
+                GetJsonString(canonical["projectionProfile"]),
+                UnsignedWindowsFreshDeltaProjectionProfile,
+                StringComparison.Ordinal))
+        {
+            ValidateUnsignedWindowsFreshDeltaPlatformFloor(
+                canonical,
+                canonicalArtifacts,
+                exactIncomingDesktopScope);
+            return;
+        }
         ReleaseDesktopTupleScope? completeShelfScope =
             exactIncomingDesktopScopeIsFreshDelta ? null : exactIncomingDesktopScope;
         IReadOnlyList<string> requiredDesktopPlatforms =
@@ -6169,6 +6439,150 @@ public sealed class ReleaseBundlePromotionService
         }
 
         ValidateCanonicalPostureFloors(canonical, expectedComplete);
+    }
+
+    private static void ValidateUnsignedWindowsFreshDeltaPlatformFloor(
+        JsonObject canonical,
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope)
+    {
+        if (exactIncomingDesktopScope is null
+            || !exactIncomingDesktopScope.TupleIds.SequenceEqual(
+                ["avalonia:windows:win-x64"],
+                StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows projection requires the authenticated exact fresh tuple.");
+        }
+        JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopPlatforms",
+            ["macos", "windows"],
+            "v3 unsigned Windows platform floor");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopHeads",
+            ["avalonia"],
+            "v3 unsigned Windows head floor");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopPlatformHeadRidTuples",
+            ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"],
+            "v3 unsigned Windows tuple floor");
+        RequireExactStringArray(
+            coverage,
+            "missingRequiredPlatforms",
+            ["windows"],
+            "v3 unsigned Windows missing platforms");
+        RequireExactStringArray(
+            coverage,
+            "missingRequiredHeads",
+            [],
+            "v3 unsigned Windows missing heads");
+        RequireExactStringArray(
+            coverage,
+            "missingRequiredPlatformHeadPairs",
+            ["avalonia:windows"],
+            "v3 unsigned Windows missing platform/head pairs");
+        RequireExactStringArray(
+            coverage,
+            "missingRequiredPlatformHeadRidTuples",
+            ["avalonia:win-x64:windows"],
+            "v3 unsigned Windows missing tuples");
+        RequireExactStringArray(
+            coverage,
+            "promotedPlatformHeadRidTuples",
+            ["avalonia:osx-arm64:macos", "blazor-desktop:osx-arm64:macos"],
+            "v3 unsigned Windows retained promoted tuples");
+        if (!TryGetJsonBoolean(coverage["complete"], out bool complete)
+            || complete
+            || !TryGetJsonBoolean(coverage["routeAuthority"], out bool routeAuthority)
+            || routeAuthority)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows desktop coverage must remain incomplete and unauthorized.");
+        }
+
+        string[] reportedPromoted = ReadObjectStringArray(
+                coverage,
+                "promotedInstallerTuples",
+                "tupleId")
+            .ToArray();
+        if (!reportedPromoted.SequenceEqual(
+                ["avalonia:macos:osx-arm64", "blazor-desktop:macos:osx-arm64"],
+                StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows promoted installer truth drifted.");
+        }
+        if (coverage["desktopRouteTruth"] is not JsonArray routeRows)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows desktop route truth is missing.");
+        }
+        Dictionary<string, JsonObject> routes = routeRows
+            .OfType<JsonObject>()
+            .ToDictionary(
+                row => GetJsonString(row["tupleId"]) ?? string.Empty,
+                StringComparer.Ordinal);
+        if (routes.Count != routeRows.Count
+            || !routes.TryGetValue("avalonia:windows:win-x64", out JsonObject? windows)
+            || !string.Equals(
+                GetJsonString(windows["promotionState"]),
+                "proof_required",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                GetJsonString(windows["installPosture"]),
+                "proof_capture_required",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                GetJsonString(windows["updateEligibility"]),
+                "blocked_missing_proof",
+                StringComparison.Ordinal)
+            || windows["publicInstallRoute"] is not null
+            || !TryGetJsonBoolean(windows["routeAuthority"], out bool windowsAuthority)
+            || windowsAuthority)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows route must remain unpromoted and proof-required.");
+        }
+        foreach (string tupleId in new[]
+                 {
+                     "avalonia:macos:osx-arm64",
+                     "blazor-desktop:macos:osx-arm64"
+                 })
+        {
+            if (!routes.TryGetValue(tupleId, out JsonObject? retained)
+                || !string.Equals(
+                    GetJsonString(retained["promotionState"]),
+                    "promoted",
+                    StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(GetJsonString(retained["publicInstallRoute"]))
+                || !TryGetJsonBoolean(retained["routeAuthority"], out bool retainedAuthority)
+                || retainedAuthority)
+            {
+                throw new InvalidDataException(
+                    "v3 unsigned Windows retained macOS route truth drifted.");
+            }
+        }
+        string[] platforms = canonicalArtifacts
+            .Select(artifact => NormalizePlatform(artifact.Platform))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!platforms.SequenceEqual(["macos", "windows"], StringComparer.Ordinal)
+            || canonicalArtifacts.Count(artifact =>
+                string.Equals(NormalizePlatform(artifact.Platform), "windows", StringComparison.Ordinal)
+                && string.Equals(NormalizeToken(artifact.Head), "avalonia", StringComparison.Ordinal)
+                && string.Equals(NormalizeToken(artifact.Rid), "win-x64", StringComparison.Ordinal)) != 1)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows canonical shelf must be exact macOS plus Windows.");
+        }
+        ValidateCanonicalPostureFloors(canonical, desktopCoverageComplete: false);
     }
 
     private static bool IsPromotedDesktopInstaller(CanonicalArtifactRecord artifact, string platform)
@@ -6377,14 +6791,19 @@ public sealed class ReleaseBundlePromotionService
         string filesRoot,
         string? startupSmokeRoot,
         string? promotionEvidencePath,
-        DateTimeOffset evaluatedAtUtc)
+        DateTimeOffset evaluatedAtUtc,
+        bool unsignedWindowsFreshDeltaProfile,
+        IReadOnlySet<string> profileAncillaryFiles)
     {
         if (compatibilityManifest.Downloads.Count == 0)
         {
             throw new InvalidDataException("bundle contains no downloadable artifacts.");
         }
 
-        ValidateFilesAreManifestBound(filesRoot, compatibilityManifest);
+        ValidateFilesAreManifestBound(
+            filesRoot,
+            compatibilityManifest,
+            profileAncillaryFiles);
 
         Dictionary<string, PublicReleaseArtifactDto> compatibilityById = BuildUniqueCompatibilityArtifacts(
             compatibilityManifest.Downloads);
@@ -6399,14 +6818,32 @@ public sealed class ReleaseBundlePromotionService
         {
             PublicReleaseArtifactDto compatibility = compatibilityById[artifactId];
             NormalizedArtifactContract canonicalContract = NormalizeCanonicalArtifactContract(artifact);
-            NormalizedArtifactContract compatibilityContract = NormalizeCompatibilityArtifactContract(compatibility);
+            NormalizedArtifactContract compatibilityContract =
+                NormalizeCompatibilityArtifactContract(
+                    compatibility,
+                    retainedProfileCanonical: unsignedWindowsFreshDeltaProfile
+                        ? artifact
+                        : null);
             if (canonicalContract != compatibilityContract)
             {
                 throw new InvalidDataException(
                     $"bundle manifests disagree about delivery/security contract for artifact {artifactId}.");
             }
 
-            ValidateArtifactBytes(filesRoot, canonicalContract, compatibilityManifest.Version);
+            ValidateArtifactBytes(
+                filesRoot,
+                canonicalContract,
+                compatibilityManifest.Version,
+                unsignedWindowsFreshDeltaProfile);
+        }
+
+        // This profile carries fresh Windows bytes in a deliberately unpromoted,
+        // proof-required state and retains already-promoted macOS bytes through the
+        // authority-bound incumbent snapshot. Requiring fresh startup/promotion proof
+        // here would contradict both halves of that authenticated delta contract.
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            return;
         }
 
         List<CanonicalArtifactRecord> installerArtifacts = canonicalArtifacts.Where(IsInstallerArtifact).ToList();
@@ -6515,7 +6952,8 @@ public sealed class ReleaseBundlePromotionService
 
     private static NormalizedArtifactContract NormalizeCompatibilityArtifactContract(
         PublicReleaseArtifactDto artifact,
-        bool requireIncomingUrls = true)
+        bool requireIncomingUrls = true,
+        CanonicalArtifactRecord? retainedProfileCanonical = null)
     {
         string artifactId = RequireArtifactToken(artifact.Id, "compatibility artifact id");
         string fileName = RequirePortableArtifactFileName(artifact.FileName, artifactId, "compatibility fileName");
@@ -6527,6 +6965,25 @@ public sealed class ReleaseBundlePromotionService
         string platformId = RequireArtifactToken(artifact.PlatformId, "compatibility platformId");
         string arch = RequireArtifactToken(artifact.Arch, "compatibility arch");
         string normalizedPlatformId = $"{NormalizePlatform(platformId)}-{arch}";
+        bool retainedProfileMac = retainedProfileCanonical is not null
+            && string.Equals(
+                NormalizePlatform(retainedProfileCanonical.Platform),
+                "macos",
+                StringComparison.Ordinal);
+        string platformLabel = retainedProfileMac
+            ? RequireArtifactLabel(
+                artifact.PlatformLabel ?? artifact.Platform,
+                artifactId,
+                "retained compatibility platformLabel")
+            : RequireArtifactLabel(
+                artifact.PlatformLabel,
+                artifactId,
+                "compatibility platformLabel");
+        string rid = retainedProfileMac && string.IsNullOrWhiteSpace(artifact.Rid)
+            ? RequireArtifactToken(
+                retainedProfileCanonical!.Rid,
+                "retained compatibility canonical rid")
+            : RequireArtifactToken(artifact.Rid, "compatibility rid");
         string accessClass = RequireInstallAccessClass(artifact.InstallAccessClass, artifactId);
         (string? payloadFileName, string? payloadUrl, string? payloadSha256, long? payloadSizeBytes) =
             NormalizePayloadContract(
@@ -6545,9 +7002,9 @@ public sealed class ReleaseBundlePromotionService
             sizeBytes,
             RequireArtifactToken(artifact.Head, "compatibility head"),
             normalizedPlatformId,
-            RequireArtifactLabel(artifact.PlatformLabel, artifactId, "compatibility platformLabel"),
+            platformLabel,
             arch,
-            RequireArtifactToken(artifact.Rid, "compatibility rid"),
+            rid,
             RequireArtifactToken(artifact.Kind, "compatibility kind"),
             accessClass,
             NormalizeOptionalToken(artifact.InstallerMode),
@@ -6560,7 +7017,8 @@ public sealed class ReleaseBundlePromotionService
     private static void ValidateArtifactBytes(
         string filesRoot,
         NormalizedArtifactContract artifact,
-        string releaseVersion)
+        string releaseVersion,
+        bool unsignedWindowsFreshDeltaProfile)
     {
         ValidateBoundFileBytes(
             filesRoot,
@@ -6582,7 +7040,8 @@ public sealed class ReleaseBundlePromotionService
                 filesRoot,
                 artifact,
                 releaseVersion,
-                allowMutableIncomingUrl: true);
+                allowMutableIncomingUrl: true,
+                requirePayloadAcquisitionMode: unsignedWindowsFreshDeltaProfile);
         }
     }
 
@@ -6590,7 +7049,8 @@ public sealed class ReleaseBundlePromotionService
         string filesRoot,
         NormalizedArtifactContract artifact,
         string releaseVersion,
-        bool allowMutableIncomingUrl)
+        bool allowMutableIncomingUrl,
+        bool requirePayloadAcquisitionMode)
         => ValidatePayloadSidecar(
             filesRoot,
             artifact.ArtifactId,
@@ -6600,7 +7060,8 @@ public sealed class ReleaseBundlePromotionService
             artifact.PayloadSha256,
             artifact.PayloadSizeBytes,
             releaseVersion,
-            allowMutableIncomingUrl);
+            allowMutableIncomingUrl,
+            requirePayloadAcquisitionMode);
 
     private static void ValidatePayloadSidecar(
         string filesRoot,
@@ -6611,7 +7072,8 @@ public sealed class ReleaseBundlePromotionService
         string? payloadSha256,
         long? payloadSizeBytes,
         string releaseVersion,
-        bool allowMutableIncomingUrl)
+        bool allowMutableIncomingUrl,
+        bool requirePayloadAcquisitionMode)
     {
         string sidecarFileName = payloadFileName + ".json";
         string sidecarPath = Path.Combine(filesRoot, sidecarFileName);
@@ -6639,6 +7101,7 @@ public sealed class ReleaseBundlePromotionService
                 payloadSizeBytes,
                 releaseVersion,
                 allowMutableIncomingUrl,
+                requirePayloadAcquisitionMode,
                 out string? failure))
         {
             throw new InvalidDataException(
@@ -9379,7 +9842,12 @@ public sealed class ReleaseBundlePromotionService
             liveCompatibilityManifest,
             liveCanonicalManifest,
             allowReviewRequiredProof: true,
-            releaseProofAlreadyValidatedBeforeGenerationBinding: true);
+            releaseProofAlreadyValidatedBeforeGenerationBinding: true,
+            allowExactUnsignedWindowsFreshDeltaProof:
+                exactIncomingDesktopScopeIsFreshDelta
+                && HasExactUnsignedWindowsFreshDeltaProfile(
+                    liveCompatibilityManifestObject,
+                    liveCanonicalManifest));
         IReadOnlyList<CanonicalArtifactRecord> liveCanonicalArtifacts = LoadCanonicalArtifacts(liveCanonicalManifest);
         ValidateRegistryAuthoredManifestPair(
             liveCompatibilityManifestObject,

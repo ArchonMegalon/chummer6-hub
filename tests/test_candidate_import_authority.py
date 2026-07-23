@@ -24,6 +24,18 @@ UNSIGNED_V3_AUTHORITY_FIXTURE = (
     / "Fixtures"
     / "unsigned_candidate_import_authority_v3.json.gz.b64"
 )
+UNSIGNED_FRESH_DELTA_MANIFEST_PAIR_FIXTURE = (
+    REPO_ROOT
+    / "Chummer.Tests"
+    / "Fixtures"
+    / "unsigned_windows_fresh_delta_manifest_pair.json.gz.b64"
+)
+UNSIGNED_FRESH_DELTA_AUTHORITY_FIXTURE = (
+    REPO_ROOT
+    / "Chummer.Tests"
+    / "Fixtures"
+    / "unsigned_windows_fresh_delta_candidate_import_authority_v3.json.gz.b64"
+)
 DEFAULT_HEADS = ("avalonia",)
 UNSIGNED_RETAINED_POINTER_KEYS = {
     "atomicallyRetained",
@@ -2027,6 +2039,143 @@ def load_unsigned_v3_authority_fixture() -> dict[str, object]:
         "+00:00", "Z"
     )
     return authority
+
+
+def load_unsigned_fresh_delta_manifest_pair() -> dict[str, dict[str, object]]:
+    encoded = "".join(
+        UNSIGNED_FRESH_DELTA_MANIFEST_PAIR_FIXTURE.read_text().splitlines()
+    )
+    pair = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    assert isinstance(pair, dict)
+    assert isinstance(pair.get("canonical"), dict)
+    assert isinstance(pair.get("compatibility"), dict)
+    return pair
+
+
+def load_unsigned_fresh_delta_authority() -> dict[str, object]:
+    encoded = "".join(
+        UNSIGNED_FRESH_DELTA_AUTHORITY_FIXTURE.read_text().splitlines()
+    )
+    authority = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    assert isinstance(authority, dict)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    authority["generatedAtUtc"] = now.isoformat().replace("+00:00", "Z")
+    authority["expiresAtUtc"] = (now + timedelta(hours=2)).isoformat().replace(
+        "+00:00", "Z"
+    )
+    return authority
+
+
+def test_projection_accepts_registry_pinned_unsigned_fresh_delta_authority() -> None:
+    projection = load_script(
+        PROJECTION, "unsigned_fresh_delta_full_authority_projection_test"
+    )
+    authority = load_unsigned_fresh_delta_authority()
+
+    validated = projection._validate_candidate_import_authority_v3(authority)
+
+    assert validated["candidate"]["version"] == "run-20260722-165800"
+    assert (
+        validated["custody"]["unsignedPublicationEvidence"]["projectionProfile"]
+        == "v3_unsigned_windows_fresh_delta"
+    )
+    assert len(
+        validated["custody"]["unsignedPublicationEvidence"]["files"]
+    ) == 9
+
+
+def unsigned_fresh_delta_manifest_validator(layer: str):
+    if layer == "materializer":
+        module = load_script(
+            MATERIALIZER, "unsigned_fresh_delta_manifest_materializer_test"
+        )
+        return (
+            module._validate_unsigned_profile_manifest_pair,
+            module.CandidateAuthorityBlocked,
+        )
+    module = load_script(
+        PROJECTION, "unsigned_fresh_delta_manifest_projection_test"
+    )
+    return (
+        module._candidate_validate_unsigned_profile_manifest_pair,
+        module.ProjectionBlocked,
+    )
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
+    layer: str,
+) -> None:
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    validate, _error = unsigned_fresh_delta_manifest_validator(layer)
+
+    result = validate(pair["canonical"], pair["compatibility"])
+
+    assert (
+        result["registryCommit"]
+        == "ed65dc0fb6103815c849fe4cf4391c40eecd3819"
+    )
+    assert result["retainedArtifactIds"] == [
+        "avalonia-osx-arm64-installer",
+        "blazor-desktop-osx-arm64-installer",
+        "avalonia-osx-arm64-archive",
+        "blazor-desktop-osx-arm64-archive",
+    ]
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize(
+    ("tamper", "expected_failure"),
+    [
+        ("boolean_code_deploy_review", "code-deploy review posture drifted"),
+        ("retained_compatibility_byte", "retained compatibility binding"),
+        ("recursive_authority_true", "must be exactly false"),
+        ("windows_public_identity", "Windows public-byte posture drifted"),
+        (
+            "extra_compatibility_artifact",
+            "canonical/compatibility artifact identities drifted",
+        ),
+    ],
+)
+def test_unsigned_fresh_delta_manifest_pair_rejects_rehashed_policy_drift(
+    layer: str,
+    tamper: str,
+    expected_failure: str,
+) -> None:
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    if tamper == "boolean_code_deploy_review":
+        canonical["codeDeployCurrentShelfAuthority"] = False
+    elif tamper == "retained_compatibility_byte":
+        retained = next(
+            row
+            for row in compatibility["downloads"]
+            if (row.get("artifactId") or row.get("id"))
+            == "avalonia-osx-arm64-installer"
+        )
+        retained["sha256"] = "f" * 64
+    elif tamper == "recursive_authority_true":
+        canonical["smuggledPolicy"] = {"uploadAuthorized": True}
+    elif tamper == "windows_public_identity":
+        windows = next(
+            row
+            for row in canonical["artifacts"]
+            if row.get("artifactId") == "avalonia-win-x64-installer"
+        )
+        windows["artifactByteVisibility"] = "account_required"
+    elif tamper == "extra_compatibility_artifact":
+        extra = json.loads(json.dumps(compatibility["downloads"][0]))
+        extra["artifactId"] = None
+        extra["id"] = "smuggled-osx-arm64-installer"
+        extra["fileName"] = "smuggled-osx-arm64-installer.dmg"
+        compatibility["downloads"].append(extra)
+    else:
+        raise AssertionError(f"unknown tamper: {tamper}")
+
+    validate, error = unsigned_fresh_delta_manifest_validator(layer)
+    with pytest.raises(error, match=expected_failure):
+        validate(canonical, compatibility)
 
 
 def unsigned_provenance_documents() -> tuple[dict[str, bytes], str, str]:

@@ -749,6 +749,29 @@ internal static class PayloadSidecarContractValidator
         string? releaseVersion,
         bool allowMutableIncomingUrl,
         out string? failure)
+        => TryValidate(
+            bytes,
+            installerFileName,
+            payloadFileName,
+            payloadDownloadUrl,
+            payloadSha256,
+            payloadSizeBytes,
+            releaseVersion,
+            allowMutableIncomingUrl,
+            requirePayloadAcquisitionMode: false,
+            out failure);
+
+    public static bool TryValidate(
+        byte[] bytes,
+        string? installerFileName,
+        string? payloadFileName,
+        string? payloadDownloadUrl,
+        string? payloadSha256,
+        long? payloadSizeBytes,
+        string? releaseVersion,
+        bool allowMutableIncomingUrl,
+        bool requirePayloadAcquisitionMode,
+        out string? failure)
     {
         failure = null;
         try
@@ -769,7 +792,14 @@ internal static class PayloadSidecarContractValidator
                 }
             }
 
-            if (!properties.SetEquals(RequiredProperties))
+            var expectedProperties = new HashSet<string>(
+                RequiredProperties,
+                StringComparer.Ordinal);
+            if (requirePayloadAcquisitionMode)
+            {
+                expectedProperties.Add("payloadAcquisitionMode");
+            }
+            if (!properties.SetEquals(expectedProperties))
             {
                 return Fail("payload sidecar property set is noncanonical", out failure);
             }
@@ -790,7 +820,16 @@ internal static class PayloadSidecarContractValidator
                 || !string.Equals(actualVersion, expectedVersion, StringComparison.Ordinal)
                 || !root.TryGetProperty("sizeBytes", out JsonElement size)
                 || !size.TryGetInt64(out long actualSize)
-                || actualSize != payloadSizeBytes)
+                || actualSize != payloadSizeBytes
+                || requirePayloadAcquisitionMode
+                && (!TryString(
+                        root,
+                        "payloadAcquisitionMode",
+                        out string? acquisitionMode)
+                    || !string.Equals(
+                        acquisitionMode,
+                        "download",
+                        StringComparison.Ordinal)))
             {
                 return Fail("payload sidecar identity does not match its manifests", out failure);
             }
