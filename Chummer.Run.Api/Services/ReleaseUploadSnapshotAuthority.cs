@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
@@ -87,6 +88,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json";
     public const string CandidateExactIncomingDesktopScope =
         "avalonia:windows:win-x64";
+    private const string UnsignedWindowsFreshDeltaProjectionProfile =
+        "v3_unsigned_windows_fresh_delta";
+    private const string UnsignedWindowsCodeDeployReviewContract =
+        "chummer.registry.preview-publication-delta-code-deploy-review/v1";
 
     private const string CurrentFileName = "CURRENT.json";
     private const string ManifestFileName = "PUBLIC_PROJECTION_SNAPSHOT.generated.json";
@@ -173,6 +178,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static readonly HashSet<string> RetainedDesktopHeads = new(
         ["avalonia", "blazor-desktop"],
         StringComparer.Ordinal);
+    private static readonly string[] UnsignedRetainedArtifactIds =
+    [
+        "avalonia-osx-arm64-installer",
+        "blazor-desktop-osx-arm64-installer",
+        "avalonia-osx-arm64-archive",
+        "blazor-desktop-osx-arm64-archive"
+    ];
     private static readonly TimeSpan MaximumNativeProofAge = TimeSpan.FromHours(24);
 
     private readonly IConfiguration _configuration;
@@ -329,6 +341,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                                           or JsonException
                                           or NotSupportedException
                                           or ArgumentException
+                                          or InvalidOperationException
                                           or CryptographicException
                                           or FormatException)
         {
@@ -404,7 +417,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         }
     }
 
-    private static ReleaseUploadCandidateAuthority ParseCandidateAuthority(
+    internal static ReleaseUploadCandidateAuthority ParseCandidateAuthority(
         string snapshotId,
         string snapshotSha256,
         string authoritySha256,
@@ -791,14 +804,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             compatibilityDocument.RootElement,
             candidate.Version,
             "unsigned candidate compatibility manifest");
+        bool unsignedWindowsFreshDeltaProfile =
+            ValidateUnsignedWindowsFreshDeltaManifestPair(
+                canonicalDocument.RootElement,
+                compatibilityDocument.RootElement,
+                candidate.Version);
         ReleaseUploadCandidateIncumbentBinding incumbentBinding =
             ValidateUnsignedPublicationAndRegistry(
             custody,
             canonicalDocument.RootElement,
             canonicalManifest,
-            compatibilityManifest,
-            candidate,
-            inventory);
+                compatibilityManifest,
+                candidate,
+                inventory,
+                unsignedWindowsFreshDeltaProfile);
         return new ReleaseUploadCandidateAuthority(
             snapshotId,
             snapshotSha256,
@@ -832,12 +851,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         byte[] canonicalBytes,
         byte[] compatibilityBytes,
         ReleaseUploadCandidateIdentity candidate,
-        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory)
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
+        bool unsignedWindowsFreshDeltaProfile)
     {
         JsonElement evidence = RequireObject(custody, "unsignedPublicationEvidence");
-        if (!ExactPropertySet(
-                evidence,
-                new HashSet<string>(
+        var evidenceKeys = new HashSet<string>(
                     [
                         "crossRunBitReproducible",
                         "exactIncomingDesktopScope",
@@ -853,7 +871,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "sourceSha",
                         "status"
                     ],
-                    StringComparer.Ordinal)))
+                    StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            evidenceKeys.Add("projectionProfile");
+        }
+        if (!ExactPropertySet(evidence, evidenceKeys))
         {
             throw new InvalidDataException("unsigned publication evidence property set drifted");
         }
@@ -865,6 +888,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireExactString(evidence, "platformScope", "windows_only");
         RequireBoolean(evidence, "crossRunBitReproducible", expected: false);
         ValidateUnsignedSignaturePolicy(RequireObject(evidence, "signaturePolicy"));
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            RequireExactString(
+                evidence,
+                "projectionProfile",
+                UnsignedWindowsFreshDeltaProjectionProfile);
+        }
         string sourceSha = RequireString(evidence, "sourceSha");
         if (!CommitPattern.IsMatch(sourceSha))
         {
@@ -904,6 +934,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "provenance/retained-windows-publish-closure/manifest.json";
             const string nativeLockPath =
                 "provenance/config/windows-native-bootstrap-toolchain.lock.json";
+            const string sourceCanonicalPath =
+                "transport/source-publication/RELEASE_CHANNEL.generated.json";
+            const string sourceCompatibilityPath =
+                "transport/source-publication/releases.json";
             var expectedPaths = new HashSet<string>(
                 [
                     scopePath,
@@ -915,6 +949,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                     nativeLockPath
                 ],
                 StringComparer.Ordinal);
+            if (unsignedWindowsFreshDeltaProfile)
+            {
+                expectedPaths.Add(sourceCanonicalPath);
+                expectedPaths.Add(sourceCompatibilityPath);
+            }
             if (!expectedPaths.SetEquals(documents.Keys)
                 || !CryptographicOperations.FixedTimeEquals(
                     documents["RELEASE_CHANNEL.generated.json"].Bytes,
@@ -940,7 +979,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 packageLockPath,
                 packageReceiptPath,
                 retainedManifestPath,
-                nativeLockPath);
+                nativeLockPath,
+                unsignedWindowsFreshDeltaProfile);
             return ValidateUnsignedRegistry(
                 custody,
                 scope,
@@ -954,7 +994,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 packageLockPath,
                 packageReceiptPath,
                 retainedManifestPath,
-                nativeLockPath);
+                nativeLockPath,
+                unsignedWindowsFreshDeltaProfile,
+                sourceCanonicalPath,
+                sourceCompatibilityPath);
         }
         finally
         {
@@ -977,11 +1020,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string packageLockPath,
         string packageReceiptPath,
         string retainedManifestPath,
-        string nativeLockPath)
+        string nativeLockPath,
+        bool unsignedWindowsFreshDeltaProfile)
     {
-        if (!ExactPropertySet(
-                scope,
-                new HashSet<string>(
+        var scopeKeys = new HashSet<string>(
                     [
                         "compatibilityManifest",
                         "contractName",
@@ -1003,7 +1045,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                         "status",
                         "uploadAuthorized"
                     ],
-                    StringComparer.Ordinal)))
+                    StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            scopeKeys.Add("projectionProfile");
+        }
+        if (!ExactPropertySet(scope, scopeKeys))
         {
             throw new InvalidDataException("unsigned UI scope property set drifted");
         }
@@ -1018,6 +1065,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireBoolean(scope, "publicationAuthorized", expected: false);
         RequireBoolean(scope, "uploadAuthorized", expected: false);
         RequireBoolean(scope, "deployAuthorized", expected: false);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            RequireExactString(
+                scope,
+                "projectionProfile",
+                UnsignedWindowsFreshDeltaProjectionProfile);
+        }
         RequireExactString(scope, "sourceSha", sourceSha);
         JsonElement release = RequireObject(scope, "release");
         if (!ExactPropertySet(
@@ -1094,16 +1148,25 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         _ = RequireSha256(scope, "incumbentInventorySha256");
 
         JsonElement fresh = RequireArray(scope, "freshDelta");
-        if (fresh.GetArrayLength() != 2)
+        if (fresh.GetArrayLength() != (unsignedWindowsFreshDeltaProfile ? 3 : 2))
         {
             throw new InvalidDataException("unsigned UI fresh delta cardinality drifted");
         }
-        string[] roles = ["installer", "bootstrap_payload"];
-        string[] names =
-        [
-            "chummer-avalonia-win-x64-installer.exe",
-            "chummer-avalonia-win-x64-payload.zip"
-        ];
+        string[] roles = unsignedWindowsFreshDeltaProfile
+            ? ["installer", "bootstrap_payload", "bootstrap_payload_sidecar"]
+            : ["installer", "bootstrap_payload"];
+        string[] names = unsignedWindowsFreshDeltaProfile
+            ?
+            [
+                "chummer-avalonia-win-x64-installer.exe",
+                "chummer-avalonia-win-x64-payload.zip",
+                "chummer-avalonia-win-x64-payload.zip.json"
+            ]
+            :
+            [
+                "chummer-avalonia-win-x64-installer.exe",
+                "chummer-avalonia-win-x64-payload.zip"
+            ];
         var freshPaths = new HashSet<string>(StringComparer.Ordinal);
         for (int index = 0; index < roles.Length; index++)
         {
@@ -1334,6 +1397,466 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException("unsigned canonical Windows scope drifted");
         }
         return managedRetainedPaths;
+    }
+
+    internal static bool ValidateUnsignedWindowsFreshDeltaManifestPair(
+        JsonElement canonical,
+        JsonElement compatibility,
+        string expectedVersion)
+    {
+        string canonicalProfile = string.Empty;
+        if (canonical.TryGetProperty(
+                "projectionProfile",
+                out JsonElement canonicalProfileElement))
+        {
+            if (canonicalProfileElement.ValueKind != JsonValueKind.String)
+            {
+                throw new InvalidDataException(
+                    "unsigned canonical projectionProfile type drifted");
+            }
+            canonicalProfile = canonicalProfileElement.GetString()?.Trim()
+                ?? string.Empty;
+        }
+        string compatibilityProfile = string.Empty;
+        if (compatibility.TryGetProperty(
+                "projectionProfile",
+                out JsonElement compatibilityProfileElement))
+        {
+            if (compatibilityProfileElement.ValueKind != JsonValueKind.String)
+            {
+                throw new InvalidDataException(
+                    "unsigned compatibility projectionProfile type drifted");
+            }
+            compatibilityProfile = compatibilityProfileElement.GetString()?.Trim()
+                ?? string.Empty;
+        }
+        if (canonicalProfile.Length == 0 && compatibilityProfile.Length == 0)
+        {
+            return false;
+        }
+        if (!string.Equals(
+                canonicalProfile,
+                UnsignedWindowsFreshDeltaProjectionProfile,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                compatibilityProfile,
+                UnsignedWindowsFreshDeltaProjectionProfile,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned candidate manifests publish a mismatched or unsupported projectionProfile");
+        }
+
+        JsonElement? sharedProof = null;
+        JsonElement? sharedReview = null;
+        JsonElement? sharedProvenance = null;
+        foreach ((string label, JsonElement manifest) in new[]
+                 {
+                     ("canonical", canonical),
+                     ("compatibility", compatibility)
+                 })
+        {
+            RequireExactString(manifest, "version", expectedVersion);
+            RequireExactString(manifest, "releaseVersion", expectedVersion);
+            RequireExactString(manifest, "channel", "preview");
+            RequireExactString(manifest, "channelId", "preview");
+            RequireExactString(manifest, "platformScope", "windows_only");
+            RequireExactString(manifest, "previewPolicy", "preview_policy");
+            RequireExactString(manifest, "projectionStage", "prepared_candidate");
+            RequireExactString(manifest, "status", "published");
+            RequireExactString(manifest, "releaseDecisionStatus", "review_required");
+            RequireExactString(manifest, "rolloutState", "coverage_incomplete");
+            RequireExactString(manifest, "supportabilityState", "review_required");
+            RequireBoolean(manifest, "crossRunBitReproducible", expected: false);
+            foreach (string field in new[]
+                     {
+                         "publicationAuthorized",
+                         "publicationEligible",
+                         "releaseUploadAuthority",
+                         "deployAuthority",
+                         "deployAuthorized",
+                         "uploadAuthorized",
+                         "routeAuthority",
+                         "codeDeploymentAuthority"
+                     })
+            {
+                RequireBoolean(manifest, field, expected: false);
+            }
+            ValidateUnsignedManifestSignature(RequireObject(manifest, "signature"));
+            ValidateUnsignedRecursiveAuthorityPosture(manifest, $"unsigned {label} manifest");
+
+            string generatedAt = RequireMatchingAlias(
+                manifest,
+                "generatedAt",
+                "generated_at",
+                $"unsigned {label} generated time");
+            _ = manifest.TryGetProperty("generatedAt", out _)
+                ? RequireUtcTimestamp(manifest, "generatedAt")
+                : RequireUtcTimestamp(manifest, "generated_at");
+
+            JsonElement proof = RequireObject(manifest, "releaseProof");
+            if (!ExactPropertySet(
+                    proof,
+                    new HashSet<string>(
+                        ["baseUrl", "generatedAt", "journeysPassed", "proofRoutes", "status"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    $"unsigned {label} releaseProof property set drifted");
+            }
+            RequireExactString(proof, "baseUrl", "https://chummer.run");
+            RequireExactString(proof, "status", "review_required");
+            _ = RequireUtcTimestamp(proof, "generatedAt");
+            RequireExactString(proof, "generatedAt", generatedAt);
+            if (RequireArray(proof, "journeysPassed").GetArrayLength() != 0
+                || RequireArray(proof, "proofRoutes").GetArrayLength() != 0)
+            {
+                throw new InvalidDataException(
+                    $"unsigned {label} releaseProof must remain minimal and review-required");
+            }
+            if (sharedProof.HasValue
+                && !JsonSemanticEquals(sharedProof.Value, proof))
+            {
+                throw new InvalidDataException(
+                    "unsigned manifest releaseProof documents disagree");
+            }
+            sharedProof = proof.Clone();
+
+            string registryCommit = RequireMatchingAlias(
+                manifest,
+                "registryCommit",
+                "registry_commit",
+                $"unsigned {label} Registry commit");
+            if (!CommitPattern.IsMatch(registryCommit))
+            {
+                throw new InvalidDataException(
+                    $"unsigned {label} Registry commit is invalid");
+            }
+            JsonElement review = RequireObject(
+                manifest,
+                "codeDeployCurrentShelfAuthority");
+            if (!ExactPropertySet(
+                    review,
+                    new HashSet<string>(
+                        [
+                            "authority",
+                            "contract",
+                            "evaluatedAt",
+                            "incumbentSnapshotSha256",
+                            "projectedArtifactCount",
+                            "projectedArtifactInventorySha256",
+                            "projectionProfile",
+                            "registryCommit",
+                            "sourceCanonicalManifestSha256",
+                            "sourceCompatibilityManifestSha256",
+                            "sourceShelfInventorySha256",
+                            "status"
+                        ],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException(
+                    $"unsigned {label} code-deploy review shape drifted");
+            }
+            RequireBoolean(review, "authority", expected: false);
+            RequireExactString(
+                review,
+                "contract",
+                UnsignedWindowsCodeDeployReviewContract);
+            RequireExactString(
+                review,
+                "projectionProfile",
+                UnsignedWindowsFreshDeltaProjectionProfile);
+            RequireExactString(review, "registryCommit", registryCommit);
+            RequireExactString(review, "status", "review_required");
+            _ = RequireUtcTimestamp(review, "evaluatedAt");
+            RequireExactString(review, "evaluatedAt", generatedAt);
+            _ = RequireSha256(review, "incumbentSnapshotSha256");
+            _ = RequireSha256(review, "projectedArtifactInventorySha256");
+            _ = RequireSha256(review, "sourceCanonicalManifestSha256");
+            _ = RequireSha256(review, "sourceCompatibilityManifestSha256");
+            _ = RequireSha256(review, "sourceShelfInventorySha256");
+            _ = RequirePositiveInt64(review, "projectedArtifactCount");
+            JsonElement provenance = RequireObject(
+                manifest,
+                "retainedIncumbentProvenance");
+            if (sharedReview.HasValue
+                && !JsonSemanticEquals(sharedReview.Value, review)
+                || sharedProvenance.HasValue
+                && !JsonSemanticEquals(sharedProvenance.Value, provenance))
+            {
+                throw new InvalidDataException(
+                    "unsigned manifest review/provenance projections disagree");
+            }
+            sharedReview = review.Clone();
+            sharedProvenance = provenance.Clone();
+        }
+
+        JsonElement canonicalWindows = RequireSingleUnsignedWindowsArtifact(
+            RequireArray(canonical, "artifacts"),
+            compatibility: false,
+            expectedVersion);
+        JsonElement compatibilityWindows = RequireSingleUnsignedWindowsArtifact(
+            RequireArray(compatibility, "downloads"),
+            compatibility: true,
+            expectedVersion);
+        foreach (string field in new[]
+                 {
+                     "sha256", "sizeBytes", "payloadSha256", "payloadSizeBytes"
+                 })
+        {
+            if (!canonicalWindows.TryGetProperty(field, out JsonElement canonicalValue)
+                || !compatibilityWindows.TryGetProperty(field, out JsonElement compatibilityValue)
+                || !JsonSemanticEquals(canonicalValue, compatibilityValue))
+            {
+                throw new InvalidDataException(
+                    $"unsigned Windows manifest pair disagrees about {field}");
+            }
+        }
+        if (!sharedReview.HasValue)
+        {
+            throw new InvalidDataException(
+                "unsigned projected code-deploy review is missing");
+        }
+        if (!sharedProvenance.HasValue)
+        {
+            throw new InvalidDataException(
+                "unsigned retained incumbent provenance is missing");
+        }
+        _ = ValidateUnsignedRetainedProjectedBindings(
+            sharedProvenance.Value,
+            canonical,
+            compatibility);
+        ValidateUnsignedProjectedArtifactInventory(canonical, sharedReview.Value);
+        return true;
+    }
+
+    private static void ValidateUnsignedProjectedArtifactInventory(
+        JsonElement canonical,
+        JsonElement review)
+    {
+        var inventory = new JsonArray();
+        foreach (JsonElement artifact in RequireArray(canonical, "artifacts").EnumerateArray())
+        {
+            var row = new JsonObject
+            {
+                ["artifactId"] = RequireString(artifact, "artifactId"),
+                ["head"] = RequireString(artifact, "head"),
+                ["platform"] = RequireString(artifact, "platform"),
+                ["rid"] = RequireString(artifact, "rid"),
+                ["arch"] = RequireString(artifact, "arch"),
+                ["kind"] = RequireString(artifact, "kind"),
+                ["fileName"] = RequireString(artifact, "fileName"),
+                ["sha256"] = RequireSha256(artifact, "sha256"),
+                ["sizeBytes"] = RequirePositiveInt64(artifact, "sizeBytes")
+            };
+            bool hasPayloadFile = artifact.TryGetProperty(
+                "payloadFileName",
+                out JsonElement payloadFile)
+                && payloadFile.ValueKind != JsonValueKind.Null;
+            bool hasPayloadSha = artifact.TryGetProperty(
+                "payloadSha256",
+                out JsonElement payloadSha)
+                && payloadSha.ValueKind != JsonValueKind.Null;
+            bool hasPayloadSize = artifact.TryGetProperty(
+                "payloadSizeBytes",
+                out JsonElement payloadSize)
+                && payloadSize.ValueKind != JsonValueKind.Null;
+            if (hasPayloadFile || hasPayloadSha || hasPayloadSize)
+            {
+                if (!hasPayloadFile || !hasPayloadSha || !hasPayloadSize)
+                {
+                    throw new InvalidDataException(
+                        "unsigned projected artifact inventory has a partial payload binding");
+                }
+                row["payloadFileName"] = RequireString(artifact, "payloadFileName");
+                row["payloadSha256"] = RequireSha256(artifact, "payloadSha256");
+                row["payloadSizeBytes"] = RequirePositiveInt64(
+                    artifact,
+                    "payloadSizeBytes");
+            }
+            inventory.Add(row);
+        }
+        using JsonDocument inventoryDocument = JsonDocument.Parse(
+            Encoding.UTF8.GetBytes(inventory.ToJsonString()));
+        if (RequirePositiveInt64(review, "projectedArtifactCount") != inventory.Count
+            || !string.Equals(
+                RequireSha256(review, "projectedArtifactInventorySha256"),
+                UnsignedCompactSha256(inventoryDocument.RootElement),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned projected artifact inventory review binding drifted");
+        }
+    }
+
+    private static JsonElement RequireSingleUnsignedWindowsArtifact(
+        JsonElement artifacts,
+        bool compatibility,
+        string expectedVersion)
+    {
+        JsonElement[] matches = artifacts.EnumerateArray()
+            .Where(row =>
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                {
+                    return false;
+                }
+                string? artifactId;
+                if (row.TryGetProperty("id", out JsonElement id))
+                {
+                    artifactId = id.ValueKind == JsonValueKind.String
+                        ? id.GetString()
+                        : null;
+                }
+                else if (row.TryGetProperty(
+                             "artifactId",
+                             out JsonElement directArtifactId))
+                {
+                    artifactId = directArtifactId.ValueKind == JsonValueKind.String
+                        ? directArtifactId.GetString()
+                        : null;
+                }
+                else
+                {
+                    artifactId = null;
+                }
+                return string.Equals(
+                    artifactId,
+                    "avalonia-win-x64-installer",
+                    StringComparison.Ordinal);
+            })
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            throw new InvalidDataException(
+                "unsigned Windows manifest artifact cardinality drifted");
+        }
+        JsonElement artifact = matches[0];
+        RequireExactString(artifact, "artifactId", "avalonia-win-x64-installer");
+        RequireExactString(artifact, "id", "avalonia-win-x64-installer");
+        RequireExactString(artifact, "head", "avalonia");
+        RequireExactString(artifact, "platform", "windows");
+        RequireExactString(artifact, "arch", "x64");
+        RequireExactString(artifact, "rid", WindowsRid);
+        RequireExactString(artifact, "kind", "installer");
+        RequireExactString(
+            artifact,
+            "fileName",
+            "chummer-avalonia-win-x64-installer.exe");
+        RequireExactString(
+            artifact,
+            "payloadFileName",
+            "chummer-avalonia-win-x64-payload.zip");
+        RequireExactString(artifact, "installerMode", "bootstrap");
+        RequireExactString(artifact, "payloadAcquisitionMode", "download");
+        RequireExactString(artifact, "channel", "preview");
+        RequireExactString(artifact, "channelId", "preview");
+        RequireExactString(artifact, "version", expectedVersion);
+        RequireExactString(artifact, "releaseVersion", expectedVersion);
+        RequireExactString(artifact, "platformScope", "windows_only");
+        RequireExactString(artifact, "previewPolicy", "preview_policy");
+        RequireExactString(artifact, "installAccessClass", "open_public");
+        RequireBoolean(artifact, "crossRunBitReproducible", expected: false);
+        RequireExactString(artifact, "publicationDisposition", "delta");
+        ValidateUnsignedManifestSignature(RequireObject(artifact, "signature"));
+        RequireExactString(
+            artifact,
+            "downloadUrl",
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe");
+        RequireExactString(
+            artifact,
+            "payloadDownloadUrl",
+            "/downloads/files/chummer-avalonia-win-x64-payload.zip");
+        if (compatibility)
+        {
+            RequireExactString(artifact, "platformId", "windows-x64");
+            RequireExactString(
+                artifact,
+                "url",
+                "/downloads/files/chummer-avalonia-win-x64-installer.exe");
+        }
+        else
+        {
+            RequireExactString(artifact, "artifactByteVisibility", "public");
+        }
+        _ = RequireSha256(artifact, "sha256");
+        _ = RequirePositiveInt64(artifact, "sizeBytes");
+        _ = RequireSha256(artifact, "payloadSha256");
+        _ = RequirePositiveInt64(artifact, "payloadSizeBytes");
+        return artifact;
+    }
+
+    private static void ValidateUnsignedManifestSignature(JsonElement signature)
+    {
+        if (!ExactPropertySet(
+                signature,
+                new HashSet<string>(["policy", "required", "status"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("unsigned manifest signature shape drifted");
+        }
+        RequireExactString(signature, "policy", "preview_policy");
+        RequireBoolean(signature, "required", expected: false);
+        RequireExactString(signature, "status", "unsigned");
+    }
+
+    private static void ValidateUnsignedRecursiveAuthorityPosture(
+        JsonElement value,
+        string label)
+    {
+        var authorityFields = new HashSet<string>(
+            [
+                "authority",
+                "authoritative",
+                "candidateImportAuthority",
+                "candidateReviewAuthority",
+                "codeDeploymentAuthority",
+                "deployAuthority",
+                "deployAuthorized",
+                "manifestIsAuthoritative",
+                "publicationAuthority",
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "releaseUploadAuthorized",
+                "routeAuthority",
+                "routeAuthorized",
+                "uploadAuthority",
+                "uploadAuthorized"
+            ],
+            StringComparer.Ordinal);
+        var pending = new Stack<(JsonElement Value, string Path)>();
+        pending.Push((value, label));
+        while (pending.TryPop(out (JsonElement Value, string Path) current))
+        {
+            if (current.Value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty property in current.Value.EnumerateObject())
+                {
+                    string path = $"{current.Path} {property.Name}";
+                    if (authorityFields.Contains(property.Name)
+                        && property.Value.ValueKind != JsonValueKind.False)
+                    {
+                        throw new InvalidDataException($"{path} must be exactly false");
+                    }
+                    if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                    {
+                        pending.Push((property.Value, path));
+                    }
+                }
+            }
+            else if (current.Value.ValueKind == JsonValueKind.Array)
+            {
+                int index = 0;
+                foreach (JsonElement child in current.Value.EnumerateArray())
+                {
+                    if (child.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                    {
+                        pending.Push((child, $"{current.Path}[{index}]"));
+                    }
+                    index++;
+                }
+            }
+        }
     }
 
     internal static void ValidateUnsignedManifestIdentity(
@@ -1611,8 +2134,14 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string packageLockPath,
         string packageReceiptPath,
         string retainedManifestPath,
-        string nativeLockPath)
+        string nativeLockPath,
+        bool unsignedWindowsFreshDeltaProfile,
+        string sourceCanonicalPath,
+        string sourceCompatibilityPath)
     {
+        using JsonDocument projectedCompatibilityDocument = ParseStrictObject(
+            compatibilityBytes,
+            "unsigned projected compatibility manifest");
         if (!CryptographicOperations.FixedTimeEquals(
                 scopeBytes,
                 RenderUnsignedJson(scope, indented: true, trailingLf: true)))
@@ -1727,6 +2256,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "windowsDelta"
             ],
             StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            candidateKeys.UnionWith(
+            [
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256"
+            ]);
+        }
         if (!ExactPropertySet(registryCandidate, candidateKeys))
         {
             throw new InvalidDataException(
@@ -1756,6 +2301,43 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireBoolean(registryCandidate, "codeDeploymentAuthority", expected: false);
         RequireUnsignedStringArray(registryCandidate, "deltaPlatforms", ["windows"]);
         RequireUnsignedStringArray(registryCandidate, "evidencePlatforms", []);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            ValidateUnsignedRecursiveAuthorityPosture(
+                registryCandidate,
+                "unsigned Registry PREPARE candidate");
+            RequireExactString(
+                registryCandidate,
+                "projectionProfile",
+                UnsignedWindowsFreshDeltaProjectionProfile);
+            string registryCommit = RequireMatchingAlias(
+                registryCandidate,
+                "registryCommit",
+                "registry_commit",
+                "unsigned Registry PREPARE Registry commit");
+            if (!CommitPattern.IsMatch(registryCommit)
+                || !string.Equals(
+                    registryCommit,
+                    RequireMatchingAlias(
+                        canonical,
+                        "registryCommit",
+                        "registry_commit",
+                        "unsigned canonical Registry commit"),
+                    StringComparison.Ordinal)
+                || !JsonSemanticEquals(
+                    RequireObject(registryCandidate, "codeDeployCurrentShelfAuthority"),
+                    RequireObject(canonical, "codeDeployCurrentShelfAuthority"))
+                || !JsonSemanticEquals(
+                    RequireObject(registryCandidate, "retainedIncumbentProvenance"),
+                    RequireObject(canonical, "retainedIncumbentProvenance")))
+            {
+                throw new InvalidDataException(
+                    "unsigned Registry PREPARE profile graph drifted");
+            }
+            ValidateUnsignedPrivacyLaunchGateSnapshot(
+                RequireObject(registryCandidate, "privacyLaunchGateSnapshot"),
+                RequireSha256(registryCandidate, "privacyLaunchGateSnapshotSha256"));
+        }
         ValidateUnsignedByteReference(
             RequireObject(registryCandidate, "canonicalManifest"),
             "RELEASE_CHANNEL.generated.json",
@@ -1766,6 +2348,23 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             "releases.json",
             compatibilityBytes,
             "unsigned Registry candidate compatibility manifest");
+        byte[]? sourceCanonicalBytes = null;
+        byte[]? sourceCompatibilityBytes = null;
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            sourceCanonicalBytes = documents[sourceCanonicalPath].Bytes;
+            sourceCompatibilityBytes = documents[sourceCompatibilityPath].Bytes;
+            ValidateUnsignedByteReference(
+                RequireObject(registryCandidate, "sourceCanonicalManifest"),
+                sourceCanonicalPath,
+                sourceCanonicalBytes,
+                "unsigned Registry source canonical manifest");
+            ValidateUnsignedByteReference(
+                RequireObject(registryCandidate, "sourceCompatibilityManifest"),
+                sourceCompatibilityPath,
+                sourceCompatibilityBytes,
+                "unsigned Registry source compatibility manifest");
+        }
         JsonElement registryFull = RequireArray(
             registryCandidate,
             "fullShelfInventory");
@@ -1812,6 +2411,10 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "uploadAuthorized"
             ],
             StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            compositionKeys.Add("projectionProfile");
+        }
         if (!ExactPropertySet(composition, compositionKeys))
         {
             throw new InvalidDataException(
@@ -1828,6 +2431,13 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         RequireBoolean(composition, "publicationAuthorized", expected: false);
         RequireBoolean(composition, "uploadAuthorized", expected: false);
         RequireBoolean(composition, "deployAuthorized", expected: false);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            RequireExactString(
+                composition,
+                "projectionProfile",
+                UnsignedWindowsFreshDeltaProjectionProfile);
+        }
         RequireExactString(
             composition,
             "sourceSha",
@@ -1860,12 +2470,16 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         ValidateUnsignedByteReference(
             RequireObject(composition, "proposedCanonicalManifest"),
             "RELEASE_CHANNEL.generated.json",
-            canonicalBytes,
+            unsignedWindowsFreshDeltaProfile
+                ? sourceCanonicalBytes!
+                : canonicalBytes,
             "unsigned composition canonical manifest");
         ValidateUnsignedByteReference(
             RequireObject(composition, "proposedCompatibilityManifest"),
             "releases.json",
-            compatibilityBytes,
+            unsignedWindowsFreshDeltaProfile
+                ? sourceCompatibilityBytes!
+                : compatibilityBytes,
             "unsigned composition compatibility manifest");
         JsonElement proposedInventory = RequireArray(
             composition,
@@ -1881,8 +2495,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         ValidateUnsignedDirectoryModes(
             proposedModes,
             "unsigned composition proposed");
-        if (!JsonSemanticEquals(proposedInventory, scopeFull)
-            || !string.Equals(
+        if (!string.Equals(
                 RequireSha256(composition, "proposedShelfInventorySha256"),
                 UnsignedCompactSha256(proposedInventory),
                 StringComparison.Ordinal)
@@ -1890,6 +2503,75 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 RequireSha256(composition, "proposedDirectoryModesSha256"),
                 UnsignedCompactSha256(proposedModes),
                 StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned composition proposed shelf graph drifted");
+        }
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            IReadOnlyDictionary<string, JsonElement> sourceByPath =
+                ValidateUnsignedInventory(
+                    proposedInventory,
+                    "unsigned composition source shelf",
+                    allowEmpty: false,
+                    retained: false);
+            IReadOnlyDictionary<string, JsonElement> projectedByPath =
+                ValidateUnsignedInventory(
+                    scopeFull,
+                    "unsigned projected shelf",
+                    allowEmpty: false,
+                    retained: false);
+            if (!sourceByPath.Keys.Order(StringComparer.Ordinal).SequenceEqual(
+                    projectedByPath.Keys.Order(StringComparer.Ordinal),
+                    StringComparer.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "unsigned source/projected shelf paths drifted");
+            }
+            foreach (string path in sourceByPath.Keys)
+            {
+                JsonElement sourceRow = sourceByPath[path];
+                JsonElement projectedRow = projectedByPath[path];
+                if (path is not "RELEASE_CHANNEL.generated.json" and not "releases.json")
+                {
+                    if (!JsonSemanticEquals(sourceRow, projectedRow))
+                    {
+                        throw new InvalidDataException(
+                            "unsigned profile changed a non-manifest shelf byte");
+                    }
+                    continue;
+                }
+                byte[] sourceBytes = path == "RELEASE_CHANNEL.generated.json"
+                    ? sourceCanonicalBytes!
+                    : sourceCompatibilityBytes!;
+                byte[] projectedBytes = path == "RELEASE_CHANNEL.generated.json"
+                    ? canonicalBytes
+                    : compatibilityBytes;
+                if (RequireNonNegativeInt64(sourceRow, "mode")
+                    != RequireNonNegativeInt64(projectedRow, "mode")
+                    || !string.Equals(
+                        RequireSha256(sourceRow, "sha256"),
+                        Sha256(sourceBytes),
+                        StringComparison.Ordinal)
+                    || RequireNonNegativeInt64(sourceRow, "sizeBytes")
+                    != sourceBytes.LongLength
+                    || !string.Equals(
+                        RequireSha256(projectedRow, "sha256"),
+                        Sha256(projectedBytes),
+                        StringComparison.Ordinal)
+                    || RequireNonNegativeInt64(projectedRow, "sizeBytes")
+                    != projectedBytes.LongLength
+                    || string.Equals(
+                        RequireSha256(sourceRow, "sha256"),
+                        RequireSha256(projectedRow, "sha256"),
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "unsigned source/projected manifest custody drifted");
+                }
+            }
+        }
+        else if (!JsonSemanticEquals(proposedInventory, scopeFull))
         {
             throw new InvalidDataException(
                 "unsigned composition proposed shelf graph drifted");
@@ -1971,6 +2653,40 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException(
                 "unsigned composition incumbent digest graph drifted");
+        }
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            JsonElement review = RequireObject(
+                canonical,
+                "codeDeployCurrentShelfAuthority");
+            RequireExactString(
+                registryCandidate,
+                "sourceShelfInventorySha256",
+                RequireSha256(composition, "proposedShelfInventorySha256"));
+            RequireExactString(
+                review,
+                "sourceCanonicalManifestSha256",
+                Sha256(sourceCanonicalBytes!));
+            RequireExactString(
+                review,
+                "sourceCompatibilityManifestSha256",
+                Sha256(sourceCompatibilityBytes!));
+            RequireExactString(
+                review,
+                "sourceShelfInventorySha256",
+                RequireSha256(registryCandidate, "sourceShelfInventorySha256"));
+            RequireExactString(
+                review,
+                "incumbentSnapshotSha256",
+                RequireSha256(incumbent, "snapshotSha256"));
+            ValidateUnsignedRetainedIncumbentProvenance(
+                RequireObject(canonical, "retainedIncumbentProvenance"),
+                canonical,
+                projectedCompatibilityDocument.RootElement,
+                documents[sourceCanonicalPath].Root,
+                documents[sourceCompatibilityPath].Root,
+                incumbent,
+                scopeRetained);
         }
         JsonElement compositionRetained = RequireArray(
             composition,
@@ -2054,6 +2770,45 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "unsigned canonical Windows artifact is missing");
         }
         string manifestRowSha256 = UnsignedCompactSha256(windowsArtifact.Value);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            var sourceWindowsArtifacts = new List<JsonElement>();
+            foreach (JsonElement artifact in RequireArray(
+                         documents[sourceCanonicalPath].Root,
+                         "artifacts").EnumerateArray())
+            {
+                if (artifact.ValueKind != JsonValueKind.Object)
+                {
+                    throw new InvalidDataException(
+                        "unsigned composition source artifact is not an object");
+                }
+                if (string.Equals(
+                        RequireString(artifact, "head"),
+                        "avalonia",
+                        StringComparison.Ordinal)
+                    && string.Equals(
+                        RequireString(artifact, "platform"),
+                        "windows",
+                        StringComparison.Ordinal)
+                    && string.Equals(
+                        RequireString(artifact, "rid"),
+                        WindowsRid,
+                        StringComparison.Ordinal))
+                {
+                    sourceWindowsArtifacts.Add(artifact);
+                }
+            }
+            if (sourceWindowsArtifacts.Count != 1)
+            {
+                throw new InvalidDataException(
+                    "unsigned composition source Windows artifact drifted");
+            }
+            manifestRowSha256 = UnsignedCompactSha256(sourceWindowsArtifacts[0]);
+            RequireExactString(
+                windowsArtifact.Value,
+                "sourceManifestRowSha256",
+                manifestRowSha256);
+        }
         string[] freshKeys =
         [
             "artifactRole",
@@ -2123,7 +2878,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "unsigned Registry PREPARE provenance graph drifted");
         }
         ValidateUnsignedProjectionInputs(
-            RequireObject(registryCandidate, "projectionInputs"));
+            RequireObject(registryCandidate, "projectionInputs"),
+            unsignedWindowsFreshDeltaProfile);
         RequireExactString(
             registryCandidate,
             "incumbentInventorySha256",
@@ -2152,9 +2908,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             registryCandidate,
             "shelfPlatforms",
             shelfPlatforms.ToArray());
+        if (unsignedWindowsFreshDeltaProfile
+            && (!shelfPlatforms.SetEquals(["macos", "windows"])
+                || !shelfPlatforms.Where(static platform => platform != "windows")
+                    .SequenceEqual(["macos"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned Registry profile shelf platforms drifted");
+        }
         ValidateUnsignedWindowsDelta(
             RequireObject(registryCandidate, "windowsDelta"),
-            scopeFresh);
+            scopeFresh,
+            unsignedWindowsFreshDeltaProfile);
 
         var mixedGraph = new Dictionary<string, int>(StringComparer.Ordinal)
         {
@@ -2202,6 +2967,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "windowsDelta"
             ],
             StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            authorityKeys.UnionWith(
+            [
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256"
+            ]);
+        }
         if (!ExactPropertySet(registryAuthority, authorityKeys))
         {
             throw new InvalidDataException(
@@ -2218,6 +2999,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             scope,
             mixedGraph,
             includeReviewAuthority: true);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            ValidateUnsignedRegistryProfileFields(
+                registryAuthority,
+                registryCandidate,
+                canonical,
+                sourceCanonicalBytes!,
+                sourceCompatibilityBytes!,
+                sourceCanonicalPath,
+                sourceCompatibilityPath,
+                "unsigned Registry FINALIZE authority");
+        }
         ValidateUnsignedByteReference(
             RequireObject(registryAuthority, "candidateReceipt"),
             candidatePath,
@@ -2277,7 +3070,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "unsigned Registry FINALIZE/PREPARE custody graph drifted");
         }
         ValidateUnsignedProjectionInputs(
-            RequireObject(registryAuthority, "projectionInputs"));
+            RequireObject(registryAuthority, "projectionInputs"),
+            unsignedWindowsFreshDeltaProfile);
 
         var finalizeKeys = new HashSet<string>(
             [
@@ -2309,6 +3103,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "windowsDelta"
             ],
             StringComparer.Ordinal);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            finalizeKeys.UnionWith(
+            [
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256"
+            ]);
+        }
         if (!ExactPropertySet(registryFinalize, finalizeKeys))
         {
             throw new InvalidDataException(
@@ -2327,6 +3137,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             scope,
             mixedGraph,
             includeReviewAuthority: true);
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            ValidateUnsignedRegistryProfileFields(
+                registryFinalize,
+                registryCandidate,
+                canonical,
+                sourceCanonicalBytes!,
+                sourceCompatibilityBytes!,
+                sourceCanonicalPath,
+                sourceCompatibilityPath,
+                "unsigned Registry FINALIZE receipt");
+        }
         RequireExactString(
             registryFinalize,
             "fullShelfInventorySha256",
@@ -2376,11 +3198,580 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 "sha256"));
     }
 
+    private static void ValidateUnsignedRegistryProfileFields(
+        JsonElement value,
+        JsonElement registryCandidate,
+        JsonElement canonical,
+        byte[] sourceCanonicalBytes,
+        byte[] sourceCompatibilityBytes,
+        string sourceCanonicalPath,
+        string sourceCompatibilityPath,
+        string label)
+    {
+        RequireExactString(
+            value,
+            "projectionProfile",
+            UnsignedWindowsFreshDeltaProjectionProfile);
+        string registryCommit = RequireMatchingAlias(
+            value,
+            "registryCommit",
+            "registry_commit",
+            $"{label} Registry commit");
+        if (!CommitPattern.IsMatch(registryCommit)
+            || !string.Equals(
+                registryCommit,
+                RequireMatchingAlias(
+                    registryCandidate,
+                    "registryCommit",
+                    "registry_commit",
+                    "Registry PREPARE Registry commit"),
+                StringComparison.Ordinal)
+            || !JsonSemanticEquals(
+                RequireObject(value, "codeDeployCurrentShelfAuthority"),
+                RequireObject(canonical, "codeDeployCurrentShelfAuthority"))
+            || !JsonSemanticEquals(
+                RequireObject(value, "retainedIncumbentProvenance"),
+                RequireObject(canonical, "retainedIncumbentProvenance"))
+            || !JsonSemanticEquals(
+                RequireObject(value, "privacyLaunchGateSnapshot"),
+                RequireObject(registryCandidate, "privacyLaunchGateSnapshot")))
+        {
+            throw new InvalidDataException($"{label} profile graph drifted");
+        }
+        string privacyDigest = RequireSha256(value, "privacyLaunchGateSnapshotSha256");
+        RequireExactString(
+            registryCandidate,
+            "privacyLaunchGateSnapshotSha256",
+            privacyDigest);
+        ValidateUnsignedPrivacyLaunchGateSnapshot(
+            RequireObject(value, "privacyLaunchGateSnapshot"),
+            privacyDigest);
+        RequireExactString(
+            value,
+            "sourceShelfInventorySha256",
+            RequireSha256(registryCandidate, "sourceShelfInventorySha256"));
+        ValidateUnsignedByteReference(
+            RequireObject(value, "sourceCanonicalManifest"),
+            sourceCanonicalPath,
+            sourceCanonicalBytes,
+            $"{label} source canonical manifest");
+        ValidateUnsignedByteReference(
+            RequireObject(value, "sourceCompatibilityManifest"),
+            sourceCompatibilityPath,
+            sourceCompatibilityBytes,
+            $"{label} source compatibility manifest");
+    }
+
+    private static void ValidateUnsignedPrivacyLaunchGateSnapshot(
+        JsonElement snapshot,
+        string expectedDigest)
+    {
+        if (!ExactPropertySet(
+                snapshot,
+                new HashSet<string>(
+                    [
+                        "blockedClaims",
+                        "blocksLaunch",
+                        "capabilityContractName",
+                        "capabilityContractVersion",
+                        "contractName",
+                        "contractVersion",
+                        "facts",
+                        "prohibitedClaims",
+                        "reason",
+                        "reviewRequired",
+                        "scope",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned privacy launch-gate snapshot property set drifted");
+        }
+        RequireUnsignedStringArray(
+            snapshot,
+            "blockedClaims",
+            [
+                "flagship_launch",
+                "public_release_supportability",
+                "hosted_build_recovery_and_erasure"
+            ]);
+        RequireBoolean(snapshot, "blocksLaunch", expected: true);
+        RequireExactString(
+            snapshot,
+            "capabilityContractName",
+            "chummer.hosted_build_privacy_lifecycle");
+        RequireExactInt32(snapshot, "capabilityContractVersion", 1);
+        RequireExactString(
+            snapshot,
+            "contractName",
+            "chummer.privacy_launch_gate");
+        RequireExactInt32(snapshot, "contractVersion", 1);
+        RequireUnsignedStringArray(
+            snapshot,
+            "facts",
+            [
+                "active-record-delete",
+                "memory-only-recovery",
+                "no-delete-replay",
+                "no-owner-erasure",
+                "production-recovery-unverified"
+            ]);
+        RequireUnsignedStringArray(
+            snapshot,
+            "prohibitedClaims",
+            ["permanent-delete", "durable-recovery", "account-erasure"]);
+        RequireExactString(
+            snapshot,
+            "reason",
+            "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.");
+        RequireBoolean(snapshot, "reviewRequired", expected: true);
+        RequireExactString(
+            snapshot,
+            "scope",
+            "flagship_launch_and_release_supportability");
+        RequireExactString(snapshot, "status", "review_required");
+        if (!string.Equals(
+                UnsignedCompactSha256(snapshot),
+                expectedDigest,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned privacy launch-gate snapshot digest drifted");
+        }
+    }
+
+    private static (
+        JsonElement[] CanonicalRows,
+        JsonElement[] CompatibilityRows,
+        HashSet<string> RetainedIds) ValidateUnsignedRetainedProjectedBindings(
+            JsonElement provenance,
+            JsonElement canonical,
+            JsonElement compatibility)
+    {
+        if (!ExactPropertySet(
+                provenance,
+                new HashSet<string>(
+                    [
+                        "contractName",
+                        "contractVersion",
+                        "incumbentCanonicalManifestSha256",
+                        "incumbentCompatibilityManifestSha256",
+                        "incumbentFullShelfInventorySha256",
+                        "incumbentSnapshotSha256",
+                        "retainedArtifactBindings",
+                        "retainedArtifactBindingsSha256",
+                        "retainedCompatibilityBindings",
+                        "retainedCompatibilityBindingsSha256",
+                        "retainedInventorySha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained incumbent provenance property set drifted");
+        }
+        RequireExactString(
+            provenance,
+            "contractName",
+            "chummer.registry.retained-incumbent-provenance");
+        RequireExactInt32(provenance, "contractVersion", 1);
+        foreach (string field in new[]
+                 {
+                     "incumbentCanonicalManifestSha256",
+                     "incumbentCompatibilityManifestSha256",
+                     "incumbentFullShelfInventorySha256",
+                     "incumbentSnapshotSha256",
+                     "retainedInventorySha256"
+                 })
+        {
+            _ = RequireSha256(provenance, field);
+        }
+
+        JsonElement[] allCanonicalRows = RequireArray(canonical, "artifacts")
+            .EnumerateArray()
+            .ToArray();
+        JsonElement[] allCompatibilityRows = RequireArray(compatibility, "downloads")
+            .EnumerateArray()
+            .ToArray();
+        string[] expectedArtifactIds =
+            [.. UnsignedRetainedArtifactIds, "avalonia-win-x64-installer"];
+        if (!allCanonicalRows
+                .Select(RequireUnsignedArtifactIdentity)
+                .SequenceEqual(expectedArtifactIds, StringComparer.Ordinal)
+            || !allCompatibilityRows
+                .Select(RequireUnsignedArtifactIdentity)
+                .SequenceEqual(expectedArtifactIds, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned projected manifest artifact identities or order drifted");
+        }
+
+        JsonElement[] canonicalRows = allCanonicalRows
+            .Where(row => !string.Equals(
+                RequireString(row, "platform"),
+                "windows",
+                StringComparison.Ordinal))
+            .ToArray();
+        if (canonicalRows.Any(row => !string.Equals(
+                RequireString(row, "platform"),
+                "macos",
+                StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical platform is not exact macOS");
+        }
+        JsonElement canonicalBindings = RequireArray(
+            provenance,
+            "retainedArtifactBindings");
+        ValidateUnsignedRetainedBindingDigest(
+            provenance,
+            "retainedArtifactBindingsSha256",
+            canonicalBindings);
+        if (canonicalBindings.GetArrayLength() != canonicalRows.Length)
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical binding cardinality drifted");
+        }
+        var canonicalByFile = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var retainedIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < canonicalRows.Length; index++)
+        {
+            JsonElement row = canonicalRows[index];
+            JsonElement binding = canonicalBindings[index];
+            ValidateUnsignedRetainedBinding(binding, row, index, "canonical");
+            string fileName = RequireString(row, "fileName");
+            string artifactId = RequireString(binding, "artifactId");
+            if (!canonicalByFile.TryAdd(fileName, row) || !retainedIds.Add(artifactId))
+            {
+                throw new InvalidDataException(
+                    "unsigned retained canonical identity is duplicated");
+            }
+        }
+
+        JsonElement[] compatibilityRows = RequireArray(compatibility, "downloads")
+            .EnumerateArray()
+            .Where(row => canonicalByFile.ContainsKey(RequireString(row, "fileName")))
+            .ToArray();
+        JsonElement compatibilityBindings = RequireArray(
+            provenance,
+            "retainedCompatibilityBindings");
+        ValidateUnsignedRetainedBindingDigest(
+            provenance,
+            "retainedCompatibilityBindingsSha256",
+            compatibilityBindings);
+        if (compatibilityRows.Length != canonicalRows.Length
+            || compatibilityBindings.GetArrayLength() != compatibilityRows.Length)
+        {
+            throw new InvalidDataException(
+                "unsigned retained compatibility binding cardinality drifted");
+        }
+        var compatibilityIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < compatibilityRows.Length; index++)
+        {
+            JsonElement row = compatibilityRows[index];
+            JsonElement canonicalRow = canonicalByFile[RequireString(row, "fileName")];
+            JsonElement binding = compatibilityBindings[index];
+            ValidateUnsignedRetainedBinding(binding, row, index, "compatibility");
+            string artifactId = RequireString(binding, "artifactId");
+            if (!string.Equals(
+                    artifactId,
+                    RequireString(canonicalRow, "artifactId"),
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    RequireSha256(canonicalRow, "sha256"),
+                    StringComparison.Ordinal)
+                || RequirePositiveInt64(row, "sizeBytes")
+                   != RequirePositiveInt64(canonicalRow, "sizeBytes")
+                || !compatibilityIds.Add(artifactId))
+            {
+                throw new InvalidDataException(
+                    "unsigned retained compatibility binding is not canonical-bijective");
+            }
+        }
+        if (!compatibilityIds.SetEquals(retainedIds))
+        {
+            throw new InvalidDataException(
+                "unsigned retained compatibility/canonical identities differ");
+        }
+        return (canonicalRows, compatibilityRows, retainedIds);
+    }
+
+    private static string RequireUnsignedArtifactIdentity(JsonElement row)
+    {
+        if (row.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException(
+                "unsigned projected manifest contains a non-object artifact");
+        }
+        string artifactId = row.TryGetProperty("artifactId", out JsonElement directId)
+            && directId.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(directId.GetString())
+                ? directId.GetString()!
+                : RequireString(row, "id");
+        if (row.TryGetProperty("id", out JsonElement id)
+            && (id.ValueKind != JsonValueKind.String
+                || !string.Equals(id.GetString(), artifactId, StringComparison.Ordinal))
+            || directId.ValueKind is not JsonValueKind.Undefined
+                and not JsonValueKind.Null
+                and not JsonValueKind.String
+            || directId.ValueKind == JsonValueKind.String
+                && !string.Equals(
+                    directId.GetString(),
+                    artifactId,
+                    StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "unsigned projected manifest artifact aliases drifted");
+        }
+        return artifactId;
+    }
+
+    private static void ValidateUnsignedRetainedIncumbentProvenance(
+        JsonElement provenance,
+        JsonElement canonical,
+        JsonElement compatibility,
+        JsonElement sourceCanonical,
+        JsonElement sourceCompatibility,
+        JsonElement incumbent,
+        JsonElement retainedInventory)
+    {
+        if (!ExactPropertySet(
+                provenance,
+                new HashSet<string>(
+                    [
+                        "contractName",
+                        "contractVersion",
+                        "incumbentCanonicalManifestSha256",
+                        "incumbentCompatibilityManifestSha256",
+                        "incumbentFullShelfInventorySha256",
+                        "incumbentSnapshotSha256",
+                        "retainedArtifactBindings",
+                        "retainedArtifactBindingsSha256",
+                        "retainedCompatibilityBindings",
+                        "retainedCompatibilityBindingsSha256",
+                        "retainedInventorySha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained incumbent provenance property set drifted");
+        }
+        RequireExactString(
+            provenance,
+            "contractName",
+            "chummer.registry.retained-incumbent-provenance");
+        RequireExactInt32(provenance, "contractVersion", 1);
+        RequireExactString(
+            provenance,
+            "incumbentCanonicalManifestSha256",
+            RequireSha256(RequireObject(incumbent, "canonicalManifest"), "sha256"));
+        RequireExactString(
+            provenance,
+            "incumbentCompatibilityManifestSha256",
+            RequireSha256(RequireObject(incumbent, "compatibilityManifest"), "sha256"));
+        RequireExactString(
+            provenance,
+            "incumbentFullShelfInventorySha256",
+            RequireSha256(incumbent, "fullShelfInventorySha256"));
+        RequireExactString(
+            provenance,
+            "incumbentSnapshotSha256",
+            RequireSha256(incumbent, "snapshotSha256"));
+        RequireExactString(
+            provenance,
+            "retainedInventorySha256",
+            UnsignedCompactSha256(retainedInventory));
+
+        JsonElement[] canonicalRows = RequireArray(canonical, "artifacts")
+            .EnumerateArray()
+            .Where(row => !string.Equals(
+                RequireString(row, "platform"),
+                "windows",
+                StringComparison.Ordinal))
+            .ToArray();
+        if (canonicalRows.Any(row => !string.Equals(
+                RequireString(row, "platform"),
+                "macos",
+                StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical platform is not exact macOS");
+        }
+        JsonElement canonicalBindings = RequireArray(
+            provenance,
+            "retainedArtifactBindings");
+        ValidateUnsignedRetainedBindingDigest(
+            provenance,
+            "retainedArtifactBindingsSha256",
+            canonicalBindings);
+        if (canonicalBindings.GetArrayLength() != canonicalRows.Length)
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical binding cardinality drifted");
+        }
+        var canonicalByFile = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        var retainedIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < canonicalRows.Length; index++)
+        {
+            JsonElement row = canonicalRows[index];
+            JsonElement binding = canonicalBindings[index];
+            ValidateUnsignedRetainedBinding(binding, row, index, "canonical");
+            string fileName = RequireString(row, "fileName");
+            string artifactId = RequireString(binding, "artifactId");
+            if (!canonicalByFile.TryAdd(fileName, row) || !retainedIds.Add(artifactId))
+            {
+                throw new InvalidDataException(
+                    "unsigned retained canonical identity is duplicated");
+            }
+        }
+
+        JsonElement[] compatibilityRows = RequireArray(compatibility, "downloads")
+            .EnumerateArray()
+            .Where(row => canonicalByFile.ContainsKey(RequireString(row, "fileName")))
+            .ToArray();
+        JsonElement compatibilityBindings = RequireArray(
+            provenance,
+            "retainedCompatibilityBindings");
+        ValidateUnsignedRetainedBindingDigest(
+            provenance,
+            "retainedCompatibilityBindingsSha256",
+            compatibilityBindings);
+        if (compatibilityRows.Length != canonicalRows.Length
+            || compatibilityBindings.GetArrayLength() != compatibilityRows.Length)
+        {
+            throw new InvalidDataException(
+                "unsigned retained compatibility binding cardinality drifted");
+        }
+        var compatibilityIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < compatibilityRows.Length; index++)
+        {
+            JsonElement row = compatibilityRows[index];
+            JsonElement canonicalRow = canonicalByFile[RequireString(row, "fileName")];
+            JsonElement binding = compatibilityBindings[index];
+            ValidateUnsignedRetainedBinding(binding, row, index, "compatibility");
+            string artifactId = RequireString(binding, "artifactId");
+            if (!string.Equals(
+                    artifactId,
+                    RequireString(canonicalRow, "artifactId"),
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    RequireSha256(canonicalRow, "sha256"),
+                    StringComparison.Ordinal)
+                || RequirePositiveInt64(row, "sizeBytes")
+                   != RequirePositiveInt64(canonicalRow, "sizeBytes")
+                || !compatibilityIds.Add(artifactId))
+            {
+                throw new InvalidDataException(
+                    "unsigned retained compatibility binding is not canonical-bijective");
+            }
+        }
+        if (!compatibilityIds.SetEquals(retainedIds))
+        {
+            throw new InvalidDataException(
+                "unsigned retained compatibility/canonical identities differ");
+        }
+        RequireRetainedRowsMatchSource(
+            RequireArray(sourceCanonical, "artifacts"),
+            canonicalRows,
+            retainedIds,
+            "canonical");
+        RequireRetainedRowsMatchSource(
+            RequireArray(sourceCompatibility, "downloads"),
+            compatibilityRows,
+            retainedIds,
+            "compatibility");
+    }
+
+    private static void ValidateUnsignedRetainedBindingDigest(
+        JsonElement provenance,
+        string digestField,
+        JsonElement bindings)
+    {
+        RequireExactString(
+            provenance,
+            digestField,
+            UnsignedCompactSha256(bindings));
+    }
+
+    private static void ValidateUnsignedRetainedBinding(
+        JsonElement binding,
+        JsonElement row,
+        int index,
+        string label)
+    {
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(
+                    ["artifactId", "manifestRowSha256", "sha256", "sizeBytes"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                $"unsigned retained {label} binding[{index}] shape drifted");
+        }
+        string artifactId = row.TryGetProperty("artifactId", out JsonElement directId)
+            && directId.ValueKind == JsonValueKind.String
+            && !string.IsNullOrWhiteSpace(directId.GetString())
+                ? directId.GetString()!
+                : RequireString(row, "id");
+        if (!string.Equals(
+                RequireString(binding, "artifactId"),
+                artifactId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(binding, "manifestRowSha256"),
+                UnsignedCompactSha256(row),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireSha256(binding, "sha256"),
+                RequireSha256(row, "sha256"),
+                StringComparison.Ordinal)
+            || RequirePositiveInt64(binding, "sizeBytes")
+               != RequirePositiveInt64(row, "sizeBytes"))
+        {
+            throw new InvalidDataException(
+                $"unsigned retained {label} binding[{index}] differs");
+        }
+    }
+
+    private static void RequireRetainedRowsMatchSource(
+        JsonElement sourceRows,
+        IReadOnlyList<JsonElement> projectedRows,
+        IReadOnlySet<string> retainedIds,
+        string label)
+    {
+        var retainedSource = new List<JsonElement>();
+        foreach (JsonElement row in sourceRows.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidDataException(
+                    $"unsigned retained {label} source row is not an object");
+            }
+            if (retainedIds.Contains(RequireUnsignedArtifactIdentity(row)))
+            {
+                retainedSource.Add(row);
+            }
+        }
+        if (retainedSource.Count != projectedRows.Count
+            || retainedSource.Where((row, index) =>
+                    !JsonSemanticEquals(row, projectedRows[index]))
+                .Any())
+        {
+            throw new InvalidDataException(
+                $"unsigned retained {label} rows differ from source custody");
+        }
+    }
+
     private static void ValidateUnsignedWindowsDelta(
         JsonElement value,
-        JsonElement fresh)
+        JsonElement fresh,
+        bool unsignedWindowsFreshDeltaProfile = false)
     {
-        string[] roles = ["installer", "bootstrap_payload"];
+        string[] roles = unsignedWindowsFreshDeltaProfile
+            ? ["installer", "bootstrap_payload", "bootstrap_payload_sidecar"]
+            : ["installer", "bootstrap_payload"];
         if (!ExactPropertySet(
                 value,
                 new HashSet<string>(roles, StringComparer.Ordinal))
@@ -2716,13 +4107,22 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         }
     }
 
-    private static void ValidateUnsignedProjectionInputs(JsonElement value)
+    private static void ValidateUnsignedProjectionInputs(
+        JsonElement value,
+        bool unsignedWindowsFreshDeltaProfile = false)
     {
         var paths = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["materializer"] = "scripts/materialize_unsigned_preview_publication_delta.py",
             ["schema"] = "contracts/preview-publication-delta-v2.schema.json"
         };
+        if (unsignedWindowsFreshDeltaProfile)
+        {
+            paths["releaseChannelMaterializer"] =
+                "scripts/materialize_public_release_channel.py";
+            paths["releaseChannelVerifier"] =
+                "scripts/verify_public_release_channel.py";
+        }
         if (!ExactPropertySet(
                 value,
                 new HashSet<string>(paths.Keys, StringComparer.Ordinal)))

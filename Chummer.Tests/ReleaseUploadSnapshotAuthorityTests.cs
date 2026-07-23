@@ -201,6 +201,175 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             File.ReadAllText(Path.Combine(bundle, "operator-note.txt")));
     }
 
+    [Fact]
+    public void RuntimeAcceptsRegistryPinnedUnsignedWindowsFreshDeltaManifestPair()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+
+        bool profile =
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
+                JsonSerializer.SerializeToElement(canonical),
+                JsonSerializer.SerializeToElement(compatibility),
+                "run-20260722-165800");
+
+        Assert.True(profile);
+        Assert.Equal(
+            "ed65dc0fb6103815c849fe4cf4391c40eecd3819",
+            canonical["registryCommit"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void RuntimeLoadsRegistryPinnedUnsignedWindowsFreshDeltaAuthority()
+    {
+        byte[] authorityBytes = LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3();
+        ReleaseUploadCandidateAuthority candidate =
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('a', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes);
+        Assert.True(candidate.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.Equal(58, candidate.Inventory.Count);
+        ReleaseUploadCandidateIncumbentBinding incumbent =
+            Assert.IsType<ReleaseUploadCandidateIncumbentBinding>(
+                candidate.IncumbentBinding);
+        Assert.Equal(
+            "5e4e68256f7e0cd423555cc8d7daaff3e98af9fec8faf20bec3b714db64d8037",
+            incumbent.SnapshotSha256);
+    }
+
+    [Fact]
+    public void RuntimeRejectsCoordinatedRehashedUnsignedWindowsFreshDeltaRegistryCommitDrift()
+    {
+        byte[] authorityBytes =
+            TamperUnsignedWindowsFreshDeltaRegistryCommit();
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('a', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes));
+    }
+
+    [Theory]
+    [InlineData("boolean_code_deploy_review")]
+    [InlineData("retained_compatibility_byte")]
+    [InlineData("recursive_authority_true")]
+    [InlineData("windows_public_identity")]
+    [InlineData("windows_account_required")]
+    [InlineData("profile_wrong_type")]
+    [InlineData("windows_id_wrong_type")]
+    [InlineData("root_review_posture")]
+    [InlineData("root_generated_alias")]
+    [InlineData("proof_timestamp")]
+    [InlineData("review_timestamp")]
+    [InlineData("extra_compatibility_artifact")]
+    public void RuntimeRejectsUnsignedWindowsFreshDeltaManifestPolicyDrift(string tamper)
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        switch (tamper)
+        {
+            case "boolean_code_deploy_review":
+                canonical["codeDeployCurrentShelfAuthority"] = false;
+                break;
+            case "retained_compatibility_byte":
+                compatibility["downloads"]!.AsArray()
+                    .Select(static node => node!.AsObject())
+                    .Single(static row => string.Equals(
+                        row["id"]?.GetValue<string>(),
+                        "avalonia-osx-arm64-installer",
+                        StringComparison.Ordinal))["sha256"] = new string('f', 64);
+                break;
+            case "recursive_authority_true":
+                canonical["smuggledPolicy"] = new JsonObject
+                {
+                    ["uploadAuthorized"] = true
+                };
+                break;
+            case "windows_public_identity":
+                canonical["artifacts"]!.AsArray()
+                    .Select(static node => node!.AsObject())
+                    .Single(static row => string.Equals(
+                        row["artifactId"]?.GetValue<string>(),
+                        "avalonia-win-x64-installer",
+                        StringComparison.Ordinal))["artifactByteVisibility"] =
+                        "account_required";
+                break;
+            case "windows_account_required":
+                canonical["artifacts"]!.AsArray()
+                    .Select(static node => node!.AsObject())
+                    .Single(static row => string.Equals(
+                        row["artifactId"]?.GetValue<string>(),
+                        "avalonia-win-x64-installer",
+                        StringComparison.Ordinal))["installAccessClass"] =
+                            "account_required";
+                compatibility["downloads"]!.AsArray()
+                    .Select(static node => node!.AsObject())
+                    .Single(static row => string.Equals(
+                        row["id"]?.GetValue<string>(),
+                        "avalonia-win-x64-installer",
+                        StringComparison.Ordinal))["installAccessClass"] =
+                            "account_required";
+                break;
+            case "profile_wrong_type":
+                canonical["projectionProfile"] = false;
+                break;
+            case "windows_id_wrong_type":
+                canonical["artifacts"]!.AsArray()
+                    .Select(static node => node!.AsObject())
+                    .Single(static row => string.Equals(
+                        row["artifactId"]?.GetValue<string>(),
+                        "avalonia-win-x64-installer",
+                        StringComparison.Ordinal))["id"] = true;
+                break;
+            case "root_review_posture":
+                foreach (JsonObject manifest in new[] { canonical, compatibility })
+                {
+                    manifest["status"] = "draft";
+                    manifest["rolloutState"] = "blocked";
+                }
+                break;
+            case "root_generated_alias":
+                canonical["generated_at"] = "2026-07-22T16:59:00Z";
+                break;
+            case "proof_timestamp":
+                foreach (JsonObject manifest in new[] { canonical, compatibility })
+                {
+                    manifest["releaseProof"]!.AsObject()["generatedAt"] =
+                        "2026-07-22T16:59:00Z";
+                }
+                break;
+            case "review_timestamp":
+                foreach (JsonObject manifest in new[] { canonical, compatibility })
+                {
+                    manifest["codeDeployCurrentShelfAuthority"]!
+                        .AsObject()["evaluatedAt"] = "2026-07-22T16:59:00Z";
+                }
+                break;
+            case "extra_compatibility_artifact":
+            {
+                JsonArray downloads = compatibility["downloads"]!.AsArray();
+                JsonObject extra = downloads[0]!.DeepClone().AsObject();
+                extra["artifactId"] = null;
+                extra["id"] = "smuggled-osx-arm64-installer";
+                extra["fileName"] = "smuggled-osx-arm64-installer.dmg";
+                downloads.Add(extra);
+                break;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(tamper));
+        }
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
+                JsonSerializer.SerializeToElement(canonical),
+                JsonSerializer.SerializeToElement(compatibility),
+                "run-20260722-165800"));
+    }
+
     [Theory]
     [InlineData("package_lock_path_traversal", "path drifted")]
     [InlineData("package_lock_property_smuggling", "lock binding property set drifted")]
@@ -592,6 +761,108 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         authority["generatedAtUtc"] = now;
         authority["expiresAtUtc"] = now.AddHours(2);
         return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static byte[] LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_windows_fresh_delta_candidate_import_authority_v3.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        JsonObject authority = JsonNode.Parse(output.ToArray())?.AsObject()
+            ?? throw new InvalidDataException(
+                "unsigned fresh-delta authority fixture is invalid");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        authority["generatedAtUtc"] = now;
+        authority["expiresAtUtc"] = now.AddHours(2);
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static byte[] TamperUnsignedWindowsFreshDeltaRegistryCommit()
+    {
+        JsonObject authority = JsonNode.Parse(
+                LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException(
+                "unsigned fresh-delta authority fixture is invalid");
+        JsonObject custody = authority["custody"]!.AsObject();
+        const string driftedCommit =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+        JsonObject candidateEntry =
+            custody["registryPrepareCandidateReceipt"]!.AsObject();
+        JsonObject candidate = DecodeUnsignedEmbedded(candidateEntry);
+        candidate["registryCommit"] = driftedCommit;
+        candidate["registry_commit"] = driftedCommit;
+        RewriteUnsignedEmbedded(
+            candidateEntry,
+            Encoding.UTF8.GetBytes(candidate.ToJsonString() + "\n"));
+
+        JsonObject registryAuthorityEntry =
+            custody["registryFinalizeAuthority"]!.AsObject();
+        JsonObject registryAuthority = DecodeUnsignedEmbedded(registryAuthorityEntry);
+        registryAuthority["registryCommit"] = driftedCommit;
+        registryAuthority["registry_commit"] = driftedCommit;
+        RebindUnsignedReference(
+            registryAuthority["candidateReceipt"]!.AsObject(),
+            candidateEntry);
+        RewriteUnsignedEmbedded(
+            registryAuthorityEntry,
+            Encoding.UTF8.GetBytes(registryAuthority.ToJsonString() + "\n"));
+
+        JsonObject registryReceiptEntry =
+            custody["registryFinalizeReceipt"]!.AsObject();
+        JsonObject registryReceipt = DecodeUnsignedEmbedded(registryReceiptEntry);
+        registryReceipt["registryCommit"] = driftedCommit;
+        registryReceipt["registry_commit"] = driftedCommit;
+        RebindUnsignedReference(
+            registryReceipt["candidateReceipt"]!.AsObject(),
+            candidateEntry);
+        RebindUnsignedReference(
+            registryReceipt["authority"]!.AsObject(),
+            registryAuthorityEntry);
+        RewriteUnsignedEmbedded(
+            registryReceiptEntry,
+            Encoding.UTF8.GetBytes(registryReceipt.ToJsonString() + "\n"));
+
+        JsonObject finalization = custody["registryFinalization"]!.AsObject();
+        finalization["candidateReceiptSha256"] =
+            candidateEntry["sha256"]!.GetValue<string>();
+        finalization["authoritySha256"] =
+            registryAuthorityEntry["sha256"]!.GetValue<string>();
+        finalization["finalizeReceiptSha256"] =
+            registryReceiptEntry["sha256"]!.GetValue<string>();
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static (JsonObject Canonical, JsonObject Compatibility)
+        LoadUnsignedWindowsFreshDeltaManifestPair()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_windows_fresh_delta_manifest_pair.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        JsonObject pair = JsonNode.Parse(output.ToArray())?.AsObject()
+            ?? throw new InvalidDataException(
+                "unsigned fresh-delta manifest-pair fixture is invalid");
+        return (
+            pair["canonical"]?.AsObject()
+                ?? throw new InvalidDataException(
+                    "unsigned fresh-delta canonical fixture is invalid"),
+            pair["compatibility"]?.AsObject()
+                ?? throw new InvalidDataException(
+                    "unsigned fresh-delta compatibility fixture is invalid"));
     }
 
     private static byte[] TamperUnsignedCandidateAuthorityV3Scope(string tamper)

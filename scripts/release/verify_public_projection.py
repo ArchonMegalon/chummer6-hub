@@ -103,6 +103,16 @@ CANDIDATE_UNSIGNED_SCOPE_FILE = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json"
 CANDIDATE_UNSIGNED_COMPOSITION_FILE = (
     "PREVIEW_NIGHTLY_UNSIGNED_COMPOSITION.proposed.json"
 )
+CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE = "v3_unsigned_windows_fresh_delta"
+CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME = (
+    "chummer-avalonia-win-x64-payload.zip.json"
+)
+CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH = (
+    "transport/source-publication/RELEASE_CHANNEL.generated.json"
+)
+CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH = (
+    "transport/source-publication/releases.json"
+)
 CANDIDATE_REGISTRY_RECEIPT_FILE = "PREVIEW_PUBLICATION_DELTA_CANDIDATE.json"
 CANDIDATE_REGISTRY_AUTHORITY_FILE = "PREVIEW_PUBLICATION_DELTA_AUTHORITY.json"
 CANDIDATE_REGISTRY_FINALIZE_FILE = "PREVIEW_PUBLICATION_DELTA_FINALIZE.json"
@@ -125,6 +135,96 @@ CANDIDATE_EXPORT_RUNNER_LABEL_RE = re.compile(
     r"^chummer-preview-nightly-export-[a-z0-9]{12,64}$"
 )
 CANDIDATE_PROOF_MAX_AGE = timedelta(hours=24)
+CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT = {
+    "blockedClaims": [
+        "flagship_launch",
+        "public_release_supportability",
+        "hosted_build_recovery_and_erasure",
+    ],
+    "blocksLaunch": True,
+    "capabilityContractName": "chummer.hosted_build_privacy_lifecycle",
+    "capabilityContractVersion": 1,
+    "contractName": "chummer.privacy_launch_gate",
+    "contractVersion": 1,
+    "facts": [
+        "active-record-delete",
+        "memory-only-recovery",
+        "no-delete-replay",
+        "no-owner-erasure",
+        "production-recovery-unverified",
+    ],
+    "prohibitedClaims": [
+        "permanent-delete",
+        "durable-recovery",
+        "account-erasure",
+    ],
+    "reason": (
+        "Hosted Build backup and point-in-time-recovery retention, tombstone or "
+        "lineage retention, deletion replay, and whole-account erasure are not "
+        "launch-approved or production-verified."
+    ),
+    "reviewRequired": True,
+    "scope": "flagship_launch_and_release_supportability",
+    "status": "review_required",
+}
+CANDIDATE_UNSIGNED_CODE_DEPLOY_REVIEW_KEYS = {
+    "authority",
+    "contract",
+    "evaluatedAt",
+    "incumbentSnapshotSha256",
+    "projectedArtifactCount",
+    "projectedArtifactInventorySha256",
+    "projectionProfile",
+    "registryCommit",
+    "sourceCanonicalManifestSha256",
+    "sourceCompatibilityManifestSha256",
+    "sourceShelfInventorySha256",
+    "status",
+}
+CANDIDATE_UNSIGNED_RETAINED_PROVENANCE_KEYS = {
+    "contractName",
+    "contractVersion",
+    "incumbentCanonicalManifestSha256",
+    "incumbentCompatibilityManifestSha256",
+    "incumbentFullShelfInventorySha256",
+    "incumbentSnapshotSha256",
+    "retainedArtifactBindings",
+    "retainedArtifactBindingsSha256",
+    "retainedCompatibilityBindings",
+    "retainedCompatibilityBindingsSha256",
+    "retainedInventorySha256",
+}
+CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_BINDING_KEYS = {
+    "artifactId",
+    "manifestRowSha256",
+    "sha256",
+    "sizeBytes",
+}
+CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS = [
+    "avalonia-osx-arm64-installer",
+    "blazor-desktop-osx-arm64-installer",
+    "avalonia-osx-arm64-archive",
+    "blazor-desktop-osx-arm64-archive",
+]
+CANDIDATE_UNSIGNED_PROFILE_AUTHORITY_FIELDS = {
+    "authority",
+    "authoritative",
+    "candidateImportAuthority",
+    "candidateReviewAuthority",
+    "codeDeploymentAuthority",
+    "deployAuthority",
+    "deployAuthorized",
+    "manifestIsAuthoritative",
+    "publicationAuthority",
+    "publicationAuthorized",
+    "publicationEligible",
+    "releaseUploadAuthority",
+    "releaseUploadAuthorized",
+    "routeAuthority",
+    "routeAuthorized",
+    "uploadAuthority",
+    "uploadAuthorized",
+}
 
 
 class ProjectionBlocked(RuntimeError):
@@ -1426,6 +1526,41 @@ def _candidate_version(value: object, *, label: str) -> str:
     if not isinstance(value, str) or CANDIDATE_VERSION_RE.fullmatch(value) is None:
         raise ProjectionBlocked(f"{label} is invalid")
     return value
+
+
+def _candidate_unsigned_profile_enabled(
+    value: dict[str, object], *, label: str
+) -> bool:
+    profile = value.get("projectionProfile")
+    if profile is None:
+        return False
+    if profile != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE:
+        raise ProjectionBlocked(f"{label} projectionProfile is unsupported")
+    return True
+
+
+def _candidate_validate_unsigned_profile_recursive_authority(
+    value: object, *, label: str
+) -> None:
+    pending: list[tuple[object, str]] = [(value, label)]
+    while pending:
+        current, current_label = pending.pop()
+        if isinstance(current, dict):
+            for field, child in current.items():
+                child_label = f"{current_label} {field}"
+                if (
+                    field in CANDIDATE_UNSIGNED_PROFILE_AUTHORITY_FIELDS
+                    and child is not False
+                ):
+                    raise ProjectionBlocked(f"{child_label} must be exactly false")
+                if isinstance(child, (dict, list)):
+                    pending.append((child, child_label))
+        elif isinstance(current, list):
+            pending.extend(
+                (child, f"{current_label}[{index}]")
+                for index, child in enumerate(current)
+                if isinstance(child, (dict, list))
+            )
 
 
 def _candidate_windows_scope(
@@ -3456,11 +3591,24 @@ def _candidate_unsigned_directory_modes(
     return rows
 
 
-def _candidate_unsigned_projection_inputs(value: object) -> None:
+def _candidate_unsigned_projection_inputs(
+    value: object, *, profile_enabled: bool = False
+) -> None:
     expected_paths = {
         "materializer": "scripts/materialize_unsigned_preview_publication_delta.py",
         "schema": "contracts/preview-publication-delta-v2.schema.json",
     }
+    if profile_enabled:
+        expected_paths.update(
+            {
+                "releaseChannelMaterializer": (
+                    "scripts/materialize_public_release_channel.py"
+                ),
+                "releaseChannelVerifier": (
+                    "scripts/verify_public_release_channel.py"
+                ),
+            }
+        )
     if not isinstance(value, dict) or set(value) != set(expected_paths):
         raise ProjectionBlocked("unsigned Registry projection inputs drifted")
     for name, path in expected_paths.items():
@@ -3709,6 +3857,573 @@ def _candidate_unsigned_provenance(
             )
 
 
+def _candidate_profile_artifact_inventory_rows(
+    manifest: dict[str, object], *, label: str
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        raise ProjectionBlocked(f"{label} artifacts are missing")
+    inventory: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+    seen_files: set[str] = set()
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            raise ProjectionBlocked(f"{label} artifact[{index}] is invalid")
+        artifact_id = artifact.get("artifactId") or artifact.get("id")
+        if (
+            not isinstance(artifact_id, str)
+            or not artifact_id
+            or artifact_id != artifact_id.strip().lower()
+            or artifact_id in seen_ids
+        ):
+            raise ProjectionBlocked(f"{label} artifact[{index}] identity is invalid")
+        if "artifactId" in artifact and artifact.get("artifactId") != artifact_id:
+            raise ProjectionBlocked(f"{label} artifact[{index}] artifactId alias drifted")
+        if "id" in artifact and artifact.get("id") != artifact_id:
+            raise ProjectionBlocked(f"{label} artifact[{index}] id alias drifted")
+        file_name = artifact.get("fileName")
+        digest = artifact.get("sha256")
+        size_bytes = artifact.get("sizeBytes")
+        tokens: dict[str, str] = {}
+        for name in ("head", "platform", "rid", "arch", "kind"):
+            value = artifact.get(name)
+            if (
+                not isinstance(value, str)
+                or not value
+                or value != value.strip().lower()
+            ):
+                raise ProjectionBlocked(
+                    f"{label} artifact[{index}] {name} is invalid"
+                )
+            tokens[name] = value
+        if (
+            not isinstance(file_name, str)
+            or not file_name
+            or file_name != file_name.strip()
+            or file_name in seen_files
+            or SHA256_RE.fullmatch(str(digest or "")) is None
+            or isinstance(size_bytes, bool)
+            or not isinstance(size_bytes, int)
+            or size_bytes < 1
+        ):
+            raise ProjectionBlocked(f"{label} artifact[{index}] byte identity is invalid")
+        seen_ids.add(artifact_id)
+        seen_files.add(file_name)
+        inventory_row: dict[str, object] = {
+            "artifactId": artifact_id,
+            **tokens,
+            "fileName": file_name,
+            "sha256": digest,
+            "sizeBytes": size_bytes,
+        }
+        payload_values: dict[str, object] = {
+            "payloadFileName": artifact.get("payloadFileName"),
+            "payloadSha256": artifact.get("payloadSha256"),
+            "payloadSizeBytes": artifact.get("payloadSizeBytes"),
+        }
+        present_payload_fields = {
+            name for name, value in payload_values.items() if value is not None
+        }
+        if present_payload_fields:
+            if (
+                present_payload_fields != set(payload_values)
+                or not isinstance(payload_values["payloadFileName"], str)
+                or not payload_values["payloadFileName"]
+                or payload_values["payloadFileName"]
+                != payload_values["payloadFileName"].strip()
+                or SHA256_RE.fullmatch(
+                    str(payload_values["payloadSha256"] or "")
+                )
+                is None
+                or isinstance(payload_values["payloadSizeBytes"], bool)
+                or not isinstance(payload_values["payloadSizeBytes"], int)
+                or payload_values["payloadSizeBytes"] < 1
+            ):
+                raise ProjectionBlocked(
+                    f"{label} artifact[{index}] payload identity is invalid"
+                )
+            inventory_row.update(payload_values)
+        inventory.append(inventory_row)
+    return artifacts, inventory
+
+
+def _candidate_validate_profile_retained_provenance(
+    canonical: dict[str, object],
+    compatibility: dict[str, object],
+    provenance: object,
+    *,
+    review: dict[str, object],
+) -> tuple[dict[str, object], list[str]]:
+    if (
+        not isinstance(provenance, dict)
+        or set(provenance) != CANDIDATE_UNSIGNED_RETAINED_PROVENANCE_KEYS
+        or provenance.get("contractName")
+        != "chummer.registry.retained-incumbent-provenance"
+        or type(provenance.get("contractVersion")) is not int
+        or provenance.get("contractVersion") != 1
+        or provenance.get("incumbentSnapshotSha256")
+        != review.get("incumbentSnapshotSha256")
+    ):
+        raise ProjectionBlocked("projected retained incumbent provenance shape drifted")
+    for field in (
+        "incumbentCanonicalManifestSha256",
+        "incumbentCompatibilityManifestSha256",
+        "incumbentFullShelfInventorySha256",
+        "incumbentSnapshotSha256",
+        "retainedArtifactBindingsSha256",
+        "retainedCompatibilityBindingsSha256",
+        "retainedInventorySha256",
+    ):
+        if SHA256_RE.fullmatch(str(provenance.get(field) or "")) is None:
+            raise ProjectionBlocked(
+                f"projected retained incumbent provenance {field} is invalid"
+            )
+    artifacts, _inventory = _candidate_profile_artifact_inventory_rows(
+        canonical, label="projected canonical manifest"
+    )
+    retained_artifacts = [
+        artifact for artifact in artifacts if artifact.get("platform") != "windows"
+    ]
+    if any(artifact.get("platform") != "macos" for artifact in retained_artifacts):
+        raise ProjectionBlocked("projected retained artifact platform is not exact macOS")
+    bindings = provenance.get("retainedArtifactBindings")
+    if (
+        not isinstance(bindings, list)
+        or len(bindings) != len(retained_artifacts)
+        or provenance.get("retainedArtifactBindingsSha256")
+        != _candidate_ui_compact_sha256(bindings)
+    ):
+        raise ProjectionBlocked("projected retained artifact binding set drifted")
+    retained_ids: list[str] = []
+    retained_by_file: dict[str, dict[str, object]] = {}
+    for index, (binding, artifact) in enumerate(
+        zip(bindings, retained_artifacts, strict=True)
+    ):
+        artifact_id = artifact.get("artifactId") or artifact.get("id")
+        if (
+            not isinstance(binding, dict)
+            or set(binding) != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_BINDING_KEYS
+            or binding.get("artifactId") != artifact_id
+            or binding.get("manifestRowSha256")
+            != _candidate_ui_compact_sha256(artifact)
+            or binding.get("sha256") != artifact.get("sha256")
+            or binding.get("sizeBytes") != artifact.get("sizeBytes")
+            or artifact_id in retained_ids
+        ):
+            raise ProjectionBlocked(
+                f"projected retained artifact binding[{index}] drifted"
+            )
+        retained_ids.append(str(artifact_id))
+        retained_by_file[str(artifact.get("fileName"))] = artifact
+    if retained_ids != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS:
+        raise ProjectionBlocked(
+            "projected retained artifact identities or order drifted"
+        )
+    compatibility_rows = compatibility.get("downloads")
+    if not isinstance(compatibility_rows, list):
+        raise ProjectionBlocked(
+            "projected compatibility retained artifact rows are missing"
+        )
+    canonical_ids = [
+        str(artifact.get("artifactId") or artifact.get("id"))
+        for artifact in artifacts
+    ]
+    compatibility_ids_in_order: list[str] = []
+    for index, row in enumerate(compatibility_rows):
+        if not isinstance(row, dict):
+            raise ProjectionBlocked(
+                f"projected compatibility artifact[{index}] is invalid"
+            )
+        artifact_id = row.get("artifactId") or row.get("id")
+        if (
+            not isinstance(artifact_id, str)
+            or not artifact_id
+            or artifact_id in compatibility_ids_in_order
+            or row.get("id") != artifact_id
+            or row.get("artifactId") not in (None, artifact_id)
+        ):
+            raise ProjectionBlocked(
+                f"projected compatibility artifact[{index}] identity drifted"
+            )
+        compatibility_ids_in_order.append(artifact_id)
+    if compatibility_ids_in_order != canonical_ids:
+        raise ProjectionBlocked(
+            "projected canonical/compatibility artifact identities drifted"
+        )
+    retained_compatibility = [
+        row
+        for row in compatibility_rows
+        if isinstance(row, dict) and row.get("fileName") in retained_by_file
+    ]
+    compatibility_bindings = provenance.get("retainedCompatibilityBindings")
+    if (
+        not isinstance(compatibility_bindings, list)
+        or len(retained_compatibility) != len(retained_artifacts)
+        or len(compatibility_bindings) != len(retained_compatibility)
+        or provenance.get("retainedCompatibilityBindingsSha256")
+        != _candidate_ui_compact_sha256(compatibility_bindings)
+    ):
+        raise ProjectionBlocked(
+            "projected retained compatibility binding set drifted"
+        )
+    compatibility_ids: set[str] = set()
+    for index, (binding, row) in enumerate(
+        zip(compatibility_bindings, retained_compatibility, strict=True)
+    ):
+        canonical_row = retained_by_file[str(row.get("fileName"))]
+        artifact_id = canonical_row.get("artifactId") or canonical_row.get("id")
+        if (
+            not isinstance(binding, dict)
+            or set(binding) != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_BINDING_KEYS
+            or binding.get("artifactId") != artifact_id
+            or binding.get("manifestRowSha256")
+            != _candidate_ui_compact_sha256(row)
+            or binding.get("sha256") != row.get("sha256")
+            or binding.get("sizeBytes") != row.get("sizeBytes")
+            or row.get("sha256") != canonical_row.get("sha256")
+            or row.get("sizeBytes") != canonical_row.get("sizeBytes")
+            or not isinstance(artifact_id, str)
+            or artifact_id in compatibility_ids
+        ):
+            raise ProjectionBlocked(
+                f"projected retained compatibility binding[{index}] drifted"
+            )
+        compatibility_ids.add(artifact_id)
+    if compatibility_ids != set(retained_ids):
+        raise ProjectionBlocked(
+            "projected retained canonical/compatibility bindings are not bijective"
+        )
+    return provenance, retained_ids
+
+
+def _candidate_validate_unsigned_profile_manifest_pair(
+    canonical: dict[str, object],
+    compatibility: dict[str, object],
+) -> dict[str, object]:
+    registry_commit: str | None = None
+    release_version: str | None = None
+    release_proof: dict[str, object] | None = None
+    code_deploy_review: dict[str, object] | None = None
+    retained_provenance: dict[str, object] | None = None
+    retained_artifact_ids: list[str] | None = None
+    for label, manifest in (
+        ("canonical", canonical),
+        ("compatibility", compatibility),
+    ):
+        if not _candidate_unsigned_profile_enabled(
+            manifest, label=f"projected {label} manifest"
+        ):
+            raise ProjectionBlocked(f"projected {label} manifest profile is missing")
+        _candidate_validate_unsigned_profile_recursive_authority(
+            manifest, label=f"projected {label} manifest"
+        )
+        manifest_version = _candidate_manifest_alias(
+            manifest,
+            "version",
+            "releaseVersion",
+            label=f"projected {label} release version",
+        )
+        manifest_channel = _candidate_manifest_alias(
+            manifest,
+            "channel",
+            "channelId",
+            label=f"projected {label} release channel",
+        )
+        if (
+            manifest_channel != "preview"
+            or manifest.get("previewPolicy") != "preview_policy"
+            or manifest.get("platformScope") != "windows_only"
+            or manifest.get("crossRunBitReproducible") is not False
+            or manifest.get("signature")
+            != {"policy": "preview_policy", "required": False, "status": "unsigned"}
+        ):
+            raise ProjectionBlocked(
+                f"projected {label} root preview identity drifted"
+            )
+        if release_version is not None and manifest_version != release_version:
+            raise ProjectionBlocked("projected manifest release versions disagree")
+        release_version = manifest_version
+        commit = _candidate_manifest_alias(
+            manifest,
+            "registryCommit",
+            "registry_commit",
+            label=f"projected {label} Registry commit",
+        )
+        if CANDIDATE_COMMIT_RE.fullmatch(commit) is None:
+            raise ProjectionBlocked(f"projected {label} Registry commit is invalid")
+        if registry_commit is not None and commit != registry_commit:
+            raise ProjectionBlocked("projected manifest Registry commits disagree")
+        registry_commit = commit
+        proof = manifest.get("releaseProof")
+        generated_at = _candidate_manifest_alias(
+            manifest,
+            "generatedAt",
+            "generated_at",
+            label=f"projected {label} generated time",
+        )
+        if (
+            manifest.get("projectionStage") != "prepared_candidate"
+            or manifest.get("status") != "published"
+            or manifest.get("releaseDecisionStatus") != "review_required"
+            or manifest.get("rolloutState") != "coverage_incomplete"
+            or manifest.get("supportabilityState") != "review_required"
+            or manifest.get("platformScope") != "windows_only"
+            or manifest.get("crossRunBitReproducible") is not False
+            or manifest.get("signature")
+            != {"policy": "preview_policy", "required": False, "status": "unsigned"}
+            or any(
+                manifest.get(key) is not False
+                for key in (
+                    "publicationAuthorized",
+                    "publicationEligible",
+                    "releaseUploadAuthority",
+                    "deployAuthority",
+                    "deployAuthorized",
+                    "uploadAuthorized",
+                    "routeAuthority",
+                    "codeDeploymentAuthority",
+                )
+            )
+            or not isinstance(proof, dict)
+            or set(proof)
+            != {"baseUrl", "generatedAt", "journeysPassed", "proofRoutes", "status"}
+            or proof.get("baseUrl") != "https://chummer.run"
+            or proof.get("status") != "review_required"
+            or proof.get("journeysPassed") != []
+            or proof.get("proofRoutes") != []
+        ):
+            raise ProjectionBlocked(
+                f"projected {label} manifest review-required posture drifted"
+            )
+        _candidate_timestamp(
+            proof.get("generatedAt"),
+            label=f"projected {label} proof time",
+            now=datetime.now(timezone.utc),
+            require_fresh=False,
+        )
+        if proof.get("generatedAt") != generated_at:
+            raise ProjectionBlocked(
+                f"projected {label} proof/generated time drifted"
+            )
+        if release_proof is not None and proof != release_proof:
+            raise ProjectionBlocked("projected manifest releaseProof documents disagree")
+        release_proof = proof
+
+        review = manifest.get("codeDeployCurrentShelfAuthority")
+        if (
+            not isinstance(review, dict)
+            or set(review) != CANDIDATE_UNSIGNED_CODE_DEPLOY_REVIEW_KEYS
+            or review.get("authority") is not False
+            or review.get("contract")
+            != "chummer.registry.preview-publication-delta-code-deploy-review/v1"
+            or review.get("evaluatedAt") != generated_at
+            or review.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+            or review.get("registryCommit") != commit
+            or review.get("status") != "review_required"
+            or isinstance(review.get("projectedArtifactCount"), bool)
+            or not isinstance(review.get("projectedArtifactCount"), int)
+            or review.get("projectedArtifactCount") < 1
+        ):
+            raise ProjectionBlocked(
+                f"projected {label} code-deploy review posture drifted"
+            )
+        for field in (
+            "incumbentSnapshotSha256",
+            "projectedArtifactInventorySha256",
+            "sourceCanonicalManifestSha256",
+            "sourceCompatibilityManifestSha256",
+            "sourceShelfInventorySha256",
+        ):
+            if SHA256_RE.fullmatch(str(review.get(field) or "")) is None:
+                raise ProjectionBlocked(
+                    f"projected {label} code-deploy review {field} is invalid"
+                )
+        if code_deploy_review is not None and review != code_deploy_review:
+            raise ProjectionBlocked(
+                "projected manifest code-deploy review documents disagree"
+            )
+        code_deploy_review = review
+
+        provenance = manifest.get("retainedIncumbentProvenance")
+        if retained_provenance is not None and provenance != retained_provenance:
+            raise ProjectionBlocked(
+                "projected retained incumbent provenance documents disagree"
+            )
+        if label == "canonical":
+            retained_provenance, retained_artifact_ids = (
+                _candidate_validate_profile_retained_provenance(
+                    canonical, compatibility, provenance, review=review
+                )
+            )
+        elif not isinstance(provenance, dict):
+            raise ProjectionBlocked(
+                "projected compatibility retained incumbent provenance is invalid"
+            )
+
+    coverage = canonical.get("desktopTupleCoverage")
+    if (
+        not isinstance(coverage, dict)
+        or coverage.get("requiredDesktopPlatforms") != ["macos", "windows"]
+        or coverage.get("requiredDesktopHeads") != ["avalonia"]
+        or coverage.get("requiredDesktopPlatformHeadRidTuples")
+        != ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
+        or coverage.get("missingRequiredPlatforms") != ["windows"]
+        or coverage.get("missingRequiredPlatformHeadPairs") != ["avalonia:windows"]
+        or coverage.get("missingRequiredPlatformHeadRidTuples")
+        != ["avalonia:win-x64:windows"]
+        or coverage.get("complete") is not False
+        or coverage.get("routeAuthority") is not False
+    ):
+        raise ProjectionBlocked("projected canonical desktop coverage posture drifted")
+    routes = coverage.get("desktopRouteTruth")
+    if not isinstance(routes, list):
+        raise ProjectionBlocked("projected canonical desktop route truth is missing")
+    route_by_tuple = {
+        row.get("tupleId"): row for row in routes if isinstance(row, dict)
+    }
+    windows_route = route_by_tuple.get("avalonia:windows:win-x64")
+    if (
+        not isinstance(windows_route, dict)
+        or windows_route.get("promotionState") != "proof_required"
+        or windows_route.get("routeAuthority") is not False
+        or windows_route.get("publicInstallRoute") is not None
+        or windows_route.get("installPosture") != "proof_capture_required"
+        or windows_route.get("updateEligibility") != "blocked_missing_proof"
+    ):
+        raise ProjectionBlocked("projected canonical Windows route is not proof-required")
+    for tuple_id in (
+        "avalonia:macos:osx-arm64",
+        "blazor-desktop:macos:osx-arm64",
+    ):
+        row = route_by_tuple.get(tuple_id)
+        if (
+            not isinstance(row, dict)
+            or row.get("promotionState") != "promoted"
+            or row.get("routeAuthority") is not False
+            or not isinstance(row.get("publicInstallRoute"), str)
+        ):
+            raise ProjectionBlocked(
+                "projected canonical retained macOS route posture drifted"
+            )
+    windows = [
+        row
+        for row in canonical.get("artifacts") or []
+        if isinstance(row, dict)
+        and row.get("head") == "avalonia"
+        and row.get("platform") == "windows"
+        and row.get("rid") == CANDIDATE_RID
+    ]
+    if len(windows) != 1:
+        raise ProjectionBlocked("projected canonical Windows artifact cardinality drifted")
+    if (
+        release_version is None
+        or windows[0].get("artifactId") != "avalonia-win-x64-installer"
+        or windows[0].get("id") != "avalonia-win-x64-installer"
+        or windows[0].get("head") != "avalonia"
+        or windows[0].get("platform") != "windows"
+        or windows[0].get("rid") != CANDIDATE_RID
+        or windows[0].get("arch") != "x64"
+        or windows[0].get("kind") != "installer"
+        or windows[0].get("fileName")
+        != "chummer-avalonia-win-x64-installer.exe"
+        or windows[0].get("payloadFileName")
+        != "chummer-avalonia-win-x64-payload.zip"
+        or windows[0].get("installerMode") != "bootstrap"
+        or windows[0].get("payloadAcquisitionMode") != "download"
+        or windows[0].get("channel") != "preview"
+        or windows[0].get("channelId") != "preview"
+        or windows[0].get("version") != release_version
+        or windows[0].get("releaseVersion") != release_version
+        or windows[0].get("platformScope") != "windows_only"
+        or windows[0].get("previewPolicy") != "preview_policy"
+        or windows[0].get("crossRunBitReproducible") is not False
+        or windows[0].get("signature")
+        != {"policy": "preview_policy", "required": False, "status": "unsigned"}
+        or windows[0].get("publicationDisposition") != "delta"
+        or windows[0].get("installAccessClass") != "open_public"
+        or windows[0].get("artifactByteVisibility") != "public"
+        or windows[0].get("downloadUrl")
+        != "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        or windows[0].get("payloadDownloadUrl")
+        != "/downloads/files/chummer-avalonia-win-x64-payload.zip"
+    ):
+        raise ProjectionBlocked("projected canonical Windows public-byte posture drifted")
+    compatibility_downloads = compatibility.get("downloads")
+    compatibility_windows = [
+        row
+        for row in compatibility_downloads or []
+        if isinstance(row, dict)
+        and (row.get("artifactId") or row.get("id"))
+        == "avalonia-win-x64-installer"
+    ]
+    if (
+        not isinstance(compatibility_downloads, list)
+        or len(compatibility_windows) != 1
+        or compatibility_windows[0].get("artifactId")
+        != "avalonia-win-x64-installer"
+        or compatibility_windows[0].get("id") != "avalonia-win-x64-installer"
+        or compatibility_windows[0].get("head") != "avalonia"
+        or compatibility_windows[0].get("platform") != "windows"
+        or compatibility_windows[0].get("platformId") != "windows-x64"
+        or compatibility_windows[0].get("arch") != "x64"
+        or compatibility_windows[0].get("kind") != "installer"
+        or compatibility_windows[0].get("channel") != "preview"
+        or compatibility_windows[0].get("channelId") != "preview"
+        or compatibility_windows[0].get("version") != release_version
+        or compatibility_windows[0].get("releaseVersion") != release_version
+        or compatibility_windows[0].get("platformScope") != "windows_only"
+        or compatibility_windows[0].get("previewPolicy") != "preview_policy"
+        or compatibility_windows[0].get("crossRunBitReproducible") is not False
+        or compatibility_windows[0].get("signature")
+        != {"policy": "preview_policy", "required": False, "status": "unsigned"}
+        or compatibility_windows[0].get("publicationDisposition") != "delta"
+        or compatibility_windows[0].get("url")
+        != "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        or compatibility_windows[0].get("downloadUrl")
+        != "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        or compatibility_windows[0].get("payloadDownloadUrl")
+        != "/downloads/files/chummer-avalonia-win-x64-payload.zip"
+        or compatibility_windows[0].get("fileName")
+        != "chummer-avalonia-win-x64-installer.exe"
+        or compatibility_windows[0].get("payloadFileName")
+        != "chummer-avalonia-win-x64-payload.zip"
+        or compatibility_windows[0].get("installAccessClass") != "open_public"
+        or compatibility_windows[0].get("sha256") != windows[0].get("sha256")
+        or compatibility_windows[0].get("sizeBytes")
+        != windows[0].get("sizeBytes")
+        or compatibility_windows[0].get("payloadSha256")
+        != windows[0].get("payloadSha256")
+        or compatibility_windows[0].get("payloadSizeBytes")
+        != windows[0].get("payloadSizeBytes")
+    ):
+        raise ProjectionBlocked(
+            "projected compatibility Windows public-byte posture drifted"
+        )
+    _artifacts, projected_inventory = _candidate_profile_artifact_inventory_rows(
+        canonical, label="projected canonical manifest"
+    )
+    if (
+        registry_commit is None
+        or code_deploy_review is None
+        or retained_provenance is None
+        or retained_artifact_ids is None
+        or code_deploy_review.get("projectedArtifactCount")
+        != len(projected_inventory)
+        or code_deploy_review.get("projectedArtifactInventorySha256")
+        != _candidate_ui_compact_sha256(projected_inventory)
+    ):
+        raise ProjectionBlocked(
+            "projected manifest artifact inventory review binding drifted"
+        )
+    return {
+        "registryCommit": registry_commit,
+        "codeDeployReview": code_deploy_review,
+        "retainedProvenance": retained_provenance,
+        "retainedArtifactIds": retained_artifact_ids,
+    }
+
+
 def _validate_candidate_import_authority_v3(
     authority: dict[str, object],
 ) -> dict[str, object]:
@@ -3853,6 +4568,20 @@ def _validate_candidate_import_authority_v3(
     compatibility = _strict_json_object(
         compatibility_raw, label="unsigned candidate compatibility manifest"
     )
+    canonical_profile = _candidate_unsigned_profile_enabled(
+        canonical, label="unsigned candidate canonical manifest"
+    )
+    compatibility_profile = _candidate_unsigned_profile_enabled(
+        compatibility, label="unsigned candidate compatibility manifest"
+    )
+    if canonical_profile != compatibility_profile:
+        raise ProjectionBlocked("unsigned candidate manifest profiles disagree")
+    profile_enabled = canonical_profile
+    profile_manifest = (
+        _candidate_validate_unsigned_profile_manifest_pair(canonical, compatibility)
+        if profile_enabled
+        else None
+    )
     if hashlib.sha256(canonical_raw).hexdigest() != candidate.get(
         "canonicalManifestSha256"
     ):
@@ -3948,6 +4677,8 @@ def _validate_candidate_import_authority_v3(
         "sourceSha",
         "status",
     }
+    if profile_enabled:
+        evidence_keys.add("projectionProfile")
     if (
         not isinstance(evidence, dict)
         or set(evidence) != evidence_keys
@@ -3956,6 +4687,11 @@ def _validate_candidate_import_authority_v3(
         or evidence.get("platformScope") != "windows_only"
         or evidence.get("crossRunBitReproducible") is not False
         or evidence.get("signaturePolicy") != signature_policy
+        or (
+            profile_enabled
+            and evidence.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+        )
         or CANDIDATE_COMMIT_RE.fullmatch(str(evidence.get("sourceSha") or ""))
         is None
         or not isinstance(evidence.get("files"), list)
@@ -3991,6 +4727,13 @@ def _validate_candidate_import_authority_v3(
         "releases.json",
         *provenance_paths.values(),
     }
+    if profile_enabled:
+        expected_evidence_paths.update(
+            {
+                CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH,
+                CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH,
+            }
+        )
     if set(evidence_documents) != expected_evidence_paths:
         raise ProjectionBlocked("unsigned candidate evidence file scope drifted")
     if (
@@ -4025,6 +4768,8 @@ def _validate_candidate_import_authority_v3(
         "status",
         "uploadAuthorized",
     }
+    if profile_enabled:
+        scope_keys.add("projectionProfile")
     signature = {"policy": "preview_policy", "required": False, "status": "unsigned"}
     if (
         set(scope) != scope_keys
@@ -4039,6 +4784,11 @@ def _validate_candidate_import_authority_v3(
         or scope.get("crossRunBitReproducible") is not False
         or scope.get("signature") != signature
         or scope.get("sourceSha") != evidence.get("sourceSha")
+        or (
+            profile_enabled
+            and scope.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+        )
         or any(
             scope.get(key) is not False
             for key in (
@@ -4103,11 +4853,29 @@ def _validate_candidate_import_authority_v3(
     ):
         raise ProjectionBlocked("unsigned UI full shelf inventory drifted")
     fresh = scope.get("freshDelta")
-    if not isinstance(fresh, list) or len(fresh) != 2:
+    expected_roles: list[tuple[str, str | None]] = [
+        ("installer", "installer"),
+        ("bootstrap_payload", "payload"),
+    ]
+    if profile_enabled:
+        expected_roles.append(("bootstrap_payload_sidecar", None))
+    if not isinstance(fresh, list) or len(fresh) != len(expected_roles):
         raise ProjectionBlocked("unsigned UI fresh Windows delta drifted")
-    expected_roles = (("installer", "installer"), ("bootstrap_payload", "payload"))
     for row, (role, canonical_role) in zip(fresh, expected_roles, strict=True):
-        expected = canonical_scope["artifacts"]["avalonia"][canonical_role]
+        expected = (
+            canonical_scope["artifacts"]["avalonia"][canonical_role]
+            if canonical_role is not None
+            else {
+                "fileName": CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME,
+                "path": f"files/{CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME}",
+                "sha256": full_by_path.get(
+                    f"files/{CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME}", {}
+                ).get("sha256"),
+                "sizeBytes": full_by_path.get(
+                    f"files/{CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME}", {}
+                ).get("sizeBytes"),
+            }
+        )
         full = full_by_path[str(expected["path"])]
         if row != {
             "artifactRole": role,
@@ -4121,10 +4889,13 @@ def _validate_candidate_import_authority_v3(
             "sizeBytes": expected["sizeBytes"],
         }:
             raise ProjectionBlocked("unsigned UI fresh Windows delta byte drifted")
-    if [row.get("fileName") for row in fresh if isinstance(row, dict)] != [
+    expected_fresh_names = [
         "chummer-avalonia-win-x64-installer.exe",
         "chummer-avalonia-win-x64-payload.zip",
-    ]:
+    ]
+    if profile_enabled:
+        expected_fresh_names.append(CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME)
+    if [row.get("fileName") for row in fresh if isinstance(row, dict)] != expected_fresh_names:
         raise ProjectionBlocked("unsigned UI fresh Windows filenames drifted")
     retained = _candidate_unsigned_inventory(
         scope.get("retainedFromIncumbent"),
@@ -4231,6 +5002,21 @@ def _validate_candidate_import_authority_v3(
         "sourceSha",
         "windowsDelta",
     }
+    if profile_enabled:
+        candidate_keys.update(
+            {
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256",
+            }
+        )
     if (
         set(registry_candidate) != candidate_keys
         or registry_candidate.get("contractName")
@@ -4246,6 +5032,11 @@ def _validate_candidate_import_authority_v3(
         or registry_candidate.get("sourceSha") != scope["sourceSha"]
         or registry_candidate.get("deltaPlatforms") != ["windows"]
         or registry_candidate.get("evidencePlatforms") != []
+        or (
+            profile_enabled
+            and registry_candidate.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+        )
         or any(
             registry_candidate.get(key) is not False
             for key in (
@@ -4259,6 +5050,33 @@ def _validate_candidate_import_authority_v3(
         )
     ):
         raise ProjectionBlocked("unsigned Registry PREPARE v2 posture drifted")
+    if profile_enabled:
+        _candidate_validate_unsigned_profile_recursive_authority(
+            registry_candidate, label="unsigned Registry PREPARE profile"
+        )
+        if profile_manifest is None:
+            raise ProjectionBlocked("unsigned Registry profile manifest validation is missing")
+        registry_commit = _candidate_manifest_alias(
+            registry_candidate,
+            "registryCommit",
+            "registry_commit",
+            label="unsigned Registry PREPARE Registry commit",
+        )
+        if (
+            CANDIDATE_COMMIT_RE.fullmatch(registry_commit) is None
+            or registry_commit != profile_manifest["registryCommit"]
+            or registry_candidate.get("codeDeployCurrentShelfAuthority")
+            != profile_manifest["codeDeployReview"]
+            or registry_candidate.get("retainedIncumbentProvenance")
+            != profile_manifest["retainedProvenance"]
+            or registry_candidate.get("privacyLaunchGateSnapshot")
+            != CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            or registry_candidate.get("privacyLaunchGateSnapshotSha256")
+            != _candidate_ui_compact_sha256(
+                CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            )
+        ):
+            raise ProjectionBlocked("unsigned Registry PREPARE profile graph drifted")
     _candidate_reference(
         registry_candidate.get("canonicalManifest"),
         path="RELEASE_CHANNEL.generated.json",
@@ -4271,6 +5089,27 @@ def _validate_candidate_import_authority_v3(
         raw=compatibility_raw,
         label="unsigned Registry candidate compatibility manifest",
     )
+    source_canonical_raw: bytes | None = None
+    source_compatibility_raw: bytes | None = None
+    if profile_enabled:
+        source_canonical_raw = evidence_documents[
+            CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH
+        ]
+        source_compatibility_raw = evidence_documents[
+            CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH
+        ]
+        _candidate_reference(
+            registry_candidate.get("sourceCanonicalManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH,
+            raw=source_canonical_raw,
+            label="unsigned Registry source canonical manifest",
+        )
+        _candidate_reference(
+            registry_candidate.get("sourceCompatibilityManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH,
+            raw=source_compatibility_raw,
+            label="unsigned Registry source compatibility manifest",
+        )
     if (
         registry_candidate.get("fullShelfInventory") != full_inventory
         or registry_candidate.get("fullShelfInventorySha256")
@@ -4302,6 +5141,8 @@ def _validate_candidate_import_authority_v3(
         "status",
         "uploadAuthorized",
     }
+    if profile_enabled:
+        composition_keys.add("projectionProfile")
     if not isinstance(composition, dict):
         raise ProjectionBlocked("unsigned Registry composition request is missing")
     composition_raw = (
@@ -4326,6 +5167,11 @@ def _validate_candidate_import_authority_v3(
         or composition.get("crossRunBitReproducible") is not False
         or composition.get("signature") != signature
         or composition.get("sourceSha") != scope["sourceSha"]
+        or (
+            profile_enabled
+            and composition.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+        )
         or any(
             composition.get(key) is not False
             for key in (
@@ -4339,13 +5185,13 @@ def _validate_candidate_import_authority_v3(
     _candidate_reference(
         composition.get("proposedCanonicalManifest"),
         path="RELEASE_CHANNEL.generated.json",
-        raw=canonical_raw,
+        raw=source_canonical_raw if profile_enabled else canonical_raw,
         label="unsigned composition canonical manifest",
     )
     _candidate_reference(
         composition.get("proposedCompatibilityManifest"),
         path="releases.json",
-        raw=compatibility_raw,
+        raw=source_compatibility_raw if profile_enabled else compatibility_raw,
         label="unsigned composition compatibility manifest",
     )
     proposed_inventory = _candidate_unsigned_inventory(
@@ -4357,13 +5203,44 @@ def _validate_candidate_import_authority_v3(
         label="unsigned composition proposed directory modes",
     )
     if (
-        proposed_inventory != full_inventory
-        or composition.get("proposedShelfInventorySha256")
+        composition.get("proposedShelfInventorySha256")
         != _candidate_ui_compact_sha256(proposed_inventory)
         or composition.get("proposedDirectoryModesSha256")
         != _candidate_ui_compact_sha256(proposed_modes)
     ):
         raise ProjectionBlocked("unsigned composition proposed shelf graph drifted")
+    if profile_enabled:
+        if source_canonical_raw is None or source_compatibility_raw is None:
+            raise ProjectionBlocked("unsigned composition source custody is missing")
+        proposed_by_path = {str(row["path"]): row for row in proposed_inventory}
+        if set(proposed_by_path) != set(full_by_path):
+            raise ProjectionBlocked("unsigned source/projected shelf paths drifted")
+        for path in set(proposed_by_path) - {
+            "RELEASE_CHANNEL.generated.json",
+            "releases.json",
+        }:
+            if proposed_by_path[path] != full_by_path[path]:
+                raise ProjectionBlocked("unsigned profile changed a non-manifest shelf byte")
+        for path, source_raw, projected_raw in (
+            ("RELEASE_CHANNEL.generated.json", source_canonical_raw, canonical_raw),
+            ("releases.json", source_compatibility_raw, compatibility_raw),
+        ):
+            source_row = proposed_by_path[path]
+            projected_row = full_by_path[path]
+            if (
+                source_row["mode"] != projected_row["mode"]
+                or source_row["sha256"] != hashlib.sha256(source_raw).hexdigest()
+                or source_row["sizeBytes"] != len(source_raw)
+                or projected_row["sha256"]
+                != hashlib.sha256(projected_raw).hexdigest()
+                or projected_row["sizeBytes"] != len(projected_raw)
+                or source_row["sha256"] == projected_row["sha256"]
+            ):
+                raise ProjectionBlocked(
+                    "unsigned source/projected manifest custody drifted"
+                )
+    elif proposed_inventory != full_inventory:
+        raise ProjectionBlocked("unsigned composition proposed shelf differs")
     incumbent = composition.get("incumbentSnapshot")
     incumbent_keys = {
         "canonicalManifest",
@@ -4400,6 +5277,84 @@ def _validate_candidate_import_authority_v3(
         != scope["incumbentInventorySha256"]
     ):
         raise ProjectionBlocked("unsigned composition incumbent digest graph drifted")
+    if profile_enabled:
+        if (
+            profile_manifest is None
+            or source_canonical_raw is None
+            or source_compatibility_raw is None
+        ):
+            raise ProjectionBlocked("unsigned profile custody graph is missing")
+        review = profile_manifest["codeDeployReview"]
+        retained_provenance = profile_manifest["retainedProvenance"]
+        incumbent_canonical_ref = incumbent.get("canonicalManifest")
+        incumbent_compatibility_ref = incumbent.get("compatibilityManifest")
+        if (
+            not isinstance(review, dict)
+            or not isinstance(retained_provenance, dict)
+            or not isinstance(incumbent_canonical_ref, dict)
+            or not isinstance(incumbent_compatibility_ref, dict)
+        ):
+            raise ProjectionBlocked("unsigned profile review graph is invalid")
+        if (
+            registry_candidate.get("sourceShelfInventorySha256")
+            != composition.get("proposedShelfInventorySha256")
+            or review.get("sourceCanonicalManifestSha256")
+            != hashlib.sha256(source_canonical_raw).hexdigest()
+            or review.get("sourceCompatibilityManifestSha256")
+            != hashlib.sha256(source_compatibility_raw).hexdigest()
+            or review.get("sourceShelfInventorySha256")
+            != registry_candidate.get("sourceShelfInventorySha256")
+            or review.get("incumbentSnapshotSha256")
+            != incumbent.get("snapshotSha256")
+            or retained_provenance.get("incumbentCanonicalManifestSha256")
+            != incumbent_canonical_ref.get("sha256")
+            or retained_provenance.get("incumbentCompatibilityManifestSha256")
+            != incumbent_compatibility_ref.get("sha256")
+            or retained_provenance.get("incumbentFullShelfInventorySha256")
+            != incumbent.get("fullShelfInventorySha256")
+            or retained_provenance.get("retainedInventorySha256")
+            != registry_candidate.get("retainedInventorySha256")
+        ):
+            raise ProjectionBlocked("unsigned profile review/incumbent graph drifted")
+        retained_ids = profile_manifest["retainedArtifactIds"]
+        if not isinstance(retained_ids, list):
+            raise ProjectionBlocked("unsigned retained artifact identities are invalid")
+        source_canonical = _strict_json_object(
+            source_canonical_raw, label="unsigned source canonical manifest"
+        )
+        source_compatibility = _strict_json_object(
+            source_compatibility_raw, label="unsigned source compatibility manifest"
+        )
+        for label, source_manifest, projected_manifest, rows_key in (
+            ("canonical", source_canonical, canonical, "artifacts"),
+            ("compatibility", source_compatibility, compatibility, "downloads"),
+        ):
+            source_rows = source_manifest.get(rows_key)
+            projected_rows = projected_manifest.get(rows_key)
+            if not isinstance(source_rows, list) or not isinstance(projected_rows, list):
+                raise ProjectionBlocked(
+                    f"unsigned retained {label} artifact rows are missing"
+                )
+            source_retained = [
+                row
+                for row in source_rows
+                if isinstance(row, dict)
+                and (row.get("artifactId") or row.get("id")) in retained_ids
+            ]
+            projected_retained = [
+                row
+                for row in projected_rows
+                if isinstance(row, dict)
+                and (row.get("artifactId") or row.get("id")) in retained_ids
+            ]
+            if (
+                len(source_retained) != len(retained_ids)
+                or len(projected_retained) != len(retained_ids)
+                or source_retained != projected_retained
+            ):
+                raise ProjectionBlocked(
+                    f"unsigned retained {label} artifacts differ from source custody"
+                )
     _candidate_unheld_reference(
         incumbent.get("canonicalManifest"),
         path="RELEASE_CHANNEL.generated.json",
@@ -4434,11 +5389,32 @@ def _validate_candidate_import_authority_v3(
     ]
     if (
         not isinstance(composition_fresh, list)
-        or len(composition_fresh) != 2
+        or len(composition_fresh) != (3 if profile_enabled else 2)
         or len(windows_rows) != 1
     ):
         raise ProjectionBlocked("unsigned composition fresh delta drifted")
     manifest_row_sha256 = _candidate_ui_compact_sha256(windows_rows[0])
+    if profile_enabled:
+        source_artifacts = source_canonical.get("artifacts")
+        source_windows_rows = [
+            row
+            for row in source_artifacts or []
+            if isinstance(row, dict)
+            and row.get("head") == "avalonia"
+            and row.get("platform") == "windows"
+            and row.get("rid") == CANDIDATE_RID
+        ]
+        if len(source_windows_rows) != 1:
+            raise ProjectionBlocked(
+                "unsigned composition source Windows row drifted"
+            )
+        manifest_row_sha256 = _candidate_ui_compact_sha256(
+            source_windows_rows[0]
+        )
+        if windows_rows[0].get("sourceManifestRowSha256") != manifest_row_sha256:
+            raise ProjectionBlocked(
+                "unsigned projected Windows row lost its source-row custody"
+            )
     for composition_row, scope_row in zip(
         composition_fresh, fresh, strict=True
     ):
@@ -4517,7 +5493,15 @@ def _validate_candidate_import_authority_v3(
         or registry_candidate.get("provenance") != composition_provenance
     ):
         raise ProjectionBlocked("unsigned Registry PREPARE custody graph drifted")
-    _candidate_unsigned_projection_inputs(registry_candidate.get("projectionInputs"))
+    if profile_enabled and (
+        registry_candidate.get("retainedPlatforms") != ["macos"]
+        or registry_candidate.get("shelfPlatforms") != ["macos", "windows"]
+        or canonical_platforms != {"macos", "windows"}
+    ):
+        raise ProjectionBlocked("unsigned Registry profile shelf platforms drifted")
+    _candidate_unsigned_projection_inputs(
+        registry_candidate.get("projectionInputs"), profile_enabled=profile_enabled
+    )
 
     mixed_graph = {
         "authorityContractVersion": 2,
@@ -4539,6 +5523,21 @@ def _validate_candidate_import_authority_v3(
         "retainedPlatforms", "routeAuthority",
         "shelfPlatforms", "signaturePolicy", "sourceScope", "sourceSha", "windowsDelta",
     }
+    if profile_enabled:
+        authority_keys.update(
+            {
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256",
+            }
+        )
     if (
         set(registry_authority) != authority_keys
         or registry_authority.get("contractName")
@@ -4569,6 +5568,49 @@ def _validate_candidate_import_authority_v3(
         )
     ):
         raise ProjectionBlocked("unsigned Registry authority v2 posture drifted")
+    if profile_enabled:
+        if (
+            profile_manifest is None
+            or source_canonical_raw is None
+            or source_compatibility_raw is None
+        ):
+            raise ProjectionBlocked("unsigned Registry authority profile custody is missing")
+        authority_registry_commit = _candidate_manifest_alias(
+            registry_authority,
+            "registryCommit",
+            "registry_commit",
+            label="unsigned Registry authority Registry commit",
+        )
+        if (
+            registry_authority.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+            or authority_registry_commit != profile_manifest["registryCommit"]
+            or registry_authority.get("codeDeployCurrentShelfAuthority")
+            != registry_candidate.get("codeDeployCurrentShelfAuthority")
+            or registry_authority.get("retainedIncumbentProvenance")
+            != registry_candidate.get("retainedIncumbentProvenance")
+            or registry_authority.get("privacyLaunchGateSnapshot")
+            != CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            or registry_authority.get("privacyLaunchGateSnapshotSha256")
+            != _candidate_ui_compact_sha256(
+                CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            )
+            or registry_authority.get("sourceShelfInventorySha256")
+            != registry_candidate.get("sourceShelfInventorySha256")
+        ):
+            raise ProjectionBlocked("unsigned Registry authority profile graph drifted")
+        _candidate_reference(
+            registry_authority.get("sourceCanonicalManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH,
+            raw=source_canonical_raw,
+            label="unsigned Registry authority source canonical manifest",
+        )
+        _candidate_reference(
+            registry_authority.get("sourceCompatibilityManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH,
+            raw=source_compatibility_raw,
+            label="unsigned Registry authority source compatibility manifest",
+        )
     for key in (
         "fullShelfInventorySha256",
         "incumbentInventorySha256",
@@ -4590,7 +5632,9 @@ def _validate_candidate_import_authority_v3(
         _candidate_reference(value, path=path, raw=raw, label=f"unsigned Registry {label}")
     if registry_authority.get("windowsDelta") != expected_windows_delta:
         raise ProjectionBlocked("unsigned Registry Windows delta drifted")
-    _candidate_unsigned_projection_inputs(registry_authority.get("projectionInputs"))
+    _candidate_unsigned_projection_inputs(
+        registry_authority.get("projectionInputs"), profile_enabled=profile_enabled
+    )
     if registry_authority.get("projectionInputs") != registry_candidate.get(
         "projectionInputs"
     ):
@@ -4619,6 +5663,21 @@ def _validate_candidate_import_authority_v3(
         "publicationEligible", "releaseUploadAuthority", "releaseVersion", "routeAuthority",
         "signaturePolicy", "sourceScope", "verificationStatus", "windowsDelta",
     }
+    if profile_enabled:
+        finalize_keys.update(
+            {
+                "codeDeployCurrentShelfAuthority",
+                "privacyLaunchGateSnapshot",
+                "privacyLaunchGateSnapshotSha256",
+                "projectionProfile",
+                "registryCommit",
+                "registry_commit",
+                "retainedIncumbentProvenance",
+                "sourceCanonicalManifest",
+                "sourceCompatibilityManifest",
+                "sourceShelfInventorySha256",
+            }
+        )
     if (
         set(registry_finalize) != finalize_keys
         or registry_finalize.get("contractName")
@@ -4647,6 +5706,49 @@ def _validate_candidate_import_authority_v3(
         )
     ):
         raise ProjectionBlocked("unsigned Registry finalize v2 posture drifted")
+    if profile_enabled:
+        if (
+            profile_manifest is None
+            or source_canonical_raw is None
+            or source_compatibility_raw is None
+        ):
+            raise ProjectionBlocked("unsigned Registry finalize profile custody is missing")
+        finalize_registry_commit = _candidate_manifest_alias(
+            registry_finalize,
+            "registryCommit",
+            "registry_commit",
+            label="unsigned Registry finalize Registry commit",
+        )
+        if (
+            registry_finalize.get("projectionProfile")
+            != CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE
+            or finalize_registry_commit != profile_manifest["registryCommit"]
+            or registry_finalize.get("codeDeployCurrentShelfAuthority")
+            != registry_candidate.get("codeDeployCurrentShelfAuthority")
+            or registry_finalize.get("retainedIncumbentProvenance")
+            != registry_candidate.get("retainedIncumbentProvenance")
+            or registry_finalize.get("privacyLaunchGateSnapshot")
+            != CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            or registry_finalize.get("privacyLaunchGateSnapshotSha256")
+            != _candidate_ui_compact_sha256(
+                CANDIDATE_UNSIGNED_PRIVACY_LAUNCH_GATE_SNAPSHOT
+            )
+            or registry_finalize.get("sourceShelfInventorySha256")
+            != registry_candidate.get("sourceShelfInventorySha256")
+        ):
+            raise ProjectionBlocked("unsigned Registry finalize profile graph drifted")
+        _candidate_reference(
+            registry_finalize.get("sourceCanonicalManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_CANONICAL_PATH,
+            raw=source_canonical_raw,
+            label="unsigned Registry finalize source canonical manifest",
+        )
+        _candidate_reference(
+            registry_finalize.get("sourceCompatibilityManifest"),
+            path=CANDIDATE_UNSIGNED_SOURCE_COMPATIBILITY_PATH,
+            raw=source_compatibility_raw,
+            label="unsigned Registry finalize source compatibility manifest",
+        )
     for key, path, raw in (
         ("authority", CANDIDATE_REGISTRY_AUTHORITY_FILE, registry_authority_raw),
         ("candidateReceipt", CANDIDATE_REGISTRY_RECEIPT_FILE, registry_candidate_raw),
