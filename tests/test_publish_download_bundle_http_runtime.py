@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -14,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
 UPLOAD_ATTEMPT_RECEIPT_HELPER = REPO_ROOT / "scripts" / "release" / "release_upload_attempt_receipt.py"
 SESSION_ID = "0123456789abcdef0123456789abcdef"
+STAGE_PROBE_TOKEN = "stage_probe_token_" + ("a" * 32)
 
 
 def write_bundle(root: Path) -> Path:
@@ -385,7 +387,7 @@ def serve_upload_api(recorder: UploadRecorder):
                             "previousGenerationId": "gen-incumbent",
                             "previousPointerSha256": "sha256:" + "5" * 64,
                             "exactIncomingDesktopScope": "avalonia:windows:win-x64",
-                            "probeToken": "must-never-survive-sanitization",
+                            "probeToken": STAGE_PROBE_TOKEN,
                             "probeTokenExpiresAtUtc": "2026-07-22T00:15:00Z",
                         }
                     ).encode("utf-8")
@@ -426,6 +428,7 @@ def run_publish_with_script(
     env.pop("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_TOKEN_FILE", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_TOKEN_PATH", None)
+    env.pop("CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE", None)
     env.pop("CHUMMER_ARTIFACT_FACTORY_TOKEN", None)
     env.pop("CHUMMER_RELEASE_UPLOAD_ALLOW_PROOF_ONLY_VISUAL_HANDOFF", None)
     env.pop("CHUMMER_FORCE_NIGHTLY_PUBLISH", None)
@@ -703,6 +706,14 @@ def test_publish_download_bundle_http_stages_exact_windows_scope_without_complet
 ) -> None:
     bundle_root = write_bundle(tmp_path / "bundle")
     registry_root = write_registry(tmp_path / "registry")
+    sealed_manifest_bytes = {
+        manifest_name: (bundle_root / manifest_name).read_bytes()
+        for manifest_name in ("releases.json", "RELEASE_CHANNEL.generated.json")
+    }
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    probe_token_path = private_dir / "staged-probe-token"
     recorder = UploadRecorder()
 
     with serve_upload_api(recorder) as base_url:
@@ -711,7 +722,10 @@ def test_publish_download_bundle_http_stages_exact_windows_scope_without_complet
             bundle_root,
             base_url,
             registry_root,
-            extra_env={"CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1"},
+            extra_env={
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(probe_token_path),
+            },
         )
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -725,6 +739,14 @@ def test_publish_download_bundle_http_stages_exact_windows_scope_without_complet
         for headers in recorder.request_headers
         if headers.get("X-Chummer-Release-Exact-Incoming-Scope")
     } == {"avalonia:windows:win-x64"}
+    expected_manifest_sha256 = hashlib.sha256(
+        sealed_manifest_bytes["RELEASE_CHANNEL.generated.json"]
+    ).hexdigest()
+    assert {
+        headers.get("X-Chummer-Candidate-Manifest-Sha256")
+        for headers in recorder.request_headers
+        if headers.get("X-Chummer-Candidate-Manifest-Sha256")
+    } == {expected_manifest_sha256}
     receipt = json.loads(
         (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
     )
@@ -741,9 +763,197 @@ def test_publish_download_bundle_http_stages_exact_windows_scope_without_complet
     assert stage_response["previousGenerationId"] == "gen-incumbent"
     assert stage_response["previousPointerSha256"] == "sha256:" + "5" * 64
     assert "probeToken" not in stage_response
-    assert "must-never-survive-sanitization" not in result.stdout
-    assert "must-never-survive-sanitization" not in result.stderr
+    assert probe_token_path.read_text(encoding="ascii") == STAGE_PROBE_TOKEN + "\n"
+    probe_token_metadata = probe_token_path.stat()
+    assert probe_token_metadata.st_mode & 0o777 == 0o600
+    assert probe_token_metadata.st_uid == os.geteuid()
+    assert probe_token_metadata.st_nlink == 1
+    assert STAGE_PROBE_TOKEN not in result.stdout
+    assert STAGE_PROBE_TOKEN not in result.stderr
+    receipt_text = (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
+    stage_response_text = (bundle_root / "release-stage-response.json").read_text(encoding="utf-8")
+    assert STAGE_PROBE_TOKEN not in receipt_text
+    assert STAGE_PROBE_TOKEN not in stage_response_text
+    for manifest_name, sealed_bytes in sealed_manifest_bytes.items():
+        assert (bundle_root / manifest_name).read_bytes() == sealed_bytes
     assert "owner-only finalize_staged_release.py" in result.stdout
+
+
+def test_publish_download_bundle_http_scrubs_reflected_stage_probe_token(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    probe_token_path = private_dir / "staged-probe-token"
+    reflected_probe_token = "12345678901234567890123456789012"
+    encoded_probe_token = "".join(
+        f"%{ord(character):02X}" for character in reflected_probe_token
+    )
+    double_encoded_probe_token = encoded_probe_token.replace("%", "%25")
+    recorder = UploadRecorder(
+        stage_response_body=json.dumps(
+            {
+                "status": f"staged-{reflected_probe_token}-reflected",
+                "state": reflected_probe_token,
+                "totalBytes": int(reflected_probe_token),
+                "filesUrl": f"/api/internal/releases/{double_encoded_probe_token}/files",
+                "version": "run-test",
+                "channel": "preview",
+                "publishedAt": "2026-07-22T00:00:00Z",
+                "candidateArtifactIds": [
+                    f"candidate-{reflected_probe_token}-reflected",
+                    "safe-candidate",
+                ],
+                "generationId": "gen-stage-proof",
+                "stageReceiptId": "stage-proof",
+                "stagedAtUtc": "2026-07-22T00:00:01Z",
+                "inventoryDigest": "sha256:" + "1" * 64,
+                "canonicalManifestSha256": "2" * 64,
+                "compatibilityManifestSha256": "3" * 64,
+                "targetPointerSha256": "4" * 64,
+                "previousGenerationId": "gen-incumbent",
+                "previousPointerSha256": "sha256:" + "5" * 64,
+                "exactIncomingDesktopScope": "avalonia:windows:win-x64",
+                "probeToken": reflected_probe_token,
+                "probeTokenExpiresAtUtc": "2026-07-22T00:15:00Z",
+            }
+        ).encode("utf-8"),
+    )
+
+    with serve_upload_api(recorder) as base_url:
+        result = run_publish_with_script(
+            SCRIPT,
+            bundle_root,
+            base_url,
+            registry_root,
+            extra_env={
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(probe_token_path),
+            },
+        )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert recorder.stage_posts == 1
+    assert recorder.complete_posts == 0
+    assert probe_token_path.read_text(encoding="ascii") == reflected_probe_token + "\n"
+
+    stage_response_path = bundle_root / "release-stage-response.json"
+    receipt_path = bundle_root / "release-upload-handoff.json"
+    stage_response_text = stage_response_path.read_text(encoding="utf-8")
+    receipt_text = receipt_path.read_text(encoding="utf-8")
+    for public_text in (
+        result.stdout,
+        result.stderr,
+        stage_response_text,
+        receipt_text,
+    ):
+        assert reflected_probe_token not in public_text
+        assert encoded_probe_token not in public_text
+        assert double_encoded_probe_token not in public_text
+
+    stage_response = json.loads(stage_response_text)
+    assert "status" not in stage_response
+    assert "state" not in stage_response
+    assert "totalBytes" not in stage_response
+    assert "filesUrl" not in stage_response
+    assert stage_response["candidateArtifactIds"] == ["safe-candidate"]
+    assert "probeToken" not in stage_response
+
+
+def test_publish_download_bundle_http_requires_fresh_private_stage_probe_handoff(
+    tmp_path: Path,
+) -> None:
+    registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    existing_target = private_dir / "existing-token"
+    existing_target.write_text("preserve-me\n", encoding="utf-8")
+    existing_target.chmod(0o600)
+    symlink_target = private_dir / "token-link"
+    symlink_target.symlink_to(existing_target)
+    unsafe_parent = tmp_path / "shared"
+    unsafe_parent.mkdir()
+    unsafe_parent.chmod(0o755)
+
+    cases: tuple[tuple[str, Path | None], ...] = (
+        ("missing", None),
+        ("existing", existing_target),
+        ("symlink", symlink_target),
+        ("unsafe-parent", unsafe_parent / "new-token"),
+    )
+    recorder = UploadRecorder()
+    with serve_upload_api(recorder) as base_url:
+        for case_name, token_path in cases:
+            bundle_root = write_bundle(tmp_path / f"bundle-{case_name}")
+            extra_env: dict[str, str | None] = {
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1"
+            }
+            if token_path is not None:
+                extra_env["CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE"] = str(token_path)
+            result = run_publish_with_script(
+                SCRIPT,
+                bundle_root,
+                base_url,
+                registry_root,
+                extra_env=extra_env,
+            )
+
+            assert result.returncode != 0
+            assert STAGE_PROBE_TOKEN not in result.stdout
+            assert STAGE_PROBE_TOKEN not in result.stderr
+
+    assert recorder.session_posts == 0
+    assert recorder.file_posts == 0
+    assert recorder.stage_posts == 0
+    assert existing_target.read_text(encoding="utf-8") == "preserve-me\n"
+    assert not (unsafe_parent / "new-token").exists()
+
+
+def test_publish_download_bundle_http_rejects_aliased_stage_probe_receipt_targets(
+    tmp_path: Path,
+) -> None:
+    registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    alias_dir = tmp_path / "private-alias"
+    alias_dir.symlink_to(private_dir, target_is_directory=True)
+    reserved_environment_names = (
+        "CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH",
+        "CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH",
+    )
+
+    recorder = UploadRecorder()
+    with serve_upload_api(recorder) as base_url:
+        for index, reserved_environment_name in enumerate(reserved_environment_names):
+            bundle_root = write_bundle(tmp_path / f"bundle-{index}")
+            target_name = f"collision-{index}"
+            probe_token_path = private_dir / target_name
+            result = run_publish_with_script(
+                SCRIPT,
+                bundle_root,
+                base_url,
+                registry_root,
+                extra_env={
+                    "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                    "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(
+                        probe_token_path
+                    ),
+                    reserved_environment_name: str(alias_dir / target_name),
+                },
+            )
+
+            assert result.returncode != 0
+            assert "distinct from public or sanitized receipts" in result.stderr
+            assert not probe_token_path.exists()
+
+    assert recorder.session_posts == 0
+    assert recorder.file_posts == 0
+    assert recorder.stage_posts == 0
 
 
 def test_publish_download_bundle_http_retains_ambiguous_stage_handoff(
@@ -751,6 +961,10 @@ def test_publish_download_bundle_http_retains_ambiguous_stage_handoff(
 ) -> None:
     bundle_root = write_bundle(tmp_path / "bundle")
     registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    probe_token_path = private_dir / "staged-probe-token"
     recorder = UploadRecorder(
         stage_status=503,
         stage_response_body=b'{"type":"stage-outcome-unknown","token":"must-not-leak"}',
@@ -762,7 +976,10 @@ def test_publish_download_bundle_http_retains_ambiguous_stage_handoff(
             bundle_root,
             base_url,
             registry_root,
-            extra_env={"CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1"},
+            extra_env={
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(probe_token_path),
+            },
         )
 
     assert result.returncode != 0
@@ -776,6 +993,52 @@ def test_publish_download_bundle_http_retains_ambiguous_stage_handoff(
         (bundle_root / "release-upload-handoff.json").read_text(encoding="utf-8")
     )
     assert receipt["completion"]["state"] == "stage_outcome_unknown"
+    assert not (bundle_root / "release-stage-response.json").exists()
+    assert not probe_token_path.exists()
+
+
+def test_publish_download_bundle_http_fails_closed_on_invalid_stage_probe_token(
+    tmp_path: Path,
+) -> None:
+    bundle_root = write_bundle(tmp_path / "bundle")
+    registry_root = write_registry(tmp_path / "registry")
+    private_dir = tmp_path / "private"
+    private_dir.mkdir()
+    private_dir.chmod(0o700)
+    probe_token_path = private_dir / "staged-probe-token"
+    invalid_probe_token = "invalid-stage-probe-token-must-not-leak!"
+    recorder = UploadRecorder(
+        stage_response_body=json.dumps(
+            {
+                "stageReceiptId": "stage-proof",
+                "probeToken": invalid_probe_token,
+                "probeTokenExpiresAtUtc": "2026-07-22T00:15:00Z",
+            }
+        ).encode("utf-8"),
+    )
+
+    with serve_upload_api(recorder) as base_url:
+        result = run_publish_with_script(
+            SCRIPT,
+            bundle_root,
+            base_url,
+            registry_root,
+            extra_env={
+                "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY": "1",
+                "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE": str(probe_token_path),
+            },
+        )
+
+    assert result.returncode != 0
+    assert recorder.stage_posts == 1
+    assert recorder.complete_posts == 0
+    assert not probe_token_path.exists()
+    assert invalid_probe_token not in result.stdout
+    assert invalid_probe_token not in result.stderr
+    receipt_path = bundle_root / "release-upload-handoff.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["completion"]["state"] == "stage_outcome_unknown"
+    assert invalid_probe_token not in receipt_path.read_text(encoding="utf-8")
     assert not (bundle_root / "release-stage-response.json").exists()
 
 
