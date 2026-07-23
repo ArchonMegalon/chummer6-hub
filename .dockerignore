@@ -2,6 +2,10 @@
 
 !.dockerignore
 !Directory.Build.props
+!global.json
+!eng/
+!eng/package-plane.lock.json
+!eng/NuGet.Container.Config
 !.codex-design/
 !.codex-design/**
 !Chummer.Campaign.Contracts/
@@ -24,6 +28,12 @@ Chummer.InstallLinking.Postgres.Tool/obj/**
 !Chummer.World.Contracts/
 !Chummer.World.Contracts/**
 !scripts/
+!scripts/ai/
+!scripts/ai/bootstrap-hub-package-feed.py
 !scripts/validate_public_pwa_proof_authority.py
 !scripts/verify_public_pwa_static_assets.py
 !scripts/generate_public_play_worker_projection.py
+**/bin/
+**/bin/**
+**/obj/
+**/obj/**

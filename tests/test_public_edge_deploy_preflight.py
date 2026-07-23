@@ -792,6 +792,11 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     assert "apt-get install -y --no-install-recommends python3" not in docker_markers
     assert "rm -rf /var/lib/apt/lists/*" not in docker_markers
     assert "RUN python3 --version" not in docker_markers
+    assert module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM in docker_markers
+    assert module.PUBLIC_EDGE_DOCKER_BUILD_FROM in docker_markers
+    assert module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PROOF_RECEIPT_COPY in docker_markers
+    assert module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PYTHON_COPY in docker_markers
+    assert module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY in docker_markers
     assert 'grep -Fq \'const CACHE_VERSION = "v19";\'' in docker_markers
     assert "WORKDIR /proof" in docker_markers
     assert 'RUN ["/usr/local/bin/python3", "-I", "-S"' in docker_markers
@@ -800,7 +805,9 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     docker_contract = docker_check["dockerBuildContract"]
     assert docker_contract["status"] == "pass"
     assert docker_contract["proofStageCount"] == 1
+    assert docker_contract["packageFeedStageCount"] == 1
     assert docker_contract["pythonInvocationCount"] == 1
+    assert docker_contract["packageFeedPythonInvocationCount"] == 1
     assert all(docker_contract["checks"].values())
     assert not docker_contract["failures"]
     assert "! grep -Fq 'self.skipWaiting()'" in docker_markers
@@ -1334,22 +1341,26 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
 
     assert contract["status"] == "pass"
     assert contract["proofStageCount"] == 1
+    assert contract["packageFeedStageCount"] == 1
     assert contract["buildStageCount"] == 1
     assert contract["toolFinalStageCount"] == 1
     assert contract["finalStageCount"] == 1
     assert contract["stageAliases"] == [
         "public-pwa-proof",
+        "hub-package-feed",
         "build",
         "install-linking-postgres-tool-final",
         "final",
     ]
     assert contract["stageDependencies"] == {
         "public-pwa-proof": [],
-        "build": ["public-pwa-proof"],
+        "hub-package-feed": ["public-pwa-proof"],
+        "build": ["hub-package-feed", "public-pwa-proof"],
         "install-linking-postgres-tool-final": ["build"],
         "final": ["build"],
     }
     assert contract["pythonInvocationCount"] == 1
+    assert contract["packageFeedPythonInvocationCount"] == 1
     assert contract["checks"] == {
         "exactSyntaxDirective": True,
         "noLateParserDirectives": True,
@@ -1357,9 +1368,11 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "validLogicalInstructions": True,
         "noGlobalInstructions": True,
         "exactProofStage": True,
+        "exactPackageFeedStage": True,
         "exactStageHeaders": True,
         "singleProofStage": True,
         "proofStageNotDerived": True,
+        "exactPackageFeedStageCount": True,
         "exactBuildStage": True,
         "exactToolFinalStage": True,
         "exactFinalStage": True,
@@ -1367,6 +1380,9 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "defaultStageIsFinal": True,
         "exactReceiptDependency": True,
         "receiptIsFirstBuildInstruction": True,
+        "exactPackageFeedProofReceiptDependency": True,
+        "exactPackageFeedPythonDependency": True,
+        "exactPackageFeedConsumption": True,
         "noOtherProofCopies": True,
         "exactToolPublishDependency": True,
         "exactFinalPublishDependency": True,
@@ -1374,6 +1390,8 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "exactFinalPayloadMode": True,
         "exactCopyFromReferences": True,
         "exactRequiredNamedContextCopies": True,
+        "packageFeedDependsOnProof": True,
+        "buildDependsOnPackageFeed": True,
         "buildDependsOnProof": True,
         "toolFinalDependsOnBuild": True,
         "finalDependsOnBuild": True,
@@ -1405,12 +1423,16 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         ("global_onbuild", "exact pinned public PWA proof-stage"),
         ("heredoc", "heredoc syntax is forbidden"),
         ("appended_default_bypass", "default/last stage must be final"),
-        ("extra_independent_stage", "only public-pwa-proof, build"),
+        ("extra_independent_stage", "only public-pwa-proof, hub-package-feed"),
+        ("detached_package_feed", "exact proof receipt"),
+        ("package_feed_python_copy_removed", "pinned Python runtime"),
+        ("package_feed_build_copy_removed", "consume the exact validated hub-package-feed"),
+        ("package_feed_mutable_sdk", "stage FROM instructions drifted"),
         ("detached_final", "final stage must depend transitively on build"),
         ("direct_final_from_base", "final stage must depend transitively on build"),
         ("removed_build_dependency", "exact proof receipt"),
-        ("renamed_build_stage", "only public-pwa-proof, build"),
-        ("reordered_stages", "only public-pwa-proof, build"),
+        ("renamed_build_stage", "only public-pwa-proof, hub-package-feed"),
+        ("reordered_stages", "only public-pwa-proof, hub-package-feed"),
         ("duplicate_final_stage", "exactly one named final stage"),
         ("receipt_copy_decoy", "exact proof receipt"),
         ("receipt_copy_as_run_continuation", "exact proof receipt"),
@@ -1442,7 +1464,15 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
     proof_workdir = "WORKDIR /proof\n"
     proof_run = module.PUBLIC_EDGE_DOCKER_PROOF_RUN + "\n"
     receipt_copy = module.PUBLIC_EDGE_DOCKER_RECEIPT_COPY + "\n"
-    build_from = "FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build\n"
+    package_feed_from = module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM + "\n"
+    package_feed_receipt_copy = (
+        module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PROOF_RECEIPT_COPY + "\n"
+    )
+    package_feed_python_copy = (
+        module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PYTHON_COPY + "\n"
+    )
+    package_feed_build_copy = module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY + "\n"
+    build_from = module.PUBLIC_EDGE_DOCKER_BUILD_FROM + "\n"
     final_from = "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final\n"
     final_build_copies = (
         "COPY --from=build /app/publish .\n",
@@ -1534,6 +1564,19 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
         mutated = original.rstrip() + "\n\nFROM scratch AS bypass\n"
     elif mutation == "extra_independent_stage":
         mutated = original.replace(final_from, "FROM scratch AS bypass\n" + final_from, 1)
+    elif mutation == "detached_package_feed":
+        mutated = original.replace(package_feed_receipt_copy, "", 1)
+        mutated = mutated.replace(package_feed_python_copy, "", 1)
+    elif mutation == "package_feed_python_copy_removed":
+        mutated = original.replace(package_feed_python_copy, "", 1)
+    elif mutation == "package_feed_build_copy_removed":
+        mutated = original.replace(package_feed_build_copy, "", 1)
+    elif mutation == "package_feed_mutable_sdk":
+        mutated = original.replace(
+            package_feed_from,
+            "FROM mcr.microsoft.com/dotnet/sdk:10.0 AS hub-package-feed\n",
+            1,
+        )
     elif mutation in {"detached_final", "direct_final_from_base"}:
         mutated = original
         for build_copy in final_build_copies:
@@ -2378,7 +2421,7 @@ def test_source_marker_check_requires_clean_chummer_run_api_publish_guard(tmp_pa
     dockerfile = source_root / "Chummer.Run.Api" / "Dockerfile"
     dockerfile.write_text(
         dockerfile.read_text(encoding="utf-8").replace(
-            "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin /src/chummer.run-services/Chummer.Run.Api/obj\n",
+            "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin\n",
             "",
             1,
         ),
@@ -2393,7 +2436,10 @@ def test_source_marker_check_requires_clean_chummer_run_api_publish_guard(tmp_pa
 
     assert receipt["status"] == "fail"
     dockerfile_check = next(check for check in receipt["sourceMarkerChecks"] if check["path"] == "Chummer.Run.Api/Dockerfile")
-    assert "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin /src/chummer.run-services/Chummer.Run.Api/obj" in dockerfile_check["missingMarkers"]
+    assert (
+        "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin"
+        in dockerfile_check["missingMarkers"]
+    )
     assert any(finding["id"] == "public_edge_source_marker_missing" for finding in receipt["findings"])
 
 

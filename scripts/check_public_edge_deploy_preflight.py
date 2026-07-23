@@ -499,17 +499,22 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
     ),
     "Chummer.Run.Api/Dockerfile": (
         "FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS public-pwa-proof",
+        "FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS hub-package-feed",
+        "FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build",
         "WORKDIR /proof",
         "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\"",
         "\"--receipt\", \"/proof/public-pwa-proof-authority.receipt.json\"",
+        "COPY --from=public-pwa-proof /proof/public-pwa-proof-authority.receipt.json /tmp/hub-package-feed-public-pwa-proof.receipt.json",
+        "COPY --from=public-pwa-proof /usr/local/ /usr/local/",
         "COPY --from=public-pwa-proof /proof/public-pwa-proof-authority.receipt.json /tmp/public-pwa-proof-authority.receipt.json",
+        "COPY --from=hub-package-feed /opt/chummer-package-feed /opt/chummer-package-feed",
         "COPY --from=run-services-source Chummer.Run.Api/",
         "COPY --from=run-services-source scripts/generate_public_play_worker_projection.py scripts/generate_public_play_worker_projection.py",
         "COPY --from=run-services-source scripts/verify_public_pwa_static_assets.py scripts/verify_public_pwa_static_assets.py",
         "COPY --from=run-services-source scripts/validate_public_pwa_proof_authority.py scripts/validate_public_pwa_proof_authority.py",
         "COPY --from=run-services-source .codex-design/",
         "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
-        "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin /src/chummer.run-services/Chummer.Run.Api/obj",
+        "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin",
         'grep -Fq \'const CACHE_VERSION = "v19";\'',
         'grep -Fq \'const CACHE_CONTRACT = "run-api-projection-v2";\'',
         "grep -Fq 'const CRITICAL_SHELL_ASSETS = ['",
@@ -620,27 +625,40 @@ PUBLIC_EDGE_FORBIDDEN_SOURCE_MARKERS = {
         'grep -Fq \'"dependencyPolicyCount": 4\' play-pwa-mirrors.json',
         'grep -Fq "\\"templateSha256\\": \\"${template_sha}\\"" play-worker-projection.json',
         'grep -Fq "\\"projectionSha256\\": \\"${template_sha}\\"" play-pwa-mirrors.json',
+        "apt-get install -y --no-install-recommends python3",
     ),
 }
 PUBLIC_EDGE_FORBIDDEN_OVERLAY_MARKERS: dict[str, tuple[str, ...]] = {}
 PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH = "Chummer.Run.Api/Dockerfile"
 PUBLIC_EDGE_DOCKER_BUILD_STAGE = "build"
 PUBLIC_EDGE_DOCKER_PROOF_STAGE = "public-pwa-proof"
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE = "hub-package-feed"
 PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE = "install-linking-postgres-tool-final"
 PUBLIC_EDGE_DOCKER_FINAL_STAGE = "final"
-PUBLIC_EDGE_DOCKER_BUILD_FROM = "FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build"
+PUBLIC_EDGE_DOCKER_SDK_IMAGE = (
+    "mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:"
+    "e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a"
+)
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM = (
+    f"FROM {PUBLIC_EDGE_DOCKER_SDK_IMAGE} AS {PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE}"
+)
+PUBLIC_EDGE_DOCKER_BUILD_FROM = (
+    f"FROM {PUBLIC_EDGE_DOCKER_SDK_IMAGE} AS {PUBLIC_EDGE_DOCKER_BUILD_STAGE}"
+)
 PUBLIC_EDGE_DOCKER_TOOL_FINAL_FROM = (
     "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS install-linking-postgres-tool-final"
 )
 PUBLIC_EDGE_DOCKER_FINAL_FROM = "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final"
 PUBLIC_EDGE_DOCKER_STAGE_ORDER = (
     PUBLIC_EDGE_DOCKER_PROOF_STAGE,
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
     PUBLIC_EDGE_DOCKER_BUILD_STAGE,
     PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
     PUBLIC_EDGE_DOCKER_FINAL_STAGE,
 )
 PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
     PUBLIC_EDGE_DOCKER_PROOF_STAGE: frozenset({"run-services-source"}),
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset({"run-services-source"}),
     PUBLIC_EDGE_DOCKER_BUILD_STAGE: frozenset(
         {"run-services-source", "fleet-media-factory-contracts"}
     ),
@@ -650,6 +668,13 @@ PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
     ),
 }
 PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset(
+        {
+            "COPY --from=run-services-source global.json global.json",
+            "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
+            "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
+        }
+    ),
     PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset(
         {
             "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
@@ -659,7 +684,15 @@ PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
 }
 PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE = {
     PUBLIC_EDGE_DOCKER_PROOF_STAGE: frozenset(),
-    PUBLIC_EDGE_DOCKER_BUILD_STAGE: frozenset({PUBLIC_EDGE_DOCKER_PROOF_STAGE}),
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset(
+        {PUBLIC_EDGE_DOCKER_PROOF_STAGE}
+    ),
+    PUBLIC_EDGE_DOCKER_BUILD_STAGE: frozenset(
+        {
+            PUBLIC_EDGE_DOCKER_PROOF_STAGE,
+            PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
+        }
+    ),
     PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE: frozenset({PUBLIC_EDGE_DOCKER_BUILD_STAGE}),
     PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset({PUBLIC_EDGE_DOCKER_BUILD_STAGE}),
 }
@@ -668,6 +701,20 @@ PUBLIC_EDGE_DOCKER_PYTHON_IMAGE = (
     "c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28"
 )
 PUBLIC_EDGE_DOCKER_PROOF_RECEIPT = "/proof/public-pwa-proof-authority.receipt.json"
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PROOF_RECEIPT_COPY = (
+    "COPY --from=public-pwa-proof "
+    "/proof/public-pwa-proof-authority.receipt.json "
+    "/tmp/hub-package-feed-public-pwa-proof.receipt.json"
+)
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PYTHON_COPY = (
+    "COPY --from=public-pwa-proof /usr/local/ /usr/local/"
+)
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN = (
+    'RUN ["/usr/local/bin/python3", "-I", "-S", '
+    '"scripts/ai/bootstrap-hub-package-feed.py", '
+    '"--repo-root", "/proof", '
+    '"--feed", "/opt/chummer-package-feed"]'
+)
 PUBLIC_EDGE_DOCKER_PROOF_COPY_INPUTS = (
     "scripts/validate_public_pwa_proof_authority.py",
     "scripts/verify_public_pwa_static_assets.py",
@@ -711,8 +758,19 @@ PUBLIC_EDGE_DOCKER_PROOF_STAGE_INSTRUCTIONS = (
     ),
     PUBLIC_EDGE_DOCKER_PROOF_RUN,
 )
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM,
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PROOF_RECEIPT_COPY,
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PYTHON_COPY,
+    "WORKDIR /proof",
+    "COPY --from=run-services-source global.json global.json",
+    "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
+    "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
+)
 PUBLIC_EDGE_DOCKER_STAGE_FROM_INSTRUCTIONS = (
     PUBLIC_EDGE_DOCKER_PROOF_STAGE_INSTRUCTIONS[0],
+    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM,
     PUBLIC_EDGE_DOCKER_BUILD_FROM,
     PUBLIC_EDGE_DOCKER_TOOL_FINAL_FROM,
     PUBLIC_EDGE_DOCKER_FINAL_FROM,
@@ -721,6 +779,10 @@ PUBLIC_EDGE_DOCKER_RECEIPT_COPY = (
     "COPY --from=public-pwa-proof "
     "/proof/public-pwa-proof-authority.receipt.json "
     "/tmp/public-pwa-proof-authority.receipt.json"
+)
+PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY = (
+    "COPY --from=hub-package-feed "
+    "/opt/chummer-package-feed /opt/chummer-package-feed"
 )
 PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY = "COPY --from=build /app/publish ."
 PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY = (
@@ -1093,6 +1155,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "status": "fail",
         "present": False,
         "proofStageCount": 0,
+        "packageFeedStageCount": 0,
         "buildStageCount": 0,
         "toolFinalStageCount": 0,
         "finalStageCount": 0,
@@ -1100,6 +1163,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "stageDependencies": {},
         "copyFromReferences": [],
         "pythonInvocationCount": 0,
+        "packageFeedPythonInvocationCount": 0,
         "checks": {},
         "failures": ["Dockerfile is missing"],
     }
@@ -1189,9 +1253,47 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             "first Docker stage must match the exact pinned public PWA proof-stage instruction whitelist"
         )
 
+    try:
+        package_feed_stage_start = logical_instruction_text.index(
+            PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM
+        )
+    except ValueError:
+        package_feed_stage_start = -1
+    package_feed_stage_end = len(logical_instruction_text)
+    if package_feed_stage_start >= 0:
+        package_feed_stage_end = next(
+            (
+                index
+                for index, line in enumerate(
+                    logical_instruction_text[package_feed_stage_start + 1 :],
+                    start=package_feed_stage_start + 1,
+                )
+                if re.match(r"FROM(?:\s|$)", line, flags=re.IGNORECASE)
+            ),
+            len(logical_instruction_text),
+        )
+    package_feed_stage_instructions = (
+        tuple(
+            logical_instruction_text[
+                package_feed_stage_start:package_feed_stage_end
+            ]
+        )
+        if package_feed_stage_start >= 0
+        else ()
+    )
+    exact_package_feed_stage = (
+        package_feed_stage_instructions
+        == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS
+    )
+    if not exact_package_feed_stage:
+        failures.append(
+            "hub-package-feed must match the exact proof-gated package-feed instruction whitelist"
+        )
+
     current_stage = -1
     current_alias = ""
     proof_stage_count = 0
+    package_feed_stage_count = 0
     build_stage_count = 0
     tool_final_stage_count = 0
     final_stage_count = 0
@@ -1208,6 +1310,9 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     derived_proof_stages: list[int] = []
     proof_alias_redefinitions: list[int] = []
     receipt_copy_stages: list[str] = []
+    package_feed_proof_receipt_copy_stages: list[str] = []
+    package_feed_python_copy_stages: list[str] = []
+    package_feed_copy_stages: list[str] = []
     tool_publish_copy_stages: list[str] = []
     final_publish_copy_stages: list[str] = []
     tool_payload_mode_stages: list[str] = []
@@ -1230,6 +1335,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
                 proof_stage_count += 1
                 if current_stage != 0:
                     proof_alias_redefinitions.append(line_number)
+            if alias == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE:
+                package_feed_stage_count += 1
             if alias == PUBLIC_EDGE_DOCKER_BUILD_STAGE:
                 build_stage_count += 1
             if alias == PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE:
@@ -1243,8 +1350,14 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             pre_stage_instructions.append(line_number)
         if line == PUBLIC_EDGE_DOCKER_RECEIPT_COPY:
             receipt_copy_stages.append(current_alias)
+        elif line == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PROOF_RECEIPT_COPY:
+            package_feed_proof_receipt_copy_stages.append(current_alias)
+        elif line == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_PYTHON_COPY:
+            package_feed_python_copy_stages.append(current_alias)
         elif "--from=public-pwa-proof" in line.lower():
             other_proof_copies.append(line_number)
+        if line == PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY:
+            package_feed_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY:
             tool_publish_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY:
@@ -1314,6 +1427,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         failures.append("global instructions before the first FROM are forbidden")
     if proof_stage_count != 1:
         failures.append("Dockerfile must contain exactly one public-pwa-proof stage alias")
+    if package_feed_stage_count != 1:
+        failures.append("Dockerfile must contain exactly one hub-package-feed stage alias")
     if build_stage_count != 1:
         failures.append("Dockerfile must contain exactly one named build stage")
     if tool_final_stage_count != 1:
@@ -1325,8 +1440,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     exact_stage_set_and_order = tuple(stage_aliases) == PUBLIC_EDGE_DOCKER_STAGE_ORDER
     if not exact_stage_set_and_order:
         failures.append(
-            "Dockerfile must contain only public-pwa-proof, build, "
-            "install-linking-postgres-tool-final, and final stages in that exact order"
+            "Dockerfile must contain only public-pwa-proof, hub-package-feed, "
+            "build, install-linking-postgres-tool-final, and final stages in that exact order"
         )
     default_stage_is_final = bool(stage_aliases) and stage_aliases[-1] == PUBLIC_EDGE_DOCKER_FINAL_STAGE
     if not default_stage_is_final:
@@ -1337,6 +1452,29 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     if not exact_receipt_dependency:
         failures.append(
             "build stage must COPY the exact proof receipt from public-pwa-proof exactly once"
+        )
+    exact_package_feed_proof_receipt_dependency = (
+        package_feed_proof_receipt_copy_stages
+        == [PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE]
+    )
+    if not exact_package_feed_proof_receipt_dependency:
+        failures.append(
+            "hub-package-feed must COPY the exact proof receipt from public-pwa-proof exactly once"
+        )
+    exact_package_feed_python_dependency = (
+        package_feed_python_copy_stages
+        == [PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE]
+    )
+    if not exact_package_feed_python_dependency:
+        failures.append(
+            "hub-package-feed must COPY the pinned Python runtime from public-pwa-proof exactly once"
+        )
+    exact_package_feed_consumption = package_feed_copy_stages == [
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE
+    ]
+    if not exact_package_feed_consumption:
+        failures.append(
+            "build stage must consume the exact validated hub-package-feed exactly once"
         )
     if other_proof_copies:
         failures.append("no other COPY from public-pwa-proof is allowed")
@@ -1402,6 +1540,14 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             pending.extend(stage_dependencies.get(candidate, set()))
         return False
 
+    package_feed_depends_on_proof = stage_depends_on(
+        PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
+        PUBLIC_EDGE_DOCKER_PROOF_STAGE,
+    )
+    build_depends_on_package_feed = stage_depends_on(
+        PUBLIC_EDGE_DOCKER_BUILD_STAGE,
+        PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
+    )
     build_depends_on_proof = stage_depends_on(
         PUBLIC_EDGE_DOCKER_BUILD_STAGE,
         PUBLIC_EDGE_DOCKER_PROOF_STAGE,
@@ -1418,6 +1564,10 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         stage_depends_on(stage, PUBLIC_EDGE_DOCKER_PROOF_STAGE)
         for stage in PUBLIC_EDGE_DOCKER_STAGE_ORDER
     )
+    if not package_feed_depends_on_proof:
+        failures.append("hub-package-feed must depend on public-pwa-proof")
+    if not build_depends_on_package_feed:
+        failures.append("build stage must depend on hub-package-feed")
     if not build_depends_on_proof:
         failures.append("build stage must depend on public-pwa-proof")
     if not tool_final_depends_on_build:
@@ -1436,9 +1586,11 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "validLogicalInstructions": not malformed_continuations,
         "noGlobalInstructions": not pre_stage_instructions,
         "exactProofStage": exact_proof_stage,
+        "exactPackageFeedStage": exact_package_feed_stage,
         "exactStageHeaders": exact_stage_headers,
         "singleProofStage": proof_stage_count == 1,
         "proofStageNotDerived": not derived_proof_stages and not proof_alias_redefinitions,
+        "exactPackageFeedStageCount": package_feed_stage_count == 1,
         "exactBuildStage": build_stage_count == 1,
         "exactToolFinalStage": tool_final_stage_count == 1,
         "exactFinalStage": final_stage_count == 1,
@@ -1446,6 +1598,11 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "defaultStageIsFinal": default_stage_is_final,
         "exactReceiptDependency": exact_receipt_dependency,
         "receiptIsFirstBuildInstruction": receipt_is_first_build_instruction,
+        "exactPackageFeedProofReceiptDependency": (
+            exact_package_feed_proof_receipt_dependency
+        ),
+        "exactPackageFeedPythonDependency": exact_package_feed_python_dependency,
+        "exactPackageFeedConsumption": exact_package_feed_consumption,
         "noOtherProofCopies": not other_proof_copies,
         "exactToolPublishDependency": exact_tool_publish_dependency,
         "exactFinalPublishDependency": exact_final_publish_dependency,
@@ -1459,6 +1616,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             or forward_copy_from_references
         ),
         "exactRequiredNamedContextCopies": exact_required_named_context_copies,
+        "packageFeedDependsOnProof": package_feed_depends_on_proof,
+        "buildDependsOnPackageFeed": build_depends_on_package_feed,
         "buildDependsOnProof": build_depends_on_proof,
         "toolFinalDependsOnBuild": tool_final_depends_on_build,
         "finalDependsOnBuild": final_depends_on_build,
@@ -1469,6 +1628,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "status": "pass" if not unique_failures and all(checks.values()) else "fail",
         "present": True,
         "proofStageCount": proof_stage_count,
+        "packageFeedStageCount": package_feed_stage_count,
         "buildStageCount": build_stage_count,
         "toolFinalStageCount": tool_final_stage_count,
         "finalStageCount": final_stage_count,
@@ -1480,6 +1640,9 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         },
         "copyFromReferences": copy_from_references,
         "pythonInvocationCount": 1 if exact_proof_stage else 0,
+        "packageFeedPythonInvocationCount": (
+            1 if exact_package_feed_stage else 0
+        ),
         "checks": checks,
         "failures": unique_failures,
     }

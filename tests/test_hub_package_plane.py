@@ -16,6 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
+PUBLIC_EDGE_PREFLIGHT_PATH = ROOT / "scripts/check_public_edge_deploy_preflight.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
 PACKAGE_VERSION = "0.1.0-preview"
 OWNER_PACKAGE_VERSIONS = {
@@ -59,6 +60,18 @@ OWNER_VERSION_PROPERTIES = {
 
 def load_module():
     spec = importlib.util.spec_from_file_location("hub_package_plane", SCRIPT_PATH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_public_edge_preflight_module():
+    spec = importlib.util.spec_from_file_location(
+        "hub_package_plane_public_edge_preflight",
+        PUBLIC_EDGE_PREFLIGHT_PATH,
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -503,6 +516,117 @@ def test_default_package_plane_is_false_even_when_siblings_exist() -> None:
     assert result.stdout.strip() == "false"
 
 
+def test_container_restore_uses_only_the_validated_locked_package_feed() -> None:
+    dockerfile = (ROOT / "Chummer.Run.Api/Dockerfile").read_text(encoding="utf-8")
+    config_path = ROOT / "eng/NuGet.Container.Config"
+    config = ElementTree.fromstring(config_path.read_text(encoding="utf-8"))
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+
+    for required_input in (
+        "!global.json",
+        "!eng/package-plane.lock.json",
+        "!eng/NuGet.Container.Config",
+        "!scripts/ai/bootstrap-hub-package-feed.py",
+        "**/bin/**",
+        "**/obj/**",
+    ):
+        assert required_input in dockerignore
+    assert (
+        "FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:"
+        "e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a "
+        "AS hub-package-feed"
+    ) in dockerfile
+    assert (
+        "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\", "
+        "\"scripts/ai/bootstrap-hub-package-feed.py\", \"--repo-root\", "
+        "\"/proof\", \"--feed\", \"/opt/chummer-package-feed\"]"
+    ) in dockerfile
+    assert (
+        "COPY --from=public-pwa-proof "
+        "/proof/public-pwa-proof-authority.receipt.json "
+        "/tmp/hub-package-feed-public-pwa-proof.receipt.json"
+    ) in dockerfile
+    assert "COPY --from=public-pwa-proof /usr/local/ /usr/local/" in dockerfile
+    assert "apt-get install -y --no-install-recommends python3" not in dockerfile
+    assert (
+        "COPY --from=hub-package-feed /opt/chummer-package-feed "
+        "/opt/chummer-package-feed"
+    ) in dockerfile
+    assert "--configfile /tmp/chummer-package-feed.NuGet.Config" in dockerfile
+    assert "--packages /tmp/chummer-nuget/packages" in dockerfile
+    assert "--locked-mode" in dockerfile
+    assert "--no-cache" in dockerfile
+    assert "-p:ChummerPackageFeed=" in dockerfile
+    assert "-p:RestoreAdditionalProjectSources=" in dockerfile
+    assert (
+        "-p:ChummerMediaContractsAssembly=/src/fleet/repos/"
+        "chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/"
+        "net10.0/Chummer.Media.Contracts.dll"
+    ) in dockerfile
+    assert (
+        "rm -rf /src/fleet/repos/chummer-media-factory/src/"
+        "Chummer.Media.Contracts/bin"
+    ) in dockerfile
+    assert (
+        "/src/fleet/repos/chummer-media-factory/src/"
+        "Chummer.Media.Contracts/obj"
+    ) in dockerfile
+    assert "COPY chummer-core-engine/" not in dockerfile
+    assert (
+        "COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/" not in dockerfile
+    )
+    assert "COPY chummer-hub-registry/Chummer.Run.Registry/" not in dockerfile
+    assert (
+        "rm -rf /src/chummer.run-services/Chummer.Run.Api/bin "
+        "/src/chummer.run-services/Chummer.Run.Api/obj"
+    ) not in dockerfile
+    assert "dotnet publish -c Release -o /app/publish --no-restore" in dockerfile
+    for project_name in LOCKED_PROJECTS:
+        if project_name == "Chummer.Run.Api.Tests":
+            continue
+        assert (
+            f"COPY --from=run-services-source {project_name}/packages.lock.json "
+            f"chummer.run-services/{project_name}/"
+        ) in dockerfile
+
+    sources = {
+        node.get("key"): node.get("value")
+        for node in config.findall("./packageSources/add")
+    }
+    assert sources == {
+        "locked-chummer": "/opt/chummer-package-feed",
+        "nuget.org": "https://api.nuget.org/v3/index.json",
+    }
+    assert config.find("./packageSources/clear") is not None
+    mappings = {
+        node.get("key"): {
+            pattern.get("pattern") for pattern in node.findall("./package")
+        }
+        for node in config.findall("./packageSourceMapping/packageSource")
+    }
+    assert mappings == {
+        "locked-chummer": set(OWNER_PACKAGE_VERSIONS),
+        "nuget.org": {"*"},
+    }
+
+    preflight = load_public_edge_preflight_module()
+    contract = preflight.validate_public_pwa_docker_build_contract(
+        ROOT / "Chummer.Run.Api/Dockerfile"
+    )
+    assert contract["status"] == "pass", contract["failures"]
+    assert contract["stageAliases"] == [
+        "public-pwa-proof",
+        "hub-package-feed",
+        "build",
+        "install-linking-postgres-tool-final",
+        "final",
+    ]
+    assert contract["checks"]["exactPackageFeedStage"] is True
+    assert contract["checks"]["packageFeedDependsOnProof"] is True
+    assert contract["checks"]["buildDependsOnPackageFeed"] is True
+    assert contract["checks"]["receiptIsFirstBuildInstruction"] is True
+
+
 def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> None:
     workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(
         encoding="utf-8"
@@ -549,6 +673,11 @@ def test_package_plane_runs_release_handoffs_and_candidate_ui_contracts() -> Non
     assert "tests/test_verify_post_activation_acceptance.py" in workflow
     assert "tests/test_public_edge_volume_initializer.py" in workflow
     assert "tests/public/ui-frame-candidate-binding.spec.ts" in workflow
+    assert (
+        "tests/test_public_edge_deploy_preflight.py::"
+        "test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_dependency"
+        in workflow
+    )
 
 
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:
