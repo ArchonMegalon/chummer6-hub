@@ -16,6 +16,8 @@ internal static class Program
         new("http://127.0.0.1:8080/api/ready", UriKind.Absolute);
     private static readonly Uri PublicationUri =
         new("http://127.0.0.1:8080/api/ready/publication", UriKind.Absolute);
+    private static readonly Uri PublicDownloadsUri =
+        new("http://127.0.0.1:8080/api/ready/public-downloads", UriKind.Absolute);
     private static readonly Uri InstallLinkingAuthorityUri =
         new(
             "http://127.0.0.1:8080/api/ready/install-linking-authority",
@@ -27,7 +29,7 @@ internal static class Program
         {
             Console.Error.WriteLine(
                 "Usage: Chummer.Run.LoopbackProbe.dll "
-                + "</api/ready|/api/ready/publication|"
+                + "</api/ready|/api/ready/public-downloads|/api/ready/publication|"
                 + "/api/ready/install-linking-authority>");
             return 64;
         }
@@ -106,6 +108,7 @@ internal static class Program
         endpoint = path switch
         {
             "/api/ready" => ReadyUri,
+            "/api/ready/public-downloads" => PublicDownloadsUri,
             "/api/ready/publication" => PublicationUri,
             "/api/ready/install-linking-authority" =>
                 InstallLinkingAuthorityUri,
@@ -187,11 +190,53 @@ internal static class Program
         => path switch
         {
             "/api/ready" => ValidateReady(root),
+            "/api/ready/public-downloads" => ValidatePublicDownloads(root),
             "/api/ready/publication" => ValidatePublication(root),
             "/api/ready/install-linking-authority" =>
                 ValidateInstallLinkingAuthority(root),
             _ => false
         };
+
+    private static bool ValidatePublicDownloads(JsonElement root)
+    {
+        string[] properties =
+        [
+            "contractName",
+            "ready",
+            "status",
+            "generatedAt",
+            "servingReady",
+            "overallReady",
+            "publicationReady",
+            "installLinkingReady",
+            "installLinkingCode",
+            "releaseShelf"
+        ];
+        return HasExactProperties(root, properties)
+            && HasString(
+                root,
+                "contractName",
+                "chummer.public-downloads-readiness.v1")
+            && HasBoolean(root, "ready", expected: true)
+            && HasString(root, "status", "pass")
+            && HasTimestamp(root, "generatedAt")
+            && HasBoolean(root, "servingReady", expected: true)
+            && HasBoolean(root, "overallReady", expected: false)
+            && HasBoolean(root, "publicationReady", expected: false)
+            && HasBoolean(root, "installLinkingReady", expected: false)
+            && TryGetString(
+                root,
+                "installLinkingCode",
+                out string? installLinkingCode)
+            && IsSafeCode(installLinkingCode)
+            && root.TryGetProperty(
+                "releaseShelf",
+                out JsonElement releaseShelf)
+            && ValidateReleaseShelf(
+                releaseShelf,
+                expectedPublicationReady: false,
+                expectedPublicationChecksConfigured: true);
+    }
 
     private static bool ValidateReady(JsonElement root)
     {

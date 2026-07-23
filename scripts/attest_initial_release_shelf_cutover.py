@@ -10,6 +10,7 @@ import ctypes
 from datetime import datetime, timezone
 import errno
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -24,6 +25,18 @@ START_CONTRACT = "chummer.initial-release-shelf-cutover-start-request/v1"
 POSTSTATE_CONTRACT = "chummer.initial-release-shelf-cutover-poststate/v1"
 ABORTED_CONTRACT = "chummer.initial-release-shelf-cutover-aborted/v1"
 COMPLETE_CONTRACT = "chummer.initial-release-shelf-cutover-complete/v1"
+PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_CONTRACT = (
+    "chummer.initial-release-shelf-public-download-migration-authority/v1"
+)
+PUBLIC_DOWNLOAD_PRESTATE_CONTRACT = (
+    "chummer.initial-release-shelf-public-download-prestate/v1"
+)
+PUBLIC_DOWNLOAD_START_CONTRACT = (
+    "chummer.initial-release-shelf-public-download-start/v1"
+)
+PUBLIC_DOWNLOAD_POSTSTATE_CONTRACT = (
+    "chummer.initial-release-shelf-public-download-poststate/v1"
+)
 DEPLOY_STATE_CONTRACT = "chummer.initial-release-shelf-cutover-deploy-state/v1"
 READINESS_CONTRACT = "chummer.initial-release-shelf-steady-readiness/v1"
 COMPOSE_CONTRACT = "chummer.public_edge_compose_runtime_attestation.v1"
@@ -37,6 +50,7 @@ WRITER_POLICY_SCHEMA = "chummer.release-shelf.writer-policy/v1"
 WRITER_POLICY_MODE = "server-journal-v1"
 MARKER_NAME = ".release-shelf-layout-v1"
 MARKER_BYTES = b"chummer.release-shelf-layout/v1\n"
+FILESYSTEM_LAYOUT_MARKER_BYTES = b"v1\n"
 POINTER_NAME = "current.json"
 POLICY_NAME = ".release-shelf-writer-policy.json"
 ACTIVE_INTENT_NAME = ".release-shelf-activation-intent.json"
@@ -179,6 +193,29 @@ CONTROL_NAMES = {
     JOURNAL_NAME,
     GENERATIONS_NAME,
     LOCK_NAME,
+}
+PUBLIC_DOWNLOAD_RUNTIME_PROFILE = "public-download-only"
+PUBLIC_DOWNLOAD_MIGRATION_OPERATION = "initial-release-shelf-layout-migration"
+PUBLIC_DOWNLOAD_COPYABLE_FILES = {
+    CANONICAL_MANIFEST,
+    COMPATIBILITY_MANIFEST,
+    "aur-packages.json",
+}
+PUBLIC_DOWNLOAD_COPYABLE_DIRECTORIES = {
+    "files",
+    "install",
+    "proof",
+    "release-evidence",
+    "startup-smoke",
+}
+PUBLIC_DOWNLOAD_MANIFEST_FILE_KEYS = {
+    "fileName",
+    "payloadFileName",
+    "payloadMetadataFileName",
+    "pkgbuildFileName",
+    "sourceArchiveFileName",
+    "srcinfoFileName",
+    "upstreamArtifactFileName",
 }
 
 
@@ -3008,6 +3045,931 @@ def inspect_deploy_state(
         }
 
 
+def _public_download_byte_inventory(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": str(row["path"]),
+            "sha256": str(row["sha256"]),
+            "sizeBytes": int(row["sizeBytes"]),
+        }
+        for row in rows
+    ]
+
+
+def _public_download_inventory_digest(rows: list[dict[str, Any]]) -> str:
+    return f"sha256:{digest_bytes(canonical_json_bytes(rows))}"
+
+
+def _public_download_manifest_references(
+    shelf: AnchoredDirectory,
+    legacy_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    referenced_names: set[str] = set()
+
+    def collect(value: object) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in PUBLIC_DOWNLOAD_MANIFEST_FILE_KEYS:
+                    if not isinstance(item, str) or not item.strip():
+                        continue
+                    file_name = item.strip()
+                    if (
+                        Path(file_name).name != file_name
+                        or safe_relative_path(file_name, "manifest file reference")
+                        != file_name
+                    ):
+                        raise CutoverAttestationError(
+                            "migration manifest contains a noncanonical file reference"
+                        )
+                    referenced_names.add(file_name)
+                else:
+                    collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+
+    for name in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
+        payload, _ = read_json_at(
+            shelf.fd,
+            name,
+            label=f"incumbent migration manifest {name}",
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        collect(payload)
+    legacy_by_path = {str(row["path"]): row for row in legacy_rows}
+    aur_path = legacy_by_path.get("aur-packages.json")
+    if aur_path is not None:
+        payload, _ = read_json_at(
+            shelf.fd,
+            "aur-packages.json",
+            label="incumbent migration aur-packages.json",
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        collect(payload)
+    for file_name in tuple(referenced_names):
+        metadata_name = f"files/{file_name}.json"
+        if metadata_name in legacy_by_path:
+            referenced_names.add(f"{file_name}.json")
+    referenced_paths = {f"files/{name}" for name in referenced_names}
+    missing = sorted(referenced_paths.difference(legacy_by_path))
+    if missing:
+        raise CutoverAttestationError(
+            "incumbent manifests reference missing release files: "
+            + ", ".join(missing)
+        )
+    return [
+        {
+            "path": path,
+            "sha256": str(legacy_by_path[path]["sha256"]),
+            "sizeBytes": int(legacy_by_path[path]["sizeBytes"]),
+        }
+        for path in sorted(referenced_paths)
+    ]
+
+
+def _capture_public_download_candidate(
+    candidate: AnchoredDirectory,
+    *,
+    shelf: AnchoredDirectory,
+    shelf_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    candidate_before = _stable_directory_identity(candidate.fd)
+    candidate_rows = inventory_tree_fd(
+        candidate.fd,
+        skip_top_level_controls=False,
+    )
+    candidate_inventory = _public_download_byte_inventory(candidate_rows)
+    candidate_by_path = {
+        str(row["path"]): row for row in candidate_inventory
+    }
+    legacy_inventory = shelf_snapshot.get("legacyInventory")
+    if not isinstance(legacy_inventory, dict):
+        raise CutoverAttestationError(
+            "incumbent migration legacy inventory is malformed"
+        )
+    raw_legacy_rows = legacy_inventory.get("files")
+    if not isinstance(raw_legacy_rows, list):
+        raise CutoverAttestationError(
+            "incumbent migration legacy inventory files are malformed"
+        )
+    legacy_rows = _public_download_byte_inventory(raw_legacy_rows)
+    legacy_by_path = {str(row["path"]): row for row in legacy_rows}
+    if len(legacy_by_path) != len(legacy_rows):
+        raise CutoverAttestationError(
+            "incumbent migration legacy inventory contains duplicate paths"
+        )
+    for required in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
+        if required not in candidate_by_path:
+            raise CutoverAttestationError(
+                f"migration candidate is missing {required}"
+            )
+        candidate_bytes = read_regular_file_at(
+            candidate.fd,
+            required,
+            label=f"migration candidate {required}",
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        incumbent_bytes = read_regular_file_at(
+            shelf.fd,
+            required,
+            label=f"incumbent migration manifest {required}",
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        if candidate_bytes != incumbent_bytes:
+            raise CutoverAttestationError(
+                "migration candidate manifests must be byte-identical to "
+                f"the captured incumbent: {required}"
+            )
+    for path in candidate_by_path:
+        root_name = path.split("/", 1)[0]
+        if (
+            root_name not in PUBLIC_DOWNLOAD_COPYABLE_FILES
+            and root_name not in PUBLIC_DOWNLOAD_COPYABLE_DIRECTORIES
+        ):
+            raise CutoverAttestationError(
+                f"migration candidate contains a non-generational path: {path}"
+            )
+    extra_paths = sorted(candidate_by_path.keys() - legacy_by_path.keys())
+    if extra_paths:
+        raise CutoverAttestationError(
+            "migration candidate contains bytes absent from the incumbent: "
+            + ", ".join(extra_paths)
+        )
+    changed_paths = sorted(
+        path
+        for path, candidate_row in candidate_by_path.items()
+        if (
+            candidate_row["sha256"],
+            candidate_row["sizeBytes"],
+        )
+        != (
+            legacy_by_path[path]["sha256"],
+            legacy_by_path[path]["sizeBytes"],
+        )
+    )
+    if changed_paths:
+        raise CutoverAttestationError(
+            "migration candidate changed incumbent bytes: "
+            + ", ".join(changed_paths)
+        )
+    referenced_files = _public_download_manifest_references(
+        shelf,
+        raw_legacy_rows,
+    )
+    referenced_paths = {str(row["path"]) for row in referenced_files}
+    missing_references = sorted(referenced_paths.difference(candidate_by_path))
+    if missing_references:
+        raise CutoverAttestationError(
+            "migration candidate omits manifest-referenced incumbent bytes: "
+            + ", ".join(missing_references)
+        )
+    excluded_paths = sorted(legacy_by_path.keys() - candidate_by_path.keys())
+    invalid_exclusions = [
+        path
+        for path in excluded_paths
+        if not path.startswith("files/") or path in referenced_paths
+    ]
+    if invalid_exclusions:
+        raise CutoverAttestationError(
+            "migration candidate may exclude only unreferenced files/ bytes: "
+            + ", ".join(invalid_exclusions)
+        )
+    excluded = [legacy_by_path[path] for path in excluded_paths]
+    result = {
+        "root": str(candidate.path),
+        "rootIdentity": directory_object_identity(candidate.fd),
+        "inventory": {
+            "algorithm": "sha256-canonical-json-v1",
+            "digest": _public_download_inventory_digest(
+                candidate_inventory
+            ),
+            "files": candidate_inventory,
+        },
+        "referencedFileInventory": {
+            "algorithm": "sha256-canonical-json-v1",
+            "digest": _public_download_inventory_digest(
+                referenced_files
+            ),
+            "files": referenced_files,
+        },
+        "excludedLegacyFiles": excluded,
+        "manifestsByteIdenticalToIncumbent": True,
+        "allManifestReferencedFilesExact": True,
+    }
+    _verify_directory_stable(
+        candidate,
+        candidate_before,
+        "public-download migration candidate",
+    )
+    return result
+
+
+def _read_public_download_migration_authority(
+    path: Path,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], bytes]:
+    if SHA256.fullmatch(expected_sha256) is None:
+        raise CutoverAttestationError(
+            "migration authority SHA-256 pin must be lowercase hexadecimal"
+        )
+    normalized = _normalized_absolute_path(
+        path,
+        "public-download migration authority",
+    )
+    if normalized != path:
+        raise CutoverAttestationError(
+            "migration authority path must be exact, canonical, and absolute"
+        )
+    with anchored_parent(normalized, "public-download migration authority") as (
+        parent,
+        name,
+    ):
+        before = _stable_directory_identity(parent.fd)
+        raw = read_regular_file_at(
+            parent.fd,
+            name,
+            label="public-download migration authority",
+            maximum_bytes=MAX_JSON_BYTES,
+            forbid_group_world_write=True,
+        )
+        _verify_directory_stable(
+            parent,
+            before,
+            "public-download migration authority parent",
+        )
+    if digest_bytes(raw) != expected_sha256:
+        raise CutoverAttestationError(
+            "migration authority bytes do not match the independent SHA-256 pin"
+        )
+    try:
+        payload = json.loads(raw, object_pairs_hook=reject_duplicates)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CutoverAttestationError(
+            "migration authority is malformed JSON"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise CutoverAttestationError(
+            "migration authority root must be an object"
+        )
+    return payload, raw
+
+
+def _expected_public_download_migration_authority(
+    *,
+    source_head: str,
+    shelf_snapshot: dict[str, Any],
+    candidate_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    legacy = shelf_snapshot["legacyInventory"]
+    legacy_by_path = {
+        str(row["path"]): row for row in legacy["files"]
+    }
+    return {
+        "contractName": PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_CONTRACT,
+        "status": "pass",
+        "runtimeProfile": PUBLIC_DOWNLOAD_RUNTIME_PROFILE,
+        "operation": PUBLIC_DOWNLOAD_MIGRATION_OPERATION,
+        "migrationOnly": True,
+        "publicationAuthorized": False,
+        "releaseUploadAuthority": False,
+        "sourceHead": source_head,
+        "incumbent": {
+            "legacyInventoryDigest": legacy["digest"],
+            "canonicalManifestSha256": (
+                f"sha256:{legacy_by_path[CANONICAL_MANIFEST]['sha256']}"
+            ),
+            "compatibilityManifestSha256": (
+                f"sha256:{legacy_by_path[COMPATIBILITY_MANIFEST]['sha256']}"
+            ),
+        },
+        "candidate": {
+            "root": candidate_snapshot["root"],
+            "inventoryDigest": candidate_snapshot["inventory"]["digest"],
+            "referencedFileInventoryDigest": (
+                candidate_snapshot["referencedFileInventory"]["digest"]
+            ),
+            "excludedLegacyFiles": (
+                candidate_snapshot["excludedLegacyFiles"]
+            ),
+            "manifestsByteIdenticalToIncumbent": True,
+            "allManifestReferencedFilesExact": True,
+        },
+    }
+
+
+def _validate_public_download_prestate(
+    payload: dict[str, Any],
+    *,
+    state: AnchoredDirectory | AnchoredChildDirectory,
+    shelf: AnchoredDirectory,
+    candidate: AnchoredDirectory,
+    source_head: str | None = None,
+) -> None:
+    require_exact_keys(
+        payload,
+        {
+            "contractName",
+            "status",
+            "generatedAtUtc",
+            "runtimeProfile",
+            "operation",
+            "sourceHead",
+            "shelfRoot",
+            "shelfRootIdentity",
+            "stateRootIdentity",
+            "candidateRootIdentity",
+            "generationId",
+            "activationReceiptId",
+            "migrationAuthorityPath",
+            "migrationAuthoritySha256",
+            "migrationAuthorityDocumentSha256",
+            "shelfSnapshot",
+            "candidateSnapshot",
+        },
+        "public-download migration prestate",
+    )
+    if (
+        payload.get("contractName") != PUBLIC_DOWNLOAD_PRESTATE_CONTRACT
+        or payload.get("status") != "pass"
+        or payload.get("runtimeProfile") != PUBLIC_DOWNLOAD_RUNTIME_PROFILE
+        or payload.get("operation") != PUBLIC_DOWNLOAD_MIGRATION_OPERATION
+        or payload.get("shelfRoot") != str(shelf.path)
+        or payload.get("candidateSnapshot", {}).get("root")
+        != str(candidate.path)
+    ):
+        raise CutoverAttestationError(
+            "public-download migration prestate contract is invalid"
+        )
+    require_utc_timestamp(
+        payload.get("generatedAtUtc"),
+        "public-download migration prestate generatedAtUtc",
+    )
+    receipt_head = require_string(
+        payload.get("sourceHead"),
+        "public-download migration prestate sourceHead",
+    )
+    if COMMIT.fullmatch(receipt_head) is None or (
+        source_head is not None and receipt_head != source_head
+    ):
+        raise CutoverAttestationError(
+            "public-download migration source HEAD changed"
+        )
+    for field in ("generationId", "activationReceiptId"):
+        if SAFE_TOKEN.fullmatch(
+            require_string(
+                payload.get(field),
+                f"public-download migration {field}",
+            )
+        ) is None:
+            raise CutoverAttestationError(
+                f"public-download migration {field} is unsafe"
+            )
+    validate_directory_object_identity(
+        payload.get("shelfRootIdentity"),
+        shelf.fd,
+        "public-download migration shelf",
+    )
+    validate_directory_object_identity(
+        payload.get("stateRootIdentity"),
+        state.fd,
+        "public-download migration state",
+    )
+    validate_directory_object_identity(
+        payload.get("candidateRootIdentity"),
+        candidate.fd,
+        "public-download migration candidate",
+    )
+    require_sha256(
+        payload.get("migrationAuthoritySha256"),
+        "public-download migration authority pin",
+    )
+    require_sha256(
+        payload.get("migrationAuthorityDocumentSha256"),
+        "public-download migration authority document",
+        prefix=True,
+    )
+
+
+def prepare_public_download_migration(
+    shelf_root: Path,
+    state_root: Path,
+    candidate_root: Path,
+    migration_authority: Path,
+    migration_authority_sha256: str,
+    source_head: str,
+    generation_id: str,
+    activation_receipt_id: str,
+) -> dict[str, Any]:
+    if COMMIT.fullmatch(source_head) is None:
+        raise CutoverAttestationError(
+            "source HEAD must be a full lowercase commit"
+        )
+    for value, label in (
+        (generation_id, "generation ID"),
+        (activation_receipt_id, "activation receipt ID"),
+    ):
+        if SAFE_TOKEN.fullmatch(value) is None:
+            raise CutoverAttestationError(
+                f"public-download migration {label} is unsafe"
+            )
+    state_path = _normalized_absolute_path(
+        state_root,
+        "cutover state root",
+    )
+    candidate_path = _normalized_absolute_path(
+        candidate_root,
+        "public-download migration candidate",
+    )
+    with anchored_directory(
+        shelf_root,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_path,
+        "public-download migration candidate",
+    ) as candidate:
+        snapshot = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        if (
+            snapshot.get("writerPolicy") is not None
+            or snapshot.get("priorActivationOutcomes")
+        ):
+            raise CutoverAttestationError(
+                "filesystem layout migration requires an unmanaged legacy shelf "
+                "without activation history"
+            )
+        candidate_snapshot = _capture_public_download_candidate(
+            candidate,
+            shelf=shelf,
+            shelf_snapshot=snapshot,
+        )
+        authority, authority_raw = (
+            _read_public_download_migration_authority(
+                migration_authority,
+                migration_authority_sha256,
+            )
+        )
+        expected_authority = _expected_public_download_migration_authority(
+            source_head=source_head,
+            shelf_snapshot=snapshot,
+            candidate_snapshot=candidate_snapshot,
+        )
+        if not strict_python_equal(authority, expected_authority):
+            raise CutoverAttestationError(
+                "migration authority does not bind the exact incumbent-equivalent "
+                "candidate"
+            )
+        with anchored_parent(
+            state_path,
+            "cutover state root",
+        ) as (parent, leaf):
+            ensure_state_root_fd(parent.fd)
+            matches = [
+                name
+                for name in directory_entry_names(
+                    parent.fd,
+                    "cutover state parent",
+                )
+                if name.casefold() == leaf.casefold()
+            ]
+            if matches and matches != [leaf]:
+                raise CutoverAttestationError(
+                    "cutover state root has noncanonical casing"
+                )
+            if not matches:
+                os.mkdir(leaf, 0o700, dir_fd=parent.fd)
+                os.fsync(parent.fd)
+                parent.verify_links()
+            with anchored_child_directory(
+                parent,
+                leaf,
+                state_path,
+                "cutover state root",
+            ) as state:
+                entries = state_entries_fd(state.fd)
+                if entries not in (set(), {PRESTATE_NAME}):
+                    raise CutoverAttestationError(
+                        "public-download migration state is not resumable"
+                    )
+                receipt = {
+                    "contractName": PUBLIC_DOWNLOAD_PRESTATE_CONTRACT,
+                    "status": "pass",
+                    "generatedAtUtc": utc_now(),
+                    "runtimeProfile": PUBLIC_DOWNLOAD_RUNTIME_PROFILE,
+                    "operation": PUBLIC_DOWNLOAD_MIGRATION_OPERATION,
+                    "sourceHead": source_head,
+                    "shelfRoot": str(shelf.path),
+                    "shelfRootIdentity": directory_object_identity(shelf.fd),
+                    "stateRootIdentity": directory_object_identity(state.fd),
+                    "candidateRootIdentity": directory_object_identity(
+                        candidate.fd
+                    ),
+                    "generationId": generation_id,
+                    "activationReceiptId": activation_receipt_id,
+                    "migrationAuthorityPath": str(migration_authority),
+                    "migrationAuthoritySha256": migration_authority_sha256,
+                    "migrationAuthorityDocumentSha256": (
+                        f"sha256:{digest_bytes(authority_raw)}"
+                    ),
+                    "shelfSnapshot": snapshot,
+                    "candidateSnapshot": candidate_snapshot,
+                }
+                if PRESTATE_NAME in entries:
+                    existing, _ = load_state_at(
+                        state,
+                        PRESTATE_NAME,
+                        PUBLIC_DOWNLOAD_PRESTATE_CONTRACT,
+                    )
+                    _validate_public_download_prestate(
+                        existing,
+                        state=state,
+                        shelf=shelf,
+                        candidate=candidate,
+                        source_head=source_head,
+                    )
+                    if not _idempotent_receipts_equal(
+                        _render_receipt(existing),
+                        _render_receipt(receipt),
+                    ):
+                        raise CutoverAttestationError(
+                            "public-download migration prestate changed"
+                        )
+                    return existing
+                shelf_rows, _ = shelf_closure_fd(shelf.fd)
+                atomic_write_new_at(state, PRESTATE_NAME, receipt)
+                if not strict_python_equal(
+                    snapshot,
+                    capture_legacy_snapshot_fd(
+                        shelf,
+                        allow_aborted_history=False,
+                    ),
+                ) or not strict_python_equal(
+                    candidate_snapshot,
+                    _capture_public_download_candidate(
+                        candidate,
+                        shelf=shelf,
+                        shelf_snapshot=snapshot,
+                    ),
+                ):
+                    raise CutoverAttestationError(
+                        "migration inputs changed while prestate was persisted"
+                    )
+                recaptured_rows, _ = shelf_closure_fd(shelf.fd)
+                if not strict_python_equal(shelf_rows, recaptured_rows):
+                    raise CutoverAttestationError(
+                        "legacy shelf changed while migration prestate was persisted"
+                    )
+                return receipt
+
+
+def request_public_download_migration_start(
+    shelf_root: Path,
+    state_root: Path,
+    candidate_root: Path,
+) -> dict[str, Any]:
+    with anchored_directory(
+        shelf_root,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_root,
+        "public-download migration candidate",
+    ) as candidate, anchored_directory(
+        state_root,
+        "cutover state root",
+    ) as state:
+        entries = state_entries_fd(state.fd)
+        if entries not in (
+            {PRESTATE_NAME},
+            {PRESTATE_NAME, START_NAME},
+        ):
+            raise CutoverAttestationError(
+                "public-download migration cannot request start"
+            )
+        prestate, prestate_raw = load_state_at(
+            state,
+            PRESTATE_NAME,
+            PUBLIC_DOWNLOAD_PRESTATE_CONTRACT,
+        )
+        _validate_public_download_prestate(
+            prestate,
+            state=state,
+            shelf=shelf,
+            candidate=candidate,
+        )
+        live_snapshot = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        live_candidate = _capture_public_download_candidate(
+            candidate,
+            shelf=shelf,
+            shelf_snapshot=live_snapshot,
+        )
+        if (
+            not strict_python_equal(
+                live_snapshot,
+                prestate.get("shelfSnapshot"),
+            )
+            or not strict_python_equal(
+                live_candidate,
+                prestate.get("candidateSnapshot"),
+            )
+        ):
+            raise CutoverAttestationError(
+                "public-download migration inputs changed after prestate"
+            )
+        receipt = {
+            "contractName": PUBLIC_DOWNLOAD_START_CONTRACT,
+            "status": "pass",
+            "generatedAtUtc": utc_now(),
+            "runtimeProfile": PUBLIC_DOWNLOAD_RUNTIME_PROFILE,
+            "operation": PUBLIC_DOWNLOAD_MIGRATION_OPERATION,
+            "phase": "candidate_activation_requested",
+            "prestateSha256": f"sha256:{digest_bytes(prestate_raw)}",
+        }
+        atomic_write_new_at(state, START_NAME, receipt)
+        return receipt
+
+
+def _load_release_shelf_generation_module() -> Any:
+    path = Path(__file__).resolve().with_name(
+        "release_shelf_generation.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "chummer_release_shelf_generation_attestation",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise CutoverAttestationError(
+            "release shelf generation verifier is unavailable"
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _verify_public_download_migration_live(
+    shelf: AnchoredDirectory,
+    candidate: AnchoredDirectory,
+    prestate: dict[str, Any],
+) -> dict[str, Any]:
+    marker = read_regular_file_at(
+        shelf.fd,
+        MARKER_NAME,
+        label="filesystem release shelf layout marker",
+        maximum_bytes=128,
+    )
+    if marker != FILESYSTEM_LAYOUT_MARKER_BYTES:
+        raise CutoverAttestationError(
+            "filesystem release shelf layout marker is invalid"
+        )
+    entries = root_entries_fd(shelf.fd)
+    for forbidden in (POLICY_NAME, ACTIVE_INTENT_NAME, JOURNAL_NAME):
+        ensure_control_name_absent(entries, forbidden)
+    for required in (MARKER_NAME, POINTER_NAME, GENERATIONS_NAME, LOCK_NAME):
+        matches = [
+            name for name in entries if name.casefold() == required.casefold()
+        ]
+        if matches != [required]:
+            raise CutoverAttestationError(
+                f"filesystem migration control is not canonical: {required}"
+            )
+    pointer, pointer_raw = read_json_at(
+        shelf.fd,
+        POINTER_NAME,
+        label="filesystem release shelf current pointer",
+    )
+    generation_id = require_string(
+        prestate.get("generationId"),
+        "public-download migration generationId",
+    )
+    activation_receipt_id = require_string(
+        prestate.get("activationReceiptId"),
+        "public-download migration activationReceiptId",
+    )
+    if (
+        pointer.get("generationId") != generation_id
+        or pointer.get("activationReceiptId") != activation_receipt_id
+    ):
+        raise CutoverAttestationError(
+            "filesystem migration activated an unexpected generation"
+        )
+    generation_root = (
+        shelf.path / GENERATIONS_NAME / generation_id
+    )
+    module = _load_release_shelf_generation_module()
+    try:
+        validated_pointer = module.validate_pointer_payload(pointer)
+        module.verify_generation(generation_root, validated_pointer)
+        canonical = module.read_json_object(
+            generation_root / CANONICAL_MANIFEST,
+            CANONICAL_MANIFEST,
+        )
+        compatibility = module.read_json_object(
+            generation_root / COMPATIBILITY_MANIFEST,
+            COMPATIBILITY_MANIFEST,
+        )
+        module.validate_files_are_manifest_bound(
+            canonical,
+            compatibility,
+            generation_root,
+        )
+        generated_inventory = module.build_inventory(generation_root)
+    except Exception as exc:
+        raise CutoverAttestationError(
+            f"filesystem migration generation validation failed: {exc}"
+        ) from exc
+    candidate_snapshot = prestate.get("candidateSnapshot")
+    if not isinstance(candidate_snapshot, dict):
+        raise CutoverAttestationError(
+            "public-download migration candidate snapshot is malformed"
+        )
+    candidate_inventory = candidate_snapshot.get("inventory", {}).get(
+        "files"
+    )
+    if not isinstance(candidate_inventory, list):
+        raise CutoverAttestationError(
+            "public-download migration candidate inventory is malformed"
+        )
+    expected_generated_inventory = [
+        {"path": row["path"], "sha256": row["sha256"]}
+        for row in candidate_inventory
+        if row["path"]
+        not in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST)
+    ]
+    if generated_inventory != expected_generated_inventory:
+        raise CutoverAttestationError(
+            "activated generation differs from the pinned clean candidate"
+        )
+    live_legacy_rows = inventory_tree_fd(
+        shelf.fd,
+        skip_top_level_controls=True,
+    )
+    expected_legacy_rows = prestate.get("shelfSnapshot", {}).get(
+        "legacyInventory",
+        {},
+    ).get("files")
+    if not strict_python_equal(live_legacy_rows, expected_legacy_rows):
+        raise CutoverAttestationError(
+            "filesystem migration changed preserved top-level legacy bytes"
+        )
+    live_candidate = _capture_public_download_candidate(
+        candidate,
+        shelf=shelf,
+        shelf_snapshot=prestate["shelfSnapshot"],
+    )
+    if not strict_python_equal(
+        live_candidate,
+        candidate_snapshot,
+    ):
+        raise CutoverAttestationError(
+            "pinned migration candidate changed during activation"
+        )
+    generated_paths = {str(row["path"]) for row in generated_inventory}
+    excluded = candidate_snapshot.get("excludedLegacyFiles")
+    if not isinstance(excluded, list) or any(
+        not isinstance(row, dict)
+        or str(row.get("path")) in generated_paths
+        for row in excluded
+    ):
+        raise CutoverAttestationError(
+            "stale legacy exclusion proof is malformed"
+        )
+    return {
+        "markerSha256": f"sha256:{digest_bytes(marker)}",
+        "currentPointerSha256": f"sha256:{digest_bytes(pointer_raw)}",
+        "generationId": generation_id,
+        "activationReceiptId": activation_receipt_id,
+        "inventoryDigest": pointer.get("inventoryDigest"),
+        "candidateInventoryDigest": candidate_snapshot["inventory"]["digest"],
+        "excludedLegacyFiles": excluded,
+        "legacyTopLevelBytesUnchanged": True,
+        "excludedLegacyFilesAbsentFromGeneration": True,
+        "generationMatchesPinnedCandidate": True,
+    }
+
+
+def verify_public_download_migration(
+    shelf_root: Path,
+    state_root: Path,
+    candidate_root: Path,
+) -> dict[str, Any]:
+    with anchored_directory(
+        shelf_root,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_root,
+        "public-download migration candidate",
+    ) as candidate, anchored_directory(
+        state_root,
+        "cutover state root",
+    ) as state:
+        entries = state_entries_fd(state.fd)
+        if entries not in (
+            {PRESTATE_NAME, START_NAME},
+            {PRESTATE_NAME, START_NAME, POSTSTATE_NAME},
+        ):
+            raise CutoverAttestationError(
+                "public-download migration outcome phase is invalid"
+            )
+        prestate, prestate_raw = load_state_at(
+            state,
+            PRESTATE_NAME,
+            PUBLIC_DOWNLOAD_PRESTATE_CONTRACT,
+        )
+        _validate_public_download_prestate(
+            prestate,
+            state=state,
+            shelf=shelf,
+            candidate=candidate,
+        )
+        start, start_raw = load_state_at(
+            state,
+            START_NAME,
+            PUBLIC_DOWNLOAD_START_CONTRACT,
+        )
+        require_exact_keys(
+            start,
+            {
+                "contractName",
+                "status",
+                "generatedAtUtc",
+                "runtimeProfile",
+                "operation",
+                "phase",
+                "prestateSha256",
+            },
+            "public-download migration start",
+        )
+        if (
+            start.get("runtimeProfile")
+            != PUBLIC_DOWNLOAD_RUNTIME_PROFILE
+            or start.get("operation")
+            != PUBLIC_DOWNLOAD_MIGRATION_OPERATION
+            or start.get("phase") != "candidate_activation_requested"
+            or start.get("prestateSha256")
+            != f"sha256:{digest_bytes(prestate_raw)}"
+        ):
+            raise CutoverAttestationError(
+                "public-download migration start binding is invalid"
+            )
+        live = _verify_public_download_migration_live(
+            shelf,
+            candidate,
+            prestate,
+        )
+        receipt = {
+            "contractName": PUBLIC_DOWNLOAD_POSTSTATE_CONTRACT,
+            "status": "pass",
+            "generatedAtUtc": utc_now(),
+            "runtimeProfile": PUBLIC_DOWNLOAD_RUNTIME_PROFILE,
+            "operation": PUBLIC_DOWNLOAD_MIGRATION_OPERATION,
+            "classification": "committed",
+            "prestateSha256": f"sha256:{digest_bytes(prestate_raw)}",
+            "startRequestSha256": f"sha256:{digest_bytes(start_raw)}",
+            "migrationAuthoritySha256": (
+                prestate["migrationAuthorityDocumentSha256"]
+            ),
+            **live,
+        }
+        if POSTSTATE_NAME in entries:
+            existing, _ = load_state_at(
+                state,
+                POSTSTATE_NAME,
+                PUBLIC_DOWNLOAD_POSTSTATE_CONTRACT,
+            )
+            if not _idempotent_receipts_equal(
+                _render_receipt(existing),
+                _render_receipt(receipt),
+            ):
+                raise CutoverAttestationError(
+                    "public-download migration poststate changed"
+                )
+            return existing
+        shelf_rows, _ = shelf_closure_fd(shelf.fd)
+        atomic_write_new_at(state, POSTSTATE_NAME, receipt)
+        if not strict_python_equal(
+            live,
+            _verify_public_download_migration_live(
+                shelf,
+                candidate,
+                prestate,
+            ),
+        ):
+            raise CutoverAttestationError(
+                "public-download migration changed while poststate was persisted"
+            )
+        recaptured_rows, _ = shelf_closure_fd(shelf.fd)
+        if not strict_python_equal(shelf_rows, recaptured_rows):
+            raise CutoverAttestationError(
+                "release shelf changed while migration poststate was persisted"
+            )
+        return receipt
+
+
 def prepare(shelf_root: Path, state_root: Path, source_head: str) -> dict[str, Any]:
     if COMMIT.fullmatch(source_head) is None:
         raise CutoverAttestationError("source HEAD must be a full lowercase commit")
@@ -4312,6 +5274,38 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_parser.add_argument("--shelf-root", required=True)
     prepare_parser.add_argument("--state-root", required=True)
     prepare_parser.add_argument("--source-head", required=True)
+    public_prepare_parser = commands.add_parser(
+        "prepare-public-download-only"
+    )
+    public_prepare_parser.add_argument("--shelf-root", required=True)
+    public_prepare_parser.add_argument("--state-root", required=True)
+    public_prepare_parser.add_argument("--candidate-root", required=True)
+    public_prepare_parser.add_argument(
+        "--migration-authority",
+        required=True,
+    )
+    public_prepare_parser.add_argument(
+        "--migration-authority-sha256",
+        required=True,
+    )
+    public_prepare_parser.add_argument("--source-head", required=True)
+    public_prepare_parser.add_argument("--generation-id", required=True)
+    public_prepare_parser.add_argument(
+        "--activation-receipt-id",
+        required=True,
+    )
+    public_start_parser = commands.add_parser(
+        "request-public-download-only-start"
+    )
+    public_start_parser.add_argument("--shelf-root", required=True)
+    public_start_parser.add_argument("--state-root", required=True)
+    public_start_parser.add_argument("--candidate-root", required=True)
+    public_verify_parser = commands.add_parser(
+        "verify-public-download-only"
+    )
+    public_verify_parser.add_argument("--shelf-root", required=True)
+    public_verify_parser.add_argument("--state-root", required=True)
+    public_verify_parser.add_argument("--candidate-root", required=True)
     inspect_parser = commands.add_parser("inspect-deploy-state")
     inspect_parser.add_argument("--shelf-root", required=True)
     inspect_parser.add_argument("--state-root", required=True)
@@ -4355,6 +5349,29 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "prepare":
             result = prepare(Path(args.shelf_root), Path(args.state_root), args.source_head)
+        elif args.command == "prepare-public-download-only":
+            result = prepare_public_download_migration(
+                Path(args.shelf_root),
+                Path(args.state_root),
+                Path(args.candidate_root),
+                Path(args.migration_authority),
+                args.migration_authority_sha256,
+                args.source_head,
+                args.generation_id,
+                args.activation_receipt_id,
+            )
+        elif args.command == "request-public-download-only-start":
+            result = request_public_download_migration_start(
+                Path(args.shelf_root),
+                Path(args.state_root),
+                Path(args.candidate_root),
+            )
+        elif args.command == "verify-public-download-only":
+            result = verify_public_download_migration(
+                Path(args.shelf_root),
+                Path(args.state_root),
+                Path(args.candidate_root),
+            )
         elif args.command == "inspect-deploy-state":
             result = inspect_deploy_state(
                 Path(args.shelf_root),

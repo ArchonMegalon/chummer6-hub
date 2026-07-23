@@ -70,6 +70,15 @@ ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
     "portal",
     "status",
 }
+PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE = "public-download-only"
+FULL_RUNTIME_PROFILE = "full"
+PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
+    "contractName",
+    "generatedAtUtc",
+    "portal",
+    "runtimeProfile",
+    "status",
+}
 ACTIVE_RUNTIME_PORTAL_FIELDS = {
     "containerId",
     "containerName",
@@ -881,18 +890,32 @@ def _validate_candidate_active_runtime_authority(
     candidate_portal_container_name: str,
     candidate_portal_image_id: str,
     proof_mount_sha256: str,
-    readiness_path: Path,
-    readiness_sha256: str,
+    readiness_path: Path | None,
+    readiness_sha256: str | None,
+    runtime_profile: str,
 ) -> None:
     portal = payload.get("portal")
+    if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+        authority_fields = PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        readiness_binding_valid = (
+            payload.get("runtimeProfile")
+            == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        )
+    else:
+        authority_fields = ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        readiness_binding_valid = (
+            readiness_path is not None
+            and readiness_sha256 is not None
+            and payload.get("installLinkingAuthorityReadinessPath")
+            == str(readiness_path)
+            and payload.get("installLinkingAuthorityReadinessSha256")
+            == readiness_sha256
+        )
     if (
-        set(payload) != ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        set(payload) != authority_fields
         or payload.get("contractName") != ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME
         or payload.get("status") != "pass"
-        or payload.get("installLinkingAuthorityReadinessPath")
-        != str(readiness_path)
-        or payload.get("installLinkingAuthorityReadinessSha256")
-        != readiness_sha256
+        or not readiness_binding_valid
         or not isinstance(portal, dict)
         or set(portal) != ACTIVE_RUNTIME_PORTAL_FIELDS
         or portal.get("existed") is not True
@@ -921,9 +944,10 @@ def complete_transaction(
     candidate_portal_container_id: str,
     candidate_portal_container_name: str,
     candidate_portal_image_id: str,
-    install_linking_authority_readiness: Path,
-    install_linking_authority_readiness_sha256: str,
+    install_linking_authority_readiness: Path | None,
+    install_linking_authority_readiness_sha256: str | None,
     shared_mutation_lock_token: str,
+    runtime_profile: str = FULL_RUNTIME_PROFILE,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
@@ -966,24 +990,46 @@ def complete_transaction(
                 raise RuntimeError(
                     "candidate portal authority conflicts with deployment journal"
                 )
-            readiness_evidence_root = _validate_owner_only_evidence_root(
-                install_linking_authority_readiness.parent,
-                label="private cutover evidence root",
-            )
-            readiness_path, readiness_sha256, _readiness = (
-                validate_install_linking_authority_readiness(
-                    install_linking_authority_readiness,
-                    expected_sha256=(
-                        install_linking_authority_readiness_sha256
-                    ),
-                    evidence_root=readiness_evidence_root,
+            if runtime_profile == FULL_RUNTIME_PROFILE:
+                if (
+                    install_linking_authority_readiness is None
+                    or install_linking_authority_readiness_sha256 is None
+                ):
+                    raise RuntimeError(
+                        "full runtime completion requires InstallLinking "
+                        "authority readiness"
+                    )
+                readiness_evidence_root = _validate_owner_only_evidence_root(
+                    install_linking_authority_readiness.parent,
+                    label="private cutover evidence root",
                 )
-            )
-            if readiness_path in {journal_path, runtime_authority_output}:
-                raise RuntimeError(
-                    "InstallLinking authority readiness path conflicts with "
-                    "transaction authority paths"
+                readiness_path, readiness_sha256, _readiness = (
+                    validate_install_linking_authority_readiness(
+                        install_linking_authority_readiness,
+                        expected_sha256=(
+                            install_linking_authority_readiness_sha256
+                        ),
+                        evidence_root=readiness_evidence_root,
+                    )
                 )
+                if readiness_path in {journal_path, runtime_authority_output}:
+                    raise RuntimeError(
+                        "InstallLinking authority readiness path conflicts with "
+                        "transaction authority paths"
+                    )
+            elif runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+                if (
+                    install_linking_authority_readiness is not None
+                    or install_linking_authority_readiness_sha256 is not None
+                ):
+                    raise RuntimeError(
+                        "public-download-only completion refuses an "
+                        "InstallLinking authority readiness binding"
+                    )
+                readiness_path = None
+                readiness_sha256 = None
+            else:
+                raise RuntimeError("active runtime profile is unsupported")
             proof_mount_sha256 = prior[
                 "expectedRuntimeProofBindSourceSha256"
             ]
@@ -1014,6 +1060,7 @@ def complete_transaction(
                     proof_mount_sha256=proof_mount_sha256,
                     readiness_path=readiness_path,
                     readiness_sha256=readiness_sha256,
+                    runtime_profile=runtime_profile,
                 )
             else:
                 active_authority = active_runtime_authority_payload(
@@ -1025,14 +1072,19 @@ def complete_transaction(
                     proof_authority_mount_sha256=proof_mount_sha256,
                     proof_public_mount_sha256=proof_mount_sha256,
                 )
-                active_authority.update(
-                    {
-                        "installLinkingAuthorityReadinessPath": str(
-                            readiness_path
-                        ),
-                        "installLinkingAuthorityReadinessSha256": readiness_sha256,
-                    }
-                )
+                if runtime_profile == FULL_RUNTIME_PROFILE:
+                    active_authority.update(
+                        {
+                            "installLinkingAuthorityReadinessPath": str(
+                                readiness_path
+                            ),
+                            "installLinkingAuthorityReadinessSha256": readiness_sha256,
+                        }
+                    )
+                else:
+                    active_authority["runtimeProfile"] = (
+                        PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+                    )
                 overlay.atomic_write_json(
                     runtime_authority_output,
                     active_authority,
@@ -1053,16 +1105,20 @@ def complete_transaction(
                 proof_mount_sha256=proof_mount_sha256,
                 readiness_path=readiness_path,
                 readiness_sha256=readiness_sha256,
+                runtime_profile=runtime_profile,
             )
             journal_path.unlink()
             overlay.fsync_directory(journal_path.parent)
-    return {
+    result = {
         "contractName": CONTRACT_NAME,
         "operation": "complete",
         "status": "pass",
         "journalRetired": True,
         "activeRuntimeAuthority": str(runtime_authority_output),
     }
+    if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+        result["runtimeProfile"] = PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+    return result
 
 
 def _activation_receipt_backup_hint(
@@ -1546,11 +1602,14 @@ def parse_args() -> argparse.Namespace:
     complete_parser.add_argument(
         "--install-linking-authority-readiness",
         type=Path,
-        required=True,
     )
     complete_parser.add_argument(
         "--install-linking-authority-readiness-sha256",
-        required=True,
+    )
+    complete_parser.add_argument(
+        "--runtime-profile",
+        choices=(FULL_RUNTIME_PROFILE, PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE),
+        default=FULL_RUNTIME_PROFILE,
     )
     phase_parser.add_argument("--phase", choices=TRANSACTION_PHASES, required=True)
     return parser.parse_args()
@@ -1640,6 +1699,7 @@ def main() -> int:
                 install_linking_authority_readiness_sha256=(
                     args.install_linking_authority_readiness_sha256
                 ),
+                runtime_profile=args.runtime_profile,
                 shared_mutation_lock_token=args.shared_mutation_lock_token,
             )
         else:
