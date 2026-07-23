@@ -3317,6 +3317,509 @@ def _http_bytes(
         connection.close()
 
 
+def _open_probe_connection(
+    *,
+    scheme: str,
+    connect_host: str,
+    connect_port: int,
+    timeout: float,
+) -> http.client.HTTPConnection:
+    if scheme == "https":
+        return http.client.HTTPSConnection(
+            connect_host,
+            connect_port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
+        )
+    if scheme == "http":
+        return http.client.HTTPConnection(
+            connect_host,
+            connect_port,
+            timeout=timeout,
+        )
+    raise CutoverError("HTTP probe scheme is outside the audited boundary")
+
+
+def _validate_download_probe_target(
+    *,
+    request_host: str,
+    path: str,
+) -> None:
+    parsed = urlsplit(path)
+    if (
+        request_host not in SIDECAR_HOSTS
+        or not path.startswith("/downloads/")
+        or parsed.scheme
+        or parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != path
+    ):
+        raise CutoverError("download probe target is outside the audited boundary")
+
+
+def _probe_request_headers(request_host: str) -> dict[str, str]:
+    return {
+        "Host": request_host,
+        "Accept": "*/*",
+        "Accept-Encoding": "identity",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "User-Agent": "chummer-public-download-cutover/1",
+    }
+
+
+def _response_header_values(
+    response: http.client.HTTPResponse,
+) -> dict[str, list[str]]:
+    values: dict[str, list[str]] = {}
+    for key, value in response.getheaders():
+        values.setdefault(key.lower(), []).append(value)
+    return values
+
+
+def _reject_download_response_state(
+    headers: Mapping[str, list[str]],
+    *,
+    allow_location: bool,
+) -> None:
+    forbidden = {
+        "authorization",
+        "authentication-info",
+        "proxy-authenticate",
+        "proxy-authentication-info",
+        "proxy-authorization",
+        "refresh",
+        "set-cookie",
+        "set-cookie2",
+        "www-authenticate",
+    }
+    if not allow_location:
+        forbidden.add("location")
+    exposed = sorted(forbidden.intersection(headers))
+    if exposed:
+        raise CutoverError(
+            "download probe exposed credential, cookie, or redirect state"
+        )
+    encodings = headers.get("content-encoding", [])
+    if len(encodings) > 1 or (
+        encodings and encodings[0].strip().lower() != "identity"
+    ):
+        raise CutoverError("download probe returned unexpected Content-Encoding")
+
+
+def _stream_exact_download(
+    *,
+    scheme: str,
+    connect_host: str,
+    connect_port: int,
+    request_host: str,
+    path: str,
+    expected_sha256: str,
+    expected_size_bytes: int,
+    generation_id: str,
+    timeout: float = 30,
+) -> dict[str, Any]:
+    _validate_download_probe_target(request_host=request_host, path=path)
+    if (
+        SHA256.fullmatch(expected_sha256) is None
+        or isinstance(expected_size_bytes, bool)
+        or expected_size_bytes <= 0
+        or not generation_id
+    ):
+        raise CutoverError("download probe expectation is invalid")
+    request_headers = _probe_request_headers(request_host)
+    if {
+        "authorization",
+        "cookie",
+        "proxy-authorization",
+    }.intersection(key.lower() for key in request_headers):
+        raise CutoverError("download probe request is not anonymous")
+
+    connection = _open_probe_connection(
+        scheme=scheme,
+        connect_host=connect_host,
+        connect_port=connect_port,
+        timeout=timeout,
+    )
+    try:
+        connection.request("GET", path, headers=request_headers)
+        response = connection.getresponse()
+        headers = _response_header_values(response)
+        _reject_download_response_state(headers, allow_location=False)
+        if response.status != 200:
+            raise CutoverError(
+                f"download probe expected HTTP 200, got {response.status}"
+            )
+        lengths = headers.get("content-length", [])
+        if len(lengths) != 1:
+            raise CutoverError(
+                "download probe requires exactly one Content-Length"
+            )
+        try:
+            content_length = int(lengths[0])
+        except ValueError as exc:
+            raise CutoverError(
+                "download probe returned invalid Content-Length"
+            ) from exc
+        if content_length != expected_size_bytes:
+            raise CutoverError(
+                "download probe Content-Length differs from fresh authority"
+            )
+        generations = headers.get(
+            "x-chummer-release-generation",
+            [],
+        )
+        if generations != [generation_id]:
+            raise CutoverError("download probe generation header drifted")
+
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            chunk = response.read(64 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+            size += len(chunk)
+            if size > expected_size_bytes:
+                raise CutoverError(
+                    "download probe streamed more bytes than expected"
+                )
+        observed_sha256 = digest.hexdigest()
+        if size != content_length or size != expected_size_bytes:
+            raise CutoverError(
+                "download probe streamed size differs from fresh authority"
+            )
+        if observed_sha256 != expected_sha256:
+            raise CutoverError(
+                "download probe streamed SHA-256 differs from fresh authority"
+            )
+        return {
+            "method": "GET",
+            "endpoint": f"{scheme}://{request_host}{path}",
+            "httpStatus": 200,
+            "contentLength": content_length,
+            "sizeBytes": size,
+            "sha256": observed_sha256,
+            "generationId": generation_id,
+            "anonymous": True,
+            "redirectsFollowed": 0,
+        }
+    except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+        raise CutoverError("streaming download probe failed") from exc
+    finally:
+        connection.close()
+
+
+def _fresh_delta_rows(shelf: Mapping[str, Any]) -> list[dict[str, Any]]:
+    authority = shelf.get("releaseCandidateAuthority")
+    fresh = authority.get("freshDelta") if isinstance(authority, dict) else None
+    expected_paths = (
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+    )
+    if (
+        not isinstance(fresh, list)
+        or len(fresh) != len(expected_paths)
+        or tuple(
+            str(row.get("path") or "")
+            for row in fresh
+            if isinstance(row, dict)
+        )
+        != expected_paths
+    ):
+        raise CutoverError("fresh download authority path closure drifted")
+    result: list[dict[str, Any]] = []
+    for path, row in zip(expected_paths, fresh, strict=True):
+        if not isinstance(row, dict):
+            raise CutoverError("fresh download authority row is malformed")
+        sha256 = str(row.get("sha256") or "").strip().lower()
+        size = row.get("sizeBytes")
+        if (
+            SHA256.fullmatch(sha256) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size <= 0
+        ):
+            raise CutoverError("fresh download authority digest or size drifted")
+        result.append(
+            {
+                "kind": (
+                    "installer"
+                    if path.endswith("-installer.exe")
+                    else "sidecar"
+                    if path.endswith(".json")
+                    else "payload"
+                ),
+                "path": f"/downloads/{path}",
+                "sha256": sha256,
+                "sizeBytes": size,
+            }
+        )
+    return result
+
+
+def _retained_account_required_artifact(
+    *,
+    config: SidecarConfig,
+    generation_root: Path,
+    fresh_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    raw = stable_regular_bytes(
+        generation_root / "RELEASE_CHANNEL.generated.json",
+        label="prepared generation canonical manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    try:
+        manifest = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise CutoverError("prepared canonical manifest is malformed") from exc
+    artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
+    if not isinstance(artifacts, list):
+        raise CutoverError("prepared canonical manifest artifacts are unavailable")
+    fresh_paths = {str(row["path"]) for row in fresh_rows}
+    candidates: list[dict[str, Any]] = []
+    for row in artifacts:
+        if not isinstance(row, dict):
+            continue
+        platform = str(row.get("platform") or "").strip().lower()
+        rid = str(row.get("rid") or "").strip().lower()
+        if (
+            str(row.get("installAccessClass") or "").strip().lower()
+            != "account_required"
+            or (
+                platform not in {"mac", "macos", "osx"}
+                and not rid.startswith("osx-")
+            )
+        ):
+            continue
+        artifact_id = str(
+            row.get("artifactId") or row.get("id") or ""
+        ).strip()
+        file_name = str(row.get("fileName") or "").strip()
+        sha256 = str(row.get("sha256") or "").strip().lower()
+        size = row.get("sizeBytes")
+        raw_url = str(
+            row.get("downloadUrl") or row.get("url") or ""
+        ).strip()
+        resolved = urlsplit(
+            urljoin(config.base_url.rstrip("/") + "/", raw_url)
+        )
+        path = f"/downloads/files/{file_name}"
+        if (
+            not artifact_id
+            or not file_name
+            or Path(file_name).name != file_name
+            or "/" in file_name
+            or "\\" in file_name
+            or SHA256.fullmatch(sha256) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size <= 0
+            or resolved.scheme != "https"
+            or resolved.hostname != SIDECAR_HOSTS[0]
+            or resolved.path != path
+            or resolved.query
+            or resolved.fragment
+            or path in fresh_paths
+        ):
+            raise CutoverError(
+                "retained account-required artifact contract is invalid"
+            )
+        candidates.append(
+            {
+                "artifactId": artifact_id,
+                "path": path,
+                "sha256": sha256,
+                "sizeBytes": size,
+                "installAccessClass": "account_required",
+            }
+        )
+    if not candidates:
+        raise CutoverError(
+            "no retained account-required Mac artifact is available for denial proof"
+        )
+    return sorted(candidates, key=lambda row: str(row["artifactId"]))[0]
+
+
+def _probe_denied_download(
+    *,
+    scheme: str,
+    connect_host: str,
+    connect_port: int,
+    request_host: str,
+    path: str,
+    generation_id: str,
+    timeout: float = 30,
+) -> dict[str, Any]:
+    _validate_download_probe_target(request_host=request_host, path=path)
+    connection = _open_probe_connection(
+        scheme=scheme,
+        connect_host=connect_host,
+        connect_port=connect_port,
+        timeout=timeout,
+    )
+    try:
+        request_headers = _probe_request_headers(request_host)
+        connection.request("GET", path, headers=request_headers)
+        response = connection.getresponse()
+        headers = _response_header_values(response)
+        _reject_download_response_state(headers, allow_location=True)
+        if response.status not in {
+            302,
+            303,
+            307,
+            308,
+            401,
+            403,
+            404,
+            409,
+            410,
+            503,
+        }:
+            raise CutoverError(
+                "account-required artifact did not fail closed anonymously"
+            )
+        generations = headers.get(
+            "x-chummer-release-generation",
+            [],
+        )
+        if generations != [generation_id]:
+            raise CutoverError(
+                "account-required denial generation header drifted"
+            )
+        locations = headers.get("location", [])
+        if 300 <= response.status < 400:
+            if len(locations) != 1:
+                raise CutoverError(
+                    "account-required redirect has ambiguous Location"
+                )
+            parsed_location = urlsplit(locations[0])
+            if (
+                parsed_location.username is not None
+                or parsed_location.password is not None
+                or (
+                    parsed_location.hostname is not None
+                    and parsed_location.hostname not in SIDECAR_HOSTS
+                )
+                or (
+                    parsed_location.path != "/login"
+                    and not parsed_location.path.startswith("/account/")
+                )
+            ):
+                raise CutoverError(
+                    "account-required redirect escaped the account boundary"
+                )
+        elif locations:
+            raise CutoverError(
+                "account-required non-redirect exposed Location"
+            )
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            chunk = response.read(64 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+            size += len(chunk)
+            if size > 64 * 1024:
+                raise CutoverError(
+                    "account-required denial returned an artifact-sized body"
+                )
+        return {
+            "method": "GET",
+            "endpoint": f"{scheme}://{request_host}{path}",
+            "httpStatus": int(response.status),
+            "bodySizeBytes": size,
+            "bodySha256": digest.hexdigest(),
+            "generationId": generation_id,
+            "anonymous": True,
+            "artifactBytesServed": False,
+            "redirectsFollowed": 0,
+        }
+    except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+        raise CutoverError("account-required denial probe failed") from exc
+    finally:
+        connection.close()
+
+
+def probe_download_artifact_hosts(
+    config: SidecarConfig,
+    *,
+    shelf: Mapping[str, Any],
+    scope: str,
+) -> dict[str, Any]:
+    if scope == "local":
+        scheme = "http"
+        connect_port = SIDECAR_PORT
+    elif scope == "public":
+        scheme = "https"
+        connect_port = 443
+    else:
+        raise CutoverError("artifact probe scope is invalid")
+    generation_id = str(shelf.get("generationId") or "").strip()
+    generation_root = Path(str(shelf.get("generationRoot") or ""))
+    if not generation_id or not generation_root.is_absolute():
+        raise CutoverError("artifact probe generation authority is invalid")
+    fresh_rows = _fresh_delta_rows(shelf)
+    retained = _retained_account_required_artifact(
+        config=config,
+        generation_root=generation_root,
+        fresh_rows=fresh_rows,
+    )
+    observations: list[dict[str, Any]] = []
+    denial_observations: list[dict[str, Any]] = []
+    for hostname in SIDECAR_HOSTS:
+        connect_host = SIDECAR_ADDRESS if scope == "local" else hostname
+        for row in fresh_rows:
+            observation = _stream_exact_download(
+                scheme=scheme,
+                connect_host=connect_host,
+                connect_port=connect_port,
+                request_host=hostname,
+                path=str(row["path"]),
+                expected_sha256=str(row["sha256"]),
+                expected_size_bytes=int(row["sizeBytes"]),
+                generation_id=generation_id,
+            )
+            observations.append(
+                {
+                    **observation,
+                    "kind": row["kind"],
+                }
+            )
+        for path in (
+            str(retained["path"]),
+            (
+                f"/downloads/g/{generation_id}/files/"
+                f"{Path(str(retained['path'])).name}"
+            ),
+        ):
+            denial_observations.append(
+                {
+                    **_probe_denied_download(
+                        scheme=scheme,
+                        connect_host=connect_host,
+                        connect_port=connect_port,
+                        request_host=hostname,
+                        path=path,
+                        generation_id=generation_id,
+                    ),
+                    "artifactId": retained["artifactId"],
+                    "installAccessClass": "account_required",
+                }
+            )
+    return {
+        "status": "pass",
+        "scope": scope,
+        "hosts": list(SIDECAR_HOSTS),
+        "generationId": generation_id,
+        "freshArtifacts": observations,
+        "accountRequiredDenials": denial_observations,
+    }
+
+
 def _probe_exact_manifest(
     *,
     scheme: str,
@@ -3353,6 +3856,7 @@ def _probe_exact_manifest(
 def probe_sidecar_hosts(
     config: SidecarConfig,
     *,
+    shelf: Mapping[str, Any],
     generation_id: str,
     generation_root: Path,
 ) -> dict[str, Any]:
@@ -3416,12 +3920,18 @@ def probe_sidecar_hosts(
                     generation_id=generation_id,
                 )
             )
+    artifact_verification = probe_download_artifact_hosts(
+        config,
+        shelf=shelf,
+        scope="local",
+    )
     return {
         "status": "pass",
         "origin": SIDECAR_ORIGIN,
         "hosts": list(SIDECAR_HOSTS),
         "generationId": generation_id,
         "observations": observations,
+        "artifactVerification": artifact_verification,
     }
 
 
@@ -4922,6 +5432,7 @@ class TopologyBActions:
         if scope == "local":
             receipt = probe_sidecar_hosts(
                 config,
+                shelf=shelf,
                 generation_id=str(shelf["generationId"]),
                 generation_root=Path(str(shelf["generationRoot"])),
             )
@@ -5100,6 +5611,11 @@ class TopologyBActions:
         )
         if strict.get("status") != "pass":
             raise CutoverError("strict public download receipt did not pass")
+        artifact_verification = probe_download_artifact_hosts(
+            self.config,
+            shelf=shelf,
+            scope="public",
+        )
         journal = self.cloudflare.load_journal(
             self.config.cloudflare_journal
         )
@@ -5169,6 +5685,7 @@ class TopologyBActions:
                     owner_only=True,
                 )
             ),
+            "artifactVerification": artifact_verification,
         }
 
     def commit_cloudflare(
@@ -5452,8 +5969,14 @@ class TopologyBActions:
             )
             probe_sidecar_hosts(
                 self.config,
+                shelf=shelf,
                 generation_id=str(shelf["generationId"]),
                 generation_root=Path(str(shelf["generationRoot"])),
+            )
+            probe_download_artifact_hosts(
+                self.config,
+                shelf=shelf,
+                scope="public",
             )
             manifest = stable_regular_bytes(
                 Path(str(shelf["generationRoot"])) / "releases.json",

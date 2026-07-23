@@ -1072,6 +1072,11 @@ def test_commit_archive_crash_reconstructs_active_authority_without_state_receip
         "_probe_exact_manifest",
         lambda *_args, **_kwargs: {"status": "pass"},
     )
+    monkeypatch.setattr(
+        controller,
+        "probe_download_artifact_hosts",
+        lambda *_args, **_kwargs: {"status": "pass"},
+    )
     captured_commit: list[dict[str, Any]] = []
 
     def write_active(
@@ -1144,6 +1149,361 @@ def test_incumbent_baseline_and_rollback_cover_both_public_hosts(
     drift_www = True
     with pytest.raises(controller.CutoverError):
         controller.probe_public_incumbent(config, expected=baseline)
+
+
+class FakeProbeResponse:
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        status: int = 200,
+        generation: str = "generation-a",
+        headers: list[tuple[str, str]] | None = None,
+    ) -> None:
+        self.status = status
+        self._body = body
+        self._offset = 0
+        self._headers = [
+            ("Content-Length", str(len(body))),
+            ("X-Chummer-Release-Generation", generation),
+            *(headers or []),
+        ]
+
+    def getheaders(self) -> list[tuple[str, str]]:
+        return list(self._headers)
+
+    def read(self, amount: int) -> bytes:
+        chunk = self._body[self._offset : self._offset + amount]
+        self._offset += len(chunk)
+        return chunk
+
+
+class FakeProbeConnection:
+    def __init__(self, response: FakeProbeResponse) -> None:
+        self.response = response
+        self.requests: list[tuple[str, str, dict[str, str]]] = []
+        self.closed = False
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: dict[str, str],
+    ) -> None:
+        self.requests.append((method, path, dict(headers)))
+
+    def getresponse(self) -> FakeProbeResponse:
+        return self.response
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_exact_download_probe_streams_hashes_and_sends_no_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    body = b"fresh-windows-payload"
+    response = FakeProbeResponse(body)
+    connection = FakeProbeConnection(response)
+    monkeypatch.setattr(
+        controller,
+        "_open_probe_connection",
+        lambda **_kwargs: connection,
+    )
+
+    receipt = controller._stream_exact_download(
+        scheme="https",
+        connect_host="www.chummer.run",
+        connect_port=443,
+        request_host="www.chummer.run",
+        path="/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        expected_sha256=hashlib.sha256(body).hexdigest(),
+        expected_size_bytes=len(body),
+        generation_id="generation-a",
+    )
+
+    assert receipt["sha256"] == hashlib.sha256(body).hexdigest()
+    assert receipt["sizeBytes"] == len(body)
+    assert receipt["anonymous"] is True
+    assert receipt["redirectsFollowed"] == 0
+    method, path, headers = connection.requests[0]
+    assert (method, path) == (
+        "GET",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip",
+    )
+    assert headers["Host"] == "www.chummer.run"
+    assert headers["Accept-Encoding"] == "identity"
+    assert {
+        "authorization",
+        "cookie",
+        "proxy-authorization",
+    }.isdisjoint(key.lower() for key in headers)
+    assert connection.closed is True
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ("corrupt", "redirect", "cookie", "auth-challenge"),
+)
+def test_exact_download_probe_rejects_corruption_redirect_cookie_and_auth(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    require_topology_b_surface()
+    expected = b"fresh-installer"
+    body = expected
+    status = 200
+    headers: list[tuple[str, str]] = []
+    if failure == "corrupt":
+        body = b"Fresh-installer"
+    elif failure == "redirect":
+        status = 302
+        headers.append(("Location", "/login"))
+    elif failure == "cookie":
+        headers.append(("Set-Cookie", "session=secret"))
+    else:
+        headers.append(("WWW-Authenticate", 'Bearer realm="private"'))
+    response = FakeProbeResponse(
+        body,
+        status=status,
+        headers=headers,
+    )
+    connection = FakeProbeConnection(response)
+    monkeypatch.setattr(
+        controller,
+        "_open_probe_connection",
+        lambda **_kwargs: connection,
+    )
+
+    with pytest.raises(controller.CutoverError):
+        controller._stream_exact_download(
+            scheme="http",
+            connect_host=controller.SIDECAR_ADDRESS,
+            connect_port=controller.SIDECAR_PORT,
+            request_host="chummer.run",
+            path="/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            expected_sha256=hashlib.sha256(expected).hexdigest(),
+            expected_size_bytes=len(expected),
+            generation_id="generation-a",
+        )
+
+
+def test_account_required_denial_probe_does_not_follow_login_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    response = FakeProbeResponse(
+        b"",
+        status=302,
+        headers=[("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac")],
+    )
+    connection = FakeProbeConnection(response)
+    monkeypatch.setattr(
+        controller,
+        "_open_probe_connection",
+        lambda **_kwargs: connection,
+    )
+
+    receipt = controller._probe_denied_download(
+        scheme="https",
+        connect_host="chummer.run",
+        connect_port=443,
+        request_host="chummer.run",
+        path="/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
+        generation_id="generation-a",
+    )
+
+    assert receipt["httpStatus"] == 302
+    assert receipt["artifactBytesServed"] is False
+    assert receipt["redirectsFollowed"] == 0
+    assert len(connection.requests) == 1
+    assert {
+        "authorization",
+        "cookie",
+        "proxy-authorization",
+    }.isdisjoint(
+        key.lower() for key in connection.requests[0][2]
+    )
+
+
+@pytest.mark.parametrize(
+    "status,headers",
+    [
+        (200, []),
+        (302, [("Location", "/login"), ("Set-Cookie", "session=secret")]),
+        (401, [("WWW-Authenticate", 'Bearer realm="private"')]),
+    ],
+)
+def test_account_required_denial_probe_rejects_exposure_or_auth_state(
+    monkeypatch: pytest.MonkeyPatch,
+    status: int,
+    headers: list[tuple[str, str]],
+) -> None:
+    require_topology_b_surface()
+    response = FakeProbeResponse(
+        b"mac-installer-bytes" if status == 200 else b"",
+        status=status,
+        headers=headers,
+    )
+    connection = FakeProbeConnection(response)
+    monkeypatch.setattr(
+        controller,
+        "_open_probe_connection",
+        lambda **_kwargs: connection,
+    )
+
+    with pytest.raises(controller.CutoverError):
+        controller._probe_denied_download(
+            scheme="https",
+            connect_host="chummer.run",
+            connect_port=443,
+            request_host="chummer.run",
+            path="/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
+            generation_id="generation-a",
+        )
+
+
+@pytest.mark.parametrize(
+    "scope,scheme,connect_hosts",
+    [
+        (
+            "local",
+            "http",
+            {controller.SIDECAR_ADDRESS},
+        ),
+        (
+            "public",
+            "https",
+            set(HOSTS),
+        ),
+    ],
+)
+def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scope: str,
+    scheme: str,
+    connect_hosts: set[str],
+) -> None:
+    require_topology_b_surface()
+    generation_id = "generation-a"
+    generation_root = tmp_path / "generation"
+    generation_root.mkdir()
+    mac_file = "chummer-avalonia-osx-x64-installer.dmg"
+    (generation_root / "RELEASE_CHANNEL.generated.json").write_text(
+        json.dumps(
+            {
+                "artifacts": [
+                    {
+                        "artifactId": "avalonia-osx-x64-installer",
+                        "platform": "macos",
+                        "rid": "osx-x64",
+                        "fileName": mac_file,
+                        "downloadUrl": f"/downloads/files/{mac_file}",
+                        "sha256": "d" * 64,
+                        "sizeBytes": 101,
+                        "installAccessClass": "account_required",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    fresh_paths = (
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+    )
+    shelf = {
+        "generationId": generation_id,
+        "generationRoot": str(generation_root),
+        "releaseCandidateAuthority": {
+            "freshDelta": [
+                {
+                    "path": path,
+                    "sha256": character * 64,
+                    "sizeBytes": index + 10,
+                }
+                for index, (path, character) in enumerate(
+                    zip(fresh_paths, ("a", "b", "c"), strict=True)
+                )
+            ]
+        },
+    }
+    config = SimpleNamespace(base_url="https://chummer.run")
+    streamed: list[dict[str, Any]] = []
+    denied: list[dict[str, Any]] = []
+
+    def fake_stream(**kwargs: Any) -> dict[str, Any]:
+        streamed.append(kwargs)
+        return {
+            "endpoint": (
+                f"{kwargs['scheme']}://{kwargs['request_host']}"
+                f"{kwargs['path']}"
+            ),
+            "httpStatus": 200,
+            "sha256": kwargs["expected_sha256"],
+            "sizeBytes": kwargs["expected_size_bytes"],
+            "anonymous": True,
+            "redirectsFollowed": 0,
+        }
+
+    def fake_denial(**kwargs: Any) -> dict[str, Any]:
+        denied.append(kwargs)
+        return {
+            "endpoint": (
+                f"{kwargs['scheme']}://{kwargs['request_host']}"
+                f"{kwargs['path']}"
+            ),
+            "httpStatus": 302,
+            "anonymous": True,
+            "artifactBytesServed": False,
+            "redirectsFollowed": 0,
+        }
+
+    monkeypatch.setattr(controller, "_stream_exact_download", fake_stream)
+    monkeypatch.setattr(controller, "_probe_denied_download", fake_denial)
+
+    receipt = controller.probe_download_artifact_hosts(
+        config,
+        shelf=shelf,
+        scope=scope,
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["hosts"] == list(HOSTS)
+    assert len(receipt["freshArtifacts"]) == 6
+    assert len(receipt["accountRequiredDenials"]) == 4
+    assert {call["request_host"] for call in streamed} == set(HOSTS)
+    assert {call["connect_host"] for call in streamed} == connect_hosts
+    assert {call["scheme"] for call in streamed} == {scheme}
+    assert {call["path"] for call in streamed} == {
+        f"/downloads/{path}" for path in fresh_paths
+    }
+    assert {call["path"] for call in denied} == {
+        f"/downloads/files/{mac_file}",
+        f"/downloads/g/{generation_id}/files/{mac_file}",
+    }
+    assert all(
+        observation["installAccessClass"] == "account_required"
+        and observation["artifactBytesServed"] is False
+        for observation in receipt["accountRequiredDenials"]
+    )
+
+
+def test_local_and_public_controller_phases_both_require_artifact_host_gate() -> None:
+    require_topology_b_surface()
+    assert "probe_download_artifact_hosts" in call_leaf_names(
+        function_node("probe_sidecar_hosts")
+    )
+    assert "probe_download_artifact_hosts" in call_leaf_names(
+        class_method_node("TopologyBActions", "_verify_public_downloads")
+    )
+    assert "probe_download_artifact_hosts" in call_leaf_names(
+        class_method_node("TopologyBActions", "reconcile_committed")
+    )
 
 
 class FakeDataProtectionRunner:
