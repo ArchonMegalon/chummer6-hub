@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Run the fail-closed incumbent-only public-download release cutover.
+"""Run the fail-closed isolated-sidecar public-download release cutover.
 
 This controller is intentionally callable only from the authenticated public-edge
-wrapper while that wrapper owns the shared mutation lock.  It never tags either
-canonical application image and never starts a PostgreSQL or initializer service.
+wrapper while that wrapper owns the shared mutation lock.  The incumbent shelf
+inputs are attestation-only; only a separately authenticated sealed release
+candidate may populate the sidecar shelf.  The controller never tags either
+canonical application image and never starts PostgreSQL.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import copy
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
+import http.client
 import io
 import importlib.util
 import json
@@ -21,14 +24,15 @@ from pathlib import Path, PurePosixPath
 import re
 import secrets
 import shutil
+import ssl
 import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
 import time
-from typing import Any
-from urllib.parse import urljoin
+from typing import Any, Mapping, Protocol
+from urllib.parse import urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -2076,7 +2080,7 @@ def active_public_runtime(config: Config, runner: Runner) -> dict[str, Any] | No
     return payload
 
 
-def execute(config: Config) -> dict[str, Any]:
+def _retired_topology_a_execute(config: Config) -> dict[str, Any]:
     journal_was_present = (
         config.transaction_journal.exists()
         or config.transaction_journal.is_symlink()
@@ -2461,7 +2465,7 @@ def execute(config: Config) -> dict[str, Any]:
     return result
 
 
-def parse_args(argv: list[str] | None = None) -> Config:
+def _retired_topology_a_parse_args(argv: list[str] | None = None) -> Config:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--operation", choices=tuple(sorted(OPERATIONS)), required=True)
     parser.add_argument("--source-root", type=Path, required=True)
@@ -2472,11 +2476,26 @@ def parse_args(argv: list[str] | None = None) -> Config:
     parser.add_argument("--migration-candidate-root", type=Path, required=True)
     parser.add_argument("--migration-authority", type=Path, required=True)
     parser.add_argument("--migration-authority-sha256", required=True)
+    parser.add_argument("--release-candidate-root", type=Path, required=True)
+    parser.add_argument(
+        "--candidate-import-authority",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--candidate-import-authority-sha256",
+        required=True,
+    )
     parser.add_argument("--release-channel-receipt", type=Path, required=True)
     parser.add_argument("--release-channel-receipt-sha256", required=True)
     parser.add_argument("--projection-snapshot-root", type=Path, required=True)
     parser.add_argument("--projection-snapshot-id", required=True)
     parser.add_argument("--projection-snapshot-sha256", required=True)
+    parser.add_argument(
+        "--projection-snapshot-tree-sha256",
+        dest="projection_source_tree_sha256",
+        required=True,
+    )
     parser.add_argument("--projection-manifest-sha256", required=True)
     parser.add_argument("--runtime-proof-source", type=Path, required=True)
     parser.add_argument("--runtime-proof-sha256", required=True)
@@ -2533,11 +2552,25 @@ def parse_args(argv: list[str] | None = None) -> Config:
         migration_candidate_root=args.migration_candidate_root,
         migration_authority=exact_input(args.migration_authority),
         migration_authority_sha256=args.migration_authority_sha256,
+        release_candidate_root=cutover_input(
+            args.release_candidate_root,
+            "sealed release candidate",
+        ),
+        candidate_import_authority=cutover_input(
+            args.candidate_import_authority,
+            "candidate import authority",
+        ),
+        candidate_import_authority_sha256=(
+            args.candidate_import_authority_sha256
+        ),
         release_channel_receipt=exact_input(args.release_channel_receipt),
         release_channel_receipt_sha256=args.release_channel_receipt_sha256,
         projection_snapshot_root=args.projection_snapshot_root.resolve(strict=True),
         projection_snapshot_id=args.projection_snapshot_id,
         projection_snapshot_sha256=args.projection_snapshot_sha256,
+        projection_source_tree_sha256=(
+            args.projection_source_tree_sha256
+        ),
         projection_manifest_sha256=args.projection_manifest_sha256,
         runtime_proof_source=exact_input(args.runtime_proof_source),
         runtime_proof_sha256=args.runtime_proof_sha256,
@@ -2562,25 +2595,3072 @@ def parse_args(argv: list[str] | None = None) -> Config:
     )
 
 
+TOPOLOGY_B_CONTRACT = "chummer.public-download-only-topology-b/v1"
+TOPOLOGY_B_OPERATION_SCHEMA = "chummer.public-download-only-operation/v1"
+TOPOLOGY_B_ACTIVE_SCHEMA = "chummer.public-download-only-active-runtime/v1"
+SIDECAR_ORIGIN = "http://172.17.0.1:18091"
+SIDECAR_ADDRESS = "172.17.0.1"
+SIDECAR_PORT = 18091
+SIDECAR_HOSTS = ("chummer.run", "www.chummer.run")
+CF_ACCOUNT_ID = re.compile(r"^[0-9a-f]{32}$")
+CF_TUNNEL_ID = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+SIDECAR_PROJECT = re.compile(r"^chummer-public-download-[a-z0-9-]{8,80}$")
+SIDECAR_LOGICAL_VOLUMES = (
+    "public-download-app",
+    "public-download-fleet",
+    "public-download-state",
+    "public-download-upload-sessions",
+    "public-download-windows-proof",
+    "public-download-windows-proof-upload",
+    "public-download-runtime-secrets",
+    "public-download-projection",
+    "public-download-proofs",
+    "public-download-shelf",
+)
+SIDECAR_VOLUME_ENVIRONMENT = {
+    "public-download-app": "CHUMMER_PUBLIC_DOWNLOAD_APP_VOLUME",
+    "public-download-fleet": "CHUMMER_PUBLIC_DOWNLOAD_FLEET_VOLUME",
+    "public-download-state": "CHUMMER_PUBLIC_DOWNLOAD_STATE_VOLUME",
+    "public-download-upload-sessions": (
+        "CHUMMER_PUBLIC_DOWNLOAD_UPLOAD_SESSIONS_VOLUME"
+    ),
+    "public-download-windows-proof": (
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_VOLUME"
+    ),
+    "public-download-windows-proof-upload": (
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_UPLOAD_VOLUME"
+    ),
+    "public-download-runtime-secrets": (
+        "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_SECRETS_VOLUME"
+    ),
+    "public-download-projection": "CHUMMER_PUBLIC_DOWNLOAD_PROJECTION_VOLUME",
+    "public-download-proofs": "CHUMMER_PUBLIC_DOWNLOAD_PROOFS_VOLUME",
+    "public-download-shelf": "CHUMMER_PUBLIC_DOWNLOAD_SHELF_VOLUME",
+}
+
+
+@dataclass(frozen=True)
+class SidecarConfig:
+    operation: str
+    source_root: Path
+    source_head: str
+    shared_lock_token: str
+    shelf_root: Path
+    migration_candidate_root: Path
+    migration_authority: Path
+    migration_authority_sha256: str
+    release_candidate_root: Path
+    candidate_import_authority: Path
+    candidate_import_authority_sha256: str
+    manifest_closure_restoration_spec: Path
+    manifest_closure_restoration_spec_sha256: str
+    release_channel_receipt: Path
+    release_channel_receipt_sha256: str
+    projection_snapshot_root: Path
+    projection_snapshot_id: str
+    projection_snapshot_sha256: str
+    projection_source_tree_sha256: str
+    projection_manifest_sha256: str
+    runtime_proof_source: Path
+    runtime_proof_sha256: str
+    final_gold_source: Path
+    final_gold_sha256: str
+    fleet_source: Path
+    fleet_sha256: str
+    operation_root: Path
+    active_runtime_authority: Path
+    docker_config_root: Path
+    cloudflare_credentials_file: Path
+    cloudflare_account_id: str
+    cloudflare_tunnel_id: str
+    cloudflare_api_base: str
+    receipt_root: Path
+    base_url: str
+    build_context: Path
+    fleet_media_contracts: Path
+    design_product_root: Path
+    delivery_phase: str
+    ready_timeout_seconds: int
+
+    @property
+    def project_name(self) -> str:
+        return self.operation_root.name
+
+    @property
+    def bind_address(self) -> str:
+        return SIDECAR_ADDRESS
+
+    @property
+    def bind_port(self) -> int:
+        return SIDECAR_PORT
+
+    @property
+    def canonical_project(self) -> str:
+        return CANONICAL_PROJECT
+
+    @property
+    def canonical_shelf_root(self) -> Path:
+        return self.shelf_root
+
+    @property
+    def sidecar_dp_certificate(self) -> Path:
+        return self.sidecar_certificate
+
+    @property
+    def sidecar_dp_password(self) -> Path:
+        return self.sidecar_certificate_password
+
+    @property
+    def operation_journal(self) -> Path:
+        return self.receipt_root / f"{self.project_name}.operation.json"
+
+    @property
+    def shelf_source(self) -> Path:
+        return self.operation_root / "release-shelf"
+
+    @property
+    def overlay_root(self) -> Path:
+        return self.operation_root / "overlay-active-unused"
+
+    @property
+    def overlay_staging_root(self) -> Path:
+        return self.operation_root / "app-overlay"
+
+    @property
+    def overlay_backup_root(self) -> Path:
+        return self.operation_root / "overlay-backups-unused"
+
+    @property
+    def overlay_build_root(self) -> Path:
+        return self.operation_root / "overlay-build"
+
+    @property
+    def compose_file(self) -> Path:
+        return self.operation_root / "public-download-runtime.json"
+
+    @property
+    def materialization_receipt(self) -> Path:
+        return self.operation_root / "compose-materialization.json"
+
+    @property
+    def runtime_attestation(self) -> Path:
+        return self.operation_root / "compose-runtime-attestation.json"
+
+    @property
+    def cloudflare_journal(self) -> Path:
+        return self.operation_root / "cloudflare-transaction.json"
+
+    @property
+    def cloudflare_lock(self) -> Path:
+        return self.operation_root / "cloudflare-transaction.lock"
+
+    @property
+    def cloudflare_committed_evidence(self) -> Path:
+        return self.operation_root / "cloudflare-committed.json"
+
+    @property
+    def cloudflare_rollback_evidence(self) -> Path:
+        return self.operation_root / "cloudflare-rolled-back.json"
+
+    @property
+    def external_probe_receipt(self) -> Path:
+        return self.operation_root / "cloudflare-external-probe.json"
+
+    @property
+    def prepared_active_authority(self) -> Path:
+        return self.operation_root / "prepared-active-runtime.json"
+
+    @property
+    def sidecar_certificate(self) -> Path:
+        return self.operation_root / "sidecar-data-protection.pfx"
+
+    @property
+    def sidecar_certificate_password(self) -> Path:
+        return self.operation_root / "sidecar-data-protection.password"
+
+    @property
+    def volume_names(self) -> dict[str, str]:
+        return {
+            logical: (
+                f"{self.project_name}-"
+                f"{logical.removeprefix('public-download-')}"
+            )
+            for logical in SIDECAR_LOGICAL_VOLUMES
+        }
+
+
+class TopologyBRunner:
+    def __init__(self, config: SidecarConfig) -> None:
+        self.config = config
+        self.base_environment = {
+            "PATH": "/usr/bin:/bin",
+            "DOCKER_CONFIG": str(config.docker_config_root / "config"),
+            "LANG": "C",
+            "LC_ALL": "C",
+        }
+
+    def run(
+        self,
+        command: list[str],
+        *,
+        label: str,
+        timeout: int = 300,
+        input_bytes: bytes | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> bytes:
+        process_environment = dict(self.base_environment)
+        if environment:
+            process_environment.update(environment)
+        try:
+            completed = subprocess.run(
+                command,
+                env=process_environment,
+                input=input_bytes,
+                stdin=(
+                    subprocess.PIPE
+                    if input_bytes is not None
+                    else subprocess.DEVNULL
+                ),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=timeout,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise CutoverError(f"{label} could not execute") from exc
+        if completed.returncode != 0:
+            raise CutoverError(
+                f"{label} failed with status {completed.returncode}"
+            )
+        return completed.stdout
+
+    def python(
+        self,
+        script: Path,
+        arguments: list[str],
+        *,
+        label: str,
+        timeout: int = 300,
+        input_bytes: bytes | None = None,
+    ) -> bytes:
+        return self.run(
+            ["/usr/bin/python3", "-I", str(script), *arguments],
+            label=label,
+            timeout=timeout,
+            input_bytes=input_bytes,
+        )
+
+    def docker(
+        self,
+        arguments: list[str],
+        *,
+        label: str,
+        timeout: int = 300,
+    ) -> bytes:
+        return self.run(
+            ["/usr/bin/docker", "--context", "default", *arguments],
+            label=label,
+            timeout=timeout,
+        )
+
+    def compose(
+        self,
+        arguments: list[str],
+        *,
+        environment: Mapping[str, str],
+        label: str,
+        timeout: int = 300,
+    ) -> bytes:
+        return self.run(
+            [
+                "/usr/bin/docker",
+                "--context",
+                "default",
+                "compose",
+                "--env-file",
+                "/dev/null",
+                "--project-name",
+                self.config.project_name,
+                "--file",
+                str(self.config.compose_file),
+                "--project-directory",
+                str(self.config.operation_root),
+                "--profile",
+                "public-downloads",
+                *arguments,
+            ],
+            environment={
+                "COMPOSE_DISABLE_ENV_FILE": "1",
+                **dict(environment),
+            },
+            label=label,
+            timeout=timeout,
+        )
+
+
+def _tree_file_bytes(path: Path, label: str) -> bytes:
+    try:
+        before = path.lstat()
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or stat.S_ISLNK(before.st_mode)
+            or before.st_nlink != 1
+        ):
+            raise CutoverError(f"{label} contains an unsafe file")
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError as exc:
+        raise CutoverError(f"{label} changed while hashed") from exc
+    identity = lambda item: (
+        item.st_dev,
+        item.st_ino,
+        item.st_mode,
+        item.st_nlink,
+        item.st_size,
+        item.st_mtime_ns,
+        item.st_ctime_ns,
+    )
+    if identity(before) != identity(after) or len(raw) != before.st_size:
+        raise CutoverError(f"{label} changed while hashed")
+    return raw
+
+
+def tree_sha256_file_stream(root: Path, *, label: str) -> str:
+    """Implement the initializer's exact ``sha256-file-tree-v1`` stream."""
+
+    try:
+        root_metadata = root.lstat()
+    except OSError as exc:
+        raise CutoverError(f"{label} root is unavailable") from exc
+    if (
+        not root.is_absolute()
+        or root.resolve(strict=True) != root
+        or not stat.S_ISDIR(root_metadata.st_mode)
+        or stat.S_ISLNK(root_metadata.st_mode)
+    ):
+        raise CutoverError(f"{label} root is unsafe")
+    files: list[tuple[bytes, str, Path]] = []
+
+    def walk(directory: Path, relative: str) -> None:
+        before = directory.lstat()
+        if not stat.S_ISDIR(before.st_mode) or stat.S_ISLNK(before.st_mode):
+            raise CutoverError(f"{label} contains an unsafe directory")
+        try:
+            entries = list(os.scandir(directory))
+        except OSError as exc:
+            raise CutoverError(f"{label} directory is unreadable") from exc
+        for entry in entries:
+            if "\n" in entry.name or "\r" in entry.name:
+                raise CutoverError(f"{label} contains an unsafe path name")
+            child = directory / entry.name
+            child_relative = (
+                entry.name if not relative else f"{relative}/{entry.name}"
+            )
+            metadata = child.lstat()
+            if stat.S_ISLNK(metadata.st_mode):
+                raise CutoverError(f"{label} contains a symbolic link")
+            if stat.S_ISDIR(metadata.st_mode):
+                walk(child, child_relative)
+            elif stat.S_ISREG(metadata.st_mode):
+                if metadata.st_nlink != 1:
+                    raise CutoverError(f"{label} contains a multi-link file")
+                display = f"./{child_relative}"
+                files.append((os.fsencode(display), display, child))
+            else:
+                raise CutoverError(f"{label} contains a special entry")
+        after = directory.lstat()
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            raise CutoverError(f"{label} directory changed while hashed")
+
+    walk(root, "")
+    stream = hashlib.sha256()
+    for _sort_key, display, path in sorted(files, key=lambda row: row[0]):
+        digest = hashlib.sha256(_tree_file_bytes(path, label)).hexdigest()
+        stream.update(f"{digest}  {display}\n".encode("utf-8"))
+    return stream.hexdigest()
+
+
+def _require_digest_file(path: Path, expected: str, label: str) -> bytes:
+    if SHA256.fullmatch(expected) is None:
+        raise CutoverError(f"{label} SHA-256 is invalid")
+    raw = stable_regular_bytes(path, label=label, maximum_bytes=None)
+    if sha256_bytes(raw) != expected:
+        raise CutoverError(f"{label} does not match its independent SHA-256")
+    return raw
+
+
+def _load_restoration_spec(config: SidecarConfig) -> list[dict[str, Any]]:
+    raw = _require_digest_file(
+        config.manifest_closure_restoration_spec,
+        config.manifest_closure_restoration_spec_sha256,
+        "manifest-closure restoration spec",
+    )
+    try:
+        payload = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise CutoverError("manifest-closure restoration spec is malformed") from exc
+    if not isinstance(payload, (list, dict)):
+        raise CutoverError("manifest-closure restoration spec has invalid shape")
+    if isinstance(payload, dict):
+        rows = payload.get("restorations")
+        if not isinstance(rows, list):
+            raise CutoverError(
+                "manifest-closure restoration spec omits restorations"
+            )
+    else:
+        rows = payload
+    if not all(isinstance(row, dict) for row in rows):
+        raise CutoverError("manifest-closure restoration rows are malformed")
+    return [dict(row) for row in rows]
+
+
+def generate_sidecar_data_protection(
+    config: SidecarConfig,
+    runner: TopologyBRunner,
+) -> dict[str, Any]:
+    def validated_pair(certificate_path: Path, password_path: Path) -> dict[str, Any]:
+        certificate_bytes = stable_regular_bytes(
+            certificate_path,
+            label="operation-bound data-protection certificate",
+            maximum_bytes=1024 * 1024,
+            owner_only=True,
+        )
+        password_bytes = stable_regular_bytes(
+            password_path,
+            label="operation-bound data-protection password",
+            maximum_bytes=4096,
+            owner_only=True,
+        )
+        runner.run(
+            [
+                "/usr/bin/openssl",
+                "pkcs12",
+                "-in",
+                str(certificate_path),
+                "-passin",
+                f"file:{password_path}",
+                "-noout",
+            ],
+            label="validate operation-bound data-protection PKCS#12",
+        )
+        return {
+            "authority": "operation-bound-sidecar-only",
+            "certificatePath": str(config.sidecar_certificate),
+            "certificateSha256": sha256_bytes(certificate_bytes),
+            "passwordPath": str(config.sidecar_certificate_password),
+            "passwordSha256": sha256_bytes(password_bytes),
+        }
+
+    certificate_exists = (
+        config.sidecar_certificate.exists()
+        or config.sidecar_certificate.is_symlink()
+    )
+    password_exists = (
+        config.sidecar_certificate_password.exists()
+        or config.sidecar_certificate_password.is_symlink()
+    )
+    if certificate_exists and password_exists:
+        try:
+            return validated_pair(
+                config.sidecar_certificate,
+                config.sidecar_certificate_password,
+            )
+        except (CutoverError, OSError) as exc:
+            raise RecoveryUncertain(
+                "existing sidecar data-protection pair is invalid"
+            ) from exc
+    if certificate_exists and not password_exists:
+        raise RecoveryUncertain(
+            "sidecar data-protection certificate exists without its password"
+        )
+    if password_exists:
+        password = stable_regular_bytes(
+            config.sidecar_certificate_password,
+            label="operation-bound data-protection password",
+            maximum_bytes=4096,
+            owner_only=True,
+        )
+    else:
+        password = secrets.token_urlsafe(48).encode("ascii") + b"\n"
+        atomic_private_write(
+            config.sidecar_certificate_password,
+            password,
+            replace=False,
+        )
+    key = config.operation_root / ".sidecar-data-protection.key"
+    certificate = config.operation_root / ".sidecar-data-protection.crt"
+    pending = config.operation_root / ".sidecar-data-protection.pfx.pending"
+    key.unlink(missing_ok=True)
+    certificate.unlink(missing_ok=True)
+    pending.unlink(missing_ok=True)
+    try:
+        runner.run(
+            [
+                "/usr/bin/openssl",
+                "req",
+                "-x509",
+                "-newkey",
+                "rsa:2048",
+                "-sha256",
+                "-nodes",
+                "-subj",
+                "/CN=chummer-public-download-sidecar",
+                "-days",
+                "7",
+                "-keyout",
+                str(key),
+                "-out",
+                str(certificate),
+            ],
+            label="generate operation-bound data-protection certificate",
+        )
+        runner.run(
+            [
+                "/usr/bin/openssl",
+                "pkcs12",
+                "-export",
+                "-out",
+                str(pending),
+                "-inkey",
+                str(key),
+                "-in",
+                str(certificate),
+                "-passout",
+                f"file:{config.sidecar_certificate_password}",
+            ],
+            label="seal operation-bound data-protection PKCS#12",
+        )
+        pending.chmod(0o600)
+        validated_pair(
+            pending,
+            config.sidecar_certificate_password,
+        )
+        descriptor = os.open(
+            pending,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.replace(pending, config.sidecar_certificate)
+        directory = os.open(
+            config.operation_root,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+        return validated_pair(
+            config.sidecar_certificate,
+            config.sidecar_certificate_password,
+        )
+    finally:
+        key.unlink(missing_ok=True)
+        certificate.unlink(missing_ok=True)
+        pending.unlink(missing_ok=True)
+
+
+def _parse_credentials_file(path: Path) -> dict[str, str]:
+    raw = stable_regular_bytes(
+        path,
+        label="Cloudflare credentials file",
+        maximum_bytes=1024 * 1024,
+        owner_only=True,
+    )
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError as exc:
+        raise CutoverError("Cloudflare credentials file is not UTF-8") from exc
+    accepted = {
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_EMAIL",
+        "CLOUDFLARE_GLOBAL_API_KEY",
+    }
+    values: dict[str, str] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        key = key.strip()
+        if not separator or key not in accepted:
+            continue
+        if key in values:
+            raise CutoverError(
+                f"Cloudflare credentials file repeats {key}"
+            )
+        value = value.strip()
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+        if not value or "\x00" in value or "\r" in value or "\n" in value:
+            raise CutoverError(
+                f"Cloudflare credentials file has invalid {key}"
+            )
+        values[key] = value
+    return values
+
+
+def _http_bytes(
+    *,
+    scheme: str,
+    connect_host: str,
+    connect_port: int,
+    request_host: str,
+    path: str,
+    timeout: float,
+    maximum_bytes: int = 8 * 1024 * 1024,
+) -> tuple[int, dict[str, str], bytes]:
+    if (
+        scheme not in {"http", "https"}
+        or request_host not in SIDECAR_HOSTS
+        or not path.startswith("/")
+        or "?" in path
+        or "#" in path
+    ):
+        raise CutoverError("HTTP probe target is outside the audited boundary")
+    if scheme == "https":
+        connection: http.client.HTTPConnection = http.client.HTTPSConnection(
+            connect_host,
+            connect_port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
+        )
+    else:
+        connection = http.client.HTTPConnection(
+            connect_host,
+            connect_port,
+            timeout=timeout,
+        )
+    try:
+        connection.request(
+            "GET",
+            path,
+            headers={
+                "Host": request_host,
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "User-Agent": "chummer-public-download-cutover/1",
+            },
+        )
+        response = connection.getresponse()
+        response_headers: dict[str, str] = {}
+        forbidden_headers = {
+            "authentication-info",
+            "location",
+            "proxy-authenticate",
+            "proxy-authentication-info",
+            "set-cookie",
+            "set-cookie2",
+            "www-authenticate",
+        }
+        for key, value in response.getheaders():
+            lowered = key.lower()
+            if lowered in forbidden_headers:
+                raise CutoverError(
+                    "HTTP probe exposed credential or redirect state"
+                )
+            if lowered == "content-length" and lowered in response_headers:
+                if response_headers[lowered].strip() != value.strip():
+                    raise CutoverError(
+                        "HTTP probe returned conflicting Content-Length headers"
+                    )
+                continue
+            if lowered in response_headers:
+                response_headers[lowered] += f", {value}"
+            else:
+                response_headers[lowered] = value
+        chunks: list[bytes] = []
+        observed = 0
+        while True:
+            chunk = response.read(min(64 * 1024, maximum_bytes + 1 - observed))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            observed += len(chunk)
+            if observed > maximum_bytes:
+                raise CutoverError("HTTP probe body exceeded its bound")
+        return int(response.status), response_headers, b"".join(chunks)
+    except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+        raise CutoverError("HTTP probe failed") from exc
+    finally:
+        connection.close()
+
+
+def _probe_exact_manifest(
+    *,
+    scheme: str,
+    connect_host: str,
+    connect_port: int,
+    request_host: str,
+    path: str,
+    expected: bytes,
+    generation_id: str | None,
+) -> dict[str, Any]:
+    status, headers, body = _http_bytes(
+        scheme=scheme,
+        connect_host=connect_host,
+        connect_port=connect_port,
+        request_host=request_host,
+        path=path,
+        timeout=30,
+    )
+    if status != 200 or body != expected:
+        raise CutoverError("served manifest does not match exact prepared bytes")
+    observed_generation = headers.get("x-chummer-release-generation", "")
+    if generation_id is not None and observed_generation != generation_id:
+        raise CutoverError("served manifest generation header drifted")
+    return {
+        "endpoint": f"{scheme}://{request_host}{path}",
+        "httpStatus": status,
+        "bodySha256": sha256_bytes(body),
+        "sizeBytes": len(body),
+        "generationId": observed_generation,
+        "anonymous": True,
+    }
+
+
+def probe_sidecar_hosts(
+    config: SidecarConfig,
+    *,
+    generation_id: str,
+    generation_root: Path,
+) -> dict[str, Any]:
+    canonical = stable_regular_bytes(
+        generation_root / "RELEASE_CHANNEL.generated.json",
+        label="prepared generation canonical manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    compatibility = stable_regular_bytes(
+        generation_root / "releases.json",
+        label="prepared generation compatibility manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    observations: list[dict[str, Any]] = []
+    for hostname in SIDECAR_HOSTS:
+        status, _headers, readiness = _http_bytes(
+            scheme="http",
+            connect_host=SIDECAR_ADDRESS,
+            connect_port=SIDECAR_PORT,
+            request_host=hostname,
+            path="/api/ready/public-downloads",
+            timeout=30,
+        )
+        try:
+            readiness_payload = json.loads(readiness)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise CutoverError("sidecar readiness response is malformed") from exc
+        if (
+            status != 200
+            or not isinstance(readiness_payload, dict)
+            or readiness_payload.get("ready") is not True
+            or readiness_payload.get("servingReady") is not True
+        ):
+            raise CutoverError("sidecar serving readiness did not pass")
+        observations.append(
+            {
+                "endpoint": f"http://{hostname}/api/ready/public-downloads",
+                "httpStatus": status,
+                "bodySha256": sha256_bytes(readiness),
+                "anonymous": True,
+            }
+        )
+        for path, expected in (
+            ("/downloads/RELEASE_CHANNEL.generated.json", canonical),
+            ("/downloads/releases.json", compatibility),
+            (
+                f"/downloads/g/{generation_id}/"
+                "RELEASE_CHANNEL.generated.json",
+                canonical,
+            ),
+            (f"/downloads/g/{generation_id}/releases.json", compatibility),
+        ):
+            observations.append(
+                _probe_exact_manifest(
+                    scheme="http",
+                    connect_host=SIDECAR_ADDRESS,
+                    connect_port=SIDECAR_PORT,
+                    request_host=hostname,
+                    path=path,
+                    expected=expected,
+                    generation_id=generation_id,
+                )
+            )
+    return {
+        "status": "pass",
+        "origin": SIDECAR_ORIGIN,
+        "hosts": list(SIDECAR_HOSTS),
+        "generationId": generation_id,
+        "observations": observations,
+    }
+
+
+def probe_public_incumbent(
+    config: SidecarConfig,
+    *,
+    expected: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    base = urlsplit(config.base_url)
+    if base.scheme != "https" or base.hostname != SIDECAR_HOSTS[0]:
+        raise CutoverError("public base URL is outside the canonical origin")
+    observations: dict[str, dict[str, Any]] = {}
+    for hostname in SIDECAR_HOSTS:
+        host_observations: dict[str, Any] = {}
+        for path in (
+            "/downloads/RELEASE_CHANNEL.generated.json",
+            "/downloads/releases.json",
+        ):
+            status, _headers, body = _http_bytes(
+                scheme="https",
+                connect_host=hostname,
+                connect_port=443,
+                request_host=hostname,
+                path=path,
+                timeout=30,
+            )
+            observation = {
+                "httpStatus": status,
+                "bodySha256": sha256_bytes(body),
+                "sizeBytes": len(body),
+            }
+            if status != 200:
+                raise CutoverError("incumbent public manifest is unavailable")
+            if (
+                expected is not None
+                and observation != expected.get(hostname, {}).get(path)
+            ):
+                raise CutoverError(
+                    "incumbent public manifest changed across rollback"
+                )
+            host_observations[path] = observation
+        observations[hostname] = host_observations
+    return observations
+
+
+class TopologyBActionsProtocol(Protocol):
+    def prepare_sidecar_release_shelf(self, config: Any) -> dict[str, Any]: ...
+    def generate_sidecar_data_protection(self, config: Any) -> dict[str, Any]: ...
+    def materialize_sidecar_compose(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def create_sidecar_resources(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def start_sidecar_runtime(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def wait_sidecar_healthy(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def probe_sidecar_hosts(self, config: Any, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
+    def probe_public_incumbent(self, config: Any, **kwargs: Any) -> dict[str, Any]: ...
+    def capture_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def apply_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def commit_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def write_active_receipt(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def rollback_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def cleanup_sidecar_resources(self, config: Any, *args: Any) -> dict[str, Any]: ...
+    def classify_recovery(self, config: Any) -> str: ...
+    def reconcile_committed(self, config: Any, *args: Any) -> dict[str, Any]: ...
+
+
+def _validate_sidecar_config(config: SidecarConfig) -> None:
+    if config.operation not in OPERATIONS:
+        raise CutoverError("topology-B operation is invalid")
+    if COMMIT.fullmatch(config.source_head) is None:
+        raise CutoverError("source HEAD must be a lowercase full commit")
+    if SHA256.fullmatch(config.shared_lock_token) is None:
+        raise CutoverError("shared mutation lock token is invalid")
+    if SIDECAR_PROJECT.fullmatch(config.project_name) is None:
+        raise CutoverError("sidecar Compose project name is invalid")
+    if config.base_url.rstrip("/") != "https://chummer.run":
+        raise CutoverError("public base URL is not canonical")
+    if CF_ACCOUNT_ID.fullmatch(config.cloudflare_account_id) is None:
+        raise CutoverError("Cloudflare account id is invalid")
+    if CF_TUNNEL_ID.fullmatch(config.cloudflare_tunnel_id) is None:
+        raise CutoverError("Cloudflare tunnel id is invalid")
+    if config.cloudflare_api_base != "https://api.cloudflare.com/client/v4":
+        raise CutoverError("Cloudflare API base is invalid")
+    if not 1 <= config.ready_timeout_seconds <= 900:
+        raise CutoverError("portal readiness timeout is outside the audited range")
+    if config.delivery_phase not in {"bootstrap", "windows-preview"}:
+        raise CutoverError("public download delivery phase is invalid")
+    try:
+        observed_head = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(config.source_root),
+                "rev-parse",
+                "--verify",
+                "HEAD^{commit}",
+            ],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CutoverError("source HEAD could not be verified") from exc
+    if observed_head != config.source_head:
+        raise CutoverError("checked-out source does not match source HEAD")
+    if config.operation == RECOVERY_OPERATION:
+        for directory, label in (
+            (config.source_root, "source root"),
+            (config.shelf_root, "canonical release shelf"),
+            (config.receipt_root, "receipt root"),
+            (config.docker_config_root, "Docker configuration root"),
+            (
+                config.docker_config_root / "config",
+                "Docker client configuration",
+            ),
+            (
+                config.active_runtime_authority.parent,
+                "active runtime authority parent",
+            ),
+        ):
+            try:
+                metadata = directory.lstat()
+            except OSError as exc:
+                raise CutoverError(f"{label} is unavailable") from exc
+            if (
+                not directory.is_absolute()
+                or directory.resolve(strict=True) != directory
+                or not stat.S_ISDIR(metadata.st_mode)
+                or stat.S_ISLNK(metadata.st_mode)
+            ):
+                raise CutoverError(f"{label} is unsafe")
+        if config.shelf_root != CANONICAL_RELEASE_SHELF_ROOT:
+            raise CutoverError("canonical release shelf path drifted")
+        stable_regular_bytes(
+            config.cloudflare_credentials_file,
+            label="Cloudflare credentials file",
+            maximum_bytes=1024 * 1024,
+            owner_only=True,
+        )
+        if config.operation_root.exists():
+            private_directory(config.operation_root, create=False)
+        elif not config.operation_journal.is_file():
+            raise RecoveryUncertain(
+                "recovery has neither operation root nor planned journal"
+            )
+        private_directory(config.receipt_root, create=False)
+        private_directory(config.docker_config_root, create=False)
+        private_directory(config.docker_config_root / "config", create=False)
+        private_directory(
+            config.active_runtime_authority.parent,
+            create=False,
+        )
+        return
+    for directory, label in (
+        (config.source_root, "source root"),
+        (config.shelf_root, "canonical release shelf"),
+        (config.migration_candidate_root, "migration candidate"),
+        (config.release_candidate_root, "sealed release candidate"),
+        (config.projection_snapshot_root, "projection snapshot"),
+        (config.fleet_source, "fleet runtime source"),
+        (config.build_context, "build context"),
+        (config.fleet_media_contracts, "fleet media contracts"),
+        (config.design_product_root, "design product root"),
+        (config.receipt_root, "receipt root"),
+        (config.docker_config_root, "Docker configuration root"),
+        (config.docker_config_root / "config", "Docker client configuration"),
+    ):
+        try:
+            metadata = directory.lstat()
+        except OSError as exc:
+            raise CutoverError(f"{label} is unavailable") from exc
+        if (
+            not directory.is_absolute()
+            or directory.resolve(strict=True) != directory
+            or not stat.S_ISDIR(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+        ):
+            raise CutoverError(f"{label} is unsafe")
+    if (
+        config.shelf_root != CANONICAL_RELEASE_SHELF_ROOT
+        or config.shelf_root.is_symlink()
+    ):
+        raise CutoverError("canonical release shelf path drifted")
+    for digest, label in (
+        (config.migration_authority_sha256, "migration authority"),
+        (
+            config.candidate_import_authority_sha256,
+            "candidate import authority",
+        ),
+        (
+            config.manifest_closure_restoration_spec_sha256,
+            "manifest-closure restoration spec",
+        ),
+        (config.release_channel_receipt_sha256, "release-channel receipt"),
+        (config.projection_snapshot_sha256, "projection snapshot"),
+        (
+            config.projection_source_tree_sha256,
+            "projection source tree",
+        ),
+        (config.projection_manifest_sha256, "projection manifest"),
+        (config.runtime_proof_sha256, "runtime proof"),
+        (config.final_gold_sha256, "final-gold handoff"),
+        (config.fleet_sha256, "fleet runtime tree"),
+    ):
+        if SHA256.fullmatch(digest) is None:
+            raise CutoverError(f"{label} SHA-256 is invalid")
+    if (
+        config.projection_snapshot_id
+        != f"public-projection-{config.projection_snapshot_sha256}"
+    ):
+        raise CutoverError("projection snapshot identity is invalid")
+    for path, digest, label, owner_only in (
+        (
+            config.migration_authority,
+            config.migration_authority_sha256,
+            "migration authority",
+            False,
+        ),
+        (
+            config.candidate_import_authority,
+            config.candidate_import_authority_sha256,
+            "candidate import authority",
+            False,
+        ),
+        (
+            config.manifest_closure_restoration_spec,
+            config.manifest_closure_restoration_spec_sha256,
+            "manifest-closure restoration spec",
+            False,
+        ),
+        (
+            config.release_channel_receipt,
+            config.release_channel_receipt_sha256,
+            "release-channel receipt",
+            False,
+        ),
+        (
+            config.runtime_proof_source,
+            config.runtime_proof_sha256,
+            "runtime proof",
+            False,
+        ),
+        (
+            config.final_gold_source,
+            config.final_gold_sha256,
+            "final-gold handoff",
+            False,
+        ),
+        (
+            config.cloudflare_credentials_file,
+            "",
+            "Cloudflare credentials file",
+            True,
+        ),
+    ):
+        raw = stable_regular_bytes(
+            path,
+            label=label,
+            maximum_bytes=None if digest else 1024 * 1024,
+            owner_only=owner_only,
+        )
+        if digest and sha256_bytes(raw) != digest:
+            raise CutoverError(f"{label} SHA-256 drifted")
+    observed_fleet = tree_sha256_file_stream(
+        config.fleet_source,
+        label="fleet runtime source",
+    )
+    if observed_fleet != config.fleet_sha256:
+        raise CutoverError("fleet runtime source tree digest drifted")
+    observed_projection = tree_sha256_file_stream(
+        config.projection_snapshot_root,
+        label="projection snapshot source",
+    )
+    if observed_projection != config.projection_source_tree_sha256:
+        raise CutoverError("projection snapshot tree digest drifted")
+    if config.projection_snapshot_root.name != config.projection_snapshot_id:
+        raise CutoverError("projection snapshot directory identity drifted")
+    if config.candidate_import_authority != (
+        config.projection_snapshot_root
+        / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+    ):
+        raise CutoverError(
+            "candidate import authority is outside the selected projection snapshot"
+        )
+    if config.release_channel_receipt != (
+        config.projection_snapshot_root / "RELEASE_CHANNEL.generated.json"
+    ):
+        raise CutoverError(
+            "release-channel receipt is outside the selected projection snapshot"
+        )
+    if config.runtime_proof_source != (
+        config.projection_snapshot_root
+        / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    ):
+        raise CutoverError(
+            "runtime proof is outside the selected projection snapshot"
+        )
+    private_directory(config.receipt_root, create=False)
+    private_directory(config.active_runtime_authority.parent, create=False)
+    private_directory(config.docker_config_root, create=False)
+    private_directory(config.docker_config_root / "config", create=False)
+    if config.operation == CUTOVER_OPERATION:
+        if config.operation_root.exists() or config.operation_root.is_symlink():
+            raise CutoverError("fresh sidecar operation root already exists")
+        private_directory(config.operation_root.parent, create=False)
+    else:
+        private_directory(config.operation_root, create=False)
+
+
+def validate_release_candidate_authority(
+    config: SidecarConfig,
+    *,
+    projection_verifier: Any | None = None,
+    candidate_materializer: Any | None = None,
+) -> dict[str, Any]:
+    """Authenticate the exact sealed bundle and its incumbent/fresh partition."""
+
+    scripts = config.source_root / "scripts"
+    projection_verifier = projection_verifier or load_module(
+        scripts / "release/verify_public_projection.py",
+        f"topology_b_projection_verifier_{secrets.token_hex(6)}",
+    )
+    candidate_materializer = candidate_materializer or load_module(
+        scripts / "release/materialize_candidate_import_authority.py",
+        f"topology_b_candidate_materializer_{secrets.token_hex(6)}",
+    )
+    authority_raw = stable_regular_bytes(
+        config.candidate_import_authority,
+        label="candidate import authority",
+        maximum_bytes=16 * 1024 * 1024,
+    )
+    if (
+        sha256_bytes(authority_raw)
+        != config.candidate_import_authority_sha256
+    ):
+        raise CutoverError("candidate import authority SHA-256 drifted")
+    try:
+        authority = projection_verifier._validate_candidate_import_authority(
+            authority_raw
+        )
+    except Exception as exc:
+        raise CutoverError(
+            "candidate import authority semantic validation failed"
+        ) from exc
+    if (
+        authority.get("contractName")
+        != "chummer.release-upload.candidate-import-authority/v3"
+        or authority.get("contractVersion") != 3
+    ):
+        raise CutoverError("candidate import authority is not the required v3 contract")
+    candidate = authority.get("candidate")
+    custody = authority.get("custody")
+    if not isinstance(candidate, dict) or not isinstance(custody, dict):
+        raise CutoverError("candidate import authority identity is unavailable")
+
+    try:
+        inventory_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("inventory"),
+            label="candidate upload inventory",
+            expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+        )
+        inventory = projection_verifier._strict_json_object(
+            inventory_raw,
+            label="candidate upload inventory",
+        )
+        (
+            release_rows,
+            release_modes,
+            _release_directory_modes,
+            _release_captured,
+        ) = candidate_materializer._validate_bundle_inventory(
+            config.release_candidate_root,
+            inventory,
+            candidate,
+            allow_root_ancillary_files=True,
+        )
+        evidence = custody.get("unsignedPublicationEvidence")
+        if not isinstance(evidence, dict) or not isinstance(
+            evidence.get("files"), list
+        ):
+            raise CutoverError("candidate unsigned publication evidence is unavailable")
+        scope_path = projection_verifier.CANDIDATE_UNSIGNED_SCOPE_FILE
+        matching_scope = [
+            item
+            for item in evidence["files"]
+            if isinstance(item, dict) and item.get("path") == scope_path
+        ]
+        if len(matching_scope) != 1:
+            raise CutoverError("candidate unsigned scope custody is ambiguous")
+        scope = projection_verifier._strict_json_object(
+            projection_verifier._candidate_embedded_bytes(
+                matching_scope[0],
+                label="candidate unsigned publication scope",
+                expected_path=scope_path,
+            ),
+            label="candidate unsigned publication scope",
+        )
+        registry_candidate = projection_verifier._strict_json_object(
+            projection_verifier._candidate_embedded_bytes(
+                custody.get("registryPrepareCandidateReceipt"),
+                label="candidate Registry PREPARE receipt",
+                expected_path=(
+                    projection_verifier.CANDIDATE_REGISTRY_RECEIPT_FILE
+                ),
+            ),
+            label="candidate Registry PREPARE receipt",
+        )
+        composition = registry_candidate.get("compositionInputDocument")
+        if not isinstance(composition, dict):
+            raise CutoverError("candidate incumbent composition is unavailable")
+        incumbent_snapshot = composition.get("incumbentSnapshot")
+        if not isinstance(incumbent_snapshot, dict):
+            raise CutoverError("candidate incumbent snapshot is unavailable")
+        (
+            incumbent_rows,
+            incumbent_modes,
+            incumbent_directory_modes,
+            _incumbent_captured,
+        ) = candidate_materializer._scan_bundle_tree(
+            config.migration_candidate_root
+        )
+    except CutoverError:
+        raise
+    except Exception as exc:
+        raise CutoverError(
+            "sealed release bundle custody validation failed"
+        ) from exc
+
+    release_with_modes = [
+        {**row, "mode": release_modes[str(row["path"])]}
+        for row in release_rows
+    ]
+    if release_with_modes != scope.get("fullShelfInventory"):
+        raise CutoverError(
+            "sealed release bundle modes differ from the v3 authority"
+        )
+    incumbent_with_modes = [
+        {**row, "mode": incumbent_modes[str(row["path"])]}
+        for row in incumbent_rows
+    ]
+    if (
+        incumbent_with_modes != incumbent_snapshot.get("fullShelfInventory")
+        or incumbent_directory_modes
+        != incumbent_snapshot.get("directoryModes")
+    ):
+        raise CutoverError(
+            "v3 authority incumbent snapshot differs from the attested candidate"
+        )
+
+    fresh = scope.get("freshDelta")
+    expected_fresh = (
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+    )
+    if (
+        not isinstance(fresh, list)
+        or tuple(
+            str(item.get("path") or "")
+            for item in fresh
+            if isinstance(item, dict)
+        )
+        != expected_fresh
+    ):
+        raise CutoverError(
+            "v3 authority freshDelta is not exactly installer/payload/sidecar"
+        )
+    fresh_by_path = {
+        str(item["path"]): item
+        for item in fresh
+        if isinstance(item, dict)
+    }
+    if set(fresh_by_path) != set(expected_fresh):
+        raise CutoverError("v3 authority freshDelta path closure drifted")
+    incumbent_by_path = {
+        str(item["path"]): item for item in incumbent_with_modes
+    }
+    for path, fresh_row in fresh_by_path.items():
+        incumbent_row = incumbent_by_path.get(path)
+        if (
+            incumbent_row is not None
+            and incumbent_row.get("sha256") == fresh_row.get("sha256")
+        ):
+            raise CutoverError(
+                "v3 authority labels an incumbent Windows byte as fresh"
+            )
+
+    retained = scope.get("retainedFromIncumbent")
+    if not isinstance(retained, list):
+        raise CutoverError("v3 authority retained incumbent inventory is unavailable")
+    retained_by_path = {
+        str(item.get("path") or ""): item
+        for item in retained
+        if isinstance(item, dict)
+    }
+    expected_retained_paths = set(incumbent_by_path) - {
+        "RELEASE_CHANNEL.generated.json",
+        "releases.json",
+        *expected_fresh,
+    }
+    if set(retained_by_path) != expected_retained_paths:
+        raise CutoverError("v3 authority retained incumbent path closure drifted")
+    for path, retained_row in retained_by_path.items():
+        incumbent_row = incumbent_by_path[path]
+        if any(
+            retained_row.get(key) != incumbent_row.get(key)
+            for key in ("mode", "sha256", "sizeBytes")
+        ):
+            raise CutoverError("v3 authority retained incumbent bytes drifted")
+
+    canonical_authority_raw = projection_verifier._candidate_embedded_bytes(
+        custody.get("canonicalManifest"),
+        label="candidate canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    compatibility_authority_raw = projection_verifier._candidate_embedded_bytes(
+        custody.get("compatibilityManifest"),
+        label="candidate compatibility manifest",
+        expected_path="releases.json",
+    )
+    canonical_bundle_raw = stable_regular_bytes(
+        config.release_candidate_root / "RELEASE_CHANNEL.generated.json",
+        label="sealed candidate canonical manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    compatibility_bundle_raw = stable_regular_bytes(
+        config.release_candidate_root / "releases.json",
+        label="sealed candidate compatibility manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    release_receipt_raw = stable_regular_bytes(
+        config.release_channel_receipt,
+        label="authenticated release-channel receipt",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    if (
+        canonical_bundle_raw != canonical_authority_raw
+        or canonical_bundle_raw != release_receipt_raw
+        or compatibility_bundle_raw != compatibility_authority_raw
+        or sha256_bytes(canonical_bundle_raw)
+        != candidate.get("canonicalManifestSha256")
+        or sha256_bytes(release_receipt_raw)
+        != config.release_channel_receipt_sha256
+    ):
+        raise CutoverError(
+            "release manifest bytes do not share one v3 candidate authority"
+        )
+
+    return {
+        "path": str(config.candidate_import_authority),
+        "sha256": config.candidate_import_authority_sha256,
+        "contractName": authority["contractName"],
+        "contractVersion": authority["contractVersion"],
+        "candidateVersion": candidate["version"],
+        "bundleIdentitySha256": candidate["bundleIdentitySha256"],
+        "inventorySha256": candidate["inventorySha256"],
+        "fileCount": candidate["fileCount"],
+        "totalBytes": candidate["totalBytes"],
+        "canonicalManifestSha256": candidate[
+            "canonicalManifestSha256"
+        ],
+        "freshDelta": [
+            {
+                "path": path,
+                "sha256": str(fresh_by_path[path]["sha256"]),
+                "sizeBytes": int(fresh_by_path[path]["sizeBytes"]),
+            }
+            for path in expected_fresh
+        ],
+        "retainedInventorySha256": evidence[
+            "retainedInventorySha256"
+        ],
+        "incumbentInventorySha256": evidence[
+            "incumbentInventorySha256"
+        ],
+        "servingAuthority": True,
+        "validatedAtUtc": utc_now(),
+    }
+
+
+def prepare_sidecar_release_shelf(
+    config: SidecarConfig,
+    *,
+    generation: Any | None = None,
+    attestor: Any | None = None,
+    projection_verifier: Any | None = None,
+    candidate_materializer: Any | None = None,
+) -> dict[str, Any]:
+    scripts = config.source_root / "scripts"
+    generation = generation or load_module(
+        scripts / "release_shelf_generation.py",
+        f"topology_b_release_generation_{secrets.token_hex(6)}",
+    )
+    attestor = attestor or load_module(
+        scripts / "attest_initial_release_shelf_cutover.py",
+        f"topology_b_migration_attestor_{secrets.token_hex(6)}",
+    )
+    projection_verifier = projection_verifier or load_module(
+        scripts / "release/verify_public_projection.py",
+        f"topology_b_projection_verifier_{secrets.token_hex(6)}",
+    )
+    candidate_materializer = candidate_materializer or load_module(
+        scripts / "release/materialize_candidate_import_authority.py",
+        f"topology_b_candidate_materializer_{secrets.token_hex(6)}",
+    )
+    _require_digest_file(
+        config.migration_authority,
+        config.migration_authority_sha256,
+        "migration candidate authority",
+    )
+    restorations = _load_restoration_spec(config)
+    candidate_receipt = materialize_incumbent_candidate(
+        attestor=attestor,
+        shelf_root=config.shelf_root,
+        candidate_root=config.migration_candidate_root,
+        manifest_closure_restorations=restorations,
+    )
+    generation_id = generation.new_generation_id()
+    activation_receipt_id = generation.new_activation_receipt_id()
+    authority_validation_root = (
+        config.operation_root / "candidate-authority-validation"
+    )
+    authority_validation = attestor.prepare_public_download_migration(
+        config.shelf_root,
+        authority_validation_root,
+        config.migration_candidate_root,
+        config.migration_authority,
+        config.migration_authority_sha256,
+        config.source_head,
+        generation_id,
+        activation_receipt_id,
+    )
+    release_validation = validate_release_candidate_authority(
+        config,
+        projection_verifier=projection_verifier,
+        candidate_materializer=candidate_materializer,
+    )
+    prepared = generation.prepare_sidecar_active_layout(
+        config.release_candidate_root,
+        config.shelf_source,
+        generation_id=generation_id,
+        activation_receipt_id=activation_receipt_id,
+        activated_at=utc_now(),
+    )
+    pointer = prepared["pointer"]
+    generation_root = (
+        config.shelf_source
+        / generation.GENERATIONS_DIRECTORY
+        / generation_id
+    )
+    receipt = {
+        "contractName": "chummer.public-download-sidecar-shelf/v1",
+        "status": "pass",
+        "sourceHead": config.source_head,
+        "incumbentMigrationAuthority": {
+            "path": str(config.migration_authority),
+            "sha256": config.migration_authority_sha256,
+            "candidateInventoryDigest": candidate_receipt[
+                "candidateInventoryDigest"
+            ],
+            "validation": authority_validation,
+            "validationSha256": sha256_bytes(
+                json.dumps(
+                    authority_validation,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ),
+            "servingAuthority": False,
+        },
+        "releaseCandidateAuthority": release_validation,
+        "generationId": generation_id,
+        "activationReceiptId": activation_receipt_id,
+        "inventoryDigest": pointer["inventoryDigest"],
+        "pointerSha256": prepared["pointerSha256"],
+        "activationCandidateSha256": prepared[
+            "activationCandidateSha256"
+        ],
+        "canonicalMirrorSha256": prepared["canonicalMirrorSha256"],
+        "compatibilityMirrorSha256": prepared[
+            "compatibilityMirrorSha256"
+        ],
+        "generationCanonicalSha256": generation.sha256_file(
+            generation_root / generation.CANONICAL_MANIFEST
+        ),
+        "generationCompatibilitySha256": generation.sha256_file(
+            generation_root / generation.COMPATIBILITY_MANIFEST
+        ),
+        "writerPolicy": prepared["writerPolicy"],
+        "shelfTreeSha256": tree_sha256_file_stream(
+            config.shelf_source,
+            label="prepared sidecar release shelf",
+        ),
+        "generationRoot": str(generation_root),
+    }
+    write_private_json(
+        config.operation_root / "sidecar-shelf-receipt.json",
+        receipt,
+    )
+    return receipt
+
+
+def _sidecar_compose_environment(
+    config: SidecarConfig,
+    *,
+    dp: Mapping[str, Any],
+    app_overlay_sha256: str,
+    shelf: Mapping[str, Any],
+) -> dict[str, str]:
+    values = {
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_FILE": str(
+            config.sidecar_certificate
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_FILE": str(
+            config.sidecar_certificate_password
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256": str(
+            dp["certificateSha256"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256": str(
+            dp["passwordSha256"]
+        ),
+        "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR": str(
+            config.overlay_staging_root
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": app_overlay_sha256,
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE": str(config.fleet_source),
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": config.fleet_sha256,
+        "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SOURCE": str(config.shelf_source),
+        "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": str(
+            shelf["shelfTreeSha256"]
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": str(
+            config.projection_snapshot_root
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": (
+            config.projection_source_tree_sha256
+        ),
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(
+            config.runtime_proof_source
+        ),
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": (
+            config.runtime_proof_sha256
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE": str(
+            config.final_gold_source
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256": config.final_gold_sha256,
+    }
+    for logical, environment_name in SIDECAR_VOLUME_ENVIRONMENT.items():
+        values[environment_name] = config.volume_names[logical]
+    return values
+
+
+def materialize_sidecar_compose(
+    config: SidecarConfig,
+    runner: TopologyBRunner,
+    *,
+    image_id: str,
+    dp: Mapping[str, Any],
+    app_overlay_sha256: str,
+    shelf: Mapping[str, Any],
+) -> dict[str, Any]:
+    materializer = (
+        config.source_root
+        / "scripts/materialize_public_download_only_compose.py"
+    )
+    validator = (
+        config.source_root
+        / "scripts/validate_public_download_only_compose_runtime.py"
+    )
+    runner.python(
+        materializer,
+        [
+            "--source-root",
+            str(config.source_root),
+            "--source-head",
+            config.source_head,
+            "--source",
+            str(config.source_root / "docker-compose.public-edge.yml"),
+            "--profile-source",
+            str(config.source_root / "docker-compose.public-downloads.yml"),
+            "--output",
+            str(config.compose_file),
+            "--receipt-output",
+            str(config.materialization_receipt),
+            "--candidate-image-id",
+            image_id,
+            "--operation",
+            config.operation,
+        ],
+        label="materialize topology-B Compose",
+    )
+    environment = _sidecar_compose_environment(
+        config,
+        dp=dp,
+        app_overlay_sha256=app_overlay_sha256,
+        shelf=shelf,
+    )
+    rendered = runner.compose(
+        ["config", "--format", "json"],
+        environment=environment,
+        label="render topology-B Compose",
+    )
+    validator_arguments = [
+        "--project-name",
+        config.project_name,
+        "--operation-root",
+        str(config.operation_root),
+        "--operation",
+        config.operation,
+        "--source-root",
+        str(config.source_root),
+        "--source-head",
+        config.source_head,
+        "--materialized-compose",
+        str(config.compose_file),
+        "--materialization-receipt",
+        str(config.materialization_receipt),
+        "--candidate-image-id",
+        image_id,
+        "--shelf-source",
+        str(config.shelf_source),
+        "--shelf-sha256",
+        str(shelf["shelfTreeSha256"]),
+        "--certificate-source",
+        str(config.sidecar_certificate),
+        "--certificate-password-source",
+        str(config.sidecar_certificate_password),
+        "--certificate-sha256",
+        str(dp["certificateSha256"]),
+        "--certificate-password-sha256",
+        str(dp["passwordSha256"]),
+        "--app-overlay-source",
+        str(config.overlay_staging_root),
+        "--app-overlay-sha256",
+        app_overlay_sha256,
+        "--fleet-source",
+        str(config.fleet_source),
+        "--fleet-sha256",
+        config.fleet_sha256,
+        "--projection-source",
+        str(config.projection_snapshot_root),
+        "--projection-sha256",
+        config.projection_source_tree_sha256,
+        "--runtime-proof-source",
+        str(config.runtime_proof_source),
+        "--runtime-proof-sha256",
+        config.runtime_proof_sha256,
+        "--final-gold-source",
+        str(config.final_gold_source),
+        "--final-gold-sha256",
+        config.final_gold_sha256,
+    ]
+    validator_volume_flags = {
+        "public-download-app": "--app-volume",
+        "public-download-fleet": "--fleet-volume",
+        "public-download-state": "--state-volume",
+        "public-download-upload-sessions": "--upload-sessions-volume",
+        "public-download-windows-proof": "--windows-proof-volume",
+        "public-download-windows-proof-upload": (
+            "--windows-proof-upload-volume"
+        ),
+        "public-download-runtime-secrets": "--runtime-secrets-volume",
+        "public-download-projection": "--projection-volume",
+        "public-download-proofs": "--proofs-volume",
+        "public-download-shelf": "--shelf-volume",
+    }
+    for logical in SIDECAR_LOGICAL_VOLUMES:
+        validator_arguments.extend(
+            [validator_volume_flags[logical], config.volume_names[logical]]
+        )
+    validator_arguments.extend(["--output", str(config.runtime_attestation)])
+    runner.python(
+        validator,
+        validator_arguments,
+        label="attest topology-B Compose",
+        input_bytes=rendered,
+    )
+    return {
+        "projectName": config.project_name,
+        "publishedAddress": SIDECAR_ADDRESS,
+        "publishedPort": SIDECAR_PORT,
+        "candidateImageId": image_id,
+        "composePath": str(config.compose_file),
+        "materializationReceipt": str(config.materialization_receipt),
+        "runtimeAttestation": str(config.runtime_attestation),
+        "environment": environment,
+        "volumes": dict(config.volume_names),
+    }
+
+
+class TopologyBActions:
+    """Concrete, journaled side-effect boundary for the topology-B controller."""
+
+    def __init__(self, config: SidecarConfig) -> None:
+        self.config = config
+        _validate_sidecar_config(config)
+        self.runner = TopologyBRunner(config)
+        scripts = config.source_root / "scripts"
+        self.generation = load_module(
+            scripts / "release_shelf_generation.py",
+            f"topology_b_generation_{secrets.token_hex(6)}",
+        )
+        self.attestor = load_module(
+            scripts / "attest_initial_release_shelf_cutover.py",
+            f"topology_b_attestor_{secrets.token_hex(6)}",
+        )
+        self.cloudflare = load_module(
+            scripts / "cloudflare_public_download_transaction.py",
+            f"topology_b_cloudflare_{secrets.token_hex(6)}",
+        )
+        self.projection_verifier = load_module(
+            scripts / "release/verify_public_projection.py",
+            f"topology_b_projection_verifier_{secrets.token_hex(6)}",
+        )
+        self.candidate_materializer = load_module(
+            scripts / "release/materialize_candidate_import_authority.py",
+            f"topology_b_candidate_materializer_{secrets.token_hex(6)}",
+        )
+        self._compose_environment: dict[str, str] = {}
+        self._state: dict[str, Any] = {}
+        if config.operation == CUTOVER_OPERATION:
+            config.operation_root.mkdir(mode=0o700)
+            config.operation_root.chmod(0o700)
+            private_directory(config.operation_root, create=False)
+            planned = {
+                "schema": TOPOLOGY_B_OPERATION_SCHEMA,
+                "phase": "planned",
+                "operation": config.operation,
+                "projectName": config.project_name,
+                "operationRoot": str(config.operation_root),
+                "sourceHead": config.source_head,
+                "bindAddress": SIDECAR_ADDRESS,
+                "bindPort": SIDECAR_PORT,
+                "canonicalProject": CANONICAL_PROJECT,
+                "canonicalShelfRoot": str(config.shelf_root),
+                "volumes": dict(config.volume_names),
+                "createdAtUtc": utc_now(),
+                "updatedAtUtc": utc_now(),
+                "receipts": {},
+                "incumbentBaseline": None,
+            }
+            write_private_json(config.operation_journal, planned)
+            self._state = planned
+        else:
+            self._state = self._load_operation_journal()
+
+    def _load_operation_journal(self) -> dict[str, Any]:
+        raw = stable_regular_bytes(
+            self.config.operation_journal,
+            label="topology-B operation journal",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        try:
+            payload = json.loads(raw)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise RecoveryUncertain(
+                "topology-B operation journal is malformed"
+            ) from exc
+        if (
+            not isinstance(payload, dict)
+            or payload.get("schema") != TOPOLOGY_B_OPERATION_SCHEMA
+            or payload.get("projectName") != self.config.project_name
+            or payload.get("operationRoot") != str(self.config.operation_root)
+            or payload.get("sourceHead") != self.config.source_head
+            or payload.get("volumes") != self.config.volume_names
+        ):
+            raise RecoveryUncertain(
+                "topology-B operation journal authority drifted"
+            )
+        return payload
+
+    def _record(self, phase: str, name: str, receipt: Any) -> None:
+        state = copy.deepcopy(self._state)
+        state["phase"] = phase
+        state["updatedAtUtc"] = utc_now()
+        receipts = state.setdefault("receipts", {})
+        if not isinstance(receipts, dict):
+            raise RecoveryUncertain("topology-B operation receipts are malformed")
+        receipts[name] = receipt
+        write_private_json(
+            self.config.operation_journal,
+            state,
+            replace=True,
+        )
+        self._state = state
+
+    def _assert_canonical_shelf_unchanged(self) -> None:
+        expected = self._state.get("canonicalShelfTreeSha256")
+        observed = tree_sha256_file_stream(
+            self.config.shelf_root,
+            label="canonical incumbent release shelf",
+        )
+        if expected is None:
+            self._state["canonicalShelfTreeSha256"] = observed
+            write_private_json(
+                self.config.operation_journal,
+                self._state,
+                replace=True,
+            )
+        elif observed != expected:
+            raise CutoverError(
+                "canonical incumbent release shelf changed during topology-B cutover"
+            )
+
+    def _cloudflare_api(self) -> Any:
+        values = _parse_credentials_file(
+            self.config.cloudflare_credentials_file
+        )
+        headers = self.cloudflare.resolve_auth_headers(
+            values,
+            api_token_env="CLOUDFLARE_API_TOKEN",
+            allow_legacy_global_key_auth=True,
+            legacy_email_env="CLOUDFLARE_EMAIL",
+            legacy_global_key_env="CLOUDFLARE_GLOBAL_API_KEY",
+        )
+        return self.cloudflare.CloudflareTunnelApi(
+            api_base=self.config.cloudflare_api_base,
+            account_id=self.config.cloudflare_account_id,
+            tunnel_id=self.config.cloudflare_tunnel_id,
+            auth_headers=headers,
+            timeout_seconds=20,
+        )
+
+    def prepare_sidecar_release_shelf(
+        self, config: SidecarConfig
+    ) -> dict[str, Any]:
+        if not isinstance(self._state.get("incumbentBaseline"), dict):
+            baseline = probe_public_incumbent(config)
+            state = copy.deepcopy(self._state)
+            state["incumbentBaseline"] = baseline
+            self._state = state
+            self._record(
+                "incumbent-baseline-captured",
+                "incumbentBaseline",
+                baseline,
+            )
+        self._assert_canonical_shelf_unchanged()
+        receipt = prepare_sidecar_release_shelf(
+            config,
+            generation=self.generation,
+            attestor=self.attestor,
+            projection_verifier=self.projection_verifier,
+            candidate_materializer=self.candidate_materializer,
+        )
+        self._record("shelf-prepared", "shelf", receipt)
+        return receipt
+
+    def generate_sidecar_data_protection(
+        self, config: SidecarConfig
+    ) -> dict[str, Any]:
+        receipt = generate_sidecar_data_protection(config, self.runner)
+        self._record("data-protection-prepared", "dataProtection", receipt)
+        return receipt
+
+    def _stage_application(self) -> dict[str, Any]:
+        output = self.config.operation_root / "overlay-stage.json"
+        self.runner.python(
+            self.config.source_root
+            / "scripts/publish_public_edge_portal_overlay.py",
+            [
+                "--source-root",
+                str(self.config.source_root),
+                "--active-root",
+                str(self.config.overlay_root),
+                "--staging-root",
+                str(self.config.overlay_staging_root),
+                "--backup-root",
+                str(self.config.overlay_backup_root),
+                "--build-root",
+                str(self.config.overlay_build_root),
+                "--release-channel-receipt",
+                str(self.config.release_channel_receipt),
+                "--release-channel-receipt-sha256",
+                self.config.release_channel_receipt_sha256,
+                "--output",
+                str(output),
+            ],
+            label="stage operation-only portal application",
+            timeout=3600,
+        )
+        overlay_digest = tree_sha256_file_stream(
+            self.config.overlay_staging_root,
+            label="operation-only portal application",
+        )
+        return {
+            "receipt": str(output),
+            "root": str(self.config.overlay_staging_root),
+            "treeSha256": overlay_digest,
+        }
+
+    def materialize_sidecar_compose(
+        self,
+        config: SidecarConfig,
+        shelf: Mapping[str, Any],
+        dp: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        application = self._stage_application()
+        contexts, context_digests, context_receipt = (
+            prepare_immutable_build_contexts(
+                config,
+                config.operation_root,
+            )
+        )
+        unique_tag, image_id = build_candidate_image(
+            config,
+            self.runner,
+            contexts=contexts,
+            context_digests=context_digests,
+        )
+        if resolve_image_tag(self.runner, unique_tag) != image_id:
+            raise CutoverError("candidate image tag changed before sidecar use")
+        compose = materialize_sidecar_compose(
+            config,
+            self.runner,
+            image_id=image_id,
+            dp=dp,
+            app_overlay_sha256=str(application["treeSha256"]),
+            shelf=shelf,
+        )
+        self._compose_environment = dict(compose["environment"])
+        receipt = {
+            **compose,
+            "candidateTag": unique_tag,
+            "application": application,
+            "immutableBuildContextReceipt": str(context_receipt),
+            "immutableBuildContextDigests": context_digests,
+        }
+        self._record("runtime-materialized", "runtime", receipt)
+        return receipt
+
+    def create_sidecar_resources(
+        self,
+        config: SidecarConfig,
+        _runtime: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        created: list[str] = []
+        reused: list[str] = []
+        for logical in SIDECAR_LOGICAL_VOLUMES:
+            name = config.volume_names[logical]
+            listed = self.runner.docker(
+                [
+                    "volume",
+                    "ls",
+                    "--quiet",
+                    "--filter",
+                    f"name=^{name}$",
+                ],
+                label=f"resolve exact {logical} sidecar volume",
+            ).decode("utf-8", errors="strict").splitlines()
+            if name in listed:
+                inspection = json.loads(
+                    self.runner.docker(
+                        ["volume", "inspect", name],
+                        label=f"inspect exact {logical} sidecar volume",
+                    )
+                )
+                expected_labels = {
+                    "run.chummer.public-download-operation": (
+                        config.project_name
+                    ),
+                    "run.chummer.public-download-logical-volume": logical,
+                }
+                if (
+                    not isinstance(inspection, list)
+                    or len(inspection) != 1
+                    or inspection[0].get("Name") != name
+                    or inspection[0].get("Labels") != expected_labels
+                ):
+                    raise RecoveryUncertain(
+                        "preexisting topology-B volume authority is ambiguous"
+                    )
+                mountpoint = Path(str(inspection[0].get("Mountpoint") or ""))
+                try:
+                    mount_metadata = mountpoint.lstat()
+                    entries = list(os.scandir(mountpoint))
+                except OSError as exc:
+                    raise RecoveryUncertain(
+                        "preexisting topology-B volume cannot be inspected"
+                    ) from exc
+                if (
+                    not mountpoint.is_absolute()
+                    or not stat.S_ISDIR(mount_metadata.st_mode)
+                    or stat.S_ISLNK(mount_metadata.st_mode)
+                    or entries
+                ):
+                    raise RecoveryUncertain(
+                        "preexisting topology-B volume is not empty"
+                    )
+                reused.append(name)
+                continue
+            raw = self.runner.docker(
+                [
+                    "volume",
+                    "create",
+                    "--label",
+                    f"run.chummer.public-download-operation={config.project_name}",
+                    "--label",
+                    f"run.chummer.public-download-logical-volume={logical}",
+                    name,
+                ],
+                label=f"create exact {logical} sidecar volume",
+            )
+            if raw.decode("utf-8", errors="strict").strip() != name:
+                raise CutoverError("Docker returned an unexpected volume name")
+            inspection = json.loads(
+                self.runner.docker(
+                    ["volume", "inspect", name],
+                    label=f"verify created {logical} sidecar volume",
+                )
+            )
+            expected_labels = {
+                "run.chummer.public-download-operation": (
+                    config.project_name
+                ),
+                "run.chummer.public-download-logical-volume": logical,
+            }
+            if (
+                not isinstance(inspection, list)
+                or len(inspection) != 1
+                or inspection[0].get("Name") != name
+                or inspection[0].get("Labels") != expected_labels
+            ):
+                raise RecoveryUncertain(
+                    "created topology-B volume authority is ambiguous"
+                )
+            mountpoint = Path(str(inspection[0].get("Mountpoint") or ""))
+            try:
+                mount_metadata = mountpoint.lstat()
+                entries = list(os.scandir(mountpoint))
+            except OSError as exc:
+                raise RecoveryUncertain(
+                    "created topology-B volume cannot be inspected"
+                ) from exc
+            if (
+                not mountpoint.is_absolute()
+                or not stat.S_ISDIR(mount_metadata.st_mode)
+                or stat.S_ISLNK(mount_metadata.st_mode)
+                or entries
+            ):
+                raise RecoveryUncertain(
+                    "created topology-B volume is not empty"
+                )
+            created.append(name)
+        receipt = {
+            "projectName": config.project_name,
+            "volumes": created,
+            "reusedEmptyVolumes": reused,
+        }
+        self._record("resources-created", "resources", receipt)
+        return receipt
+
+    def start_sidecar_runtime(
+        self,
+        config: SidecarConfig,
+        runtime: Mapping[str, Any],
+        _resources: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        if not self._compose_environment:
+            environment = runtime.get("environment")
+            if not isinstance(environment, dict):
+                raise CutoverError("sidecar Compose environment is unavailable")
+            self._compose_environment = {
+                str(key): str(value) for key, value in environment.items()
+            }
+        self.runner.compose(
+            ["up", "-d", "--no-build", "--remove-orphans"],
+            environment=self._compose_environment,
+            label="start isolated topology-B sidecar",
+            timeout=600,
+        )
+        raw = self.runner.compose(
+            ["ps", "--quiet", PORTAL_SERVICE],
+            environment=self._compose_environment,
+            label="resolve isolated topology-B portal",
+        )
+        container_id = raw.decode("ascii", errors="strict").strip()
+        if CONTAINER_ID.fullmatch(container_id) is None:
+            raise CutoverError("isolated topology-B portal identity is invalid")
+        inspection = docker_inspect_json(
+            self.runner,
+            "container",
+            container_id,
+        )
+        labels = inspection.get("Config", {}).get("Labels") or {}
+        if (
+            labels.get("com.docker.compose.project") != config.project_name
+            or labels.get("com.docker.compose.service") != PORTAL_SERVICE
+            or str(inspection.get("Image") or "")
+            != runtime.get("candidateImageId")
+        ):
+            raise CutoverError("isolated topology-B portal authority drifted")
+        receipt = {
+            "containerId": container_id,
+            "imageId": runtime["candidateImageId"],
+            "projectName": config.project_name,
+        }
+        self._record("sidecar-started", "sidecar", receipt)
+        return receipt
+
+    def wait_sidecar_healthy(
+        self,
+        config: SidecarConfig,
+        runtime: Mapping[str, Any],
+        sidecar: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        receipt = wait_healthy(
+            self.runner,
+            str(sidecar["containerId"]),
+            expected_image=str(runtime["candidateImageId"]),
+            timeout_seconds=config.ready_timeout_seconds,
+        )
+        self._record("sidecar-healthy", "health", receipt)
+        return receipt
+
+    def probe_sidecar_hosts(
+        self,
+        config: SidecarConfig,
+        shelf: Mapping[str, Any],
+        *_args: Any,
+        hosts: tuple[str, ...],
+        scope: str,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        if hosts != SIDECAR_HOSTS:
+            raise CutoverError("sidecar host closure drifted")
+        if scope == "local":
+            receipt = probe_sidecar_hosts(
+                config,
+                generation_id=str(shelf["generationId"]),
+                generation_root=Path(str(shelf["generationRoot"])),
+            )
+            self._record("local-verified", "localProbe", receipt)
+            return receipt
+        if scope != "public":
+            raise CutoverError("sidecar probe scope is invalid")
+        receipt = self._verify_public_downloads(shelf)
+        self._record("public-verified", "publicProbe", receipt)
+        return receipt
+
+    def probe_public_incumbent(
+        self,
+        config: SidecarConfig,
+        *,
+        phase: str,
+        hosts: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        if hosts != SIDECAR_HOSTS:
+            raise CutoverError("incumbent host closure drifted")
+        if phase == "before-cloudflare":
+            baseline = self._state.get("incumbentBaseline")
+            receipt = probe_public_incumbent(
+                config,
+                expected=baseline if isinstance(baseline, dict) else None,
+            )
+            state = copy.deepcopy(self._state)
+            state["incumbentBaseline"] = receipt
+            self._state = state
+            self._record("incumbent-captured", "incumbentBefore", receipt)
+            return receipt
+        if phase != "after-rollback":
+            raise CutoverError("incumbent probe phase is invalid")
+        baseline = self._state.get("incumbentBaseline")
+        if not isinstance(baseline, dict):
+            rollback_receipt = (
+                self._state.get("receipts", {}).get(
+                    "cloudflareRollback",
+                    {},
+                )
+            )
+            if (
+                self._state.get("phase") != "planned"
+                and (
+                    not isinstance(rollback_receipt, dict)
+                    or rollback_receipt.get("phase") != "not-captured"
+                )
+            ):
+                raise RecoveryUncertain(
+                    "incumbent rollback baseline is unavailable"
+                )
+            receipt = probe_public_incumbent(config)
+        else:
+            receipt = probe_public_incumbent(config, expected=baseline)
+        self._record("incumbent-restored", "incumbentAfterRollback", receipt)
+        return receipt
+
+    def capture_cloudflare(
+        self,
+        config: SidecarConfig,
+        shelf: Mapping[str, Any],
+        *_args: Any,
+    ) -> dict[str, Any]:
+        release_revalidation = validate_release_candidate_authority(
+            config,
+            projection_verifier=self.projection_verifier,
+            candidate_materializer=self.candidate_materializer,
+        )
+        if release_revalidation != shelf.get("releaseCandidateAuthority"):
+            initial = shelf.get("releaseCandidateAuthority")
+            if (
+                not isinstance(initial, dict)
+                or {
+                    key: value
+                    for key, value in initial.items()
+                    if key != "validatedAtUtc"
+                }
+                != {
+                    key: value
+                    for key, value in release_revalidation.items()
+                    if key != "validatedAtUtc"
+                }
+            ):
+                raise CutoverError(
+                    "release candidate authority changed before Cloudflare capture"
+                )
+        self._record(
+            "release-authority-revalidated",
+            "releaseCandidateAuthorityRevalidation",
+            release_revalidation,
+        )
+        generation_id = str(shelf["generationId"])
+        manifest = stable_regular_bytes(
+            Path(str(shelf["generationRoot"])) / "releases.json",
+            label="Cloudflare probe generation manifest",
+            maximum_bytes=8 * 1024 * 1024,
+        )
+        receipt = self.cloudflare.capture_transaction(
+            self._cloudflare_api(),
+            account_id=config.cloudflare_account_id,
+            tunnel_id=config.cloudflare_tunnel_id,
+            origin=SIDECAR_ORIGIN,
+            generation_id=generation_id,
+            probe_endpoint=(
+                f"https://chummer.run/downloads/g/{generation_id}/releases.json"
+            ),
+            probe_body_sha256=sha256_bytes(manifest),
+            journal_path=config.cloudflare_journal,
+            lock_path=config.cloudflare_lock,
+        )
+        summary = {
+            "phase": receipt["phase"],
+            "priorConfigSha256": receipt["priorConfigSha256"],
+            "priorVersion": receipt["priorVersion"],
+            "targetConfigSha256": receipt["targetConfigSha256"],
+            "generationId": generation_id,
+        }
+        self._record("cloudflare-captured", "cloudflareCapture", summary)
+        return summary
+
+    def apply_cloudflare(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        receipt = self.cloudflare.apply_transaction(
+            self._cloudflare_api(),
+            journal_path=config.cloudflare_journal,
+            lock_path=config.cloudflare_lock,
+        )
+        summary = {
+            "phase": receipt["phase"],
+            "targetConfigSha256": receipt["targetConfigSha256"],
+            "targetVersion": receipt["targetVersion"],
+            "connectorConvergence": receipt["connectorConvergence"],
+        }
+        self._record("cloudflare-applied", "cloudflareApply", summary)
+        return summary
+
+    def _verify_public_downloads(
+        self,
+        shelf: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        generation_root = Path(str(shelf["generationRoot"]))
+        strict_output = self.config.operation_root / "public-postdeploy.json"
+        self.runner.python(
+            self.config.source_root
+            / "scripts/verify_public_download_only_postdeploy.py",
+            [
+                "--base-url",
+                self.config.base_url,
+                "--source-root",
+                str(self.config.source_root),
+                "--local-manifest",
+                str(generation_root / "releases.json"),
+                "--local-canonical-manifest",
+                str(generation_root / "RELEASE_CHANNEL.generated.json"),
+                "--delivery-phase",
+                self.config.delivery_phase,
+                "--output",
+                str(strict_output),
+                "--timeout",
+                "30",
+            ],
+            label="verify strict anonymous public download delivery",
+            timeout=1800,
+        )
+        strict = json.loads(
+            stable_regular_bytes(
+                strict_output,
+                label="strict public download receipt",
+                maximum_bytes=16 * 1024 * 1024,
+                owner_only=True,
+            )
+        )
+        if strict.get("status") != "pass":
+            raise CutoverError("strict public download receipt did not pass")
+        journal = self.cloudflare.load_journal(
+            self.config.cloudflare_journal
+        )
+        manifest = stable_regular_bytes(
+            generation_root / "releases.json",
+            label="prepared generation compatibility manifest",
+            maximum_bytes=8 * 1024 * 1024,
+        )
+        generation_id = str(shelf["generationId"])
+        path = f"/downloads/g/{generation_id}/releases.json"
+        observations: list[dict[str, Any]] = []
+        for hostname in SIDECAR_HOSTS:
+            observed = _probe_exact_manifest(
+                scheme="https",
+                connect_host=hostname,
+                connect_port=443,
+                request_host=hostname,
+                path=path,
+                expected=manifest,
+                generation_id=generation_id,
+            )
+            observations.append(
+                {
+                    "endpoint": f"https://{hostname}{path}",
+                    "httpStatus": observed["httpStatus"],
+                    "bodySha256": observed["bodySha256"],
+                    "anonymous": True,
+                }
+            )
+        missing_connector_ids = [
+            row["id"]
+            for row in journal["connectorConvergence"]
+            if not row["configVersionAvailable"]
+        ]
+        external = {
+            "schema": self.cloudflare.EXTERNAL_PROBE_SCHEMA,
+            "accountId": journal["accountId"],
+            "tunnelId": journal["tunnelId"],
+            "targetConfigSha256": journal["targetConfigSha256"],
+            "targetVersion": journal["targetVersion"],
+            "connectorIds": missing_connector_ids,
+            "generationId": generation_id,
+            "observations": observations,
+            "observedAt": utc_now(),
+        }
+        write_private_json(self.config.external_probe_receipt, external)
+        self.cloudflare.validate_external_probe_receipt(external, journal)
+        self._assert_canonical_shelf_unchanged()
+        return {
+            "strictReceiptPath": str(strict_output),
+            "strictReceiptSha256": sha256_bytes(
+                stable_regular_bytes(
+                    strict_output,
+                    label="strict public download receipt",
+                    maximum_bytes=16 * 1024 * 1024,
+                    owner_only=True,
+                )
+            ),
+            "externalProbeReceiptPath": str(
+                self.config.external_probe_receipt
+            ),
+            "externalProbeReceiptSha256": sha256_bytes(
+                stable_regular_bytes(
+                    self.config.external_probe_receipt,
+                    label="Cloudflare external probe receipt",
+                    maximum_bytes=1024 * 1024,
+                    owner_only=True,
+                )
+            ),
+        }
+
+    def commit_cloudflare(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        receipt = self.cloudflare.commit_transaction(
+            self._cloudflare_api(),
+            journal_path=config.cloudflare_journal,
+            lock_path=config.cloudflare_lock,
+            evidence_path=config.cloudflare_committed_evidence,
+            external_probe_receipt=config.external_probe_receipt,
+        )
+        summary = {
+            "phase": receipt["phase"],
+            "targetConfigSha256": receipt["targetConfigSha256"],
+            "targetVersion": receipt["targetVersion"],
+            "evidencePath": str(config.cloudflare_committed_evidence),
+            "evidenceSha256": sha256_bytes(
+                stable_regular_bytes(
+                    config.cloudflare_committed_evidence,
+                    label="committed Cloudflare evidence",
+                    maximum_bytes=16 * 1024 * 1024,
+                    owner_only=True,
+                )
+            ),
+        }
+        self._record("cloudflare-committed", "cloudflareCommit", summary)
+        return summary
+
+    def write_active_receipt(
+        self,
+        config: SidecarConfig,
+        shelf: Mapping[str, Any],
+        runtime: Mapping[str, Any],
+        sidecar: Mapping[str, Any],
+        cloudflare_commit: Mapping[str, Any],
+        *_args: Any,
+    ) -> dict[str, Any]:
+        payload = {
+            "schema": TOPOLOGY_B_ACTIVE_SCHEMA,
+            "status": "active",
+            "operation": config.operation,
+            "operationRoot": str(config.operation_root),
+            "projectName": config.project_name,
+            "sourceHead": config.source_head,
+            "origin": SIDECAR_ORIGIN,
+            "publicHosts": list(SIDECAR_HOSTS),
+            "generationId": shelf["generationId"],
+            "shelfTreeSha256": shelf["shelfTreeSha256"],
+            "candidateImageId": runtime["candidateImageId"],
+            "portalContainerId": sidecar["containerId"],
+            "volumes": dict(config.volume_names),
+            "finalGoldDiagnostic": {
+                "path": str(config.final_gold_source),
+                "sha256": config.final_gold_sha256,
+                "authority": "diagnostic-only-not-release-completion",
+            },
+            "cloudflare": dict(cloudflare_commit),
+            "activatedAtUtc": utc_now(),
+        }
+        write_private_json(
+            config.active_runtime_authority,
+            payload,
+            replace=(
+                config.active_runtime_authority.exists()
+                and not config.active_runtime_authority.is_symlink()
+            ),
+        )
+        self._record("active", "activeAuthority", payload)
+        return payload
+
+    def rollback_cloudflare(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        if (
+            not self.cloudflare.journal_path_present(
+                config.cloudflare_journal
+            )
+            and not self.cloudflare.journal_path_present(
+                config.cloudflare_rollback_evidence
+            )
+        ):
+            receipt = {"phase": "not-captured"}
+        else:
+            receipt = self.cloudflare.rollback_transaction(
+                self._cloudflare_api(),
+                journal_path=config.cloudflare_journal,
+                lock_path=config.cloudflare_lock,
+                evidence_path=config.cloudflare_rollback_evidence,
+            )
+        summary = {
+            "phase": receipt["phase"],
+            "evidencePath": (
+                str(config.cloudflare_rollback_evidence)
+                if config.cloudflare_rollback_evidence.exists()
+                else None
+            ),
+        }
+        self._record("cloudflare-rolled-back", "cloudflareRollback", summary)
+        return summary
+
+    def cleanup_sidecar_resources(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        runtime = self._state.get("receipts", {}).get("runtime", {})
+        environment = runtime.get("environment", {})
+        if config.compose_file.is_file() and isinstance(environment, dict):
+            self.runner.compose(
+                ["down", "--remove-orphans"],
+                environment={
+                    str(key): str(value)
+                    for key, value in environment.items()
+                },
+                label="remove exact topology-B sidecar project",
+                timeout=600,
+            )
+        removed: list[str] = []
+        for name in config.volume_names.values():
+            listed = self.runner.docker(
+                [
+                    "volume",
+                    "ls",
+                    "--quiet",
+                    "--filter",
+                    f"name=^{name}$",
+                ],
+                label="resolve exact topology-B volume",
+            ).decode("utf-8", errors="strict").splitlines()
+            if name not in listed:
+                continue
+            inspection = json.loads(
+                self.runner.docker(
+                    ["volume", "inspect", name],
+                    label="inspect exact topology-B volume",
+                )
+            )
+            if (
+                not isinstance(inspection, list)
+                or len(inspection) != 1
+                or inspection[0].get("Name") != name
+                or (
+                    inspection[0].get("Labels") or {}
+                ).get("run.chummer.public-download-operation")
+                != config.project_name
+            ):
+                raise RecoveryUncertain(
+                    "topology-B volume identity is ambiguous"
+                )
+            self.runner.docker(
+                ["volume", "rm", name],
+                label="remove exact topology-B volume",
+            )
+            removed.append(name)
+        receipt = {
+            "projectName": config.project_name,
+            "removedVolumes": removed,
+        }
+        self._record("cleaned", "cleanup", receipt)
+        return receipt
+
+    def classify_recovery(self, config: SidecarConfig) -> str:
+        if config.cloudflare_committed_evidence.is_file():
+            return "committed"
+        if self.cloudflare.journal_path_present(config.cloudflare_journal):
+            journal = self.cloudflare.load_journal(
+                config.cloudflare_journal
+            )
+            if journal["phase"] == "committed":
+                return "committed"
+            if journal["phase"] == "rolled-back":
+                return "rollback"
+            if journal["phase"] not in {
+                "captured",
+                "apply-in-flight",
+                "applied",
+                "awaiting-external-probe",
+                "rollback-in-flight",
+            }:
+                raise RecoveryUncertain(
+                    "Cloudflare recovery journal phase is unsupported"
+                )
+        return "rollback"
+
+    def reconcile_committed(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        receipt = self.cloudflare.commit_transaction(
+            self._cloudflare_api(),
+            journal_path=config.cloudflare_journal,
+            lock_path=config.cloudflare_lock,
+            evidence_path=config.cloudflare_committed_evidence,
+            external_probe_receipt=(
+                config.external_probe_receipt
+                if config.external_probe_receipt.is_file()
+                else None
+            ),
+        )
+        active = self._state.get("receipts", {}).get("activeAuthority")
+        if not isinstance(active, dict):
+            shelf = self._state.get("receipts", {}).get("shelf")
+            runtime = self._state.get("receipts", {}).get("runtime")
+            sidecar = self._state.get("receipts", {}).get("sidecar")
+            commit = self._state.get("receipts", {}).get("cloudflareCommit")
+            if not isinstance(commit, dict):
+                commit = {
+                    "phase": receipt["phase"],
+                    "targetConfigSha256": receipt[
+                        "targetConfigSha256"
+                    ],
+                    "targetVersion": receipt["targetVersion"],
+                    "evidencePath": str(
+                        config.cloudflare_committed_evidence
+                    ),
+                    "evidenceSha256": sha256_bytes(
+                        stable_regular_bytes(
+                            config.cloudflare_committed_evidence,
+                            label="committed Cloudflare evidence",
+                            maximum_bytes=16 * 1024 * 1024,
+                            owner_only=True,
+                        )
+                    ),
+                }
+            if not all(
+                isinstance(item, dict)
+                for item in (shelf, runtime, sidecar, commit)
+            ):
+                raise RecoveryUncertain(
+                    "committed route lacks reconstructable active authority"
+                )
+            current_runtime = container_runtime(
+                self.runner,
+                str(sidecar.get("containerId") or ""),
+            )
+            if (
+                not current_runtime["wasRunning"]
+                or current_runtime["imageId"]
+                != runtime.get("candidateImageId")
+            ):
+                raise RecoveryUncertain(
+                    "committed sidecar runtime is not exact and running"
+                )
+            wait_healthy(
+                self.runner,
+                str(sidecar["containerId"]),
+                expected_image=str(runtime["candidateImageId"]),
+                timeout_seconds=self.config.ready_timeout_seconds,
+            )
+            probe_sidecar_hosts(
+                self.config,
+                generation_id=str(shelf["generationId"]),
+                generation_root=Path(str(shelf["generationRoot"])),
+            )
+            manifest = stable_regular_bytes(
+                Path(str(shelf["generationRoot"])) / "releases.json",
+                label="recovery generation compatibility manifest",
+                maximum_bytes=8 * 1024 * 1024,
+            )
+            path = (
+                f"/downloads/g/{shelf['generationId']}/releases.json"
+            )
+            for hostname in SIDECAR_HOSTS:
+                _probe_exact_manifest(
+                    scheme="https",
+                    connect_host=hostname,
+                    connect_port=443,
+                    request_host=hostname,
+                    path=path,
+                    expected=manifest,
+                    generation_id=str(shelf["generationId"]),
+                )
+            active = self.write_active_receipt(
+                config,
+                shelf,
+                runtime,
+                sidecar,
+                commit,
+            )
+        return {"cloudflarePhase": receipt["phase"], "active": active}
+
+
+def execute_topology_b(
+    config: SidecarConfig,
+    actions: TopologyBActionsProtocol | None = None,
+) -> dict[str, Any]:
+    action_boundary = actions if actions is not None else TopologyBActions(config)
+    cloudflare_committed = False
+    try:
+        shelf = action_boundary.prepare_sidecar_release_shelf(config)
+        data_protection = action_boundary.generate_sidecar_data_protection(
+            config
+        )
+        runtime = action_boundary.materialize_sidecar_compose(
+            config,
+            shelf,
+            data_protection,
+        )
+        resources = action_boundary.create_sidecar_resources(
+            config,
+            runtime,
+        )
+        sidecar = action_boundary.start_sidecar_runtime(
+            config,
+            runtime,
+            resources,
+        )
+        health = action_boundary.wait_sidecar_healthy(
+            config,
+            runtime,
+            sidecar,
+        )
+        local_probe = action_boundary.probe_sidecar_hosts(
+            config,
+            shelf,
+            runtime,
+            sidecar,
+            hosts=SIDECAR_HOSTS,
+            scope="local",
+        )
+        incumbent = action_boundary.probe_public_incumbent(
+            config,
+            phase="before-cloudflare",
+            hosts=SIDECAR_HOSTS,
+        )
+        capture = action_boundary.capture_cloudflare(
+            config,
+            shelf,
+            runtime,
+            sidecar,
+            local_probe,
+            incumbent,
+        )
+        applied = action_boundary.apply_cloudflare(
+            config,
+            capture,
+        )
+        public_probe = action_boundary.probe_sidecar_hosts(
+            config,
+            shelf,
+            runtime,
+            sidecar,
+            applied,
+            hosts=SIDECAR_HOSTS,
+            scope="public",
+        )
+        committed = action_boundary.commit_cloudflare(
+            config,
+            applied,
+            public_probe,
+        )
+        cloudflare_committed = True
+        active = action_boundary.write_active_receipt(
+            config,
+            shelf,
+            runtime,
+            sidecar,
+            committed,
+            health,
+            local_probe,
+            public_probe,
+        )
+        return {
+            "contractName": TOPOLOGY_B_CONTRACT,
+            "status": "pass",
+            "operation": config.operation,
+            "projectName": config.project_name,
+            "sourceHead": getattr(config, "source_head", ""),
+            "shelf": shelf,
+            "dataProtection": data_protection,
+            "runtime": runtime,
+            "resources": resources,
+            "sidecar": sidecar,
+            "health": health,
+            "localProbe": local_probe,
+            "cloudflareCapture": capture,
+            "cloudflareApply": applied,
+            "publicProbe": public_probe,
+            "cloudflareCommit": committed,
+            "activeAuthority": active,
+            "incumbentPortalStopped": False,
+            "incumbentTunnelStopped": False,
+            "canonicalShelfMutated": False,
+        }
+    except Exception as original:
+        if cloudflare_committed:
+            raise RecoveryUncertain(
+                "Cloudflare committed; active authority requires reconciliation"
+            ) from original
+        try:
+            action_boundary.rollback_cloudflare(config)
+            action_boundary.probe_public_incumbent(
+                config,
+                phase="after-rollback",
+                hosts=SIDECAR_HOSTS,
+            )
+            action_boundary.cleanup_sidecar_resources(config)
+        except Exception as recovery_error:
+            raise RecoveryUncertain(
+                "topology-B rollback or incumbent verification is uncertain"
+            ) from recovery_error
+        raise CutoverError(
+            "topology-B cutover failed after exact rollback"
+        ) from original
+
+
+def recover_topology_b(
+    config: SidecarConfig,
+    actions: TopologyBActionsProtocol | None = None,
+) -> dict[str, Any]:
+    action_boundary = actions if actions is not None else TopologyBActions(config)
+    try:
+        disposition = action_boundary.classify_recovery(config)
+        if disposition == "committed":
+            reconciliation = action_boundary.reconcile_committed(config)
+            return {
+                "contractName": TOPOLOGY_B_CONTRACT,
+                "status": "pass",
+                "operation": config.operation,
+                "disposition": "committed-sidecar-reconciled",
+                "reconciliation": reconciliation,
+            }
+        if disposition != "rollback":
+            raise RecoveryUncertain(
+                "topology-B recovery disposition is unsupported"
+            )
+        rollback = action_boundary.rollback_cloudflare(config)
+        incumbent = action_boundary.probe_public_incumbent(
+            config,
+            phase="after-rollback",
+            hosts=SIDECAR_HOSTS,
+        )
+        cleanup = action_boundary.cleanup_sidecar_resources(config)
+        return {
+            "contractName": TOPOLOGY_B_CONTRACT,
+            "status": "pass",
+            "operation": config.operation,
+            "disposition": "rolled-back-to-incumbent",
+            "cloudflareRollback": rollback,
+            "incumbent": incumbent,
+            "cleanup": cleanup,
+        }
+    except RecoveryUncertain:
+        raise
+    except Exception as exc:
+        raise RecoveryUncertain(
+            "topology-B recovery could not establish exact state"
+        ) from exc
+
+
+def execute(config: SidecarConfig) -> dict[str, Any]:
+    return execute_topology_b(config)
+
+
+def parse_args(argv: list[str] | None = None) -> SidecarConfig:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--operation",
+        choices=tuple(sorted(OPERATIONS)),
+        required=True,
+    )
+    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--source-head", required=True)
+    parser.add_argument("--shared-mutation-lock-token", required=True)
+    parser.add_argument("--shelf-root", type=Path, required=True)
+    parser.add_argument("--migration-candidate-root", type=Path, required=True)
+    parser.add_argument("--migration-authority", type=Path, required=True)
+    parser.add_argument("--migration-authority-sha256", required=True)
+    parser.add_argument(
+        "--manifest-closure-restoration-spec",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--manifest-closure-restoration-spec-sha256",
+        required=True,
+    )
+    parser.add_argument("--release-channel-receipt", type=Path, required=True)
+    parser.add_argument("--release-channel-receipt-sha256", required=True)
+    parser.add_argument("--projection-snapshot-root", type=Path, required=True)
+    parser.add_argument("--projection-snapshot-id", required=True)
+    parser.add_argument("--projection-snapshot-sha256", required=True)
+    parser.add_argument("--projection-manifest-sha256", required=True)
+    parser.add_argument("--runtime-proof-source", type=Path, required=True)
+    parser.add_argument("--runtime-proof-sha256", required=True)
+    parser.add_argument("--final-gold-source", type=Path, required=True)
+    parser.add_argument("--final-gold-sha256", required=True)
+    parser.add_argument("--fleet-source", type=Path, required=True)
+    parser.add_argument("--fleet-sha256", required=True)
+    parser.add_argument("--operation-root", type=Path, required=True)
+    parser.add_argument("--active-runtime-authority", type=Path, required=True)
+    parser.add_argument("--docker-config-root", type=Path, required=True)
+    parser.add_argument(
+        "--cloudflare-credentials-file",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument("--cloudflare-account-id", required=True)
+    parser.add_argument("--cloudflare-tunnel-id", required=True)
+    parser.add_argument(
+        "--cloudflare-api-base",
+        default="https://api.cloudflare.com/client/v4",
+    )
+    parser.add_argument("--receipt-root", type=Path, required=True)
+    parser.add_argument("--base-url", required=True)
+    parser.add_argument("--build-context", type=Path, required=True)
+    parser.add_argument("--fleet-media-contracts", type=Path, required=True)
+    parser.add_argument("--design-product-root", type=Path, required=True)
+    parser.add_argument(
+        "--delivery-phase",
+        choices=("bootstrap", "windows-preview"),
+        required=True,
+    )
+    parser.add_argument("--ready-timeout-seconds", type=int, default=180)
+    args = parser.parse_args(argv)
+
+    def exact_existing(path: Path, label: str) -> Path:
+        if not path.is_absolute() or path.is_symlink():
+            raise CutoverError(f"{label} must use an exact absolute path")
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise CutoverError(f"{label} is unavailable") from exc
+        if resolved != path:
+            raise CutoverError(f"{label} contains a symlink component")
+        return path
+
+    source_root = exact_existing(args.source_root, "source root")
+    shelf_root = exact_existing(args.shelf_root, "canonical release shelf")
+    if shelf_root != CANONICAL_RELEASE_SHELF_ROOT:
+        raise CutoverError("release shelf must be the exact canonical path")
+    receipt_root = exact_existing(args.receipt_root, "receipt root")
+    docker_config_root = exact_existing(
+        args.docker_config_root,
+        "Docker configuration root",
+    )
+    active_parent = exact_existing(
+        args.active_runtime_authority.parent,
+        "active runtime authority parent",
+    )
+    if args.active_runtime_authority != active_parent / args.active_runtime_authority.name:
+        raise CutoverError("active runtime authority path is unsafe")
+    recovery = args.operation == RECOVERY_OPERATION
+    if not recovery:
+        operation_parent = exact_existing(
+            args.operation_root.parent,
+            "sidecar operation parent",
+        )
+        operation_root = operation_parent / args.operation_root.name
+        if operation_root != args.operation_root:
+            raise CutoverError("sidecar operation root is not canonical")
+    else:
+        if args.operation_root.exists() or args.operation_root.is_symlink():
+            operation_root = exact_existing(
+                args.operation_root,
+                "sidecar operation root",
+            )
+        else:
+            operation_parent = exact_existing(
+                args.operation_root.parent,
+                "sidecar operation parent",
+            )
+            operation_root = operation_parent / args.operation_root.name
+            planned_journal = (
+                receipt_root / f"{operation_root.name}.operation.json"
+            )
+            if not planned_journal.is_file() or planned_journal.is_symlink():
+                raise RecoveryUncertain(
+                    "missing operation root has no planned recovery journal"
+                )
+
+    def cutover_input(path: Path, label: str) -> Path:
+        return path if recovery else exact_existing(path, label)
+
+    return SidecarConfig(
+        operation=args.operation,
+        source_root=source_root,
+        source_head=args.source_head,
+        shared_lock_token=args.shared_mutation_lock_token,
+        shelf_root=shelf_root,
+        migration_candidate_root=cutover_input(
+            args.migration_candidate_root,
+            "migration candidate",
+        ),
+        migration_authority=cutover_input(
+            args.migration_authority,
+            "migration authority",
+        ),
+        migration_authority_sha256=args.migration_authority_sha256,
+        manifest_closure_restoration_spec=cutover_input(
+            args.manifest_closure_restoration_spec,
+            "manifest-closure restoration spec",
+        ),
+        manifest_closure_restoration_spec_sha256=(
+            args.manifest_closure_restoration_spec_sha256
+        ),
+        release_channel_receipt=cutover_input(
+            args.release_channel_receipt,
+            "release-channel receipt",
+        ),
+        release_channel_receipt_sha256=args.release_channel_receipt_sha256,
+        projection_snapshot_root=cutover_input(
+            args.projection_snapshot_root,
+            "projection snapshot",
+        ),
+        projection_snapshot_id=args.projection_snapshot_id,
+        projection_snapshot_sha256=args.projection_snapshot_sha256,
+        projection_manifest_sha256=args.projection_manifest_sha256,
+        runtime_proof_source=cutover_input(
+            args.runtime_proof_source,
+            "runtime proof",
+        ),
+        runtime_proof_sha256=args.runtime_proof_sha256,
+        final_gold_source=cutover_input(
+            args.final_gold_source,
+            "final-gold handoff",
+        ),
+        final_gold_sha256=args.final_gold_sha256,
+        fleet_source=cutover_input(
+            args.fleet_source,
+            "fleet runtime source",
+        ),
+        fleet_sha256=args.fleet_sha256,
+        operation_root=operation_root,
+        active_runtime_authority=args.active_runtime_authority,
+        docker_config_root=docker_config_root,
+        cloudflare_credentials_file=exact_existing(
+            args.cloudflare_credentials_file,
+            "Cloudflare credentials file",
+        ),
+        cloudflare_account_id=args.cloudflare_account_id,
+        cloudflare_tunnel_id=args.cloudflare_tunnel_id,
+        cloudflare_api_base=args.cloudflare_api_base,
+        receipt_root=receipt_root,
+        base_url=args.base_url,
+        build_context=cutover_input(args.build_context, "build context"),
+        fleet_media_contracts=cutover_input(
+            args.fleet_media_contracts,
+            "fleet media contracts",
+        ),
+        design_product_root=cutover_input(
+            args.design_product_root,
+            "design product root",
+        ),
+        delivery_phase=args.delivery_phase,
+        ready_timeout_seconds=args.ready_timeout_seconds,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
-    global SHELF_MUTATION_MAY_HAVE_BEGUN
-    SHELF_MUTATION_MAY_HAVE_BEGUN = False
     try:
         config = parse_args(argv)
-        if config.ready_timeout_seconds < 1 or config.ready_timeout_seconds > 900:
-            raise CutoverError("portal readiness timeout is outside the audited range")
-        result = execute(config)
+        result = (
+            recover_topology_b(config)
+            if config.operation == RECOVERY_OPERATION
+            else execute(config)
+        )
     except RecoveryUncertain as exc:
         print(f"public_download_cutover: recovery uncertain: {exc}", file=sys.stderr)
         return 76
     except (CutoverError, OSError, ValueError, json.JSONDecodeError) as exc:
-        if SHELF_MUTATION_MAY_HAVE_BEGUN:
-            print(
-                "public_download_cutover: release-shelf mutation may have "
-                f"begun; recovery required: {exc}",
-                file=sys.stderr,
-            )
-            return 76
         print(f"public_download_cutover: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(result, sort_keys=True))

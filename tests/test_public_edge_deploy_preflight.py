@@ -4588,6 +4588,15 @@ def test_public_download_wrapper_passes_only_private_cloudflare_credentials_path
     assert '--cloudflare-credentials-file "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"' in branch
     assert '--cloudflare-account-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID"' in branch
     assert '--cloudflare-tunnel-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID"' in branch
+    assert "--manifest-closure-restoration-spec" in branch
+    assert "--final-gold-source" in branch
+    assert "--fleet-source" in branch
+    assert "--operation-root" in branch
+    assert "--delivery-phase" in branch
+    assert "--migration-state-root" not in branch
+    assert "--overlay-staging-root" not in branch
+    assert "--transaction-journal" not in branch
+    assert "--env-file" not in branch
     assert "--certificate-file" not in branch
     assert "--certificate-password-file" not in branch
     for secret_name in (
@@ -4602,6 +4611,8 @@ def test_public_download_wrapper_passes_only_private_cloudflare_credentials_path
     clean_env = branch.index('"$TRUSTED_ENV" -i')
     controller = branch.index('"$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER"')
     assert clean_env < controller
+    controller_environment = branch[clean_env:controller]
+    assert "HOME=" not in controller_environment
     assert "compose_cli stop" not in branch
     assert "docker stop" not in branch
 

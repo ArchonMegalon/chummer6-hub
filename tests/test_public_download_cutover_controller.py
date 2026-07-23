@@ -359,8 +359,16 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
         receipt_root,
     ):
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    journal = receipt_root / "journal.json"
+    operation_root = receipt_root / "chummer-public-download-recovery-test"
+    journal = receipt_root / f"{operation_root.name}.operation.json"
     journal.write_text("{}\n", encoding="utf-8")
+    journal.chmod(0o600)
+    credentials = tmp_path / "cloudflare.env"
+    credentials.write_text(
+        "CLOUDFLARE_API_TOKEN=test-token\n",
+        encoding="utf-8",
+    )
+    credentials.chmod(0o600)
     monkeypatch.setattr(
         controller,
         "CANONICAL_RELEASE_SHELF_ROOT",
@@ -380,13 +388,15 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
             "c" * 64,
             "--shelf-root",
             str(shelf),
-            "--migration-state-root",
-            str(missing / "state"),
             "--migration-candidate-root",
             str(missing / "candidate"),
             "--migration-authority",
             str(missing / "authority.json"),
             "--migration-authority-sha256",
+            sha,
+            "--manifest-closure-restoration-spec",
+            str(missing / "restoration.json"),
+            "--manifest-closure-restoration-spec-sha256",
             sha,
             "--release-channel-receipt",
             str(missing / "release.json"),
@@ -404,26 +414,26 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
             str(missing / "proof.json"),
             "--runtime-proof-sha256",
             sha,
-            "--certificate-file",
-            str(missing / "certificate.pfx"),
-            "--certificate-password-file",
-            str(missing / "certificate-password"),
-            "--overlay-root",
-            str(tmp_path / "overlay"),
-            "--overlay-staging-root",
-            str(tmp_path / "overlay-next"),
-            "--overlay-backup-root",
-            str(tmp_path / "overlay-backups"),
-            "--overlay-build-root",
-            str(tmp_path / "overlay-build"),
-            "--transaction-journal",
-            str(journal),
+            "--final-gold-source",
+            str(missing / "final-gold.json"),
+            "--final-gold-sha256",
+            sha,
+            "--fleet-source",
+            str(missing / "fleet-runtime"),
+            "--fleet-sha256",
+            sha,
+            "--operation-root",
+            str(operation_root),
             "--active-runtime-authority",
             str(receipt_root / "active.json"),
             "--docker-config-root",
             str(docker_config),
-            "--env-file",
-            str(missing / ".env"),
+            "--cloudflare-credentials-file",
+            str(credentials),
+            "--cloudflare-account-id",
+            "d" * 32,
+            "--cloudflare-tunnel-id",
+            "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
             "--receipt-root",
             str(receipt_root),
             "--base-url",
@@ -434,10 +444,14 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
             str(missing / "fleet"),
             "--design-product-root",
             str(missing / "design"),
+            "--delivery-phase",
+            "windows-preview",
         ]
     )
 
-    assert config.env_file == missing / ".env"
+    assert config.operation_root == operation_root
+    assert config.final_gold_source == missing / "final-gold.json"
+    assert config.fleet_source == missing / "fleet-runtime"
     assert config.build_context == missing / "build"
     assert config.fleet_media_contracts == missing / "fleet"
     assert config.design_product_root == missing / "design"
@@ -602,6 +616,13 @@ def test_wrapper_routes_public_profile_before_postgres_boundary() -> None:
     assert "initial-release-shelf-public-download-cutover-recover" in script
     assert "--migration-authority-sha256" in script
     assert "--runtime-proof-sha256" in script
+    assert "--manifest-closure-restoration-spec-sha256" in script
+    assert "--final-gold-sha256" in script
+    assert "--fleet-sha256" in script
+    assert "--operation-root" in script
+    assert "--delivery-phase" in script
+    assert "--transaction-journal" not in script[controller_branch:postgres_boundary]
+    assert "--env-file" not in script[controller_branch:postgres_boundary]
     assert 'if ((public_download_controller_status == 76)); then' in script
     assert "authenticated mutation lock retained" in script
     assert "if ((RECOVERY_ROUTE_REQUESTED == 0)); then" in script
