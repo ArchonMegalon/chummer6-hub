@@ -12,6 +12,9 @@ namespace Chummer.Tests;
 public sealed class InstallLinkingPostgresConnectionConfigurationTests
 {
     private const string ExpectedHost = "db.example.net";
+    private const string ExpectedDatabase = "chummer";
+    private const string ExpectedPort = "5432";
+    private const string ExpectedRuntimeRole = "install_linking_runtime";
     private const string ExpectedRootCertificate =
         InstallLinkingPostgresConnectionConfiguration.ExpectedRootCertificatePath;
     private const UnixFileMode OwnerFileMode =
@@ -253,14 +256,180 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         Assert.DoesNotContain(secret, failure.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("other_database", "5432")]
+    [InlineData("chummer", "5433")]
+    public void Production_runtime_rejects_database_or_port_substitution(
+        string database,
+        string port)
+    {
+        using CredentialFileFixture fixture = new();
+        fixture.Write(
+            $"Host={ExpectedHost};Database={database};Port={port};"
+            + "Username=runtime;Password=secret;"
+            + $"SSL Mode=VerifyFull;Root Certificate={ExpectedRootCertificate}",
+            OwnerFileMode);
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .RuntimeConnectionStringFileConfigurationKey,
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration
+                .ExpectedHostConfigurationKey,
+                ExpectedHost));
+
+        InvalidDataException failure = Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingPostgresConnectionConfiguration
+                .LoadRuntimeConnectionString(
+                    configuration,
+                    new ProductionHostEnvironment()));
+
+        Assert.Contains(
+            "reviewed authority",
+            failure.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Password=secret",
+            failure.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("-c session_replication_role=replica")]
+    [InlineData("--search_path=public")]
+    public void Runtime_connection_rejects_startup_session_options(
+        string options)
+    {
+        using CredentialFileFixture fixture = new();
+        fixture.Write(
+            $"Host={ExpectedHost};Database={ExpectedDatabase};Port={ExpectedPort};"
+            + "Username=runtime;Password=secret;"
+            + $"Options={options};SSL Mode=VerifyFull;"
+            + $"Root Certificate={ExpectedRootCertificate}",
+            OwnerFileMode);
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .RuntimeConnectionStringFileConfigurationKey,
+                fixture.Path),
+            (InstallLinkingPostgresConnectionConfiguration
+                .ExpectedHostConfigurationKey,
+                ExpectedHost));
+
+        InvalidDataException failure = Assert.Throws<InvalidDataException>(() =>
+            InstallLinkingPostgresConnectionConfiguration
+                .LoadRuntimeConnectionString(
+                    configuration,
+                    new ProductionHostEnvironment()));
+
+        Assert.Contains("session options", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Password=secret", failure.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("other-role")]
+    [InlineData("role with spaces")]
+    [InlineData("0starts_with_digit")]
+    public void Expected_runtime_role_rejects_missing_or_unsafe_names(
+        string value)
+    {
+        IConfiguration configuration = Configuration(
+            (InstallLinkingPostgresConnectionConfiguration
+                .ExpectedRuntimeRoleConfigurationKey,
+                value));
+
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            InstallLinkingPostgresConnectionConfiguration
+                .LoadExpectedRuntimeRole(configuration));
+
+        Assert.Contains(
+            InstallLinkingPostgresConnectionConfiguration
+                .ExpectedRuntimeRoleConfigurationKey,
+            failure.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Expected_runtime_role_is_loaded_as_an_exact_safe_name()
+    {
+        IConfiguration configuration = Configuration();
+
+        Assert.Equal(
+            ExpectedRuntimeRole,
+            InstallLinkingPostgresConnectionConfiguration
+                .LoadExpectedRuntimeRole(configuration));
+    }
+
+    [Theory]
+    [InlineData("leaf-dangling")]
+    [InlineData("ancestor-dangling")]
+    [InlineData("symlink-directory")]
+    public void Local_absence_proof_rejects_symlinked_leaf_or_ancestor(
+        string posture)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        string root = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"install-linking-absence-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string parent = System.IO.Path.Combine(root, "install-linking");
+            string store = System.IO.Path.Combine(parent, "store.json");
+            switch (posture)
+            {
+                case "leaf-dangling":
+                    Directory.CreateDirectory(parent);
+                    File.CreateSymbolicLink(
+                        store,
+                        System.IO.Path.Combine(root, "missing-store"));
+                    break;
+                case "ancestor-dangling":
+                    Directory.CreateSymbolicLink(
+                        parent,
+                        System.IO.Path.Combine(root, "missing-directory"));
+                    break;
+                case "symlink-directory":
+                    string target = System.IO.Path.Combine(root, "empty-target");
+                    Directory.CreateDirectory(target);
+                    Directory.CreateSymbolicLink(parent, target);
+                    break;
+            }
+
+            Assert.True(
+                InstallLinkingLocalStoreAbsenceProof
+                    .HasRetainedEntryOrUnsafeAncestor(store, root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static IConfiguration Configuration(
         params (string Key, string? Value)[] values)
-        => new ConfigurationBuilder()
-            .AddInMemoryCollection(values.ToDictionary(
-                static pair => pair.Key,
-                static pair => pair.Value,
-                StringComparer.Ordinal))
+    {
+        var selected = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [InstallLinkingPostgresConnectionConfiguration
+                .ExpectedDatabaseConfigurationKey] = ExpectedDatabase,
+            [InstallLinkingPostgresConnectionConfiguration
+                .ExpectedPortConfigurationKey] = ExpectedPort,
+            [InstallLinkingPostgresConnectionConfiguration
+                .ExpectedRuntimeRoleConfigurationKey] = ExpectedRuntimeRole
+        };
+        foreach ((string key, string? value) in values)
+        {
+            selected[key] = value;
+        }
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(selected)
             .Build();
+    }
 
     private sealed class CredentialFileFixture : IDisposable
     {

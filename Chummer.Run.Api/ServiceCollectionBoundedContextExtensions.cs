@@ -242,9 +242,13 @@ internal static class ServiceCollectionBoundedContextExtensions
                 InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
                     configuration,
                     environment)));
-            services.AddSingleton(static provider =>
+            string expectedRuntimeRole =
+                InstallLinkingPostgresConnectionConfiguration
+                    .LoadExpectedRuntimeRole(configuration);
+            services.AddSingleton(provider =>
                 new NpgsqlInstallLinkingSnapshotAuthority(
-                    provider.GetRequiredService<InstallLinkingPostgresRuntime>().DataSource));
+                    provider.GetRequiredService<InstallLinkingPostgresRuntime>().DataSource,
+                    expectedRuntimeRole: expectedRuntimeRole));
             services.AddSingleton(static provider =>
                 new InstallLinkingPostgresAuthorityCoordinator(
                     provider.GetRequiredService<NpgsqlInstallLinkingSnapshotAuthority>()));

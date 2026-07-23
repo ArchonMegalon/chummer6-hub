@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Cryptography;
+using System.Text;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -85,18 +86,30 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
     private readonly IInstallLinkingPostgresUnitOfWorkFactory _unitOfWorkFactory;
     private readonly InstallLinkingPostgresMigrator _migrator;
     private readonly TimeProvider _timeProvider;
+    private readonly string? _expectedRuntimeRole;
 
     public NpgsqlInstallLinkingSnapshotAuthority(
         NpgsqlDataSource dataSource,
         IInstallLinkingPostgresUnitOfWorkFactory? unitOfWorkFactory = null,
         InstallLinkingPostgresMigrator? migrator = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        string? expectedRuntimeRole = null)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
         _unitOfWorkFactory = unitOfWorkFactory
             ?? new NpgsqlInstallLinkingPostgresUnitOfWorkFactory(dataSource);
         _migrator = migrator ?? new InstallLinkingPostgresMigrator(dataSource);
         _timeProvider = timeProvider ?? TimeProvider.System;
+        if (expectedRuntimeRole is not null
+            && !InstallLinkingPostgresConnectionConfiguration.IsValidRuntimeRole(
+                expectedRuntimeRole))
+        {
+            throw new ArgumentException(
+                "The expected PostgreSQL runtime role is invalid.",
+                nameof(expectedRuntimeRole));
+        }
+
+        _expectedRuntimeRole = expectedRuntimeRole;
     }
 
     public async Task<InstallLinkingAuthoritativeEnvelope> ReadCurrentAsync(
@@ -220,8 +233,13 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
 
         try
         {
-            if (!await _migrator.ValidateCurrentRuntimePrivilegesAsync(
-                    cancellationToken))
+            bool runtimePrivilegesValid = _expectedRuntimeRole is null
+                ? await _migrator.ValidateCurrentRuntimePrivilegesAsync(
+                    cancellationToken)
+                : await _migrator.ValidateCurrentRuntimePrivilegesAsync(
+                    _expectedRuntimeRole,
+                    cancellationToken);
+            if (!runtimePrivilegesValid)
             {
                 return new(
                     false,
@@ -273,6 +291,72 @@ public sealed class NpgsqlInstallLinkingSnapshotAuthority : IInstallLinkingSnaps
                 "authority_invalid",
                 InstallLinkingPostgresSchema.CurrentVersion,
                 schema.AppliedVersion,
+                null,
+                checkedAt);
+        }
+    }
+
+    public async Task<InstallLinkingPostgresRuntimeAuthorityReadiness>
+        ProveRuntimeAuthorityReadinessAsync(
+            CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset checkedAt = _timeProvider.GetUtcNow();
+        if (_expectedRuntimeRole is null)
+        {
+            return new(
+                false,
+                "expected_runtime_role_missing",
+                false,
+                false,
+                null,
+                null,
+                checkedAt);
+        }
+
+        string runtimeRoleSha256 = Convert.ToHexString(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(_expectedRuntimeRole)))
+            .ToLowerInvariant();
+        try
+        {
+            InstallLinkingPostgresRuntimeRoleProof proof =
+                await _migrator.ProveCurrentRuntimeRoleAsync(
+                    _expectedRuntimeRole,
+                    cancellationToken);
+            return new(
+                proof.Valid,
+                proof.Code,
+                proof.CurrentRoleMatches,
+                proof.LeastPrivilegeValid,
+                runtimeRoleSha256,
+                string.IsNullOrWhiteSpace(proof.AuthorityIdentitySha256)
+                    ? null
+                    : proof.AuthorityIdentitySha256,
+                checkedAt);
+        }
+        catch (Exception exception) when (
+            IsUnavailablePersistenceFailure(exception))
+        {
+            return new(
+                false,
+                "postgres_unavailable",
+                false,
+                false,
+                runtimeRoleSha256,
+                null,
+                checkedAt);
+        }
+        catch (Exception exception) when (
+            exception is InvalidDataException
+                or CryptographicException
+                or InvalidOperationException)
+        {
+            return new(
+                false,
+                "authority_invalid",
+                false,
+                false,
+                runtimeRoleSha256,
                 null,
                 checkedAt);
         }

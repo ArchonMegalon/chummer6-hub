@@ -404,6 +404,49 @@ app.MapMethods("/api/ready/play-projection", new[] { HttpMethods.Get, HttpMethod
             ? StatusCodes.Status200OK
             : StatusCodes.Status503ServiceUnavailable);
 });
+app.MapMethods(
+    "/api/ready/install-linking-authority",
+    new[] { HttpMethods.Get, HttpMethods.Head },
+    async (
+        IServiceProvider services,
+        HttpContext context,
+        CancellationToken cancellationToken) =>
+    {
+        PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        NpgsqlInstallLinkingSnapshotAuthority? authority =
+            services.GetService<NpgsqlInstallLinkingSnapshotAuthority>();
+        InstallLinkingPostgresRuntimeAuthorityReadiness proof =
+            authority is null
+                ? new(
+                    false,
+                    "authority_not_configured",
+                    false,
+                    false,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow)
+                : await authority.ProveRuntimeAuthorityReadinessAsync(
+                    cancellationToken);
+        var response = new
+        {
+            authorityIdentitySha256 = proof.AuthorityIdentitySha256,
+            checkedAtUtc = proof.CheckedAtUtc,
+            code = proof.Code,
+            contractName =
+                "chummer.install_linking_postgres_runtime_authority_readiness.v1",
+            currentRoleMatches = proof.CurrentRoleMatches,
+            leastPrivilegeValid = proof.LeastPrivilegeValid,
+            ready = proof.Ready,
+            runtimeRoleSha256 = proof.RuntimeRoleSha256,
+            status = proof.Ready ? "pass" : "fail"
+        };
+        return Results.Json(
+            response,
+            statusCode: proof.Ready
+                ? StatusCodes.Status200OK
+                : StatusCodes.Status503ServiceUnavailable);
+    });
 app.MapMethods("/api/ready/publication", new[] { HttpMethods.Get, HttpMethods.Head }, async (
     HubDeepReadinessService readiness,
     CancellationToken cancellationToken) =>
