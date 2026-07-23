@@ -1,29 +1,13 @@
-# Wrapper-selected public-download serving profile. This file deliberately removes
-# every PostgreSQL authority input from the long-running portal. Account-linked and
-# personalized install operations therefore remain fail-closed while verified public
-# release bytes can use their independent serving-readiness contract.
+# Source-controlled selector for the generated public-download runtime. The
+# materializer validates this closure before it constructs the two-service runtime;
+# no inherited environment, dependency, host mapping, or mount survives implicitly.
 services:
   chummer-portal:
     profiles: ["public-downloads"]
+    env_file: !reset []
+    depends_on: !reset {}
     extra_hosts: !reset []
-    environment:
-      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: !reset null
-      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: !reset null
-      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: !reset null
-      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: !reset null
-      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: !reset null
-    volumes: !override
-      - ${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro
-      - chummer-run-api-state:/app/state
-      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
-      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
-      - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
-      - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
-      - chummer-release-upload-sessions:/release-upload-sessions
-      - chummer-windows-proof-store:/windows-proof-store
-      - chummer-windows-proof-upload-sessions:/windows-proof-upload-sessions
-      - ${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}:/public-projection:ro
-      - ${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
-      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
+    environment: !override {}
+    volumes: !override []
     healthcheck:
       test: ["CMD", "dotnet", "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll", "/api/ready/public-downloads"]

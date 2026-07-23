@@ -77,23 +77,24 @@ def environment_keys(service: dict[str, object]) -> set[str]:
     return keys
 
 
-def test_public_download_profile_removes_postgres_inputs_instead_of_blank_substitutes() -> None:
+def test_public_download_profile_closes_inherited_runtime_authority() -> None:
     base = portal(render_compose(BASE_COMPOSE))
     scoped = portal(render_compose(BASE_COMPOSE, PUBLIC_DOWNLOADS_COMPOSE))
 
     base_environment_keys = environment_keys(base)
     scoped_environment_keys = environment_keys(scoped)
     assert POSTGRES_ENVIRONMENT_KEYS <= base_environment_keys
-    assert POSTGRES_ENVIRONMENT_KEYS.isdisjoint(scoped_environment_keys)
+    assert scoped_environment_keys == set()
 
     base_targets = volume_targets(base)
     scoped_targets = volume_targets(scoped)
     assert POSTGRES_MOUNT_TARGETS <= base_targets
-    assert POSTGRES_MOUNT_TARGETS.isdisjoint(scoped_targets)
-    assert scoped_targets == base_targets - POSTGRES_MOUNT_TARGETS
+    assert scoped_targets == set()
 
     assert "extra_hosts" in base
     assert not scoped.get("extra_hosts")
+    assert not scoped.get("depends_on")
+    assert not scoped.get("env_file")
     assert scoped.get("profiles") == ["public-downloads"]
 
 

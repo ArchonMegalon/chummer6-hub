@@ -45,6 +45,105 @@ REMOVED_PORTAL_MOUNT_TARGETS = {
     "/run/chummer-secrets/install-linking-postgres-runtime.connection-string",
     "/run/chummer-secrets/install-linking-postgres-server-ca.pem",
 }
+INITIALIZER_SERVICE = "chummer-public-download-init"
+PORTAL_SERVICE = "chummer-portal"
+LOGICAL_VOLUMES = {
+    "public-download-state": "CHUMMER_PUBLIC_DOWNLOAD_STATE_VOLUME",
+    "public-download-upload-sessions": (
+        "CHUMMER_PUBLIC_DOWNLOAD_UPLOAD_SESSIONS_VOLUME"
+    ),
+    "public-download-windows-proof": (
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_VOLUME"
+    ),
+    "public-download-windows-proof-upload": (
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_UPLOAD_VOLUME"
+    ),
+    "public-download-runtime-secrets": (
+        "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_SECRETS_VOLUME"
+    ),
+    "public-download-projection": "CHUMMER_PUBLIC_DOWNLOAD_PROJECTION_VOLUME",
+    "public-download-proofs": "CHUMMER_PUBLIC_DOWNLOAD_PROOFS_VOLUME",
+    "public-download-shelf": "CHUMMER_PUBLIC_DOWNLOAD_SHELF_VOLUME",
+}
+PUBLIC_PORTAL_ENVIRONMENT = {
+    "ASPNETCORE_ENVIRONMENT": "Production",
+    "ASPNETCORE_HTTPS_PORT": "443",
+    "CHUMMER_ENABLE_HTTPS_REDIRECTION": "false",
+    "AllowedHosts": "chummer.run",
+    "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+    "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
+    "CHUMMER_PUBLIC_CANON_ROOT": "/app",
+    "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT": "/fleet-artifacts",
+    "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
+        "/app/state/data-protection-keys-v2"
+    ),
+    "CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH": (
+        "/run/chummer-secrets/data-protection-key-encryption.pfx"
+    ),
+    "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": (
+        "/run/chummer-secrets/data-protection-key-encryption.password"
+    ),
+    "CHUMMER_DOWNLOADS_SOURCE_ROOT": "/downloads-source",
+    "CHUMMER_RELEASE_UPLOAD_SESSION_ROOT": "/release-upload-sessions",
+    "CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED": "false",
+    "CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED": "false",
+    "CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED": "false",
+    "CHUMMER_WINDOWS_PROOF_ROOT": "/windows-proof-store",
+    "CHUMMER_WINDOWS_PROOF_UPLOAD_SESSION_ROOT": (
+        "/windows-proof-upload-sessions"
+    ),
+    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE": (
+        "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    ),
+    "CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE": (
+        "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    ),
+    "CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT": "/public-projection",
+    "CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_REQUIRED": "true",
+    "CHUMMER_PUBLIC_FINAL_GOLD_JANITOR_FILE": (
+        "/proofs/FINAL_GOLD_JANITOR.generated.json"
+    ),
+    "CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS": "false",
+    "CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER": "true",
+    "CHUMMER_PUBLIC_DOWNLOAD_ONLY": "true",
+}
+INITIALIZER_ENVIRONMENT = {
+    "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_INIT": "true",
+    "CHUMMER_PORTAL_UID": "1654",
+    "CHUMMER_PORTAL_GID": "1654",
+    "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256": (
+        "${CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256:"
+        "?Set the reviewed certificate SHA-256}"
+    ),
+    "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256": (
+        "${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256:"
+        "?Set the reviewed certificate-password SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256:"
+        "?Set the app-overlay tree SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256:"
+        "?Set the fleet tree SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256:"
+        "?Set the prevalidated active shelf tree SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": (
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256:"
+        "?Set the projection tree SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": (
+        "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256:"
+        "?Set the runtime-proof SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256:"
+        "?Set the final-gold SHA-256}"
+    ),
+}
 EXPECTED_BASE_HEALTHCHECK = {
     "test": [
         "CMD",
@@ -100,7 +199,6 @@ def validate_profile_source(
     source: Path,
     *,
     raw: bytes,
-    base_portal: dict[str, Any],
 ) -> str:
     try:
         text = raw.decode("utf-8")
@@ -108,25 +206,24 @@ def validate_profile_source(
         raise ValueError(
             "public-downloads Compose profile is unavailable or invalid"
         ) from exc
-    reset_list_line = "    extra_hosts: !reset []"
-    override_line = "    volumes: !override"
-    reset_null_suffix = ": !reset null"
+    replacements = {
+        "    env_file: !reset []": "    env_file: []",
+        "    depends_on: !reset {}": "    depends_on: {}",
+        "    extra_hosts: !reset []": "    extra_hosts: []",
+        "    environment: !override {}": "    environment: {}",
+        "    volumes: !override []": "    volumes: []",
+    }
     if (
-        text.count(reset_list_line) != 1
-        or text.count(override_line) != 1
-        or text.count(reset_null_suffix) != 5
-        or text.count("!reset") != 6
-        or text.count("!override") != 1
+        any(text.count(tagged) != 1 for tagged in replacements)
+        or text.count("!reset") != 3
+        or text.count("!override") != 2
     ):
         raise ValueError(
             "public-downloads Compose profile tag closure drifted"
         )
-    normalized_text = text.replace(reset_list_line, "    extra_hosts: []")
-    normalized_text = normalized_text.replace(
-        override_line,
-        "    volumes:",
-    )
-    normalized_text = normalized_text.replace(reset_null_suffix, ": null")
+    normalized_text = text
+    for tagged, normalized in replacements.items():
+        normalized_text = normalized_text.replace(tagged, normalized)
     try:
         payload = yaml.safe_load(normalized_text)
     except yaml.YAMLError as exc:
@@ -148,6 +245,8 @@ def validate_profile_source(
     )
     expected_fields = {
         "profiles",
+        "env_file",
+        "depends_on",
         "extra_hosts",
         "environment",
         "volumes",
@@ -157,38 +256,20 @@ def validate_profile_source(
         raise ValueError("public-downloads Compose profile portal fields drifted")
     if portal.get("profiles") != ["public-downloads"]:
         raise ValueError("public-downloads Compose profile selector drifted")
+    for name, expected in (
+        ("env_file", []),
+        ("depends_on", {}),
+        ("extra_hosts", []),
+        ("environment", {}),
+        ("volumes", []),
+    ):
+        if portal.get(name) != expected:
+            raise ValueError(
+                f"public-downloads {name} closure drifted"
+            )
     if portal.get("extra_hosts") != []:
         raise ValueError(
             "public-downloads extra_hosts reset contract drifted"
-        )
-    environment = require_mapping(
-        portal.get("environment"),
-        "public-downloads Compose profile environment",
-    )
-    expected_reset_environment = (
-        REMOVED_PORTAL_ENVIRONMENT
-        - {"CHUMMER_INSTALL_LINKING_STORE_PATH"}
-    )
-    if set(environment) != expected_reset_environment:
-        raise ValueError(
-            "public-downloads Compose profile PostgreSQL environment closure drifted"
-        )
-    for name, value in environment.items():
-        if value is not None:
-            raise ValueError(
-                f"public-downloads environment {name} reset contract drifted"
-            )
-    base_volumes = base_portal.get("volumes")
-    if not isinstance(base_volumes, list):
-        raise ValueError("canonical portal volumes must be a sequence")
-    expected_volumes = [
-        item
-        for item in base_volumes
-        if mount_target(item) not in REMOVED_PORTAL_MOUNT_TARGETS
-    ]
-    if portal.get("volumes") != expected_volumes:
-        raise ValueError(
-            "public-downloads volumes override contract drifted"
         )
     if portal.get("healthcheck") != PUBLIC_DOWNLOAD_PROFILE_HEALTHCHECK:
         raise ValueError("public-downloads Compose profile healthcheck drifted")
@@ -205,6 +286,112 @@ def _contains_install_linking_postgres(value: object) -> bool:
     if isinstance(value, list):
         return any(_contains_install_linking_postgres(item) for item in value)
     return isinstance(value, str) and "install-linking-postgres" in value.lower()
+
+
+def required_environment(name: str, description: str) -> str:
+    return f"${{{name}:?{description}}}"
+
+
+def initializer_mounts() -> list[str]:
+    return [
+        "public-download-state:/app/state",
+        "public-download-upload-sessions:/release-upload-sessions",
+        "public-download-windows-proof:/windows-proof-store",
+        (
+            "public-download-windows-proof-upload:"
+            "/windows-proof-upload-sessions"
+        ),
+        "public-download-runtime-secrets:/run/chummer-secrets",
+        "public-download-projection:/public-projection-staging",
+        "public-download-proofs:/proofs-staging",
+        "public-download-shelf:/downloads-source",
+        (
+            required_environment(
+                "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE",
+                "Set the reviewed PKCS#12 certificate source",
+            )
+            + ":/runtime-inputs/data-protection-key-encryption.pfx:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE",
+                "Set the reviewed certificate-password source",
+            )
+            + ":/runtime-inputs/data-protection-key-encryption.password:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR",
+                "Set the immutable portal app overlay",
+            )
+            + ":/runtime-inputs/app:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE",
+                "Set the immutable fleet/static source",
+            )
+            + ":/runtime-inputs/fleet:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SOURCE",
+                "Set the prevalidated active release shelf",
+            )
+            + ":/runtime-inputs/shelf:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT",
+                "Set the authenticated projection source",
+            )
+            + ":/runtime-inputs/projection:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE",
+                "Set the authenticated runtime proof",
+            )
+            + ":/runtime-inputs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro"
+        ),
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE",
+                "Set the reviewed final-gold handoff",
+            )
+            + ":/runtime-inputs/FINAL_GOLD_JANITOR.generated.json:ro"
+        ),
+    ]
+
+
+def portal_mounts() -> list[str]:
+    return [
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR",
+                "Set the immutable portal app overlay",
+            )
+            + ":/app:ro"
+        ),
+        "public-download-state:/app/state",
+        "public-download-runtime-secrets:/run/chummer-secrets:ro",
+        (
+            required_environment(
+                "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE",
+                "Set the immutable fleet/static source",
+            )
+            + ":/fleet-artifacts:ro"
+        ),
+        "public-download-shelf:/downloads-source:ro",
+        "public-download-upload-sessions:/release-upload-sessions",
+        "public-download-windows-proof:/windows-proof-store",
+        (
+            "public-download-windows-proof-upload:"
+            "/windows-proof-upload-sessions"
+        ),
+        "public-download-projection:/public-projection:ro",
+        "public-download-proofs:/proofs:ro",
+    ]
 
 
 def materialize(
@@ -227,45 +414,36 @@ def materialize(
     missing_services = REMOVED_SERVICES.difference(services)
     if missing_services:
         raise ValueError("canonical Compose source lost a PostgreSQL service")
-    for service_name in REMOVED_SERVICES:
-        del services[service_name]
 
-    portal = require_mapping(services.get("chummer-portal"), "portal service")
-    initializer = require_mapping(
+    base_portal = require_mapping(
+        services.get(PORTAL_SERVICE),
+        "portal service",
+    )
+    base_initializer = require_mapping(
         services.get("chummer-portal-volume-init"),
         "portal initializer service",
     )
-    if portal.get("image") != "chummer-run-api:local" or "build" not in portal:
+    if (
+        base_portal.get("image") != "chummer-run-api:local"
+        or "build" not in base_portal
+    ):
         raise ValueError("canonical portal image/build contract drifted")
-    if initializer.get("image") != "chummer-run-api:local":
+    if base_initializer.get("image") != "chummer-run-api:local":
         raise ValueError("canonical portal initializer image contract drifted")
     profile_sha256 = validate_profile_source(
         profile_source,
         raw=profile_raw,
-        base_portal=portal,
     )
-    portal["image"] = candidate_image_id
-    del portal["build"]
-    if "depends_on" not in portal:
+    if "depends_on" not in base_portal:
         raise ValueError("canonical portal dependency contract drifted")
-    del portal["depends_on"]
-
-    environment = require_mapping(
-        portal.get("environment"),
+    base_environment = require_mapping(
+        base_portal.get("environment"),
         "portal environment",
     )
-    if not REMOVED_PORTAL_ENVIRONMENT.issubset(environment):
+    if not REMOVED_PORTAL_ENVIRONMENT.issubset(base_environment):
         raise ValueError("canonical portal PostgreSQL environment contract drifted")
-    for name in REMOVED_PORTAL_ENVIRONMENT:
-        del environment[name]
-    layout_required, migration_allowed = POSTURES[operation]
-    environment["CHUMMER_PUBLIC_DOWNLOAD_ONLY"] = "true"
-    environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
-    environment["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = (
-        migration_allowed
-    )
 
-    extra_hosts = portal.get("extra_hosts")
+    extra_hosts = base_portal.get("extra_hosts")
     if (
         not isinstance(extra_hosts, list)
         or len(extra_hosts) != 2
@@ -274,9 +452,8 @@ def materialize(
         or "CHUMMER_INSTALL_LINKING_POSTGRES_IP" not in str(extra_hosts[1])
     ):
         raise ValueError("canonical portal PostgreSQL host mapping contract drifted")
-    del portal["extra_hosts"]
 
-    volumes = portal.get("volumes")
+    volumes = base_portal.get("volumes")
     if not isinstance(volumes, list):
         raise ValueError("canonical portal volumes must be a sequence")
     observed_removed_targets = {
@@ -286,46 +463,87 @@ def materialize(
     }
     if observed_removed_targets != REMOVED_PORTAL_MOUNT_TARGETS:
         raise ValueError("canonical portal PostgreSQL mount contract drifted")
-    portal["volumes"] = [
-        item
-        for item in volumes
-        if mount_target(item) not in REMOVED_PORTAL_MOUNT_TARGETS
-    ]
 
-    if portal.get("healthcheck") != EXPECTED_BASE_HEALTHCHECK:
+    if base_portal.get("healthcheck") != EXPECTED_BASE_HEALTHCHECK:
         raise ValueError("canonical portal healthcheck contract drifted")
-    portal["healthcheck"] = PUBLIC_DOWNLOAD_HEALTHCHECK
-    portal["profiles"] = ["public-downloads"]
-
-    root_volumes = require_mapping(
-        root.get("volumes"),
-        "canonical Compose volumes",
-    )
-    named_volumes = {
-        mount_source(item)
-        for item in portal["volumes"]
-        if mount_source(item)
-        and not mount_source(item).startswith(("/", ".", "${"))
-    }
-    if not named_volumes or not named_volumes.issubset(root_volumes):
-        raise ValueError("canonical portal named-volume closure drifted")
+    if base_portal.get("cap_drop") != ["ALL"] or base_portal.get(
+        "security_opt"
+    ) != ["no-new-privileges:true"]:
+        raise ValueError("canonical portal security contract drifted")
     portal_networks = require_mapping(
-        portal.get("networks"),
+        base_portal.get("networks"),
         "canonical portal networks",
     )
     root_networks = require_mapping(
         root.get("networks"),
         "canonical Compose networks",
     )
-    if not portal_networks or not set(portal_networks).issubset(root_networks):
+    if (
+        set(portal_networks) != {"public-origin", "fleet-origin", "ea-origin"}
+        or not set(portal_networks).issubset(root_networks)
+    ):
         raise ValueError("canonical portal network closure drifted")
-    root = {
-        "services": {"chummer-portal": portal},
-        "volumes": {
-            name: root_volumes[name] for name in sorted(named_volumes)
+
+    layout_required, migration_allowed = POSTURES[operation]
+    environment = dict(PUBLIC_PORTAL_ENVIRONMENT)
+    environment["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"] = layout_required
+    environment["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = (
+        migration_allowed
+    )
+    portal = {
+        "image": candidate_image_id,
+        "restart": "unless-stopped",
+        "user": "1654:1654",
+        "cap_drop": ["ALL"],
+        "security_opt": ["no-new-privileges:true"],
+        "ulimits": {"core": 0},
+        "depends_on": {
+            INITIALIZER_SERVICE: {
+                "condition": "service_completed_successfully",
+            }
         },
-        "networks": {
-            name: root_networks[name] for name in portal_networks
+        "environment": environment,
+        "volumes": portal_mounts(),
+        "ports": ["172.17.0.1:18091:8080"],
+        "healthcheck": PUBLIC_DOWNLOAD_HEALTHCHECK,
+        "mem_limit": "${CHUMMER_PORTAL_MEMORY_LIMIT:-1536m}",
+        "cpu_shares": 256,
+        "cpus": "${CHUMMER_PORTAL_CPUS:-1.00}",
+        "network_mode": "bridge",
+        "profiles": ["public-downloads"],
+    }
+    initializer = {
+        "image": candidate_image_id,
+        "profiles": ["public-downloads"],
+        "restart": "no",
+        "user": "0:0",
+        "read_only": True,
+        "cap_drop": ["ALL"],
+        "cap_add": ["CHOWN", "SETUID", "SETGID", "DAC_READ_SEARCH"],
+        "security_opt": ["no-new-privileges:true"],
+        "network_mode": "none",
+        "ulimits": {"core": 0},
+        "pids_limit": 64,
+        "environment": INITIALIZER_ENVIRONMENT,
+        "entrypoint": [
+            "/usr/local/libexec/chummer/initialize-public-edge-volumes.sh"
+        ],
+        "volumes": initializer_mounts(),
+    }
+    root = {
+        "services": {
+            INITIALIZER_SERVICE: initializer,
+            PORTAL_SERVICE: portal,
+        },
+        "volumes": {
+            logical_name: {
+                "external": True,
+                "name": required_environment(
+                    environment_name,
+                    f"Set the operation-bound {logical_name} volume",
+                ),
+            }
+            for logical_name, environment_name in LOGICAL_VOLUMES.items()
         },
     }
     if _contains_install_linking_postgres(root):

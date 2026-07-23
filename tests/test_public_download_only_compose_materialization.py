@@ -14,6 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 MATERIALIZER = ROOT / "scripts" / "materialize_public_download_only_compose.py"
 VALIDATOR = ROOT / "scripts" / "validate_public_download_only_compose_runtime.py"
+INITIALIZER = ROOT / "scripts" / "initialize-public-edge-volumes.sh"
 BASE_COMPOSE = ROOT / "docker-compose.public-edge.yml"
 PROFILE_COMPOSE = ROOT / "docker-compose.public-downloads.yml"
 CANDIDATE_IMAGE_ID = "sha256:" + ("1" * 64)
@@ -28,9 +29,32 @@ SOURCE_HEAD = subprocess.run(
 CERTIFICATE_SOURCE = "/tmp/cert.pfx"
 CERTIFICATE_PASSWORD_SOURCE = "/tmp/cert.pass"
 RUNTIME_PROOF_SOURCE = "/tmp/proof.json"
-PROJECTION_SOURCE = (
-    "/docker/chummercomplete/chummer.run-services/.codex-studio/published"
-)
+APP_OVERLAY_SOURCE = "/tmp/public-download-app"
+FLEET_SOURCE = "/tmp/public-download-fleet"
+SHELF_SOURCE = "/tmp/public-download-shelf"
+PROJECTION_SOURCE = "/tmp/public-download-projection"
+FINAL_GOLD_SOURCE = "/tmp/final-gold.json"
+PROJECT_NAME = "public-download-op-1234"
+DIGESTS = {
+    "certificate": "2" * 64,
+    "certificate_password": "3" * 64,
+    "app_overlay": "4" * 64,
+    "fleet": "5" * 64,
+    "shelf": "6" * 64,
+    "projection": "7" * 64,
+    "runtime_proof": "8" * 64,
+    "final_gold": "9" * 64,
+}
+VOLUMES = {
+    "state": "public-download-op-state",
+    "upload_sessions": "public-download-op-upload-sessions",
+    "windows_proof": "public-download-op-windows-proof",
+    "windows_proof_upload": "public-download-op-windows-proof-upload",
+    "runtime_secrets": "public-download-op-runtime-secrets",
+    "projection": "public-download-op-projection",
+    "proofs": "public-download-op-proofs",
+    "shelf": "public-download-op-shelf",
+}
 
 
 def materialize(
@@ -79,8 +103,42 @@ def render(output: Path) -> str:
         "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": (
             CERTIFICATE_PASSWORD_SOURCE
         ),
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256": DIGESTS["certificate"],
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256": (
+            DIGESTS["certificate_password"]
+        ),
+        "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR": APP_OVERLAY_SOURCE,
+        "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": DIGESTS["app_overlay"],
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE": FLEET_SOURCE,
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": DIGESTS["fleet"],
+        "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SOURCE": SHELF_SOURCE,
+        "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": DIGESTS["shelf"],
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": PROJECTION_SOURCE,
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": (
+            DIGESTS["projection"]
+        ),
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": RUNTIME_PROOF_SOURCE,
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": (
+            DIGESTS["runtime_proof"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE": FINAL_GOLD_SOURCE,
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256": DIGESTS["final_gold"],
+        "CHUMMER_PUBLIC_DOWNLOAD_STATE_VOLUME": VOLUMES["state"],
+        "CHUMMER_PUBLIC_DOWNLOAD_UPLOAD_SESSIONS_VOLUME": (
+            VOLUMES["upload_sessions"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_VOLUME": (
+            VOLUMES["windows_proof"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_WINDOWS_PROOF_UPLOAD_VOLUME": (
+            VOLUMES["windows_proof_upload"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_SECRETS_VOLUME": (
+            VOLUMES["runtime_secrets"]
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_PROJECTION_VOLUME": VOLUMES["projection"],
+        "CHUMMER_PUBLIC_DOWNLOAD_PROOFS_VOLUME": VOLUMES["proofs"],
+        "CHUMMER_PUBLIC_DOWNLOAD_SHELF_VOLUME": VOLUMES["shelf"],
     }
     return subprocess.run(
         [
@@ -89,7 +147,7 @@ def render(output: Path) -> str:
             "-f",
             str(output),
             "--project-name",
-            "chummer6-hub",
+            PROJECT_NAME,
             "--profile",
             "public-downloads",
             "config",
@@ -116,6 +174,8 @@ def validate(
         [
             sys.executable,
             str(VALIDATOR),
+            "--project-name",
+            PROJECT_NAME,
             "--operation",
             OPERATION,
             "--source-root",
@@ -128,12 +188,54 @@ def validate(
             str(receipt),
             "--candidate-image-id",
             CANDIDATE_IMAGE_ID,
+            "--shelf-source",
+            SHELF_SOURCE,
+            "--shelf-sha256",
+            DIGESTS["shelf"],
             "--certificate-source",
             CERTIFICATE_SOURCE,
             "--certificate-password-source",
             CERTIFICATE_PASSWORD_SOURCE,
+            "--certificate-sha256",
+            DIGESTS["certificate"],
+            "--certificate-password-sha256",
+            DIGESTS["certificate_password"],
+            "--app-overlay-source",
+            APP_OVERLAY_SOURCE,
+            "--app-overlay-sha256",
+            DIGESTS["app_overlay"],
+            "--fleet-source",
+            FLEET_SOURCE,
+            "--fleet-sha256",
+            DIGESTS["fleet"],
+            "--projection-source",
+            PROJECTION_SOURCE,
+            "--projection-sha256",
+            DIGESTS["projection"],
             "--runtime-proof-source",
             RUNTIME_PROOF_SOURCE,
+            "--runtime-proof-sha256",
+            DIGESTS["runtime_proof"],
+            "--final-gold-source",
+            FINAL_GOLD_SOURCE,
+            "--final-gold-sha256",
+            DIGESTS["final_gold"],
+            "--state-volume",
+            VOLUMES["state"],
+            "--upload-sessions-volume",
+            VOLUMES["upload_sessions"],
+            "--windows-proof-volume",
+            VOLUMES["windows_proof"],
+            "--windows-proof-upload-volume",
+            VOLUMES["windows_proof_upload"],
+            "--runtime-secrets-volume",
+            VOLUMES["runtime_secrets"],
+            "--projection-volume",
+            VOLUMES["projection"],
+            "--proofs-volume",
+            VOLUMES["proofs"],
+            "--shelf-volume",
+            VOLUMES["shelf"],
             "--output",
             str(tmp_path / "runtime-attestation.json"),
         ],
@@ -145,7 +247,7 @@ def validate(
     )
 
 
-def test_materialized_runtime_is_exact_portal_only_build_free_closure(
+def test_materialized_runtime_is_exact_isolated_portal_and_initializer_closure(
     tmp_path: Path,
 ) -> None:
     output, receipt = materialize(tmp_path)
@@ -153,13 +255,41 @@ def test_materialized_runtime_is_exact_portal_only_build_free_closure(
 
     assert stat.S_IMODE(output.stat().st_mode) == 0o600
     assert stat.S_IMODE(receipt.stat().st_mode) == 0o600
-    assert set(payload["services"]) == {"chummer-portal"}
+    assert set(payload["services"]) == {
+        "chummer-portal",
+        "chummer-public-download-init",
+    }
     portal = payload["services"]["chummer-portal"]
+    initializer = payload["services"]["chummer-public-download-init"]
     assert portal["image"] == CANDIDATE_IMAGE_ID
+    assert initializer["image"] == CANDIDATE_IMAGE_ID
     assert "build" not in portal
-    assert "depends_on" not in portal
+    assert "build" not in initializer
+    assert "env_file" not in portal
     assert "extra_hosts" not in portal
+    assert "group_add" not in portal
+    assert portal["network_mode"] == "bridge"
+    assert portal["ports"] == ["172.17.0.1:18091:8080"]
+    assert "public-download-shelf:/downloads-source:ro" in portal["volumes"]
+    assert portal["environment"]["CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED"] == (
+        "false"
+    )
+    assert not any("TOKEN" in key for key in portal["environment"])
+    assert portal["depends_on"] == {
+        "chummer-public-download-init": {
+            "condition": "service_completed_successfully"
+        }
+    }
     assert portal["profiles"] == ["public-downloads"]
+    assert initializer["profiles"] == ["public-downloads"]
+    assert initializer["network_mode"] == "none"
+    assert initializer["read_only"] is True
+    assert initializer["cap_add"] == [
+        "CHOWN",
+        "SETUID",
+        "SETGID",
+        "DAC_READ_SEARCH",
+    ]
     assert portal["healthcheck"]["test"] == [
         "CMD",
         "dotnet",
@@ -172,6 +302,20 @@ def test_materialized_runtime_is_exact_portal_only_build_free_closure(
     serialized = json.dumps(payload, sort_keys=True).lower()
     assert "install-linking-postgres" not in serialized
     assert "chummer_install_linking_postgres" not in serialized
+    assert set(payload["volumes"]) == {
+        "public-download-state",
+        "public-download-upload-sessions",
+        "public-download-windows-proof",
+        "public-download-windows-proof-upload",
+        "public-download-runtime-secrets",
+        "public-download-projection",
+        "public-download-proofs",
+        "public-download-shelf",
+    }
+    assert all(
+        volume["external"] is True
+        for volume in payload["volumes"].values()
+    )
     assert (
         portal["environment"]["CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED"]
         == "true"
@@ -188,20 +332,44 @@ def test_materialized_runtime_is_exact_portal_only_build_free_closure(
     assert authority["candidateImageId"] == CANDIDATE_IMAGE_ID
 
 
+def test_initializer_requires_and_seals_a_committed_active_shelf() -> None:
+    script = INITIALIZER.read_text(encoding="utf-8")
+
+    assert "require_active_release_shelf \"$source\"" in script
+    assert "require_active_release_shelf \"$destination\"" in script
+    assert ".release-shelf-layout-v1" in script
+    assert ".release-shelf-writer-policy.json" in script
+    assert ".release-shelf-activation-journal/$receipt_id" in script
+    assert "targetPointerBase64" in script
+    assert "cmp -s - \"$root/current.json\"" in script
+    assert '"state"[[:space:]]*:[[:space:]]*"committed"' in script
+    assert "chown -R 0:0 -- \"$destination\"" in script
+    assert "chmod 0444" in script
+    assert "chmod 0555" in script
+
+
 def test_materialized_runtime_survives_real_compose_render_and_attestation(
     tmp_path: Path,
 ) -> None:
     output, receipt = materialize(tmp_path)
     rendered = render(output)
     payload = json.loads(rendered)
-    assert set(payload["services"]) == {"chummer-portal"}
+    assert set(payload["services"]) == {
+        "chummer-portal",
+        "chummer-public-download-init",
+    }
     validate(tmp_path, output=output, receipt=receipt, rendered=rendered)
     attestation = tmp_path / "runtime-attestation.json"
     receipt = json.loads(attestation.read_text(encoding="utf-8"))
     assert receipt["status"] == "pass"
     assert receipt["portalBuildAbsent"] is True
-    assert receipt["toolImage"] is None
+    assert receipt["initializerImageId"] == CANDIDATE_IMAGE_ID
+    assert receipt["projectName"] == PROJECT_NAME
+    assert receipt["publishedAddress"] == "172.17.0.1"
+    assert receipt["publishedPort"] == 18091
     assert receipt["portalImageId"] == CANDIDATE_IMAGE_ID
+    assert receipt["releaseShelfPreinitialized"] is True
+    assert receipt["releaseShelfPortalReadOnly"] is True
     assert receipt["sourceHead"] == SOURCE_HEAD
 
 
@@ -343,11 +511,11 @@ def test_materializer_rejects_working_source_drift(tmp_path: Path) -> None:
             "mount authority drifted",
         ),
         (
-            lambda payload: payload["networks"]["public-origin"].__setitem__(
-                "name",
-                "rogue-public",
+            lambda payload: payload["services"]["chummer-portal"].__setitem__(
+                "network_mode",
+                "host",
             ),
-            "external network authority drifted",
+            "isolated network contract drifted",
         ),
         (
             lambda payload: payload["services"]["chummer-portal"].__setitem__(
@@ -357,7 +525,7 @@ def test_materializer_rejects_working_source_drift(tmp_path: Path) -> None:
             "portal field closure drifted",
         ),
         (
-            lambda payload: payload["volumes"]["chummer-run-api-state"].__setitem__(
+            lambda payload: payload["volumes"]["public-download-state"].__setitem__(
                 "name",
                 "rogue-state",
             ),
@@ -367,7 +535,13 @@ def test_materializer_rejects_working_source_drift(tmp_path: Path) -> None:
             lambda payload: payload["services"]["chummer-portal"][
                 "environment"
             ].__setitem__("ASPNETCORE_ENVIRONMENT", "Development"),
-            "ASPNETCORE_ENVIRONMENT authority drifted",
+            "environment allowlist drifted",
+        ),
+        (
+            lambda payload: payload["services"][
+                "chummer-public-download-init"
+            ].__setitem__("cap_add", ["CHOWN", "SYS_ADMIN"]),
+            "initializer capability closure drifted",
         ),
     ],
 )
