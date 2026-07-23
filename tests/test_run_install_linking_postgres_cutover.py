@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import copy
 from dataclasses import replace
 import importlib.util
@@ -85,6 +86,53 @@ def make_runner(module, tmp_path: Path, commands: FakeCommands):
     runner.public_network_name = "chummer5a_default"
     runner.public_network_id = NETWORK_ID
     return runner
+
+
+def make_pinned_final_bind_runner(module, tmp_path: Path):
+    commands = FakeCommands(lambda *_args: module.CommandResult(0, b"", b""))
+    base = make_runner(module, tmp_path, commands)
+    source = base.inputs.source_root
+    scripts = source / "scripts"
+    scripts.mkdir()
+    shutil.copyfile(
+        ROOT / "docker-compose.public-edge.yml",
+        base.inputs.compose_file,
+    )
+    shutil.copyfile(SCRIPT, scripts / SCRIPT.name)
+    base.inputs.env_file.write_text(
+        "FINAL_BIND_AUTHORITY=canonical\n",
+        encoding="utf-8",
+    )
+    base.inputs.env_file.chmod(0o600)
+    inputs = replace(
+        base.inputs,
+        compose_sha256=module.hash_regular_file(
+            base.inputs.compose_file,
+            owner_only=False,
+        ),
+        env_sha256=module.hash_regular_file(
+            base.inputs.env_file,
+            owner_only=True,
+        ),
+        runner_sha256=module.hash_regular_file(
+            scripts / SCRIPT.name,
+            owner_only=False,
+        ),
+    )
+
+    class Harness(module.GovernedCutoverRunner):
+        def _validate_build_workspace_paths(self):
+            return None
+
+        def _validate_source(self):
+            self._bind_pinned_source_inputs()
+
+        def _validate_rendered_compose(self, **_kwargs):
+            return None
+
+    runner = Harness(inputs, command_runner=commands)
+    runner._write_build_override()
+    return runner, commands
 
 
 def make_synthetic_runner(module, tmp_path: Path, commands: FakeCommands):
@@ -1023,7 +1071,7 @@ def test_candidate_build_rejects_external_source_drift_during_build(
         def _validate_rendered_compose(self):
             return None
 
-        def _revalidate_compose_inputs(self, **_kwargs):
+        def _final_bind_compose_inputs(self, **_kwargs):
             return None
 
     commands = FakeCommands(
@@ -1403,7 +1451,7 @@ def test_start_latency_consumes_the_single_monotonic_job_budget(
             path = self.inputs.receipt_root / "job-receipt.json"
             return path, "f" * 64
 
-        def _revalidate_compose_inputs(self, **_kwargs):
+        def _final_bind_compose_inputs(self, **_kwargs):
             return None
 
     commands = FakeCommands(callback)
@@ -2033,7 +2081,7 @@ def test_runtime_rendered_compose_rejects_every_unreviewed_build_selector(
     assert failures
 
 
-def test_compose_input_revalidation_binds_every_effective_file_twice(
+def test_compose_input_final_bind_covers_every_effective_file(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -2052,6 +2100,9 @@ def test_compose_input_revalidation_binds_every_effective_file_twice(
         def _validate_rendered_compose(self, **kwargs):
             events.append(("rendered", kwargs))
 
+        def _bind_pinned_source_inputs(self):
+            events.append("pinned-source-inputs")
+
     base = make_runner(
         module,
         tmp_path,
@@ -2061,7 +2112,7 @@ def test_compose_input_revalidation_binds_every_effective_file_twice(
     override = tmp_path / "job.override.json"
     command = ("prove-empty-authority",)
 
-    runner._revalidate_compose_inputs(
+    runner._final_bind_compose_inputs(
         job_override=override,
         job_service="chummer-install-linking-postgres-runtime-proof",
         job_command=command,
@@ -2075,6 +2126,7 @@ def test_compose_input_revalidation_binds_every_effective_file_twice(
         "job-override",
         "rendered",
         "source",
+        "pinned-source-inputs",
         "build-override",
         "job-override",
     ]
@@ -2089,6 +2141,89 @@ def test_compose_input_revalidation_binds_every_effective_file_twice(
             )
         },
     }
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error"),
+    (
+        ("base-compose", "independently pinned cutover input digest drifted"),
+        ("canonical-env", "independently pinned cutover input digest drifted"),
+        ("build-override", "retained cutover image override identity drifted"),
+        ("job-override", "generated job Compose override identity drifted"),
+    ),
+)
+def test_final_bind_rejects_base_env_or_override_mutated_during_provenance(
+    tmp_path: Path,
+    mutation: str,
+    expected_error: str,
+) -> None:
+    module = load_module()
+    runner, commands = make_pinned_final_bind_runner(module, tmp_path)
+    service = "chummer-install-linking-postgres-runtime-proof"
+    command = ("prove-empty-authority",)
+    override, container_name, project = runner._job_override(
+        job_name="final-bind-proof",
+        service=service,
+        command=command,
+    )
+    bind_arguments = {
+        "job_override": override,
+        "job_service": service,
+        "job_command": command,
+        "container_name": container_name,
+        "project": project,
+    }
+    runner._final_bind_compose_inputs(**bind_arguments)
+    provenance_events: list[str] = []
+
+    def capture_with_mutation():
+        provenance_events.append("source-provenance")
+        if mutation == "base-compose":
+            runner.inputs.compose_file.write_bytes(
+                runner.inputs.compose_file.read_bytes()
+                + b"\n# changed during provenance\n"
+            )
+        elif mutation == "canonical-env":
+            runner.inputs.env_file.write_text(
+                "FINAL_BIND_AUTHORITY=changed-during-provenance\n",
+                encoding="utf-8",
+            )
+        elif mutation == "build-override":
+            payload = runner._build_override_payload()
+            portal = payload["services"]["chummer-portal"]
+            assert isinstance(portal, dict)
+            portal["pull_policy"] = "always"
+            module.write_private_json(
+                runner.build_override,
+                payload,
+                replace=True,
+            )
+        elif mutation == "job-override":
+            payload = runner._job_override_payload(
+                service=service,
+                command=command,
+                container_name=container_name,
+            )
+            job = payload["services"][service]
+            assert isinstance(job, dict)
+            job["pull_policy"] = "always"
+            module.write_private_json(
+                override,
+                payload,
+                replace=True,
+            )
+        else:  # pragma: no cover - the parameter set above is closed.
+            raise AssertionError(f"unhandled mutation: {mutation}")
+        return {}
+
+    runner._capture_build_source_provenance = capture_with_mutation
+    runner._capture_build_source_provenance()
+
+    with pytest.raises(module.CutoverError, match=expected_error):
+        runner._final_bind_compose_inputs(**bind_arguments)
+
+    assert provenance_events == ["source-provenance"]
+    assert commands.calls == []
 
 
 def test_generated_job_override_is_exactly_sealed_before_create(
@@ -2135,7 +2270,7 @@ def test_generated_job_override_is_exactly_sealed_before_create(
         )
 
 
-def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
+def test_build_and_create_dispatches_are_immediately_preceded_by_final_bind(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -2152,12 +2287,16 @@ def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
         def _resolve_image(self, _tag, *, allow_absent=False):
             return ""
 
-        def _revalidate_compose_inputs(self, **_kwargs):
-            build_events.append("revalidate")
+        def _final_bind_compose_inputs(self, **_kwargs):
+            build_events.append("final-bind")
 
         def _capture_build_source_provenance(self):
             build_events.append("source-provenance")
             return {}
+
+        def _compose(self, *arguments, **kwargs):
+            build_events.append("compose-command")
+            return super()._compose(*arguments, **kwargs)
 
     def build_callback(_arguments, _timeout, _check):
         build_events.append("compose-build")
@@ -2175,8 +2314,9 @@ def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
     with pytest.raises(StopAtCompose):
         build_runner._build_candidates()
     assert build_events == [
-        "revalidate",
         "source-provenance",
+        "compose-command",
+        "final-bind",
         "compose-build",
     ]
 
@@ -2199,8 +2339,12 @@ def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
                 "chummer6-ilpg-test",
             )
 
-        def _revalidate_compose_inputs(self, **_kwargs):
-            create_events.append("revalidate")
+        def _final_bind_compose_inputs(self, **_kwargs):
+            create_events.append("final-bind")
+
+        def _compose(self, *arguments, **kwargs):
+            create_events.append("compose-command")
+            return super()._compose(*arguments, **kwargs)
 
     create_commands = FakeCommands(create_callback)
     create_root = tmp_path / "create"
@@ -2220,7 +2364,122 @@ def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
                 "chummer.install_linking_postgres_empty_authority_proof.v1"
             ),
         )
-    assert create_events == ["revalidate", "compose-create"]
+    assert create_events == [
+        "compose-command",
+        "final-bind",
+        "compose-create",
+    ]
+    source_tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    runner_class = next(
+        node
+        for node in source_tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name == "GovernedCutoverRunner"
+    )
+    for method_name, command_name in (
+        ("_build_candidates", "build_command"),
+        ("_run_job", "create_command"),
+    ):
+        method = next(
+            node
+            for node in runner_class.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == method_name
+        )
+        final_bind_index = next(
+            index
+            for index, statement in enumerate(method.body)
+            if isinstance(statement, ast.Expr)
+            and isinstance(statement.value, ast.Call)
+            and isinstance(statement.value.func, ast.Attribute)
+            and statement.value.func.attr == "_final_bind_compose_inputs"
+        )
+        dispatch = method.body[final_bind_index + 1]
+        assert isinstance(dispatch, ast.Expr)
+        assert isinstance(dispatch.value, ast.Call)
+        assert isinstance(dispatch.value.func, ast.Attribute)
+        assert dispatch.value.func.attr == "run"
+        assert dispatch.value.args
+        assert isinstance(dispatch.value.args[0], ast.Name)
+        assert dispatch.value.args[0].id == command_name
+
+
+def test_compose_explicit_canonical_env_file_ignores_synthetic_root_dotenv(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    base = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    source = base.inputs.source_root
+    base.inputs.compose_file.write_text(
+        "services:\n"
+        "  probe:\n"
+        '    image: "alpine:${FINAL_BIND_ENV_AUTHORITY:'
+        '?canonical env required}"\n',
+        encoding="utf-8",
+    )
+    (source / ".env").write_text(
+        "FINAL_BIND_ENV_AUTHORITY=hostile-synthetic-root\n",
+        encoding="utf-8",
+    )
+    base.inputs.env_file.write_text(
+        "FINAL_BIND_ENV_AUTHORITY=canonical-pinned\n",
+        encoding="utf-8",
+    )
+    base.inputs.env_file.chmod(0o600)
+    command_runner = module.CommandRunner(
+        docker_config_root=tmp_path / "docker-client",
+    )
+    runner = module.GovernedCutoverRunner(
+        base.inputs,
+        command_runner=command_runner,
+    )
+    module.write_private_json(runner.build_override, {})
+    command = runner._compose(
+        "config",
+        "--format",
+        "json",
+        project="env-authority-probe",
+    )
+    assert command[command.index("--env-file") + 1] == str(
+        base.inputs.env_file
+    )
+    assert command[command.index("--project-directory") + 1] == str(source)
+
+    rendered = subprocess.run(
+        command,
+        cwd=source,
+        env=command_runner.environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=30,
+    )
+    assert rendered.returncode == 0, rendered.stderr
+    payload = json.loads(rendered.stdout)
+    assert payload["services"]["probe"]["image"] == "alpine:canonical-pinned"
+
+    base.inputs.env_file.write_text(
+        "UNRELATED_PIN=present\n",
+        encoding="utf-8",
+    )
+    missing = subprocess.run(
+        command,
+        cwd=source,
+        env=command_runner.environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=30,
+    )
+    assert missing.returncode != 0
+    assert b"canonical env required" in missing.stderr
+    assert b"hostile-synthetic-root" not in missing.stdout + missing.stderr
 
 
 def test_rendered_compose_policy_expands_every_profile(

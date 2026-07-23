@@ -9,7 +9,8 @@ An explicitly selected synthetic workspace may replace canonical dependency path
 must be a sealed, standalone Git repository beneath that root and bind an exact content digest,
 origin, and main commit. The ownership and mode seal prevents accidental or cross-user mutation;
 an actor already running as the operator UID can remove that seal and is outside this boundary.
-Pre/post-build revalidation detects drift but does not claim an atomic filesystem snapshot.
+The final pre-execution bind narrows that mutation window but does not claim atomic pathname
+immunity from an actor already running as the operator UID.
 """
 
 from __future__ import annotations
@@ -2294,7 +2295,8 @@ class GovernedCutoverRunner:
         }
         return provenance
 
-    def _validate_source(self) -> None:
+    def _bind_pinned_source_inputs(self) -> None:
+        """Rebind the exact local files that determine a Compose invocation."""
         self._validate_build_workspace_paths()
         source = self.inputs.source_root
         if not source.is_absolute() or source.resolve(strict=True) != source:
@@ -2325,6 +2327,10 @@ class GovernedCutoverRunner:
         except UnicodeDecodeError as exc:
             raise CutoverError("Compose input is not strict UTF-8") from exc
         require_public_edge_compose_build_syntax(compose_text)
+
+    def _validate_source(self) -> None:
+        self._bind_pinned_source_inputs()
+        source = self.inputs.source_root
         if self.inputs.synthetic_workspace_root is None:
             head = self.commands.run(
                 ["/usr/bin/git", "-C", str(source), "rev-parse", "HEAD"]
@@ -2580,7 +2586,7 @@ class GovernedCutoverRunner:
         self.public_network_name = public_name
         self.public_network_id = network_id
 
-    def _revalidate_compose_inputs(
+    def _final_bind_compose_inputs(
         self,
         *,
         job_override: Path | None = None,
@@ -2589,6 +2595,7 @@ class GovernedCutoverRunner:
         container_name: str = "",
         project: str = CANONICAL_PROJECT,
     ) -> None:
+        """Bind the complete effective Compose authority immediately before dispatch."""
         overrides = (job_override,) if job_override is not None else ()
         transient_service_keys = (
             {job_service: ("container_name",)}
@@ -2609,10 +2616,11 @@ class GovernedCutoverRunner:
             project=project,
             transient_service_keys=transient_service_keys,
         )
-        # Bind the same files again after Compose rendered them. Their stable
-        # identity makes that classification authoritative for the immediately
-        # following build/create command.
+        # Complete every slow source and Docker identity check after rendering,
+        # then make the bounded pinned-file checks below the final filesystem
+        # operation before the caller dispatches its preconstructed command.
         self._validate_source()
+        self._bind_pinned_source_inputs()
         self._bind_existing_build_override()
         if job_override is not None:
             self._bind_job_override(
@@ -2679,16 +2687,17 @@ class GovernedCutoverRunner:
         self._require_candidate_tags_absent()
         prior_portal = self._resolve_image(PORTAL_CANONICAL_TAG, allow_absent=True)
         prior_tool = self._resolve_image(TOOL_CANONICAL_TAG, allow_absent=True)
-        self._revalidate_compose_inputs()
         source_provenance_before = self._capture_build_source_provenance()
+        build_command = self._compose(
+            "--profile",
+            "install-linking-postgres-admin",
+            "build",
+            "chummer-portal",
+            "chummer-install-linking-postgres-admin",
+        )
+        self._final_bind_compose_inputs()
         self.commands.run(
-            self._compose(
-                "--profile",
-                "install-linking-postgres-admin",
-                "build",
-                "chummer-portal",
-                "chummer-install-linking-postgres-admin",
-            ),
+            build_command,
             timeout=BUILD_TIMEOUT_SECONDS,
         )
         self.candidate_image_id = self._resolve_image(self.portal_tag)
@@ -3333,26 +3342,25 @@ class GovernedCutoverRunner:
             raise AmbiguousCutoverError(
                 f"deterministic operator container already exists: {container_name}"
             )
-        self._revalidate_compose_inputs(
+        create_command = self._compose(
+            "--profile",
+            "install-linking-postgres-admin",
+            "create",
+            "--no-build",
+            "--no-recreate",
+            "--no-deps",
+            service,
+            overrides=(override,),
+            project=project,
+        )
+        self._final_bind_compose_inputs(
             job_override=override,
             job_service=service,
             job_command=command,
             container_name=container_name,
             project=project,
         )
-        self.commands.run(
-            self._compose(
-                "--profile",
-                "install-linking-postgres-admin",
-                "create",
-                "--no-build",
-                "--no-recreate",
-                "--no-deps",
-                service,
-                overrides=(override,),
-                project=project,
-            )
-        )
+        self.commands.run(create_command)
         container_id, topology = self._inspect_container(
             container_name=container_name,
             service=service,
