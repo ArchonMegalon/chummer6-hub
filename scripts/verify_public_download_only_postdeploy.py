@@ -56,6 +56,12 @@ CREDENTIAL_REQUEST_HEADERS = (
     "Cookie",
     "Proxy-Authorization",
 )
+DELIVERY_PHASE_BOOTSTRAP = "bootstrap"
+DELIVERY_PHASE_WINDOWS_PREVIEW = "windows-preview"
+DELIVERY_PHASES = (
+    DELIVERY_PHASE_BOOTSTRAP,
+    DELIVERY_PHASE_WINDOWS_PREVIEW,
+)
 
 
 class DownloadExpectation(NamedTuple):
@@ -85,6 +91,45 @@ class AnonymousAuth(requests.auth.AuthBase):
         return request
 
 
+def anonymous_session() -> requests.Session:
+    """Create one transport that cannot inherit ambient proxy or account state."""
+
+    session = requests.Session()
+    session.trust_env = False
+    session.auth = AnonymousAuth()
+    session.cookies.clear()
+    return session
+
+
+class AnonymousRequestsAdapter:
+    """Route the legacy truth gate through the same anonymous transport."""
+
+    RequestException = requests.RequestException
+
+    def __init__(self, session: requests.Session) -> None:
+        self._session = session
+
+    def get(self, url: str, **kwargs: Any) -> requests.Response:
+        kwargs["allow_redirects"] = False
+        kwargs["auth"] = AnonymousAuth()
+        kwargs["cookies"] = {}
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.setdefault("Accept-Encoding", "identity")
+        kwargs["headers"] = headers
+        self._session.cookies.clear()
+        return self._session.get(url, **kwargs)
+
+    def head(self, url: str, **kwargs: Any) -> requests.Response:
+        kwargs["allow_redirects"] = False
+        kwargs["auth"] = AnonymousAuth()
+        kwargs["cookies"] = {}
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.setdefault("Accept-Encoding", "identity")
+        kwargs["headers"] = headers
+        self._session.cookies.clear()
+        return self._session.head(url, **kwargs)
+
+
 def load_truth_gate(source_root: Path) -> Any:
     path = source_root / "scripts" / "public_download_shelf_truth_gate.py"
     if not path.is_file() or path.is_symlink():
@@ -100,8 +145,15 @@ def load_truth_gate(source_root: Path) -> Any:
     return module
 
 
-def anonymous_get(url: str, timeout: float, *, stream: bool) -> requests.Response:
-    return requests.get(
+def anonymous_get(
+    session: requests.Session,
+    url: str,
+    timeout: float,
+    *,
+    stream: bool,
+) -> requests.Response:
+    session.cookies.clear()
+    return session.get(
         url,
         timeout=timeout,
         headers={
@@ -117,8 +169,14 @@ def anonymous_get(url: str, timeout: float, *, stream: bool) -> requests.Respons
     )
 
 
-def get(base_url: str, path: str, timeout: float) -> requests.Response:
-    return requests.get(
+def get(
+    session: requests.Session,
+    base_url: str,
+    path: str,
+    timeout: float,
+) -> requests.Response:
+    session.cookies.clear()
+    return session.get(
         base_url.rstrip("/") + path,
         timeout=timeout,
         headers={
@@ -299,6 +357,66 @@ def _row_platform_is_windows(row: Mapping[str, Any]) -> bool:
     return platform in {"win", "windows"} or rid.startswith("win-")
 
 
+def _windows_bootstrap_rows(
+    payload: Mapping[str, Any],
+    *,
+    key: str,
+    label: str,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in _rows(payload, key, label)
+        if _row_platform_is_windows(row)
+        and str(row.get("kind") or "").strip().lower() == "installer"
+        and str(row.get("installerMode") or "").strip().lower() == "bootstrap"
+    ]
+
+
+def _require_delivery_phase_shape(
+    *,
+    delivery_phase: str,
+    canonical: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    canonical_rows = _windows_bootstrap_rows(
+        canonical,
+        key="artifacts",
+        label="local canonical manifest",
+    )
+    compatibility_rows = _windows_bootstrap_rows(
+        compatibility,
+        key="downloads",
+        label="local compatibility manifest",
+    )
+    if delivery_phase == DELIVERY_PHASE_BOOTSTRAP:
+        if canonical_rows or compatibility_rows:
+            raise ValueError(
+                "bootstrap delivery phase requires zero Windows bootstrap rows"
+            )
+        return []
+    if delivery_phase != DELIVERY_PHASE_WINDOWS_PREVIEW:
+        raise ValueError("delivery phase is invalid")
+    if not canonical_rows:
+        raise ValueError("canonical manifest has no Windows bootstrap installer")
+    canonical_ids = {
+        str(row.get("artifactId") or row.get("id") or "").strip()
+        for row in canonical_rows
+    }
+    compatibility_ids = {
+        str(row.get("artifactId") or row.get("id") or "").strip()
+        for row in compatibility_rows
+    }
+    if (
+        "" in canonical_ids
+        or "" in compatibility_ids
+        or canonical_ids != compatibility_ids
+    ):
+        raise ValueError(
+            "canonical and compatibility Windows bootstrap row sets disagree"
+        )
+    return canonical_rows
+
+
 def _assert_manifest_policy(
     canonical: Mapping[str, Any],
     artifact: Mapping[str, Any],
@@ -426,15 +544,11 @@ def derive_download_expectations(
         raise ValueError("local manifest generation ids disagree")
     expected_generation = canonical_generation or compatibility_generation or None
 
-    canonical_rows = [
-        row
-        for row in _rows(canonical, "artifacts", "local canonical manifest")
-        if _row_platform_is_windows(row)
-        and str(row.get("kind") or "").strip().lower() == "installer"
-        and str(row.get("installerMode") or "").strip().lower() == "bootstrap"
-    ]
-    if not canonical_rows:
-        raise ValueError("canonical manifest has no Windows bootstrap installer")
+    canonical_rows = _require_delivery_phase_shape(
+        delivery_phase=DELIVERY_PHASE_WINDOWS_PREVIEW,
+        canonical=canonical,
+        compatibility=compatibility,
+    )
 
     compatibility_by_id = {
         str(row.get("artifactId") or row.get("id") or "").strip(): row
@@ -539,6 +653,7 @@ def derive_download_expectations(
 
 def _stream_exact_get(
     *,
+    session: requests.Session,
     url: str,
     label: str,
     expected_sha256: str,
@@ -547,7 +662,7 @@ def _stream_exact_get(
     generation_id: str | None,
     capture: bool,
 ) -> tuple[dict[str, Any], bytes]:
-    response = anonymous_get(url, timeout, stream=True)
+    response = anonymous_get(session, url, timeout, stream=True)
     try:
         if response.status_code != 200:
             raise ValueError(f"{label} expected HTTP 200, got {response.status_code}")
@@ -614,14 +729,15 @@ def _stream_exact_get(
         response.close()
 
 
-def _stream_canonical_manifest_get(
+def _stream_manifest_get(
     *,
+    session: requests.Session,
     url: str,
+    label: str,
     timeout: float,
     generation_id: str | None,
 ) -> tuple[dict[str, Any], bytes]:
-    label = "canonical manifest"
-    response = anonymous_get(url, timeout, stream=True)
+    response = anonymous_get(session, url, timeout, stream=True)
     try:
         if response.status_code != 200:
             raise ValueError(f"{label} expected HTTP 200, got {response.status_code}")
@@ -763,34 +879,109 @@ def _validate_embedded_installer_metadata(
 
 def verify_public_download_delivery(
     *,
+    session: requests.Session,
+    delivery_phase: str,
     base_url: str,
     local_manifest_path: Path,
     local_canonical_manifest_path: Path,
     timeout: float,
 ) -> dict[str, Any]:
     base = _validated_base_url(base_url)
-    _canonical_bytes, expected_generation, expectations = derive_download_expectations(
-        base_url=base,
-        local_manifest_path=local_manifest_path,
-        local_canonical_manifest_path=local_canonical_manifest_path,
+    local_canonical_bytes = _regular_file_bytes(
+        local_canonical_manifest_path,
+        "local canonical manifest",
     )
-    manifest_receipt, live_canonical_bytes = _stream_canonical_manifest_get(
+    local_compatibility_bytes = _regular_file_bytes(
+        local_manifest_path,
+        "local compatibility manifest",
+    )
+    local_canonical = _json_object(
+        local_canonical_bytes,
+        "local canonical manifest",
+    )
+    local_compatibility = _json_object(
+        local_compatibility_bytes,
+        "local compatibility manifest",
+    )
+    _require_delivery_phase_shape(
+        delivery_phase=delivery_phase,
+        canonical=local_canonical,
+        compatibility=local_compatibility,
+    )
+    canonical_generation = str(local_canonical.get("generationId") or "").strip()
+    compatibility_generation = str(
+        local_compatibility.get("generationId") or ""
+    ).strip()
+    if (
+        canonical_generation
+        and compatibility_generation
+        and canonical_generation != compatibility_generation
+    ):
+        raise ValueError("local manifest generation ids disagree")
+    expected_generation = (
+        canonical_generation or compatibility_generation or None
+    )
+
+    canonical_receipt, live_canonical_bytes = _stream_manifest_get(
+        session=session,
         url=f"{base}/downloads/RELEASE_CHANNEL.generated.json",
+        label="canonical manifest",
         timeout=timeout,
         generation_id=expected_generation,
     )
-    generation_id = manifest_receipt["generationId"]
-    live_canonical = _json_object(live_canonical_bytes, "live canonical manifest")
-    _validate_live_canonical_manifest(
-        live_canonical,
-        expectations,
-        generation_id,
-        base,
+    generation_id = canonical_receipt["generationId"]
+    compatibility_receipt, live_compatibility_bytes = _stream_manifest_get(
+        session=session,
+        url=f"{base}/downloads/releases.json",
+        label="compatibility manifest",
+        timeout=timeout,
+        generation_id=generation_id,
     )
+    canonical_receipt.update(
+        {
+            "localSha256": hashlib.sha256(local_canonical_bytes).hexdigest(),
+            "localSizeBytes": len(local_canonical_bytes),
+        }
+    )
+    compatibility_receipt.update(
+        {
+            "localSha256": hashlib.sha256(
+                local_compatibility_bytes
+            ).hexdigest(),
+            "localSizeBytes": len(local_compatibility_bytes),
+        }
+    )
+    live_canonical = _json_object(live_canonical_bytes, "live canonical manifest")
+    live_compatibility = _json_object(
+        live_compatibility_bytes,
+        "live compatibility manifest",
+    )
+    _require_delivery_phase_shape(
+        delivery_phase=delivery_phase,
+        canonical=live_canonical,
+        compatibility=live_compatibility,
+    )
+
+    expectations: list[DownloadExpectation] = []
+    if delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW:
+        _canonical_bytes, _generation, expectations = (
+            derive_download_expectations(
+                base_url=base,
+                local_manifest_path=local_manifest_path,
+                local_canonical_manifest_path=local_canonical_manifest_path,
+            )
+        )
+        _validate_live_canonical_manifest(
+            live_canonical,
+            expectations,
+            generation_id,
+            base,
+        )
 
     artifact_receipts: list[dict[str, Any]] = []
     for expected in expectations:
         installer_receipt, installer_bytes = _stream_exact_get(
+            session=session,
             url=expected.installer_url,
             label=f"{expected.artifact_id} installer",
             expected_sha256=expected.installer_sha256,
@@ -800,6 +991,7 @@ def verify_public_download_delivery(
             capture=True,
         )
         payload_receipt, _ = _stream_exact_get(
+            session=session,
             url=expected.payload_url,
             label=f"{expected.artifact_id} payload",
             expected_sha256=expected.payload_sha256,
@@ -809,6 +1001,7 @@ def verify_public_download_delivery(
             capture=False,
         )
         sidecar_receipt, sidecar_bytes = _stream_exact_get(
+            session=session,
             url=expected.sidecar_url,
             label=f"{expected.artifact_id} sidecar",
             expected_sha256=expected.sidecar_sha256,
@@ -846,15 +1039,29 @@ def verify_public_download_delivery(
 
     return {
         "status": "pass",
+        "deliveryPhase": delivery_phase,
+        "expectedWindowsState": (
+            "absent"
+            if delivery_phase == DELIVERY_PHASE_BOOTSTRAP
+            else "present"
+        ),
+        "windowsDeliveryClaimed": (
+            delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW
+        ),
         "generationHeader": GENERATION_HEADER,
         "generationId": generation_id,
-        "canonicalManifest": manifest_receipt,
+        "canonicalManifest": canonical_receipt,
+        "compatibilityManifest": compatibility_receipt,
         "artifacts": artifact_receipts,
     }
 
 
-def verify_control_plane(base_url: str, timeout: float) -> dict[str, Any]:
-    serving = get(base_url, "/api/ready/public-downloads", timeout)
+def verify_control_plane(
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+) -> dict[str, Any]:
+    serving = get(session, base_url, "/api/ready/public-downloads", timeout)
     _reject_credential_headers(serving, "public downloads readiness")
     serving_payload = require_json(serving, "public downloads readiness")
     checks = serving_payload.get("checks")
@@ -876,7 +1083,7 @@ def verify_control_plane(base_url: str, timeout: float) -> dict[str, Any]:
 
     readiness_statuses: dict[str, int] = {}
     for path in UNAVAILABLE_READINESS_PATHS:
-        response = get(base_url, path, timeout)
+        response = get(session, base_url, path, timeout)
         _reject_credential_headers(response, path)
         readiness_statuses[path] = response.status_code
         if response.status_code != 503:
@@ -884,7 +1091,7 @@ def verify_control_plane(base_url: str, timeout: float) -> dict[str, Any]:
 
     private_statuses: dict[str, int] = {}
     for path in PRIVATE_PATHS:
-        response = get(base_url, path, timeout)
+        response = get(session, base_url, path, timeout)
         _reject_credential_headers(response, path)
         private_statuses[path] = response.status_code
         content_type = response.headers.get("Content-Type", "").lower()
@@ -933,34 +1140,48 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--local-manifest", type=Path, required=True)
     parser.add_argument("--local-canonical-manifest", type=Path, required=True)
+    parser.add_argument(
+        "--delivery-phase",
+        choices=DELIVERY_PHASES,
+        required=True,
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args(argv)
     try:
-        control_plane = verify_control_plane(args.base_url, args.timeout)
-        truth_gate = load_truth_gate(args.source_root)
-        download_truth = truth_gate.evaluate(
-            base_url=args.base_url,
-            local_manifest_path=args.local_manifest,
-            local_canonical_manifest_path=args.local_canonical_manifest,
-            timeout=args.timeout,
-            artifact_probes_enabled=False,
-            live_confirmation_count=3,
-            live_confirmation_delay_seconds=2.0,
-            live_max_samples=6,
-        )
-        if download_truth.get("status") != "pass":
-            raise ValueError("public download shelf truth gate failed")
-        strict_downloads = verify_public_download_delivery(
-            base_url=args.base_url,
-            local_manifest_path=args.local_manifest,
-            local_canonical_manifest_path=args.local_canonical_manifest,
-            timeout=args.timeout,
-        )
+        with anonymous_session() as session:
+            control_plane = verify_control_plane(
+                session,
+                args.base_url,
+                args.timeout,
+            )
+            truth_gate = load_truth_gate(args.source_root)
+            truth_gate.requests = AnonymousRequestsAdapter(session)
+            download_truth = truth_gate.evaluate(
+                base_url=args.base_url,
+                local_manifest_path=args.local_manifest,
+                local_canonical_manifest_path=args.local_canonical_manifest,
+                timeout=args.timeout,
+                artifact_probes_enabled=False,
+                live_confirmation_count=3,
+                live_confirmation_delay_seconds=2.0,
+                live_max_samples=6,
+            )
+            if download_truth.get("status") != "pass":
+                raise ValueError("public download shelf truth gate failed")
+            strict_downloads = verify_public_download_delivery(
+                session=session,
+                delivery_phase=args.delivery_phase,
+                base_url=args.base_url,
+                local_manifest_path=args.local_manifest,
+                local_canonical_manifest_path=args.local_canonical_manifest,
+                timeout=args.timeout,
+            )
         payload = {
             "contractName": CONTRACT_NAME,
             "status": "pass",
             "runtimeProfile": "public-download-only",
+            "deliveryPhase": args.delivery_phase,
             "baseUrl": args.base_url.rstrip("/"),
             **control_plane,
             "publicDownloadTruth": download_truth,

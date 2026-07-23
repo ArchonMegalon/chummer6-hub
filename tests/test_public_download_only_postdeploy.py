@@ -87,6 +87,7 @@ class DeliveryFixture:
         self.canonical_url = (
             f"{self.base_url}/downloads/RELEASE_CHANNEL.generated.json"
         )
+        self.compatibility_url = f"{self.base_url}/downloads/releases.json"
         self.payload_bytes = b"payload-body-v1"
         self.payload_sha256 = hashlib.sha256(self.payload_bytes).hexdigest()
         metadata = (
@@ -202,6 +203,11 @@ class DeliveryFixture:
                 canonical_bytes,
                 generation=self.generation,
             ),
+            self.compatibility_url: StreamResponse(
+                self.compatibility_url,
+                manifest_bytes,
+                generation=self.generation,
+            ),
             self.installer_url: StreamResponse(
                 self.installer_url,
                 self.installer_bytes,
@@ -222,7 +228,13 @@ class DeliveryFixture:
     def install(self, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
         calls: list[tuple[str, bool]] = []
 
-        def fake_get(url: str, timeout: float, *, stream: bool) -> StreamResponse:
+        def fake_get(
+            _session: object,
+            url: str,
+            timeout: float,
+            *,
+            stream: bool,
+        ) -> StreamResponse:
             assert timeout == 1
             calls.append((url, stream))
             return self.responses[url]
@@ -231,12 +243,15 @@ class DeliveryFixture:
         return calls
 
     def verify(self) -> dict[str, object]:
-        return postdeploy.verify_public_download_delivery(
-            base_url=self.base_url,
-            local_manifest_path=self.local_manifest,
-            local_canonical_manifest_path=self.local_canonical,
-            timeout=1,
-        )
+        with postdeploy.anonymous_session() as session:
+            return postdeploy.verify_public_download_delivery(
+                session=session,
+                delivery_phase=postdeploy.DELIVERY_PHASE_WINDOWS_PREVIEW,
+                base_url=self.base_url,
+                local_manifest_path=self.local_manifest,
+                local_canonical_manifest_path=self.local_canonical,
+                timeout=1,
+            )
 
 
 def responses() -> dict[str, Response]:
@@ -272,9 +287,14 @@ def test_control_plane_accepts_serving_only_and_private_fail_closed(
     monkeypatch.setattr(
         postdeploy,
         "get",
-        lambda _base, path, _timeout: fixture[path],
+        lambda _session, _base, path, _timeout: fixture[path],
     )
-    result = postdeploy.verify_control_plane("https://chummer.run", 1)
+    with postdeploy.anonymous_session() as session:
+        result = postdeploy.verify_control_plane(
+            session,
+            "https://chummer.run",
+            1,
+        )
     assert result["privateBoundaryStatuses"] == {
         path: 503 for path in postdeploy.PRIVATE_PATHS
     }
@@ -288,10 +308,15 @@ def test_control_plane_rejects_global_readiness_claim(
     monkeypatch.setattr(
         postdeploy,
         "get",
-        lambda _base, path, _timeout: fixture[path],
+        lambda _session, _base, path, _timeout: fixture[path],
     )
-    with pytest.raises(ValueError, match="unexpectedly claimed readiness"):
-        postdeploy.verify_control_plane("https://chummer.run", 1)
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="unexpectedly claimed readiness"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
 
 
 def test_control_plane_rejects_private_problem_body_drift(
@@ -306,34 +331,266 @@ def test_control_plane_rejects_private_problem_body_drift(
     monkeypatch.setattr(
         postdeploy,
         "get",
-        lambda _base, path, _timeout: fixture[path],
+        lambda _session, _base, path, _timeout: fixture[path],
     )
-    with pytest.raises(ValueError, match="private 503 boundary"):
-        postdeploy.verify_control_plane("https://chummer.run", 1)
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="private 503 boundary"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
 
 
 def test_anonymous_get_is_redirect_free_and_carries_no_credentials(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     sentinel = object()
     captured: dict[str, object] = {}
+    netrc = tmp_path / "ambient.netrc"
+    netrc.write_text(
+        "machine chummer.run login ambient password credential\n",
+        encoding="utf-8",
+    )
+    netrc.chmod(0o600)
+    monkeypatch.setenv("NETRC", str(netrc))
+    monkeypatch.setenv(
+        "HTTPS_PROXY",
+        "http://ambient:credential@proxy.invalid:8443",
+    )
+    monkeypatch.setenv(
+        "REQUESTS_CA_BUNDLE",
+        str(tmp_path / "ambient-ca.pem"),
+    )
 
-    def fake_requests_get(url: str, **kwargs: object) -> object:
-        captured["url"] = url
+    def fake_send(request: object, **kwargs: object) -> object:
+        captured["request"] = request
         captured.update(kwargs)
         return sentinel
 
-    monkeypatch.setattr(postdeploy.requests, "get", fake_requests_get)
-    assert postdeploy.anonymous_get("https://chummer.run/downloads/a", 2, stream=True) is sentinel
+    session = postdeploy.anonymous_session()
+    assert session.trust_env is False
+    monkeypatch.setattr(session, "send", fake_send)
+    assert (
+        postdeploy.anonymous_get(
+            session,
+            "https://chummer.run/downloads/a",
+            2,
+            stream=True,
+        )
+        is sentinel
+    )
     assert captured["allow_redirects"] is False
     assert captured["stream"] is True
-    assert captured["cookies"] == {}
-    assert isinstance(captured["auth"], postdeploy.AnonymousAuth)
-    headers = captured["headers"]
-    assert isinstance(headers, dict)
+    assert captured["proxies"] == {}
+    assert captured["verify"] is True
+    request = captured["request"]
+    headers = request.headers
     assert headers["Accept-Encoding"] == "identity"
     assert "Authorization" not in headers
+    assert "Proxy-Authorization" not in headers
     assert "Cookie" not in headers
+    session.close()
+
+
+def _exact_incumbent_bootstrap(
+    tmp_path: Path,
+) -> tuple[Path, Path, dict[str, StreamResponse]]:
+    incumbent_rows = [
+        {
+            "artifactId": "avalonia-osx-arm64-installer",
+            "platform": "macos",
+            "rid": "osx-arm64",
+            "kind": "installer",
+            "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+            "sha256": "e5d6f7feb0ae1297dfe7dceae1a3d49078134861f475099688eb8cc8979bb006",
+            "sizeBytes": 53916415,
+        },
+        {
+            "artifactId": "blazor-desktop-osx-arm64-installer",
+            "platform": "macos",
+            "rid": "osx-arm64",
+            "kind": "installer",
+            "fileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
+            "sha256": "68dd1a5ba76c2b927f9eb56d43a9c3c855144158d29c48a34f8567624b781c9a",
+            "sizeBytes": 51884585,
+        },
+        {
+            "artifactId": "avalonia-osx-arm64-archive",
+            "platform": "macos",
+            "rid": "osx-arm64",
+            "kind": "archive",
+            "fileName": "chummer-avalonia-osx-arm64.tar.gz",
+            "sha256": "ccd2c28045d1d4a57678f9ed24aafe9e39f3f5e5e82d6749c40fe1828d47e54a",
+            "sizeBytes": 47387641,
+        },
+        {
+            "artifactId": "blazor-desktop-osx-arm64-archive",
+            "platform": "macos",
+            "rid": "osx-arm64",
+            "kind": "archive",
+            "fileName": "chummer-blazor-desktop-osx-arm64.tar.gz",
+            "sha256": "6b6ea64dbb05dfb8b99cb6c9ec859d98d7493a8d9a79e75d1ffd26e8e8004fdf",
+            "sizeBytes": 45382391,
+        },
+    ]
+    canonical = {
+        "version": "run-20260715-140426",
+        "artifacts": incumbent_rows,
+    }
+    compatibility = {
+        "version": "run-20260715-140426",
+        "downloads": [
+            {
+                **row,
+                "id": row["artifactId"],
+            }
+            for row in incumbent_rows
+        ],
+    }
+    canonical_bytes = DeliveryFixture.json_bytes(canonical)
+    compatibility_bytes = DeliveryFixture.json_bytes(compatibility)
+    assert canonical["version"] == "run-20260715-140426"
+    assert compatibility["version"] == "run-20260715-140426"
+    assert (
+        postdeploy._windows_bootstrap_rows(
+            canonical,
+            key="artifacts",
+            label="exact incumbent canonical manifest",
+        )
+        == []
+    )
+    assert (
+        postdeploy._windows_bootstrap_rows(
+            compatibility,
+            key="downloads",
+            label="exact incumbent compatibility manifest",
+        )
+        == []
+    )
+    bundle = tmp_path / "exact-incumbent"
+    bundle.mkdir(parents=True)
+    local_canonical = bundle / "RELEASE_CHANNEL.generated.json"
+    local_manifest = bundle / "releases.json"
+    local_canonical.write_bytes(canonical_bytes)
+    local_manifest.write_bytes(compatibility_bytes)
+    generation = "legacy-migration-generation"
+    base = "https://chummer.run/downloads"
+    return (
+        local_manifest,
+        local_canonical,
+        {
+            f"{base}/RELEASE_CHANNEL.generated.json": StreamResponse(
+                f"{base}/RELEASE_CHANNEL.generated.json",
+                canonical_bytes,
+                generation=generation,
+            ),
+            f"{base}/releases.json": StreamResponse(
+                f"{base}/releases.json",
+                compatibility_bytes,
+                generation=generation,
+            ),
+        },
+    )
+
+
+def test_bootstrap_phase_accepts_exact_no_windows_incumbent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local_manifest, local_canonical, responses_by_url = (
+        _exact_incumbent_bootstrap(tmp_path)
+    )
+    calls: list[str] = []
+
+    def fake_get(
+        _session: object,
+        url: str,
+        _timeout: float,
+        *,
+        stream: bool,
+    ) -> StreamResponse:
+        assert stream is True
+        calls.append(url)
+        return responses_by_url[url]
+
+    monkeypatch.setattr(postdeploy, "anonymous_get", fake_get)
+    with postdeploy.anonymous_session() as session:
+        result = postdeploy.verify_public_download_delivery(
+            session=session,
+            delivery_phase=postdeploy.DELIVERY_PHASE_BOOTSTRAP,
+            base_url="https://chummer.run",
+            local_manifest_path=local_manifest,
+            local_canonical_manifest_path=local_canonical,
+            timeout=1,
+        )
+
+    assert result["deliveryPhase"] == "bootstrap"
+    assert result["expectedWindowsState"] == "absent"
+    assert result["windowsDeliveryClaimed"] is False
+    assert result["artifacts"] == []
+    assert result["canonicalManifest"]["generationId"] == (
+        result["compatibilityManifest"]["generationId"]
+    )
+    assert calls == [
+        "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
+        "https://chummer.run/downloads/releases.json",
+    ]
+
+
+def test_delivery_phases_reject_manifest_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    windows = DeliveryFixture(tmp_path / "windows")
+    windows.install(monkeypatch)
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="requires zero Windows"):
+            postdeploy.verify_public_download_delivery(
+                session=session,
+                delivery_phase=postdeploy.DELIVERY_PHASE_BOOTSTRAP,
+                base_url=windows.base_url,
+                local_manifest_path=windows.local_manifest,
+                local_canonical_manifest_path=windows.local_canonical,
+                timeout=1,
+            )
+
+    local_manifest, local_canonical, _responses = _exact_incumbent_bootstrap(
+        tmp_path / "incumbent"
+    )
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="no Windows bootstrap installer",
+        ):
+            postdeploy.verify_public_download_delivery(
+                session=session,
+                delivery_phase=postdeploy.DELIVERY_PHASE_WINDOWS_PREVIEW,
+                base_url="https://chummer.run",
+                local_manifest_path=local_manifest,
+                local_canonical_manifest_path=local_canonical,
+                timeout=1,
+            )
+
+
+def test_cli_requires_explicit_delivery_phase(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as raised:
+        postdeploy.main(
+            [
+                "--base-url",
+                "https://chummer.run",
+                "--source-root",
+                str(ROOT),
+                "--local-manifest",
+                str(tmp_path / "releases.json"),
+                "--local-canonical-manifest",
+                str(tmp_path / "canonical.json"),
+                "--output",
+                str(tmp_path / "receipt.json"),
+            ]
+        )
+    assert raised.value.code == 2
 
 
 def test_strict_delivery_accepts_exact_anonymous_gets(
@@ -350,6 +607,7 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
     assert result["generationHeader"] == postdeploy.GENERATION_HEADER
     assert [url for url, _ in calls] == [
         fixture.canonical_url,
+        fixture.compatibility_url,
         fixture.installer_url,
         fixture.payload_url,
         fixture.sidecar_url,
