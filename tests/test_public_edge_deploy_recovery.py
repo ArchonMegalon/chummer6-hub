@@ -304,8 +304,14 @@ def run_reconcile(module, runtime: FakeRuntime, state: dict[str, object], overla
     )
 
 
-def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[str]:
-    return [
+def recovery_argv(
+    tmp_path: Path,
+    source_root: Path,
+    active_root: Path,
+    *,
+    runtime_profile: str | None = None,
+) -> list[str]:
+    arguments = [
         "--source-root",
         str(source_root),
         "--active-root",
@@ -345,9 +351,18 @@ def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[
         "--tool-image-tag",
         TOOL_TAG,
     ]
+    if runtime_profile is not None:
+        arguments.extend(["--runtime-profile", runtime_profile])
+    return arguments
 
 
-def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
+def write_deploy_journal(
+    module,
+    tmp_path: Path,
+    *,
+    runtime_profile: str | None = None,
+    prior_active_authority: bytes | None = None,
+) -> tuple[Path, Path, Path]:
     source_root = tmp_path / "source"
     active_root = tmp_path / "active" / "app"
     staging_root = tmp_path / "staging" / "app"
@@ -374,6 +389,35 @@ def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
     prior_authority_snapshot.write_bytes(PRIOR_PROOF_BYTES)
     prior_public_snapshot.write_bytes(PRIOR_PROOF_BYTES)
     journal = tmp_path / "journal.json"
+    profile_arguments: dict[str, object] = {}
+    if runtime_profile is not None:
+        prior_active_authority_snapshot = (
+            tmp_path / "prior-active-authority.json"
+        )
+        if prior_active_authority is not None:
+            prior_active_authority_snapshot.write_bytes(
+                prior_active_authority
+            )
+        profile_arguments = {
+            "runtime_profile": runtime_profile,
+            "deployment_operation": (
+                "initial-release-shelf-public-download-cutover"
+            ),
+            "source_head": "d" * 40,
+            "prior_active_runtime_authority_existed": (
+                prior_active_authority is not None
+            ),
+            "prior_active_runtime_authority_snapshot": (
+                prior_active_authority_snapshot
+                if prior_active_authority is not None
+                else None
+            ),
+            "prior_active_runtime_authority_snapshot_sha256": (
+                hashlib.sha256(prior_active_authority).hexdigest()
+                if prior_active_authority is not None
+                else None
+            ),
+        }
     module.transaction.snapshot(
         source_root=source_root,
         active_root=active_root,
@@ -389,6 +433,7 @@ def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
         candidate_proof_bind_source_snapshot=candidate_snapshot,
         prior_portal_proof_authority_snapshot=prior_authority_snapshot,
         prior_portal_proof_public_snapshot=prior_public_snapshot,
+        **profile_arguments,
     )
     return source_root, active_root, journal
 
@@ -565,6 +610,159 @@ def test_recovery_command_consumes_journal_and_writes_prior_runtime_authority(
     assert not journal.exists()
     assert second_status == 0
     assert second_receipt["disposition"] == "already_reconciled"
+
+
+def test_public_recovery_restores_exact_prior_authority_before_journal_retirement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    prior_authority = b'{"exactPriorAuthority":true}\n'
+    source_root, active_root, journal = write_deploy_journal(
+        module,
+        tmp_path,
+        runtime_profile=(
+            module.transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        ),
+        prior_active_authority=prior_authority,
+    )
+    authority_path = tmp_path / "active-runtime-authority.json"
+    authority_path.write_bytes(b'{"candidateAuthority":true}\n')
+    runtime = FakeRuntime()
+    monkeypatch.setattr(module, "DockerRuntime", lambda **_kwargs: runtime)
+
+    status = module.main(
+        recovery_argv(
+            tmp_path,
+            source_root,
+            active_root,
+            runtime_profile=(
+                module.transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            ),
+        )
+    )
+    receipt = json.loads(
+        (tmp_path / "recovery.json").read_text(encoding="utf-8")
+    )
+
+    assert status == 0
+    assert authority_path.read_bytes() == prior_authority
+    assert receipt["runtimeAuthorityRecovery"] == (
+        "exact_prior_authority_restored"
+    )
+    assert not journal.exists()
+
+
+def test_public_recovery_crash_after_authority_restore_retains_journal_and_retries(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    prior_authority = b'{"exactPriorAuthority":"crash-safe"}\n'
+    source_root, active_root, journal = write_deploy_journal(
+        module,
+        tmp_path,
+        runtime_profile=(
+            module.transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        ),
+        prior_active_authority=prior_authority,
+    )
+    authority_path = tmp_path / "active-runtime-authority.json"
+    authority_path.write_bytes(b'{"candidateAuthority":true}\n')
+    runtime = FakeRuntime()
+    monkeypatch.setattr(module, "DockerRuntime", lambda **_kwargs: runtime)
+    original_retire = module.retire_recovery_journal
+    crashed = False
+
+    def crash_before_journal_unlink(_path: Path) -> None:
+        nonlocal crashed
+        if not crashed:
+            crashed = True
+            raise RuntimeError("simulated crash before journal unlink")
+        original_retire(_path)
+
+    monkeypatch.setattr(
+        module,
+        "retire_recovery_journal",
+        crash_before_journal_unlink,
+    )
+    argv = recovery_argv(
+        tmp_path,
+        source_root,
+        active_root,
+        runtime_profile=(
+            module.transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        ),
+    )
+
+    first_status = module.main(argv)
+    assert first_status == 70
+    assert authority_path.read_bytes() == prior_authority
+    assert journal.is_file()
+
+    second_status = module.main(argv)
+    assert second_status == 0
+    assert authority_path.read_bytes() == prior_authority
+    assert not journal.exists()
+
+
+def test_public_recovery_rejects_full_profile_journal_before_docker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    source_root, active_root, journal = write_deploy_journal(
+        module,
+        tmp_path,
+    )
+
+    def unexpected_docker(**_kwargs):
+        raise AssertionError("cross-profile recovery must not reach Docker")
+
+    monkeypatch.setattr(module, "DockerRuntime", unexpected_docker)
+    status = module.main(
+        recovery_argv(
+            tmp_path,
+            source_root,
+            active_root,
+            runtime_profile=(
+                module.transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            ),
+        )
+    )
+
+    assert status == 70
+    assert journal.is_file()
 
 
 def test_recovery_command_retains_journal_when_prior_portal_identity_is_lost(

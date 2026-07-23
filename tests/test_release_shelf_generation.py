@@ -894,6 +894,268 @@ def test_generation_id_cannot_be_reused_even_with_identical_bytes(tmp_path: Path
         )
 
 
+def test_same_intent_retry_recovers_generation_rename_before_pointer_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_write = MODULE._atomic_write_json
+    failed = False
+
+    def crash_before_pointer(path: Path, payload: dict[str, object]) -> None:
+        nonlocal failed
+        if path.name == MODULE.CURRENT_POINTER and not failed:
+            failed = True
+            raise RuntimeError("simulated pointer-write crash")
+        original_write(path, payload)
+
+    monkeypatch.setattr(MODULE, "_atomic_write_json", crash_before_pointer)
+    with pytest.raises(RuntimeError, match="pointer-write crash"):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-retry",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-retry",
+            allow_orphan_generation_recovery=True,
+        )
+
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+    assert (shelf / MODULE.LAYOUT_MARKER).read_bytes() == b"v1\n"
+    assert (
+        shelf / MODULE.GENERATIONS_DIRECTORY / "generation-retry"
+    ).is_dir()
+    assert len(
+        [
+            path
+            for path in shelf.iterdir()
+            if path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        ]
+    ) == 1
+
+    monkeypatch.setattr(MODULE, "_atomic_write_json", original_write)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retry",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-retry",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert pointer["generationId"] == "generation-retry"
+    assert MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER) == pointer
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+
+
+def test_same_intent_retry_recovers_marker_commit_before_pointer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_marker = MODULE._create_layout_marker
+    failed = False
+
+    def crash_after_marker(root: Path) -> None:
+        nonlocal failed
+        original_marker(root)
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated marker crash")
+
+    monkeypatch.setattr(MODULE, "_create_layout_marker", crash_after_marker)
+    with pytest.raises(RuntimeError, match="marker crash"):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-marker-retry",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-marker-retry",
+            allow_orphan_generation_recovery=True,
+        )
+    assert (shelf / MODULE.LAYOUT_MARKER).read_bytes() == b"v1\n"
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+
+    monkeypatch.setattr(MODULE, "_create_layout_marker", original_marker)
+    MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-marker-retry",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-marker-retry",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert (
+        MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER)["generationId"]
+        == "generation-marker-retry"
+    )
+
+
+def test_unknown_or_partial_activation_stage_residue_fails_closed(
+    tmp_path: Path,
+) -> None:
+    shelf = tmp_path / "shelf"
+    shelf.mkdir()
+    candidate = write_candidate(tmp_path / "candidate")
+    residue = shelf / f"{MODULE.ACTIVATION_STAGE_PREFIX}unknown"
+    residue.mkdir()
+    (residue / "partial").write_text("not a transaction\n", encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.ReleaseShelfError,
+        match="unknown release shelf activation stage residue",
+    ):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-stage-reject",
+            activation_receipt_id="receipt-stage-reject",
+            allow_orphan_generation_recovery=True,
+        )
+
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+    assert residue.is_dir()
+
+
+def test_committed_stage_is_atomically_retired_before_best_effort_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_rmtree = MODULE.shutil.rmtree
+
+    def fail_retired_cleanup(path: Path, *args, **kwargs) -> None:
+        if "-retired-activation-stage-" in Path(path).name:
+            raise OSError("simulated retired cleanup failure")
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", fail_retired_cleanup)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retired-cleanup",
+        activation_receipt_id="receipt-retired-cleanup",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER) == pointer
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+    retired = [
+        path
+        for path in shelf.parent.iterdir()
+        if "-retired-activation-stage-" in path.name
+    ]
+    assert len(retired) == 1
+    original_rmtree(retired[0])
+
+
+def test_internal_promotion_lock_remains_held_through_stage_retirement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_retire = MODULE._retire_activation_stage
+    observed_lock = False
+
+    def assert_lock_then_retire(stage_root: Path, shelf_root: Path) -> Path:
+        nonlocal observed_lock
+        descriptor = os.open(
+            shelf_root / MODULE.PROMOTION_LOCK,
+            os.O_RDWR,
+        )
+        try:
+            with pytest.raises(BlockingIOError):
+                MODULE.fcntl.flock(
+                    descriptor,
+                    MODULE.fcntl.LOCK_EX | MODULE.fcntl.LOCK_NB,
+                )
+            observed_lock = True
+        finally:
+            os.close(descriptor)
+        return original_retire(stage_root, shelf_root)
+
+    monkeypatch.setattr(
+        MODULE,
+        "_retire_activation_stage",
+        assert_lock_then_retire,
+    )
+    MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-lock-retirement",
+        activation_receipt_id="receipt-lock-retirement",
+    )
+
+    assert observed_lock is True
+
+
+def test_retry_after_process_death_during_retired_stage_cleanup_is_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_rmtree = MODULE.shutil.rmtree
+
+    class SimulatedProcessDeath(BaseException):
+        pass
+
+    def die_during_retired_cleanup(path: Path, *args, **kwargs) -> None:
+        if "-retired-activation-stage-" in Path(path).name:
+            raise SimulatedProcessDeath()
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", die_during_retired_cleanup)
+    with pytest.raises(SimulatedProcessDeath):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-retired-crash",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-retired-crash",
+            allow_orphan_generation_recovery=True,
+        )
+    assert (shelf / MODULE.CURRENT_POINTER).is_file()
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", original_rmtree)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retired-crash",
+        activation_receipt_id="receipt-retired-crash",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert pointer["generationId"] == "generation-retired-crash"
+    for path in shelf.parent.iterdir():
+        if "-retired-activation-stage-" in path.name:
+            original_rmtree(path)
+
+
 def test_concurrent_pointer_readers_observe_only_complete_generation_a_or_b(
     tmp_path: Path,
 ) -> None:

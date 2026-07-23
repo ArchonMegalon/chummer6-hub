@@ -294,7 +294,7 @@ RUNTIME_PROOF_BIND_SOURCE=""
 AUTHENTICATED_RUNTIME_PROOF_SHA256=""
 RELEASE_CHANNEL_RECEIPT=""
 AUTHENTICATED_RELEASE_CHANNEL_SHA256=""
-if ((RECOVERY_ROUTE_REQUESTED == 0 || PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+if ((RECOVERY_ROUTE_REQUESTED == 0)); then
 if [[ ! "$RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be externally supplied as a lowercase SHA-256" >&2
   exit 2
@@ -820,37 +820,43 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     echo "audited public-download cutover controller is group- or world-writable" >&2
     exit 2
   fi
-  if [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" != /* \
-    || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *$'\n'* \
-    || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *'|'* \
-    || ! "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "public-download migration authority path and independent SHA-256 are required" >&2
-    exit 2
-  fi
-  if ! PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$(
-    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
-  )" \
-    || [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY" \
-      != "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" ]]; then
-    echo "public-download migration authority must be an exact canonical path" >&2
-    exit 2
-  fi
-  if [[ "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" != /* \
-    || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" != /* ]]; then
-    echo "public-download runtime requires exact certificate and password-file paths" >&2
-    exit 2
-  fi
-  if ! PUBLIC_DOWNLOAD_CERTIFICATE="$(
-    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
-  )" \
-    || ! PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$(
-      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
+  if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+    if [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" != /* \
+      || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *$'\n'* \
+      || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *'|'* \
+      || ! "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "public-download migration authority path and independent SHA-256 are required" >&2
+      exit 2
+    fi
+    if ! PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$(
+      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
     )" \
-    || [[ "$PUBLIC_DOWNLOAD_CERTIFICATE" != "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" \
-      || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD" \
-        != "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" ]]; then
-    echo "public-download certificate inputs must be exact canonical paths" >&2
-    exit 2
+      || [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY" \
+        != "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" ]]; then
+      echo "public-download migration authority must be an exact canonical path" >&2
+      exit 2
+    fi
+    if [[ "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" != /* \
+      || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" != /* ]]; then
+      echo "public-download runtime requires exact certificate and password-file paths" >&2
+      exit 2
+    fi
+    if ! PUBLIC_DOWNLOAD_CERTIFICATE="$(
+      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
+    )" \
+      || ! PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$(
+        "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
+      )" \
+      || [[ "$PUBLIC_DOWNLOAD_CERTIFICATE" != "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" \
+        || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD" \
+          != "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" ]]; then
+      echo "public-download certificate inputs must be exact canonical paths" >&2
+      exit 2
+    fi
+  else
+    PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
+    PUBLIC_DOWNLOAD_CERTIFICATE="$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
+    PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
   fi
   if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
     || (-e "$CANONICAL_DOCKER_CONFIG_ROOT" \

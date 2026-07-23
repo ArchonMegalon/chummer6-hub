@@ -96,35 +96,34 @@ def public_download_migration_inputs(module, tmp_path: Path):
     for relative, raw in stale_payloads.items():
         path = shelf / relative
         path.write_bytes(raw)
-    candidate = tmp_path / "sealed-incumbent-candidate"
-    shutil.copytree(shelf, candidate)
-    for relative in stale_payloads:
-        (candidate / relative).unlink()
-
-    with module.anchored_directory(
-        shelf,
-        "release shelf root",
-    ) as anchored_shelf, module.anchored_directory(
-        candidate,
-        "migration candidate",
-    ) as anchored_candidate:
-        snapshot = module.capture_legacy_snapshot_fd(
-            anchored_shelf,
-            allow_aborted_history=False,
-        )
-        candidate_snapshot = module._capture_public_download_candidate(
-            anchored_candidate,
-            shelf=anchored_shelf,
-            shelf_snapshot=snapshot,
-        )
     source_head = "d" * 40
-    authority = module._expected_public_download_migration_authority(
-        source_head=source_head,
-        shelf_snapshot=snapshot,
-        candidate_snapshot=candidate_snapshot,
+    candidate = tmp_path / "sealed-incumbent-candidate"
+    restoration_spec = tmp_path / "manifest-closure-restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, [])
+    restoration_spec_sha256 = sha256(restoration_spec_raw)
+    candidate_receipt = tmp_path / "candidate-materialization.json"
+    module.materialize_public_download_migration_candidate(
+        shelf,
+        candidate,
+        source_head,
+        restoration_spec,
+        restoration_spec_sha256,
+        candidate_receipt,
     )
     authority_path = tmp_path / "migration-authority.json"
-    authority_raw = write_json(authority_path, authority)
+    authority_materialization = (
+        module.materialize_public_download_migration_authority(
+            shelf,
+            candidate,
+            source_head,
+            restoration_spec,
+            restoration_spec_sha256,
+            candidate_receipt,
+            sha256(candidate_receipt.read_bytes()),
+            authority_path,
+        )
+    )
+    authority_raw = authority_path.read_bytes()
     receipts = tmp_path / "deploy-receipts"
     receipts.mkdir(mode=0o700)
     receipts.chmod(0o700)
@@ -136,6 +135,9 @@ def public_download_migration_inputs(module, tmp_path: Path):
         "source_head": source_head,
         "authority": authority_path,
         "authority_sha256": sha256(authority_raw),
+        "candidate_receipt": candidate_receipt,
+        "candidate_receipt_sha256": sha256(candidate_receipt.read_bytes()),
+        "authority_materialization": authority_materialization,
         "generation_id": "generation-public-download-initial",
         "activation_receipt_id": "activation-public-download-initial",
         "stale_payloads": stale_payloads,
@@ -800,6 +802,374 @@ def test_public_download_migration_rejects_authority_or_incumbent_candidate_drif
             second["generation_id"],
             second["activation_receipt_id"],
         )
+
+    third_root = tmp_path / "third"
+    third_root.mkdir()
+    third = public_download_migration_inputs(module, third_root)
+    third["candidate_receipt"].write_bytes(
+        third["candidate_receipt"].read_bytes() + b" "
+    )
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="receipt changed from its SHA-256 pin",
+    ):
+        module.prepare_public_download_migration(
+            third["shelf"],
+            third["state"],
+            third["candidate"],
+            third["authority"],
+            third["authority_sha256"],
+            third["source_head"],
+            third["generation_id"],
+            third["activation_receipt_id"],
+        )
+
+
+def test_public_download_migration_repairs_only_exact_manifest_bound_missing_byte(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    restored_bytes = b"exact governed incumbent closure repair\n"
+    restored_sha256 = sha256(restored_bytes)
+    restored_name = "chummer-linux-installer.deb"
+    write_json(
+        shelf / "aur-packages.json",
+        {
+            "packages": [
+                {
+                    "upstreamArtifactFileName": restored_name,
+                    "upstreamArtifactSha256": restored_sha256,
+                    "upstreamArtifactSizeBytes": len(restored_bytes),
+                }
+            ]
+        },
+    )
+    source = tmp_path / "trusted-source" / restored_name
+    source.parent.mkdir()
+    source.write_bytes(restored_bytes)
+    candidate = tmp_path / "candidate"
+    restored_path = f"files/{restored_name}"
+    restorations = [
+        {
+            "path": restored_path,
+            "sha256": restored_sha256,
+            "sizeBytes": len(restored_bytes),
+            "sourcePath": str(source),
+        }
+    ]
+    source_head = "e" * 40
+    restoration_spec = tmp_path / "manifest-closure-restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, restorations)
+    candidate_receipt = tmp_path / "candidate-materialization.json"
+    candidate_command = [
+        "materialize-public-download-only-candidate",
+        "--shelf-root",
+        str(shelf),
+        "--candidate-root",
+        str(candidate),
+        "--source-head",
+        source_head,
+        "--manifest-closure-restoration-spec",
+        str(restoration_spec),
+        "--manifest-closure-restoration-spec-sha256",
+        sha256(restoration_spec_raw),
+        "--output",
+        str(candidate_receipt),
+    ]
+    assert module.main(candidate_command) == 0
+    candidate_materialization = json.loads(capsys.readouterr().out)
+    candidate_receipt_raw = candidate_receipt.read_bytes()
+    assert candidate_receipt_raw == (
+        module.canonical_json_bytes(candidate_materialization) + b"\n"
+    )
+    assert candidate_materialization["candidateRoot"] == str(candidate)
+    assert candidate_materialization[
+        "manifestClosureRestorations"
+    ] == restorations
+    assert candidate_materialization[
+        "candidateInventory"
+    ]["digest"].startswith("sha256:")
+    assert (candidate / restored_path).read_bytes() == restored_bytes
+    candidate_identity = candidate.stat().st_dev, candidate.stat().st_ino
+    candidate_inventory_before = module.inventory_tree(
+        candidate,
+        skip_top_level_controls=False,
+    )
+
+    assert module.main(candidate_command) == 0
+    assert json.loads(capsys.readouterr().out) == candidate_materialization
+    assert (
+        candidate.stat().st_dev,
+        candidate.stat().st_ino,
+    ) == candidate_identity
+    assert module.inventory_tree(
+        candidate,
+        skip_top_level_controls=False,
+    ) == candidate_inventory_before
+
+    authority = tmp_path / "migration-authority.json"
+    assert module.main(
+        [
+            "materialize-public-download-only-authority",
+            "--shelf-root",
+            str(shelf),
+            "--candidate-root",
+            str(candidate),
+            "--source-head",
+            source_head,
+            "--manifest-closure-restoration-spec",
+            str(restoration_spec),
+            "--manifest-closure-restoration-spec-sha256",
+            sha256(restoration_spec_raw),
+            "--candidate-materialization-receipt",
+            str(candidate_receipt),
+            "--candidate-materialization-receipt-sha256",
+            sha256(candidate_receipt_raw),
+            "--output",
+            str(authority),
+        ]
+    ) == 0
+    authority_materialization = json.loads(capsys.readouterr().out)
+    authority_raw = authority.read_bytes()
+    authority_payload = json.loads(authority_raw)
+    assert authority_raw == module.canonical_json_bytes(authority_payload) + b"\n"
+    assert authority_materialization["sha256"] == sha256(authority_raw)
+    assert authority_materialization["manifestClosureRestorationCount"] == 1
+    assert authority_payload["candidateMaterialization"] == {
+        "receiptPath": str(candidate_receipt),
+        "receiptSha256": sha256(candidate_receipt_raw),
+        "manifestClosureRestorationSpecSha256": sha256(
+            restoration_spec_raw
+        ),
+        "sourceHead": source_head,
+    }
+    assert module.main(
+        [
+            "materialize-public-download-only-authority",
+            "--shelf-root",
+            str(shelf),
+            "--candidate-root",
+            str(candidate),
+            "--source-head",
+            source_head,
+            "--manifest-closure-restoration-spec",
+            str(restoration_spec),
+            "--manifest-closure-restoration-spec-sha256",
+            sha256(restoration_spec_raw),
+            "--candidate-materialization-receipt",
+            str(candidate_receipt),
+            "--candidate-materialization-receipt-sha256",
+            sha256(candidate_receipt_raw),
+            "--output",
+            str(authority),
+        ]
+    ) == 1
+    assert "already exists" in capsys.readouterr().err
+    state = tmp_path / "receipts" / "migration"
+    state.parent.mkdir(mode=0o700)
+    state.parent.chmod(0o700)
+
+    prestate = module.prepare_public_download_migration(
+        shelf,
+        state,
+        candidate,
+        authority,
+        authority_materialization["sha256"],
+        source_head,
+        "generation-closure-repair",
+        "activation-closure-repair",
+    )
+    module.request_public_download_migration_start(shelf, state, candidate)
+    generation_module = module._load_release_shelf_generation_module()
+    generation_module.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-closure-repair",
+        activation_receipt_id="activation-closure-repair",
+    )
+    poststate = module.verify_public_download_migration(
+        shelf,
+        state,
+        candidate,
+    )
+
+    assert not (shelf / restored_path).exists()
+    assert (
+        shelf
+        / "generations"
+        / "generation-closure-repair"
+        / restored_path
+    ).read_bytes() == restored_bytes
+    assert prestate["candidateSnapshot"]["manifestClosureRestorations"] == restorations
+    assert prestate["candidateSnapshot"]["governedIncumbentClosureRepair"] is True
+    assert poststate["legacyTopLevelBytesUnchanged"] is True
+
+
+def test_public_download_candidate_preflight_resumes_commit_boundary_crashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    candidate = private / "candidate"
+    restoration_spec = private / "restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, [])
+    receipt = private / "candidate-materialization.json"
+    arguments = (
+        shelf,
+        candidate,
+        "c" * 40,
+        restoration_spec,
+        sha256(restoration_spec_raw),
+        receipt,
+    )
+    original_rename = module._rename_directory_noreplace_at
+
+    def crash_after_candidate_rename(*args, **kwargs) -> None:
+        original_rename(*args, **kwargs)
+        raise RuntimeError("simulated crash after candidate rename")
+
+    monkeypatch.setattr(
+        module,
+        "_rename_directory_noreplace_at",
+        crash_after_candidate_rename,
+    )
+    with pytest.raises(RuntimeError, match="after candidate rename"):
+        module.materialize_public_download_migration_candidate(*arguments)
+    assert candidate.is_dir()
+    assert not receipt.exists()
+    candidate_identity = candidate.stat().st_dev, candidate.stat().st_ino
+
+    monkeypatch.setattr(
+        module,
+        "_rename_directory_noreplace_at",
+        original_rename,
+    )
+    first_receipt = module.materialize_public_download_migration_candidate(
+        *arguments
+    )
+    assert json.loads(receipt.read_bytes()) == first_receipt
+    assert (
+        candidate.stat().st_dev,
+        candidate.stat().st_ino,
+    ) == candidate_identity
+
+    receipt.unlink()
+    original_publish = module._write_and_publish_unnamed_at
+
+    def crash_after_receipt_publish(*args, **kwargs) -> None:
+        original_publish(*args, **kwargs)
+        raise RuntimeError("simulated crash after receipt publication")
+
+    monkeypatch.setattr(
+        module,
+        "_write_and_publish_unnamed_at",
+        crash_after_receipt_publish,
+    )
+    with pytest.raises(RuntimeError, match="after receipt publication"):
+        module.materialize_public_download_migration_candidate(*arguments)
+    published_receipt_raw = receipt.read_bytes()
+
+    monkeypatch.setattr(
+        module,
+        "_write_and_publish_unnamed_at",
+        original_publish,
+    )
+    resumed_receipt = module.materialize_public_download_migration_candidate(
+        *arguments
+    )
+    assert resumed_receipt == json.loads(published_receipt_raw)
+    assert receipt.read_bytes() == published_receipt_raw
+    assert (
+        candidate.stat().st_dev,
+        candidate.stat().st_ino,
+    ) == candidate_identity
+
+
+def test_public_download_preflight_outputs_cannot_mutate_frozen_inputs(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    candidate = private / "candidate"
+    restoration_spec = private / "restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, [])
+    restoration_sha256 = sha256(restoration_spec_raw)
+    shelf_inventory = module.inventory_tree(
+        shelf,
+        skip_top_level_controls=False,
+    )
+
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="outside the candidate and release shelf",
+    ):
+        module.materialize_public_download_migration_candidate(
+            shelf,
+            candidate,
+            "d" * 40,
+            restoration_spec,
+            restoration_sha256,
+            shelf / "candidate-materialization.json",
+        )
+    assert not candidate.exists()
+    assert module.inventory_tree(
+        shelf,
+        skip_top_level_controls=False,
+    ) == shelf_inventory
+
+    candidate_receipt = private / "candidate-materialization.json"
+    module.materialize_public_download_migration_candidate(
+        shelf,
+        candidate,
+        "d" * 40,
+        restoration_spec,
+        restoration_sha256,
+        candidate_receipt,
+    )
+    candidate_inventory = module.inventory_tree(
+        candidate,
+        skip_top_level_controls=False,
+    )
+    for forbidden_output in (
+        shelf / "migration-authority.json",
+        candidate / "migration-authority.json",
+    ):
+        with pytest.raises(
+            module.CutoverAttestationError,
+            match="outside the release shelf and frozen candidate",
+        ):
+            module.materialize_public_download_migration_authority(
+                shelf,
+                candidate,
+                "d" * 40,
+                restoration_spec,
+                restoration_sha256,
+                candidate_receipt,
+                sha256(candidate_receipt.read_bytes()),
+                forbidden_output,
+            )
+        assert not forbidden_output.exists()
+    assert module.inventory_tree(
+        shelf,
+        skip_top_level_controls=False,
+    ) == shelf_inventory
+    assert module.inventory_tree(
+        candidate,
+        skip_top_level_controls=False,
+    ) == candidate_inventory
 
 
 def test_prepare_and_request_start_bind_complete_legacy_inventory(tmp_path: Path) -> None:

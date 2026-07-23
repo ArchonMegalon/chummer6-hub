@@ -133,6 +133,8 @@ class SimulatedHardCrash(BaseException):
 def prepare_deploy_activation(
     module,
     tmp_path: Path,
+    *,
+    runtime_profile: str | None = None,
 ) -> tuple[Path, Path, Path, Path, Path, dict[str, int]]:
     source_root = tmp_path / "source"
     active_root = tmp_path / "overlay" / "app"
@@ -149,6 +151,16 @@ def prepare_deploy_activation(
         active_root,
         label="active root",
     )
+    profile_arguments: dict[str, object] = {}
+    if runtime_profile is not None:
+        profile_arguments = {
+            "runtime_profile": runtime_profile,
+            "deployment_operation": (
+                "initial-release-shelf-public-download-cutover"
+            ),
+            "source_head": "d" * 40,
+            "prior_active_runtime_authority_existed": False,
+        }
     module.snapshot(
         source_root=source_root,
         active_root=active_root,
@@ -158,6 +170,7 @@ def prepare_deploy_activation(
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
+        **profile_arguments,
         **deploy_proof_authority(tmp_path),
     )
     return (
@@ -704,6 +717,34 @@ def test_transaction_phase_journal_is_monotonic(tmp_path: Path, monkeypatch) -> 
             shared_mutation_lock_token="2" * 64,
         )
     assert json.loads(journal.read_text(encoding="utf-8"))["phase"] == "tunnel_drained"
+
+
+def test_default_full_snapshot_preserves_legacy_exact_field_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        _source_root,
+        _active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(module, tmp_path)
+    payload = json.loads(journal.read_text(encoding="utf-8"))
+
+    assert set(payload) == module.FULL_SNAPSHOT_FIELDS
+    assert set(payload["deployOverlayAuthority"]) == (
+        module.DEPLOY_OVERLAY_AUTHORITY_FIELDS
+    )
+    assert "runtimeProfile" not in payload
+    assert "deploymentOperation" not in payload
+    assert "sourceHead" not in payload
+    assert "priorActiveRuntimeAuthorityExisted" not in (
+        payload["deployOverlayAuthority"]
+    )
 
 
 def test_deploy_snapshot_rejects_inconsistent_runtime_prior_state(
@@ -1257,7 +1298,11 @@ def test_public_download_only_completion_neither_requires_nor_claims_install_lin
         _backup_root,
         journal,
         _prior_identity,
-    ) = prepare_deploy_activation(module, tmp_path)
+    ) = prepare_deploy_activation(
+        module,
+        tmp_path,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
     for phase in module.TRANSACTION_PHASES[1:]:
         module.mark_phase(
             source_root=source_root,
@@ -1291,9 +1336,56 @@ def test_public_download_only_completion_neither_requires_nor_claims_install_lin
         module.PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS
     )
     assert authority["runtimeProfile"] == "public-download-only"
+    assert authority["sourceHead"] == "d" * 40
+    assert (
+        authority["deploymentOperation"]
+        == "initial-release-shelf-public-download-cutover"
+    )
+    assert authority["publicProjectionSnapshotId"] == (
+        runtime_prior_state()["publicProjectionSnapshotId"]
+    )
     assert "installLinkingAuthorityReadinessPath" not in authority
     assert "installLinkingAuthorityReadinessSha256" not in authority
     assert not journal.exists()
+
+
+def test_runtime_profile_and_source_binding_reject_cross_profile_recovery(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        source_root,
+        active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(
+        module,
+        tmp_path,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
+
+    with pytest.raises(RuntimeError, match="runtime profile conflicts"):
+        module.validated_deploy_snapshot(
+            journal,
+            source_root=source_root,
+            active_root=active_root,
+            expected_runtime_profile=module.FULL_RUNTIME_PROFILE,
+        )
+    with pytest.raises(RuntimeError, match="source HEAD conflicts"):
+        module.validated_deploy_snapshot(
+            journal,
+            source_root=source_root,
+            active_root=active_root,
+            expected_runtime_profile=(
+                module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            ),
+            expected_source_head="e" * 40,
+        )
+    assert journal.is_file()
 
 
 def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:

@@ -37,6 +37,7 @@ OPERATIONS = {
     "initial-release-shelf-public-download-cutover-recover",
 }
 RECOVERY_OPERATION = "initial-release-shelf-public-download-cutover-recover"
+CUTOVER_OPERATION = "initial-release-shelf-public-download-cutover"
 CANONICAL_PROJECT = "chummer6-hub"
 CANONICAL_PORT = 8091
 CANONICAL_STATE_VOLUME = "chummer6-hub_chummer-run-api-state"
@@ -49,6 +50,31 @@ CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{7,127}$")
+CANONICAL_RELEASE_SHELF_ROOT = Path(
+    "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
+)
+SHELF_MUTATION_MAY_HAVE_BEGUN = False
+PUBLIC_ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
+    "contractName",
+    "deploymentOperation",
+    "generatedAtUtc",
+    "portal",
+    "publicProjectionManifestSha256",
+    "publicProjectionSnapshotId",
+    "publicProjectionSnapshotSha256",
+    "runtimeProfile",
+    "sourceHead",
+    "status",
+}
+ACTIVE_RUNTIME_PORTAL_FIELDS = {
+    "containerId",
+    "containerName",
+    "existed",
+    "imageId",
+    "proofAuthorityMountSha256",
+    "proofPublicMountSha256",
+    "wasRunning",
+}
 
 
 class CutoverError(RuntimeError):
@@ -71,7 +97,7 @@ def stable_regular_bytes(
     path: Path,
     *,
     label: str,
-    maximum_bytes: int = 16 * 1024 * 1024,
+    maximum_bytes: int | None = 16 * 1024 * 1024,
     owner_only: bool = False,
 ) -> bytes:
     try:
@@ -85,7 +111,7 @@ def stable_regular_bytes(
         or before.st_uid != os.getuid()
         or (owner_only and stat.S_IMODE(before.st_mode) & 0o077)
         or stat.S_IMODE(before.st_mode) & 0o022
-        or before.st_size > maximum_bytes
+        or (maximum_bytes is not None and before.st_size > maximum_bytes)
     ):
         raise CutoverError(f"{label} metadata is unsafe")
     try:
@@ -421,6 +447,55 @@ def validate_config(config: Config) -> None:
     private_directory(config.docker_config_root / "config", create=False)
 
 
+def validate_journal_recovery_config(config: Config) -> None:
+    """Validate only inputs that recovery consumes; never resolve CURRENT."""
+
+    if config.operation != RECOVERY_OPERATION:
+        raise CutoverError("journal recovery operation is invalid")
+    if COMMIT.fullmatch(config.source_head) is None:
+        raise CutoverError("journal recovery source HEAD is invalid")
+    if SHA256.fullmatch(config.shared_lock_token) is None:
+        raise CutoverError("shared mutation lock token is invalid")
+    if (
+        config.shelf_root != CANONICAL_RELEASE_SHELF_ROOT
+        or config.shelf_root.resolve(strict=True) != config.shelf_root
+        or config.shelf_root.is_symlink()
+    ):
+        raise CutoverError("journal recovery shelf root is not canonical")
+    if (
+        not config.transaction_journal.is_file()
+        or config.transaction_journal.is_symlink()
+    ):
+        raise CutoverError("journal recovery transaction is unavailable")
+    try:
+        observed_head = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(config.source_root),
+                "rev-parse",
+                "--verify",
+                "HEAD^{commit}",
+            ],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CutoverError("journal recovery source HEAD could not be verified") from exc
+    if observed_head != config.source_head:
+        raise CutoverError("journal recovery source checkout changed")
+    private_directory(config.receipt_root, create=False)
+    private_directory(config.active_runtime_authority.parent, create=False)
+    private_directory(config.docker_config_root, create=False)
+    private_directory(config.docker_config_root / "home", create=False)
+    private_directory(config.docker_config_root / "config", create=False)
+
+
 def docker_inspect_json(runner: Runner, kind: str, identity: str) -> dict[str, Any]:
     raw = runner.docker(
         [kind, "inspect", identity],
@@ -640,66 +715,68 @@ def materialize_incumbent_candidate(
     attestor: Any,
     shelf_root: Path,
     candidate_root: Path,
+    manifest_closure_restorations: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    if candidate_root.exists() or candidate_root.is_symlink():
-        raise CutoverError("unattested migration candidate already exists")
+    """Consume only the exact candidate created by the audited preflight."""
+
     parent = private_directory(candidate_root.parent, create=False)
-    candidate_root.mkdir(mode=0o700)
-    if candidate_root.parent != parent:
-        raise CutoverError("migration candidate parent changed")
-    with attestor.anchored_directory(
-        shelf_root,
-        "release shelf root",
-    ) as shelf:
-        snapshot = attestor.capture_legacy_snapshot_fd(
-            shelf,
-            allow_aborted_history=False,
+    if not candidate_root.exists() or candidate_root.is_symlink():
+        raise CutoverError(
+            "audited preflight migration candidate is unavailable"
         )
-        raw_rows = snapshot["legacyInventory"]["files"]
-        referenced = {
-            str(row["path"])
-            for row in attestor._public_download_manifest_references(
+    try:
+        with attestor.anchored_directory(
+            shelf_root,
+            "release shelf root",
+        ) as shelf, attestor.anchored_directory(
+            candidate_root,
+            "public-download migration candidate",
+        ) as candidate:
+            snapshot = attestor.capture_legacy_snapshot_fd(
                 shelf,
-                raw_rows,
+                allow_aborted_history=False,
             )
-        }
-        copied: list[str] = []
-        excluded: list[str] = []
-        for row in raw_rows:
-            relative = str(row["path"])
-            if relative.startswith("files/") and relative not in referenced:
-                excluded.append(relative)
-                continue
-            source = shelf_root / relative
-            destination = candidate_root / relative
+            candidate_snapshot = attestor._capture_public_download_candidate(
+                candidate,
+                shelf=shelf,
+                shelf_snapshot=snapshot,
+                manifest_closure_restorations=(
+                    manifest_closure_restorations
+                ),
+            )
+    except Exception as exc:
+        quarantine = parent / (
+            f".quarantine-{candidate_root.name}-{secrets.token_hex(8)}"
+        )
+        try:
+            os.rename(candidate_root, quarantine)
+            descriptor = os.open(parent, os.O_RDONLY)
             try:
-                metadata = source.lstat()
-            except OSError as exc:
-                raise CutoverError("incumbent release byte disappeared during copy") from exc
-            if (
-                not stat.S_ISREG(metadata.st_mode)
-                or stat.S_ISLNK(metadata.st_mode)
-                or metadata.st_nlink != int(row["linkCount"])
-                or metadata.st_size != int(row["sizeBytes"])
-            ):
-                raise CutoverError("incumbent release byte metadata changed during copy")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination, follow_symlinks=False)
-            copied_bytes = stable_regular_bytes(
-                destination,
-                label="migration candidate byte",
-                maximum_bytes=max(int(row["sizeBytes"]), 1),
-            )
-            if (
-                len(copied_bytes) != int(row["sizeBytes"])
-                or sha256_bytes(copied_bytes) != str(row["sha256"])
-            ):
-                raise CutoverError("migration candidate byte differs from incumbent")
-            copied.append(relative)
-    fsync_candidate_tree(candidate_root)
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except OSError as quarantine_error:
+            raise CutoverError(
+                "unattested migration candidate is invalid and quarantine failed"
+            ) from quarantine_error
+        raise CutoverError(
+            f"invalid migration candidate quarantined as {quarantine.name}"
+        ) from exc
     return {
-        "copiedPaths": copied,
-        "excludedUnreferencedFiles": excluded,
+        "resumedExactCandidate": True,
+        "candidateInventoryDigest": candidate_snapshot["inventory"]["digest"],
+        "copiedPaths": [
+            str(row["path"])
+            for row in candidate_snapshot["inventory"]["files"]
+        ],
+        "excludedUnreferencedFiles": [
+            str(row["path"])
+            for row in candidate_snapshot["excludedLegacyFiles"]
+        ],
+        "manifestClosureRestorations": manifest_closure_restorations,
+        "governedIncumbentClosureRepair": bool(
+            manifest_closure_restorations
+        ),
     }
 
 
@@ -709,6 +786,8 @@ def migrate_shelf(
     attestor: Any,
     generation: Any,
 ) -> tuple[dict[str, Any], Path, Path]:
+    global SHELF_MUTATION_MAY_HAVE_BEGUN
+    SHELF_MUTATION_MAY_HAVE_BEGUN = True
     with generation.promotion_lock(config.shelf_root) as lease:
         prestate_path = config.migration_state_root / attestor.PRESTATE_NAME
         start_path = config.migration_state_root / attestor.START_NAME
@@ -719,10 +798,20 @@ def migrate_shelf(
                 existing = tuple(config.migration_state_root.iterdir())
                 if existing:
                     raise CutoverError("migration state exists without a valid prestate")
+            manifest_closure_restorations = (
+                attestor.public_download_manifest_closure_restorations(
+                    config.shelf_root,
+                    config.migration_authority,
+                    config.migration_authority_sha256,
+                )
+            )
             copy_receipt = materialize_incumbent_candidate(
                 attestor=attestor,
                 shelf_root=config.shelf_root,
                 candidate_root=config.migration_candidate_root,
+                manifest_closure_restorations=(
+                    manifest_closure_restorations
+                ),
             )
             generation_id = generation.new_generation_id()
             activation_receipt_id = generation.new_activation_receipt_id()
@@ -748,27 +837,19 @@ def migrate_shelf(
             )
             generation_id = str(prestate.get("generationId") or "")
             activation_receipt_id = str(prestate.get("activationReceiptId") or "")
-            if not pointer_path.exists():
-                with attestor.anchored_directory(
-                    config.shelf_root,
-                    "release shelf root",
-                ) as shelf, attestor.anchored_directory(
-                    config.migration_candidate_root,
-                    "public-download migration candidate",
-                ) as candidate, attestor.anchored_directory(
-                    config.migration_state_root,
-                    "cutover state root",
-                ) as state:
-                    attestor._validate_public_download_prestate(
-                        prestate,
-                        state=state,
-                        shelf=shelf,
-                        candidate=candidate,
-                        source_head=config.source_head,
-                    )
-                    attestor._revalidate_public_download_migration_authority(
-                        prestate
-                    )
+            stage = generation.reconcile_activation_stage_residue(
+                config.migration_candidate_root,
+                config.shelf_root,
+                generation_id=generation_id,
+                activation_receipt_id=activation_receipt_id,
+            )
+            prestate = attestor.validate_public_download_migration_resume(
+                config.shelf_root,
+                config.migration_state_root,
+                config.migration_candidate_root,
+                source_head=config.source_head,
+                ignored_activation_stage_name=stage.name if stage else "",
+            )
         if pointer_path.exists() and not start_path.exists():
             raise CutoverError(
                 "migration pointer committed without its start authority"
@@ -779,7 +860,15 @@ def migrate_shelf(
                 config.migration_state_root,
                 config.migration_candidate_root,
             )
-        if not pointer_path.exists():
+        poststate_path = (
+            config.migration_state_root / attestor.POSTSTATE_NAME
+        )
+        marker_path = config.shelf_root / generation.LAYOUT_MARKER
+        if (
+            not poststate_path.exists()
+            or not pointer_path.exists()
+            or not marker_path.exists()
+        ):
             generation.activate_filesystem(
                 config.migration_candidate_root,
                 config.shelf_root,
@@ -787,6 +876,7 @@ def migrate_shelf(
                 generation_id=generation_id,
                 activation_receipt_id=activation_receipt_id,
                 promotion_lease=lease,
+                allow_orphan_generation_recovery=True,
             )
         poststate = attestor.verify_public_download_migration(
             config.shelf_root,
@@ -835,7 +925,317 @@ def stage_overlay(config: Config, runner: Runner, receipt_dir: Path) -> Path:
     return output
 
 
-def build_candidate_image(config: Config, runner: Runner) -> tuple[str, str]:
+def _snapshot_context_entries(
+    source_root: Path,
+    destination_root: Path,
+    *,
+    selected_entries: tuple[str, ...] | None,
+    label: str,
+) -> dict[str, Any]:
+    try:
+        source_metadata = source_root.lstat()
+    except OSError as exc:
+        raise CutoverError(f"{label} source is unavailable") from exc
+    if (
+        not source_root.is_absolute()
+        or source_root.resolve(strict=True) != source_root
+        or not stat.S_ISDIR(source_metadata.st_mode)
+        or stat.S_ISLNK(source_metadata.st_mode)
+    ):
+        raise CutoverError(f"{label} source root is unsafe")
+    destination_root.mkdir(mode=0o700)
+
+    def copy_path(source: Path, destination: Path, relative: str) -> None:
+        metadata = source.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise CutoverError(f"{label} contains a symbolic link: {relative}")
+        if stat.S_ISDIR(metadata.st_mode):
+            destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            destination.mkdir(mode=0o700)
+            names = sorted(item.name for item in os.scandir(source))
+            for name in names:
+                if name in ("", ".", "..") or "/" in name or "\\" in name:
+                    raise CutoverError(f"{label} contains an unsafe entry name")
+                child_relative = f"{relative}/{name}" if relative else name
+                copy_path(source / name, destination / name, child_relative)
+            after = source.lstat()
+            if (
+                after.st_dev,
+                after.st_ino,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ) != (
+                metadata.st_dev,
+                metadata.st_ino,
+                metadata.st_mtime_ns,
+                metadata.st_ctime_ns,
+            ):
+                raise CutoverError(f"{label} directory changed during snapshot")
+            destination.chmod(stat.S_IMODE(metadata.st_mode) & 0o777)
+            return
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise CutoverError(f"{label} contains a non-regular entry: {relative}")
+        raw = stable_regular_bytes(
+            source,
+            label=f"{label} file",
+            maximum_bytes=None,
+        )
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        descriptor = os.open(
+            destination,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            view = memoryview(raw)
+            while view:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise CutoverError(f"{label} snapshot write made no progress")
+                view = view[written:]
+            os.fchmod(descriptor, stat.S_IMODE(metadata.st_mode) & 0o777)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    entries = (
+        selected_entries
+        if selected_entries is not None
+        else tuple(sorted(item.name for item in os.scandir(source_root)))
+    )
+    for relative in entries:
+        if (
+            not relative
+            or Path(relative).is_absolute()
+            or ".." in Path(relative).parts
+        ):
+            raise CutoverError(f"{label} selected path is unsafe")
+        source = source_root / relative
+        if not source.exists() or source.is_symlink():
+            raise CutoverError(f"{label} selected path is unavailable: {relative}")
+        copy_path(source, destination_root / relative, relative)
+    destination_root.chmod(stat.S_IMODE(source_metadata.st_mode) & 0o777)
+    rows, digest = _context_inventory(
+        destination_root,
+        label=f"{label} snapshot",
+    )
+    return {
+        "sourceRoot": str(source_root),
+        "snapshotRoot": str(destination_root),
+        "algorithm": "sha256-canonical-file-inventory-v1",
+        "digest": digest,
+        "fileCount": len(rows),
+        "files": rows,
+    }
+
+
+def _snapshot_inventory(root: Path, *, label: str) -> str:
+    _rows, digest = _context_inventory(root, label=label)
+    return digest
+
+
+def _context_inventory(
+    root: Path,
+    *,
+    label: str,
+) -> tuple[list[dict[str, Any]], str]:
+    try:
+        root_metadata = root.lstat()
+    except OSError as exc:
+        raise CutoverError(f"{label} root is unavailable") from exc
+    if (
+        not stat.S_ISDIR(root_metadata.st_mode)
+        or stat.S_ISLNK(root_metadata.st_mode)
+    ):
+        raise CutoverError(f"{label} root is unsafe")
+    rows: list[dict[str, Any]] = []
+    def walk(path: Path, relative: str) -> None:
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise CutoverError(f"{label} contains a symbolic link: {relative}")
+        if stat.S_ISDIR(metadata.st_mode):
+            rows.append(
+                {
+                    "path": relative,
+                    "type": "directory",
+                    "mode": stat.S_IMODE(metadata.st_mode) & 0o777,
+                }
+            )
+            try:
+                entries = sorted(os.scandir(path), key=lambda item: item.name)
+            except OSError as exc:
+                raise CutoverError(f"{label} directory is unreadable") from exc
+            for entry in entries:
+                child_relative = (
+                    entry.name if relative == "." else f"{relative}/{entry.name}"
+                )
+                walk(path / entry.name, child_relative)
+            after = path.lstat()
+            if (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ) != (
+                metadata.st_dev,
+                metadata.st_ino,
+                metadata.st_mode,
+                metadata.st_mtime_ns,
+                metadata.st_ctime_ns,
+            ):
+                raise CutoverError(f"{label} directory changed during inventory")
+            return
+        if stat.S_ISREG(metadata.st_mode):
+            if metadata.st_nlink != 1:
+                raise CutoverError(f"{label} contains a multi-link file")
+            raw = stable_regular_bytes(
+                path,
+                label=f"{label} file",
+                maximum_bytes=None,
+            )
+            rows.append(
+                {
+                    "path": relative,
+                    "type": "file",
+                    "mode": stat.S_IMODE(metadata.st_mode) & 0o777,
+                    "sha256": sha256_bytes(raw),
+                    "sizeBytes": len(raw),
+                }
+            )
+            return
+        raise CutoverError(f"{label} contains a special entry: {relative}")
+
+    walk(root, ".")
+    rows.sort(key=lambda row: (str(row["path"]), str(row["type"])))
+    digest = sha256_bytes(
+        json.dumps(
+            rows,
+            separators=(",", ":"),
+            sort_keys=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    )
+    return rows, digest
+
+
+def prepare_immutable_build_contexts(
+    config: Config,
+    receipt_dir: Path,
+) -> tuple[dict[str, Path], dict[str, str], Path]:
+    snapshots_root = receipt_dir / "immutable-build-contexts"
+    snapshots_root.mkdir(mode=0o700)
+    source_entries = (
+        ".codex-design",
+        "Chummer.Campaign.Contracts",
+        "Chummer.Control.Contracts",
+        "Chummer.InstallLinking.Postgres.Tool",
+        "Chummer.Play.Contracts",
+        "Chummer.Run.Api",
+        "Chummer.Run.Contracts",
+        "Chummer.Run.LoopbackProbe",
+        "Chummer.World.Contracts",
+        "Directory.Build.props",
+        "eng/NuGet.Container.Config",
+        "eng/package-plane.lock.json",
+        "global.json",
+        "scripts/ai/bootstrap-hub-package-feed.py",
+        "scripts/generate_public_play_worker_projection.py",
+        "scripts/initialize-public-edge-volumes.sh",
+        "scripts/validate_public_pwa_proof_authority.py",
+        "scripts/verify_public_pwa_static_assets.py",
+    )
+    definitions = (
+        (
+            "default",
+            config.source_root,
+            ("Chummer.Run.Api/Dockerfile",),
+            "default Docker build context",
+        ),
+        (
+            "run-services",
+            config.source_root,
+            source_entries,
+            "run-services build context",
+        ),
+        (
+            "hub-registry",
+            config.build_context / "chummer-hub-registry",
+            ("black-ledger",),
+            "hub-registry build context",
+        ),
+        (
+            "fleet-media",
+            config.fleet_media_contracts,
+            None,
+            "fleet media contracts build context",
+        ),
+        (
+            "design-product",
+            config.design_product_root,
+            ("products/chummer",),
+            "design product build context",
+        ),
+    )
+    contexts: dict[str, Path] = {}
+    digests: dict[str, str] = {}
+    receipts: dict[str, Any] = {}
+    for name, source, selected, label in definitions:
+        destination = snapshots_root / name
+        receipt = _snapshot_context_entries(
+            source,
+            destination,
+            selected_entries=selected,
+            label=label,
+        )
+        contexts[name] = destination
+        digests[name] = str(receipt["digest"])
+        receipts[name] = receipt
+    receipt_path = receipt_dir / "immutable-build-contexts.json"
+    write_private_json(
+        receipt_path,
+        {
+            "contractName": (
+                "chummer.public-download-only-build-context-snapshots/v1"
+            ),
+            "status": "pass",
+            "sourceHead": config.source_head,
+            "contexts": receipts,
+        },
+    )
+    return contexts, digests, receipt_path
+
+
+def build_candidate_image(
+    config: Config,
+    runner: Runner,
+    *,
+    contexts: dict[str, Path] | None = None,
+    context_digests: dict[str, str] | None = None,
+) -> tuple[str, str]:
+    if contexts is None:
+        contexts = {
+            "default": config.build_context,
+            "run-services": config.source_root,
+            "hub-registry": config.build_context / "chummer-hub-registry",
+            "fleet-media": config.fleet_media_contracts,
+            "design-product": config.design_product_root,
+        }
+    if context_digests is None:
+        context_digests = {
+            name: _snapshot_inventory(path, label=f"{name} build context")
+            for name, path in contexts.items()
+        }
+    before_digests = {
+        name: _snapshot_inventory(path, label=f"{name} immutable build context")
+        for name, path in contexts.items()
+    }
+    if before_digests != context_digests:
+        raise CutoverError("immutable build context changed before image build")
     unique_tag = (
         f"chummer-run-api:public-download-{config.source_head[:16]}-"
         f"{secrets.token_hex(4)}"
@@ -848,16 +1248,16 @@ def build_candidate_image(config: Config, runner: Runner) -> tuple[str, str]:
             "--progress",
             "plain",
             "--file",
-            str(config.source_root / "Chummer.Run.Api/Dockerfile"),
+            str(contexts["default"] / "Chummer.Run.Api/Dockerfile"),
             "--build-context",
-            f"run-services-source={config.source_root}",
+            f"run-services-source={contexts['run-services']}",
             "--build-context",
             "hub-registry-source="
-            + str(config.build_context / "chummer-hub-registry"),
+            + str(contexts["hub-registry"]),
             "--build-context",
-            f"fleet-media-factory-contracts={config.fleet_media_contracts}",
+            f"fleet-media-factory-contracts={contexts['fleet-media']}",
             "--build-context",
-            f"design-product={config.design_product_root}",
+            f"design-product={contexts['design-product']}",
             "--build-arg",
             "CHUMMER_BUILD_CONCURRENCY=1",
             "--build-arg",
@@ -868,9 +1268,18 @@ def build_candidate_image(config: Config, runner: Runner) -> tuple[str, str]:
             f"org.opencontainers.image.revision={config.source_head}",
             "--label",
             f"run.chummer.runtime-profile={RUNTIME_PROFILE}",
+            *[
+                item
+                for name in sorted(context_digests)
+                for item in (
+                    "--label",
+                    "run.chummer.build-context."
+                    f"{name}.sha256={context_digests[name]}",
+                )
+            ],
             "--tag",
             unique_tag,
-            str(config.build_context),
+            str(contexts["default"]),
         ],
         label="build unique public-download portal image",
         timeout=3600,
@@ -878,10 +1287,19 @@ def build_candidate_image(config: Config, runner: Runner) -> tuple[str, str]:
     inspection = docker_inspect_json(runner, "image", unique_tag)
     image_id = str(inspection.get("Id") or "")
     labels = inspection.get("Config", {}).get("Labels") or {}
+    after_digests = {
+        name: _snapshot_inventory(path, label=f"{name} immutable build context")
+        for name, path in contexts.items()
+    }
     if (
         IMAGE_ID.fullmatch(image_id) is None
         or labels.get("org.opencontainers.image.revision") != config.source_head
         or labels.get("run.chummer.runtime-profile") != RUNTIME_PROFILE
+        or after_digests != context_digests
+        or any(
+            labels.get(f"run.chummer.build-context.{name}.sha256") != digest
+            for name, digest in context_digests.items()
+        )
     ):
         raise CutoverError("candidate image identity or source labels are invalid")
     return unique_tag, image_id
@@ -997,7 +1415,7 @@ def start_oneoff_portal(
     overlay_root: Path,
     service_ports: bool,
     image_id: str,
-) -> tuple[str, dict[str, Any]]:
+) -> str:
     arguments = ["run", "-T", "-d", "--no-deps"]
     if service_ports:
         arguments.extend(["--service-ports", "--use-aliases"])
@@ -1022,13 +1440,7 @@ def start_oneoff_portal(
         or str(labels.get("com.docker.compose.oneoff") or "").lower() != "true"
     ):
         raise CutoverError("candidate portal Compose authority is invalid")
-    health = wait_healthy(
-        runner,
-        candidate_id,
-        expected_image=image_id,
-        timeout_seconds=config.ready_timeout_seconds,
-    )
-    return candidate_id, health
+    return candidate_id
 
 
 def stop_container(runner: Runner, identity: str, label: str) -> None:
@@ -1057,6 +1469,69 @@ def remove_oneoff(runner: Runner, identity: str, name: str) -> None:
         ["container", "rm", "--force", identity],
         label="remove exact temporary portal",
     )
+
+
+def remove_oneoff_by_exact_name(runner: Runner, name: str) -> bool:
+    raw = runner.docker(
+        [
+            "container",
+            "ls",
+            "--all",
+            "--quiet",
+            "--no-trunc",
+            "--filter",
+            f"name=^/{name}$",
+        ],
+        label="resolve exact temporary portal by name",
+    )
+    identities = tuple(
+        line
+        for line in raw.decode("ascii", errors="strict").splitlines()
+        if line
+    )
+    if len(identities) > 1 or any(
+        CONTAINER_ID.fullmatch(identity) is None for identity in identities
+    ):
+        raise CutoverError("temporary portal name resolved ambiguously")
+    if not identities:
+        return False
+    remove_oneoff(runner, identities[0], name)
+    return True
+
+
+def warm_oneoff_portal(
+    config: Config,
+    runner: Runner,
+    compose: Path,
+    *,
+    name: str,
+    overlay_root: Path,
+    image_id: str,
+) -> dict[str, Any]:
+    candidate_id = ""
+    start_attempted = False
+    try:
+        start_attempted = True
+        candidate_id = start_oneoff_portal(
+            config,
+            runner,
+            compose,
+            name=name,
+            overlay_root=overlay_root,
+            service_ports=False,
+            image_id=image_id,
+        )
+        return wait_healthy(
+            runner,
+            candidate_id,
+            expected_image=image_id,
+            timeout_seconds=config.ready_timeout_seconds,
+        )
+    finally:
+        if candidate_id:
+            remove_oneoff(runner, candidate_id, name)
+        elif start_attempted:
+            remove_oneoff_by_exact_name(runner, name)
 
 
 def install_linking_inventory(
@@ -1192,6 +1667,9 @@ def run_recovery(config: Config, runner: Runner) -> dict[str, Any]:
         config.transaction_journal,
         source_root=config.source_root,
         active_root=config.overlay_root,
+        expected_runtime_profile=RUNTIME_PROFILE,
+        expected_source_head=config.source_head,
+        expected_deployment_operation=CUTOVER_OPERATION,
     )
     authority = journal["deployOverlayAuthority"]
     receipt_dir = Path(authority["activationReceipt"]).parent
@@ -1254,7 +1732,6 @@ def run_recovery(config: Config, runner: Runner) -> dict[str, Any]:
     )
     if receipt.get("status") != "pass" or receipt.get("exactPriorStateRestored") is not True:
         raise RecoveryUncertain("public-download recovery did not restore exact prior state")
-    restore_active_authority(config, receipt_dir)
     before_inventory = receipt_dir / "install-linking-before.json"
     if before_inventory.exists():
         before_payload = json.loads(
@@ -1333,6 +1810,8 @@ def final_postdeploy(
             str(manifest),
             "--local-canonical-manifest",
             str(canonical_manifest),
+            "--delivery-phase",
+            "bootstrap",
             "--output",
             str(output),
         ],
@@ -1363,11 +1842,27 @@ def active_public_runtime(config: Config, runner: Runner) -> dict[str, Any] | No
         return None
     portal = payload.get("portal")
     if (
-        payload.get("contractName")
+        set(payload) != PUBLIC_ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        or payload.get("contractName")
         != "chummer.public-edge.active-runtime-authority/v1"
         or payload.get("status") != "pass"
         or payload.get("runtimeProfile") != RUNTIME_PROFILE
+        or payload.get("sourceHead") != config.source_head
+        or payload.get("deploymentOperation") != CUTOVER_OPERATION
+        or payload.get("publicProjectionSnapshotId")
+        != config.projection_snapshot_id
+        or payload.get("publicProjectionSnapshotSha256")
+        != config.projection_snapshot_sha256
+        or payload.get("publicProjectionManifestSha256")
+        != config.projection_manifest_sha256
         or not isinstance(portal, dict)
+        or set(portal) != ACTIVE_RUNTIME_PORTAL_FIELDS
+        or portal.get("existed") is not True
+        or portal.get("wasRunning") is not True
+        or portal.get("proofAuthorityMountSha256")
+        != config.runtime_proof_sha256
+        or portal.get("proofPublicMountSha256")
+        != config.runtime_proof_sha256
     ):
         return None
     container_id = str(portal.get("containerId") or "")
@@ -1375,6 +1870,7 @@ def active_public_runtime(config: Config, runner: Runner) -> dict[str, Any] | No
     if (
         CONTAINER_ID.fullmatch(container_id) is None
         or IMAGE_ID.fullmatch(image_id) is None
+        or SAFE_NAME.fullmatch(str(portal.get("containerName") or "")) is None
     ):
         return None
     runtime = container_runtime(runner, container_id)
@@ -1384,7 +1880,14 @@ def active_public_runtime(config: Config, runner: Runner) -> dict[str, Any] | No
 
 
 def execute(config: Config) -> dict[str, Any]:
-    validate_config(config)
+    journal_was_present = (
+        config.transaction_journal.exists()
+        or config.transaction_journal.is_symlink()
+    )
+    if config.operation == RECOVERY_OPERATION and journal_was_present:
+        validate_journal_recovery_config(config)
+    else:
+        validate_config(config)
     runner = Runner(config)
     scripts = config.source_root / "scripts"
     attestor = load_module(
@@ -1401,17 +1904,40 @@ def execute(config: Config) -> dict[str, Any]:
     )
 
     recovery_receipt: dict[str, Any] | None = None
-    if config.transaction_journal.exists() or config.transaction_journal.is_symlink():
+    if journal_was_present:
         try:
             recovery_receipt = run_recovery(config, runner)
         except Exception as exc:
             raise RecoveryUncertain("interrupted public-download cutover is not recoverable") from exc
 
-    if (
-        config.operation == RECOVERY_OPERATION
-        and not config.transaction_journal.exists()
-        and active_public_runtime(config, runner) is not None
-    ):
+    if config.operation == RECOVERY_OPERATION and journal_was_present:
+        return {
+            "contractName": CONTRACT_NAME,
+            "status": "pass",
+            "operation": config.operation,
+            "runtimeProfile": RUNTIME_PROFILE,
+            "disposition": "interrupted_cutover_recovered_to_exact_prior_state",
+            "recovery": recovery_receipt,
+        }
+
+    if config.operation == RECOVERY_OPERATION:
+        if active_public_runtime(config, runner) is None:
+            raise CutoverError(
+                "recovery-only operation found neither a journal nor an exact "
+                "source-and-projection-bound active public runtime"
+            )
+        required_committed_migration_paths = (
+            config.migration_state_root / attestor.PRESTATE_NAME,
+            config.migration_state_root / attestor.START_NAME,
+            config.migration_state_root / attestor.POSTSTATE_NAME,
+            config.shelf_root / generation.CURRENT_POINTER,
+            config.shelf_root / generation.LAYOUT_MARKER,
+        )
+        if not all(path.is_file() and not path.is_symlink() for path in required_committed_migration_paths):
+            raise CutoverError(
+                "recovery-only operation refuses to begin or repair an "
+                "uncommitted release-shelf migration"
+            )
         migration, generation_manifest, generation_canonical = migrate_shelf(
             config,
             attestor=attestor,
@@ -1472,7 +1998,15 @@ def execute(config: Config) -> dict[str, Any]:
     stage_receipt = stage_overlay(config, runner, receipt_dir)
     prior_portal_tag = resolve_image_tag(runner, CANONICAL_PORTAL_TAG)
     prior_tool_tag = resolve_image_tag(runner, CANONICAL_TOOL_TAG)
-    unique_tag, candidate_image_id = build_candidate_image(config, runner)
+    build_contexts, build_context_digests, build_context_receipt = (
+        prepare_immutable_build_contexts(config, receipt_dir)
+    )
+    unique_tag, candidate_image_id = build_candidate_image(
+        config,
+        runner,
+        contexts=build_contexts,
+        context_digests=build_context_digests,
+    )
     compose, compose_attestation = materialize_compose(
         config,
         runner,
@@ -1491,27 +2025,21 @@ def execute(config: Config) -> dict[str, Any]:
         before=None,
     )
     warm_name = f"chummer-public-download-warm-{secrets.token_hex(5)}"
-    warm_id = ""
-    try:
-        warm_id, warm_health = start_oneoff_portal(
-            config,
-            runner,
-            compose,
-            name=warm_name,
-            overlay_root=config.overlay_staging_root,
-            service_ports=False,
-            image_id=candidate_image_id,
-        )
-        serving_after_warm = http_manifest_observation(
-            base_url=config.base_url,
-            manifest_root=generation_manifest.parent,
-            portal_id=incumbent_portal["containerId"],
-            runner=runner,
-            phase="after-replacement-warmup-healthy",
-        )
-    finally:
-        if warm_id:
-            remove_oneoff(runner, warm_id, warm_name)
+    warm_health = warm_oneoff_portal(
+        config,
+        runner,
+        compose,
+        name=warm_name,
+        overlay_root=config.overlay_staging_root,
+        image_id=candidate_image_id,
+    )
+    serving_after_warm = http_manifest_observation(
+        base_url=config.base_url,
+        manifest_root=generation_manifest.parent,
+        portal_id=incumbent_portal["containerId"],
+        runner=runner,
+        phase="after-replacement-warmup-healthy",
+    )
 
     proof_snapshot = receipt_dir / "candidate-proof-bind-source.json"
     atomic_private_write(
@@ -1559,7 +2087,7 @@ def execute(config: Config) -> dict[str, Any]:
         "priorTunnelExisted": True,
         "priorTunnelWasRunning": True,
     }
-    snapshot_active_authority(config, receipt_dir)
+    prior_active_authority = snapshot_active_authority(config, receipt_dir)
     transaction.snapshot(
         source_root=config.source_root,
         active_root=config.overlay_root,
@@ -1573,6 +2101,20 @@ def execute(config: Config) -> dict[str, Any]:
         candidate_proof_bind_source_snapshot=proof_snapshot,
         prior_portal_proof_authority_snapshot=prior_authority_snapshot,
         prior_portal_proof_public_snapshot=prior_public_snapshot,
+        runtime_profile=RUNTIME_PROFILE,
+        deployment_operation=config.operation,
+        source_head=config.source_head,
+        prior_active_runtime_authority_existed=prior_active_authority["existed"],
+        prior_active_runtime_authority_snapshot=(
+            Path(prior_active_authority["snapshot"])
+            if prior_active_authority["existed"]
+            else None
+        ),
+        prior_active_runtime_authority_snapshot_sha256=(
+            prior_active_authority["sha256"]
+            if prior_active_authority["existed"]
+            else None
+        ),
     )
 
     candidate_id = ""
@@ -1611,7 +2153,7 @@ def execute(config: Config) -> dict[str, Any]:
         )
         if resolve_image_tag(runner, unique_tag) != candidate_image_id:
             raise CutoverError("candidate image identity changed before portal start")
-        candidate_id, candidate_health = start_oneoff_portal(
+        candidate_id = start_oneoff_portal(
             config,
             runner,
             compose,
@@ -1619,6 +2161,12 @@ def execute(config: Config) -> dict[str, Any]:
             overlay_root=config.overlay_root,
             service_ports=True,
             image_id=candidate_image_id,
+        )
+        candidate_health = wait_healthy(
+            runner,
+            candidate_id,
+            expected_image=candidate_image_id,
+            timeout_seconds=config.ready_timeout_seconds,
         )
         transaction.mark_phase(
             source_root=config.source_root,
@@ -1691,6 +2239,8 @@ def execute(config: Config) -> dict[str, Any]:
         "initializerServiceStarted": False,
         "migration": migration,
         "overlayStageReceipt": str(stage_receipt),
+        "immutableBuildContextReceipt": str(build_context_receipt),
+        "immutableBuildContextDigests": build_context_digests,
         "composeAttestation": str(compose_attestation),
         "postdeploy": postdeploy,
         "installLinkingBefore": before_inventory,
@@ -1750,26 +2300,54 @@ def parse_args(argv: list[str] | None = None) -> Config:
     parser.add_argument("--design-product-root", type=Path, required=True)
     parser.add_argument("--ready-timeout-seconds", type=int, default=180)
     args = parser.parse_args(argv)
+    raw_shelf_root = args.shelf_root
+    try:
+        shelf_metadata = raw_shelf_root.lstat()
+        resolved_shelf_root = raw_shelf_root.resolve(strict=True)
+    except OSError as exc:
+        raise CutoverError("canonical release shelf is unavailable") from exc
+    if (
+        raw_shelf_root != CANONICAL_RELEASE_SHELF_ROOT
+        or resolved_shelf_root != raw_shelf_root
+        or not stat.S_ISDIR(shelf_metadata.st_mode)
+        or stat.S_ISLNK(shelf_metadata.st_mode)
+    ):
+        raise CutoverError(
+            "release shelf must be the exact non-symlink canonical shelf root"
+        )
+    journal_recovery = (
+        args.operation == RECOVERY_OPERATION
+        and (
+            args.transaction_journal.exists()
+            or args.transaction_journal.is_symlink()
+        )
+    )
+
+    def exact_input(path: Path) -> Path:
+        return path if journal_recovery else path.resolve(strict=True)
+
     return Config(
         operation=args.operation,
         source_root=args.source_root.resolve(strict=True),
         source_head=args.source_head,
         shared_lock_token=args.shared_mutation_lock_token,
-        shelf_root=args.shelf_root.resolve(strict=True),
+        shelf_root=raw_shelf_root,
         migration_state_root=args.migration_state_root,
         migration_candidate_root=args.migration_candidate_root,
-        migration_authority=args.migration_authority.resolve(strict=True),
+        migration_authority=exact_input(args.migration_authority),
         migration_authority_sha256=args.migration_authority_sha256,
-        release_channel_receipt=args.release_channel_receipt.resolve(strict=True),
+        release_channel_receipt=exact_input(args.release_channel_receipt),
         release_channel_receipt_sha256=args.release_channel_receipt_sha256,
         projection_snapshot_root=args.projection_snapshot_root.resolve(strict=True),
         projection_snapshot_id=args.projection_snapshot_id,
         projection_snapshot_sha256=args.projection_snapshot_sha256,
         projection_manifest_sha256=args.projection_manifest_sha256,
-        runtime_proof_source=args.runtime_proof_source.resolve(strict=True),
+        runtime_proof_source=exact_input(args.runtime_proof_source),
         runtime_proof_sha256=args.runtime_proof_sha256,
-        certificate_file=args.certificate_file.resolve(strict=True),
-        certificate_password_file=args.certificate_password_file.resolve(strict=True),
+        certificate_file=exact_input(args.certificate_file),
+        certificate_password_file=exact_input(
+            args.certificate_password_file
+        ),
         overlay_root=args.overlay_root,
         overlay_staging_root=args.overlay_staging_root,
         overlay_backup_root=args.overlay_backup_root,
@@ -1777,17 +2355,19 @@ def parse_args(argv: list[str] | None = None) -> Config:
         transaction_journal=args.transaction_journal,
         active_runtime_authority=args.active_runtime_authority,
         docker_config_root=args.docker_config_root.resolve(strict=True),
-        env_file=args.env_file.resolve(strict=True),
+        env_file=exact_input(args.env_file),
         receipt_root=args.receipt_root,
         base_url=args.base_url,
-        build_context=args.build_context.resolve(strict=True),
-        fleet_media_contracts=args.fleet_media_contracts.resolve(strict=True),
-        design_product_root=args.design_product_root.resolve(strict=True),
+        build_context=exact_input(args.build_context),
+        fleet_media_contracts=exact_input(args.fleet_media_contracts),
+        design_product_root=exact_input(args.design_product_root),
         ready_timeout_seconds=args.ready_timeout_seconds,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
+    global SHELF_MUTATION_MAY_HAVE_BEGUN
+    SHELF_MUTATION_MAY_HAVE_BEGUN = False
     try:
         config = parse_args(argv)
         if config.ready_timeout_seconds < 1 or config.ready_timeout_seconds > 900:
@@ -1797,6 +2377,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"public_download_cutover: recovery uncertain: {exc}", file=sys.stderr)
         return 76
     except (CutoverError, OSError, ValueError, json.JSONDecodeError) as exc:
+        if SHELF_MUTATION_MAY_HAVE_BEGUN:
+            print(
+                "public_download_cutover: release-shelf mutation may have "
+                f"begun; recovery required: {exc}",
+                file=sys.stderr,
+            )
+            return 76
         print(f"public_download_cutover: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(result, sort_keys=True))

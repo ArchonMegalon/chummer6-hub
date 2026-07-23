@@ -15,6 +15,8 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import secrets
+import shutil
 import stat
 import sys
 from typing import Any, Iterator
@@ -217,6 +219,30 @@ PUBLIC_DOWNLOAD_MANIFEST_FILE_KEYS = {
     "srcinfoFileName",
     "upstreamArtifactFileName",
 }
+PUBLIC_DOWNLOAD_MANIFEST_BINDING_FIELDS = {
+    "fileName": ("sha256", "sizeBytes"),
+    "payloadFileName": ("payloadSha256", "payloadSizeBytes"),
+    "pkgbuildFileName": ("pkgbuildSha256", "pkgbuildSizeBytes"),
+    "sourceArchiveFileName": (
+        "sourceArchiveSha256",
+        "sourceArchiveSizeBytes",
+    ),
+    "srcinfoFileName": ("srcinfoSha256", "srcinfoSizeBytes"),
+    "upstreamArtifactFileName": (
+        "upstreamArtifactSha256",
+        "upstreamArtifactSizeBytes",
+    ),
+}
+MANIFEST_CLOSURE_RESTORATION_FIELDS = {
+    "path",
+    "sha256",
+    "sizeBytes",
+    "sourcePath",
+}
+PUBLIC_DOWNLOAD_CANDIDATE_MATERIALIZATION_CONTRACT = (
+    "chummer.initial-release-shelf-public-download-"
+    "candidate-materialization/v1"
+)
 
 
 class CutoverAttestationError(RuntimeError):
@@ -780,7 +806,12 @@ def _fresh_scandir(directory_fd: int) -> list[str]:
         os.close(scan_fd)
 
 
-def inventory_tree_fd(root_fd: int, *, skip_top_level_controls: bool) -> list[dict[str, Any]]:
+def inventory_tree_fd(
+    root_fd: int,
+    *,
+    skip_top_level_controls: bool,
+    skip_top_level_names: frozenset[str] = frozenset(),
+) -> list[dict[str, Any]]:
     root_flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -809,6 +840,8 @@ def inventory_tree_fd(root_fd: int, *, skip_top_level_controls: bool) -> list[di
                 raise CutoverAttestationError("release shelf contains case-colliding entries")
             folded_names.add(folded)
             if not prefix and skip_top_level_controls and name in CONTROL_NAMES:
+                continue
+            if not prefix and name in skip_top_level_names:
                 continue
             relative = f"{prefix}/{name}" if prefix else name
             relative = safe_relative_path(relative, "release shelf inventory path")
@@ -3065,8 +3098,10 @@ def _public_download_inventory_digest(rows: list[dict[str, Any]]) -> str:
 def _public_download_manifest_references(
     shelf: AnchoredDirectory,
     legacy_rows: list[dict[str, Any]],
+    manifest_closure_restorations: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     referenced_names: set[str] = set()
+    manifest_bindings: dict[str, tuple[str, int]] = {}
 
     def collect(value: object) -> None:
         if isinstance(value, dict):
@@ -3084,6 +3119,26 @@ def _public_download_manifest_references(
                             "migration manifest contains a noncanonical file reference"
                         )
                     referenced_names.add(file_name)
+                    binding_fields = PUBLIC_DOWNLOAD_MANIFEST_BINDING_FIELDS.get(
+                        key
+                    )
+                    if binding_fields is not None:
+                        sha_field, size_field = binding_fields
+                        sha_value = value.get(sha_field)
+                        size_value = value.get(size_field)
+                        if (
+                            isinstance(sha_value, str)
+                            and SHA256.fullmatch(sha_value) is not None
+                            and type(size_value) is int
+                            and size_value >= 0
+                        ):
+                            binding = (sha_value, size_value)
+                            prior = manifest_bindings.get(file_name)
+                            if prior is not None and prior != binding:
+                                raise CutoverAttestationError(
+                                    "migration manifests conflict on a file binding"
+                                )
+                            manifest_bindings[file_name] = binding
                 else:
                     collect(item)
         elif isinstance(value, list):
@@ -3113,20 +3168,1002 @@ def _public_download_manifest_references(
         if metadata_name in legacy_by_path:
             referenced_names.add(f"{file_name}.json")
     referenced_paths = {f"files/{name}" for name in referenced_names}
-    missing = sorted(referenced_paths.difference(legacy_by_path))
+    restorations = list(manifest_closure_restorations or [])
+    restoration_by_path = {
+        str(row["path"]): row
+        for row in restorations
+    }
+    if len(restoration_by_path) != len(restorations):
+        raise CutoverAttestationError(
+            "manifest-closure restoration paths are duplicated"
+        )
+    missing = sorted(
+        referenced_paths.difference(
+            legacy_by_path.keys() | restoration_by_path.keys()
+        )
+    )
     if missing:
         raise CutoverAttestationError(
             "incumbent manifests reference missing release files: "
             + ", ".join(missing)
         )
-    return [
-        {
-            "path": path,
-            "sha256": str(legacy_by_path[path]["sha256"]),
-            "sizeBytes": int(legacy_by_path[path]["sizeBytes"]),
+    result: list[dict[str, Any]] = []
+    for path in sorted(referenced_paths):
+        row = legacy_by_path.get(path) or restoration_by_path[path]
+        result.append(
+            {
+                "path": path,
+                "sha256": str(row["sha256"]),
+                "sizeBytes": int(row["sizeBytes"]),
+            }
+        )
+    for path, row in restoration_by_path.items():
+        if path not in referenced_paths:
+            raise CutoverAttestationError(
+                "manifest-closure restoration is not referenced by an "
+                f"incumbent manifest: {path}"
+            )
+        if path in legacy_by_path:
+            raise CutoverAttestationError(
+                "manifest-closure restoration may repair only an absent byte"
+            )
+        file_name = path.removeprefix("files/")
+        binding = manifest_bindings.get(file_name)
+        if binding is None or binding != (
+            str(row["sha256"]),
+            int(row["sizeBytes"]),
+        ):
+            raise CutoverAttestationError(
+                "manifest-closure restoration does not match the incumbent "
+                f"manifest SHA-256/size binding: {path}"
+            )
+    return result
+
+
+def _validate_manifest_closure_restorations(
+    value: object,
+    *,
+    shelf: AnchoredDirectory,
+    legacy_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise CutoverAttestationError(
+            "migration authority manifestClosureRestorations is not a list"
+        )
+    normalized: list[dict[str, Any]] = []
+    prior_path = ""
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise CutoverAttestationError(
+                f"manifest-closure restoration {index} is malformed"
+            )
+        require_exact_keys(
+            item,
+            MANIFEST_CLOSURE_RESTORATION_FIELDS,
+            f"manifest-closure restoration {index}",
+        )
+        path = safe_relative_path(
+            item.get("path"),
+            f"manifest-closure restoration {index} path",
+        )
+        if not path.startswith("files/") or PurePosixPath(path).parent != PurePosixPath(
+            "files"
+        ):
+            raise CutoverAttestationError(
+                "manifest-closure restoration path must be one files/ basename"
+            )
+        if path <= prior_path:
+            raise CutoverAttestationError(
+                "manifest-closure restorations must be uniquely sorted by path"
+            )
+        prior_path = path
+        source_text = require_string(
+            item.get("sourcePath"),
+            f"manifest-closure restoration {index} sourcePath",
+        )
+        source = Path(source_text)
+        if not source.is_absolute() or _normalized_absolute_path(
+            source,
+            f"manifest-closure restoration {index} source",
+        ) != source:
+            raise CutoverAttestationError(
+                "manifest-closure restoration source path is not canonical"
+            )
+        normalized.append(
+            {
+                "path": path,
+                "sourcePath": source_text,
+                "sha256": require_sha256(
+                    item.get("sha256"),
+                    f"manifest-closure restoration {index} SHA-256",
+                ),
+                "sizeBytes": require_exact_int(
+                    item.get("sizeBytes"),
+                    f"manifest-closure restoration {index} size",
+                ),
+            }
+        )
+        if normalized[-1]["sizeBytes"] < 0:
+            raise CutoverAttestationError(
+                "manifest-closure restoration size is negative"
+            )
+    _public_download_manifest_references(
+        shelf,
+        legacy_rows,
+        normalized,
+    )
+    return normalized
+
+
+def public_download_manifest_closure_restorations(
+    shelf_root: Path,
+    migration_authority: Path,
+    migration_authority_sha256: str,
+) -> list[dict[str, Any]]:
+    authority, _raw = _read_public_download_migration_authority(
+        migration_authority,
+        migration_authority_sha256,
+    )
+    with anchored_directory(shelf_root, "release shelf root") as shelf:
+        snapshot = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        return _validate_manifest_closure_restorations(
+            authority.get("manifestClosureRestorations"),
+            shelf=shelf,
+            legacy_rows=snapshot["legacyInventory"]["files"],
+        )
+
+
+def _read_manifest_closure_restoration_spec(
+    path: Path,
+    expected_sha256: str,
+) -> tuple[list[dict[str, Any]], bytes]:
+    if SHA256.fullmatch(expected_sha256) is None:
+        raise CutoverAttestationError(
+            "manifest-closure restoration spec SHA-256 is invalid"
+        )
+    normalized = _normalized_absolute_path(
+        path,
+        "manifest-closure restoration spec",
+    )
+    with anchored_parent(
+        normalized,
+        "manifest-closure restoration spec",
+    ) as (parent, name):
+        raw = read_regular_file_at(
+            parent.fd,
+            name,
+            label="manifest-closure restoration spec",
+            maximum_bytes=MAX_JSON_BYTES,
+            forbid_group_world_write=True,
+        )
+    if digest_bytes(raw) != expected_sha256:
+        raise CutoverAttestationError(
+            "manifest-closure restoration spec does not match its SHA-256 pin"
+        )
+    try:
+        value = json.loads(raw, object_pairs_hook=reject_duplicates)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CutoverAttestationError(
+            "manifest-closure restoration spec is malformed JSON"
+        ) from exc
+    if not isinstance(value, list):
+        raise CutoverAttestationError(
+            "manifest-closure restoration spec root must be a list"
+        )
+    return value, raw
+
+
+def _write_public_download_json_noreplace(
+    output: Path,
+    payload: dict[str, Any],
+    *,
+    label: str,
+) -> bytes:
+    output = _normalized_absolute_path(
+        output,
+        f"{label} output",
+    )
+    raw = canonical_json_bytes(payload) + b"\n"
+    with anchored_parent(
+        output,
+        f"{label} output",
+    ) as (parent, name):
+        aliases = [
+            candidate
+            for candidate in directory_entry_names(
+                parent.fd,
+                f"{label} output parent",
+            )
+            if candidate.casefold() == name.casefold()
+        ]
+        if aliases:
+            raise CutoverAttestationError(
+                f"{label} output already exists"
+            )
+        try:
+            _write_and_publish_unnamed_at(
+                parent.fd,
+                name,
+                raw,
+                label,
+            )
+        except FileExistsError as exc:
+            raise CutoverAttestationError(
+                f"{label} output already exists"
+            ) from exc
+        parent.verify_links()
+    return raw
+
+
+def _write_public_download_authority_noreplace(
+    output: Path,
+    payload: dict[str, Any],
+) -> bytes:
+    return _write_public_download_json_noreplace(
+        output,
+        payload,
+        label="public-download migration authority",
+    )
+
+
+def _require_private_owner_directory(
+    directory: AnchoredDirectory,
+    label: str,
+) -> None:
+    metadata = os.fstat(directory.fd)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) & 0o077
+    ):
+        raise CutoverAttestationError(f"{label} is not an owner-private directory")
+
+
+def _rename_directory_noreplace_at(
+    directory_fd: int,
+    source_name: str,
+    target_name: str,
+) -> None:
+    try:
+        renameat2 = ctypes.CDLL(None, use_errno=True).renameat2
+    except AttributeError as exc:
+        raise CutoverAttestationError(
+            "atomic no-replace candidate publication is unavailable"
+        ) from exc
+    renameat2.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    renameat2.restype = ctypes.c_int
+    rename_noreplace = 1
+    if (
+        renameat2(
+            directory_fd,
+            os.fsencode(source_name),
+            directory_fd,
+            os.fsencode(target_name),
+            rename_noreplace,
+        )
+        == 0
+    ):
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(error_number, os.strerror(error_number), target_name)
+    raise CutoverAttestationError(
+        "atomic no-replace candidate publication failed: "
+        f"errno={error_number}"
+    )
+
+
+def _write_candidate_regular_file(
+    path: Path,
+    raw: bytes,
+    *,
+    mode: int,
+    label: str,
+) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor = os.open(
+        path,
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+    )
+    try:
+        offset = 0
+        while offset < len(raw):
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise CutoverAttestationError(
+                    f"short write while materializing {label}"
+                )
+            offset += written
+        os.fchmod(descriptor, mode & 0o777)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _fsync_candidate_tree(root: Path) -> None:
+    directories = [root]
+    for directory, child_directories, _files in os.walk(
+        root,
+        topdown=True,
+        followlinks=False,
+    ):
+        current = Path(directory)
+        for name in child_directories:
+            child = current / name
+            metadata = child.lstat()
+            if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(
+                metadata.st_mode
+            ):
+                raise CutoverAttestationError(
+                    "candidate materialization produced an unsafe directory"
+                )
+            directories.append(child)
+    for directory in reversed(directories):
+        descriptor = os.open(
+            directory,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def _public_download_candidate_receipt_core(
+    *,
+    source_head: str,
+    shelf_path: Path,
+    candidate_path: Path,
+    restoration_spec_sha256: str,
+    shelf_snapshot: dict[str, Any],
+    candidate_snapshot: dict[str, Any],
+    restorations: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "contractName": (
+            PUBLIC_DOWNLOAD_CANDIDATE_MATERIALIZATION_CONTRACT
+        ),
+        "status": "pass",
+        "sourceHead": source_head,
+        "shelfRoot": str(shelf_path),
+        "candidateRoot": str(candidate_path),
+        "candidateDirectoryIdentity": candidate_snapshot["rootIdentity"],
+        "manifestClosureRestorationSpecSha256": (
+            restoration_spec_sha256
+        ),
+        "shelfLegacyInventoryDigest": shelf_snapshot[
+            "legacyInventory"
+        ]["digest"],
+        "candidateInventory": candidate_snapshot["inventory"],
+        "referencedFileInventory": candidate_snapshot[
+            "referencedFileInventory"
+        ],
+        "excludedLegacyFiles": candidate_snapshot[
+            "excludedLegacyFiles"
+        ],
+        "manifestClosureRestorations": restorations,
+        "manifestsByteIdenticalToIncumbent": True,
+        "allManifestReferencedFilesExact": True,
+        "copiedPaths": sorted(
+            str(row["path"])
+            for row in candidate_snapshot["inventory"]["files"]
+        ),
+        "excludedPaths": sorted(
+            str(row["path"])
+            for row in candidate_snapshot["excludedLegacyFiles"]
+        ),
+    }
+
+
+def _publish_or_validate_candidate_receipt(
+    output: Path,
+    receipt_core: dict[str, Any],
+) -> dict[str, Any]:
+    output = _normalized_absolute_path(
+        output,
+        "public-download candidate materialization receipt",
+    )
+    with anchored_parent(
+        output,
+        "public-download candidate materialization receipt",
+    ) as (parent, name):
+        _require_private_owner_directory(
+            parent,
+            "public-download candidate materialization receipt parent",
+        )
+
+        def read_existing() -> dict[str, Any]:
+            raw = read_regular_file_at(
+                parent.fd,
+                name,
+                label="public-download candidate materialization receipt",
+                maximum_bytes=MAX_JSON_BYTES,
+                owner_only=True,
+            )
+            try:
+                payload = json.loads(
+                    raw,
+                    object_pairs_hook=reject_duplicates,
+                    parse_constant=_reject_json_constant,
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise CutoverAttestationError(
+                    "existing candidate materialization receipt is malformed"
+                ) from exc
+            if (
+                not isinstance(payload, dict)
+                or raw != canonical_json_bytes(payload) + b"\n"
+            ):
+                raise CutoverAttestationError(
+                    "existing candidate materialization receipt is not canonical"
+                )
+            generated_at = require_utc_timestamp(
+                payload.get("generatedAtUtc"),
+                "candidate materialization generatedAtUtc",
+            )
+            expected = {
+                **receipt_core,
+                "generatedAtUtc": generated_at,
+            }
+            if not strict_python_equal(payload, expected):
+                raise CutoverAttestationError(
+                    "existing candidate materialization receipt differs from "
+                    "the exact current candidate intent"
+                )
+            return payload
+
+        aliases = [
+            candidate
+            for candidate in directory_entry_names(
+                parent.fd,
+                "public-download candidate materialization receipt parent",
+            )
+            if candidate.casefold() == name.casefold()
+        ]
+        if aliases:
+            if aliases != [name]:
+                raise CutoverAttestationError(
+                    "candidate materialization receipt has a casing alias"
+                )
+            result = read_existing()
+            parent.verify_links()
+            return result
+        receipt = {
+            **receipt_core,
+            "generatedAtUtc": utc_now(),
         }
-        for path in sorted(referenced_paths)
-    ]
+        raw = canonical_json_bytes(receipt) + b"\n"
+        try:
+            _write_and_publish_unnamed_at(
+                parent.fd,
+                name,
+                raw,
+                "public-download candidate materialization receipt",
+            )
+        except FileExistsError:
+            result = read_existing()
+            parent.verify_links()
+            return result
+        parent.verify_links()
+        return receipt
+
+
+def materialize_public_download_migration_candidate(
+    shelf_root: Path,
+    candidate_root: Path,
+    source_head: str,
+    restoration_spec: Path,
+    restoration_spec_sha256: str,
+    output: Path,
+) -> dict[str, Any]:
+    """Create or resume the exact frozen candidate before authority sealing."""
+
+    if COMMIT.fullmatch(source_head) is None:
+        raise CutoverAttestationError(
+            "candidate source HEAD must be a full lowercase commit"
+        )
+    shelf_path = _normalized_absolute_path(
+        shelf_root,
+        "release shelf root",
+    )
+    candidate_path = _normalized_absolute_path(
+        candidate_root,
+        "public-download migration candidate",
+    )
+    output_path = _normalized_absolute_path(
+        output,
+        "public-download candidate materialization receipt",
+    )
+    if (
+        candidate_path == shelf_path
+        or candidate_path.is_relative_to(shelf_path)
+        or shelf_path.is_relative_to(candidate_path)
+    ):
+        raise CutoverAttestationError(
+            "public-download migration candidate must be outside the release shelf"
+        )
+    if (
+        output_path == candidate_path
+        or output_path.is_relative_to(candidate_path)
+        or output_path == shelf_path
+        or output_path.is_relative_to(shelf_path)
+    ):
+        raise CutoverAttestationError(
+            "candidate materialization receipt must be outside the candidate "
+            "and release shelf"
+        )
+    candidate_name = candidate_path.name
+    try:
+        candidate_name.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise CutoverAttestationError(
+            "public-download migration candidate name is not portable ASCII"
+        ) from exc
+    if (
+        not candidate_name
+        or candidate_name in (".", "..")
+        or "/" in candidate_name
+        or "\\" in candidate_name
+    ):
+        raise CutoverAttestationError(
+            "public-download migration candidate name is unsafe"
+        )
+    raw_restorations, _spec_raw = _read_manifest_closure_restoration_spec(
+        restoration_spec,
+        restoration_spec_sha256,
+    )
+    stage_path: Path | None = None
+    with anchored_directory(
+        shelf_path,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_path.parent,
+        "public-download migration candidate parent",
+    ) as candidate_parent:
+        _require_private_owner_directory(
+            candidate_parent,
+            "public-download migration candidate parent",
+        )
+        shelf_snapshot = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        restorations = _validate_manifest_closure_restorations(
+            raw_restorations,
+            shelf=shelf,
+            legacy_rows=shelf_snapshot["legacyInventory"]["files"],
+        )
+        restoration_bytes: dict[str, bytes] = {}
+        for index, restoration in enumerate(restorations):
+            expected_size = int(restoration["sizeBytes"])
+            raw = read_regular_file(
+                Path(restoration["sourcePath"]),
+                maximum_bytes=max(expected_size, 1),
+            )
+            if (
+                len(raw) != expected_size
+                or digest_bytes(raw) != restoration["sha256"]
+            ):
+                raise CutoverAttestationError(
+                    "manifest-closure restoration source changed during "
+                    f"candidate materialization at row {index}"
+                )
+            restoration_bytes[str(restoration["path"])] = raw
+        aliases = [
+            name
+            for name in directory_entry_names(
+                candidate_parent.fd,
+                "public-download migration candidate parent",
+            )
+            if name.casefold() == candidate_name.casefold()
+        ]
+        if aliases and aliases != [candidate_name]:
+            raise CutoverAttestationError(
+                "public-download migration candidate has a casing alias"
+            )
+        if aliases:
+            with anchored_directory(
+                candidate_path,
+                "public-download migration candidate",
+            ) as existing_candidate:
+                candidate_snapshot = _capture_public_download_candidate(
+                    existing_candidate,
+                    shelf=shelf,
+                    shelf_snapshot=shelf_snapshot,
+                    manifest_closure_restorations=restorations,
+                )
+        else:
+            referenced_paths = {
+                str(row["path"])
+                for row in _public_download_manifest_references(
+                    shelf,
+                    shelf_snapshot["legacyInventory"]["files"],
+                    restorations,
+                )
+            }
+            for _attempt in range(8):
+                stage_name = (
+                    f".{candidate_name}.candidate-preparing-"
+                    f"{secrets.token_hex(12)}"
+                )
+                try:
+                    os.mkdir(
+                        stage_name,
+                        mode=0o700,
+                        dir_fd=candidate_parent.fd,
+                    )
+                    stage_path = candidate_path.parent / stage_name
+                    break
+                except FileExistsError:
+                    continue
+            if stage_path is None:
+                raise CutoverAttestationError(
+                    "could not allocate a private candidate preparation directory"
+                )
+            try:
+                for row in shelf_snapshot["legacyInventory"]["files"]:
+                    relative = str(row["path"])
+                    if (
+                        relative.startswith("files/")
+                        and relative not in referenced_paths
+                    ):
+                        continue
+                    expected_size = int(row["sizeBytes"])
+                    raw = read_regular_file(
+                        shelf_path / relative,
+                        maximum_bytes=max(expected_size, 1),
+                    )
+                    if (
+                        len(raw) != expected_size
+                        or digest_bytes(raw) != row["sha256"]
+                    ):
+                        raise CutoverAttestationError(
+                            "incumbent release byte changed during candidate "
+                            f"materialization: {relative}"
+                        )
+                    _write_candidate_regular_file(
+                        stage_path / relative,
+                        raw,
+                        mode=int(row["mode"]),
+                        label=f"candidate byte {relative}",
+                    )
+                for restoration in restorations:
+                    relative = str(restoration["path"])
+                    _write_candidate_regular_file(
+                        stage_path / relative,
+                        restoration_bytes[relative],
+                        mode=0o600,
+                        label=f"candidate restoration {relative}",
+                    )
+                _fsync_candidate_tree(stage_path)
+                with anchored_directory(
+                    stage_path,
+                    "prepared public-download migration candidate",
+                ) as prepared_candidate:
+                    prepared_snapshot = _capture_public_download_candidate(
+                        prepared_candidate,
+                        shelf=shelf,
+                        shelf_snapshot=shelf_snapshot,
+                        manifest_closure_restorations=restorations,
+                    )
+                recaptured_shelf = capture_legacy_snapshot_fd(
+                    shelf,
+                    allow_aborted_history=False,
+                )
+                if not strict_python_equal(
+                    recaptured_shelf,
+                    shelf_snapshot,
+                ):
+                    raise CutoverAttestationError(
+                        "release shelf changed during candidate materialization"
+                    )
+                try:
+                    _rename_directory_noreplace_at(
+                        candidate_parent.fd,
+                        stage_path.name,
+                        candidate_name,
+                    )
+                except FileExistsError as exc:
+                    raise CutoverAttestationError(
+                        "public-download migration candidate already exists"
+                    ) from exc
+                stage_path = None
+                os.fsync(candidate_parent.fd)
+                candidate_parent.verify_links()
+                with anchored_directory(
+                    candidate_path,
+                    "public-download migration candidate",
+                ) as published_candidate:
+                    published_snapshot = _capture_public_download_candidate(
+                        published_candidate,
+                        shelf=shelf,
+                        shelf_snapshot=shelf_snapshot,
+                        manifest_closure_restorations=restorations,
+                    )
+                if not strict_python_equal(
+                    {
+                        key: value
+                        for key, value in published_snapshot.items()
+                        if key not in {"root", "rootIdentity"}
+                    },
+                    {
+                        key: value
+                        for key, value in prepared_snapshot.items()
+                        if key not in {"root", "rootIdentity"}
+                    },
+                ):
+                    raise CutoverAttestationError(
+                        "published public-download candidate changed at commit"
+                    )
+                candidate_snapshot = published_snapshot
+            finally:
+                if stage_path is not None:
+                    try:
+                        metadata = stage_path.lstat()
+                    except FileNotFoundError:
+                        pass
+                    else:
+                        if (
+                            stat.S_ISDIR(metadata.st_mode)
+                            and not stat.S_ISLNK(metadata.st_mode)
+                        ):
+                            shutil.rmtree(stage_path)
+                            os.fsync(candidate_parent.fd)
+        recaptured_shelf = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        if not strict_python_equal(recaptured_shelf, shelf_snapshot):
+            raise CutoverAttestationError(
+                "release shelf changed while candidate was validated"
+            )
+        receipt_core = _public_download_candidate_receipt_core(
+            source_head=source_head,
+            shelf_path=shelf_path,
+            candidate_path=candidate_path,
+            restoration_spec_sha256=restoration_spec_sha256,
+            shelf_snapshot=shelf_snapshot,
+            candidate_snapshot=candidate_snapshot,
+            restorations=restorations,
+        )
+    return _publish_or_validate_candidate_receipt(
+        output_path,
+        receipt_core,
+    )
+
+
+def _validated_candidate_materialization_binding(
+    receipt_path: Path,
+    receipt_sha256: str,
+    *,
+    source_head: str,
+    restoration_spec_sha256: str,
+    shelf: AnchoredDirectory,
+    candidate: AnchoredDirectory,
+    shelf_snapshot: dict[str, Any],
+    candidate_snapshot: dict[str, Any],
+    restorations: list[dict[str, Any]],
+) -> dict[str, str]:
+    require_sha256(
+        receipt_sha256,
+        "candidate materialization receipt SHA-256",
+    )
+    path = _normalized_absolute_path(
+        receipt_path,
+        "candidate materialization receipt",
+    )
+    if (
+        path == shelf.path
+        or path.is_relative_to(shelf.path)
+        or path == candidate.path
+        or path.is_relative_to(candidate.path)
+    ):
+        raise CutoverAttestationError(
+            "candidate materialization receipt must remain outside the "
+            "release shelf and frozen candidate"
+        )
+    with anchored_parent(
+        path,
+        "candidate materialization receipt",
+    ) as (parent, name):
+        raw = read_regular_file_at(
+            parent.fd,
+            name,
+            label="candidate materialization receipt",
+            maximum_bytes=MAX_JSON_BYTES,
+            owner_only=True,
+        )
+    if digest_bytes(raw) != receipt_sha256:
+        raise CutoverAttestationError(
+            "candidate materialization receipt changed from its SHA-256 pin"
+        )
+    try:
+        payload = json.loads(
+            raw,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CutoverAttestationError(
+            "candidate materialization receipt is malformed"
+        ) from exc
+    if (
+        not isinstance(payload, dict)
+        or raw != canonical_json_bytes(payload) + b"\n"
+    ):
+        raise CutoverAttestationError(
+            "candidate materialization receipt is not canonical"
+        )
+    generated_at = require_utc_timestamp(
+        payload.get("generatedAtUtc"),
+        "candidate materialization generatedAtUtc",
+    )
+    expected = {
+        **_public_download_candidate_receipt_core(
+            source_head=source_head,
+            shelf_path=shelf.path,
+            candidate_path=candidate.path,
+            restoration_spec_sha256=restoration_spec_sha256,
+            shelf_snapshot=shelf_snapshot,
+            candidate_snapshot=candidate_snapshot,
+            restorations=restorations,
+        ),
+        "generatedAtUtc": generated_at,
+    }
+    if not strict_python_equal(payload, expected):
+        raise CutoverAttestationError(
+            "candidate materialization receipt does not bind the exact "
+            "shelf, candidate, source HEAD, and restoration specification"
+        )
+    return {
+        "receiptPath": str(path),
+        "receiptSha256": receipt_sha256,
+        "manifestClosureRestorationSpecSha256": restoration_spec_sha256,
+        "sourceHead": source_head,
+    }
+
+
+def materialize_public_download_migration_authority(
+    shelf_root: Path,
+    candidate_root: Path,
+    source_head: str,
+    restoration_spec: Path,
+    restoration_spec_sha256: str,
+    candidate_materialization_receipt: Path,
+    candidate_materialization_receipt_sha256: str,
+    output: Path,
+) -> dict[str, Any]:
+    """Read-only derivation of one exact, no-replace migration authority."""
+
+    if COMMIT.fullmatch(source_head) is None:
+        raise CutoverAttestationError(
+            "authority source HEAD must be a full lowercase commit"
+        )
+    shelf_path = _normalized_absolute_path(
+        shelf_root,
+        "release shelf root",
+    )
+    candidate_path = _normalized_absolute_path(
+        candidate_root,
+        "public-download migration candidate",
+    )
+    output_path = _normalized_absolute_path(
+        output,
+        "public-download migration authority output",
+    )
+    if (
+        output_path == shelf_path
+        or output_path.is_relative_to(shelf_path)
+        or output_path == candidate_path
+        or output_path.is_relative_to(candidate_path)
+    ):
+        raise CutoverAttestationError(
+            "public-download migration authority output must be outside the "
+            "release shelf and frozen candidate"
+        )
+    raw_restorations, _spec_raw = _read_manifest_closure_restoration_spec(
+        restoration_spec,
+        restoration_spec_sha256,
+    )
+    with anchored_directory(
+        shelf_path,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_path,
+        "public-download migration candidate",
+    ) as candidate:
+        snapshot = capture_legacy_snapshot_fd(
+            shelf,
+            allow_aborted_history=False,
+        )
+        restorations = _validate_manifest_closure_restorations(
+            raw_restorations,
+            shelf=shelf,
+            legacy_rows=snapshot["legacyInventory"]["files"],
+        )
+        for index, restoration in enumerate(restorations):
+            source = Path(restoration["sourcePath"])
+            raw = read_regular_file(
+                source,
+                maximum_bytes=max(int(restoration["sizeBytes"]), 1),
+            )
+            if (
+                len(raw) != restoration["sizeBytes"]
+                or digest_bytes(raw) != restoration["sha256"]
+            ):
+                raise CutoverAttestationError(
+                    "manifest-closure restoration source conflicts with its "
+                    f"authority binding at row {index}"
+                )
+        candidate_snapshot = _capture_public_download_candidate(
+            candidate,
+            shelf=shelf,
+            shelf_snapshot=snapshot,
+            manifest_closure_restorations=restorations,
+        )
+        candidate_materialization = (
+            _validated_candidate_materialization_binding(
+                candidate_materialization_receipt,
+                candidate_materialization_receipt_sha256,
+                source_head=source_head,
+                restoration_spec_sha256=restoration_spec_sha256,
+                shelf=shelf,
+                candidate=candidate,
+                shelf_snapshot=snapshot,
+                candidate_snapshot=candidate_snapshot,
+                restorations=restorations,
+            )
+        )
+        authority = _expected_public_download_migration_authority(
+            source_head=source_head,
+            shelf_snapshot=snapshot,
+            candidate_snapshot=candidate_snapshot,
+            candidate_materialization=candidate_materialization,
+        )
+    authority_raw = _write_public_download_authority_noreplace(
+        output_path,
+        authority,
+    )
+    authority_sha256 = digest_bytes(authority_raw)
+    round_trip, round_trip_raw = _read_public_download_migration_authority(
+        output_path,
+        authority_sha256,
+    )
+    if (
+        round_trip_raw != authority_raw
+        or not strict_python_equal(round_trip, authority)
+    ):
+        raise CutoverAttestationError(
+            "materialized public-download migration authority failed round trip"
+        )
+    return {
+        "contractName": (
+            "chummer.initial-release-shelf-public-download-"
+            "migration-authority-materialization/v1"
+        ),
+        "status": "pass",
+        "sourceHead": source_head,
+        "output": str(output_path),
+        "sha256": authority_sha256,
+        "manifestClosureRestorationCount": len(restorations),
+    }
 
 
 def _capture_public_download_candidate(
@@ -3134,6 +4171,7 @@ def _capture_public_download_candidate(
     *,
     shelf: AnchoredDirectory,
     shelf_snapshot: dict[str, Any],
+    manifest_closure_restorations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     candidate_before = _stable_directory_identity(candidate.fd)
     candidate_rows = inventory_tree_fd(
@@ -3191,15 +4229,33 @@ def _capture_public_download_candidate(
             raise CutoverAttestationError(
                 f"migration candidate contains a non-generational path: {path}"
             )
+    restorations = list(manifest_closure_restorations or [])
+    restoration_by_path = {str(row["path"]): row for row in restorations}
     extra_paths = sorted(candidate_by_path.keys() - legacy_by_path.keys())
-    if extra_paths:
+    invalid_extra_paths = sorted(set(extra_paths) - restoration_by_path.keys())
+    if invalid_extra_paths:
         raise CutoverAttestationError(
             "migration candidate contains bytes absent from the incumbent: "
-            + ", ".join(extra_paths)
+            + ", ".join(invalid_extra_paths)
         )
+    for path in extra_paths:
+        candidate_row = candidate_by_path[path]
+        restoration = restoration_by_path[path]
+        if (
+            candidate_row["sha256"],
+            candidate_row["sizeBytes"],
+        ) != (
+            restoration["sha256"],
+            restoration["sizeBytes"],
+        ):
+            raise CutoverAttestationError(
+                "migration candidate closure restoration changed bytes: "
+                + path
+            )
     changed_paths = sorted(
         path
         for path, candidate_row in candidate_by_path.items()
+        if path in legacy_by_path
         if (
             candidate_row["sha256"],
             candidate_row["sizeBytes"],
@@ -3217,6 +4273,7 @@ def _capture_public_download_candidate(
     referenced_files = _public_download_manifest_references(
         shelf,
         raw_legacy_rows,
+        restorations,
     )
     referenced_paths = {str(row["path"]) for row in referenced_files}
     missing_references = sorted(referenced_paths.difference(candidate_by_path))
@@ -3255,6 +4312,8 @@ def _capture_public_download_candidate(
             "files": referenced_files,
         },
         "excludedLegacyFiles": excluded,
+        "manifestClosureRestorations": restorations,
+        "governedIncumbentClosureRepair": bool(restorations),
         "manifestsByteIdenticalToIncumbent": True,
         "allManifestReferencedFilesExact": True,
     }
@@ -3321,6 +4380,7 @@ def _expected_public_download_migration_authority(
     source_head: str,
     shelf_snapshot: dict[str, Any],
     candidate_snapshot: dict[str, Any],
+    candidate_materialization: dict[str, str],
 ) -> dict[str, Any]:
     legacy = shelf_snapshot["legacyInventory"]
     legacy_by_path = {
@@ -3335,6 +4395,10 @@ def _expected_public_download_migration_authority(
         "publicationAuthorized": False,
         "releaseUploadAuthority": False,
         "sourceHead": source_head,
+        "candidateMaterialization": candidate_materialization,
+        "manifestClosureRestorations": candidate_snapshot[
+            "manifestClosureRestorations"
+        ],
         "incumbent": {
             "legacyInventoryDigest": legacy["digest"],
             "canonicalManifestSha256": (
@@ -3353,10 +4417,71 @@ def _expected_public_download_migration_authority(
             "excludedLegacyFiles": (
                 candidate_snapshot["excludedLegacyFiles"]
             ),
+            "governedIncumbentClosureRepair": candidate_snapshot[
+                "governedIncumbentClosureRepair"
+            ],
             "manifestsByteIdenticalToIncumbent": True,
             "allManifestReferencedFilesExact": True,
         },
     }
+
+
+def _candidate_materialization_from_authority(
+    authority: dict[str, Any],
+    *,
+    source_head: str,
+    shelf: AnchoredDirectory,
+    candidate: AnchoredDirectory,
+    shelf_snapshot: dict[str, Any],
+    candidate_snapshot: dict[str, Any],
+    restorations: list[dict[str, Any]],
+) -> dict[str, str]:
+    binding = authority.get("candidateMaterialization")
+    if not isinstance(binding, dict):
+        raise CutoverAttestationError(
+            "migration authority candidate materialization binding is malformed"
+        )
+    require_exact_keys(
+        binding,
+        {
+            "receiptPath",
+            "receiptSha256",
+            "manifestClosureRestorationSpecSha256",
+            "sourceHead",
+        },
+        "migration authority candidate materialization binding",
+    )
+    if binding.get("sourceHead") != source_head:
+        raise CutoverAttestationError(
+            "candidate materialization source HEAD differs from cutover source"
+        )
+    observed = _validated_candidate_materialization_binding(
+        Path(
+            require_string(
+                binding.get("receiptPath"),
+                "candidate materialization receipt path",
+            )
+        ),
+        require_sha256(
+            binding.get("receiptSha256"),
+            "candidate materialization receipt SHA-256",
+        ),
+        source_head=source_head,
+        restoration_spec_sha256=require_sha256(
+            binding.get("manifestClosureRestorationSpecSha256"),
+            "candidate restoration specification SHA-256",
+        ),
+        shelf=shelf,
+        candidate=candidate,
+        shelf_snapshot=shelf_snapshot,
+        candidate_snapshot=candidate_snapshot,
+        restorations=restorations,
+    )
+    if not strict_python_equal(binding, observed):
+        raise CutoverAttestationError(
+            "migration authority candidate materialization binding changed"
+        )
+    return observed
 
 
 def _validate_public_download_prestate(
@@ -3454,6 +4579,9 @@ def _validate_public_download_prestate(
 
 def _revalidate_public_download_migration_authority(
     prestate: dict[str, Any],
+    *,
+    shelf: AnchoredDirectory,
+    candidate: AnchoredDirectory,
 ) -> None:
     path = Path(
         require_string(
@@ -3466,13 +4594,26 @@ def _revalidate_public_download_migration_authority(
         "public-download migration authority pin",
     )
     payload, raw = _read_public_download_migration_authority(path, pin)
-    expected = _expected_public_download_migration_authority(
-        source_head=require_string(
-            prestate.get("sourceHead"),
-            "public-download migration sourceHead",
-        ),
+    source_head = require_string(
+        prestate.get("sourceHead"),
+        "public-download migration sourceHead",
+    )
+    candidate_snapshot = prestate["candidateSnapshot"]
+    restorations = candidate_snapshot["manifestClosureRestorations"]
+    candidate_materialization = _candidate_materialization_from_authority(
+        payload,
+        source_head=source_head,
+        shelf=shelf,
+        candidate=candidate,
         shelf_snapshot=prestate["shelfSnapshot"],
-        candidate_snapshot=prestate["candidateSnapshot"],
+        candidate_snapshot=candidate_snapshot,
+        restorations=restorations,
+    )
+    expected = _expected_public_download_migration_authority(
+        source_head=source_head,
+        shelf_snapshot=prestate["shelfSnapshot"],
+        candidate_snapshot=candidate_snapshot,
+        candidate_materialization=candidate_materialization,
     )
     if (
         not strict_python_equal(payload, expected)
@@ -3482,6 +4623,78 @@ def _revalidate_public_download_migration_authority(
         raise CutoverAttestationError(
             "public-download migration authority changed after prestate"
         )
+
+
+def validate_public_download_migration_resume(
+    shelf_root: Path,
+    state_root: Path,
+    candidate_root: Path,
+    *,
+    source_head: str,
+    ignored_activation_stage_name: str = "",
+) -> dict[str, Any]:
+    ignored = (
+        frozenset({ignored_activation_stage_name})
+        if ignored_activation_stage_name
+        else frozenset()
+    )
+    with anchored_directory(
+        shelf_root,
+        "release shelf root",
+    ) as shelf, anchored_directory(
+        candidate_root,
+        "public-download migration candidate",
+    ) as candidate, anchored_directory(
+        state_root,
+        "cutover state root",
+    ) as state:
+        prestate, _ = load_state_at(
+            state,
+            PRESTATE_NAME,
+            PUBLIC_DOWNLOAD_PRESTATE_CONTRACT,
+        )
+        _validate_public_download_prestate(
+            prestate,
+            state=state,
+            shelf=shelf,
+            candidate=candidate,
+            source_head=source_head,
+        )
+        _revalidate_public_download_migration_authority(
+            prestate,
+            shelf=shelf,
+            candidate=candidate,
+        )
+        live_legacy = inventory_tree_fd(
+            shelf.fd,
+            skip_top_level_controls=True,
+            skip_top_level_names=ignored,
+        )
+        expected_legacy = (
+            prestate.get("shelfSnapshot", {})
+            .get("legacyInventory", {})
+            .get("files")
+        )
+        if not strict_python_equal(live_legacy, expected_legacy):
+            raise CutoverAttestationError(
+                "public-download migration incumbent bytes changed after prestate"
+            )
+        live_candidate = _capture_public_download_candidate(
+            candidate,
+            shelf=shelf,
+            shelf_snapshot=prestate["shelfSnapshot"],
+            manifest_closure_restorations=prestate["candidateSnapshot"][
+                "manifestClosureRestorations"
+            ],
+        )
+        if not strict_python_equal(
+            live_candidate,
+            prestate.get("candidateSnapshot"),
+        ):
+            raise CutoverAttestationError(
+                "public-download migration candidate changed after prestate"
+            )
+        return prestate
 
 
 def prepare_public_download_migration(
@@ -3533,21 +4746,41 @@ def prepare_public_download_migration(
                 "filesystem layout migration requires an unmanaged legacy shelf "
                 "without activation history"
             )
-        candidate_snapshot = _capture_public_download_candidate(
-            candidate,
-            shelf=shelf,
-            shelf_snapshot=snapshot,
-        )
         authority, authority_raw = (
             _read_public_download_migration_authority(
                 migration_authority,
                 migration_authority_sha256,
             )
         )
+        manifest_closure_restorations = (
+            _validate_manifest_closure_restorations(
+                authority.get("manifestClosureRestorations"),
+                shelf=shelf,
+                legacy_rows=snapshot["legacyInventory"]["files"],
+            )
+        )
+        candidate_snapshot = _capture_public_download_candidate(
+            candidate,
+            shelf=shelf,
+            shelf_snapshot=snapshot,
+            manifest_closure_restorations=manifest_closure_restorations,
+        )
+        candidate_materialization = (
+            _candidate_materialization_from_authority(
+                authority,
+                source_head=source_head,
+                shelf=shelf,
+                candidate=candidate,
+                shelf_snapshot=snapshot,
+                candidate_snapshot=candidate_snapshot,
+                restorations=manifest_closure_restorations,
+            )
+        )
         expected_authority = _expected_public_download_migration_authority(
             source_head=source_head,
             shelf_snapshot=snapshot,
             candidate_snapshot=candidate_snapshot,
+            candidate_materialization=candidate_materialization,
         )
         if not strict_python_equal(authority, expected_authority):
             raise CutoverAttestationError(
@@ -3644,6 +4877,9 @@ def prepare_public_download_migration(
                         candidate,
                         shelf=shelf,
                         shelf_snapshot=snapshot,
+                        manifest_closure_restorations=(
+                            manifest_closure_restorations
+                        ),
                     ),
                 ):
                     raise CutoverAttestationError(
@@ -3691,7 +4927,11 @@ def request_public_download_migration_start(
             shelf=shelf,
             candidate=candidate,
         )
-        _revalidate_public_download_migration_authority(prestate)
+        _revalidate_public_download_migration_authority(
+            prestate,
+            shelf=shelf,
+            candidate=candidate,
+        )
         live_snapshot = capture_legacy_snapshot_fd(
             shelf,
             allow_aborted_history=False,
@@ -3700,6 +4940,9 @@ def request_public_download_migration_start(
             candidate,
             shelf=shelf,
             shelf_snapshot=live_snapshot,
+            manifest_closure_restorations=prestate["candidateSnapshot"][
+                "manifestClosureRestorations"
+            ],
         )
         if (
             not strict_python_equal(
@@ -3749,7 +4992,11 @@ def _verify_public_download_migration_live(
     candidate: AnchoredDirectory,
     prestate: dict[str, Any],
 ) -> dict[str, Any]:
-    _revalidate_public_download_migration_authority(prestate)
+    _revalidate_public_download_migration_authority(
+        prestate,
+        shelf=shelf,
+        candidate=candidate,
+    )
     marker = read_regular_file_at(
         shelf.fd,
         MARKER_NAME,
@@ -3869,6 +5116,9 @@ def _verify_public_download_migration_live(
         candidate,
         shelf=shelf,
         shelf_snapshot=prestate["shelfSnapshot"],
+        manifest_closure_restorations=candidate_snapshot[
+            "manifestClosureRestorations"
+        ],
     )
     if not strict_python_equal(
         live_candidate,
@@ -5343,6 +6593,44 @@ def build_parser() -> argparse.ArgumentParser:
         "--activation-receipt-id",
         required=True,
     )
+    candidate_parser = commands.add_parser(
+        "materialize-public-download-only-candidate"
+    )
+    candidate_parser.add_argument("--shelf-root", required=True)
+    candidate_parser.add_argument("--candidate-root", required=True)
+    candidate_parser.add_argument("--source-head", required=True)
+    candidate_parser.add_argument(
+        "--manifest-closure-restoration-spec",
+        required=True,
+    )
+    candidate_parser.add_argument(
+        "--manifest-closure-restoration-spec-sha256",
+        required=True,
+    )
+    candidate_parser.add_argument("--output", required=True)
+    authority_parser = commands.add_parser(
+        "materialize-public-download-only-authority"
+    )
+    authority_parser.add_argument("--shelf-root", required=True)
+    authority_parser.add_argument("--candidate-root", required=True)
+    authority_parser.add_argument("--source-head", required=True)
+    authority_parser.add_argument(
+        "--manifest-closure-restoration-spec",
+        required=True,
+    )
+    authority_parser.add_argument(
+        "--manifest-closure-restoration-spec-sha256",
+        required=True,
+    )
+    authority_parser.add_argument(
+        "--candidate-materialization-receipt",
+        required=True,
+    )
+    authority_parser.add_argument(
+        "--candidate-materialization-receipt-sha256",
+        required=True,
+    )
+    authority_parser.add_argument("--output", required=True)
     public_start_parser = commands.add_parser(
         "request-public-download-only-start"
     )
@@ -5398,6 +6686,26 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "prepare":
             result = prepare(Path(args.shelf_root), Path(args.state_root), args.source_head)
+        elif args.command == "materialize-public-download-only-candidate":
+            result = materialize_public_download_migration_candidate(
+                Path(args.shelf_root),
+                Path(args.candidate_root),
+                args.source_head,
+                Path(args.manifest_closure_restoration_spec),
+                args.manifest_closure_restoration_spec_sha256,
+                Path(args.output),
+            )
+        elif args.command == "materialize-public-download-only-authority":
+            result = materialize_public_download_migration_authority(
+                Path(args.shelf_root),
+                Path(args.candidate_root),
+                args.source_head,
+                Path(args.manifest_closure_restoration_spec),
+                args.manifest_closure_restoration_spec_sha256,
+                Path(args.candidate_materialization_receipt),
+                args.candidate_materialization_receipt_sha256,
+                Path(args.output),
+            )
         elif args.command == "prepare-public-download-only":
             result = prepare_public_download_migration(
                 Path(args.shelf_root),

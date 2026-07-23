@@ -682,12 +682,95 @@ def fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def retire_recovery_journal(path: Path) -> None:
+    path.unlink()
+    fsync_directory(path.parent)
+
+
 def stable_file_sha256(path: Path, *, label: str) -> str:
     payload, _metadata = transaction.overlay.read_stable_regular_bytes(
         path,
         label=label,
     )
     return hashlib.sha256(payload).hexdigest()
+
+
+def restore_exact_active_runtime_authority(
+    *,
+    deploy_authority: dict[str, Any],
+    destination: Path,
+) -> str:
+    """Restore the exact pre-transaction runtime-authority existence and bytes."""
+
+    destination = transaction.overlay.normalized_absolute_path(destination)
+    transaction.overlay.assert_no_symlink_components(
+        destination.parent,
+        label="active runtime authority parent",
+    )
+    existed = deploy_authority["priorActiveRuntimeAuthorityExisted"]
+    snapshot_value = deploy_authority["priorActiveRuntimeAuthoritySnapshotPath"]
+    expected_sha256 = deploy_authority[
+        "priorActiveRuntimeAuthoritySnapshotSha256"
+    ]
+    if existed:
+        snapshot = transaction.overlay.normalized_absolute_path(
+            Path(snapshot_value)
+        )
+        payload, _metadata = transaction.overlay.read_stable_regular_bytes(
+            snapshot,
+            label="prior active runtime authority snapshot",
+        )
+        if hashlib.sha256(payload).hexdigest() != expected_sha256:
+            raise RuntimeError(
+                "prior active runtime authority snapshot changed during recovery"
+            )
+        temporary = destination.parent / (
+            f".{destination.name}.restore-{os.getpid()}-{secrets.token_hex(8)}"
+        )
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        try:
+            view = memoryview(payload)
+            while view:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise RuntimeError(
+                        "active runtime authority restore made no progress"
+                    )
+                view = view[written:]
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        try:
+            os.replace(temporary, destination)
+            fsync_directory(destination.parent)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+        if stable_file_sha256(
+            destination,
+            label="restored active runtime authority",
+        ) != expected_sha256:
+            raise RuntimeError(
+                "exact prior active runtime authority bytes were not restored"
+            )
+        return "exact_prior_authority_restored"
+
+    if destination.exists() or destination.is_symlink():
+        destination.unlink()
+        fsync_directory(destination.parent)
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeError("prior active runtime authority absence was not restored")
+    return "prior_authority_absence_restored"
 
 
 def atomic_replace_from_snapshot(
@@ -817,6 +900,7 @@ def main(argv: list[str] | None = None) -> int:
             snapshot_path,
             source_root=source_root,
             active_root=args.active_root,
+            expected_runtime_profile=args.runtime_profile,
         )
         prior = snapshot["runtimePriorState"]
         deploy_authority = snapshot["deployOverlayAuthority"]
@@ -938,22 +1022,39 @@ def main(argv: list[str] | None = None) -> int:
             )
             payload["journalPhase"] = snapshot["phase"]
             if payload["status"] == "pass":
-                runtime_authority = transaction.active_runtime_authority_payload(
-                    portal_existed=prior["priorPortalExisted"],
-                    portal_container_id=prior["priorPortalContainerId"],
-                    portal_container_name=prior["priorPortalContainerName"],
-                    portal_image_id=prior["priorPortalImageId"],
-                    portal_was_running=prior["priorPortalWasRunning"],
-                    proof_authority_mount_sha256=prior[
-                        "priorPortalProofAuthorityMountSha256"
-                    ],
-                    proof_public_mount_sha256=prior[
-                        "priorPortalProofPublicMountSha256"
-                    ],
-                )
-                atomic_write(args.runtime_authority_output, runtime_authority)
-                snapshot_path.unlink()
-                fsync_directory(snapshot_path.parent)
+                if (
+                    args.runtime_profile
+                    == transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+                ):
+                    payload["runtimeAuthorityRecovery"] = (
+                        restore_exact_active_runtime_authority(
+                            deploy_authority=deploy_authority,
+                            destination=args.runtime_authority_output,
+                        )
+                    )
+                else:
+                    runtime_authority = (
+                        transaction.active_runtime_authority_payload(
+                            portal_existed=prior["priorPortalExisted"],
+                            portal_container_id=prior["priorPortalContainerId"],
+                            portal_container_name=prior[
+                                "priorPortalContainerName"
+                            ],
+                            portal_image_id=prior["priorPortalImageId"],
+                            portal_was_running=prior["priorPortalWasRunning"],
+                            proof_authority_mount_sha256=prior[
+                                "priorPortalProofAuthorityMountSha256"
+                            ],
+                            proof_public_mount_sha256=prior[
+                                "priorPortalProofPublicMountSha256"
+                            ],
+                        )
+                    )
+                    atomic_write(args.runtime_authority_output, runtime_authority)
+                    payload["runtimeAuthorityRecovery"] = (
+                        "legacy_full_runtime_authority_reconciled"
+                    )
+                retire_recovery_journal(snapshot_path)
     except Exception as exc:
         payload = {
             "contractName": CONTRACT_NAME,
