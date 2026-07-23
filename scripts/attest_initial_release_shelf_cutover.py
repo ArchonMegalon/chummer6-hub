@@ -61,6 +61,8 @@ GENERATIONS_NAME = "generations"
 LOCK_NAME = ".release-shelf-promotion.lock"
 CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
 COMPATIBILITY_MANIFEST = "releases.json"
+PUBLICATION_SCOPE_NAME = "PUBLICATION_SCOPE.generated.json"
+PUBLICATION_SCOPE_SCHEMA = "chummer.downloads.publication_scope.v1"
 CANDIDATE_NAME = "activation-candidate.json"
 PRESTATE_NAME = "prestate.json"
 START_NAME = "candidate-start-requested.json"
@@ -201,6 +203,7 @@ PUBLIC_DOWNLOAD_MIGRATION_OPERATION = "initial-release-shelf-layout-migration"
 PUBLIC_DOWNLOAD_COPYABLE_FILES = {
     CANONICAL_MANIFEST,
     COMPATIBILITY_MANIFEST,
+    PUBLICATION_SCOPE_NAME,
     "aur-packages.json",
 }
 PUBLIC_DOWNLOAD_COPYABLE_DIRECTORIES = {
@@ -243,6 +246,40 @@ PUBLIC_DOWNLOAD_CANDIDATE_MATERIALIZATION_CONTRACT = (
     "chummer.initial-release-shelf-public-download-"
     "candidate-materialization/v1"
 )
+PUBLIC_DOWNLOAD_EXCLUDED_TOP_LEVEL_FILES = {
+    "README.md",
+    "RELEASE_BUILD_HANDOFF.generated.json",
+    "RELEASE_BUILD_HANDOFF.generated.md",
+    "UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json",
+    "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json",
+    "WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json",
+    "WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.md",
+    "external-proof-manifest.json",
+}
+PUBLIC_DOWNLOAD_EXCLUDED_TOP_LEVEL_DIRECTORIES = {
+    "signing",
+    "visual-audit",
+    "windows-installer-visual-proof",
+}
+PUBLIC_DOWNLOAD_ROOT_BACKUP = re.compile(
+    r"^(?:RELEASE_CHANNEL\.generated\.json|releases\.json)"
+    r"\.root-backup-[0-9]{8}T[0-9]{6}Z$"
+)
+PUBLICATION_SCOPE_FIELDS = {
+    "deployDir",
+    "deployMode",
+    "externalArtifactPublishVerified",
+    "generatedAt",
+    "liveVerifyTarget",
+    "promotedArtifactCount",
+    "releaseChannel",
+    "releaseVersion",
+    "requireExternalPublish",
+    "schema",
+    "scope",
+    "status",
+    "summary",
+}
 
 
 class CutoverAttestationError(RuntimeError):
@@ -3665,6 +3702,73 @@ def _publish_or_validate_candidate_receipt(
         return receipt
 
 
+def _is_public_download_excluded_legacy_path(path: str) -> bool:
+    """Classify only the audited, non-runtime live-shelf compatibility debris."""
+
+    relative = PurePosixPath(path)
+    if (
+        not path
+        or relative.is_absolute()
+        or any(part in ("", ".", "..") for part in relative.parts)
+    ):
+        return False
+    root_name = relative.parts[0]
+    if len(relative.parts) == 1:
+        return (
+            root_name in PUBLIC_DOWNLOAD_EXCLUDED_TOP_LEVEL_FILES
+            or PUBLIC_DOWNLOAD_ROOT_BACKUP.fullmatch(root_name) is not None
+        )
+    return root_name in PUBLIC_DOWNLOAD_EXCLUDED_TOP_LEVEL_DIRECTORIES
+
+
+def _validate_public_download_publication_scope(
+    raw: bytes,
+    *,
+    shelf: AnchoredDirectory,
+    shelf_snapshot: dict[str, Any],
+    label: str,
+) -> None:
+    """Validate the one approved top-level compatibility document before copying."""
+
+    try:
+        payload = json.loads(
+            raw,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CutoverAttestationError(f"{label} is malformed") from exc
+    manifest_identity = shelf_snapshot.get("manifestIdentity")
+    if not isinstance(payload, dict) or not isinstance(manifest_identity, dict):
+        raise CutoverAttestationError(f"{label} has an invalid object shape")
+    if set(payload) != PUBLICATION_SCOPE_FIELDS:
+        raise CutoverAttestationError(f"{label} has an unsupported field set")
+    if (
+        payload.get("schema") != PUBLICATION_SCOPE_SCHEMA
+        or payload.get("scope") != "local_downloads_shelf_only"
+        or payload.get("status") != "passed"
+        or payload.get("deployDir") != str(shelf.path)
+        # This compatibility receipt can legitimately predate the currently
+        # served manifests. Its exact bytes are inventory-bound; it is not a
+        # release-identity authority.
+        or not isinstance(payload.get("releaseChannel"), str)
+        or not payload["releaseChannel"]
+        or not isinstance(payload.get("releaseVersion"), str)
+        or not payload["releaseVersion"]
+        or type(payload.get("promotedArtifactCount")) is not int
+        or int(payload["promotedArtifactCount"]) < 0
+        or type(payload.get("deployMode")) is not bool
+        or type(payload.get("externalArtifactPublishVerified")) is not bool
+        or type(payload.get("requireExternalPublish")) is not bool
+        or not isinstance(payload.get("liveVerifyTarget"), str)
+        or not isinstance(payload.get("summary"), str)
+    ):
+        raise CutoverAttestationError(
+            f"{label} conflicts with the approved publication scope contract"
+        )
+    require_utc_timestamp(payload.get("generatedAt"), f"{label} generatedAt")
+
+
 def materialize_public_download_migration_candidate(
     shelf_root: Path,
     candidate_root: Path,
@@ -3820,11 +3924,30 @@ def materialize_public_download_migration_candidate(
             try:
                 for row in shelf_snapshot["legacyInventory"]["files"]:
                     relative = str(row["path"])
+                    if _is_public_download_excluded_legacy_path(relative):
+                        continue
                     if (
                         relative.startswith("files/")
                         and relative not in referenced_paths
                     ):
                         continue
+                    root_name = relative.split("/", 1)[0]
+                    if (
+                        root_name not in PUBLIC_DOWNLOAD_COPYABLE_FILES
+                        and root_name not in PUBLIC_DOWNLOAD_COPYABLE_DIRECTORIES
+                    ):
+                        raise CutoverAttestationError(
+                            "incumbent release shelf contains an unclassified "
+                            f"non-generational path: {relative}"
+                        )
+                    if (
+                        root_name in PUBLIC_DOWNLOAD_COPYABLE_FILES
+                        and relative != root_name
+                    ):
+                        raise CutoverAttestationError(
+                            "incumbent release shelf contains an invalid child "
+                            f"beneath a file-class metadata path: {relative}"
+                        )
                     expected_size = int(row["sizeBytes"])
                     raw = read_regular_file(
                         shelf_path / relative,
@@ -4220,6 +4343,40 @@ def _capture_public_download_candidate(
                 "migration candidate manifests must be byte-identical to "
                 f"the captured incumbent: {required}"
             )
+    if PUBLICATION_SCOPE_NAME in legacy_by_path:
+        if PUBLICATION_SCOPE_NAME not in candidate_by_path:
+            raise CutoverAttestationError(
+                "migration candidate omitted the incumbent publication scope metadata"
+            )
+        incumbent_publication_scope = read_regular_file_at(
+            shelf.fd,
+            PUBLICATION_SCOPE_NAME,
+            label="incumbent publication scope metadata",
+            maximum_bytes=MAX_JSON_BYTES,
+        )
+        candidate_publication_scope = read_regular_file_at(
+            candidate.fd,
+            PUBLICATION_SCOPE_NAME,
+            label="migration candidate publication scope metadata",
+            maximum_bytes=MAX_JSON_BYTES,
+        )
+        _validate_public_download_publication_scope(
+            incumbent_publication_scope,
+            shelf=shelf,
+            shelf_snapshot=shelf_snapshot,
+            label="incumbent publication scope metadata",
+        )
+        _validate_public_download_publication_scope(
+            candidate_publication_scope,
+            shelf=shelf,
+            shelf_snapshot=shelf_snapshot,
+            label="migration candidate publication scope metadata",
+        )
+        if candidate_publication_scope != incumbent_publication_scope:
+            raise CutoverAttestationError(
+                "migration candidate publication scope metadata must be "
+                "byte-identical to the captured incumbent"
+            )
     for path in candidate_by_path:
         root_name = path.split("/", 1)[0]
         if (
@@ -4286,7 +4443,13 @@ def _capture_public_download_candidate(
     invalid_exclusions = [
         path
         for path in excluded_paths
-        if not path.startswith("files/") or path in referenced_paths
+        if not (
+            (
+                path.startswith("files/")
+                and path not in referenced_paths
+            )
+            or _is_public_download_excluded_legacy_path(path)
+        )
     ]
     if invalid_exclusions:
         raise CutoverAttestationError(

@@ -76,6 +76,31 @@ def write_legacy_shelf(root: Path) -> dict[str, bytes]:
     return payloads
 
 
+def write_live_publication_scope(module, shelf: Path) -> bytes:
+    return write_json(
+        shelf / module.PUBLICATION_SCOPE_NAME,
+        {
+            "deployDir": str(shelf),
+            "deployMode": False,
+            "externalArtifactPublishVerified": False,
+            "generatedAt": "2026-07-12T18:47:54.101249Z",
+            "liveVerifyTarget": "",
+            "promotedArtifactCount": 4,
+            "releaseChannel": "preview",
+            # The live compatibility receipt can lag the current manifest.
+            "releaseVersion": "run-20260712-174412",
+            "requireExternalPublish": False,
+            "schema": module.PUBLICATION_SCOPE_SCHEMA,
+            "scope": "local_downloads_shelf_only",
+            "status": "passed",
+            "summary": (
+                "A local downloads shelf was updated and verified. "
+                "This is not an external desktop artifact upload."
+            ),
+        },
+    )
+
+
 def prepare_requested(module, tmp_path: Path):
     shelf = tmp_path / "downloads"
     state = tmp_path / "deploy-receipts" / "initial-release-shelf-cutover"
@@ -752,6 +777,113 @@ def test_public_download_migration_activates_clean_generation_without_touching_s
     assert (
         fixture["shelf"] / ".release-shelf-layout-v1"
     ).read_bytes() == b"v1\n"
+
+
+def test_public_download_candidate_classifies_live_compatibility_and_private_evidence(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    publication_scope_raw = write_live_publication_scope(module, shelf)
+    excluded = {
+        "README.md": b"operator-only shelf notes\n",
+        "RELEASE_BUILD_HANDOFF.generated.json": b'{"handoff_only":true}\n',
+        "RELEASE_BUILD_HANDOFF.generated.md": b"# Operator handoff\n",
+        "UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json": b'{"status":"failed"}\n',
+        "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json": b'{"status":"pass"}\n',
+        "WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json": (
+            b'{"handoff_only":true}\n'
+        ),
+        "WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.md": (
+            b"# Windows handoff\n"
+        ),
+        "external-proof-manifest.json": b'{"schema_version":1}\n',
+        "RELEASE_CHANNEL.generated.json.root-backup-20260704T162721Z": (
+            b'{"backup":true}\n'
+        ),
+        "releases.json.root-backup-20260704T162721Z": b'{"backup":true}\n',
+        "signing/signing-avalonia-win-x64.receipt.json": b'{"status":"pass"}\n',
+        "visual-audit/windows-installer/audit.json": b'{"status":"pass"}\n',
+        "windows-installer-visual-proof/windows-installer-progress.png": (
+            b"private screenshot bytes"
+        ),
+    }
+    for relative, raw in excluded.items():
+        path = shelf / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    candidate = private / "candidate"
+    restoration_spec = private / "restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, [])
+    receipt_path = private / "candidate-materialization.json"
+
+    receipt = module.materialize_public_download_migration_candidate(
+        shelf,
+        candidate,
+        "d" * 40,
+        restoration_spec,
+        sha256(restoration_spec_raw),
+        receipt_path,
+    )
+
+    assert (candidate / module.PUBLICATION_SCOPE_NAME).read_bytes() == (
+        publication_scope_raw
+    )
+    assert module.PUBLICATION_SCOPE_NAME in receipt["copiedPaths"]
+    assert set(excluded) <= set(receipt["excludedPaths"])
+    for relative in excluded:
+        assert (shelf / relative).read_bytes() == excluded[relative]
+        assert not (candidate / relative).exists()
+
+
+@pytest.mark.parametrize(
+    ("relative", "raw", "match"),
+    [
+        (
+            "private-secrets.json",
+            b'{"secret":"must-not-be-classified"}\n',
+            "unclassified non-generational path",
+        ),
+        (
+            "PUBLICATION_SCOPE.generated.json",
+            b'{"schema":"forged"}\n',
+            "publication scope metadata",
+        ),
+    ],
+)
+def test_public_download_candidate_rejects_unknown_or_malformed_top_level_metadata(
+    tmp_path: Path,
+    relative: str,
+    raw: bytes,
+    match: str,
+) -> None:
+    module = load_module()
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    if relative != module.PUBLICATION_SCOPE_NAME:
+        write_live_publication_scope(module, shelf)
+    (shelf / relative).write_bytes(raw)
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    restoration_spec = private / "restorations.json"
+    restoration_spec_raw = write_json(restoration_spec, [])
+    candidate = private / "candidate"
+
+    with pytest.raises(module.CutoverAttestationError, match=match):
+        module.materialize_public_download_migration_candidate(
+            shelf,
+            candidate,
+            "e" * 40,
+            restoration_spec,
+            sha256(restoration_spec_raw),
+            private / "candidate-materialization.json",
+        )
+    assert not candidate.exists()
 
 
 def test_public_download_migration_rejects_authority_or_incumbent_candidate_drift(
