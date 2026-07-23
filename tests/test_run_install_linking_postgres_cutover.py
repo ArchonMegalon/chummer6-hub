@@ -654,11 +654,79 @@ def test_synthetic_git_dependency_requires_strict_full_object_verification(
     )
 
     assert provenance["sourceKind"] == module.SYNTHETIC_SOURCE_KIND
-    assert any(
-        call[0][-5:]
-        == ["fsck", "--strict", "--full", "--no-dangling", "--no-progress"]
+    fsck_calls = [
+        call
         for call in commands.calls
+        if call[0][-5:]
+        == ["fsck", "--strict", "--full", "--no-dangling", "--no-progress"]
+    ]
+    assert len(fsck_calls) == 1
+    assert fsck_calls[0][1] == module.SYNTHETIC_GIT_FSCK_TIMEOUT_SECONDS
+    assert all(
+        call[1] == module.COMMAND_TIMEOUT_SECONDS
+        for call in commands.calls
+        if call not in fsck_calls
     )
+
+
+def test_synthetic_git_dependency_fsck_timeout_fails_closed(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    base = make_synthetic_runner(module, tmp_path, placeholder)
+    repository, consumed, content_sha256 = prepare_hub_provenance_fixture(
+        module,
+        base,
+    )
+    provenance_callback = git_provenance_callback(
+        module,
+        repository,
+        expected_head=base.inputs.expected_hub_registry_head,
+    )
+
+    def callback(arguments, timeout, check):
+        if arguments[-5:] == [
+            "fsck",
+            "--strict",
+            "--full",
+            "--no-dangling",
+            "--no-progress",
+        ]:
+            raise module.CommandDeadlineExceeded(
+                "bounded operator command timed out"
+            )
+        return provenance_callback(arguments, timeout, check)
+
+    commands = FakeCommands(callback)
+    runner = module.GovernedCutoverRunner(
+        base.inputs,
+        command_runner=commands,
+    )
+
+    with pytest.raises(
+        module.CommandDeadlineExceeded,
+        match="bounded operator command timed out",
+    ):
+        runner._git_source_provenance(
+            name="hub-registry",
+            repository=repository,
+            consumed_path=consumed,
+            expected_head=runner.inputs.expected_hub_registry_head,
+            expected_content_sha256=content_sha256,
+            allow_docker_excluded_ignored=False,
+        )
+
+    fsck_calls = [
+        call
+        for call in commands.calls
+        if call[0][-5:]
+        == ["fsck", "--strict", "--full", "--no-dangling", "--no-progress"]
+    ]
+    assert len(fsck_calls) == 1
+    assert fsck_calls[0][1] == module.SYNTHETIC_GIT_FSCK_TIMEOUT_SECONDS
 
 
 def test_real_sealed_standalone_git_repository_passes_strict_provenance(

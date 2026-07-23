@@ -147,6 +147,7 @@ JOB_RECEIPT_CONTRACT = "chummer.install_linking_postgres_operator_job.v1"
 START_INTENT_CONTRACT = "chummer.install_linking_postgres_start_intent.v1"
 JOB_TIMEOUT_SECONDS = 180
 COMMAND_TIMEOUT_SECONDS = 30
+SYNTHETIC_GIT_FSCK_TIMEOUT_SECONDS = 5 * 60
 BUILD_TIMEOUT_SECONDS = 20 * 60
 MAX_COMMAND_OUTPUT_BYTES = 2 * 1024 * 1024
 CANONICAL_ENV_FILE = Path("/docker/chummercomplete/chummer.run-services/.env")
@@ -1595,7 +1596,8 @@ class GovernedCutoverRunner:
                     "--full",
                     "--no-dangling",
                     "--no-progress",
-                ]
+                ],
+                timeout=SYNTHETIC_GIT_FSCK_TIMEOUT_SECONDS,
             )
             if replace_refs or shallow != "false" or promisor_configuration:
                 raise CutoverError(
