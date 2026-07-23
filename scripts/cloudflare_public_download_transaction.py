@@ -28,8 +28,8 @@ import urllib.parse
 import urllib.request
 
 
-SCHEMA = "cloudflare-public-download-ingress-transaction/v1"
-EXTERNAL_PROBE_SCHEMA = "cloudflare-public-download-external-probe/v1"
+SCHEMA = "cloudflare-public-download-ingress-transaction/v2"
+EXTERNAL_PROBE_SCHEMA = "cloudflare-public-download-external-probe/v2"
 PHASES = frozenset(
     {
         "captured",
@@ -43,10 +43,20 @@ PHASES = frozenset(
 )
 MANAGED_HOSTS = ("chummer.run", "www.chummer.run")
 # Go/RE2-compatible: capturing groups only; no lookaround or backreferences.
+GENERATION_ID_RE2 = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
+PORTABLE_FILE_LEAF_RE2 = r"[A-Za-z0-9][A-Za-z0-9._+-]{0,254}"
 MANAGED_PATH_RE2 = (
     r"^(/api/ready/public-downloads|/downloads/"
-    r"(g/.*|files/.*|releases\.json|RELEASE_CHANNEL\.generated\.json))$"
+    r"(releases\.json|RELEASE_CHANNEL\.generated\.json|g/"
+    + GENERATION_ID_RE2
+    + r"/(releases\.json|RELEASE_CHANNEL\.generated\.json|files/"
+    + PORTABLE_FILE_LEAF_RE2
+    + r")|files/"
+    + PORTABLE_FILE_LEAF_RE2
+    + r"))$"
 )
+SAFE_GENERATION_ID = re.compile(r"^" + GENERATION_ID_RE2 + r"$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 JOURNAL_FIELDS = frozenset(
     {
         "schema",
@@ -63,8 +73,13 @@ JOURNAL_FIELDS = frozenset(
         "targetConfig",
         "targetConfigSha256",
         "targetVersion",
+        "generationId",
+        "probeEndpoint",
+        "probeBodySha256",
         "preexistingConnectors",
         "connectorConvergence",
+        "appliedResponse",
+        "rollbackResponse",
         "externalProbeReceiptSha256",
     }
 )
@@ -173,6 +188,49 @@ def validate_origin(origin: str) -> str:
     if parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
         raise ValidationError("origin must not contain a path, query, or fragment")
     return origin[:-1] if origin.endswith("/") else origin
+
+
+def validate_generation_id(value: Any) -> str:
+    if (
+        not isinstance(value, str)
+        or SAFE_GENERATION_ID.fullmatch(value) is None
+        or value in {".", ".."}
+        or ".." in value
+    ):
+        raise ValidationError("generation id is not a traversal-safe opaque token")
+    return value
+
+
+def validate_sha256(value: Any, label: str) -> str:
+    if not isinstance(value, str) or SHA256.fullmatch(value) is None:
+        raise ValidationError(f"{label} must be a lowercase SHA-256")
+    return value
+
+
+def validate_probe_endpoint(endpoint: Any, generation_id: str) -> str:
+    if not isinstance(endpoint, str) or not endpoint:
+        raise ValidationError("probe endpoint must be a non-empty URL")
+    generation_id = validate_generation_id(generation_id)
+    parsed = urllib.parse.urlsplit(endpoint)
+    expected_paths = {
+        f"/downloads/g/{generation_id}/releases.json",
+        f"/downloads/g/{generation_id}/RELEASE_CHANNEL.generated.json",
+    }
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != MANAGED_HOSTS[0]
+        or parsed.netloc != parsed.hostname
+        or parsed.path not in expected_paths
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+        or not managed_path_matches(parsed.path)
+    ):
+        raise ValidationError(
+            "probe endpoint must be the exact canonical generation manifest URL"
+        )
+    return endpoint
 
 
 def validate_re2_pattern(pattern: str) -> None:
@@ -528,6 +586,9 @@ def validate_journal(value: Any) -> dict[str, Any]:
     validate_planned_config(value["priorConfig"], value["targetConfig"], origin)
     if canonical_sha256(value["targetConfig"]) != value["targetConfigSha256"]:
         raise ValidationError("journal target config digest mismatch")
+    generation_id = validate_generation_id(value["generationId"])
+    validate_probe_endpoint(value["probeEndpoint"], generation_id)
+    validate_sha256(value["probeBodySha256"], "journal probe body digest")
     target_version = value["targetVersion"]
     if target_version is not None:
         target_version = _require_version(target_version, "target version")
@@ -545,10 +606,37 @@ def validate_journal(value: Any) -> dict[str, Any]:
     if value["phase"] in {"applied", "awaiting-external-probe", "committed"}:
         if len(convergence) != len(connectors):
             raise ValidationError("applied journal lacks connector observations")
+    applied_response = value["appliedResponse"]
+    if applied_response is not None:
+        applied = parse_configuration_response(applied_response)
+        if (
+            applied.sha256 != value["targetConfigSha256"]
+            or target_version is None
+            or applied.version != target_version
+        ):
+            raise ValidationError("journal applied response does not bind the target")
+    applied_response_required = value["phase"] in {
+        "applied",
+        "awaiting-external-probe",
+        "committed",
+    } or (
+        value["phase"] in {"rollback-in-flight", "rolled-back"}
+        and target_version is not None
+    )
+    if applied_response_required and applied_response is None:
+        raise ValidationError("post-apply journal lacks the full applied response")
+    rollback_response = value["rollbackResponse"]
+    if rollback_response is not None:
+        rollback = parse_configuration_response(rollback_response)
+        if rollback.sha256 != value["priorConfigSha256"]:
+            raise ValidationError("journal rollback response does not bind the prior config")
+    if value["phase"] == "rolled-back" and rollback_response is None:
+        raise ValidationError("rolled-back journal lacks the full rollback response")
+    if value["phase"] != "rolled-back" and rollback_response is not None:
+        raise ValidationError("non-terminal journal unexpectedly records rollback")
     proof_sha = value["externalProbeReceiptSha256"]
     if proof_sha is not None and (
-        not isinstance(proof_sha, str)
-        or not re.fullmatch(r"[0-9a-f]{64}", proof_sha)
+        not isinstance(proof_sha, str) or SHA256.fullmatch(proof_sha) is None
     ):
         raise ValidationError("external probe receipt digest is invalid")
     if value["phase"] == "committed" and any(
@@ -792,6 +880,60 @@ def remove_journal(path: Path) -> None:
         os.close(parent_fd)
 
 
+def journal_path_present(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def archive_terminal_journal(
+    journal_path: Path,
+    evidence_path: Path,
+    journal: Mapping[str, Any],
+) -> dict[str, Any]:
+    terminal = validate_journal(copy.deepcopy(dict(journal)))
+    if terminal["phase"] not in {"committed", "rolled-back"}:
+        raise JournalError("only a terminal journal can be archived")
+    if evidence_path == journal_path:
+        raise JournalError("terminal evidence path must differ from the live journal")
+    if journal_path_present(evidence_path):
+        archived = load_journal(evidence_path)
+        if canonical_json_bytes(archived) != canonical_json_bytes(terminal):
+            raise JournalError("terminal evidence already exists with different bytes")
+    else:
+        create_journal_no_replace(evidence_path, terminal)
+    if journal_path_present(journal_path):
+        live = load_journal(journal_path)
+        if canonical_json_bytes(live) != canonical_json_bytes(terminal):
+            raise JournalError("live terminal journal changed before archival")
+        remove_journal(journal_path)
+    return terminal
+
+
+def reconcile_terminal_evidence(
+    api: TunnelApi,
+    *,
+    evidence_path: Path,
+    expected_phase: str,
+) -> dict[str, Any]:
+    evidence = load_journal(evidence_path)
+    if evidence["phase"] != expected_phase:
+        raise JournalError("terminal evidence phase does not match the requested action")
+    current = parse_configuration_response(api.get_configuration())
+    if expected_phase == "committed":
+        if not _snapshot_matches(
+            current,
+            evidence["targetConfigSha256"],
+            evidence["targetVersion"],
+        ):
+            raise DriftError("committed terminal evidence no longer matches live config")
+    elif expected_phase == "rolled-back":
+        rollback = parse_configuration_response(evidence["rollbackResponse"])
+        if not _snapshot_matches(current, rollback.sha256, rollback.version):
+            raise DriftError("rollback terminal evidence no longer matches live config")
+    else:
+        raise JournalError("terminal evidence phase is unsupported")
+    return evidence
+
+
 def _update_journal(
     path: Path, journal: Mapping[str, Any], **changes: Any
 ) -> dict[str, Any]:
@@ -844,12 +986,20 @@ def capture_transaction(
     account_id: str,
     tunnel_id: str,
     origin: str,
+    generation_id: str,
+    probe_endpoint: str,
+    probe_body_sha256: str,
     journal_path: Path,
     lock_path: Path,
 ) -> dict[str, Any]:
     account_id = _require_identifier(account_id, "account id")
     tunnel_id = _require_identifier(tunnel_id, "tunnel id")
     origin = validate_origin(origin)
+    generation_id = validate_generation_id(generation_id)
+    probe_endpoint = validate_probe_endpoint(probe_endpoint, generation_id)
+    probe_body_sha256 = validate_sha256(
+        probe_body_sha256, "probe body digest"
+    )
     with ExclusiveFileLock(lock_path):
         prior = parse_configuration_response(api.get_configuration())
         target = plan_public_download_config(prior.config, origin)
@@ -870,8 +1020,13 @@ def capture_transaction(
             "targetConfig": target,
             "targetConfigSha256": canonical_sha256(target),
             "targetVersion": None,
+            "generationId": generation_id,
+            "probeEndpoint": probe_endpoint,
+            "probeBodySha256": probe_body_sha256,
             "preexistingConnectors": connectors,
             "connectorConvergence": [],
+            "appliedResponse": None,
+            "rollbackResponse": None,
             "externalProbeReceiptSha256": None,
         }
         create_journal_no_replace(journal_path, journal)
@@ -970,7 +1125,7 @@ def apply_transaction(
                 journal_path, journal, targetVersion=target_version
             )
         assert isinstance(target_version, int)
-        poll_configuration(
+        applied = poll_configuration(
             api,
             expected_sha256=journal["targetConfigSha256"],
             expected_version=target_version,
@@ -1000,6 +1155,7 @@ def apply_transaction(
             journal,
             phase=phase,
             connectorConvergence=convergence,
+            appliedResponse=applied.response,
         )
 
 
@@ -1046,7 +1202,8 @@ def validate_external_probe_receipt(
             "targetConfigSha256",
             "targetVersion",
             "connectorIds",
-            "confirmed",
+            "generationId",
+            "observations",
             "observedAt",
         }
     )
@@ -1058,6 +1215,57 @@ def validate_external_probe_receipt(
     for field in ("accountId", "tunnelId", "targetConfigSha256", "targetVersion"):
         if receipt[field] != journal[field]:
             raise ValidationError(f"external probe receipt {field} mismatch")
+    if receipt["generationId"] != journal["generationId"]:
+        raise ValidationError("external probe receipt generationId mismatch")
+    validate_generation_id(receipt["generationId"])
+    canonical_endpoint = validate_probe_endpoint(
+        journal["probeEndpoint"], receipt["generationId"]
+    )
+    canonical_path = urllib.parse.urlsplit(canonical_endpoint).path
+    expected_endpoints = [
+        f"https://{hostname}{canonical_path}" for hostname in MANAGED_HOSTS
+    ]
+    observations = receipt["observations"]
+    if not isinstance(observations, list) or len(observations) != len(
+        expected_endpoints
+    ):
+        raise ValidationError(
+            "external probe must contain one observation per managed host"
+        )
+    observation_fields = frozenset(
+        {"endpoint", "httpStatus", "bodySha256", "anonymous"}
+    )
+    for index, (observation, expected_endpoint) in enumerate(
+        zip(observations, expected_endpoints, strict=True)
+    ):
+        if not isinstance(observation, dict):
+            raise ValidationError(
+                f"external probe observation[{index}] must be an object"
+            )
+        _require_exact_fields(
+            observation,
+            observation_fields,
+            f"external probe observation[{index}]",
+        )
+        if observation["endpoint"] != expected_endpoint:
+            raise ValidationError(
+                f"external probe observation[{index}] endpoint mismatch"
+            )
+        if observation["httpStatus"] != 200:
+            raise ValidationError(
+                f"external probe observation[{index}] did not return HTTP 200"
+            )
+        if observation["bodySha256"] != journal["probeBodySha256"]:
+            raise ValidationError(
+                f"external probe observation[{index}] body digest mismatch"
+            )
+        validate_sha256(
+            observation["bodySha256"], "external probe body digest"
+        )
+        if observation["anonymous"] is not True:
+            raise ValidationError(
+                f"external probe observation[{index}] was not strictly anonymous"
+            )
     missing_ids = [
         row["id"]
         for row in journal["connectorConvergence"]
@@ -1065,8 +1273,6 @@ def validate_external_probe_receipt(
     ]
     if receipt["connectorIds"] != missing_ids:
         raise ValidationError("external probe connector coverage mismatch")
-    if receipt["confirmed"] is not True:
-        raise ValidationError("external probe did not confirm the target")
     if not isinstance(receipt["observedAt"], str) or not receipt["observedAt"]:
         raise ValidationError("external probe observedAt is invalid")
 
@@ -1076,9 +1282,16 @@ def commit_transaction(
     *,
     journal_path: Path,
     lock_path: Path,
+    evidence_path: Path,
     external_probe_receipt: Path | None = None,
 ) -> dict[str, Any]:
     with ExclusiveFileLock(lock_path):
+        if not journal_path_present(journal_path):
+            return reconcile_terminal_evidence(
+                api,
+                evidence_path=evidence_path,
+                expected_phase="committed",
+            )
         journal = load_journal(journal_path)
         if journal["phase"] == "committed":
             current = parse_configuration_response(api.get_configuration())
@@ -1088,8 +1301,9 @@ def commit_transaction(
                 journal["targetVersion"],
             ):
                 raise DriftError("committed target configuration drifted")
-            remove_journal(journal_path)
-            return journal
+            return archive_terminal_journal(
+                journal_path, evidence_path, journal
+            )
         if journal["phase"] not in {"applied", "awaiting-external-probe"}:
             raise JournalError("only an applied transaction can be committed")
         current = parse_configuration_response(api.get_configuration())
@@ -1115,10 +1329,12 @@ def commit_transaction(
             journal_path,
             journal,
             phase="committed",
+            appliedResponse=current.response,
             externalProbeReceiptSha256=proof_sha,
         )
-        remove_journal(journal_path)
-        return completed
+        return archive_terminal_journal(
+            journal_path, evidence_path, completed
+        )
 
 
 def rollback_transaction(
@@ -1126,26 +1342,39 @@ def rollback_transaction(
     *,
     journal_path: Path,
     lock_path: Path,
+    evidence_path: Path,
     attempts: int = 30,
     interval_seconds: float = 2.0,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     with ExclusiveFileLock(lock_path):
+        if not journal_path_present(journal_path):
+            return reconcile_terminal_evidence(
+                api,
+                evidence_path=evidence_path,
+                expected_phase="rolled-back",
+            )
         journal = load_journal(journal_path)
         if journal["phase"] == "committed":
             raise JournalError("transaction phase cannot be rolled back")
         current = parse_configuration_response(api.get_configuration())
         if journal["phase"] == "rolled-back":
-            if current.sha256 != journal["priorConfigSha256"]:
+            rollback = parse_configuration_response(journal["rollbackResponse"])
+            if not _snapshot_matches(current, rollback.sha256, rollback.version):
                 raise DriftError("rolled-back prior configuration drifted")
-            remove_journal(journal_path)
-            return journal
+            return archive_terminal_journal(
+                journal_path, evidence_path, journal
+            )
         if current.sha256 == journal["priorConfigSha256"]:
             completed = _update_journal(
-                journal_path, journal, phase="rolled-back"
+                journal_path,
+                journal,
+                phase="rolled-back",
+                rollbackResponse=current.response,
             )
-            remove_journal(journal_path)
-            return completed
+            return archive_terminal_journal(
+                journal_path, evidence_path, completed
+            )
         target_is_exact = current.sha256 == journal["targetConfigSha256"] and (
             journal["targetVersion"] is None
             or current.version == journal["targetVersion"]
@@ -1159,6 +1388,7 @@ def rollback_transaction(
             journal,
             phase="rollback-in-flight",
             targetVersion=current.version,
+            appliedResponse=current.response,
         )
         # Re-read immediately before restoring the exact captured config.
         current = parse_configuration_response(api.get_configuration())
@@ -1175,7 +1405,7 @@ def rollback_transaction(
             fallback_sha256=journal["targetConfigSha256"],
             fallback_version=journal["targetVersion"],
         )
-        poll_configuration(
+        rolled_back = poll_configuration(
             api,
             expected_sha256=journal["priorConfigSha256"],
             expected_version=restored.version,
@@ -1187,10 +1417,14 @@ def rollback_transaction(
             interval_seconds=interval_seconds,
         )
         completed = _update_journal(
-            journal_path, journal, phase="rolled-back"
+            journal_path,
+            journal,
+            phase="rolled-back",
+            rollbackResponse=rolled_back.response,
         )
-        remove_journal(journal_path)
-        return completed
+        return archive_terminal_journal(
+            journal_path, evidence_path, completed
+        )
 
 
 class CloudflareTunnelApi:
@@ -1323,11 +1557,18 @@ def _parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     capture = subparsers.add_parser("capture")
     capture.add_argument("--origin", required=True)
-    for command in ("apply", "rollback"):
-        child = subparsers.add_parser(command)
-        child.add_argument("--poll-attempts", type=int, default=30)
-        child.add_argument("--poll-interval-seconds", type=float, default=2.0)
+    capture.add_argument("--generation-id", required=True)
+    capture.add_argument("--probe-endpoint", required=True)
+    capture.add_argument("--probe-body-sha256", required=True)
+    apply = subparsers.add_parser("apply")
+    apply.add_argument("--poll-attempts", type=int, default=30)
+    apply.add_argument("--poll-interval-seconds", type=float, default=2.0)
+    rollback = subparsers.add_parser("rollback")
+    rollback.add_argument("--poll-attempts", type=int, default=30)
+    rollback.add_argument("--poll-interval-seconds", type=float, default=2.0)
+    rollback.add_argument("--evidence-output", type=Path, required=True)
     commit = subparsers.add_parser("commit")
+    commit.add_argument("--evidence-output", type=Path, required=True)
     commit.add_argument("--external-probe-receipt", type=Path)
     return parser
 
@@ -1359,6 +1600,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 account_id=args.account_id,
                 tunnel_id=args.tunnel_id,
                 origin=args.origin,
+                generation_id=args.generation_id,
+                probe_endpoint=args.probe_endpoint,
+                probe_body_sha256=args.probe_body_sha256,
                 **common,
             )
         elif args.command == "apply":
@@ -1369,12 +1613,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         elif args.command == "rollback":
             journal = rollback_transaction(
+                evidence_path=args.evidence_output,
                 attempts=args.poll_attempts,
                 interval_seconds=args.poll_interval_seconds,
                 **common,
             )
         else:
             journal = commit_transaction(
+                evidence_path=args.evidence_output,
                 external_probe_receipt=args.external_probe_receipt,
                 **common,
             )

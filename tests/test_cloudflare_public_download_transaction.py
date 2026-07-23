@@ -23,6 +23,26 @@ transaction = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = transaction
 SPEC.loader.exec_module(transaction)
 
+GENERATION_ID = "g-20260724T000000Z-0123456789abcdef"
+PROBE_ENDPOINT = (
+    f"https://chummer.run/downloads/g/{GENERATION_ID}/releases.json"
+)
+PROBE_BODY_SHA256 = "a" * 64
+
+
+def probe_observations() -> list[dict[str, object]]:
+    path = f"/downloads/g/{GENERATION_ID}/releases.json"
+    return [
+        {
+            "endpoint": f"https://{hostname}{path}",
+            "httpStatus": 200,
+            "bodySha256": PROBE_BODY_SHA256,
+            "anonymous": True,
+        }
+        for hostname in transaction.MANAGED_HOSTS
+    ]
+
+
 def base_config() -> dict[str, Any]:
     return {
         "warp-routing": {"enabled": False},
@@ -119,6 +139,9 @@ def capture(
         account_id="account_123",
         tunnel_id="tunnel-456",
         origin=origin,
+        generation_id=GENERATION_ID,
+        probe_endpoint=PROBE_ENDPOINT,
+        probe_body_sha256=PROBE_BODY_SHA256,
         journal_path=journal_path,
         lock_path=lock_path,
     )
@@ -136,6 +159,14 @@ def apply(
         interval_seconds=0,
         sleep_fn=lambda _: None,
     )
+
+
+def committed_evidence(tmp_path: Path) -> Path:
+    return tmp_path / "cloudflare-committed.json"
+
+
+def rollback_evidence(tmp_path: Path) -> Path:
+    return tmp_path / "cloudflare-rolled-back.json"
 
 
 def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> None:
@@ -169,8 +200,13 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
     "path",
     [
         "/api/ready/public-downloads",
-        "/downloads/g/sha256/index.json",
+        f"/downloads/g/{GENERATION_ID}/releases.json",
+        f"/downloads/g/{GENERATION_ID}/RELEASE_CHANNEL.generated.json",
+        f"/downloads/g/{GENERATION_ID}/files/Chummer6-installer.msi",
+        f"/downloads/g/{GENERATION_ID}/files/Chummer6-payload.zip",
+        f"/downloads/g/{GENERATION_ID}/files/Chummer6-sidecar+portable.zip",
         "/downloads/files/Chummer.zip",
+        "/downloads/files/Chummer_6.1.0+portable.zip",
         "/downloads/releases.json",
         "/downloads/RELEASE_CHANNEL.generated.json",
     ],
@@ -196,6 +232,21 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         "/DOWNLOADS/releases.json",
         "/downloads/g",
         "/downloads/files",
+        f"/downloads/g/{GENERATION_ID}/index.json",
+        f"/downloads/g/{GENERATION_ID}/files/private/Chummer.zip",
+        f"/downloads/g/{GENERATION_ID}/files/Chummer%2fprivate.zip",
+        f"/downloads/g/{GENERATION_ID}/install/Chummer.zip",
+        f"/downloads/g/{GENERATION_ID}/payload/Chummer.zip",
+        "/downloads/files/private/Chummer.zip",
+        "/downloads/files/payload/Chummer.zip",
+        "/downloads/files/install/Chummer.zip",
+        "/downloads/files/Chummer%2fprivate.zip",
+        "/downloads/files/Chummer%252fprivate.zip",
+        "/downloads/files/.hidden",
+        "/downloads/files/Chummer.zip/",
+        "/downloads/install/Chummer.zip",
+        "/downloads/payload/Chummer.zip",
+        "/downloads/private/Chummer.zip",
     ],
 )
 def test_managed_regex_excludes_all_unapproved_surfaces(path: str) -> None:
@@ -330,6 +381,9 @@ def test_capture_is_no_replace_and_does_not_delete_existing_journal(
             account_id="account_123",
             tunnel_id="tunnel-456",
             origin="http://172.17.0.1:8080",
+            generation_id=GENERATION_ID,
+            probe_endpoint=PROBE_ENDPOINT,
+            probe_body_sha256=PROBE_BODY_SHA256,
             journal_path=journal_path,
             lock_path=lock_path,
         )
@@ -471,7 +525,10 @@ def test_missing_connector_config_version_requires_bound_external_probe(
 
     with pytest.raises(transaction.ConvergenceError, match="external probe"):
         transaction.commit_transaction(
-            api, journal_path=journal_path, lock_path=lock_path
+            api,
+            journal_path=journal_path,
+            lock_path=lock_path,
+            evidence_path=committed_evidence(tmp_path),
         )
     assert journal_path.exists()
 
@@ -485,7 +542,8 @@ def test_missing_connector_config_version_requires_bound_external_probe(
                 "targetConfigSha256": "0" * 64,
                 "targetVersion": applied["targetVersion"],
                 "connectorIds": ["connector-without-version"],
-                "confirmed": True,
+                "generationId": GENERATION_ID,
+                "observations": probe_observations(),
                 "observedAt": "2026-07-24T00:00:00Z",
             }
         ),
@@ -496,6 +554,7 @@ def test_missing_connector_config_version_requires_bound_external_probe(
             api,
             journal_path=journal_path,
             lock_path=lock_path,
+            evidence_path=committed_evidence(tmp_path),
             external_probe_receipt=wrong_receipt_path,
         )
     assert journal_path.exists()
@@ -510,7 +569,8 @@ def test_missing_connector_config_version_requires_bound_external_probe(
                 "targetConfigSha256": applied["targetConfigSha256"],
                 "targetVersion": applied["targetVersion"],
                 "connectorIds": ["connector-without-version"],
-                "confirmed": True,
+                "generationId": GENERATION_ID,
+                "observations": probe_observations(),
                 "observedAt": "2026-07-24T00:00:00Z",
             }
         ),
@@ -520,11 +580,84 @@ def test_missing_connector_config_version_requires_bound_external_probe(
         api,
         journal_path=journal_path,
         lock_path=lock_path,
+        evidence_path=committed_evidence(tmp_path),
         external_probe_receipt=receipt_path,
     )
     assert committed["phase"] == "committed"
     assert committed["externalProbeReceiptSha256"]
+    assert committed["priorResponse"]
+    assert committed["appliedResponse"]
+    assert committed["rollbackResponse"] is None
     assert not journal_path.exists()
+    assert transaction.load_journal(committed_evidence(tmp_path)) == committed
+    assert stat.S_IMODE(committed_evidence(tmp_path).stat().st_mode) == 0o600
+    put_count = len(api.put_calls)
+    retried = transaction.commit_transaction(
+        api,
+        journal_path=journal_path,
+        lock_path=lock_path,
+        evidence_path=committed_evidence(tmp_path),
+    )
+    assert retried == committed
+    assert len(api.put_calls) == put_count
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        (
+            "endpoint",
+            PROBE_ENDPOINT.replace("chummer.run", "www.chummer.run"),
+            r"observation\[0\] endpoint mismatch",
+        ),
+        ("httpStatus", 204, r"observation\[0\].*HTTP 200"),
+        ("bodySha256", "b" * 64, r"observation\[0\] body digest mismatch"),
+        (
+            "generationId",
+            "g-20260724T000001Z-fedcba9876543210",
+            "generationId mismatch",
+        ),
+        ("anonymous", False, r"observation\[0\].*strictly anonymous"),
+    ],
+)
+def test_external_probe_is_strictly_bound_to_anonymous_generation_observation(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    expected: str,
+) -> None:
+    api = FakeApi(connector_versions={"connector-without-version": None})
+    journal_path, lock_path, _ = capture(tmp_path, api)
+    applied = apply(api, journal_path, lock_path)
+    receipt = {
+        "schema": transaction.EXTERNAL_PROBE_SCHEMA,
+        "accountId": applied["accountId"],
+        "tunnelId": applied["tunnelId"],
+        "targetConfigSha256": applied["targetConfigSha256"],
+        "targetVersion": applied["targetVersion"],
+        "connectorIds": ["connector-without-version"],
+        "generationId": GENERATION_ID,
+        "observations": probe_observations(),
+        "observedAt": "2026-07-24T00:00:00Z",
+    }
+    if field == "generationId":
+        receipt[field] = value
+    else:
+        receipt["observations"][0][field] = value
+    receipt_path = tmp_path / "tampered-probe.json"
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    with pytest.raises(transaction.ValidationError, match=expected):
+        transaction.commit_transaction(
+            api,
+            journal_path=journal_path,
+            lock_path=lock_path,
+            evidence_path=committed_evidence(tmp_path),
+            external_probe_receipt=receipt_path,
+        )
+
+    assert journal_path.exists()
+    assert not committed_evidence(tmp_path).exists()
 
 
 def test_rollback_restores_exact_prior_config_and_removes_journal(
@@ -538,6 +671,7 @@ def test_rollback_restores_exact_prior_config_and_removes_journal(
         api,
         journal_path=journal_path,
         lock_path=lock_path,
+        evidence_path=rollback_evidence(tmp_path),
         attempts=2,
         interval_seconds=0,
         sleep_fn=lambda _: None,
@@ -547,6 +681,19 @@ def test_rollback_restores_exact_prior_config_and_removes_journal(
     assert api.config == captured["priorConfig"]
     assert api.put_calls[-1] == captured["priorConfig"]
     assert not journal_path.exists()
+    assert transaction.load_journal(rollback_evidence(tmp_path)) == rolled_back
+    assert rolled_back["appliedResponse"]
+    assert rolled_back["rollbackResponse"]
+    assert stat.S_IMODE(rollback_evidence(tmp_path).stat().st_mode) == 0o600
+    put_count = len(api.put_calls)
+    retried = transaction.rollback_transaction(
+        api,
+        journal_path=journal_path,
+        lock_path=lock_path,
+        evidence_path=rollback_evidence(tmp_path),
+    )
+    assert retried == rolled_back
+    assert len(api.put_calls) == put_count
 
 
 def test_rollback_accepts_prior_already_restored_without_another_put(
@@ -560,11 +707,15 @@ def test_rollback_accepts_prior_already_restored_without_another_put(
     put_count = len(api.put_calls)
 
     transaction.rollback_transaction(
-        api, journal_path=journal_path, lock_path=lock_path
+        api,
+        journal_path=journal_path,
+        lock_path=lock_path,
+        evidence_path=rollback_evidence(tmp_path),
     )
 
     assert len(api.put_calls) == put_count
     assert not journal_path.exists()
+    assert rollback_evidence(tmp_path).exists()
 
 
 def test_rollback_recovers_when_restore_put_response_is_lost(
@@ -579,6 +730,7 @@ def test_rollback_recovers_when_restore_put_response_is_lost(
         api,
         journal_path=journal_path,
         lock_path=lock_path,
+        evidence_path=rollback_evidence(tmp_path),
         attempts=2,
         interval_seconds=0,
         sleep_fn=lambda _: None,
@@ -586,6 +738,7 @@ def test_rollback_recovers_when_restore_put_response_is_lost(
 
     assert api.config == captured["priorConfig"]
     assert not journal_path.exists()
+    assert rollback_evidence(tmp_path).exists()
 
 
 def test_rollback_refuses_unrelated_concurrent_edit_and_retains_journal(
@@ -603,7 +756,10 @@ def test_rollback_refuses_unrelated_concurrent_edit_and_retains_journal(
 
     with pytest.raises(transaction.DriftError, match="neither target nor prior"):
         transaction.rollback_transaction(
-            api, journal_path=journal_path, lock_path=lock_path
+            api,
+            journal_path=journal_path,
+            lock_path=lock_path,
+            evidence_path=rollback_evidence(tmp_path),
         )
 
     assert api.config == concurrent
@@ -621,7 +777,10 @@ def test_commit_rechecks_exact_target_and_refuses_version_drift(
 
     with pytest.raises(transaction.DriftError, match="drifted"):
         transaction.commit_transaction(
-            api, journal_path=journal_path, lock_path=lock_path
+            api,
+            journal_path=journal_path,
+            lock_path=lock_path,
+            evidence_path=committed_evidence(tmp_path),
         )
 
     assert journal_path.exists()
