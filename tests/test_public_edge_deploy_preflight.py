@@ -1386,6 +1386,8 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "noOtherProofCopies": True,
         "exactToolPublishDependency": True,
         "exactFinalPublishDependency": True,
+        "exactLoopbackProbePublishDependency": True,
+        "publicImageExcludesOperatorTool": True,
         "exactToolPayloadMode": True,
         "exactFinalPayloadMode": True,
         "exactCopyFromReferences": True,
@@ -1442,6 +1444,14 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         ("initializer_copy_moved_to_build", "exact required named-context COPY set"),
         ("receipt_moved_after_publish", "first build-stage instruction"),
         ("final_publish_edge_removed", "exact build publish artifact"),
+        (
+            "loopback_probe_publish_edge_removed",
+            "dedicated loopback probe artifact",
+        ),
+        (
+            "operator_tool_copied_into_public_image",
+            "must not include the InstallLinking operator tool",
+        ),
         ("tool_publish_edge_removed", "exact tool publish artifact"),
         ("tool_payload_mode_removed", "normalize payload readability exactly once"),
         ("final_payload_mode_removed", "normalize payload readability and isolate state exactly once"),
@@ -1473,16 +1483,17 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
     )
     package_feed_build_copy = module.PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY + "\n"
     build_from = module.PUBLIC_EDGE_DOCKER_BUILD_FROM + "\n"
-    final_from = "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final\n"
+    final_from = module.PUBLIC_EDGE_DOCKER_FINAL_FROM + "\n"
     final_build_copies = (
         "COPY --from=build /app/publish .\n",
+        "COPY --from=build /app/loopback-probe /app/loopback-probe/\n",
         "COPY --from=build /src/chummer.run-services/.codex-design /app/.codex-design\n",
         "COPY --from=build /src/chummer-hub-registry/black-ledger /app/black-ledger\n",
     )
     tool_publish_copy = module.PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY + "\n"
     tool_payload_mode = module.PUBLIC_EDGE_DOCKER_TOOL_PAYLOAD_MODE_RUN + "\n"
     final_payload_mode = module.PUBLIC_EDGE_DOCKER_FINAL_PAYLOAD_MODE_RUN + "\n"
-    assert original.startswith("# syntax=docker/dockerfile:1.4\n" + proof_from)
+    assert original.startswith(module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE + "\n" + proof_from)
     assert proof_run in original
     assert receipt_copy in original
 
@@ -1542,8 +1553,8 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
     elif mutation == "receipt_wrong_stage":
         mutated = original.replace(receipt_copy, "", 1)
         mutated = mutated.replace(
-            "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final\n",
-            "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final\n" + receipt_copy,
+            module.PUBLIC_EDGE_DOCKER_FINAL_FROM + "\n",
+            module.PUBLIC_EDGE_DOCKER_FINAL_FROM + "\n" + receipt_copy,
             1,
         )
     elif mutation == "global_arg":
@@ -1636,6 +1647,16 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
         mutated = mutated.replace(final_from, receipt_copy + final_from, 1)
     elif mutation == "final_publish_edge_removed":
         mutated = original.replace(final_build_copies[0], "", 1)
+    elif mutation == "loopback_probe_publish_edge_removed":
+        mutated = original.replace(final_build_copies[1], "", 1)
+    elif mutation == "operator_tool_copied_into_public_image":
+        mutated = original.replace(
+            final_from,
+            final_from
+            + "COPY --from=build /app/install-linking-postgres-tool "
+            + "/app/operator-tool/\n",
+            1,
+        )
     elif mutation == "tool_publish_edge_removed":
         mutated = original.replace(tool_publish_copy, "", 1)
     elif mutation == "tool_payload_mode_removed":
@@ -3458,10 +3479,13 @@ def test_cutover_finalize_consumes_only_immediate_owner_only_gate_snapshots() ->
     overlay_complete = deploy.index(
         'public_edge_overlay_transaction.py" complete'
     )
-    transaction_retired = deploy.index("deployment_transaction_active=0", overlay_complete)
-    runtime_snapshot = deploy.index('--kind active-runtime', transaction_retired)
+    runtime_snapshot = deploy.index('--kind active-runtime', overlay_complete)
     finalize = deploy.index('"$CUTOVER_ATTESTOR" finalize', runtime_snapshot)
-    assert overlay_complete < transaction_retired < runtime_snapshot < finalize
+    transaction_retired = deploy.index(
+        "deployment_transaction_active=0",
+        finalize,
+    )
+    assert overlay_complete < runtime_snapshot < finalize < transaction_retired
 
     migration_readiness = deploy.index(
         'if ! verify_candidate_publication_readiness; then'

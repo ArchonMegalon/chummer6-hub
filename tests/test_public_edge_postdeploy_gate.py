@@ -1089,6 +1089,7 @@ def test_review_required_code_deploy_postdeploy_passes_without_claiming_release_
     ] == "code-deploy"
     receipt = json.loads(output.read_text(encoding="utf-8"))
     assert receipt["status"] == "pass"
+    assert receipt["childReceipts"] == {}
     assert receipt["projectionPurpose"] == "code-deploy"
     assert receipt["projectionStatus"] == "review_required"
     assert receipt["projectionStage"] == "code_deploy_review_required"
@@ -4469,11 +4470,45 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     assert "--allow-non-launch-supported-release-channel" in downloads_command
     assert "--skip-release-version-match" not in downloads_command
     result = json.loads(output.read_text(encoding="utf-8"))
+    schema_authority = module.load_exact_public_edge_postdeploy_schema()
+    assert result["childReceipts"] == {}
+    assert result["schemaContractName"] == schema_authority["contractName"]
+    assert result["schemaSha256"] == schema_authority["sha256"]
     assert result["skipPreflight"] is False
     assert result["skipReleaseVersionMatch"] is False
     assert result["strictPreflight"] is False
     assert result["strictInvocation"] is True
     assert result["strictNoAllowanceInvocation"] is False
+
+
+def test_child_receipt_sanitizer_drops_secret_bearing_keys_recursively() -> None:
+    module = load_module()
+
+    sanitized = module.sanitize_child_receipt(
+        {
+            "status": "pass",
+            "databasePassword": "hunter2",
+            "credentials": "credential-value",
+            "passwords": ["password-value"],
+            "tokens": {"primary": "token-value"},
+            "connectionString": "Host=db;Password=connection-value",
+            "nested": {
+                "api_key": "do-not-persist",
+                "secretCanarySha256": "a" * 64,
+            },
+        }
+    )
+
+    assert sanitized == {
+        "status": "pass",
+        "nested": {"secretCanarySha256": "a" * 64},
+    }
+    assert "hunter2" not in str(sanitized)
+    assert "credential-value" not in str(sanitized)
+    assert "password-value" not in str(sanitized)
+    assert "token-value" not in str(sanitized)
+    assert "connection-value" not in str(sanitized)
+    assert "do-not-persist" not in str(sanitized)
 
 
 def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, tmp_path) -> None:
@@ -5349,8 +5384,7 @@ def test_postdeploy_gate_fails_closed_and_redacts_raw_frontdoor_child_receipt() 
     assert "front-door navigation anchor artifact contains raw private session or device identity" in result["failures"]
     assert "receipt-private-session" not in serialized
     assert "receipt-private-device" not in serialized
-    assert "sessionId=[redacted]" in serialized
-    assert "deviceId=[redacted]" in serialized
+    assert result["childReceipts"] == {}
 
 
 def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_expected(monkeypatch, tmp_path) -> None:

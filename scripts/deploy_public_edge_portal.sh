@@ -1,14 +1,15 @@
-#!/usr/bin/bash
+#!/usr/bin/bash -p
+set +x
 set -euo pipefail
 
 # Required outer boundary (with the explicit CHUMMER authority/runtime inputs
 # inserted before the executable):
 # /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
 #   CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1 ... \
-#   /usr/bin/bash --noprofile --norc scripts/deploy_public_edge_portal.sh
+#   /usr/bin/bash --noprofile --norc -p scripts/deploy_public_edge_portal.sh
 if [[ "${CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH-}" != "1" ]]; then
   printf '%s\n' \
-    'public edge deploy requires /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1 ... /usr/bin/bash --noprofile --norc' >&2
+    'public edge deploy requires /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1 ... /usr/bin/bash --noprofile --norc -p' >&2
   exit 2
 fi
 
@@ -32,7 +33,6 @@ fi
 readonly TRUSTED_GIT="/usr/bin/git"
 readonly TRUSTED_PYTHON="/usr/bin/python3"
 readonly TRUSTED_DOCKER="/usr/bin/docker"
-readonly TRUSTED_CURL="/usr/bin/curl"
 readonly TRUSTED_TIMEOUT="/usr/bin/timeout"
 readonly TRUSTED_REALPATH="/usr/bin/realpath"
 readonly TRUSTED_INSTALL="/usr/bin/install"
@@ -49,7 +49,7 @@ readonly TRUSTED_MKTEMP="/usr/bin/mktemp"
 readonly TRUSTED_RM="/usr/bin/rm"
 
 for trusted_tool in \
-  "$TRUSTED_GIT" "$TRUSTED_PYTHON" "$TRUSTED_DOCKER" "$TRUSTED_CURL" \
+  "$TRUSTED_GIT" "$TRUSTED_PYTHON" "$TRUSTED_DOCKER" \
   "$TRUSTED_TIMEOUT" "$TRUSTED_REALPATH" "$TRUSTED_INSTALL" "$TRUSTED_CHMOD" \
   "$TRUSTED_MKDIR" "$TRUSTED_RMDIR" "$TRUSTED_AWK" "$TRUSTED_SLEEP" \
   "$TRUSTED_ENV" "$TRUSTED_DIRNAME" "$TRUSTED_STAT" "$TRUSTED_SHA256SUM" \
@@ -65,7 +65,7 @@ done
 ambient_routing_names=()
 while IFS='=' read -r ambient_name _ambient_value; do
   case "$ambient_name" in
-    BASH_ENV|ENV|CDPATH|GLOBIGNORE|LD_PRELOAD|LD_LIBRARY_PATH|PYTHONHOME|PYTHONPATH|PYTHONSTARTUP|PYTHONINSPECT|PYTHONBREAKPOINT|PYTHONWARNINGS|PYTHONSAFEPATH|DOCKER_*|BUILDKIT_HOST|BUILDX_*|COMPOSE_*)
+    BASH_ENV|BASHOPTS|BASH_XTRACEFD|ENV|PS4|SHELLOPTS|CDPATH|GLOBIGNORE|LD_PRELOAD|LD_LIBRARY_PATH|PYTHONHOME|PYTHONPATH|PYTHONSTARTUP|PYTHONINSPECT|PYTHONBREAKPOINT|PYTHONWARNINGS|PYTHONSAFEPATH|DOCKER_*|BUILDKIT_HOST|BUILDX_*|COMPOSE_*)
       ambient_routing_names+=("$ambient_name")
       ;;
   esac
@@ -141,6 +141,7 @@ fi
 
 CANONICAL_BUILD_CONTEXT="/docker/chummercomplete"
 CANONICAL_COMPOSE_PROJECT="chummer6-hub"
+CANONICAL_INSTALL_LINKING_STATE_VOLUME="${CANONICAL_COMPOSE_PROJECT}_chummer-run-api-state"
 CANONICAL_ENV_FILE="/docker/chummercomplete/chummer.run-services/.env"
 CANONICAL_IMAGE_TAG="chummer-run-api:local"
 CANONICAL_OVERLAY_ROOT="/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app"
@@ -148,7 +149,6 @@ CANONICAL_PUBLIC_EDGE_PORT="8091"
 CANONICAL_BASE_URL="https://chummer.run"
 CANONICAL_DOCKER_CONTEXT="default"
 CANONICAL_DOCKER_HOST="unix:///var/run/docker.sock"
-CANONICAL_BUILDX_BUILDER="default"
 CANONICAL_DOCKER_CONFIG_ROOT="/docker/chummercomplete/.state/public-edge-docker-cli"
 CANONICAL_FLEET_MEDIA_CONTRACTS="/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
 CANONICAL_DESIGN_PRODUCT_ROOT="/docker/chummercomplete/chummer-design"
@@ -164,6 +164,10 @@ RELEASE_CHANNEL_RECEIPT_INPUT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT-}"
 RELEASE_CHANNEL_RECEIPT_SHA256="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256-}"
 PROJECTION_SNAPSHOT_ROOT_INPUT="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT-}"
 RUNTIME_PROOF_BIND_SOURCE_SHA256="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
+INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY-}"
+INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256-}"
+EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID="${CHUMMER_INSTALL_LINKING_CANDIDATE_IMAGE_ID-}"
+EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID="${CHUMMER_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID-}"
 FLEET_MEDIA_CONTRACTS="${CHUMMER_FLEET_MEDIA_CONTRACTS:-$CANONICAL_FLEET_MEDIA_CONTRACTS}"
 DESIGN_PRODUCT_ROOT="${CHUMMER_DESIGN_PRODUCT_ROOT:-$CANONICAL_DESIGN_PRODUCT_ROOT}"
 BUILD_CONCURRENCY="${CHUMMER_BUILD_CONCURRENCY:-1}"
@@ -792,6 +796,35 @@ fi
 if [[ -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
 fi
+INSTALL_LINKING_CUTOVER_BOUNDARY=""
+if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+  if [[ "$INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT" != /* \
+    || "$INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT" == *$'\n'* \
+    || "$INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT" == *'|'* ]]; then
+    echo "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY must be an absolute private receipt path" >&2
+    exit 2
+  fi
+  if [[ ! "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256 must be an independently supplied lowercase SHA-256" >&2
+    exit 2
+  fi
+  if [[ ! "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_INSTALL_LINKING_CANDIDATE_IMAGE_ID must be an independently supplied full image ID" >&2
+    exit 2
+  fi
+  if [[ ! "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID must be an independently supplied full image ID" >&2
+    exit 2
+  fi
+  if ! INSTALL_LINKING_CUTOVER_BOUNDARY="$(
+    "$TRUSTED_REALPATH" -e -- "$INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT"
+  )" \
+    || [[ "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+      != "$INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT" ]]; then
+    echo "InstallLinking cutover boundary must be an exact existing non-aliased path" >&2
+    exit 2
+  fi
+fi
 DEPLOY_RECEIPT_DIR="$(
   "$TRUSTED_MKTEMP" -d -- "$CANONICAL_DEPLOY_RECEIPT_ROOT/deploy.XXXXXXXX"
 )"
@@ -802,6 +835,7 @@ OVERLAY_ROLLBACK_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-rollback.json"
 OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.json"
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
 DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
+PRECOMPLETION_TRANSACTION_BACKUP="$DEPLOY_RECEIPT_DIR/precompletion-overlay-transaction.json"
 STEADY_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/steady-compose-runtime-attestation.json"
 COMPOSE_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/docker-compose.public-edge.snapshot.yml"
 COMPOSE_SOURCE_BINDING_RECEIPT="$DEPLOY_RECEIPT_DIR/compose-source-binding.json"
@@ -814,6 +848,33 @@ ACTIVE_RUNTIME_AUTHORITY_SNAPSHOT="$DEPLOY_RECEIPT_DIR/cutover-final-active-runt
 CANDIDATE_PROOF_BIND_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/candidate-proof-bind-source.json"
 PRIOR_PROOF_AUTHORITY_SNAPSHOT="$DEPLOY_RECEIPT_DIR/prior-proof-authority-mount.json"
 PRIOR_PROOF_PUBLIC_SNAPSHOT="$DEPLOY_RECEIPT_DIR/prior-proof-public-mount.json"
+INSTALL_LINKING_CUTOVER_RECEIPT_ROOT=""
+INSTALL_LINKING_REPROOF_ATTEMPT_ID=""
+INSTALL_LINKING_POSTQUIESCE_RECEIPT=""
+INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY=""
+INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY=""
+INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS=""
+INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT=""
+INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT=""
+INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE=""
+if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+  INSTALL_LINKING_CUTOVER_RECEIPT_ROOT="$(
+    "$TRUSTED_DIRNAME" -- "$INSTALL_LINKING_CUTOVER_BOUNDARY"
+  )"
+  install_linking_deploy_suffix="${DEPLOY_RECEIPT_DIR##*.}"
+  if [[ ! "$install_linking_deploy_suffix" =~ ^[A-Za-z0-9]{8}$ ]]; then
+    echo "generated InstallLinking deploy receipt suffix is invalid" >&2
+    exit 70
+  fi
+  INSTALL_LINKING_REPROOF_ATTEMPT_ID="deploy-${install_linking_deploy_suffix,,}"
+  INSTALL_LINKING_POSTQUIESCE_RECEIPT="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/INSTALL_LINKING_POSTGRES_POSTQUIESCE_REPROOF.${INSTALL_LINKING_REPROOF_ATTEMPT_ID}.json"
+  INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/INSTALL_LINKING_STATE_VOLUME_INVENTORY.post-incumbent-quiesce.${INSTALL_LINKING_REPROOF_ATTEMPT_ID}.json"
+  INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/INSTALL_LINKING_STATE_VOLUME_INVENTORY.pre-overlay-activation.${INSTALL_LINKING_REPROOF_ATTEMPT_ID}.json"
+  INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/install-linking-authority-readiness-${install_linking_deploy_suffix}.json"
+  INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/public-edge-postdeploy-${install_linking_deploy_suffix}.json"
+  INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/active-runtime-${install_linking_deploy_suffix}.json"
+  INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE="$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT/public-acceptance-${install_linking_deploy_suffix}.json"
+fi
 CANDIDATE_PORTAL_CONTAINER_NAME="chummer-public-edge-candidate-${DEPLOY_RECEIPT_DIR##*.}"
 if [[ ! "$CANDIDATE_PORTAL_CONTAINER_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{7,127}$ ]]; then
   echo "generated public-edge candidate container name is invalid" >&2
@@ -823,6 +884,28 @@ CUTOVER_ATTESTOR="$SOURCE_ROOT/scripts/attest_initial_release_shelf_cutover.py"
 if [[ ! -f "$CUTOVER_ATTESTOR" || -L "$CUTOVER_ATTESTOR" ]]; then
   echo "audited initial release-shelf cutover attestor is missing or symlinked" >&2
   exit 2
+fi
+INSTALL_LINKING_CUTOVER_VERIFIER="$ROOT_DIR/scripts/verify_install_linking_cutover_boundary.py"
+INSTALL_LINKING_CUTOVER_RUNNER="$SOURCE_ROOT/scripts/run_install_linking_postgres_cutover.py"
+INSTALL_LINKING_CUTOVER_MATERIALIZER="$SOURCE_ROOT/scripts/materialize_install_linking_cutover_boundary.py"
+if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+  for cutover_authority in \
+    "$INSTALL_LINKING_CUTOVER_VERIFIER" \
+    "$INSTALL_LINKING_CUTOVER_RUNNER" \
+    "$INSTALL_LINKING_CUTOVER_MATERIALIZER"; do
+    if [[ ! -f "$cutover_authority" || -L "$cutover_authority" \
+      || ! -O "$cutover_authority" \
+      || "$("$TRUSTED_STAT" -c '%h' -- "$cutover_authority")" != 1 ]]; then
+      echo "an audited InstallLinking cutover authority is unsafe" >&2
+      exit 2
+    fi
+    if ! cutover_authority_mode="$("$TRUSTED_STAT" -c '%a' -- "$cutover_authority")" \
+      || [[ ! "$cutover_authority_mode" =~ ^[0-7]{3,4}$ ]] \
+      || (( (8#$cutover_authority_mode & 8#022) != 0 )); then
+      echo "an audited InstallLinking cutover authority is group- or world-writable" >&2
+      exit 2
+    fi
+  done
 fi
 COMPOSE_SOURCE_ATTESTOR="$SOURCE_ROOT/scripts/attest_public_edge_compose_source.py"
 if [[ ! -f "$COMPOSE_SOURCE_ATTESTOR" || -L "$COMPOSE_SOURCE_ATTESTOR" \
@@ -865,6 +948,15 @@ docker_command=(
 
 docker_cli() {
   "${docker_command[@]}" "$@"
+}
+
+resolve_exact_image_id() {
+  local image_reference="$1"
+  local image_id
+  image_id="$(docker_cli image inspect "$image_reference" --format '{{.Id}}')" \
+    || return 1
+  [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  printf '%s' "$image_id"
 }
 
 compose_command=()
@@ -1064,7 +1156,7 @@ resolve_active_runtime_authority() {
     return 0
   fi
   trusted_source_python -c '
-import json, os, re, stat, sys
+import hashlib, json, os, re, stat, sys
 from datetime import datetime
 from pathlib import Path
 
@@ -1075,6 +1167,65 @@ def reject_duplicates(pairs):
             raise ValueError(f"duplicate JSON key: {key}")
         result[key] = value
     return result
+
+def read_private_json(path, *, maximum):
+    if not path.is_absolute():
+        raise ValueError("private receipt path is not absolute")
+    current = Path(path.anchor)
+    for component in path.parent.parts[1:]:
+        current /= component
+        if stat.S_ISLNK(current.lstat().st_mode):
+            raise ValueError("private receipt has a symlinked parent")
+    parent = path.parent.lstat()
+    if (
+        not stat.S_ISDIR(parent.st_mode)
+        or parent.st_uid != os.getuid()
+        or stat.S_IMODE(parent.st_mode) != 0o700
+    ):
+        raise ValueError("private receipt parent is unsafe")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_size < 1
+            or before.st_size > maximum
+        ):
+            raise ValueError("private receipt metadata is unsafe")
+        raw = os.read(descriptor, before.st_size + 1)
+        after = os.fstat(descriptor)
+        if (
+            len(raw) != before.st_size
+            or (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
+        ):
+            raise ValueError("private receipt changed while open")
+    finally:
+        os.close(descriptor)
+    return (
+        json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicates),
+        hashlib.sha256(raw).hexdigest(),
+    )
 
 path = Path(sys.argv[1])
 flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
@@ -1111,8 +1262,13 @@ try:
 finally:
     os.close(descriptor)
 portal = payload.get("portal") or {}
+legacy_keys = {"contractName", "status", "generatedAtUtc", "portal"}
+enriched_keys = legacy_keys | {
+    "installLinkingAuthorityReadinessPath",
+    "installLinkingAuthorityReadinessSha256",
+}
 if (
-    set(payload) != {"contractName", "status", "generatedAtUtc", "portal"}
+    frozenset(payload) not in {frozenset(legacy_keys), frozenset(enriched_keys)}
     or payload.get("contractName") != "chummer.public-edge.active-runtime-authority/v1"
     or payload.get("status") != "pass"
     or not isinstance(payload.get("generatedAtUtc"), str)
@@ -1130,6 +1286,64 @@ except ValueError:
     raise SystemExit(1)
 if generated.tzinfo is None:
     raise SystemExit(1)
+if set(payload) == enriched_keys:
+    readiness_path = Path(
+        str(payload.get("installLinkingAuthorityReadinessPath") or "")
+    )
+    readiness_expected_sha256 = str(
+        payload.get("installLinkingAuthorityReadinessSha256") or ""
+    )
+    try:
+        readiness, readiness_sha256 = read_private_json(
+            readiness_path,
+            maximum=4096,
+        )
+        readiness_checked = datetime.fromisoformat(
+            str(readiness.get("checkedAtUtc") or "").replace("Z", "+00:00")
+        )
+    except (OSError, UnicodeError, ValueError):
+        raise SystemExit(1)
+    if (
+        re.fullmatch(
+            r"install-linking-authority-readiness-[A-Za-z0-9]{8}\.json",
+            readiness_path.name,
+        )
+        is None
+        or re.fullmatch(r"[0-9a-f]{64}", readiness_expected_sha256) is None
+        or readiness_sha256 != readiness_expected_sha256
+        or set(readiness)
+        != {
+            "authorityIdentitySha256",
+            "checkedAtUtc",
+            "code",
+            "contractName",
+            "currentRoleMatches",
+            "leastPrivilegeValid",
+            "ready",
+            "runtimeRoleSha256",
+            "status",
+        }
+        or readiness.get("contractName")
+        != "chummer.install_linking_postgres_runtime_authority_readiness.v1"
+        or readiness.get("status") != "pass"
+        or readiness.get("ready") is not True
+        or readiness.get("code") != "runtime_role_least_privilege"
+        or readiness.get("currentRoleMatches") is not True
+        or readiness.get("leastPrivilegeValid") is not True
+        or re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(readiness.get("authorityIdentitySha256") or ""),
+        )
+        is None
+        or re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(readiness.get("runtimeRoleSha256") or ""),
+        )
+        is None
+        or readiness_checked.tzinfo is None
+        or readiness_checked.utcoffset().total_seconds() != 0
+    ):
+        raise SystemExit(1)
 existed = portal["existed"]
 container_id = str(portal.get("containerId") or "")
 container_name = str(portal.get("containerName") or "")
@@ -1234,6 +1448,184 @@ if ((RECOVERY_ROUTE_REQUESTED == 1)); then
   exit 0
 fi
 
+INSTALL_LINKING_CUTOVER_ID=""
+verify_install_linking_cutover_boundary() {
+  local expected_boundary_sha256="$1"
+  local expected_phase="$2"
+  local observed_portal_image_id="$3"
+  local observed_tool_image_id="$4"
+  local expected_cutover_args=()
+  if [[ -n "$INSTALL_LINKING_CUTOVER_ID" ]]; then
+    expected_cutover_args=(
+      --expected-cutover-id "$INSTALL_LINKING_CUTOVER_ID"
+    )
+  fi
+  trusted_source_python "$INSTALL_LINKING_CUTOVER_VERIFIER" \
+    --boundary "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+    --expected-boundary-sha256 "$expected_boundary_sha256" \
+    "${expected_cutover_args[@]}" \
+    --expected-source-head "${EXPECTED_HEAD,,}" \
+    --expected-candidate-image-id \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    --expected-candidate-tool-image-id \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    --observed-candidate-image-id "$observed_portal_image_id" \
+    --observed-candidate-tool-image-id "$observed_tool_image_id" \
+    --source-root "$SOURCE_ROOT" \
+    --env-file "$ENV_FILE" \
+    --expected-phase "$expected_phase"
+}
+
+if ! install_linking_boundary_verification="$(
+  verify_install_linking_cutover_boundary \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" \
+    validate_completed \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID"
+)"; then
+  echo "InstallLinking cutover boundary verification failed before Docker mutation" >&2
+  exit 2
+fi
+if ! install_linking_boundary_binding="$(
+  printf '%s' "$install_linking_boundary_verification" \
+    | trusted_source_python -c '
+# InstallLinking verified boundary binding parser.
+import json, re, sys
+
+def reject_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate")
+        result[key] = value
+    return result
+
+payload = json.load(sys.stdin, object_pairs_hook=reject_duplicates)
+expected_keys = {
+    "activeBuildInfoPath", "activeBuildInfoSha256", "boundaryReceiptPath",
+    "boundaryReceiptSha256", "candidateImageId", "candidatePortalTag",
+    "candidateToolImageId", "candidateToolTag",
+    "canonicalPortalTagIdBeforeAndAfter",
+    "canonicalToolTagIdBeforeAndAfter", "composeSha256", "contractName",
+    "cutoverId", "envSha256", "finalRunReceiptPath",
+    "finalRunReceiptSha256", "finalRunReceiptStatus", "phase",
+    "runnerSha256", "sourceHead", "status",
+}
+hex64 = re.compile(r"[0-9a-f]{64}")
+image = re.compile(r"sha256:[0-9a-f]{64}")
+path_fields = (
+    "activeBuildInfoPath", "boundaryReceiptPath", "finalRunReceiptPath",
+)
+if (
+    set(payload) != expected_keys
+    or payload.get("contractName")
+    != "chummer.install_linking_postgres_cutover_boundary_verification.v1"
+    or payload.get("status") != "pass"
+    or payload.get("phase") != "validate_completed"
+    or payload.get("finalRunReceiptStatus") != "pass"
+    or any(
+        hex64.fullmatch(str(payload.get(field) or "")) is None
+        for field in (
+            "activeBuildInfoSha256", "boundaryReceiptSha256",
+            "composeSha256", "envSha256", "finalRunReceiptSha256",
+            "runnerSha256",
+        )
+    )
+    or image.fullmatch(str(payload.get("candidateImageId") or "")) is None
+    or image.fullmatch(str(payload.get("candidateToolImageId") or "")) is None
+    or any(
+        not isinstance(payload.get(field), str)
+        or not payload[field].startswith("/")
+        or "|" in payload[field]
+        or "\n" in payload[field]
+        for field in path_fields
+    )
+):
+    raise SystemExit(1)
+portal_prior = payload.get("canonicalPortalTagIdBeforeAndAfter")
+tool_prior = payload.get("canonicalToolTagIdBeforeAndAfter")
+if any(value is not None and image.fullmatch(str(value)) is None for value in (portal_prior, tool_prior)):
+    raise SystemExit(1)
+values = (
+    payload["cutoverId"], payload["candidatePortalTag"],
+    payload["candidateToolTag"], payload["activeBuildInfoPath"],
+    payload["activeBuildInfoSha256"], payload["composeSha256"],
+    payload["envSha256"], payload["runnerSha256"],
+    "" if portal_prior is None else portal_prior,
+    "" if tool_prior is None else tool_prior,
+)
+if any("|" in str(value) or "\n" in str(value) for value in values):
+    raise SystemExit(1)
+print("|".join(str(value) for value in values), end="")
+'
+)"; then
+  echo "InstallLinking verified boundary binding is malformed" >&2
+  exit 2
+fi
+IFS='|' read -r verified_cutover_id INSTALL_LINKING_CANDIDATE_PORTAL_TAG \
+  INSTALL_LINKING_CANDIDATE_TOOL_TAG INSTALL_LINKING_ACTIVE_BUILD_INFO \
+  INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256 INSTALL_LINKING_COMPOSE_SHA256 \
+  INSTALL_LINKING_ENV_SHA256 INSTALL_LINKING_RUNNER_SHA256 \
+  INSTALL_LINKING_PRIOR_PORTAL_TAG_ID INSTALL_LINKING_PRIOR_TOOL_TAG_ID \
+  <<<"$install_linking_boundary_binding"
+INSTALL_LINKING_CUTOVER_ID="$verified_cutover_id"
+if [[ ! "$INSTALL_LINKING_CUTOVER_ID" \
+    =~ ^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,127}$ \
+  || ! "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG" \
+    =~ ^chummer-run-api:cutover-[0-9a-f]{24}$ \
+  || ! "$INSTALL_LINKING_CANDIDATE_TOOL_TAG" \
+    =~ ^chummer-install-linking-postgres-tool:cutover-[0-9a-f]{24}$ ]]; then
+  echo "InstallLinking verified candidate tag binding is invalid" >&2
+  exit 2
+fi
+if ! install_linking_build_source_provenance="$(
+  trusted_source_python -c '
+# InstallLinking candidate build-source provenance parser.
+import pathlib, re, sys
+scripts = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+from materialize_install_linking_cutover_boundary import bind_active_build_info
+
+path, digest, payload = bind_active_build_info(
+    pathlib.Path(sys.argv[2]),
+    cutover_id=sys.argv[3],
+    candidate_image_id=sys.argv[4],
+    candidate_tool_image_id=sys.argv[5],
+)
+if str(path) != sys.argv[2] or digest != sys.argv[6]:
+    raise SystemExit(1)
+provenance = payload.get("buildSourceProvenance")
+if not isinstance(provenance, dict):
+    raise SystemExit(1)
+values = (
+    (provenance.get("hub-registry") or {}).get("head"),
+    (provenance.get("design-product") or {}).get("head"),
+    (provenance.get("fleet-media-factory-contracts") or {}).get("head"),
+    (provenance.get("canonical-build-context") or {}).get(
+        "dockerignoreSha256"
+    ),
+)
+if (
+    any(not isinstance(value, str) or "|" in value or "\n" in value for value in values)
+    or any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in values[:3])
+    or re.fullmatch(r"[0-9a-f]{64}", values[3]) is None
+):
+    raise SystemExit(1)
+print("|".join(values), end="")
+' "$SOURCE_ROOT/scripts" "$INSTALL_LINKING_ACTIVE_BUILD_INFO" \
+    "$INSTALL_LINKING_CUTOVER_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256"
+)"; then
+  echo "InstallLinking candidate build-source provenance is invalid" >&2
+  exit 2
+fi
+IFS='|' read -r INSTALL_LINKING_EXPECTED_HUB_REGISTRY_HEAD \
+  INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_HEAD \
+  INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_HEAD \
+  INSTALL_LINKING_EXPECTED_BUILD_CONTEXT_DOCKERIGNORE_SHA256 \
+  <<<"$install_linking_build_source_provenance"
 if ! builder_identity="$(
   docker_cli buildx ls --format json \
     | "$TRUSTED_PYTHON" -I -c '
@@ -1306,6 +1698,34 @@ compose_cli --profile install-linking-postgres-admin config --format json \
       --runtime-proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
       --published-port "$PUBLIC_EDGE_PORT" \
       --output "$COMPOSE_ATTESTATION_OUTPUT"
+if ! observed_install_linking_candidate_image_id="$(
+  resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG"
+)" \
+  || ! observed_install_linking_candidate_tool_image_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_TOOL_TAG"
+  )"; then
+  echo "InstallLinking unique candidate images are unavailable" >&2
+  exit 2
+fi
+if [[ "$observed_install_linking_candidate_image_id" \
+    != "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+  || "$observed_install_linking_candidate_tool_image_id" \
+    != "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" ]]; then
+  echo "InstallLinking unique candidate image identity differs from its independent pin" >&2
+  exit 2
+fi
+if ! verified_install_linking_boundary_verification="$(
+  verify_install_linking_cutover_boundary \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" \
+    validate_completed \
+    "$observed_install_linking_candidate_image_id" \
+    "$observed_install_linking_candidate_tool_image_id"
+)" \
+  || [[ "$verified_install_linking_boundary_verification" \
+    != "$install_linking_boundary_verification" ]]; then
+  echo "InstallLinking cutover boundary or candidate images changed during verification" >&2
+  exit 2
+fi
 if ((CUTOVER_STEADY_HANDOFF == 1)); then
   if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
     --kind compose \
@@ -1365,6 +1785,7 @@ resolve_image_tag_id() {
   if ! resolved_ids="$(docker_cli image ls --quiet --no-trunc --filter "reference=$1")"; then
     return 1
   fi
+  # shellcheck disable=SC2016  # $0 is intentionally evaluated by awk.
   resolved_ids="$(printf '%s\n' "$resolved_ids" | "$TRUSTED_AWK" 'NF && !seen[$0]++')"
   if [[ "$resolved_ids" == *$'\n'* ]]; then
     return 1
@@ -1397,6 +1818,956 @@ abort_portal_recreate() {
   exit "$failure_status"
 }
 
+retain_unknown_postquiesce_authority() {
+  local failure_label="$1"
+  retain_deploy_authority_on_exit=1
+  printf \
+    'public-edge portal %s is unknown; retaining mutation lock and durable transaction authority\n' \
+    "$failure_label" >&2
+  exit 70
+}
+
+classify_install_linking_postquiesce_attempt() {
+  trusted_source_python -c '
+# InstallLinking post-quiesce attempt receipt classifier.
+import pathlib, re, sys
+
+scripts = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+from materialize_install_linking_cutover_boundary import (
+    bind_active_build_info,
+    classify_postquiesce_reproof,
+)
+
+(
+    build_path,
+    build_sha256,
+    build_info,
+) = bind_active_build_info(
+    pathlib.Path(sys.argv[3]),
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+)
+if str(build_path) != sys.argv[3] or build_sha256 != sys.argv[7]:
+    raise SystemExit(1)
+classification, receipt_sha256, _ = classify_postquiesce_reproof(
+    pathlib.Path(sys.argv[2]),
+    boundary_output=pathlib.Path(sys.argv[8]),
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+    candidate_build_info_sha256=build_sha256,
+    candidate_build_info=build_info,
+    expected_mutation_lock_token_sha256=sys.argv[9],
+    expected_volume_inventory_sha256=sys.argv[10],
+)
+if (
+    classification not in {"pass", "safe_fail", "unknown"}
+    or re.fullmatch(r"[0-9a-f]{64}", receipt_sha256) is None
+):
+    raise SystemExit(1)
+print(f"{classification}|{receipt_sha256}", end="")
+' "$SOURCE_ROOT/scripts" "$INSTALL_LINKING_POSTQUIESCE_RECEIPT" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO" "$INSTALL_LINKING_CUTOVER_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY" "$deploy_lock_token_digest" \
+    "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256"
+}
+
+bind_install_linking_postquiesce_runtime_authority_identity() {
+  trusted_source_python -c '
+# InstallLinking post-quiesce runtime authority identity parser.
+import pathlib, re, sys
+
+scripts = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+from materialize_install_linking_cutover_boundary import (
+    POSTQUIESCE_REPROOF_PHASE,
+    bind_active_build_info,
+    bind_phase_evidence,
+    bind_postquiesce_reproof,
+)
+
+build_path, build_sha256, build_info = bind_active_build_info(
+    pathlib.Path(sys.argv[3]),
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+)
+if str(build_path) != sys.argv[3] or build_sha256 != sys.argv[7]:
+    raise SystemExit(1)
+_, _, receipt = bind_postquiesce_reproof(
+    pathlib.Path(sys.argv[2]),
+    boundary_output=pathlib.Path(sys.argv[8]),
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+    candidate_build_info_sha256=build_sha256,
+    candidate_build_info=build_info,
+    expected_volume_inventory_sha256=sys.argv[9],
+)
+_, _, evidence = bind_phase_evidence(
+    pathlib.Path(str(receipt["phaseEvidencePath"])),
+    phase=POSTQUIESCE_REPROOF_PHASE,
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+    candidate_build_info_sha256=build_sha256,
+    candidate_build_info=build_info,
+    boundary_output=pathlib.Path(sys.argv[8]),
+    postquiesce_attempt_id=str(receipt["attemptId"]),
+)
+values = (
+    evidence.get("authorityIdentitySha256"),
+    evidence.get("runtimeRoleSha256"),
+)
+if any(
+    not isinstance(value, str)
+    or re.fullmatch(r"[0-9a-f]{64}", value) is None
+    for value in values
+):
+    raise SystemExit(1)
+print("|".join(values), end="")
+' "$SOURCE_ROOT/scripts" "$INSTALL_LINKING_POSTQUIESCE_RECEIPT" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO" "$INSTALL_LINKING_CUTOVER_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+    "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256"
+}
+
+publish_private_snapshot() {
+  local source_path="$1"
+  local output_path="$2"
+  local encoding="$3"
+  local require_source_mode_0600="$4"
+  trusted_source_python -c '
+# Public-edge private snapshot publisher.
+import hashlib, json, os, pathlib, stat, sys, tempfile
+
+source = pathlib.Path(sys.argv[1])
+output = pathlib.Path(sys.argv[2])
+encoding = sys.argv[3]
+require_mode_0600 = sys.argv[4] == "1"
+if (
+    not source.is_absolute()
+    or not output.is_absolute()
+    or source == output
+    or encoding not in {"raw", "canonical-json"}
+):
+    raise SystemExit(1)
+for candidate in (source, output.parent):
+    current = pathlib.Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        current /= component
+        metadata = current.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise SystemExit(1)
+source_metadata = source.lstat()
+if (
+    not stat.S_ISREG(source_metadata.st_mode)
+    or source_metadata.st_nlink != 1
+    or source_metadata.st_uid != os.getuid()
+    or source_metadata.st_size <= 0
+    or source_metadata.st_size > 16 * 1024 * 1024
+    or (require_mode_0600 and stat.S_IMODE(source_metadata.st_mode) != 0o600)
+    or ((not require_mode_0600) and stat.S_IMODE(source_metadata.st_mode) & 0o022)
+):
+    raise SystemExit(1)
+parent_metadata = output.parent.lstat()
+if (
+    not stat.S_ISDIR(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(parent_metadata.st_mode) != 0o700
+    or output.exists()
+    or output.is_symlink()
+):
+    raise SystemExit(1)
+flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+descriptor = os.open(source, flags)
+try:
+    before = os.fstat(descriptor)
+    raw = bytearray()
+    while True:
+        chunk = os.read(descriptor, 65536)
+        if not chunk:
+            break
+        raw.extend(chunk)
+        if len(raw) > 16 * 1024 * 1024:
+            raise SystemExit(1)
+    after = os.fstat(descriptor)
+finally:
+    os.close(descriptor)
+source_after = source.lstat()
+identity = (
+    before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
+    before.st_ctime_ns, before.st_nlink, stat.S_IMODE(before.st_mode),
+)
+if identity != (
+    after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
+    after.st_ctime_ns, after.st_nlink, stat.S_IMODE(after.st_mode),
+) or identity != (
+    source_after.st_dev, source_after.st_ino, source_after.st_size,
+    source_after.st_mtime_ns, source_after.st_ctime_ns,
+    source_after.st_nlink, stat.S_IMODE(source_after.st_mode),
+) or len(raw) != before.st_size:
+    raise SystemExit(1)
+payload = bytes(raw)
+if encoding == "canonical-json":
+    def reject_duplicates(pairs):
+        parsed = {}
+        for key, value in pairs:
+            if key in parsed:
+                raise ValueError("duplicate")
+            parsed[key] = value
+        return parsed
+    def reject_constant(_value):
+        raise ValueError("non-finite")
+    parsed = json.loads(
+        payload.decode("utf-8"),
+        object_pairs_hook=reject_duplicates,
+        parse_constant=reject_constant,
+    )
+    if not isinstance(parsed, dict):
+        raise SystemExit(1)
+    payload = (
+        json.dumps(parsed, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    ).encode("utf-8")
+temporary_descriptor, temporary_name = tempfile.mkstemp(
+    prefix=f".{output.name}.", suffix=".tmp", dir=output.parent
+)
+temporary = pathlib.Path(temporary_name)
+try:
+    os.fchmod(temporary_descriptor, 0o600)
+    written = 0
+    while written < len(payload):
+        written += os.write(temporary_descriptor, payload[written:])
+    os.fsync(temporary_descriptor)
+finally:
+    os.close(temporary_descriptor)
+try:
+    os.link(temporary, output, follow_symlinks=False)
+finally:
+    temporary.unlink(missing_ok=True)
+output_metadata = output.lstat()
+if (
+    not stat.S_ISREG(output_metadata.st_mode)
+    or output_metadata.st_nlink != 1
+    or output_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(output_metadata.st_mode) != 0o600
+):
+    raise SystemExit(1)
+parent_descriptor = os.open(
+    output.parent,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+)
+try:
+    os.fsync(parent_descriptor)
+finally:
+    os.close(parent_descriptor)
+print(hashlib.sha256(payload).hexdigest(), end="")
+' "$source_path" "$output_path" "$encoding" "$require_source_mode_0600"
+}
+
+stable_private_receipt_sha256() {
+  local receipt_path="$1"
+  trusted_source_python -c '
+# InstallLinking stable private receipt hasher.
+import hashlib, os, pathlib, stat, sys
+
+path = pathlib.Path(sys.argv[1])
+if not path.is_absolute():
+    raise SystemExit(1)
+current = pathlib.Path(path.anchor)
+for component in path.parts[1:]:
+    current /= component
+    metadata = current.lstat()
+    if stat.S_ISLNK(metadata.st_mode):
+        raise SystemExit(1)
+metadata = path.lstat()
+parent_metadata = path.parent.lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or metadata.st_nlink != 1
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o600
+    or metadata.st_size <= 0
+    or metadata.st_size > 16 * 1024 * 1024
+    or not stat.S_ISDIR(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(parent_metadata.st_mode) != 0o700
+):
+    raise SystemExit(1)
+descriptor = os.open(
+    path,
+    os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+)
+try:
+    before = os.fstat(descriptor)
+    payload = bytearray()
+    while True:
+        chunk = os.read(descriptor, 65536)
+        if not chunk:
+            break
+        payload.extend(chunk)
+        if len(payload) > 16 * 1024 * 1024:
+            raise SystemExit(1)
+    after = os.fstat(descriptor)
+finally:
+    os.close(descriptor)
+final_metadata = path.lstat()
+identity = (
+    before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
+    before.st_ctime_ns, before.st_nlink, stat.S_IMODE(before.st_mode),
+)
+if (
+    identity
+    != (
+        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
+        after.st_ctime_ns, after.st_nlink, stat.S_IMODE(after.st_mode),
+    )
+    or identity
+    != (
+        final_metadata.st_dev, final_metadata.st_ino, final_metadata.st_size,
+        final_metadata.st_mtime_ns, final_metadata.st_ctime_ns,
+        final_metadata.st_nlink, stat.S_IMODE(final_metadata.st_mode),
+    )
+    or len(payload) != before.st_size
+):
+    raise SystemExit(1)
+print(hashlib.sha256(payload).hexdigest(), end="")
+' "$receipt_path"
+}
+
+verify_install_linking_public_acceptance_boundary() {
+  local boundary_sha256 boundary_verification
+  boundary_sha256="$(
+    stable_private_receipt_sha256 "$INSTALL_LINKING_CUTOVER_BOUNDARY"
+  )" || return 1
+  [[ "$boundary_sha256" =~ ^[0-9a-f]{64}$ ]] || return 1
+  boundary_verification="$(
+    verify_install_linking_cutover_boundary \
+      "$boundary_sha256" \
+      public_acceptance_completed \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID"
+  )" || return 1
+  if ! printf '%s' "$boundary_verification" \
+    | trusted_source_python -c '
+# InstallLinking accepted boundary closure parser.
+import json, sys
+
+def reject_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate")
+        result[key] = value
+    return result
+
+payload = json.load(sys.stdin, object_pairs_hook=reject_duplicates)
+expected_keys = {
+    "activeBuildInfoPath", "activeBuildInfoSha256", "boundaryReceiptPath",
+    "boundaryReceiptSha256", "candidateImageId", "candidatePortalTag",
+    "candidateToolImageId", "candidateToolTag",
+    "canonicalPortalTagIdBeforeAndAfter",
+    "canonicalToolTagIdBeforeAndAfter", "composeSha256", "contractName",
+    "cutoverId", "envSha256", "finalRunReceiptPath",
+    "finalRunReceiptSha256", "finalRunReceiptStatus", "phase",
+    "runnerSha256", "sourceHead", "status",
+}
+if (
+    set(payload) != expected_keys
+    or payload.get("contractName")
+    != "chummer.install_linking_postgres_cutover_boundary_verification.v1"
+    or payload.get("status") != "pass"
+    or payload.get("phase") != "public_acceptance_completed"
+    or payload.get("finalRunReceiptStatus") != "pass"
+    or payload.get("boundaryReceiptSha256") != sys.argv[1]
+    or payload.get("cutoverId") != sys.argv[2]
+    or payload.get("candidateImageId") != sys.argv[3]
+    or payload.get("candidateToolImageId") != sys.argv[4]
+    or payload.get("activeBuildInfoSha256") != sys.argv[5]
+):
+    raise SystemExit(1)
+' "$boundary_sha256" \
+      "$INSTALL_LINKING_CUTOVER_ID" \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+      "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+      "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256"; then
+    return 1
+  fi
+  printf '%s' "$boundary_sha256"
+}
+
+write_install_linking_public_acceptance_evidence() {
+  trusted_source_python -c '
+# InstallLinking public acceptance evidence publisher.
+import hashlib, json, os, pathlib, re, stat, sys, tempfile
+
+(
+    output_value,
+    cutover_id,
+    candidate_image_id,
+    candidate_tool_image_id,
+    build_info_sha256,
+    postdeploy_path_value,
+    postdeploy_sha256,
+    active_runtime_path_value,
+    active_runtime_sha256,
+    postquiesce_path_value,
+    postquiesce_sha256,
+) = sys.argv[1:]
+output = pathlib.Path(output_value)
+paths = tuple(
+    pathlib.Path(value)
+    for value in (
+        postdeploy_path_value,
+        active_runtime_path_value,
+        postquiesce_path_value,
+    )
+)
+if (
+    not output.is_absolute()
+    or any(not path.is_absolute() or path.parent != output.parent for path in paths)
+    or len(set(paths)) != 3
+    or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:+-]{0,127}", cutover_id) is None
+    or re.fullmatch(r"sha256:[0-9a-f]{64}", candidate_image_id) is None
+    or re.fullmatch(r"sha256:[0-9a-f]{64}", candidate_tool_image_id) is None
+    or any(
+        re.fullmatch(r"[0-9a-f]{64}", value) is None
+        for value in (
+            build_info_sha256,
+            postdeploy_sha256,
+            active_runtime_sha256,
+            postquiesce_sha256,
+        )
+    )
+):
+    raise SystemExit(1)
+current = pathlib.Path(output.anchor)
+for component in output.parent.parts[1:]:
+    current /= component
+    metadata = current.lstat()
+    if stat.S_ISLNK(metadata.st_mode):
+        raise SystemExit(1)
+parent_metadata = output.parent.lstat()
+if (
+    not stat.S_ISDIR(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(parent_metadata.st_mode) != 0o700
+    or output.exists()
+    or output.is_symlink()
+):
+    raise SystemExit(1)
+payload = {
+    "activeRuntimeAuthorityPath": active_runtime_path_value,
+    "activeRuntimeAuthoritySha256": active_runtime_sha256,
+    "candidateBuildInfoSha256": build_info_sha256,
+    "candidateContainerImageId": candidate_image_id,
+    "candidateImageId": candidate_image_id,
+    "candidateToolImageId": candidate_tool_image_id,
+    "contractName": (
+        "chummer.install_linking_postgres_public_acceptance_evidence.v1"
+    ),
+    "cutoverId": cutover_id,
+    "overlayAccepted": True,
+    "postQuiesceReceiptPath": postquiesce_path_value,
+    "postQuiesceReceiptSha256": postquiesce_sha256,
+    "postdeployReceiptPath": postdeploy_path_value,
+    "postdeployReceiptSha256": postdeploy_sha256,
+    "publicReadinessAccepted": True,
+    "status": "pass",
+}
+encoded = (
+    json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+).encode("utf-8")
+descriptor, temporary_name = tempfile.mkstemp(
+    prefix=f".{output.name}.", suffix=".tmp", dir=output.parent
+)
+temporary = pathlib.Path(temporary_name)
+try:
+    os.fchmod(descriptor, 0o600)
+    written = 0
+    while written < len(encoded):
+        written += os.write(descriptor, encoded[written:])
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+try:
+    os.link(temporary, output, follow_symlinks=False)
+finally:
+    temporary.unlink(missing_ok=True)
+metadata = output.lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or metadata.st_nlink != 1
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o600
+):
+    raise SystemExit(1)
+parent_descriptor = os.open(
+    output.parent,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+)
+try:
+    os.fsync(parent_descriptor)
+finally:
+    os.close(parent_descriptor)
+print(hashlib.sha256(encoded).hexdigest(), end="")
+' "$INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE" \
+    "$INSTALL_LINKING_CUTOVER_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+    "$INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT" \
+    "$INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT_SHA256" \
+    "$INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT" \
+    "$INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT_SHA256" \
+    "$INSTALL_LINKING_POSTQUIESCE_RECEIPT" \
+    "$INSTALL_LINKING_POSTQUIESCE_RECEIPT_SHA256"
+}
+
+INSTALL_LINKING_STATE_VOLUME_INSPECT_FORMAT='{{json .Id}} {{json .Name}} {{json .Image}} {{json .State.Running}} {{json .Config.Labels}} {{json .Mounts}}'
+
+list_install_linking_state_volume_consumer_ids() {
+  local raw_ids
+  raw_ids="$(
+    docker_cli container ls --all --quiet --no-trunc \
+      --filter "volume=$CANONICAL_INSTALL_LINKING_STATE_VOLUME"
+  )" || return 1
+  printf '%s' "$raw_ids" | trusted_source_python -c '
+# InstallLinking state-volume consumer ID parser.
+import re, sys
+
+raw = sys.stdin.read()
+identifiers = raw.splitlines()
+if any(re.fullmatch(r"[0-9a-f]{64}", value) is None for value in identifiers):
+    raise SystemExit(1)
+if len(identifiers) != len(set(identifiers)):
+    raise SystemExit(1)
+print("\n".join(sorted(identifiers)), end="")
+'
+}
+
+capture_install_linking_state_volume_consumers_once() {
+  local identifiers container_id raw_record parsed_record
+  identifiers="$(list_install_linking_state_volume_consumer_ids)" || return 1
+  while IFS= read -r container_id; do
+    [[ -n "$container_id" ]] || continue
+    raw_record="$(
+      docker_cli container inspect \
+        --format "$INSTALL_LINKING_STATE_VOLUME_INSPECT_FORMAT" \
+        "$container_id"
+    )" || return 1
+    parsed_record="$(
+      printf '%s' "$raw_record" | trusted_source_python -c '
+# InstallLinking state-volume consumer parser.
+import hashlib, json, re, sys
+
+decoder = json.JSONDecoder()
+raw = sys.stdin.read()
+values = []
+position = 0
+while position < len(raw):
+    while position < len(raw) and raw[position].isspace():
+        position += 1
+    if position == len(raw):
+        break
+    value, position = decoder.raw_decode(raw, position)
+    values.append(value)
+if len(values) != 6:
+    raise SystemExit(1)
+container_id, name, image_id, running, labels, mounts = values
+expected_id = sys.argv[1]
+volume_name = sys.argv[2]
+cutover_id = sys.argv[3]
+incumbent_id = sys.argv[4]
+incumbent_name = sys.argv[5]
+incumbent_image_id = sys.argv[6]
+candidate_tool_image_id = sys.argv[7]
+if (
+    container_id != expected_id
+    or re.fullmatch(r"[0-9a-f]{64}", str(container_id or "")) is None
+    or not isinstance(name, str)
+    or re.fullmatch(r"/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", name) is None
+    or re.fullmatch(r"sha256:[0-9a-f]{64}", str(image_id or "")) is None
+    or type(running) is not bool
+    or not isinstance(labels, dict)
+    or not isinstance(mounts, list)
+):
+    raise SystemExit(1)
+matching_mounts = [
+    mount
+    for mount in mounts
+    if isinstance(mount, dict)
+    and mount.get("Type") == "volume"
+    and mount.get("Name") == volume_name
+]
+if len(matching_mounts) != 1:
+    raise SystemExit(1)
+mount = matching_mounts[0]
+if (
+    mount.get("Destination") != "/app/state"
+    or type(mount.get("RW")) is not bool
+):
+    raise SystemExit(1)
+container_name = name[1:]
+project = labels.get("com.docker.compose.project")
+service = labels.get("com.docker.compose.service")
+oneoff = labels.get("com.docker.compose.oneoff")
+classification = ""
+job_name = None
+if container_id == incumbent_id:
+    if (
+        not incumbent_id
+        or container_name != incumbent_name
+        or image_id != incumbent_image_id
+        or running is not False
+        or mount["RW"] is not True
+        or project != "chummer6-hub"
+        or service != "chummer-portal"
+        or oneoff != "False"
+    ):
+        raise SystemExit(1)
+    classification = "incumbent_portal"
+else:
+    suffix = hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24]
+    prefix = f"chummer-install-linking-cutover-{suffix}-"
+    if not container_name.startswith(prefix):
+        raise SystemExit(1)
+    job_name = container_name[len(prefix):]
+    if (
+        job_name != "prove-local-store-absent"
+        and re.fullmatch(
+            r"postquiesce-[a-z0-9][a-z0-9-]{7,31}-"
+            r"prove-local-store-absent",
+            job_name,
+        )
+        is None
+    ):
+        raise SystemExit(1)
+    job_hash = hashlib.sha256(job_name.encode("utf-8")).hexdigest()[:12]
+    expected_project = f"chummer6-ilpg-{suffix[:16]}-{job_hash}"
+    if (
+        image_id != candidate_tool_image_id
+        or running is not False
+        or mount["RW"] is not False
+        or project != expected_project
+        or service
+        != "chummer-install-linking-postgres-import-presence-proof"
+        or oneoff != "False"
+    ):
+        raise SystemExit(1)
+    classification = "governed_local_store_proof"
+record = {
+    "classification": classification,
+    "composeOneoff": oneoff,
+    "composeProject": project,
+    "composeService": service,
+    "containerId": container_id,
+    "containerName": container_name,
+    "imageId": image_id,
+    "jobName": job_name,
+    "readWrite": mount["RW"],
+    "running": running,
+    "volumeDestination": mount["Destination"],
+}
+print(
+    json.dumps(record, sort_keys=True, separators=(",", ":"), allow_nan=False),
+    end="",
+)
+' "$container_id" "$CANONICAL_INSTALL_LINKING_STATE_VOLUME" \
+        "$INSTALL_LINKING_CUTOVER_ID" "$prior_portal_container_id" \
+        "$prior_portal_container_name" "$prior_portal_image_id" \
+        "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID"
+    )" || return 1
+    printf '%s\n' "$parsed_record"
+  done <<<"$identifiers"
+}
+
+write_install_linking_state_volume_inventory() {
+  local checkpoint="$1"
+  local output="$2"
+  local first_inventory second_inventory
+  first_inventory="$(capture_install_linking_state_volume_consumers_once)" \
+    || return 1
+  second_inventory="$(capture_install_linking_state_volume_consumers_once)" \
+    || return 1
+  [[ "$first_inventory" == "$second_inventory" ]] || return 1
+  printf '%s' "$second_inventory" | trusted_source_python -c '
+# InstallLinking state-volume inventory publisher.
+import hashlib, json, os, pathlib, re, stat, sys, tempfile
+
+output = pathlib.Path(sys.argv[1])
+checkpoint = sys.argv[2]
+attempt_id = sys.argv[3]
+cutover_id = sys.argv[4]
+volume_name = sys.argv[5]
+incumbent_id = sys.argv[6]
+candidate_tool_image_id = sys.argv[7]
+mutation_lock_token_sha256 = sys.argv[8]
+expected_name = (
+    "INSTALL_LINKING_STATE_VOLUME_INVENTORY."
+    f"{checkpoint.replace(chr(95), chr(45))}.{attempt_id}.json"
+)
+if (
+    not output.is_absolute()
+    or output.name != expected_name
+    or checkpoint not in {
+        "post_incumbent_quiesce",
+        "pre_overlay_activation",
+    }
+    or re.fullmatch(r"[a-z0-9][a-z0-9-]{7,31}", attempt_id) is None
+    or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:+-]{0,127}", cutover_id)
+    is None
+    or volume_name != "chummer6-hub_chummer-run-api-state"
+    or (
+        incumbent_id
+        and re.fullmatch(r"[0-9a-f]{64}", incumbent_id) is None
+    )
+    or re.fullmatch(r"sha256:[0-9a-f]{64}", candidate_tool_image_id) is None
+    or re.fullmatch(r"[0-9a-f]{64}", mutation_lock_token_sha256) is None
+):
+    raise SystemExit(1)
+current = pathlib.Path(output.anchor)
+for component in output.parent.parts[1:]:
+    current /= component
+    metadata = current.lstat()
+    if stat.S_ISLNK(metadata.st_mode):
+        raise SystemExit(1)
+parent_metadata = output.parent.lstat()
+if (
+    not stat.S_ISDIR(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.getuid()
+    or stat.S_IMODE(parent_metadata.st_mode) != 0o700
+    or output.exists()
+    or output.is_symlink()
+):
+    raise SystemExit(1)
+consumers = []
+for line in sys.stdin.read().splitlines():
+    if not line:
+        raise SystemExit(1)
+    consumers.append(json.loads(line))
+if consumers != sorted(consumers, key=lambda item: item["containerId"]):
+    raise SystemExit(1)
+if len(consumers) != len({item["containerId"] for item in consumers}):
+    raise SystemExit(1)
+consumer_bytes = json.dumps(
+    consumers,
+    sort_keys=True,
+    separators=(",", ":"),
+    allow_nan=False,
+).encode("utf-8")
+payload = {
+    "attemptId": attempt_id,
+    "candidateToolImageId": candidate_tool_image_id,
+    "checkpoint": checkpoint,
+    "consumerCount": len(consumers),
+    "consumerSetSha256": hashlib.sha256(consumer_bytes).hexdigest(),
+    "consumers": consumers,
+    "contractName": "chummer.install_linking_state_volume_inventory.v1",
+    "cutoverId": cutover_id,
+    "incumbentPortalContainerId": incumbent_id or None,
+    "mutationLockTokenSha256": mutation_lock_token_sha256,
+    "status": "pass",
+    "volumeName": volume_name,
+}
+encoded = (
+    json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+).encode("utf-8")
+descriptor, temporary_name = tempfile.mkstemp(
+    prefix=f".{output.name}.",
+    suffix=".tmp",
+    dir=output.parent,
+)
+temporary = pathlib.Path(temporary_name)
+try:
+    os.fchmod(descriptor, 0o600)
+    written = 0
+    while written < len(encoded):
+        written += os.write(descriptor, encoded[written:])
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+try:
+    os.link(temporary, output, follow_symlinks=False)
+finally:
+    temporary.unlink(missing_ok=True)
+metadata = output.lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or metadata.st_nlink != 1
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o600
+):
+    raise SystemExit(1)
+parent_descriptor = os.open(
+    output.parent,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+)
+try:
+    os.fsync(parent_descriptor)
+finally:
+    os.close(parent_descriptor)
+print(hashlib.sha256(encoded).hexdigest(), end="")
+' "$output" "$checkpoint" "$INSTALL_LINKING_REPROOF_ATTEMPT_ID" \
+    "$INSTALL_LINKING_CUTOVER_ID" "$CANONICAL_INSTALL_LINKING_STATE_VOLUME" \
+    "$prior_portal_container_id" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$deploy_lock_token_digest"
+}
+
+verify_install_linking_state_volume_inventory_transition() {
+  local before_path="$1"
+  local before_sha256="$2"
+  local after_path="$3"
+  local after_sha256="$4"
+  trusted_source_python -c '
+# InstallLinking state-volume inventory transition verifier.
+import hashlib, json, os, pathlib, re, stat, sys
+
+def reject_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate")
+        result[key] = value
+    return result
+
+def read_private(path_value, expected_sha256):
+    path = pathlib.Path(path_value)
+    if (
+        not path.is_absolute()
+        or re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is None
+    ):
+        raise ValueError("invalid input")
+    metadata = path.lstat()
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+    ):
+        raise ValueError("unsafe receipt")
+    descriptor = os.open(
+        path,
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        before = os.fstat(descriptor)
+        raw = bytearray()
+        while True:
+            chunk = os.read(descriptor, 65536)
+            if not chunk:
+                break
+            raw.extend(chunk)
+            if len(raw) > 16 * 1024 * 1024:
+                raise ValueError("oversized")
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    final = path.lstat()
+    identity = (
+        before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
+        before.st_ctime_ns, before.st_nlink, stat.S_IMODE(before.st_mode),
+    )
+    if (
+        identity
+        != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
+            after.st_ctime_ns, after.st_nlink, stat.S_IMODE(after.st_mode),
+        )
+        or identity
+        != (
+            final.st_dev, final.st_ino, final.st_size, final.st_mtime_ns,
+            final.st_ctime_ns, final.st_nlink, stat.S_IMODE(final.st_mode),
+        )
+        or hashlib.sha256(raw).hexdigest() != expected_sha256
+    ):
+        raise ValueError("receipt drift")
+    return json.loads(
+        bytes(raw).decode("utf-8"),
+        object_pairs_hook=reject_duplicates,
+    )
+
+before = read_private(sys.argv[1], sys.argv[2])
+after = read_private(sys.argv[3], sys.argv[4])
+expected_keys = {
+    "attemptId", "candidateToolImageId", "checkpoint", "consumerCount",
+    "consumerSetSha256", "consumers", "contractName", "cutoverId",
+    "incumbentPortalContainerId", "mutationLockTokenSha256", "status",
+    "volumeName",
+}
+if (
+    set(before) != expected_keys
+    or set(after) != expected_keys
+    or before.get("contractName")
+    != "chummer.install_linking_state_volume_inventory.v1"
+    or after.get("contractName") != before.get("contractName")
+    or before.get("status") != "pass"
+    or after.get("status") != "pass"
+    or before.get("checkpoint") != "post_incumbent_quiesce"
+    or after.get("checkpoint") != "pre_overlay_activation"
+):
+    raise SystemExit(1)
+for key in (
+    "attemptId", "candidateToolImageId", "cutoverId",
+    "incumbentPortalContainerId", "mutationLockTokenSha256", "volumeName",
+):
+    if after.get(key) != before.get(key):
+        raise SystemExit(1)
+before_consumers = before.get("consumers")
+after_consumers = after.get("consumers")
+if not isinstance(before_consumers, list) or not isinstance(after_consumers, list):
+    raise SystemExit(1)
+def verify_set(payload, consumers):
+    encoded = json.dumps(
+        consumers,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    if (
+        payload.get("consumerCount") != len(consumers)
+        or payload.get("consumerSetSha256")
+        != hashlib.sha256(encoded).hexdigest()
+    ):
+        raise SystemExit(1)
+verify_set(before, before_consumers)
+verify_set(after, after_consumers)
+before_by_id = {item.get("containerId"): item for item in before_consumers}
+after_by_id = {item.get("containerId"): item for item in after_consumers}
+if len(before_by_id) != len(before_consumers) or len(after_by_id) != len(after_consumers):
+    raise SystemExit(1)
+if any(after_by_id.get(identifier) != item for identifier, item in before_by_id.items()):
+    raise SystemExit(1)
+additions = [
+    item for identifier, item in after_by_id.items()
+    if identifier not in before_by_id
+]
+attempt_id = before.get("attemptId")
+expected_job = f"postquiesce-{attempt_id}-prove-local-store-absent"
+if (
+    len(additions) != 1
+    or additions[0].get("classification")
+    != "governed_local_store_proof"
+    or additions[0].get("jobName") != expected_job
+    or additions[0].get("running") is not False
+    or additions[0].get("readWrite") is not False
+):
+    raise SystemExit(1)
+' "$before_path" "$before_sha256" "$after_path" "$after_sha256"
+}
+
 if ! prior_tool_image_tag_id="$(resolve_image_tag_id "$TOOL_IMAGE_TAG")"; then
   echo "could not query prior PostgreSQL tool image tag identity" >&2
   exit 3
@@ -1407,6 +2778,11 @@ for prior_tag_id in "$prior_image_tag_id" "$prior_tool_image_tag_id"; do
     exit 3
   fi
 done
+if [[ "$prior_image_tag_id" != "$INSTALL_LINKING_PRIOR_PORTAL_TAG_ID" \
+  || "$prior_tool_image_tag_id" != "$INSTALL_LINKING_PRIOR_TOOL_TAG_ID" ]]; then
+  echo "canonical portal or tool tag changed after the governed candidate build" >&2
+  exit 3
+fi
 
 if ! active_runtime_authority="$(resolve_active_runtime_authority)"; then
   echo "could not validate active public-edge runtime authority" >&2
@@ -1622,12 +2998,71 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction
 fi
 
 deployment_transaction_active=1
+precompletion_transaction_backup_active=0
+install_linking_materializer_invoked=0
+postquiesce_runner_invoked=0
+postquiesce_outcome_resolved=0
+retain_deploy_authority_on_exit=0
 reconcile_transaction_on_exit() {
   local failure_status="$?"
   local recovery_failed=0
+  local exit_reconciled_boundary_sha256
+  local exit_postquiesce_classification
   trap - EXIT HUP INT TERM
+  if ((deployment_transaction_active == 1 \
+    && postquiesce_runner_invoked == 1 \
+    && postquiesce_outcome_resolved == 0)); then
+    if exit_postquiesce_classification="$(
+      classify_install_linking_postquiesce_attempt
+    )" \
+      && [[ "$exit_postquiesce_classification" \
+        =~ ^safe_fail\|[0-9a-f]{64}$ ]]; then
+      postquiesce_outcome_resolved=1
+      printf \
+        'install_linking_postquiesce_safe_fail_exit_reconciled receipt_sha256=%s\n' \
+        "${exit_postquiesce_classification#safe_fail|}" >&2
+    else
+      retain_deploy_authority_on_exit=1
+    fi
+  fi
+  if ((retain_deploy_authority_on_exit == 1)); then
+    printf \
+      'install_linking_postquiesce_unknown_authority_retained lock=%s journal=%s receipt=%s\n' \
+      "$DEPLOY_LOCK_DIR" "$OVERLAY_PRIOR_STATE_OUTPUT" \
+      "$INSTALL_LINKING_POSTQUIESCE_RECEIPT" >&2
+    exit "$failure_status"
+  fi
+  if ((deployment_transaction_active == 1 \
+    && install_linking_materializer_invoked == 1)); then
+    if exit_reconciled_boundary_sha256="$(
+      verify_install_linking_public_acceptance_boundary
+    )"; then
+      deployment_transaction_active=0
+      precompletion_transaction_backup_active=0
+      printf \
+        'install_linking_public_acceptance_exit_reconciled boundary_sha256=%s\n' \
+        "$exit_reconciled_boundary_sha256" >&2
+    fi
+  fi
   if ((deployment_transaction_active == 1)); then
-    run_deploy_recovery || recovery_failed=1
+    if ((precompletion_transaction_backup_active == 1)) \
+      && [[ ! -e "$OVERLAY_PRIOR_STATE_OUTPUT" \
+        && ! -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
+      if ! restored_transaction_sha256="$(
+        publish_private_snapshot \
+          "$PRECOMPLETION_TRANSACTION_BACKUP" \
+          "$OVERLAY_PRIOR_STATE_OUTPUT" \
+          raw \
+          1
+      )" \
+        || [[ "$restored_transaction_sha256" \
+          != "$precompletion_transaction_backup_sha256" ]]; then
+        recovery_failed=1
+      fi
+    fi
+    if ((recovery_failed == 0)); then
+      run_deploy_recovery || recovery_failed=1
+    fi
   fi
   release_deploy_lock || recovery_failed=1
   if ((recovery_failed == 1)); then
@@ -1642,28 +3077,36 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 if ! mark_deploy_phase image_build_started; then
-  abort_portal_recreate "image build journal" 1
+  abort_portal_recreate "candidate image promotion journal" 1
 fi
 
-docker_cli buildx build \
-  --builder "$CANONICAL_BUILDX_BUILDER" \
-  --load \
-  --progress="$PROGRESS" \
-  -t "$IMAGE_TAG" \
-  -f "$SOURCE_ROOT/Chummer.Run.Api/Dockerfile" \
-  --build-context "run-services-source=$SOURCE_ROOT" \
-  --build-context "fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS" \
-  --build-context "design-product=$DESIGN_PRODUCT_ROOT" \
-  --build-arg "CHUMMER_BUILD_CONCURRENCY=$BUILD_CONCURRENCY" \
-  "$BUILD_CONTEXT"
-
-image_id="$(docker_cli image inspect "$IMAGE_TAG" --format '{{.Id}}')"
-if [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-  echo "could not resolve built portal image id for $IMAGE_TAG" >&2
-  exit 3
+# The governed cutover runner already built both images from the exact clean
+# source under unique, retained tags. The durable transaction above captured
+# the incumbent canonical tag IDs before either tag can be repointed.
+if ! docker_cli image tag \
+  "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG" "$IMAGE_TAG" \
+  || ! docker_cli image tag \
+    "$INSTALL_LINKING_CANDIDATE_TOOL_TAG" "$TOOL_IMAGE_TAG"; then
+  abort_portal_recreate "candidate image promotion" 1
+fi
+if ! image_id="$(resolve_exact_image_id "$IMAGE_TAG")" \
+  || ! tool_image_id="$(resolve_exact_image_id "$TOOL_IMAGE_TAG")" \
+  || ! retained_candidate_image_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG"
+  )" \
+  || ! retained_candidate_tool_image_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_TOOL_TAG"
+  )"; then
+  abort_portal_recreate "candidate image promotion identity" 1
+fi
+if [[ "$image_id" != "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+  || "$tool_image_id" != "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+  || "$retained_candidate_image_id" != "$image_id" \
+  || "$retained_candidate_tool_image_id" != "$tool_image_id" ]]; then
+  abort_portal_recreate "candidate image ID comparison" 1
 fi
 if ! mark_deploy_phase image_built; then
-  abort_portal_recreate "image build completion journal" 1
+  abort_portal_recreate "candidate image promotion completion journal" 1
 fi
 
 # Rebind the source-only gate after the image build. A source mutation between
@@ -1677,6 +3120,33 @@ trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.p
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
 
+if ! predrain_portal_tag_id="$(resolve_exact_image_id "$IMAGE_TAG")" \
+  || ! predrain_tool_tag_id="$(resolve_exact_image_id "$TOOL_IMAGE_TAG")" \
+  || ! predrain_candidate_portal_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG"
+  )" \
+  || ! predrain_candidate_tool_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_TOOL_TAG"
+  )" \
+  || [[ "$predrain_portal_tag_id" != "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    || "$predrain_candidate_portal_id" != "$predrain_portal_tag_id" \
+    || "$predrain_tool_tag_id" \
+      != "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    || "$predrain_candidate_tool_id" != "$predrain_tool_tag_id" ]]; then
+  abort_portal_recreate "predrain candidate image identity" 1
+fi
+if ! predrain_boundary_verification="$(
+  verify_install_linking_cutover_boundary \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" \
+    validate_completed \
+    "$predrain_candidate_portal_id" \
+    "$predrain_candidate_tool_id"
+)" \
+  || [[ "$predrain_boundary_verification" \
+    != "$install_linking_boundary_verification" ]]; then
+  abort_portal_recreate "predrain InstallLinking boundary identity" 1
+fi
+
 if ! compose_cli stop chummer-run-cloudflared; then
   abort_portal_recreate "tunnel drain" 1
 fi
@@ -1689,6 +3159,108 @@ if ((prior_portal_existed == 1 && prior_portal_was_running == 1)) \
 fi
 if ! mark_deploy_phase portal_stopped; then
   abort_portal_recreate "portal stop journal" 1
+fi
+
+if ! INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256="$(
+  write_install_linking_state_volume_inventory \
+    post_incumbent_quiesce \
+    "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY"
+)" \
+  || [[ ! "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+  abort_portal_recreate "post-quiesce state-volume consumer inventory" 1
+fi
+
+# With the incumbent portal and tunnel quiesced, repeat the no-local-store,
+# remote generation-zero, and runtime-role proofs from the exact retained
+# candidate tool image. The runner inherits this wrapper's canonical mutation
+# lease and preserves every job container/receipt on ambiguous outcomes.
+postquiesce_status=0
+postquiesce_runner_invoked=1
+trusted_source_python "$INSTALL_LINKING_CUTOVER_RUNNER" \
+  --post-quiesce-reproof \
+  --reproof-attempt-id "$INSTALL_LINKING_REPROOF_ATTEMPT_ID" \
+  --source-root "$SOURCE_ROOT" \
+  --expected-head "${EXPECTED_HEAD,,}" \
+  --expected-compose-sha256 "$INSTALL_LINKING_COMPOSE_SHA256" \
+  --env-file "$ENV_FILE" \
+  --expected-env-sha256 "$INSTALL_LINKING_ENV_SHA256" \
+  --expected-runner-sha256 "$INSTALL_LINKING_RUNNER_SHA256" \
+  --expected-hub-registry-head \
+    "$INSTALL_LINKING_EXPECTED_HUB_REGISTRY_HEAD" \
+  --expected-design-product-head \
+    "$INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_HEAD" \
+  --expected-fleet-media-factory-head \
+    "$INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_HEAD" \
+  --expected-build-context-dockerignore-sha256 \
+    "$INSTALL_LINKING_EXPECTED_BUILD_CONTEXT_DOCKERIGNORE_SHA256" \
+  --cutover-id "$INSTALL_LINKING_CUTOVER_ID" \
+  --receipt-root "$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT" \
+  --boundary-output "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+  --expected-boundary-sha256 "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" \
+  --expected-candidate-image-id \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+  --expected-candidate-tool-image-id \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+  --shared-mutation-lock-token "$deploy_lock_owner_token" \
+  --volume-inventory-receipt \
+    "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY" \
+  --expected-volume-inventory-sha256 \
+    "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256" \
+  --output "$INSTALL_LINKING_POSTQUIESCE_RECEIPT" \
+  >/dev/null || postquiesce_status=$?
+if ! postquiesce_classification="$(
+  classify_install_linking_postquiesce_attempt
+)" \
+  || [[ ! "$postquiesce_classification" \
+    =~ ^(pass|safe_fail|unknown)\|([0-9a-f]{64})$ ]]; then
+  retain_unknown_postquiesce_authority \
+    "post-quiesce InstallLinking receipt classification"
+fi
+INSTALL_LINKING_POSTQUIESCE_RECEIPT_SHA256="${BASH_REMATCH[2]}"
+case "${BASH_REMATCH[1]}" in
+  pass)
+    if ! install_linking_postquiesce_runtime_authority="$(
+      bind_install_linking_postquiesce_runtime_authority_identity
+    )" \
+      || [[ ! "$install_linking_postquiesce_runtime_authority" \
+        =~ ^([0-9a-f]{64})\|([0-9a-f]{64})$ ]]; then
+      retain_unknown_postquiesce_authority \
+        "post-quiesce InstallLinking runtime authority binding"
+    fi
+    INSTALL_LINKING_EXPECTED_AUTHORITY_IDENTITY_SHA256="${BASH_REMATCH[1]}"
+    INSTALL_LINKING_EXPECTED_RUNTIME_ROLE_SHA256="${BASH_REMATCH[2]}"
+    postquiesce_outcome_resolved=1
+    ;;
+  safe_fail)
+    postquiesce_outcome_resolved=1
+    abort_portal_recreate \
+      "post-quiesce InstallLinking verified safe failure (runner exit ${postquiesce_status})" \
+      1
+    ;;
+  unknown)
+    retain_unknown_postquiesce_authority \
+      "post-quiesce InstallLinking proof (runner exit ${postquiesce_status})"
+    ;;
+esac
+
+if ! INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY_SHA256="$(
+  write_install_linking_state_volume_inventory \
+    pre_overlay_activation \
+    "$INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY"
+)" \
+  || [[ ! "$INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+  retain_unknown_postquiesce_authority \
+    "pre-activation state-volume consumer inventory"
+fi
+if ! verify_install_linking_state_volume_inventory_transition \
+  "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY" \
+  "$INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256" \
+  "$INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY" \
+  "$INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY_SHA256"; then
+  retain_unknown_postquiesce_authority \
+    "pre-activation state-volume consumer transition"
 fi
 
 # The stopped portal no longer has the active root bind-mounted. Reuse-staging
@@ -1770,49 +3342,31 @@ start_candidate_portal() {
 verify_candidate_publication_readiness() {
   "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
     "${docker_command[@]}" container exec "$candidate_portal_container_id" \
-      /usr/bin/curl --fail --silent --show-error --max-time 20 \
-        --output /dev/null --header 'Host: chummer.run' \
-        http://127.0.0.1:8080/api/ready/publication
+      dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll \
+        /api/ready/publication >/dev/null
 }
 
 capture_candidate_publication_readiness() {
-  local body_file status_file readiness_http_status response_sha256
+  local body_file readiness_http_status response_sha256
   local observed_id observed_name observed_image observed_running observed_health
   body_file="$($TRUSTED_MKTEMP -- "$DEPLOY_RECEIPT_DIR/.publication-readiness-body.XXXXXXXX")" \
     || return 1
-  status_file="$($TRUSTED_MKTEMP -- "$DEPLOY_RECEIPT_DIR/.publication-readiness-status.XXXXXXXX")" \
-    || {
-      "$TRUSTED_RM" -f -- "$body_file"
-      return 1
-    }
-  "$TRUSTED_CHMOD" 0600 -- "$body_file" "$status_file" || {
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+  "$TRUSTED_CHMOD" 0600 -- "$body_file" || {
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   }
   if ! "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
     "${docker_command[@]}" container exec "$candidate_portal_container_id" \
-      /usr/bin/curl --fail --silent --show-error --max-time 20 \
-        --output - --write-out '%{stderr}%{http_code}' \
-        --header 'Host: chummer.run' \
-        http://127.0.0.1:8080/api/ready/publication \
-        >"$body_file" 2>"$status_file"; then
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+      dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll \
+        /api/ready/publication >"$body_file"; then
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   fi
-  readiness_http_status="$(trusted_source_python -c '
-import pathlib, sys
-raw = pathlib.Path(sys.argv[1]).read_bytes()
-if raw != b"200":
-    raise SystemExit(1)
-print("200", end="")
-' "$status_file")" || {
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
-    return 1
-  }
+  readiness_http_status=200
   response_sha256="$($TRUSTED_SHA256SUM -- "$body_file")"
   response_sha256="${response_sha256%% *}"
   [[ "$response_sha256" =~ ^[0-9a-f]{64}$ ]] || {
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   }
   if ! observed_id="$(docker_cli container inspect --format '{{.Id}}' \
@@ -1826,7 +3380,7 @@ print("200", end="")
     || ! observed_health="$(docker_cli container inspect \
       --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
       "$candidate_portal_container_id")"; then
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   fi
   observed_name="${observed_name#/}"
@@ -1835,7 +3389,7 @@ print("200", end="")
     || "$observed_image" != "$image_id" \
     || "$observed_running" != true \
     || "$observed_health" != healthy ]]; then
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   fi
   if ! trusted_source_python "$CUTOVER_ATTESTOR" record-readiness \
@@ -1847,10 +3401,235 @@ print("200", end="")
     --response-sha256 "$response_sha256" \
     --running "$observed_running" \
     --health "$observed_health" >/dev/null; then
-    "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+    "$TRUSTED_RM" -f -- "$body_file"
     return 1
   fi
-  "$TRUSTED_RM" -f -- "$body_file" "$status_file"
+  "$TRUSTED_RM" -f -- "$body_file"
+}
+
+capture_candidate_install_linking_authority_readiness() {
+  local body_file observed_id observed_name observed_image
+  local observed_running observed_health
+  body_file="$(
+    "$TRUSTED_MKTEMP" -- \
+      "$DEPLOY_RECEIPT_DIR/.install-linking-authority-body.XXXXXXXX"
+  )" || return 1
+  "$TRUSTED_CHMOD" 0600 -- "$body_file" || {
+    "$TRUSTED_RM" -f -- "$body_file"
+    return 1
+  }
+  if ! "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
+    "${docker_command[@]}" container exec "$candidate_portal_container_id" \
+      dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll \
+        /api/ready/install-linking-authority \
+        >"$body_file"; then
+    "$TRUSTED_RM" -f -- "$body_file"
+    return 1
+  fi
+  if ! observed_id="$(docker_cli container inspect --format '{{.Id}}' \
+    "$candidate_portal_container_id")" \
+    || ! observed_name="$(docker_cli container inspect --format '{{.Name}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_image="$(docker_cli container inspect --format '{{.Image}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_running="$(docker_cli container inspect --format '{{.State.Running}}' \
+      "$candidate_portal_container_id")" \
+    || ! observed_health="$(docker_cli container inspect \
+      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+      "$candidate_portal_container_id")"; then
+    "$TRUSTED_RM" -f -- "$body_file"
+    return 1
+  fi
+  observed_name="${observed_name#/}"
+  if [[ "$observed_id" != "$candidate_portal_container_id" \
+    || "$observed_name" != "$CANDIDATE_PORTAL_CONTAINER_NAME" \
+    || "$observed_image" != "$image_id" \
+    || "$observed_running" != true \
+    || "$observed_health" != healthy ]]; then
+    "$TRUSTED_RM" -f -- "$body_file"
+    return 1
+  fi
+  INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS_SHA256="$(
+    trusted_source_python -c '
+# InstallLinking live runtime authority readiness publisher.
+import hashlib, json, os, pathlib, re, stat, sys, tempfile
+from datetime import datetime, timedelta
+
+def reject_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+def read_private(path, *, maximum):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_uid != os.getuid()
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_size < 1
+            or before.st_size > maximum
+        ):
+            raise ValueError("unsafe private response")
+        chunks = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, remaining)
+            if not chunk:
+                raise ValueError("short private response")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise ValueError("oversized private response")
+        after = os.fstat(descriptor)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            raise ValueError("private response changed while open")
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+body = pathlib.Path(sys.argv[1])
+output = pathlib.Path(sys.argv[2])
+expected_authority = sys.argv[3]
+expected_role = sys.argv[4]
+if (
+    not output.is_absolute()
+    or re.fullmatch(
+        r"install-linking-authority-readiness-[A-Za-z0-9]{8}\.json",
+        output.name,
+    )
+    is None
+    or re.fullmatch(r"[0-9a-f]{64}", expected_authority) is None
+    or re.fullmatch(r"[0-9a-f]{64}", expected_role) is None
+):
+    raise SystemExit(1)
+current = pathlib.Path(output.anchor)
+for component in output.parent.parts[1:]:
+    current /= component
+    if stat.S_ISLNK(current.lstat().st_mode):
+        raise SystemExit(1)
+parent = output.parent.lstat()
+if (
+    not stat.S_ISDIR(parent.st_mode)
+    or parent.st_uid != os.getuid()
+    or stat.S_IMODE(parent.st_mode) != 0o700
+    or output.exists()
+    or output.is_symlink()
+):
+    raise SystemExit(1)
+try:
+    payload = json.loads(
+        read_private(body, maximum=4096).decode("utf-8"),
+        object_pairs_hook=reject_duplicates,
+    )
+except (UnicodeError, ValueError, json.JSONDecodeError):
+    raise SystemExit(1)
+expected_keys = {
+    "authorityIdentitySha256",
+    "checkedAtUtc",
+    "code",
+    "contractName",
+    "currentRoleMatches",
+    "leastPrivilegeValid",
+    "ready",
+    "runtimeRoleSha256",
+    "status",
+}
+if (
+    not isinstance(payload, dict)
+    or set(payload) != expected_keys
+    or payload.get("contractName")
+    != "chummer.install_linking_postgres_runtime_authority_readiness.v1"
+    or payload.get("status") != "pass"
+    or payload.get("ready") is not True
+    or payload.get("code") != "runtime_role_least_privilege"
+    or payload.get("currentRoleMatches") is not True
+    or payload.get("leastPrivilegeValid") is not True
+    or payload.get("authorityIdentitySha256") != expected_authority
+    or payload.get("runtimeRoleSha256") != expected_role
+):
+    raise SystemExit(1)
+checked_at = payload.get("checkedAtUtc")
+try:
+    parsed = datetime.fromisoformat(
+        checked_at.replace("Z", "+00:00")
+        if isinstance(checked_at, str)
+        else ""
+    )
+except ValueError:
+    raise SystemExit(1)
+if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+    raise SystemExit(1)
+encoded = (
+    json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+).encode("utf-8")
+descriptor, temporary_name = tempfile.mkstemp(
+    prefix=f".{output.name}.", suffix=".tmp", dir=output.parent
+)
+temporary = pathlib.Path(temporary_name)
+try:
+    os.fchmod(descriptor, 0o600)
+    written = 0
+    while written < len(encoded):
+        written += os.write(descriptor, encoded[written:])
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+try:
+    os.link(temporary, output, follow_symlinks=False)
+finally:
+    temporary.unlink(missing_ok=True)
+metadata = output.lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or metadata.st_nlink != 1
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o600
+):
+    raise SystemExit(1)
+parent_descriptor = os.open(
+    output.parent,
+    os.O_RDONLY
+    | getattr(os, "O_DIRECTORY", 0)
+    | getattr(os, "O_CLOEXEC", 0),
+)
+try:
+    os.fsync(parent_descriptor)
+finally:
+    os.close(parent_descriptor)
+print(hashlib.sha256(encoded).hexdigest(), end="")
+' "$body_file" "$INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS" \
+      "$INSTALL_LINKING_EXPECTED_AUTHORITY_IDENTITY_SHA256" \
+      "$INSTALL_LINKING_EXPECTED_RUNTIME_ROLE_SHA256"
+  )" || {
+    "$TRUSTED_RM" -f -- "$body_file"
+    return 1
+  }
+  "$TRUSTED_RM" -f -- "$body_file"
+  [[ "$INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]
 }
 
 # This receipt is durable before Docker receives the first instruction that can
@@ -2066,6 +3845,9 @@ verify_candidate_tunnel_runtime() {
 if ! verify_candidate_runtime_identity; then
   abort_portal_recreate "candidate image identity" 1
 fi
+if ! capture_candidate_install_linking_authority_readiness; then
+  abort_portal_recreate "InstallLinking runtime authority readiness" 1
+fi
 
 if ((prior_tunnel_existed == 1)); then
   if ! docker_cli start "$prior_tunnel_container_id" >/dev/null \
@@ -2125,8 +3907,113 @@ for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++)); do
 done
 
 if ! trusted_source_python -c '
-import json, pathlib, sys
+import json, pathlib, re, sys
+from urllib.parse import unquote
+# Public-edge postdeploy code-deploy receipt scanner.
 payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+secret_key_stems = (
+    "accesskey", "accountkey", "apikey", "authorization", "bearertoken",
+    "clientsecret", "connstr", "connectionstring", "connectionuri", "connectionurl",
+    "credential", "databaseurl", "dsn", "password", "passwd", "privatekey",
+    "pwd", "secret", "sharedaccesssignature", "token",
+)
+secret_key_short_words = {"connstr", "dsn", "dsns", "pwd", "pwds", "sas"}
+safe_boolean_suffixes = {
+    "absent", "configured", "exposed", "leaked", "matches", "performed",
+    "present", "redacted", "required", "stored", "valid",
+}
+safe_integer_suffixes = {"count", "device", "inode", "mtimens"}
+safe_digest_suffixes = {"digest", "hash", "sha256"}
+def key_parts(value):
+    words = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
+    words = re.sub(r"[^A-Za-z0-9]+", "_", words).strip("_").lower()
+    return tuple(part for part in words.split("_") if part)
+def secret_like_key(value):
+    parts = key_parts(value)
+    collapsed = "".join(parts)
+    return bool(
+        parts
+        and (
+            any(stem in collapsed for stem in secret_key_stems)
+            or any(part in secret_key_short_words for part in parts)
+        )
+    )
+def safe_secret_metadata(key, value):
+    parts = key_parts(key)
+    if not parts or not secret_like_key(key):
+        return False
+    suffix = parts[-1]
+    if suffix in safe_boolean_suffixes:
+        return type(value) is bool
+    if suffix in safe_integer_suffixes:
+        return type(value) is int and value >= 0
+    if suffix in safe_digest_suffixes:
+        return bool(
+            isinstance(value, str)
+            and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+        )
+    if key.startswith("/run/chummer-secrets/"):
+        return bool(
+            isinstance(value, str)
+            and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+        )
+    return False
+def secret_like_value(value):
+    if not isinstance(value, str):
+        return False
+    for candidate in {value, unquote(value)}:
+        if (
+            re.search(
+                r"(?i)(?:passwords?|passwds?|pwds?|tokens?|secrets?|"
+                r"credentials?|accountkeys?|api[_ -]?keys?|client[_ -]?secrets?|"
+                r"private[_ -]?keys?|authorization|connection[_ -]?strings?|"
+                r"dsns?)\s*[:=]",
+                candidate,
+            )
+            or re.search(r"://[^/\s:@]+:[^@\s/]+@", candidate)
+            or re.search(r"(?i)\bpostgres(?:ql)?://", candidate)
+            or re.search(
+                r"(?i)[?&](?:access_token|api[_-]?key|password|sig|signature|token)=",
+                candidate,
+            )
+            or re.search(
+                r"(?i)-----BEGIN [A-Z0-9 ]+(?:PRIVATE KEY|CERTIFICATE)-----",
+                candidate,
+            )
+            or re.search(r"(?i)\bAccountKey\s*=", candidate)
+            or re.search(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", candidate)
+            or re.search(
+                r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|"
+                r"github_pat_[A-Za-z0-9_]{20,}|"
+                r"(?:AKIA|ASIA)[0-9A-Z]{16}|"
+                r"(?:sk|rk)_live_[A-Za-z0-9]{16,}|"
+                r"xox[baprs]-[A-Za-z0-9-]{10,}|"
+                r"AIza[0-9A-Za-z_-]{20,})\b",
+                candidate,
+            )
+            or re.search(
+                r"\beyJ[A-Za-z0-9_-]{8,}\."
+                r"[A-Za-z0-9_-]{8,}\."
+                r"[A-Za-z0-9_-]{8,}\b",
+                candidate,
+            )
+        ):
+            return True
+    return False
+def has_secret_material(value):
+    if isinstance(value, dict):
+        return any(
+            not isinstance(key, str)
+            or (
+                secret_like_key(key)
+                and not safe_secret_metadata(key, item)
+            )
+            or has_secret_material(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(has_secret_material(item) for item in value)
+    return secret_like_value(value)
 if (
     payload.get("contractName") != "chummer.public_edge_postdeploy_gate.v1"
     or payload.get("status") != "pass"
@@ -2137,6 +4024,8 @@ if (
     or payload.get("releaseUploadAuthority") is not False
     or payload.get("releaseReady") is not False
     or payload.get("codeDeployReviewRequiredAuthoritySatisfied") is not True
+    or ("childReceipts" in payload and payload.get("childReceipts") != {})
+    or has_secret_material(payload)
 ):
     raise SystemExit(1)
 ' "$FINAL_POSTDEPLOY_ATTESTATION_OUTPUT"; then
@@ -2183,6 +4072,45 @@ print("committed", end="")
   fi
 fi
 
+if ! precompletion_boundary_verification="$(
+  verify_install_linking_cutover_boundary \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256" \
+    validate_completed \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID"
+)" \
+  || [[ "$precompletion_boundary_verification" \
+    != "$install_linking_boundary_verification" ]]; then
+  abort_portal_recreate "precompletion InstallLinking boundary identity" 1
+fi
+if ! precompletion_portal_tag_id="$(resolve_exact_image_id "$IMAGE_TAG")" \
+  || ! precompletion_tool_tag_id="$(resolve_exact_image_id "$TOOL_IMAGE_TAG")" \
+  || ! precompletion_candidate_portal_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG"
+  )" \
+  || ! precompletion_candidate_tool_id="$(
+    resolve_exact_image_id "$INSTALL_LINKING_CANDIDATE_TOOL_TAG"
+  )" \
+  || [[ "$precompletion_portal_tag_id" \
+      != "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    || "$precompletion_candidate_portal_id" != "$precompletion_portal_tag_id" \
+    || "$precompletion_tool_tag_id" \
+      != "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    || "$precompletion_candidate_tool_id" != "$precompletion_tool_tag_id" ]]; then
+  abort_portal_recreate "precompletion candidate image identity" 1
+fi
+if ! precompletion_transaction_backup_sha256="$(
+  publish_private_snapshot \
+    "$OVERLAY_PRIOR_STATE_OUTPUT" \
+    "$PRECOMPLETION_TRANSACTION_BACKUP" \
+    raw \
+    1
+)" \
+  || [[ ! "$precompletion_transaction_backup_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+  abort_portal_recreate "precompletion transaction backup" 1
+fi
+precompletion_transaction_backup_active=1
+
 if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" complete \
   --source-root "$SOURCE_ROOT" \
   --active-root "$OVERLAY_ROOT" \
@@ -2191,11 +4119,13 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction
   --candidate-portal-container-id "$candidate_portal_container_id" \
   --candidate-portal-container-name "$CANDIDATE_PORTAL_CONTAINER_NAME" \
   --candidate-portal-image-id "$image_id" \
+  --install-linking-authority-readiness \
+    "$INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS" \
+  --install-linking-authority-readiness-sha256 \
+    "$INSTALL_LINKING_RUNTIME_AUTHORITY_READINESS_SHA256" \
   --shared-mutation-lock-token "$deploy_lock_owner_token"; then
-  echo "failed to retire the completed public-edge deployment journal" >&2
-  exit 70
+  abort_portal_recreate "completed deployment journal retirement" 70
 fi
-deployment_transaction_active=0
 if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
   if ! trusted_source_python "$CUTOVER_ATTESTOR" snapshot-evidence \
     --kind active-runtime \
@@ -2217,6 +4147,114 @@ if ((CUTOVER_FINALIZE_REQUIRED == 1)); then
     exit 70
   fi
 fi
+
+if ! INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT_SHA256="$(
+  publish_private_snapshot \
+    "$FINAL_POSTDEPLOY_ATTESTATION_OUTPUT" \
+    "$INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT" \
+    canonical-json \
+    0
+)" \
+  || [[ ! "$INSTALL_LINKING_PRIVATE_POSTDEPLOY_RECEIPT_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+  abort_portal_recreate "private postdeploy acceptance receipt" 1
+fi
+if ! INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT_SHA256="$(
+  publish_private_snapshot \
+    "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
+    "$INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT" \
+    canonical-json \
+    1
+)" \
+  || [[ ! "$INSTALL_LINKING_PRIVATE_ACTIVE_RUNTIME_RECEIPT_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+  abort_portal_recreate "private active-runtime acceptance receipt" 1
+fi
+if ! INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE_SHA256="$(
+  write_install_linking_public_acceptance_evidence
+)" \
+  || [[ ! "$INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+  abort_portal_recreate "InstallLinking public acceptance evidence" 1
+fi
+if ! verified_public_acceptance_evidence_sha256="$(
+  trusted_source_python -c '
+# InstallLinking public acceptance evidence precommit verifier.
+import pathlib, sys
+scripts = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+from materialize_install_linking_cutover_boundary import (
+    bind_active_build_info,
+    bind_phase_evidence,
+)
+
+build_path, build_sha256, build_info = bind_active_build_info(
+    pathlib.Path(sys.argv[3]),
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+)
+if str(build_path) != sys.argv[3] or build_sha256 != sys.argv[7]:
+    raise SystemExit(1)
+evidence_path, evidence_sha256, _ = bind_phase_evidence(
+    pathlib.Path(sys.argv[2]),
+    phase="public_acceptance_completed",
+    cutover_id=sys.argv[4],
+    candidate_image_id=sys.argv[5],
+    candidate_tool_image_id=sys.argv[6],
+    candidate_build_info_sha256=build_sha256,
+    candidate_build_info=build_info,
+    boundary_output=pathlib.Path(sys.argv[8]),
+)
+if str(evidence_path) != sys.argv[2]:
+    raise SystemExit(1)
+print(evidence_sha256, end="")
+' "$SOURCE_ROOT/scripts" "$INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO" "$INSTALL_LINKING_CUTOVER_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+    "$INSTALL_LINKING_CUTOVER_BOUNDARY"
+)"; then
+  abort_portal_recreate "InstallLinking public acceptance evidence verification" 1
+fi
+if [[ "$verified_public_acceptance_evidence_sha256" \
+  != "$INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE_SHA256" ]]; then
+  abort_portal_recreate "InstallLinking public acceptance evidence digest" 1
+fi
+
+install_linking_materializer_status=0
+install_linking_materializer_invoked=1
+trusted_source_python "$INSTALL_LINKING_CUTOVER_MATERIALIZER" \
+  --output "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+  --phase public_acceptance_completed \
+  --cutover-id "$INSTALL_LINKING_CUTOVER_ID" \
+  --candidate-image-id "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+  --candidate-tool-image-id \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+  --active-build-info "$INSTALL_LINKING_ACTIVE_BUILD_INFO" \
+  --evidence-receipt "$INSTALL_LINKING_PUBLIC_ACCEPTANCE_EVIDENCE" \
+  >/dev/null || install_linking_materializer_status=$?
+if ! accepted_install_linking_boundary_sha256="$(
+  verify_install_linking_public_acceptance_boundary
+)"; then
+  abort_portal_recreate \
+    "InstallLinking public acceptance materializer exact reconciliation" \
+    70
+fi
+
+# The exact boundary is now independently re-read and verified as an accepted,
+# irreversible receipt. A nonzero materializer exit can therefore be reconciled
+# without rolling the live candidate back behind its passing acceptance chain.
+deployment_transaction_active=0
+precompletion_transaction_backup_active=0
+if ((install_linking_materializer_status != 0)); then
+  printf \
+    'install_linking_public_acceptance_materializer_reconciled exit_status=%s boundary_sha256=%s\n' \
+    "$install_linking_materializer_status" \
+    "$accepted_install_linking_boundary_sha256" >&2
+fi
+
 if ((prior_portal_existed == 1)) \
   && [[ "$prior_portal_container_id" != "$candidate_portal_container_id" ]]; then
   prior_portal_postcommit_running="$(

@@ -269,6 +269,9 @@ services:
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
       CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
       CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed InstallLinking PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed InstallLinking PostgreSQL TCP port}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the reviewed InstallLinking PostgreSQL runtime role}"
       CHUMMER_PUBLIC_CONCIERGE_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_ENABLED:-true}
       CHUMMER_PUBLIC_CONCIERGE_STORE_PATH: /app/state/public-concierge-store.json
       CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED:-true}
@@ -617,7 +620,7 @@ services:
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--header", "Host: chummer.run", "http://127.0.0.1:8080/api/ready"]
+      test: ["CMD", "dotnet", "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll", "/api/ready"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -665,6 +668,8 @@ services:
     environment:
       CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
       CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed InstallLinking PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed InstallLinking PostgreSQL TCP port}"
       CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
     volumes:
       # The migrator credential is never mounted into the long-running portal or the import job.
@@ -674,6 +679,87 @@ services:
     command: ["validate"]
     networks:
       public-origin: {}
+
+  # Proof-only runtime-credential job. It deliberately has neither the migrator credential nor
+  # the local state/Data Protection mounts, so its identity and empty-authority attestations are
+  # made through the exact least-privilege credential used by the portal.
+  chummer-install-linking-postgres-runtime-proof:
+    image: chummer-install-linking-postgres-tool:local
+    profiles: ["install-linking-postgres-admin"]
+    restart: "no"
+    build:
+      context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
+      dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
+      target: install-linking-postgres-tool-final
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        design-product: /docker/chummercomplete/chummer-design
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+        CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed InstallLinking PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed InstallLinking PostgreSQL TCP port}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
+    volumes:
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the reviewed PostgreSQL server CA bundle}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
+    command: ["prove-runtime-role"]
+    networks:
+      public-origin: {}
+
+  # Existence-only local import-source proof. The state volume is read-only and this service has
+  # no network or credential mounts; it cannot decrypt, import, or contact PostgreSQL.
+  chummer-install-linking-postgres-import-presence-proof:
+    image: chummer-install-linking-postgres-tool:local
+    profiles: ["install-linking-postgres-admin"]
+    restart: "no"
+    build:
+      context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
+      dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
+      target: install-linking-postgres-tool-final
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        design-product: /docker/chummercomplete/chummer-design
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+        CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+    volumes:
+      - chummer-run-api-state:/app/state:ro
+    command: ["prove-local-store-absent"]
+    network_mode: "none"
 
   chummer-install-linking-postgres-import:
     image: chummer-install-linking-postgres-tool:local
@@ -713,6 +799,8 @@ services:
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
       CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
       CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_HOST: "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_DATABASE: "${CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE:?Set the reviewed InstallLinking PostgreSQL database name}"
+      CHUMMER_INSTALL_LINKING_POSTGRES_EXPECTED_PORT: "${CHUMMER_INSTALL_LINKING_POSTGRES_PORT:?Set the reviewed InstallLinking PostgreSQL TCP port}"
     volumes:
       # The import job shares only the state and cryptographic material needed to decrypt the local snapshot.
       - chummer-run-api-state:/app/state

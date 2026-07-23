@@ -498,9 +498,12 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         "OpenAbsoluteDirectory(",
     ),
     "Chummer.Run.Api/Dockerfile": (
+        "# syntax=docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc",
         "FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS public-pwa-proof",
         "FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS hub-package-feed",
         "FROM mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a AS build",
+        "FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS install-linking-postgres-tool-final",
+        "FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS final",
         "WORKDIR /proof",
         "RUN [\"/usr/local/bin/python3\", \"-I\", \"-S\"",
         "\"--receipt\", \"/proof/public-pwa-proof-authority.receipt.json\"",
@@ -514,6 +517,7 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         "COPY --from=run-services-source scripts/validate_public_pwa_proof_authority.py scripts/validate_public_pwa_proof_authority.py",
         "COPY --from=run-services-source .codex-design/",
         "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
+        "COPY --from=build /app/loopback-probe /app/loopback-probe/",
         "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin",
         'grep -Fq \'const CACHE_VERSION = "v19";\'',
         'grep -Fq \'const CACHE_CONTRACT = "run-api-projection-v2";\'',
@@ -522,6 +526,24 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         "! grep -Fq 'self.clients.claim()'",
         "grep -Fq 'play_public_route_network_unavailable'",
         "mkdir -p /app/state",
+    ),
+    "Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj": (
+        "<OutputType>Exe</OutputType>",
+        "<TargetFramework>net10.0</TargetFramework>",
+        "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>",
+        "<RestoreLockedMode>true</RestoreLockedMode>",
+        "<UseAppHost>false</UseAppHost>",
+    ),
+    "Chummer.Run.LoopbackProbe/Program.cs": (
+        '"http://127.0.0.1:8080/api/ready"',
+        'request.Headers.Host = "chummer.run";',
+        "VersionPolicy = HttpVersionPolicy.RequestVersionExact",
+        "AllowAutoRedirect = false",
+        "UseCookies = false",
+        "UseProxy = false",
+        "MaximumResponseBytes = 256 * 1024",
+        "ValidateInstallLinkingAuthority",
+        "Console.OpenStandardOutput().WriteAsync",
     ),
     ".codex-design/product/PUBLIC_FEEDBACK_TAXONOMY.yaml": (
         "owner: chummer6-design",
@@ -626,6 +648,23 @@ PUBLIC_EDGE_FORBIDDEN_SOURCE_MARKERS = {
         'grep -Fq "\\"templateSha256\\": \\"${template_sha}\\"" play-worker-projection.json',
         'grep -Fq "\\"projectionSha256\\": \\"${template_sha}\\"" play-pwa-mirrors.json',
         "apt-get install -y --no-install-recommends python3",
+        "apt-get update",
+        "apk add",
+        "dnf install",
+        "yum install",
+    ),
+    "Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj": (
+        "<PackageReference",
+        "<ProjectReference",
+        "<FrameworkReference",
+    ),
+    "Chummer.Run.LoopbackProbe/Program.cs": (
+        "Chummer.InstallLinking",
+        "Npgsql",
+        "Environment.GetEnvironmentVariable",
+        "System.Data",
+        "ConnectionString",
+        "CHUMMER_",
     ),
 }
 PUBLIC_EDGE_FORBIDDEN_OVERLAY_MARKERS: dict[str, tuple[str, ...]] = {}
@@ -639,6 +678,17 @@ PUBLIC_EDGE_DOCKER_SDK_IMAGE = (
     "mcr.microsoft.com/dotnet/sdk:10.0.103@sha256:"
     "e362a8dbcd691522456da26a5198b8f3ca1d7641c95624fadc5e3e82678bd08a"
 )
+PUBLIC_EDGE_DOCKERFILE_FRONTEND = (
+    "docker/dockerfile:1.4@sha256:"
+    "9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc"
+)
+PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE = (
+    f"# syntax={PUBLIC_EDGE_DOCKERFILE_FRONTEND}"
+)
+PUBLIC_EDGE_DOCKER_ASPNET_IMAGE = (
+    "mcr.microsoft.com/dotnet/aspnet:10.0@sha256:"
+    "1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7"
+)
 PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM = (
     f"FROM {PUBLIC_EDGE_DOCKER_SDK_IMAGE} AS {PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE}"
 )
@@ -646,9 +696,10 @@ PUBLIC_EDGE_DOCKER_BUILD_FROM = (
     f"FROM {PUBLIC_EDGE_DOCKER_SDK_IMAGE} AS {PUBLIC_EDGE_DOCKER_BUILD_STAGE}"
 )
 PUBLIC_EDGE_DOCKER_TOOL_FINAL_FROM = (
-    "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS install-linking-postgres-tool-final"
+    f"FROM {PUBLIC_EDGE_DOCKER_ASPNET_IMAGE} AS "
+    "install-linking-postgres-tool-final"
 )
-PUBLIC_EDGE_DOCKER_FINAL_FROM = "FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final"
+PUBLIC_EDGE_DOCKER_FINAL_FROM = f"FROM {PUBLIC_EDGE_DOCKER_ASPNET_IMAGE} AS final"
 PUBLIC_EDGE_DOCKER_STAGE_ORDER = (
     PUBLIC_EDGE_DOCKER_PROOF_STAGE,
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
@@ -785,6 +836,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_COPY = (
     "/opt/chummer-package-feed /opt/chummer-package-feed"
 )
 PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY = "COPY --from=build /app/publish ."
+PUBLIC_EDGE_DOCKER_LOOPBACK_PROBE_PUBLISH_COPY = (
+    "COPY --from=build /app/loopback-probe /app/loopback-probe/"
+)
 PUBLIC_EDGE_DOCKER_TOOL_PUBLISH_COPY = (
     "COPY --from=build /app/install-linking-postgres-tool ."
 )
@@ -1179,10 +1233,10 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         }
 
     lines = text.splitlines()
-    exact_header = bool(lines) and lines[0] == "# syntax=docker/dockerfile:1.4"
+    exact_header = bool(lines) and lines[0] == PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE
     if not exact_header:
         failures.append(
-            "Dockerfile must begin with the exact '# syntax=docker/dockerfile:1.4' directive"
+            "Dockerfile must begin with the exact digest-pinned frontend directive"
         )
 
     late_directives = [
@@ -1315,6 +1369,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     package_feed_copy_stages: list[str] = []
     tool_publish_copy_stages: list[str] = []
     final_publish_copy_stages: list[str] = []
+    loopback_probe_publish_copy_stages: list[str] = []
+    public_final_operator_tool_lines: list[int] = []
     tool_payload_mode_stages: list[str] = []
     final_payload_mode_stages: list[str] = []
     other_proof_copies: list[int] = []
@@ -1362,6 +1418,13 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             tool_publish_copy_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PUBLISH_COPY:
             final_publish_copy_stages.append(current_alias)
+        if line == PUBLIC_EDGE_DOCKER_LOOPBACK_PROBE_PUBLISH_COPY:
+            loopback_probe_publish_copy_stages.append(current_alias)
+        if (
+            current_alias == PUBLIC_EDGE_DOCKER_FINAL_STAGE
+            and "install-linking-postgres-tool" in line
+        ):
+            public_final_operator_tool_lines.append(line_number)
         if line == PUBLIC_EDGE_DOCKER_TOOL_PAYLOAD_MODE_RUN:
             tool_payload_mode_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PAYLOAD_MODE_RUN:
@@ -1492,6 +1555,18 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         failures.append(
             "final stage must COPY the exact build publish artifact exactly once"
         )
+    exact_loopback_probe_publish_dependency = (
+        loopback_probe_publish_copy_stages
+        == [PUBLIC_EDGE_DOCKER_FINAL_STAGE]
+    )
+    if not exact_loopback_probe_publish_dependency:
+        failures.append(
+            "final stage must COPY the dedicated loopback probe artifact exactly once"
+        )
+    if public_final_operator_tool_lines:
+        failures.append(
+            "public API final stage must not include the InstallLinking operator tool"
+        )
     exact_tool_payload_mode = tool_payload_mode_stages == [
         PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE
     ]
@@ -1606,6 +1681,12 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "noOtherProofCopies": not other_proof_copies,
         "exactToolPublishDependency": exact_tool_publish_dependency,
         "exactFinalPublishDependency": exact_final_publish_dependency,
+        "exactLoopbackProbePublishDependency": (
+            exact_loopback_probe_publish_dependency
+        ),
+        "publicImageExcludesOperatorTool": (
+            not public_final_operator_tool_lines
+        ),
         "exactToolPayloadMode": exact_tool_payload_mode,
         "exactFinalPayloadMode": exact_final_payload_mode,
         "exactCopyFromReferences": not (

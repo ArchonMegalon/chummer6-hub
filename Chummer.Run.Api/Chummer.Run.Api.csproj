@@ -13,6 +13,7 @@
     <RazorCompileOnPublish Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'">false</RazorCompileOnPublish>
     <RestorePackagesWithLockFile Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+    <PublishPublicEdgeLoopbackProbe Condition="'$(PublishPublicEdgeLoopbackProbe)' == ''">false</PublishPublicEdgeLoopbackProbe>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
@@ -71,4 +72,35 @@
     <Compile Include="Services\PublicProxyRedirectPolicy.cs" />
     <Compile Include="Services\PublicPlayUpstreamNetworkPolicy.cs" />
   </ItemGroup>
+
+  <Target
+    Name="PublishStandalonePublicEdgeLoopbackProbe"
+    AfterTargets="Publish"
+    Condition="'$(PublishPublicEdgeLoopbackProbe)' == 'true'">
+    <PropertyGroup>
+      <_PublicEdgeLoopbackProbeProject>$(MSBuildThisFileDirectory)..\Chummer.Run.LoopbackProbe\Chummer.Run.LoopbackProbe.csproj</_PublicEdgeLoopbackProbeProject>
+      <_PublicEdgeLoopbackProbePublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))loopback-probe/</_PublicEdgeLoopbackProbePublishDir>
+    </PropertyGroup>
+    <Error
+      Condition="'$(PublishDir)' == ''"
+      Text="PublishPublicEdgeLoopbackProbe requires a resolved API PublishDir." />
+    <Error
+      Condition="!Exists('$(_PublicEdgeLoopbackProbeProject)')"
+      Text="The standalone public-edge loopback probe project is missing: $(_PublicEdgeLoopbackProbeProject)" />
+    <MSBuild
+      Projects="$(_PublicEdgeLoopbackProbeProject)"
+      Targets="Restore;Publish"
+      BuildInParallel="false"
+      RemoveProperties="NoBuild;NoRestore;RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun;PublishAot;PublishProfile;DeployOnBuild;TargetFramework;TargetFrameworks"
+      Properties="Configuration=$(Configuration);PublishDir=$(_PublicEdgeLoopbackProbePublishDir);RestorePackagesWithLockFile=true;RestoreLockedMode=true;SelfContained=false;UseAppHost=false;PublishSingleFile=false;PublishTrimmed=false;PublishReadyToRun=false;PublishAot=false" />
+    <Error
+      Condition="!Exists('$(_PublicEdgeLoopbackProbePublishDir)Chummer.Run.LoopbackProbe.dll')"
+      Text="The standalone public-edge loopback probe assembly was not published to $(_PublicEdgeLoopbackProbePublishDir)." />
+    <Error
+      Condition="!Exists('$(_PublicEdgeLoopbackProbePublishDir)Chummer.Run.LoopbackProbe.deps.json')"
+      Text="The standalone public-edge loopback probe dependency manifest was not published to $(_PublicEdgeLoopbackProbePublishDir)." />
+    <Error
+      Condition="!Exists('$(_PublicEdgeLoopbackProbePublishDir)Chummer.Run.LoopbackProbe.runtimeconfig.json')"
+      Text="The standalone public-edge loopback probe runtime configuration was not published to $(_PublicEdgeLoopbackProbePublishDir)." />
+  </Target>
 </Project>

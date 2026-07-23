@@ -54,6 +54,19 @@ try:
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from strict_json_contract import StrictJsonContractError, strict_json_object
 
+try:
+    from scripts.public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        load_exact_public_edge_postdeploy_schema,
+        public_edge_forbidden_secret_key,
+    )
+except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        load_exact_public_edge_postdeploy_schema,
+        public_edge_forbidden_secret_key,
+    )
+
 
 POSTDEPLOY_VERIFIER_LOADED_SHA256 = hashlib.sha256(
     Path(__file__).read_bytes()
@@ -1515,7 +1528,7 @@ def verify(
         "participateIframeRouteCount": child_receipts["participateIframeShell"].get("iframe_route_count", 0),
         "visibleVersion": child_receipts["downloads"].get("visible_version", ""),
         "releaseManifestVersion": child_receipts["downloads"].get("release_version", ""),
-        "childReceipts": child_receipts,
+        "childReceipts": {},
         "failures": failures,
     }
 
@@ -1541,7 +1554,6 @@ def self_contained_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--portal-image-tag", default=DEFAULT_PORTAL_IMAGE_TAG)
     parser.add_argument("--output")
     args = parser.parse_args(argv)
-
     playwright_requirements: list[str] = []
     if args.require_downloads_status_playwright:
         playwright_requirements.append("downloadsStatus")
@@ -2672,8 +2684,6 @@ CHILD_UNSAFE_DIAGNOSTIC_TEXT = re.compile(
     re.IGNORECASE,
 )
 CHILD_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.py")
-
-
 def child_verifier_identifier(command: list[str]) -> str:
     """Return a bounded, query-free identifier without serializing child argv."""
     for argument in command:
@@ -2697,7 +2707,8 @@ def sanitize_child_receipt(value: Any, *, diagnostic_context: bool = False) -> A
         for key, item in value.items():
             normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
             if (
-                normalized_key in CHILD_RAW_DIAGNOSTIC_FIELDS
+                public_edge_forbidden_secret_key(key, item)
+                or normalized_key in CHILD_RAW_DIAGNOSTIC_FIELDS
                 or any(
                     raw_name in normalized_key
                     for raw_name in ("argv", "command", "stderr", "stdout")
@@ -4102,14 +4113,7 @@ def compose_status(
             for name, child in core_child_receipts.items()
         },
         "failures": failures,
-        "childReceipts": {
-            "preflight": preflight,
-            "downloads": downloads,
-            "pwaStatic": pwa_static,
-            "mobileLedger": mobile_ledger,
-            "readyMobileHandoff": ready_mobile_handoff,
-            "participateIframeShell": participate_iframe_shell,
-        },
+        "childReceipts": {},
     }
     if online_launch is not None:
         result["onlineLaunchStatus"] = online_launch.get("status")
@@ -4119,7 +4123,6 @@ def compose_status(
         result["onlineLaunchHttpStatus"] = online_launch.get("http_status")
         result["onlineLaunchHasBlazorMarker"] = online_launch.get("has_blazor_marker")
         result["onlineLaunchHasRosterMarker"] = online_launch.get("has_roster_marker")
-        result["childReceipts"]["onlineLaunch"] = online_launch
     if role_alias_routes is not None:
         result["roleAliasRouteStatus"] = role_alias_routes.get("status")
         result["roleAliasRouteContract"] = receipt_contract(role_alias_routes)
@@ -4136,7 +4139,6 @@ def compose_status(
         result["downloadsStatusBrowserStatusRedirectHeadingExpected"] = artifact.get("status_redirect_heading_expected")
         result["downloadsStatusBrowserStatusRedirectHeadingMatchesReleaseChannel"] = artifact.get("status_redirect_heading_matches_release_channel")
         result["downloadsStatusBrowserStatusRedirectHeadingUsesGenericUpdatedCopy"] = artifact.get("status_redirect_heading_uses_generic_updated_copy")
-        result["childReceipts"]["downloadsStatusBrowser"] = downloads_status_browser
     if mobile_pwa_viewport:
         artifact = mobile_pwa_viewport.get("artifact") if isinstance(mobile_pwa_viewport.get("artifact"), dict) else {}
         result["mobilePwaViewportStatus"] = mobile_pwa_viewport.get("status")
@@ -4153,7 +4155,6 @@ def compose_status(
         result["mobilePwaViewportArtifactContractFailures"] = (
             mobile_pwa_viewport_artifact_failures
         )
-        result["childReceipts"]["mobilePwaViewport"] = mobile_pwa_viewport
     if frontdoor_navigation:
         result["frontdoorNavigationStatus"] = frontdoor_navigation.get("status")
         result["frontdoorNavigationExitCode"] = frontdoor_navigation.get("exitCode")
@@ -4213,7 +4214,6 @@ def compose_status(
                 "playwrightCliSha256"
             )
         )
-        result["childReceipts"]["frontdoorNavigation"] = redact_private_identity(frontdoor_navigation)
     if pwa_offline_cache:
         artifact = pwa_offline_cache.get("artifact") if isinstance(pwa_offline_cache.get("artifact"), dict) else {}
         result["pwaOfflineCacheStatus"] = pwa_offline_cache.get("status")
@@ -4231,7 +4231,6 @@ def compose_status(
         result["pwaOfflineCachePersonalizedLedgerCached"] = artifact.get("personalized_ledger_cached")
         result["pwaOfflineCacheLegacyPrivateCachePrefixesPurged"] = artifact.get("legacy_private_cache_prefixes_purged")
         result["pwaOfflineCacheUnrelatedCachePreserved"] = artifact.get("unrelated_cache_preserved")
-        result["childReceipts"]["pwaOfflineCache"] = pwa_offline_cache
     if blazor_new_runner_menu:
         artifact = artifact_object(blazor_new_runner_menu.get("artifact"))
         app_roster_transition = blazor_new_runner_app_roster_transition(artifact)
@@ -4256,7 +4255,6 @@ def compose_status(
         result["blazorNewRunnerMenuReopenedDataTab"] = artifact_value_with_fallback(artifact, "reopened_data_tab", workbench_fallback_route)
         result["blazorNewRunnerMenuDialogCount"] = artifact_value_with_fallback(artifact, "dialog_count", workbench_fallback_route)
         result["blazorNewRunnerMenuDialogTitle"] = artifact_value_with_fallback(artifact, "dialog_title", workbench_fallback_route)
-        result["childReceipts"]["blazorNewRunnerMenu"] = blazor_new_runner_menu
     return result
 
 
@@ -4887,6 +4885,12 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         help="Sealed preflight PWA asset inventory digest; mandatory when preflight is skipped.",
     )
     args = parser.parse_args(argv)
+    try:
+        postdeploy_schema_authority = (
+            load_exact_public_edge_postdeploy_schema()
+        )
+    except RuntimeError as exc:
+        parser.error(str(exc))
     if args.skip_preflight and args.strict_preflight:
         parser.error("--strict-preflight cannot be combined with --skip-preflight")
     if (
@@ -5273,6 +5277,10 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             expected_full_deployment_digest_sha256
         ),
     )
+    result["schemaContractName"] = (
+        PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+    )
+    result["schemaSha256"] = postdeploy_schema_authority["sha256"]
     result["skipPreflight"] = args.skip_preflight
     result["skipReleaseVersionMatch"] = args.skip_release_version_match
     result["strictPreflight"] = args.strict_preflight and args.skip_preflight is False

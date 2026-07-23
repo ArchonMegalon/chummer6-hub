@@ -21,6 +21,8 @@ PRIOR_PROOF_SHA256 = hashlib.sha256(PRIOR_PROOF_BYTES).hexdigest()
 CANDIDATE_PORTAL_NAME = "chummer-public-edge-candidate-test"
 CANDIDATE_PORTAL_ID = "c" * 64
 CANDIDATE_PORTAL_IMAGE = "sha256:" + "6" * 64
+AUTHORITY_IDENTITY_SHA256 = "8" * 64
+RUNTIME_ROLE_SHA256 = "9" * 64
 
 
 def load_module():
@@ -85,6 +87,43 @@ def deploy_proof_authority(tmp_path: Path) -> dict[str, Path]:
         "prior_portal_proof_authority_snapshot": prior_authority_snapshot,
         "prior_portal_proof_public_snapshot": prior_public_snapshot,
     }
+
+
+def install_linking_authority_readiness_payload() -> dict[str, object]:
+    return {
+        "authorityIdentitySha256": AUTHORITY_IDENTITY_SHA256,
+        "checkedAtUtc": "2026-07-23T12:34:56.1234567+00:00",
+        "code": "runtime_role_least_privilege",
+        "contractName": (
+            "chummer.install_linking_postgres_runtime_authority_readiness.v1"
+        ),
+        "currentRoleMatches": True,
+        "leastPrivilegeValid": True,
+        "ready": True,
+        "runtimeRoleSha256": RUNTIME_ROLE_SHA256,
+        "status": "pass",
+    }
+
+
+def write_install_linking_authority_readiness(
+    path: Path,
+    *,
+    payload: dict[str, object] | None = None,
+) -> tuple[Path, str]:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    encoded = (
+        json.dumps(
+            payload or install_linking_authority_readiness_payload(),
+            indent=2,
+            sort_keys=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    path.write_bytes(encoded)
+    path.chmod(0o600)
+    return path, hashlib.sha256(encoded).hexdigest()
 
 
 class SimulatedHardCrash(BaseException):
@@ -713,6 +752,311 @@ def test_deploy_snapshot_rejects_unsealed_runtime_proof_authority(
         )
 
 
+def test_install_linking_authority_readiness_is_pinned_from_one_stable_read(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json"
+        )
+    )
+    original_read = module.overlay.read_stable_regular_bytes
+    read_paths: list[Path] = []
+
+    def record_read(path: Path, **kwargs):
+        read_paths.append(path)
+        return original_read(path, **kwargs)
+
+    monkeypatch.setattr(
+        module.overlay,
+        "read_stable_regular_bytes",
+        record_read,
+    )
+
+    normalized, actual_sha256, payload = (
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+    )
+
+    assert normalized == readiness_path
+    assert actual_sha256 == readiness_sha256
+    assert payload == install_linking_authority_readiness_payload()
+    assert read_paths == [readiness_path]
+
+
+def test_install_linking_authority_readiness_rejects_malformed_or_noncanonical_json(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    malformed = tmp_path / "malformed.json"
+    malformed.write_bytes(b'{"status":"pass",}\n')
+    malformed.chmod(0o600)
+    malformed_sha256 = hashlib.sha256(malformed.read_bytes()).hexdigest()
+
+    with pytest.raises(RuntimeError, match="strict JSON"):
+        module.validate_install_linking_authority_readiness(
+            malformed,
+            expected_sha256=malformed_sha256,
+            evidence_root=tmp_path,
+        )
+
+    noncanonical = tmp_path / "noncanonical.json"
+    noncanonical_bytes = json.dumps(
+        install_linking_authority_readiness_payload(),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    noncanonical.write_bytes(noncanonical_bytes)
+    noncanonical.chmod(0o600)
+    with pytest.raises(RuntimeError, match="not canonical JSON"):
+        module.validate_install_linking_authority_readiness(
+            noncanonical,
+            expected_sha256=hashlib.sha256(noncanonical_bytes).hexdigest(),
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_digest_mismatch(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    readiness_path, _readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json"
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="does not match its pin"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256="f" * 64,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_path_identity_change_after_read(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json"
+        )
+    )
+    original_read = module.overlay.read_stable_regular_bytes
+
+    def replace_after_read(path: Path, **kwargs):
+        payload, metadata = original_read(path, **kwargs)
+        replacement = tmp_path / "replacement-readiness.json"
+        replacement.write_bytes(payload)
+        replacement.chmod(0o600)
+        replacement.replace(path)
+        return payload, metadata
+
+    monkeypatch.setattr(
+        module.overlay,
+        "read_stable_regular_bytes",
+        replace_after_read,
+    )
+
+    with pytest.raises(RuntimeError, match="changed identity"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_path_outside_evidence_root(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    tmp_path.chmod(0o700)
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path
+            / "other-evidence"
+            / "install-linking-authority-readiness-test.json"
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="remain in the active runtime evidence root"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_noncanonical_alias_path(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json"
+        )
+    )
+    aliased_path = tmp_path / "unused-component" / ".." / readiness_path.name
+
+    with pytest.raises(RuntimeError, match="exact, canonical, and absolute"):
+        module.validate_install_linking_authority_readiness(
+            aliased_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_symlink(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    target, readiness_sha256 = write_install_linking_authority_readiness(
+        tmp_path / "readiness-target.json"
+    )
+    readiness_path = tmp_path / "install-linking-authority-readiness-test.json"
+    readiness_path.symlink_to(target)
+
+    with pytest.raises(RuntimeError, match="symlink"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_open_schema(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    payload = install_linking_authority_readiness_payload()
+    payload["diagnostic"] = "benign-extra-field"
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json",
+            payload=payload,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="contract is invalid"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    "secret_value",
+    (
+        "password=do-not-publish",
+        "postgresql://runtime-user:do-not-publish@database/chummer",
+        "https://runtime-user:do-not-publish@example.test/readiness",
+        "https://example.test/readiness?access_token=do-not-publish",
+        "-----BEGIN PRIVATE KEY-----\ndo-not-publish",
+        "Bearer abcdefghijklmnop",
+        "github_pat_" + "a" * 24,
+        "eyJabcdefghijk.abcdefghijk.abcdefghijk",
+    ),
+)
+def test_install_linking_authority_readiness_rejects_secret_value(
+    tmp_path: Path,
+    secret_value: str,
+) -> None:
+    module = load_module()
+    payload = install_linking_authority_readiness_payload()
+    payload["checkedAtUtc"] = secret_value
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json",
+            payload=payload,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="apparent secret material"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+def test_install_linking_authority_readiness_rejects_public_or_multi_link_file(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json"
+        )
+    )
+    readiness_path.chmod(0o640)
+
+    with pytest.raises(RuntimeError, match="mode-0600 single-link"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+    readiness_path.chmod(0o600)
+    (tmp_path / "readiness-hardlink.json").hardlink_to(readiness_path)
+    with pytest.raises(RuntimeError, match="mode-0600 single-link"):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    (
+        ("currentRoleMatches", False, "contract is invalid"),
+        ("leastPrivilegeValid", 1, "contract is invalid"),
+        ("runtimeRoleSha256", "A" * 64, "contract is invalid"),
+        (
+            "authorityIdentitySha256",
+            int("8" * 64),
+            "contract is invalid",
+        ),
+        (
+            "checkedAtUtc",
+            "2026-07-23T12:34:56+01:00",
+            "timestamp is invalid",
+        ),
+    ),
+)
+def test_install_linking_authority_readiness_rejects_invalid_success_semantics(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    module = load_module()
+    payload = install_linking_authority_readiness_payload()
+    payload[field] = value
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            tmp_path / "install-linking-authority-readiness-test.json",
+            payload=payload,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        module.validate_install_linking_authority_readiness(
+            readiness_path,
+            expected_sha256=readiness_sha256,
+            evidence_root=tmp_path,
+        )
+
+
 def test_complete_retires_only_fully_advanced_deploy_journal(
     tmp_path: Path,
     monkeypatch,
@@ -730,6 +1074,13 @@ def test_complete_retires_only_fully_advanced_deploy_journal(
     (staging_root / "payload.txt").write_text("candidate\n", encoding="utf-8")
     backup_root = tmp_path / "backups"
     backup_root.mkdir()
+    runtime_evidence_root = tmp_path / "canonical-runtime-evidence"
+    runtime_evidence_root.mkdir(mode=0o700)
+    cutover_evidence_root = tmp_path / "private-cutover-evidence"
+    cutover_evidence_root.mkdir(mode=0o700)
+    runtime_authority_output = (
+        runtime_evidence_root / "active-runtime-authority.json"
+    )
     module.snapshot(
         source_root=source_root,
         active_root=active_root,
@@ -741,15 +1092,23 @@ def test_complete_retires_only_fully_advanced_deploy_journal(
         activation_receipt=tmp_path / "activation.json",
         **deploy_proof_authority(tmp_path),
     )
+    readiness_path, readiness_sha256 = (
+        write_install_linking_authority_readiness(
+            cutover_evidence_root
+            / "install-linking-authority-readiness-test.json"
+        )
+    )
     with pytest.raises(RuntimeError, match="before tunnel start"):
         module.complete_transaction(
             source_root=source_root,
             active_root=active_root,
             journal_path=journal,
-            runtime_authority_output=tmp_path / "active-runtime-authority.json",
+            runtime_authority_output=runtime_authority_output,
             candidate_portal_container_id=CANDIDATE_PORTAL_ID,
             candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
             candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
+            install_linking_authority_readiness=readiness_path,
+            install_linking_authority_readiness_sha256=readiness_sha256,
             shared_mutation_lock_token="4" * 64,
         )
     for phase in module.TRANSACTION_PHASES[1:]:
@@ -773,7 +1132,18 @@ import sys
 from contextlib import nullcontext
 from pathlib import Path
 
-script, source, active, journal, authority, container_id, name, image = sys.argv[1:]
+(
+    script,
+    source,
+    active,
+    journal,
+    authority,
+    container_id,
+    name,
+    image,
+    readiness,
+    readiness_sha256,
+) = sys.argv[1:]
 spec = importlib.util.spec_from_file_location("killed_complete_transaction", script)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
@@ -796,6 +1166,8 @@ module.complete_transaction(
     candidate_portal_container_id=container_id,
     candidate_portal_container_name=name,
     candidate_portal_image_id=image,
+    install_linking_authority_readiness=Path(readiness),
+    install_linking_authority_readiness_sha256=readiness_sha256,
     shared_mutation_lock_token="4" * 64,
 )
 """,
@@ -803,10 +1175,12 @@ module.complete_transaction(
             str(source_root),
             str(active_root),
             str(journal),
-            str(tmp_path / "active-runtime-authority.json"),
+            str(runtime_authority_output),
             CANDIDATE_PORTAL_ID,
             CANDIDATE_PORTAL_NAME,
             CANDIDATE_PORTAL_IMAGE,
+            str(readiness_path),
+            readiness_sha256,
         ],
         check=False,
     )
@@ -816,18 +1190,26 @@ module.complete_transaction(
     # retirement remains rollback-authorized: recovery sees the journal first.
     assert journal.exists()
     interrupted_authority = json.loads(
-        (tmp_path / "active-runtime-authority.json").read_text(encoding="utf-8")
+        runtime_authority_output.read_text(encoding="utf-8")
     )
     assert interrupted_authority["portal"]["containerId"] == CANDIDATE_PORTAL_ID
+    interrupted_authority_bytes = (
+        runtime_authority_output
+    ).read_bytes()
+    interrupted_authority_identity = (
+        runtime_authority_output
+    ).stat()
 
     receipt = module.complete_transaction(
         source_root=source_root,
         active_root=active_root,
         journal_path=journal,
-        runtime_authority_output=tmp_path / "active-runtime-authority.json",
+        runtime_authority_output=runtime_authority_output,
         candidate_portal_container_id=CANDIDATE_PORTAL_ID,
         candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
         candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
+        install_linking_authority_readiness=readiness_path,
+        install_linking_authority_readiness_sha256=readiness_sha256,
         shared_mutation_lock_token="4" * 64,
     )
 
@@ -835,12 +1217,31 @@ module.complete_transaction(
     assert receipt["journalRetired"] is True
     assert not journal.exists()
     authority = json.loads(
-        (tmp_path / "active-runtime-authority.json").read_text(encoding="utf-8")
+        runtime_authority_output.read_text(encoding="utf-8")
     )
+    assert set(authority) == module.ACTIVE_RUNTIME_AUTHORITY_FIELDS
     assert authority["portal"]["containerId"] == CANDIDATE_PORTAL_ID
     assert authority["portal"]["containerName"] == CANDIDATE_PORTAL_NAME
     assert authority["portal"]["proofAuthorityMountSha256"] == CANDIDATE_PROOF_SHA256
     assert authority["portal"]["proofAuthorityMountSha256"] != PRIOR_PROOF_SHA256
+    assert authority["installLinkingAuthorityReadinessPath"] == str(
+        readiness_path
+    )
+    assert authority["installLinkingAuthorityReadinessSha256"] == readiness_sha256
+    assert (
+        runtime_authority_output
+    ).read_bytes() == interrupted_authority_bytes
+    completed_authority_identity = (
+        runtime_authority_output
+    ).stat()
+    assert (
+        completed_authority_identity.st_ino
+        == interrupted_authority_identity.st_ino
+    )
+    assert (
+        completed_authority_identity.st_mtime_ns
+        == interrupted_authority_identity.st_mtime_ns
+    )
 
 
 def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
@@ -873,14 +1274,34 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
         'public_edge_overlay_transaction.py" snapshot',
         stage_index,
     )
-    build_index = script.index("docker_cli buildx build", stage_index)
-    second_source_gate = script.index(source_gate, build_index)
+    build_phase_index = script.index(
+        "mark_deploy_phase image_build_started",
+        journal_index,
+    )
+    candidate_promotion_index = script.index(
+        'docker_cli image tag \\\n'
+        '  "$INSTALL_LINKING_CANDIDATE_PORTAL_TAG" "$IMAGE_TAG"',
+        build_phase_index,
+    )
+    build_complete_phase_index = script.index(
+        "mark_deploy_phase image_built",
+        candidate_promotion_index,
+    )
+    second_source_gate = script.index(source_gate, build_complete_phase_index)
     drain_index = script.index(drain, second_source_gate)
     activation_index = script.index(activation, drain_index)
     full_preflight_index = script.index(full_preflight, activation_index)
     volume_init_index = script.index("compose_cli run --rm --no-deps chummer-portal-volume-init")
 
-    assert first_source_gate < stage_index < journal_index < build_index < second_source_gate
+    assert (
+        first_source_gate
+        < stage_index
+        < journal_index
+        < build_phase_index
+        < candidate_promotion_index
+        < build_complete_phase_index
+        < second_source_gate
+    )
     assert second_source_gate < drain_index < activation_index < volume_init_index
     assert volume_init_index < full_preflight_index
     assert (

@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.InstallLinking;
@@ -15,7 +17,8 @@ if (!HasValidArguments(args))
     Console.Error.WriteLine(
         "Usage: Chummer.InstallLinking.Postgres.Tool "
         + "<migrate|validate|grant-runtime|prepare> [runtime-role], "
-        + "transport-proof, "
+        + "transport-proof, prove-empty-authority [runtime-role], "
+        + "prove-runtime-role [runtime-role], prove-local-store-absent, "
         + "or import-local --confirm-empty-authority");
     return 64;
 }
@@ -25,8 +28,16 @@ if (args[0] == "import-local")
     return await ImportLocalAsync();
 }
 
+if (args[0] == "prove-local-store-absent")
+{
+    return ProveLocalStoreAbsent();
+}
+
 string? runtimeRole = null;
-if (args[0] is "grant-runtime" or "prepare"
+if (args[0] is "grant-runtime"
+        or "prepare"
+        or "prove-empty-authority"
+        or "prove-runtime-role"
     && !InstallLinkingPostgresToolArguments.TryResolveRuntimeRole(
         args,
         Environment.GetEnvironmentVariable,
@@ -35,6 +46,11 @@ if (args[0] is "grant-runtime" or "prepare"
     Console.Error.WriteLine(
         "The InstallLinking PostgreSQL runtime role is unavailable or invalid.");
     return 78;
+}
+
+if (args[0] is "prove-empty-authority" or "prove-runtime-role")
+{
+    return await ProveRuntimeAuthorityAsync(args[0], runtimeRole!);
 }
 
 string migratorConnectionString;
@@ -73,8 +89,19 @@ try
                 await migrator.ValidateAsync();
             if (validation.Valid)
             {
-                Console.WriteLine(
-                    $"install_linking schema version {validation.AppliedVersion} is valid.");
+                string authorityIdentitySha256 =
+                    await ReadAuthorityIdentitySha256Async(
+                        migratorDataSource);
+                WriteCanonicalJson(
+                    new SortedDictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["appliedSchemaVersion"] = validation.AppliedVersion,
+                        ["authorityIdentitySha256"] =
+                            authorityIdentitySha256,
+                        ["contractName"] =
+                            "chummer.install_linking_postgres_schema_validation.v1",
+                        ["status"] = "pass"
+                    });
                 return 0;
             }
 
@@ -107,8 +134,20 @@ try
                 return 1;
             }
 
-            Console.WriteLine(
-                $"install_linking schema version {prepared.AppliedVersion} and least-privilege runtime grants are ready.");
+            WriteCanonicalJson(
+                new SortedDictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["appliedSchemaVersion"] = prepared.AppliedVersion,
+                    ["authorityIdentitySha256"] =
+                        await ReadAuthorityIdentitySha256Async(
+                            migratorDataSource),
+                    ["contractName"] =
+                        "chummer.install_linking_postgres_prepare.v1",
+                    ["leastPrivilegeValid"] = true,
+                    ["runtimeRoleSha256"] =
+                        ComputeRuntimeRoleSha256(runtimeRole!),
+                    ["status"] = "pass"
+                });
             return 0;
         case "transport-proof":
             return await VerifyTransportAsync(
@@ -133,11 +172,209 @@ static bool HasValidArguments(string[] values)
     {
         ["migrate" or "validate"] => true,
         ["transport-proof"] => true,
+        ["prove-local-store-absent"] => true,
         ["grant-runtime" or "prepare"] => true,
         ["grant-runtime" or "prepare", _] => true,
+        ["prove-empty-authority" or "prove-runtime-role"] => true,
+        ["prove-empty-authority" or "prove-runtime-role", _] => true,
         ["import-local", "--confirm-empty-authority"] => true,
         _ => false
     };
+
+static async Task<int> ProveRuntimeAuthorityAsync(
+    string command,
+    string runtimeRole)
+{
+    IConfiguration configuration = new ConfigurationBuilder()
+        .AddEnvironmentVariables()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ASPNETCORE_ENVIRONMENT"] = Environments.Production
+        })
+        .Build();
+    string runtimeConnectionString;
+    try
+    {
+        runtimeConnectionString = InstallLinkingPostgresConnectionConfiguration
+            .LoadRuntimeConnectionString(
+                configuration,
+                new ImportHostEnvironment());
+    }
+    catch (Exception exception) when (
+        exception is InvalidOperationException
+            or InvalidDataException
+            or IOException
+            or UnauthorizedAccessException
+            or PlatformNotSupportedException)
+    {
+        Console.Error.WriteLine(
+            "The owner-only InstallLinking PostgreSQL runtime credential file is unavailable or invalid.");
+        return 78;
+    }
+
+    await using NpgsqlDataSource runtimeDataSource =
+        NpgsqlDataSource.Create(runtimeConnectionString);
+    var migrator = new InstallLinkingPostgresMigrator(runtimeDataSource);
+    try
+    {
+        string roleSha256 = ComputeRuntimeRoleSha256(runtimeRole);
+        if (command == "prove-runtime-role")
+        {
+            InstallLinkingPostgresRuntimeRoleProof proof =
+                await migrator.ProveCurrentRuntimeRoleAsync(runtimeRole);
+            if (!proof.Valid)
+            {
+                Console.Error.WriteLine(
+                    "InstallLinking PostgreSQL runtime-role proof failed.");
+                return 1;
+            }
+
+            WriteCanonicalJson(
+                new SortedDictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["contractName"] =
+                        "chummer.install_linking_postgres_runtime_role_proof.v1",
+                    ["authorityIdentitySha256"] =
+                        proof.AuthorityIdentitySha256,
+                    ["currentRoleMatches"] = proof.CurrentRoleMatches,
+                    ["leastPrivilegeValid"] = proof.LeastPrivilegeValid,
+                    ["runtimeRoleSha256"] = roleSha256,
+                    ["status"] = "pass"
+                });
+            return 0;
+        }
+
+        InstallLinkingPostgresEmptyAuthorityProof emptyProof =
+            await migrator.ProveEmptyRuntimeAuthorityAsync(runtimeRole);
+        if (!emptyProof.Valid)
+        {
+            Console.Error.WriteLine(
+                "InstallLinking PostgreSQL empty-authority proof failed.");
+            return 1;
+        }
+
+        WriteCanonicalJson(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["appliedSchemaVersion"] = emptyProof.AppliedSchemaVersion,
+                ["authorityIdentitySha256"] =
+                    emptyProof.AuthorityIdentitySha256,
+                ["commitCount"] = emptyProof.CommitCount,
+                ["contractName"] =
+                    "chummer.install_linking_postgres_empty_authority_proof.v1",
+                ["currentRoleMatches"] = emptyProof.CurrentRoleMatches,
+                ["empty"] = emptyProof.Empty,
+                ["headGeneration"] = emptyProof.HeadGeneration,
+                ["leastPrivilegeValid"] = emptyProof.LeastPrivilegeValid,
+                ["runtimeRoleSha256"] = roleSha256,
+                ["schemaValid"] = emptyProof.SchemaValid,
+                ["status"] = "pass"
+            });
+        return 0;
+    }
+    catch (Exception exception) when (
+        exception is NpgsqlException
+            or InvalidOperationException
+            or ArgumentException
+            or TimeoutException)
+    {
+        Console.Error.WriteLine(
+            $"InstallLinking PostgreSQL runtime proof failed ({exception.GetType().Name}).");
+        return 1;
+    }
+}
+
+static int ProveLocalStoreAbsent()
+{
+    try
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = Environments.Production
+            })
+            .Build();
+        string storagePath = InstallLinkingStore.ResolveStoragePath(configuration);
+        if (!string.Equals(
+                storagePath,
+                InstallLinkingLocalStoreAbsenceProof.CanonicalStorePath,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "InstallLinking local-store absence proof requires the canonical state path.");
+        }
+
+        string[] paths =
+        [
+            storagePath,
+            $"{storagePath}.floor",
+            $"{storagePath}.postgres-import.intent"
+        ];
+        foreach (string path in paths)
+        {
+            if (InstallLinkingLocalStoreAbsenceProof
+                .HasRetainedEntryOrUnsafeAncestor(path))
+            {
+                Console.Error.WriteLine(
+                    "InstallLinking local-store absence proof found retained state.");
+                return 1;
+            }
+        }
+
+        WriteCanonicalJson(
+            new SortedDictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["checkedPathCount"] = paths.Length,
+                ["contractName"] =
+                    "chummer.install_linking_local_store_absence_proof.v1",
+                ["localStorePresent"] = false,
+                ["status"] = "pass"
+            });
+        return 0;
+    }
+    catch (Exception exception) when (
+        exception is InvalidOperationException
+            or ArgumentException
+            or IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+    {
+        Console.Error.WriteLine(
+            $"InstallLinking local-store absence proof failed ({exception.GetType().Name}).");
+        return 1;
+    }
+}
+
+static void WriteCanonicalJson(
+    SortedDictionary<string, object?> payload)
+{
+    Console.Out.Write(
+        JsonSerializer.Serialize(
+            payload,
+            new JsonSerializerOptions
+            {
+                IndentCharacter = ' ',
+                IndentSize = 2,
+                NewLine = "\n",
+                WriteIndented = true
+            }));
+    Console.Out.Write('\n');
+}
+
+static string ComputeRuntimeRoleSha256(string runtimeRole)
+    => Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(runtimeRole)))
+        .ToLowerInvariant();
+
+static async Task<string> ReadAuthorityIdentitySha256Async(
+    NpgsqlDataSource dataSource)
+{
+    await using NpgsqlConnection connection =
+        await dataSource.OpenConnectionAsync();
+    return await InstallLinkingPostgresAuthorityIdentity.ComputeSha256Async(
+        connection);
+}
 
 static async Task<int> VerifyTransportAsync(
     NpgsqlDataSource tlsDataSource,
@@ -145,14 +382,18 @@ static async Task<int> VerifyTransportAsync(
 {
     try
     {
+        string authorityIdentitySha256;
         await using (NpgsqlConnection tlsConnection =
                      await tlsDataSource.OpenConnectionAsync())
-        await using (var sslCommand = new NpgsqlCommand(
-                         "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()",
-                         tlsConnection))
         {
-            object? observed = await sslCommand.ExecuteScalarAsync();
-            if (observed is not true)
+            authorityIdentitySha256 =
+                await InstallLinkingPostgresAuthorityIdentity
+                    .ComputeSha256Async(tlsConnection);
+            await using var sslCommand = new NpgsqlCommand(
+                "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()",
+                tlsConnection);
+            object? observedSsl = await sslCommand.ExecuteScalarAsync();
+            if (observedSsl is not true)
             {
                 Console.Error.WriteLine(
                     "PostgreSQL transport proof did not observe an authenticated TLS session.");
@@ -181,12 +422,20 @@ static async Task<int> VerifyTransportAsync(
                 PostgresErrorCodes.InvalidAuthorizationSpecification,
                 StringComparison.Ordinal))
         {
-            Console.WriteLine(
-                "{\"contractName\":\"chummer.postgres_transport_proof.v1\","
-                + "\"authenticated\":true,\"pgStatSsl\":true,"
-                + "\"plaintextAttempted\":true,\"plaintextRejected\":true,"
-                + "\"plaintextSqlState\":\"28000\","
-                + "\"gssEncryptionDisabled\":true}");
+            WriteCanonicalJson(
+                new SortedDictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["authenticated"] = true,
+                    ["authorityIdentitySha256"] =
+                        authorityIdentitySha256,
+                    ["contractName"] = "chummer.postgres_transport_proof.v1",
+                    ["gssEncryptionDisabled"] = true,
+                    ["pgStatSsl"] = true,
+                    ["plaintextAttempted"] = true,
+                    ["plaintextRejected"] = true,
+                    ["plaintextSqlState"] = "28000",
+                    ["status"] = "pass"
+                });
             return 0;
         }
         catch (Exception exception) when (

@@ -32,6 +32,28 @@ def make_completed(stdout: str = "", stderr: str = "", returncode: int = 0) -> s
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
+def write_fake_runtime_payload(staging_root: Path) -> None:
+    staging_root.mkdir(parents=True, exist_ok=True)
+    (staging_root / "Chummer.Run.Api.dll").write_text(
+        "api assembly\n",
+        encoding="utf-8",
+    )
+    probe_root = staging_root / "loopback-probe"
+    probe_root.mkdir(parents=True, exist_ok=True)
+    (probe_root / "Chummer.Run.LoopbackProbe.dll").write_text(
+        "probe assembly\n",
+        encoding="utf-8",
+    )
+    (probe_root / "Chummer.Run.LoopbackProbe.deps.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+    (probe_root / "Chummer.Run.LoopbackProbe.runtimeconfig.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+
 def make_source_tree(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root.parent / ".dockerignore").write_text(
@@ -88,6 +110,23 @@ def make_source_tree(root: Path) -> None:
     )
     (root / "Chummer.InstallLinking.Postgres.Tool" / "Program.cs").write_text(
         "operator tool\n",
+        encoding="utf-8",
+    )
+    (root / "Chummer.Run.LoopbackProbe").mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    (
+        root
+        / "Chummer.Run.LoopbackProbe"
+        / "Chummer.Run.LoopbackProbe.csproj"
+    ).write_text("<Project />\n", encoding="utf-8")
+    (root / "Chummer.Run.LoopbackProbe" / "packages.lock.json").write_text(
+        '{"dependencies":{"net10.0":{}},"version":1}\n',
+        encoding="utf-8",
+    )
+    (root / "Chummer.Run.LoopbackProbe" / "Program.cs").write_text(
+        "loopback probe\n",
         encoding="utf-8",
     )
     (root / "scripts").mkdir(parents=True, exist_ok=True)
@@ -186,6 +225,30 @@ def write_staged_build_info(
     return build_info_path
 
 
+def test_staging_overlay_ready_requires_api_and_standalone_probe_payload(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir()
+    (staging_root / "Chummer.Run.Api.dll").write_bytes(b"api")
+
+    assert module.staging_overlay_ready(staging_root) is False
+
+    write_fake_runtime_payload(staging_root)
+
+    assert module.staging_overlay_ready(staging_root) is True
+    assert {
+        str(path).replace("\\", "/")
+        for path in module.REQUIRED_STAGING_RUNTIME_PAYLOAD_RELATIVE_PATHS
+    } == {
+        "Chummer.Run.Api.dll",
+        "loopback-probe/Chummer.Run.LoopbackProbe.dll",
+        "loopback-probe/Chummer.Run.LoopbackProbe.deps.json",
+        "loopback-probe/Chummer.Run.LoopbackProbe.runtimeconfig.json",
+    }
+
+
 def test_full_deployment_digest_binds_source_closure_and_staged_payload() -> None:
     module = load_module()
     source_fingerprint = {
@@ -273,9 +336,6 @@ def test_staged_payload_fingerprint_prunes_private_state_contents(tmp_path: Path
     state.mkdir(parents=True)
     payload = root / "Chummer.Run.Api.dll"
     payload.write_bytes(b"assembly")
-    mounted_proof = root / module.REQUIRED_COMPOSE_MOUNTPOINTS[0]
-    mounted_proof.parent.mkdir(parents=True)
-    mounted_proof.write_bytes(b"runtime proof version one")
     private_target = state / "private-target"
     private_target.write_bytes(b"secret")
     (state / "private-link").symlink_to(private_target)
@@ -283,9 +343,9 @@ def test_staged_payload_fingerprint_prunes_private_state_contents(tmp_path: Path
 
     rows = module.staged_payload_rows(root)
     fingerprint = module.staged_payload_fingerprint(root)
-    mounted_proof.write_bytes(b"runtime proof version two")
+    private_target.write_bytes(b"changed secret")
     module.normalize_payload_modes(root)
-    after_runtime_proof_refresh = module.staged_payload_fingerprint(root)
+    after_private_state_refresh = module.staged_payload_fingerprint(root)
 
     assert [row["path"] for row in rows] == ["Chummer.Run.Api.dll"]
     assert fingerprint["algorithm"] == module.STAGED_PAYLOAD_FINGERPRINT_ALGORITHM
@@ -293,10 +353,11 @@ def test_staged_payload_fingerprint_prunes_private_state_contents(tmp_path: Path
     assert fingerprint["excludedRelativePaths"] == (
         module.staged_payload_runtime_mount_exclusions()
     )
-    assert after_runtime_proof_refresh == fingerprint
+    assert fingerprint["excludedRelativePaths"] == []
+    assert after_private_state_refresh == fingerprint
 
 
-def test_staged_payload_fingerprint_requires_declared_runtime_mountpoint_files(
+def test_staged_payload_fingerprint_requires_no_obsolete_nested_mountpoint(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -306,11 +367,11 @@ def test_staged_payload_fingerprint_requires_declared_runtime_mountpoint_files(
     (root / "Chummer.Run.Api.dll").write_bytes(b"assembly")
     module.normalize_payload_modes(root)
 
-    with pytest.raises(
-        module.PayloadModePolicyError,
-        match="must contain every declared runtime-mounted file exclusion",
-    ):
-        module.staged_payload_fingerprint(root)
+    fingerprint = module.staged_payload_fingerprint(root)
+
+    assert module.REQUIRED_COMPOSE_MOUNTPOINTS == ()
+    assert fingerprint["excludedRelativePaths"] == []
+    assert fingerprint["fileCount"] == 1
 
 
 def test_v3_runtime_mount_exclusions_exactly_match_nested_read_only_app_binds() -> None:
@@ -2118,6 +2179,9 @@ def test_build_input_fingerprint_covers_operator_tool_and_compose_closure(
         "chummer.run-services/scripts/verify_public_pwa_static_assets.py",
         "chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj",
         "chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Program.cs",
+        "chummer.run-services/Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj",
+        "chummer.run-services/Chummer.Run.LoopbackProbe/packages.lock.json",
+        "chummer.run-services/Chummer.Run.LoopbackProbe/Program.cs",
         "chummer-design/.dockerignore",
         "chummer-design/products/chummer/product.yaml",
     }
@@ -2137,6 +2201,9 @@ def test_build_input_fingerprint_covers_operator_tool_and_compose_closure(
         source_root / "scripts" / "verify_public_pwa_static_assets.py",
         source_root / "Chummer.InstallLinking.Postgres.Tool" / "Chummer.InstallLinking.Postgres.Tool.csproj",
         source_root / "Chummer.InstallLinking.Postgres.Tool" / "Program.cs",
+        source_root / "Chummer.Run.LoopbackProbe" / "Chummer.Run.LoopbackProbe.csproj",
+        source_root / "Chummer.Run.LoopbackProbe" / "packages.lock.json",
+        source_root / "Chummer.Run.LoopbackProbe" / "Program.cs",
         design_root / ".dockerignore",
         design_root / "products" / "chummer" / "product.yaml",
     ):
@@ -2236,8 +2303,7 @@ def test_materialize_stages_and_verifies_overlay_without_activation(tmp_path: Pa
     output = tmp_path / "receipt.json"
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         return make_completed(stdout="publish ok\n")
 
     def fake_verify(staging, *, source_root, verify_timeout_seconds, verification_receipt_path):
@@ -2290,6 +2356,7 @@ def test_materialize_stages_and_verifies_overlay_without_activation(tmp_path: Pa
     assert "publish" in payload["publishCommand"]
     assert "--artifacts-path" not in payload["publishCommand"]
     assert "-p:ChummerDesktopRuntimeIdentifiers=" in payload["publishCommand"]
+    assert "-p:PublishPublicEdgeLoopbackProbe=true" in payload["publishCommand"]
     assert payload["verification"]["receiptStatus"] == "pass"
     assert payload["releaseChannelReceipt"]["sha256Matches"] is True
     assert payload["releaseChannelReceipt"]["sha256Expected"] == payload["releaseChannelReceipt"]["sha256Actual"]
@@ -2319,17 +2386,29 @@ def test_materialize_stages_and_verifies_overlay_without_activation(tmp_path: Pa
     assert payload["activeBuildInfoPath"] == ""
     assert output.is_file()
     assert (staging_root / "state").is_dir()
+    assert (
+        staging_root
+        / "loopback-probe"
+        / "Chummer.Run.LoopbackProbe.dll"
+    ).is_file()
+    assert any(
+        row["path"]
+        == "loopback-probe/Chummer.Run.LoopbackProbe.dll"
+        for row in module.staged_payload_rows(staging_root)
+    )
     assert (staging_root / "wwwroot" / "pwa-icon.svg").read_text(encoding="utf-8") == "<svg />\n"
     assert (staging_root / "wwwroot" / "site.webmanifest").read_text(encoding="utf-8") == "{}\n"
     assert (
         staging_root / "wwwroot" / "media" / "product" / "proof-builder-trail.png"
     ).read_text(encoding="utf-8") == "png\n"
-    assert (
-        staging_root / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    ).read_text(encoding="utf-8") == "{}\n"
-    assert payload["composeMountpointsCreated"] == [
-        "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
-    ]
+    assert not (
+        staging_root
+        / "wwwroot"
+        / "proofs"
+        / "mac-codex-release"
+        / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    ).exists()
+    assert payload["composeMountpointsCreated"] == []
     assert (staging_root / ".codex-design" / "marker.txt").read_text(encoding="utf-8") == "design\n"
     build_info = json.loads((staging_root / module.OVERLAY_BUILD_INFO_RELATIVE_PATH).read_text(encoding="utf-8"))
     assert build_info["contractName"] == module.CONTRACT_NAME
@@ -2419,8 +2498,7 @@ def test_materialize_rejects_forged_verification_program_envelope(
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         return make_completed(stdout="publish ok\n")
 
     def forged_verify(
@@ -2488,8 +2566,7 @@ def test_materialize_activates_overlay_and_creates_backup_after_pass_verificatio
     prior_active_identity = active_root.stat()
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         (staging_root / "new.txt").write_text("new\n", encoding="utf-8")
         return make_completed(stdout="publish ok\n")
 
@@ -2822,8 +2899,7 @@ def test_materialize_does_not_activate_when_verification_fails(tmp_path: Path) -
     (active_root / "old.txt").write_text("old\n", encoding="utf-8")
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         return make_completed(stdout="publish ok\n")
 
     def fake_verify(staging, *, source_root, verify_timeout_seconds, verification_receipt_path):
@@ -2897,8 +2973,7 @@ def test_materialize_activates_when_verification_receipt_allows_overlay_activati
     (active_root / "old.txt").write_text("old\n", encoding="utf-8")
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         (staging_root / "new.txt").write_text("new\n", encoding="utf-8")
         return make_completed(stdout="publish ok\n")
 
@@ -2969,7 +3044,7 @@ def test_materialize_preserves_existing_published_wwwroot_files(tmp_path: Path) 
 
     def fake_run(command, *, cwd):
         (staging_root / "wwwroot" / "media" / "product").mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         (staging_root / "wwwroot" / "pwa-icon.svg").write_text("published\n", encoding="utf-8")
         (staging_root / "wwwroot" / "site.webmanifest").write_text("published manifest\n", encoding="utf-8")
         (staging_root / "wwwroot" / "media" / "product" / "proof-builder-trail.png").write_text(
@@ -3034,8 +3109,7 @@ def test_materialize_reuses_existing_staging_overlay_without_republish(tmp_path:
     active_root = tmp_path / "overlay" / "app"
     backup_root = tmp_path / "backups"
     output = tmp_path / "receipt.json"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     build_info_path = write_staged_build_info(module, staging_root, source_root)
 
     def fake_run(command, *, cwd):
@@ -3101,8 +3175,7 @@ def test_staged_source_fingerprint_rejects_duplicate_build_info_fields(
     source_root = tmp_path / "source"
     make_source_tree(source_root)
     staging_root = tmp_path / "overlay-next" / "app"
-    staging_root.mkdir(parents=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     build_info_path = write_staged_build_info(module, staging_root, source_root)
     original = build_info_path.read_text(encoding="utf-8")
     build_info_path.write_text(
@@ -3127,8 +3200,7 @@ def test_materialize_fails_closed_before_reusing_incomplete_fingerprint_contract
     make_source_tree(source_root)
     staging_root = tmp_path / "overlay-next" / "app"
     active_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     recorded = module.source_fingerprint(source_root)
     if contract_defect == "wrong_algorithm":
         recorded["buildInputs"]["algorithm"] = "sha256-path-only-v0"
@@ -3171,8 +3243,7 @@ def test_materialize_fails_closed_before_reusing_tampered_staged_payload(
     make_source_tree(source_root)
     staging_root = tmp_path / "overlay-next" / "app"
     active_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     write_staged_build_info(module, staging_root, source_root)
     tamper = staging_root / "unverified-tamper.bin"
     tamper.write_text("tampered\n", encoding="utf-8")
@@ -3212,8 +3283,7 @@ def test_materialize_fails_closed_when_reused_staging_fingerprint_is_stale(tmp_p
     active_root = tmp_path / "overlay" / "app"
     backup_root = tmp_path / "backups"
     output = tmp_path / "receipt.json"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     build_info_path = write_staged_build_info(module, staging_root, source_root)
     (source_root / "Chummer.Run.Api" / "Program.cs").write_text("changed program\n", encoding="utf-8")
 
@@ -3256,8 +3326,7 @@ def test_materialize_rechecks_source_fingerprint_after_verification_before_activ
     active_root = tmp_path / "overlay" / "app"
     backup_root = tmp_path / "backups"
     output = tmp_path / "receipt.json"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     build_info_path = write_staged_build_info(module, staging_root, source_root)
 
     def fake_run(command, *, cwd):
@@ -3320,9 +3389,8 @@ def test_materialize_reports_payload_mode_drift_without_losing_failure_receipt(
     make_source_tree(source_root)
     staging_root = tmp_path / "overlay-next" / "app"
     active_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
+    write_fake_runtime_payload(staging_root)
     payload_file = staging_root / "Chummer.Run.Api.dll"
-    payload_file.write_text("dll\n", encoding="utf-8")
     write_staged_build_info(module, staging_root, source_root)
 
     def fake_verify(staging, *, source_root, verify_timeout_seconds, verification_receipt_path):
@@ -3363,8 +3431,7 @@ def test_materialize_fails_closed_when_overlay_payload_source_changes_during_cop
     active_root = tmp_path / "overlay" / "app"
 
     def fake_run(command, *, cwd):
-        staging_root.mkdir(parents=True, exist_ok=True)
-        (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+        write_fake_runtime_payload(staging_root)
         return make_completed(stdout="publish ok\n")
 
     original_copy_optional_tree = module.copy_optional_tree
@@ -3461,7 +3528,9 @@ def test_materialize_rejects_symlinked_active_root_without_touching_target(
     assert sentinel.read_text(encoding="utf-8") == "active\n"
 
 
-def test_materialize_fails_closed_when_reuse_staging_requested_without_app_payload(tmp_path: Path) -> None:
+def test_materialize_fails_closed_when_reuse_staging_omits_standalone_probe(
+    tmp_path: Path,
+) -> None:
     module = load_module()
     source_root = tmp_path / "source"
     make_source_tree(source_root)
@@ -3471,6 +3540,7 @@ def test_materialize_fails_closed_when_reuse_staging_requested_without_app_paylo
     backup_root = tmp_path / "backups"
     output = tmp_path / "receipt.json"
     staging_root.mkdir(parents=True, exist_ok=True)
+    (staging_root / "Chummer.Run.Api.dll").write_bytes(b"api")
 
     def fake_run(command, *, cwd):
         raise AssertionError("publish should not run when reuse-staging is explicit")
@@ -3490,7 +3560,49 @@ def test_materialize_fails_closed_when_reuse_staging_requested_without_app_paylo
 
     assert payload["status"] == "fail"
     assert payload["publish"]["skipped"] is False
-    assert payload["publish"]["skipReason"] == "staging_overlay_missing_app_dll"
+    assert (
+        payload["publish"]["skipReason"]
+        == "staging_overlay_missing_runtime_payload"
+    )
+    assert payload["verification"]["reason"] == "publish_failed"
+
+
+def test_materialize_fails_closed_when_publish_omits_standalone_probe(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    make_source_tree(source_root)
+    staging_root = tmp_path / "overlay-next" / "app"
+
+    def fake_run(command, *, cwd):
+        staging_root.mkdir(parents=True, exist_ok=True)
+        (staging_root / "Chummer.Run.Api.dll").write_bytes(b"api")
+        return make_completed(stdout="publish claimed success\n")
+
+    def fail_verify(*args, **kwargs):
+        raise AssertionError("probe-less staging must fail before verification")
+
+    payload = materialize_with_binding(
+        module,
+        tmp_path / "receipt.json",
+        binding_root=tmp_path,
+        source_root=source_root,
+        staging_root=staging_root,
+        active_root=tmp_path / "overlay" / "app",
+        backup_root=tmp_path / "backups",
+        build_root=tmp_path / "build",
+        run_command_fn=fake_run,
+        verify_overlay_fn=fail_verify,
+    )
+
+    assert payload["status"] == "fail"
+    assert payload["publish"]["exitCode"] == 1
+    assert (
+        payload["publish"]["skipReason"]
+        == "staging_overlay_missing_runtime_payload"
+    )
+    assert "-p:PublishPublicEdgeLoopbackProbe=true" in payload["publishCommand"]
     assert payload["verification"]["reason"] == "publish_failed"
 
 
@@ -3782,11 +3894,49 @@ def test_runtime_dependency_stub_cannot_supply_play_html_or_executable_assets() 
     assert b"console.log" not in script_payload
 
 
+def test_verify_published_overlay_rejects_missing_probe_before_process_spawn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "overlay" / "app"
+    staging_root.mkdir(parents=True)
+    (staging_root / "Chummer.Run.Api.dll").write_bytes(b"api")
+    verification_receipt_path = tmp_path / "verify.json"
+    release_channel_receipt, release_channel_receipt_sha256 = (
+        write_release_channel_receipt(tmp_path)
+    )
+
+    def fail_popen(*args, **kwargs):
+        raise AssertionError("probe-less staging must fail before process spawn")
+
+    monkeypatch.setattr(module.subprocess, "Popen", fail_popen)
+
+    receipt = module.verify_published_overlay(
+        staging_root,
+        source_root=REPO_ROOT,
+        verify_timeout_seconds=1,
+        verification_receipt_path=verification_receipt_path,
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256=release_channel_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert (
+        receipt["reason"]
+        == "published_loopback_probe_missing_runtime_payload"
+    )
+    assert receipt["missingRuntimePayloadPaths"] == [
+        "loopback-probe/Chummer.Run.LoopbackProbe.dll",
+        "loopback-probe/Chummer.Run.LoopbackProbe.deps.json",
+        "loopback-probe/Chummer.Run.LoopbackProbe.runtimeconfig.json",
+    ]
+
+
 def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -3920,8 +4070,7 @@ def test_verify_published_overlay_rejects_pass_receipt_without_selected_input_bi
 ) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -3979,8 +4128,7 @@ def test_verify_published_overlay_rejects_preexisting_pass_receipt_when_child_cr
 ) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
     write_child_verification_receipt(
@@ -4044,8 +4192,7 @@ def test_verify_published_overlay_requires_public_install_handoffs_and_query_dro
 ) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4115,8 +4262,7 @@ def test_verify_published_overlay_requires_public_install_handoffs_and_query_dro
 def test_verify_published_overlay_allows_release_posture_only_receipt_failures(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4214,8 +4360,7 @@ def test_verify_published_overlay_rejects_retired_play_gate_marker(
 ) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4274,8 +4419,7 @@ def test_verify_published_overlay_rejects_retired_play_gate_marker(
 def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_missing(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4331,8 +4475,7 @@ def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_m
 def test_verify_published_overlay_fails_when_browser_redirect_does_not_canonicalize_anchor(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4402,8 +4545,7 @@ def test_verify_published_overlay_fails_when_browser_redirect_leaks_synthetic_qu
 ) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
@@ -4473,8 +4615,7 @@ def test_verify_published_overlay_fails_when_browser_redirect_leaks_synthetic_qu
 def test_verify_published_overlay_fails_when_local_live_surface_parity_fails(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
-    staging_root.mkdir(parents=True, exist_ok=True)
-    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    write_fake_runtime_payload(staging_root)
     verification_receipt_path = tmp_path / "verify.json"
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
 
