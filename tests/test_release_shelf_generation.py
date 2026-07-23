@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
+import stat
 import subprocess
 import threading
 import time
@@ -729,8 +731,20 @@ def test_manifest_validator_rejects_non_exact_generation_install_routes(url: str
         )
 
 
-def test_shared_helper_accepts_cross_language_contract_fixture() -> None:
-    fixture = ROOT / "tests" / "fixtures" / "atomic_release_shelf_v1"
+def test_shared_helper_accepts_cross_language_contract_fixture(
+    tmp_path: Path,
+) -> None:
+    source = ROOT / "tests" / "fixtures" / "atomic_release_shelf_v1"
+    fixture = tmp_path / "atomic-release-shelf-v1"
+    shutil.copytree(source, fixture)
+    (fixture / MODULE.CURRENT_POINTER).chmod(MODULE.PUBLIC_METADATA_FILE_MODE)
+    (fixture / MODULE.LAYOUT_MARKER).chmod(MODULE.PUBLIC_METADATA_FILE_MODE)
+    pointer = MODULE.load_pointer(fixture / MODULE.CURRENT_POINTER)
+    MODULE._normalize_public_generation_modes(
+        fixture
+        / MODULE.GENERATIONS_DIRECTORY
+        / str(pointer["generationId"])
+    )
 
     state, generation_root, pointer = MODULE.resolve_shelf_root(fixture)
 
@@ -793,6 +807,155 @@ def test_filesystem_activation_requires_explicit_initialization_and_preserves_ge
     state, resolved, _ = MODULE.resolve_shelf_root(shelf)
     assert state == "generation"
     assert resolved == shelf / "generations" / "generation-b"
+
+
+def test_activation_publishes_runtime_bytes_for_a_distinct_uid_without_widening_source_candidate(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    candidate_entries = [candidate, *candidate.rglob("*")]
+    for path in reversed(candidate_entries):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    shelf = tmp_path / "shelf"
+
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-public-modes",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-public-modes",
+    )
+
+    generation = (
+        shelf / MODULE.GENERATIONS_DIRECTORY / pointer["generationId"]
+    )
+    shared_directories = [
+        shelf,
+        shelf / MODULE.GENERATIONS_DIRECTORY,
+    ]
+    sealed_directories = [
+        generation,
+        *[path for path in generation.rglob("*") if path.is_dir()],
+    ]
+    public_metadata = [
+        shelf / MODULE.CURRENT_POINTER,
+        shelf / MODULE.LAYOUT_MARKER,
+        *[
+            generation / name
+            for name in (
+                MODULE.ACTIVATION_CANDIDATE,
+                MODULE.CANONICAL_MANIFEST,
+                MODULE.COMPATIBILITY_MANIFEST,
+            )
+        ],
+    ]
+    sealed_files = [
+        path
+        for path in generation.rglob("*")
+        if path.is_file() and path not in public_metadata
+    ]
+    for directory in shared_directories:
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o2770
+    for directory in sealed_directories:
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o555
+    for path in public_metadata:
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+    for path in sealed_files:
+        assert stat.S_IMODE(path.stat().st_mode) == 0o444
+    assert stat.S_IMODE((shelf / MODULE.PROMOTION_LOCK).stat().st_mode) == 0o660
+    assert stat.S_IMODE(candidate.stat().st_mode) == 0o700
+    assert all(
+        stat.S_IMODE(path.stat().st_mode) == (0o700 if path.is_dir() else 0o600)
+        for path in candidate.rglob("*")
+    )
+
+    runtime_uid = shelf.stat().st_uid + 100_000
+    runtime_gid = shelf.stat().st_gid
+
+    def permission_bits(path: Path) -> int:
+        metadata = path.stat()
+        mode = stat.S_IMODE(metadata.st_mode)
+        if metadata.st_uid == runtime_uid:
+            return (mode >> 6) & 0o7
+        if metadata.st_gid == runtime_gid:
+            return (mode >> 3) & 0o7
+        return mode & 0o7
+
+    assert all(permission_bits(path) & 0o3 == 0o3 for path in shared_directories)
+    assert all(permission_bits(path) & 0o1 for path in sealed_directories)
+    assert all(permission_bits(path) & 0o4 for path in public_metadata)
+    assert all(permission_bits(path) & 0o4 for path in sealed_files)
+
+    sealed_files[-1].chmod(0o600)
+    with pytest.raises(MODULE.ReleaseShelfError, match="non-public mode"):
+        MODULE.verify_generation(generation, pointer)
+
+
+def test_same_intent_recovery_repairs_authenticated_prepatch_private_modes(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    shelf = tmp_path / "shelf"
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-private-mode-recovery",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-private-mode-recovery",
+        allow_orphan_generation_recovery=True,
+    )
+    generation = (
+        shelf / MODULE.GENERATIONS_DIRECTORY / pointer["generationId"]
+    )
+    generation_entries = [generation, *generation.rglob("*")]
+    for path in reversed(generation_entries):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    (shelf / MODULE.GENERATIONS_DIRECTORY).chmod(0o700)
+    (shelf / MODULE.CURRENT_POINTER).chmod(0o600)
+    (shelf / MODULE.LAYOUT_MARKER).chmod(0o600)
+    shelf.chmod(0o700)
+
+    recovered = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-private-mode-recovery",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-private-mode-recovery",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert recovered == pointer
+    assert stat.S_IMODE(shelf.stat().st_mode) == 0o2770
+    assert stat.S_IMODE(
+        (shelf / MODULE.GENERATIONS_DIRECTORY).stat().st_mode
+    ) == 0o2770
+    assert stat.S_IMODE(generation.stat().st_mode) == 0o555
+    assert all(
+        stat.S_IMODE(path.stat().st_mode) == 0o555
+        for path in generation.rglob("*")
+        if path.is_dir()
+    )
+    assert all(
+        stat.S_IMODE(path.stat().st_mode)
+        == (
+            0o644
+            if path.relative_to(generation).as_posix()
+            in {
+                MODULE.ACTIVATION_CANDIDATE,
+                MODULE.CANONICAL_MANIFEST,
+                MODULE.COMPATIBILITY_MANIFEST,
+            }
+            else 0o444
+        )
+        for path in generation.rglob("*")
+        if path.is_file()
+    )
+    assert stat.S_IMODE((shelf / MODULE.CURRENT_POINTER).stat().st_mode) == 0o644
+    assert stat.S_IMODE((shelf / MODULE.LAYOUT_MARKER).stat().st_mode) == 0o644
+    assert stat.S_IMODE((shelf / MODULE.PROMOTION_LOCK).stat().st_mode) == 0o660
 
 
 def test_marker_or_pointer_inconsistency_fails_closed_without_legacy_fallback(tmp_path: Path) -> None:
@@ -869,7 +1032,9 @@ def test_missing_or_corrupt_generation_fails_closed(tmp_path: Path) -> None:
         generation_id="generation-a",
     )
     artifact = shelf / "generations" / "generation-a" / "files" / "chummer-test-installer.exe"
+    artifact.chmod(0o644)
     artifact.write_bytes(b"tampered")
+    artifact.chmod(MODULE.SEALED_FILE_MODE)
 
     with pytest.raises(MODULE.ReleaseShelfError, match="mismatch"):
         MODULE.resolve_shelf_root(shelf)
