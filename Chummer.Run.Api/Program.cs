@@ -6,6 +6,7 @@ using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.KarmaForge;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
