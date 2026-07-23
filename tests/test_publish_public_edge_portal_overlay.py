@@ -17,6 +17,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "publish_public_edge_portal_overlay.py"
 
 
+def test_script_starts_in_isolated_mode() -> None:
+    completed = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT), "--help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "usage:" in completed.stdout
+    assert "Traceback" not in completed.stderr
+
+
 def load_module():
     spec = importlib.util.spec_from_file_location("publish_public_edge_portal_overlay", SCRIPT)
     assert spec is not None and spec.loader is not None

@@ -38,7 +38,15 @@ try:
         StrictJsonContractError,
         strict_json_object,
     )
-except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
+    # Production executes this file directly with ``python3 -I``. Isolated
+    # mode omits both the repository root and the script directory from
+    # sys.path, so resolve sibling modules from this verified source tree.
+    script_directory = str(Path(__file__).resolve().parent)
+    if script_directory not in sys.path:
+        sys.path.insert(0, script_directory)
     from strict_json_contract import StrictJsonContractError, strict_json_object
 
 try:
@@ -48,7 +56,9 @@ try:
         validate_payload_modes,
         validate_payload_modes_against_receipt,
     )
-except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
     from public_edge_payload_modes import (
         PayloadModePolicyError,
         normalize_payload_modes,
