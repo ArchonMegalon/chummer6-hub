@@ -13,16 +13,18 @@ import copy
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
+import io
 import importlib.util
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import secrets
 import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from typing import Any
@@ -165,6 +167,7 @@ def atomic_private_write(path: Path, value: bytes, *, replace: bool) -> None:
         dir=path.parent,
     )
     temporary = Path(raw_temporary)
+    published = False
     try:
         os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "wb", closefd=True) as handle:
@@ -175,8 +178,18 @@ def atomic_private_write(path: Path, value: bytes, *, replace: bool) -> None:
             os.replace(temporary, path)
         else:
             os.link(temporary, path, follow_symlinks=False)
+        published = True
     finally:
         temporary.unlink(missing_ok=True)
+    if published:
+        descriptor = os.open(
+            path.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
 
 
 def write_private_json(path: Path, payload: dict[str, Any], *, replace: bool = False) -> None:
@@ -1123,6 +1136,177 @@ def _context_inventory(
     return rows, digest
 
 
+def _snapshot_git_context_entries(
+    source_root: Path,
+    source_head: str,
+    destination_root: Path,
+    *,
+    selected_entries: tuple[str, ...],
+    label: str,
+) -> dict[str, Any]:
+    """Materialize build bytes from the pinned Git object tree, never the worktree."""
+
+    if COMMIT.fullmatch(source_head) is None:
+        raise CutoverError(f"{label} source commit is invalid")
+    if (
+        not source_root.is_absolute()
+        or source_root.resolve(strict=True) != source_root
+        or source_root.is_symlink()
+        or not source_root.is_dir()
+    ):
+        raise CutoverError(f"{label} source root is unsafe")
+    for relative in selected_entries:
+        pure = PurePosixPath(relative)
+        if (
+            not relative
+            or pure.is_absolute()
+            or any(part in ("", ".", "..") for part in pure.parts)
+        ):
+            raise CutoverError(f"{label} selected path is unsafe")
+    try:
+        archived = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(source_root),
+                "archive",
+                "--format=tar",
+                source_head,
+                "--",
+                *selected_entries,
+            ],
+            env={
+                "PATH": "/usr/bin:/bin",
+                "LANG": "C",
+                "LC_ALL": "C",
+                "GIT_NO_REPLACE_OBJECTS": "1",
+            },
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=300,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CutoverError(
+            f"{label} could not be materialized from the source commit"
+        ) from exc
+
+    destination_root.mkdir(mode=0o700)
+    seen: dict[str, str] = {}
+    try:
+        with tarfile.open(fileobj=io.BytesIO(archived), mode="r:") as archive:
+            members = archive.getmembers()
+            for member in members:
+                pure = PurePosixPath(member.name)
+                relative = pure.as_posix()
+                if (
+                    not relative
+                    or pure.is_absolute()
+                    or any(part in ("", ".", "..") for part in pure.parts)
+                    or relative in seen
+                ):
+                    raise CutoverError(f"{label} Git archive path is unsafe")
+                if member.isdir():
+                    seen[relative] = "directory"
+                elif member.isfile():
+                    seen[relative] = "file"
+                else:
+                    raise CutoverError(
+                        f"{label} Git archive contains a non-regular entry: "
+                        f"{relative}"
+                    )
+            for selected in selected_entries:
+                if not any(
+                    path == selected or path.startswith(f"{selected}/")
+                    for path in seen
+                ):
+                    raise CutoverError(
+                        f"{label} selected path is absent from the source commit: "
+                        f"{selected}"
+                    )
+            for member in sorted(
+                members,
+                key=lambda item: (
+                    len(PurePosixPath(item.name).parts),
+                    item.name,
+                ),
+            ):
+                relative = PurePosixPath(member.name)
+                destination = destination_root.joinpath(*relative.parts)
+                if member.isdir():
+                    destination.mkdir(parents=True, exist_ok=True, mode=0o700)
+                    if (
+                        destination.is_symlink()
+                        or not destination.is_dir()
+                    ):
+                        raise CutoverError(
+                            f"{label} Git archive directory collided"
+                        )
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    raise CutoverError(f"{label} Git archive file is unreadable")
+                raw = extracted.read(member.size + 1)
+                if len(raw) != member.size:
+                    raise CutoverError(f"{label} Git archive file size changed")
+                descriptor = os.open(
+                    destination,
+                    os.O_WRONLY
+                    | os.O_CREAT
+                    | os.O_EXCL
+                    | getattr(os, "O_CLOEXEC", 0)
+                    | getattr(os, "O_NOFOLLOW", 0),
+                    0o600,
+                )
+                try:
+                    view = memoryview(raw)
+                    while view:
+                        written = os.write(descriptor, view)
+                        if written <= 0:
+                            raise CutoverError(
+                                f"{label} Git snapshot write made no progress"
+                            )
+                        view = view[written:]
+                    os.fchmod(
+                        descriptor,
+                        0o755 if member.mode & 0o111 else 0o644,
+                    )
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+    except (tarfile.TarError, OSError) as exc:
+        raise CutoverError(f"{label} Git archive is malformed") from exc
+
+    directories = [
+        path
+        for path in destination_root.rglob("*")
+        if path.is_dir() and not path.is_symlink()
+    ]
+    for directory in sorted(
+        directories,
+        key=lambda path: len(path.relative_to(destination_root).parts),
+        reverse=True,
+    ):
+        directory.chmod(0o755)
+    destination_root.chmod(0o755)
+    rows, digest = _context_inventory(
+        destination_root,
+        label=f"{label} Git snapshot",
+    )
+    return {
+        "sourceRoot": str(source_root),
+        "sourceCommit": source_head,
+        "sourceKind": "git-object-tree",
+        "snapshotRoot": str(destination_root),
+        "algorithm": "sha256-canonical-file-inventory-v1",
+        "digest": digest,
+        "fileCount": len(rows),
+        "files": rows,
+    }
+
+
 def prepare_immutable_build_contexts(
     config: Config,
     receipt_dir: Path,
@@ -1186,12 +1370,25 @@ def prepare_immutable_build_contexts(
     receipts: dict[str, Any] = {}
     for name, source, selected, label in definitions:
         destination = snapshots_root / name
-        receipt = _snapshot_context_entries(
-            source,
-            destination,
-            selected_entries=selected,
-            label=label,
-        )
+        if source == config.source_root:
+            if selected is None:
+                raise CutoverError(
+                    f"{label} requires an explicit Git object-tree closure"
+                )
+            receipt = _snapshot_git_context_entries(
+                source,
+                config.source_head,
+                destination,
+                selected_entries=selected,
+                label=label,
+            )
+        else:
+            receipt = _snapshot_context_entries(
+                source,
+                destination,
+                selected_entries=selected,
+                label=label,
+            )
         contexts[name] = destination
         digests[name] = str(receipt["digest"])
         receipts[name] = receipt

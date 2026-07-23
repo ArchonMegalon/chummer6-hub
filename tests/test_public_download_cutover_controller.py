@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -227,6 +228,58 @@ def test_context_inventory_binds_modes_empty_directories_and_rejects_symlink_dir
     symlink.symlink_to(empty, target_is_directory=True)
     with pytest.raises(controller.CutoverError, match="symbolic link"):
         controller._snapshot_inventory(root, label="test context")
+
+
+def test_git_build_context_uses_commit_bytes_when_worktree_is_dirty(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    selected = source / "Chummer.Run.Api"
+    selected.mkdir(parents=True)
+    payload = selected / "Program.cs"
+    payload.write_text("committed source\n", encoding="utf-8")
+    subprocess.run(
+        ["/usr/bin/git", "init", "--quiet", str(source)],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "config", "user.name", "Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "add", "Chummer.Run.Api/Program.cs"],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "commit", "--quiet", "-m", "fixture"],
+        check=True,
+    )
+    head = subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "rev-parse", "HEAD"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+    payload.write_text("dirty adversarial source\n", encoding="utf-8")
+    destination = tmp_path / "snapshot"
+
+    receipt = controller._snapshot_git_context_entries(
+        source,
+        head,
+        destination,
+        selected_entries=("Chummer.Run.Api",),
+        label="test source context",
+    )
+
+    assert (destination / "Chummer.Run.Api" / "Program.cs").read_text(
+        encoding="utf-8"
+    ) == "committed source\n"
+    assert receipt["sourceCommit"] == head
+    assert receipt["sourceKind"] == "git-object-tree"
 
 
 def test_warm_start_validation_failure_reconciles_exact_created_name(
@@ -488,7 +541,9 @@ def test_promotion_lease_avoids_nested_lock_and_is_shelf_bound(
     prepared = tmp_path / "prepared"
     prepared_generation = prepared / generation.GENERATIONS_DIRECTORY / "g-test"
     prepared_generation.mkdir(parents=True)
-    (prepared / generation.CURRENT_POINTER).write_text("{}\n", encoding="utf-8")
+    prepared_pointer = prepared / generation.CURRENT_POINTER
+    prepared_pointer.write_text("{}\n", encoding="utf-8")
+    prepared_pointer.chmod(generation.PUBLIC_METADATA_FILE_MODE)
 
     monkeypatch.setattr(
         generation,
@@ -509,7 +564,7 @@ def test_promotion_lease_avoids_nested_lock_and_is_shelf_bound(
     with generation.promotion_lock(shelf) as lease:
         assert stat.S_IMODE(
             (shelf / generation.PROMOTION_LOCK).stat().st_mode
-        ) == 0o600
+        ) == generation.SHARED_CONTROL_FILE_MODE
         assert (shelf / generation.PROMOTION_LOCK).stat().st_uid == os.getuid()
         pointer = generation.activate_prepared_filesystem(
             prepared,
