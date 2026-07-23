@@ -806,8 +806,9 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
   PUBLIC_DOWNLOAD_CONTROLLER="$SOURCE_ROOT/scripts/deploy_public_download_only_cutover.py"
   PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY-}"
   PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256-}"
-  PUBLIC_DOWNLOAD_CERTIFICATE_INPUT="${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE-}"
-  PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT="${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID-}"
   if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
     || ! -O "$PUBLIC_DOWNLOAD_CONTROLLER" \
     || "$("$TRUSTED_STAT" -c '%h' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" != 1 ]]; then
@@ -818,6 +819,53 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     || [[ ! "$public_download_controller_mode" =~ ^[0-7]{3,4}$ ]] \
     || (( (8#$public_download_controller_mode & 8#022) != 0 )); then
     echo "audited public-download cutover controller is group- or world-writable" >&2
+    exit 2
+  fi
+  if [[ ! "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ \
+    || ! "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID" \
+      =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    echo "public-download Cloudflare account and tunnel identifiers are invalid" >&2
+    exit 2
+  fi
+  if [[ "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" != /* \
+    || "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" == *$'\n'* \
+    || "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" == *'|'* ]]; then
+    echo "public-download Cloudflare credentials file path is required" >&2
+    exit 2
+  fi
+  if ! PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS="$(
+    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT"
+  )" \
+    || [[ "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+      != "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" ]]; then
+    echo "public-download Cloudflare credentials file must use an exact canonical path" >&2
+    exit 2
+  fi
+  if [[ ! -f "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || -L "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || ! -O "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || ! -r "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || "$("$TRUSTED_STAT" -c '%h' -- \
+      "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS")" != 1 ]]; then
+    echo "public-download Cloudflare credentials file metadata is unsafe" >&2
+    exit 2
+  fi
+  if ! public_download_cloudflare_credentials_mode="$(
+    "$TRUSTED_STAT" -c '%a' -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+  )" \
+    || [[ ! "$public_download_cloudflare_credentials_mode" \
+      =~ ^[0-7]{3,4}$ ]] \
+    || (( (8#$public_download_cloudflare_credentials_mode & 8#077) != 0 )); then
+    echo "public-download Cloudflare credentials file must be owner-only" >&2
+    exit 2
+  fi
+  if ! public_download_cloudflare_credentials_size="$(
+    "$TRUSTED_STAT" -c '%s' -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+  )" \
+    || [[ ! "$public_download_cloudflare_credentials_size" =~ ^[0-9]+$ ]] \
+    || ((public_download_cloudflare_credentials_size < 1 \
+      || public_download_cloudflare_credentials_size > 65536)); then
+    echo "public-download Cloudflare credentials file size is invalid" >&2
     exit 2
   fi
   if ((RECOVERY_ROUTE_REQUESTED == 0)); then
@@ -836,27 +884,8 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
       echo "public-download migration authority must be an exact canonical path" >&2
       exit 2
     fi
-    if [[ "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" != /* \
-      || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" != /* ]]; then
-      echo "public-download runtime requires exact certificate and password-file paths" >&2
-      exit 2
-    fi
-    if ! PUBLIC_DOWNLOAD_CERTIFICATE="$(
-      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
-    )" \
-      || ! PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$(
-        "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
-      )" \
-      || [[ "$PUBLIC_DOWNLOAD_CERTIFICATE" != "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" \
-        || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD" \
-          != "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" ]]; then
-      echo "public-download certificate inputs must be exact canonical paths" >&2
-      exit 2
-    fi
   else
     PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
-    PUBLIC_DOWNLOAD_CERTIFICATE="$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
-    PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
   fi
   if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
     || (-e "$CANONICAL_DOCKER_CONFIG_ROOT" \
@@ -890,8 +919,6 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     --projection-manifest-sha256 "$PUBLIC_PROJECTION_MANIFEST_SHA256"
     --runtime-proof-source "$RUNTIME_PROOF_BIND_SOURCE"
     --runtime-proof-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
-    --certificate-file "$PUBLIC_DOWNLOAD_CERTIFICATE"
-    --certificate-password-file "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD"
     --overlay-root "$OVERLAY_ROOT"
     --overlay-staging-root "$OVERLAY_STAGING_ROOT"
     --overlay-backup-root "$OVERLAY_BACKUP_ROOT"
@@ -900,6 +927,9 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY"
     --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT"
     --env-file "$ENV_FILE"
+    --cloudflare-credentials-file "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+    --cloudflare-account-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID"
+    --cloudflare-tunnel-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID"
     --receipt-root "$CANONICAL_DEPLOY_RECEIPT_ROOT"
     --base-url "$BASE_URL"
     --build-context "$BUILD_CONTEXT"
