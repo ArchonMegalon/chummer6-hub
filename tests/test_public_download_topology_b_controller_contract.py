@@ -127,6 +127,7 @@ def topology_b_config(tmp_path: Path) -> SimpleNamespace:
         cloudflare_rollback_evidence=(
             operation_root / "cloudflare-rolled-back.json"
         ),
+        base_url="https://chummer.run",
     )
 
 
@@ -225,10 +226,18 @@ class RecordingActions:
         return self.record(f"probe_{scope}_{','.join(hosts)}")
 
     def probe_public_incumbent(
-        self, _config: Any, *, phase: str, **_kwargs: Any
+        self,
+        _config: Any,
+        *,
+        phase: str,
+        hosts: tuple[str, ...],
+        **_kwargs: Any,
     ) -> dict[str, Any]:
         assert phase in {"before-cloudflare", "after-rollback"}
-        return self.record(f"probe_incumbent_{phase}")
+        assert hosts == HOSTS
+        return self.record(
+            f"probe_incumbent_{phase}_{','.join(hosts)}"
+        )
 
     def capture_cloudflare(self, _config: Any, *_args: Any) -> dict[str, Any]:
         return self.record("cloudflare_capture")
@@ -266,7 +275,7 @@ SUCCESS_EVENTS = [
     "start_sidecar",
     "sidecar_healthy",
     "probe_local_chummer.run,www.chummer.run",
-    "probe_incumbent_before-cloudflare",
+    "probe_incumbent_before-cloudflare_chummer.run,www.chummer.run",
     "cloudflare_capture",
     "cloudflare_apply",
     "probe_public_chummer.run,www.chummer.run",
@@ -279,10 +288,20 @@ def test_topology_b_surface_and_dispatch_replace_topology_a() -> None:
     require_topology_b_surface()
     execute = function_node("execute")
     calls = call_leaf_names(execute)
-    assert "execute_topology_b" in calls
-    assert "_retired_topology_a_execute" not in calls
-    assert "migrate_shelf" not in calls
-    assert "run_recovery" not in calls
+    assert calls == {"execute_topology_b"}
+
+    parse_args = function_node("parse_args")
+    parse_calls = call_leaf_names(parse_args)
+    assert "SidecarConfig" in parse_calls
+    assert "Config" not in parse_calls
+    assert "_retired_topology_a_parse_args" not in parse_calls
+
+    main = function_node("main")
+    main_calls = call_leaf_names(main)
+    assert "parse_args" in main_calls
+    assert "execute" in main_calls
+    assert "_retired_topology_a_parse_args" not in main_calls
+    assert "_retired_topology_a_execute" not in main_calls
 
 
 def test_topology_b_functions_contain_no_incumbent_or_canonical_mutation_calls() -> None:
@@ -339,6 +358,7 @@ def test_execute_failure_after_cf_apply_rolls_back_before_exact_cleanup(
 ) -> None:
     require_topology_b_surface()
     config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
     actions = RecordingActions(
         fail_at="probe_public_chummer.run,www.chummer.run"
     )
@@ -346,10 +366,12 @@ def test_execute_failure_after_cf_apply_rolls_back_before_exact_cleanup(
     with pytest.raises(controller.CutoverError):
         controller.execute_topology_b(config, actions=actions)
 
-    assert actions.events[-2:] == ["cloudflare_rollback", "cleanup_sidecar"]
-    assert actions.events.index("cloudflare_rollback") < actions.events.index(
-        "cleanup_sidecar"
-    )
+    assert actions.events[-3:] == [
+        "cloudflare_rollback",
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run",
+        "cleanup_sidecar",
+    ]
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
 def test_execute_retains_sidecar_when_cf_rollback_is_uncertain(
@@ -357,6 +379,7 @@ def test_execute_retains_sidecar_when_cf_rollback_is_uncertain(
 ) -> None:
     require_topology_b_surface()
     config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
     actions = RecordingActions(
         fail_at="probe_public_chummer.run,www.chummer.run"
     )
@@ -374,7 +397,46 @@ def test_execute_retains_sidecar_when_cf_rollback_is_uncertain(
         controller.execute_topology_b(config, actions=actions)
 
     assert "cloudflare_rollback" in actions.events
+    assert (
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run"
+        not in actions.events
+    )
     assert "cleanup_sidecar" not in actions.events
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
+
+
+def test_execute_retains_sidecar_when_incumbent_reprobe_is_uncertain(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
+    actions = RecordingActions()
+    original_record = actions.record
+    failed_events = {
+        "probe_public_chummer.run,www.chummer.run",
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run",
+    }
+
+    def fail_public_and_incumbent(
+        event: str, result: Any = None
+    ) -> Any:
+        if event in failed_events:
+            actions.events.append(event)
+            raise RuntimeError(f"forced failure at {event}")
+        return original_record(event, result)
+
+    actions.record = fail_public_and_incumbent  # type: ignore[method-assign]
+
+    with pytest.raises(controller.RecoveryUncertain):
+        controller.execute_topology_b(config, actions=actions)
+
+    assert actions.events[-2:] == [
+        "cloudflare_rollback",
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run",
+    ]
+    assert "cleanup_sidecar" not in actions.events
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
 def test_execute_does_not_rollback_a_committed_route_on_receipt_crash(
@@ -382,6 +444,7 @@ def test_execute_does_not_rollback_a_committed_route_on_receipt_crash(
 ) -> None:
     require_topology_b_surface()
     config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
     actions = RecordingActions(fail_at="write_active_receipt")
 
     with pytest.raises(controller.RecoveryUncertain):
@@ -390,6 +453,7 @@ def test_execute_does_not_rollback_a_committed_route_on_receipt_crash(
     assert "cloudflare_commit" in actions.events
     assert "cloudflare_rollback" not in actions.events
     assert "cleanup_sidecar" not in actions.events
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
 def test_recovery_rolls_back_cf_then_probes_incumbent_then_cleans_sidecar(
@@ -397,6 +461,7 @@ def test_recovery_rolls_back_cf_then_probes_incumbent_then_cleans_sidecar(
 ) -> None:
     require_topology_b_surface()
     config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
     actions = RecordingActions(recovery_disposition="rollback")
 
     controller.recover_topology_b(config, actions=actions)
@@ -404,9 +469,10 @@ def test_recovery_rolls_back_cf_then_probes_incumbent_then_cleans_sidecar(
     assert actions.events == [
         "classify_recovery_rollback",
         "cloudflare_rollback",
-        "probe_incumbent_after-rollback",
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run",
         "cleanup_sidecar",
     ]
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
 def test_recovery_reconciles_committed_route_without_cleanup(
@@ -414,6 +480,7 @@ def test_recovery_reconciles_committed_route_without_cleanup(
 ) -> None:
     require_topology_b_surface()
     config = topology_b_config(tmp_path)
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
     actions = RecordingActions(recovery_disposition="committed")
 
     controller.recover_topology_b(config, actions=actions)
@@ -422,6 +489,113 @@ def test_recovery_reconciles_committed_route_without_cleanup(
         "classify_recovery_committed",
         "reconcile_committed",
     ]
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
+
+
+def test_incumbent_baseline_and_rollback_cover_both_public_hosts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    observed_requests: list[tuple[str, str]] = []
+    drift_www = False
+
+    def fake_http_bytes(**kwargs: Any) -> tuple[int, dict[str, str], bytes]:
+        nonlocal drift_www
+        host = kwargs["request_host"]
+        path = kwargs["path"]
+        assert kwargs["scheme"] == "https"
+        assert kwargs["connect_host"] == host
+        assert host in HOSTS
+        observed_requests.append((host, path))
+        body = f"{host}:{path}".encode("utf-8")
+        if drift_www and host == "www.chummer.run":
+            body += b":drift"
+        return 200, {}, body
+
+    monkeypatch.setattr(controller, "_http_bytes", fake_http_bytes)
+
+    baseline = controller.probe_public_incumbent(config)
+
+    assert tuple(baseline) == HOSTS
+    assert all(
+        tuple(baseline[host])
+        == (
+            "/downloads/RELEASE_CHANNEL.generated.json",
+            "/downloads/releases.json",
+        )
+        for host in HOSTS
+    )
+    controller.probe_public_incumbent(config, expected=baseline)
+    assert {host for host, _path in observed_requests} == set(HOSTS)
+
+    drift_www = True
+    with pytest.raises(controller.CutoverError):
+        controller.probe_public_incumbent(config, expected=baseline)
+
+
+class FakeDataProtectionRunner:
+    def __init__(self, *, fail_first_request: bool = False) -> None:
+        self.fail_first_request = fail_first_request
+        self.calls: list[str] = []
+
+    def run(self, command: list[str], **_kwargs: Any) -> bytes:
+        operation = command[1]
+        self.calls.append(operation)
+        if operation == "req":
+            if self.fail_first_request:
+                self.fail_first_request = False
+                raise controller.CutoverError("simulated crash before certificate")
+            Path(command[command.index("-keyout") + 1]).write_bytes(
+                b"fake-private-key"
+            )
+            Path(command[command.index("-out") + 1]).write_bytes(
+                b"fake-certificate"
+            )
+            return b""
+        if operation == "pkcs12":
+            password_argument = command[command.index("-passout") + 1]
+            assert password_argument.startswith("file:")
+            password = Path(password_argument.removeprefix("file:")).read_bytes()
+            Path(command[command.index("-out") + 1]).write_bytes(
+                b"fake-pkcs12:" + password
+            )
+            return b""
+        raise AssertionError(f"unexpected fake OpenSSL operation: {operation}")
+
+
+def test_fresh_data_protection_generation_recovers_and_replays_exactly(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    operation_root = tmp_path / "chummer-public-download-dp-retry"
+    operation_root.mkdir(mode=0o700)
+    config = SimpleNamespace(
+        operation_root=operation_root,
+        sidecar_certificate=operation_root / "sidecar-data-protection.pfx",
+        sidecar_certificate_password=(
+            operation_root / "sidecar-data-protection.password"
+        ),
+    )
+    runner = FakeDataProtectionRunner(fail_first_request=True)
+
+    with pytest.raises(controller.CutoverError):
+        controller.generate_sidecar_data_protection(config, runner)
+
+    assert config.sidecar_certificate_password.exists()
+    assert not config.sidecar_certificate.exists()
+
+    first = controller.generate_sidecar_data_protection(config, runner)
+    certificate = config.sidecar_certificate.read_bytes()
+    password = config.sidecar_certificate_password.read_bytes()
+    replay = controller.generate_sidecar_data_protection(config, runner)
+
+    assert replay == first
+    assert config.sidecar_certificate.read_bytes() == certificate
+    assert config.sidecar_certificate_password.read_bytes() == password
+    assert first["certificateSha256"] == hashlib.sha256(certificate).hexdigest()
+    assert first["passwordSha256"] == hashlib.sha256(password).hexdigest()
 
 
 def write_candidate(root: Path) -> Path:
