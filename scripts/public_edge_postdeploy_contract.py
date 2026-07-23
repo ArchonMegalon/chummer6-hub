@@ -1,11 +1,39 @@
 from __future__ import annotations
 
+import hashlib
+import os
+from pathlib import Path
 import re
+import stat
+import sys
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlparse
 
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+try:
+    from scripts.strict_json_contract import (
+        StrictJsonContractError,
+        canonical_json_bytes,
+        strict_json_object,
+    )
+except ModuleNotFoundError:
+    from strict_json_contract import (
+        StrictJsonContractError,
+        canonical_json_bytes,
+        strict_json_object,
+    )
 
 PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = "chummer.public_edge_postdeploy_gate.v1"
+PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME = (
+    "chummer.public_edge_postdeploy_gate.schema.v1"
+)
+PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH = (
+    Path(__file__).resolve().parent
+    / "public_edge_postdeploy_gate.v1.schema.json"
+)
 PUBLIC_EDGE_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
     "/manifest.gm.webmanifest",
@@ -22,6 +50,68 @@ PUBLIC_EDGE_V2_ARTIFACT_CONTRACTS = {
     "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_install_boundary.v2",
     "frontdoorNavigationAnchorArtifactContract": "chummer.frontdoor_mobile_anchor_redirect.v2",
 }
+PUBLIC_EDGE_SECRET_KEY_STEMS = (
+    "accesskey",
+    "accountkey",
+    "apikey",
+    "authorization",
+    "bearertoken",
+    "clientsecret",
+    "connstr",
+    "connectionstring",
+    "connectionuri",
+    "connectionurl",
+    "credential",
+    "databaseurl",
+    "dsn",
+    "password",
+    "passwd",
+    "privatekey",
+    "pwd",
+    "secret",
+    "sharedaccesssignature",
+    "token",
+)
+PUBLIC_EDGE_SECRET_KEY_SHORT_WORDS = frozenset(
+    {
+        "connstr",
+        "dsn",
+        "dsns",
+        "pwd",
+        "pwds",
+        "sas",
+    }
+)
+PUBLIC_EDGE_SAFE_SECRET_BOOLEAN_SUFFIXES = frozenset(
+    {
+        "absent",
+        "configured",
+        "exposed",
+        "leaked",
+        "matches",
+        "performed",
+        "present",
+        "redacted",
+        "required",
+        "stored",
+        "valid",
+    }
+)
+PUBLIC_EDGE_SAFE_SECRET_INTEGER_SUFFIXES = frozenset(
+    {
+        "count",
+        "device",
+        "inode",
+        "mtimens",
+    }
+)
+PUBLIC_EDGE_SAFE_SECRET_DIGEST_SUFFIXES = frozenset(
+    {
+        "digest",
+        "hash",
+        "sha256",
+    }
+)
 _PRIVATE_IDENTITY_KEYS = {"sessionid", "deviceid"}
 _PRIVATE_IDENTITY_ASSIGNMENT = re.compile(
     r"(?i)((?:[?&]|\b)(?:sessionId|deviceId)[\"']?\s*[:=]\s*[\"']?)([^&#,}\s\"']*)"
@@ -201,6 +291,233 @@ PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS = {
     "frontdoorNavigationAnchorDeviceContextPresent",
     "frontdoorNavigationAnchorFailure",
 }
+
+
+def load_exact_public_edge_postdeploy_schema(
+    path: Path = PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH,
+) -> dict[str, Any]:
+    normalized = Path(os.path.abspath(path))
+    if path != normalized or not path.is_absolute():
+        raise RuntimeError(
+            "public-edge postdeploy schema path is not exact and absolute"
+        )
+    metadata = normalized.lstat()
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_size <= 0
+        or metadata.st_size > 1024 * 1024
+    ):
+        raise RuntimeError(
+            "public-edge postdeploy schema is not a safe regular file"
+        )
+    descriptor = os.open(
+        normalized,
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > 1024 * 1024:
+                raise RuntimeError(
+                    "public-edge postdeploy schema is oversized"
+                )
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    path_after = normalized.lstat()
+    identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+        before.st_nlink,
+    )
+    if (
+        identity
+        != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_nlink,
+        )
+        or identity
+        != (
+            path_after.st_dev,
+            path_after.st_ino,
+            path_after.st_size,
+            path_after.st_mtime_ns,
+            path_after.st_ctime_ns,
+            path_after.st_nlink,
+        )
+        or total != before.st_size
+    ):
+        raise RuntimeError(
+            "public-edge postdeploy schema changed while being read"
+        )
+    raw = b"".join(chunks)
+    try:
+        schema = strict_json_object(
+            raw,
+            label="public-edge postdeploy schema",
+        )
+        canonical = canonical_json_bytes(
+            schema,
+            label="public-edge postdeploy schema",
+        )
+    except StrictJsonContractError as exc:
+        raise RuntimeError(
+            "public-edge postdeploy schema is not strict canonical JSON"
+        ) from exc
+    if raw != canonical:
+        raise RuntimeError(
+            "public-edge postdeploy schema is not strict canonical JSON"
+        )
+    expected_top_level_keys = {
+        "$id",
+        "$schema",
+        "additionalProperties",
+        "maxProperties",
+        "minProperties",
+        "patternProperties",
+        "properties",
+        "propertyNames",
+        "type",
+        "x-chummer-receipt-contract",
+        "x-chummer-schema-contract",
+    }
+    property_names = schema.get("propertyNames")
+    fields = (
+        property_names.get("enum")
+        if isinstance(property_names, dict)
+        else None
+    )
+    expected_properties = {
+        "childReceipts": {
+            "additionalProperties": False,
+            "maxProperties": 0,
+            "type": "object",
+        },
+        "contractName": {
+            "const": PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+        },
+        "schemaContractName": {
+            "const": PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        },
+        "schemaSha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string",
+        },
+        "status": {"enum": ["fail", "pass"]},
+    }
+    if (
+        set(schema) != expected_top_level_keys
+        or schema.get("$id")
+        != "urn:chummer:public-edge-postdeploy-gate:schema:v1"
+        or schema.get("$schema")
+        != "https://json-schema.org/draft/2020-12/schema"
+        or schema.get("type") != "object"
+        or schema.get("additionalProperties") is not False
+        or schema.get("patternProperties")
+        != {"^[A-Za-z][A-Za-z0-9]*$": {}}
+        or schema.get("properties") != expected_properties
+        or schema.get("x-chummer-receipt-contract")
+        != PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME
+        or schema.get("x-chummer-schema-contract")
+        != PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+        or not isinstance(fields, list)
+        or not fields
+        or fields != sorted(fields)
+        or len(fields) != len(set(fields))
+        or any(
+            not isinstance(field, str)
+            or re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", field) is None
+            for field in fields
+        )
+        or schema.get("minProperties") != len(fields)
+        or schema.get("maxProperties") != len(fields)
+        or not {
+            "contractName",
+            "failures",
+            "generatedAtUtc",
+            "schemaContractName",
+            "schemaSha256",
+            "status",
+        }.issubset(fields)
+    ):
+        raise RuntimeError(
+            "public-edge postdeploy schema contract is invalid"
+        )
+    return {
+        "contractName": PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        "fields": frozenset(fields),
+        "path": normalized,
+        "receiptContractName": PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def public_edge_receipt_key_parts(value: Any) -> tuple[str, ...]:
+    words = re.sub(
+        r"([a-z0-9])([A-Z])",
+        r"\1_\2",
+        str(value),
+    )
+    words = re.sub(r"[^A-Za-z0-9]+", "_", words).strip("_").lower()
+    return tuple(part for part in words.split("_") if part)
+
+
+def public_edge_secret_like_key(value: Any) -> bool:
+    parts = public_edge_receipt_key_parts(value)
+    if not parts:
+        return False
+    collapsed = "".join(parts)
+    return bool(
+        any(stem in collapsed for stem in PUBLIC_EDGE_SECRET_KEY_STEMS)
+        or any(part in PUBLIC_EDGE_SECRET_KEY_SHORT_WORDS for part in parts)
+    )
+
+
+def public_edge_safe_secret_metadata_value(key: Any, value: Any) -> bool:
+    parts = public_edge_receipt_key_parts(key)
+    if not parts or not public_edge_secret_like_key(key):
+        return False
+    suffix = parts[-1]
+    if suffix in PUBLIC_EDGE_SAFE_SECRET_BOOLEAN_SUFFIXES:
+        return type(value) is bool
+    if suffix in PUBLIC_EDGE_SAFE_SECRET_INTEGER_SUFFIXES:
+        return type(value) is int and value >= 0
+    if suffix in PUBLIC_EDGE_SAFE_SECRET_DIGEST_SUFFIXES:
+        return bool(
+            isinstance(value, str)
+            and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+        )
+    if str(key).startswith("/run/chummer-secrets/"):
+        return bool(
+            isinstance(value, str)
+            and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+        )
+    return False
+
+
+def public_edge_forbidden_secret_key(key: Any, value: Any) -> bool:
+    return bool(
+        public_edge_secret_like_key(key)
+        and not public_edge_safe_secret_metadata_value(key, value)
+    )
 
 
 def receipt_contract(payload: dict[str, Any]) -> str:
@@ -557,6 +874,7 @@ def normalize_public_edge_postdeploy_payload(payload: dict[str, Any] | None) -> 
     if private_identity_was_raw:
         normalized["privateIdentityWasRaw"] = True
     child_receipts = normalized.get("childReceipts")
+    normalized["childReceipts"] = {}
     if not isinstance(child_receipts, dict):
         return normalized
 

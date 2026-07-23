@@ -23,9 +23,12 @@ CANDIDATE_PORTAL_IMAGE_ID = "sha256:" + "2" * 64
 MISMATCH_PORTAL_IMAGE_ID = "sha256:" + "3" * 64
 PRIOR_TOOL_IMAGE_ID = "sha256:" + "4" * 64
 PRIOR_TUNNEL_IMAGE_ID = "sha256:" + "5" * 64
+CANDIDATE_TOOL_IMAGE_ID = "sha256:" + "6" * 64
 PRIOR_PORTAL_CONTAINER_ID = "a" * 64
 CANDIDATE_PORTAL_CONTAINER_ID = "b" * 64
 PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
+POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
+ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
 
 
 def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
@@ -119,7 +122,11 @@ def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
 def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for forbidden_name in (
         "BASH_ENV",
+        "BASHOPTS",
+        "BASH_XTRACEFD",
         "ENV",
+        "PS4",
+        "SHELLOPTS",
         "CDPATH",
         "GLOBIGNORE",
         "LD_PRELOAD",
@@ -146,18 +153,38 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "#!/bin/sh\n"
         "set -eu\n"
         "if [ -n \"${FAKE_TRUSTED_PYTHON_LOG:-}\" ]; then printf '%s\\n' \"$*\" >> \"$FAKE_TRUSTED_PYTHON_LOG\"; fi\n"
+        "arg_value() { key=\"$1\"; shift; while [ \"$#\" -gt 0 ]; do if [ \"$1\" = \"$key\" ]; then shift; [ \"$#\" -gt 0 ] || return 1; printf '%s' \"$1\"; return 0; fi; shift; done; return 1; }\n"
         "case \"$*\" in\n"
         "  *verify_public_edge_deploy_authority.py*) exit \"${FAKE_AUTHORITY_EXIT:-0}\";;\n"
         "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
+        "  *verify_install_linking_cutover_boundary.py*\"--expected-phase public_acceptance_completed\"*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_FINAL_VERIFICATION_JSON\"; exit 0;;\n"
+        "  *verify_install_linking_cutover_boundary.py*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_BOUNDARY_VERIFICATION_JSON\"; exit \"${FAKE_INSTALL_LINKING_BOUNDARY_VERIFY_EXIT:-0}\";;\n"
+        "  *run_install_linking_postgres_cutover.py*\"--post-quiesce-reproof\"*) output=\"$(arg_value --output \"$@\")\"; attempt=\"$(arg_value --reproof-attempt-id \"$@\")\"; inventory=\"$(arg_value --volume-inventory-receipt \"$@\")\"; expected_inventory_sha256=\"$(arg_value --expected-volume-inventory-sha256 \"$@\")\"; actual_inventory_sha256=\"$(/usr/bin/sha256sum -- \"$inventory\" | /usr/bin/awk '{print $1}')\"; [ \"$actual_inventory_sha256\" = \"$expected_inventory_sha256\" ] || exit 84; reproof_exit=\"${FAKE_POSTQUIESCE_EXIT:-}\"; reproof_mode=\"${FAKE_POSTQUIESCE_MODE:-}\"; if [ -z \"$reproof_mode\" ]; then if [ -z \"$reproof_exit\" ] || [ \"$reproof_exit\" = 0 ]; then reproof_mode=pass; else reproof_mode=unknown; fi; fi; case \"$reproof_mode\" in sigkill) /usr/bin/kill -KILL \"$$\";; missing) exit \"${reproof_exit:-1}\";; malformed) printf '%s\\n' '{malformed' > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"${reproof_exit:-1}\";; safe_fail) reproof_status=fail; start_intent=false; start_may=false; reproof_exit=\"${reproof_exit:-1}\";; pass) reproof_status=pass; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-0}\"; printf '%s\\n' \"$attempt\" > \"$FAKE_POSTQUIESCE_COMPLETED_STATE\";; oom) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-137}\";; unknown) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-70}\";; *) exit 85;; esac; printf '{\"containerStartMayHaveBeenInvoked\":%s,\"mode\":\"%s\",\"reason\":\"%s\",\"startIntentWritten\":%s,\"status\":\"%s\"}\\n' \"$start_may\" \"$reproof_mode\" \"${FAKE_POSTQUIESCE_REASON:-none}\" \"$start_intent\" \"$reproof_status\" > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"$reproof_exit\";;\n"
+        "  *materialize_install_linking_cutover_boundary.py*\"--phase public_acceptance_completed\"*) /usr/bin/cp \"$FAKE_INSTALL_LINKING_FINAL_BOUNDARY\" \"$(arg_value --output \"$@\")\"; /usr/bin/chmod 0600 \"$(arg_value --output \"$@\")\"; exit \"${FAKE_INSTALL_LINKING_MATERIALIZER_EXIT:-0}\";;\n"
         "  *verify_public_projection.py*) exec /usr/bin/python3 \"$@\";;\n"
         "  *verify_public_edge_postdeploy_gate.py*) exec /usr/bin/python3 \"$@\";;\n"
         "  *chummer.public_projection_current/v1*) exec /usr/bin/python3 \"$@\";;\n"
         "  *validate_public_edge_compose_runtime.py*) /usr/bin/cat >/dev/null; exit 0;;\n"
         "  *secrets.token_hex*|*hmac.compare_digest*) exec /usr/bin/python3 \"$@\";;\n"
         "  *matches\\ =\\ \\[\\]*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking verified boundary binding parser\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking candidate build-source provenance parser\"*) printf '%s|%s|%s|%s' \"$FAKE_HUB_REGISTRY_HEAD\" \"$FAKE_DESIGN_PRODUCT_HEAD\" \"$FAKE_FLEET_MEDIA_FACTORY_HEAD\" \"$FAKE_BUILD_CONTEXT_DOCKERIGNORE_SHA256\"; exit 0;;\n"
+        "  *\"InstallLinking state-volume consumer ID parser\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking state-volume consumer parser\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking state-volume inventory publisher\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking state-volume inventory transition verifier\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking live runtime authority readiness publisher\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"Public-edge private snapshot publisher\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking stable private receipt hasher\"*) if [ \"${FAKE_STABLE_HASH_FAIL_ONCE:-0}\" = 1 ] && [ ! -e \"$FAKE_STABLE_HASH_STATE\" ]; then /usr/bin/touch \"$FAKE_STABLE_HASH_STATE\"; exit 83; fi; exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking public acceptance evidence publisher\"*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"InstallLinking post-quiesce attempt receipt classifier\"*) receipt=\"$5\"; [ -f \"$receipt\" ] || exit 86; reproof_mode=\"${FAKE_POSTQUIESCE_MODE:-}\"; reproof_exit=\"${FAKE_POSTQUIESCE_EXIT:-}\"; if [ -z \"$reproof_mode\" ]; then if [ -z \"$reproof_exit\" ] || [ \"$reproof_exit\" = 0 ]; then reproof_mode=pass; else reproof_mode=unknown; fi; fi; [ \"$reproof_mode\" != malformed ] || exit 87; receipt_sha256=\"$(/usr/bin/sha256sum -- \"$receipt\" | /usr/bin/awk '{print $1}')\"; case \"$reproof_mode\" in pass) classification=pass;; safe_fail) classification=safe_fail;; oom|unknown) classification=unknown;; *) exit 88;; esac; printf '%s|%s' \"$classification\" \"$receipt_sha256\"; exit 0;;\n"
+        "  *\"InstallLinking post-quiesce runtime authority identity parser\"*) printf '%s|%s' \"$FAKE_INSTALL_LINKING_AUTHORITY_IDENTITY_SHA256\" \"$FAKE_INSTALL_LINKING_RUNTIME_ROLE_SHA256\"; exit 0;;\n"
+        "  *\"InstallLinking public acceptance evidence precommit verifier\"*) [ \"${FAKE_POSTDEPLOY_DIGEST_TAMPER:-0}\" != 1 ] || exit 82; shift 4; /usr/bin/sha256sum -- \"$1\" | /usr/bin/awk '{print $1}'; exit 0;;\n"
+        "  *\"InstallLinking accepted boundary closure parser\"*) exec /usr/bin/python3 \"$@\";;\n"
         "  *runtimeProofBindSource*) printf '%s\\n' \"$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256\"; exit 0;;\n"
         "esac\n"
         "if [ \"${1:-}\" = -I ] && [ \"${2:-}\" = -c ]; then\n"
+        "  case \"${3:-}\" in *\"Public-edge postdeploy code-deploy receipt scanner\"*) exec /usr/bin/python3 \"$@\";; esac\n"
         "  /usr/bin/cat >/dev/null\n"
         "  exit 0\n"
         "fi\n"
@@ -189,9 +216,100 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     release_channel_receipt = runtime_proof.parent / "RELEASE_CHANNEL.generated.json"
     fake_event_log = tmp_path / "fake-runtime-events.log"
     fake_auto_remove_state = tmp_path / "fake-candidate-auto-remove.state"
+    fake_candidate_name_state = tmp_path / "fake-candidate-name.state"
     fake_prior_portal_running_state = tmp_path / "fake-prior-portal-running.state"
+    fake_postquiesce_completed_state = tmp_path / "fake-postquiesce-completed.state"
     fake_auto_remove_state.write_text("false\n", encoding="utf-8")
     fake_prior_portal_running_state.write_text("true\n", encoding="utf-8")
+    cutover_receipt_root = tmp_path / "install-linking-cutover"
+    cutover_receipt_root.mkdir(mode=0o700)
+    cutover_boundary = cutover_receipt_root / "INSTALL_LINKING_POSTGRES_CUTOVER_BOUNDARY.json"
+    cutover_id = "test-cutover-0001"
+    cutover_boundary.write_text(
+        json.dumps(
+            {
+                "candidateImageId": CANDIDATE_PORTAL_IMAGE_ID,
+                "candidateToolImageId": CANDIDATE_TOOL_IMAGE_ID,
+                "cutoverId": cutover_id,
+                "phase": "validate_completed",
+                "status": "in_progress",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cutover_boundary.chmod(0o600)
+    active_build_info = cutover_receipt_root / "candidate-build-info.json"
+    active_build_info.write_text("{}\n", encoding="utf-8")
+    active_build_info.chmod(0o600)
+    final_run_receipt = cutover_receipt_root / "cutover-run.json"
+    final_run_receipt.write_text('{"status":"pass"}\n', encoding="utf-8")
+    final_run_receipt.chmod(0o600)
+    final_boundary = tmp_path / "accepted-install-linking-boundary.json"
+    final_boundary.write_text(
+        json.dumps(
+            {
+                "candidateImageId": CANDIDATE_PORTAL_IMAGE_ID,
+                "candidateToolImageId": CANDIDATE_TOOL_IMAGE_ID,
+                "cutoverId": cutover_id,
+                "phase": "public_acceptance_completed",
+                "status": "pass",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cutover_boundary_sha256 = hashlib.sha256(cutover_boundary.read_bytes()).hexdigest()
+    final_boundary_sha256 = hashlib.sha256(final_boundary.read_bytes()).hexdigest()
+    verification_common = {
+        "activeBuildInfoPath": str(active_build_info),
+        "activeBuildInfoSha256": "7" * 64,
+        "boundaryReceiptPath": str(cutover_boundary),
+        "candidateImageId": CANDIDATE_PORTAL_IMAGE_ID,
+        "candidatePortalTag": f"chummer-run-api:cutover-{'a' * 24}",
+        "candidateToolImageId": CANDIDATE_TOOL_IMAGE_ID,
+        "candidateToolTag": (
+            f"chummer-install-linking-postgres-tool:cutover-{'a' * 24}"
+        ),
+        "canonicalPortalTagIdBeforeAndAfter": PRIOR_PORTAL_IMAGE_ID,
+        "canonicalToolTagIdBeforeAndAfter": PRIOR_TOOL_IMAGE_ID,
+        "composeSha256": "8" * 64,
+        "contractName": (
+            "chummer.install_linking_postgres_cutover_boundary_verification.v1"
+        ),
+        "cutoverId": cutover_id,
+        "envSha256": "9" * 64,
+        "finalRunReceiptPath": str(final_run_receipt),
+        "finalRunReceiptSha256": "a" * 64,
+        "finalRunReceiptStatus": "pass",
+        "runnerSha256": "b" * 64,
+        "sourceHead": "0" * 40,
+        "status": "pass",
+    }
+    initial_verification = {
+        **verification_common,
+        "boundaryReceiptSha256": cutover_boundary_sha256,
+        "phase": "validate_completed",
+    }
+    final_verification = {
+        **verification_common,
+        "boundaryReceiptSha256": final_boundary_sha256,
+        "phase": "public_acceptance_completed",
+    }
+    initial_verification_path = tmp_path / "install-linking-boundary-verification.json"
+    final_verification_path = tmp_path / "install-linking-final-verification.json"
+    initial_verification_path.write_text(
+        json.dumps(initial_verification, sort_keys=True),
+        encoding="utf-8",
+    )
+    final_verification_path.write_text(
+        json.dumps(final_verification, sort_keys=True),
+        encoding="utf-8",
+    )
     deploy_under_test = tmp_path / "deploy_public_edge_portal.sh"
     deploy_script = DEPLOY.read_text(encoding="utf-8")
     deploy_script = deploy_script.replace(
@@ -219,6 +337,34 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     deploy_under_test.chmod(0o755)
     monkeypatch.setattr(sys.modules[__name__], "DEPLOY", deploy_under_test)
     monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", "0" * 40)
+    monkeypatch.setenv(
+        "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY",
+        str(cutover_boundary),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256",
+        cutover_boundary_sha256,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_INSTALL_LINKING_CANDIDATE_IMAGE_ID",
+        CANDIDATE_PORTAL_IMAGE_ID,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID",
+        CANDIDATE_TOOL_IMAGE_ID,
+    )
+    monkeypatch.setenv(
+        "FAKE_INSTALL_LINKING_BOUNDARY_VERIFICATION_JSON",
+        str(initial_verification_path),
+    )
+    monkeypatch.setenv(
+        "FAKE_INSTALL_LINKING_FINAL_VERIFICATION_JSON",
+        str(final_verification_path),
+    )
+    monkeypatch.setenv(
+        "FAKE_INSTALL_LINKING_FINAL_BOUNDARY",
+        str(final_boundary),
+    )
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF", "refs/remotes/origin/main"
     )
@@ -249,11 +395,17 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("FAKE_RUNTIME_PROOF_FILE", str(runtime_proof))
     monkeypatch.setenv("FAKE_EVENT_LOG", str(fake_event_log))
     monkeypatch.setenv("FAKE_AUTO_REMOVE_STATE", str(fake_auto_remove_state))
+    monkeypatch.setenv("FAKE_CANDIDATE_NAME_STATE", str(fake_candidate_name_state))
+    monkeypatch.setenv(
+        "FAKE_POSTQUIESCE_COMPLETED_STATE",
+        str(fake_postquiesce_completed_state),
+    )
     monkeypatch.setenv(
         "FAKE_PRIOR_PORTAL_RUNNING_STATE", str(fake_prior_portal_running_state)
     )
     monkeypatch.setenv("FAKE_PRIOR_PORTAL_IMAGE_ID", PRIOR_PORTAL_IMAGE_ID)
     monkeypatch.setenv("FAKE_CANDIDATE_PORTAL_IMAGE_ID", CANDIDATE_PORTAL_IMAGE_ID)
+    monkeypatch.setenv("FAKE_CANDIDATE_TOOL_IMAGE_ID", CANDIDATE_TOOL_IMAGE_ID)
     monkeypatch.setenv("FAKE_MISMATCH_PORTAL_IMAGE_ID", MISMATCH_PORTAL_IMAGE_ID)
     monkeypatch.setenv("FAKE_PRIOR_TOOL_IMAGE_ID", PRIOR_TOOL_IMAGE_ID)
     monkeypatch.setenv("FAKE_PRIOR_TUNNEL_IMAGE_ID", PRIOR_TUNNEL_IMAGE_ID)
@@ -262,6 +414,26 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "FAKE_CANDIDATE_PORTAL_CONTAINER_ID", CANDIDATE_PORTAL_CONTAINER_ID
     )
     monkeypatch.setenv("FAKE_PRIOR_TUNNEL_CONTAINER_ID", PRIOR_TUNNEL_CONTAINER_ID)
+    monkeypatch.setenv(
+        "FAKE_POSTQUIESCE_PROOF_CONTAINER_ID",
+        POSTQUIESCE_PROOF_CONTAINER_ID,
+    )
+    monkeypatch.setenv(
+        "FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID",
+        ORPHAN_STATE_CONSUMER_CONTAINER_ID,
+    )
+    monkeypatch.setenv(
+        "FAKE_CUTOVER_NAME_SUFFIX",
+        hashlib.sha256(cutover_id.encode("utf-8")).hexdigest()[:24],
+    )
+    monkeypatch.setenv("FAKE_HUB_REGISTRY_HEAD", "c" * 40)
+    monkeypatch.setenv("FAKE_DESIGN_PRODUCT_HEAD", "d" * 40)
+    monkeypatch.setenv("FAKE_FLEET_MEDIA_FACTORY_HEAD", "e" * 40)
+    monkeypatch.setenv("FAKE_BUILD_CONTEXT_DOCKERIGNORE_SHA256", "f" * 64)
+    monkeypatch.setenv(
+        "FAKE_INSTALL_LINKING_AUTHORITY_IDENTITY_SHA256", "1" * 64
+    )
+    monkeypatch.setenv("FAKE_INSTALL_LINKING_RUNTIME_ROLE_SHA256", "2" * 64)
 
     build = {
         "context": "/docker/chummercomplete",
@@ -313,7 +485,13 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
 
 
-def make_fake_authority_source(tmp_path: Path) -> Path:
+def make_fake_authority_source(
+    tmp_path: Path,
+    *,
+    inject_postdeploy_child_secret_key: bool = False,
+    inject_postdeploy_nested_secret_key: str | None = None,
+    inject_postdeploy_nested_secret_value: str | None = None,
+) -> Path:
     source = tmp_path / "source"
     (source / "scripts").mkdir(parents=True)
     (source / "Chummer.Run.Api").mkdir()
@@ -327,6 +505,16 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
         "import sys\nsys.stdin.read()\n",
         encoding="utf-8",
     )
+    for name in (
+        "attest_initial_release_shelf_cutover.py",
+        "attest_public_edge_compose_source.py",
+        "run_install_linking_postgres_cutover.py",
+        "materialize_install_linking_cutover_boundary.py",
+    ):
+        (source / "scripts" / name).write_text(
+            "#!/usr/bin/env python3\nraise SystemExit(0)\n",
+            encoding="utf-8",
+        )
     (source / "scripts" / "verify_public_edge_postdeploy_gate.py").write_text(
         "import json, os, pathlib, sys\n"
         "args = sys.argv[1:]\n"
@@ -334,15 +522,26 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
         "json.dumps(args), encoding='utf-8')\n"
         "output = pathlib.Path(args[args.index('--output') + 1])\n"
         "output.parent.mkdir(parents=True, exist_ok=True)\n"
-        "output.write_text(json.dumps({"
+        "payload = {"
         "'contractName':'chummer.public_edge_postdeploy_gate.v1',"
         "'status':'pass','projectionPurpose':'code-deploy',"
         "'projectionStatus':'review_required',"
         "'projectionStage':'code_deploy_review_required',"
         "'codeDeploymentAuthority':True,'releaseUploadAuthority':False,"
         "'releaseReady':False,"
-        "'codeDeployReviewRequiredAuthoritySatisfied':True"
-        "}), encoding='utf-8')\n"
+        "'codeDeployReviewRequiredAuthoritySatisfied':True,"
+        "'childReceipts':{}"
+        "}\n"
+        f"if {inject_postdeploy_child_secret_key!r}:\n"
+        "    payload['childReceipts'] = {"
+        "'preflight':{'databasePassword':'hunter2'}}\n"
+        f"if {inject_postdeploy_nested_secret_key is not None!r}:\n"
+        "    payload['roleAliasRouteResults'] = ["
+        f"{{{inject_postdeploy_nested_secret_key!r}:'hunter2'}}]\n"
+        f"if {inject_postdeploy_nested_secret_value is not None!r}:\n"
+        "    payload['roleAliasRouteResults'] = ["
+        f"{{'detail':{inject_postdeploy_nested_secret_value!r}}}]\n"
+        "output.write_text(json.dumps(payload), encoding='utf-8')\n"
         "raise SystemExit(int(os.environ.get('FAKE_POSTDEPLOY_EXIT', '0')))\n",
         encoding="utf-8",
     )
@@ -378,24 +577,48 @@ arg_value() {
 case "$*" in
   *runtimeProofBindSource*)
     printf '%s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256";;
+  *"attest_public_edge_compose_source.py capture"*)
+    source="$(arg_value --source "$@")"
+    snapshot="$(arg_value --snapshot "$@")"
+    receipt="$(arg_value --receipt "$@")"
+    /usr/bin/cp "$source" "$snapshot"
+    /usr/bin/chmod 0600 "$snapshot"
+    printf '%s\n' '{"status":"pass"}' > "$receipt"
+    /usr/bin/chmod 0600 "$receipt";;
+  *"attest_public_edge_compose_source.py verify"*)
+    [ -f "$(arg_value --snapshot "$@")" ] || exit 90;;
   *"public_edge_overlay_transaction.py snapshot"*)
     output="$(arg_value --output "$@")"
     printf '%s\n' '{"phase":"prepared"}' > "$output"
+    /usr/bin/chmod 0600 "$output"
     printf '%s\n' 'journal:snapshot' >> "$FAKE_EVENT_LOG";;
   *"public_edge_overlay_transaction.py mark-phase"*)
     output="$(arg_value --output "$@")"
     phase="$(arg_value --phase "$@")"
     [ -f "$output" ] || exit 91
     printf '{"phase":"%s"}\n' "$phase" > "$output"
+    /usr/bin/chmod 0600 "$output"
     printf 'journal:phase:%s\n' "$phase" >> "$FAKE_EVENT_LOG";;
   *"public_edge_overlay_transaction.py complete"*)
     output="$(arg_value --output "$@")"
+    runtime_output="$(arg_value --runtime-authority-output "$@")"
+    candidate_id="$(arg_value --candidate-portal-container-id "$@")"
+    candidate_name="$(arg_value --candidate-portal-container-name "$@")"
+    candidate_image="$(arg_value --candidate-portal-image-id "$@")"
+    readiness="$(arg_value --install-linking-authority-readiness "$@")"
+    readiness_sha256="$(arg_value --install-linking-authority-readiness-sha256 "$@")"
     [ -f "$output" ] || exit 92
+    actual_readiness_sha256="$(/usr/bin/sha256sum -- "$readiness" | /usr/bin/awk '{print $1}')"
+    [ "$actual_readiness_sha256" = "$readiness_sha256" ] || exit 93
+    printf '{"contractName":"chummer.public-edge.active-runtime-authority/v1","generatedAtUtc":"2026-07-23T00:00:00+00:00","installLinkingAuthorityReadinessPath":"%s","installLinkingAuthorityReadinessSha256":"%s","portal":{"containerId":"%s","containerName":"%s","existed":true,"imageId":"%s","proofAuthorityMountSha256":"%s","proofPublicMountSha256":"%s","wasRunning":true},"status":"pass"}\n' "$readiness" "$readiness_sha256" "$candidate_id" "$candidate_name" "$candidate_image" "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" > "$runtime_output"
+    /usr/bin/chmod 0600 "$runtime_output"
     /usr/bin/rm -f -- "$output"
     printf '%s\n' 'journal:complete' >> "$FAKE_EVENT_LOG";;
   *public_edge_deploy_recovery.py*)
     snapshot="$(arg_value --snapshot "$@")"
     /usr/bin/rm -f -- "$snapshot"
+    printf 'recovery:portal-tag:%s\n' "$FAKE_PRIOR_PORTAL_IMAGE_ID" >> "$FAKE_EVENT_LOG"
+    printf 'recovery:tool-tag:%s\n' "$FAKE_PRIOR_TOOL_IMAGE_ID" >> "$FAKE_EVENT_LOG"
     printf '%s\n' 'journal:recovered' >> "$FAKE_EVENT_LOG";;
 esac
 exit 0
@@ -413,6 +636,39 @@ printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
 printf 'docker:%s\n' "$*" >> "$FAKE_EVENT_LOG"
 case "$*" in
   *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;;
+  "container ls --all --quiet --no-trunc --filter volume=chummer6-hub_chummer-run-api-state")
+    printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID"
+    if [ "${FAKE_STATE_VOLUME_CONSUMER_RACE:-}" = orphan_before ]; then
+      printf '%s\n' "$FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID"
+    fi
+    if [ -f "$FAKE_POSTQUIESCE_COMPLETED_STATE" ]; then
+      printf '%s\n' "$FAKE_POSTQUIESCE_PROOF_CONTAINER_ID"
+      if [ "${FAKE_STATE_VOLUME_CONSUMER_RACE:-}" = rw_after ]; then
+        printf '%s\n' "$FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID"
+      fi
+    fi
+    ;;
+  "container inspect --format {{json .Id}}"*" $FAKE_PRIOR_PORTAL_CONTAINER_ID")
+    printf '"%s" "/chummer6-hub-chummer-portal-1" "%s" false {"com.docker.compose.oneoff":"False","com.docker.compose.project":"chummer6-hub","com.docker.compose.service":"chummer-portal"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":true,"Type":"volume"}]\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID" "$FAKE_PRIOR_PORTAL_IMAGE_ID"
+    ;;
+  "container inspect --format {{json .Id}}"*" $FAKE_POSTQUIESCE_PROOF_CONTAINER_ID")
+    attempt="$(/usr/bin/cat "$FAKE_POSTQUIESCE_COMPLETED_STATE")"
+    job_name="postquiesce-${attempt}-prove-local-store-absent"
+    job_hash="$(printf '%s' "$job_name" | /usr/bin/sha256sum | /usr/bin/awk '{print substr($1,1,12)}')"
+    project_prefix="$(printf '%s' "$FAKE_CUTOVER_NAME_SUFFIX" | /usr/bin/cut -c1-16)"
+    container_name="chummer-install-linking-cutover-${FAKE_CUTOVER_NAME_SUFFIX}-${job_name}"
+    project="chummer6-ilpg-${project_prefix}-${job_hash}"
+    printf '"%s" "/%s" "%s" false {"com.docker.compose.oneoff":"False","com.docker.compose.project":"%s","com.docker.compose.service":"chummer-install-linking-postgres-import-presence-proof"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":false,"Type":"volume"}]\n' "$FAKE_POSTQUIESCE_PROOF_CONTAINER_ID" "$container_name" "$FAKE_CANDIDATE_TOOL_IMAGE_ID" "$project"
+    ;;
+  "container inspect --format {{json .Id}}"*" $FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID")
+    orphan_running=false
+    orphan_rw=false
+    if [ "${FAKE_STATE_VOLUME_CONSUMER_RACE:-}" = rw_after ]; then
+      orphan_running=true
+      orphan_rw=true
+    fi
+    printf '"%s" "/orphan-state-consumer" "%s" %s {"com.docker.compose.oneoff":"False","com.docker.compose.project":"attacker-project","com.docker.compose.service":"chummer-portal"} [{"Destination":"/app/state","Name":"chummer6-hub_chummer-run-api-state","RW":%s,"Type":"volume"}]\n' "$FAKE_ORPHAN_STATE_CONSUMER_CONTAINER_ID" "$FAKE_CANDIDATE_TOOL_IMAGE_ID" "$orphan_running" "$orphan_rw"
+    ;;
   "image ls --quiet --no-trunc --filter reference=chummer-run-api:local")
     count="$(grep -c '^image ls --quiet --no-trunc --filter reference=chummer-run-api:local$' "$FAKE_DOCKER_LOG")"
     if [ "$count" -eq 1 ]; then
@@ -423,8 +679,16 @@ case "$*" in
     ;;
   "image ls --quiet --no-trunc --filter reference=chummer-install-linking-postgres-tool:local")
     printf '%s\n' "$FAKE_PRIOR_TOOL_IMAGE_ID";;
+  "image inspect chummer-run-api:cutover-"*" --format {{.Id}}")
+    printf '%s\n' "$FAKE_CANDIDATE_PORTAL_IMAGE_ID";;
+  "image inspect chummer-install-linking-postgres-tool:cutover-"*" --format {{.Id}}")
+    printf '%s\n' "$FAKE_CANDIDATE_TOOL_IMAGE_ID";;
   "image inspect chummer-run-api:local --format {{.Id}}")
     printf '%s\n' "$FAKE_CANDIDATE_PORTAL_IMAGE_ID";;
+  "image inspect chummer-install-linking-postgres-tool:local --format {{.Id}}")
+    printf '%s\n' "$FAKE_CANDIDATE_TOOL_IMAGE_ID";;
+  "image tag "*)
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = image_promotion ]; then exit 44; fi;;
   *" ps --all -q chummer-portal")
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID";;
   *" ps --all -q chummer-run-cloudflared")
@@ -471,15 +735,41 @@ case "$*" in
       *" --rm "*) printf '%s\n' true > "$FAKE_AUTO_REMOVE_STATE";;
       *) printf '%s\n' false > "$FAKE_AUTO_REMOVE_STATE";;
     esac
+    previous=
+    for argument in "$@"; do
+      if [ "$previous" = --name ]; then
+        printf '%s\n' "$argument" > "$FAKE_CANDIDATE_NAME_STATE"
+        break
+      fi
+      previous="$argument"
+    done
     printf '%s\n' "$FAKE_CANDIDATE_PORTAL_CONTAINER_ID";;
   "container inspect --format {{.Id}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     printf '%s\n' "$FAKE_CANDIDATE_PORTAL_CONTAINER_ID";;
+  "container inspect --format {{.Name}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
+    printf '/%s\n' "$(/usr/bin/cat "$FAKE_CANDIDATE_NAME_STATE")";;
   "container inspect --format {{.State.Running}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = candidate_readiness ]; then printf '%s\n' false; else printf '%s\n' true; fi;;
   "container inspect --format {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     printf '%s\n' healthy;;
-  "container exec $FAKE_CANDIDATE_PORTAL_CONTAINER_ID /usr/bin/curl "*)
-    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = publication_readiness ]; then exit 45; fi;;
+  "container exec $FAKE_CANDIDATE_PORTAL_CONTAINER_ID dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll /api/ready/install-linking-authority")
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = install_linking_authority_readiness ]; then exit 45; fi
+    readiness_mode="${FAKE_INSTALL_LINKING_AUTHORITY_MODE:-pass}"
+    readiness_authority="$FAKE_INSTALL_LINKING_AUTHORITY_IDENTITY_SHA256"
+    readiness_extra=
+    case "$readiness_mode" in
+      pass) ;;
+      hash_mismatch) readiness_authority="3333333333333333333333333333333333333333333333333333333333333333";;
+      extra_field) readiness_extra=',"unexpected":true';;
+      malformed) printf '%s' '{malformed'; exit 0;;
+      http_503) printf '%s' '{"status":"fail"}'; exit 22;;
+      *) exit 89;;
+    esac
+    printf '{"authorityIdentitySha256":"%s","checkedAtUtc":"%s","code":"runtime_role_least_privilege","contractName":"chummer.install_linking_postgres_runtime_authority_readiness.v1","currentRoleMatches":true,"leastPrivilegeValid":true,"ready":true,"runtimeRoleSha256":"%s","status":"pass"%s}' "$readiness_authority" "${FAKE_INSTALL_LINKING_AUTHORITY_CHECKED_AT:-2026-07-23T00:00:00+00:00}" "$FAKE_INSTALL_LINKING_RUNTIME_ROLE_SHA256" "$readiness_extra"
+    ;;
+  "container exec $FAKE_CANDIDATE_PORTAL_CONTAINER_ID dotnet /app/loopback-probe/Chummer.Run.LoopbackProbe.dll /api/ready/publication")
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = publication_readiness ]; then exit 45; fi
+    printf '%s' '{"ready":true}';;
   "container exec $FAKE_CANDIDATE_PORTAL_CONTAINER_ID /usr/bin/sha256sum -- "*)
     printf '%s  %s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" "${*##* }";;
   "container inspect --format {{.Image}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
@@ -562,6 +852,7 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
     write_fake_blue_green_docker(fake_bin / "docker")
     docker_log = tmp_path / "docker.log"
     python_log = tmp_path / "python.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
     postdeploy_log = tmp_path / "postdeploy.json"
     env = os.environ.copy()
     env.update(
@@ -569,6 +860,7 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
             "PATH": f"{fake_bin}:{env['PATH']}",
             "FAKE_DOCKER_LOG": str(docker_log),
             "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
             "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
             "CHUMMER_RUN_SERVICES_SOURCE": str(source),
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
@@ -604,7 +896,71 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
         f"container update --restart unless-stopped {CANDIDATE_PORTAL_CONTAINER_ID}"
         in commands
     )
+    assert not any("/usr/bin/curl" in command for command in commands)
+    assert any(
+        command.endswith("Chummer.Run.LoopbackProbe.dll /api/ready/publication")
+        for command in commands
+    )
+    assert any(
+        command.endswith(
+            "Chummer.Run.LoopbackProbe.dll "
+            "/api/ready/install-linking-authority"
+        )
+        for command in commands
+    )
     assert Path(env["FAKE_AUTO_REMOVE_STATE"]).read_text(encoding="utf-8") == "false\n"
+    cutover_root = Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).parent
+    readiness_files = list(
+        cutover_root.glob("install-linking-authority-readiness-*.json")
+    )
+    assert len(readiness_files) == 1
+    readiness_path = readiness_files[0]
+    readiness_bytes = readiness_path.read_bytes()
+    readiness_sha256 = hashlib.sha256(readiness_bytes).hexdigest()
+    readiness = json.loads(readiness_bytes)
+    assert set(readiness) == {
+        "authorityIdentitySha256",
+        "checkedAtUtc",
+        "code",
+        "contractName",
+        "currentRoleMatches",
+        "leastPrivilegeValid",
+        "ready",
+        "runtimeRoleSha256",
+        "status",
+    }
+    assert (
+        readiness["authorityIdentitySha256"]
+        == env["FAKE_INSTALL_LINKING_AUTHORITY_IDENTITY_SHA256"]
+    )
+    assert (
+        readiness["runtimeRoleSha256"]
+        == env["FAKE_INSTALL_LINKING_RUNTIME_ROLE_SHA256"]
+    )
+    assert readiness_path.stat().st_mode & 0o777 == 0o600
+    private_active_runtime_files = list(cutover_root.glob("active-runtime-*.json"))
+    assert len(private_active_runtime_files) == 1
+    private_active_runtime = json.loads(
+        private_active_runtime_files[0].read_text(encoding="utf-8")
+    )
+    assert (
+        private_active_runtime["installLinkingAuthorityReadinessPath"]
+        == str(readiness_path)
+    )
+    assert (
+        private_active_runtime["installLinkingAuthorityReadinessSha256"]
+        == readiness_sha256
+    )
+    complete_command = next(
+        command
+        for command in python_log.read_text(encoding="utf-8").splitlines()
+        if "public_edge_overlay_transaction.py complete" in command
+    )
+    assert f"--install-linking-authority-readiness {readiness_path}" in complete_command
+    assert (
+        f"--install-linking-authority-readiness-sha256 {readiness_sha256}"
+        in complete_command
+    )
 
     events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
     journal_events = [event for event in events if event.startswith("journal:")]
@@ -640,6 +996,758 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
 
 
 @pytest.mark.parametrize(
+    ("mode", "checked_at"),
+    (
+        ("hash_mismatch", None),
+        ("extra_field", None),
+        ("malformed", None),
+        ("http_503", None),
+        ("pass", "2026-07-23T01:00:00+01:00"),
+    ),
+)
+def test_guarded_deploy_rejects_unbound_runtime_authority_readiness(
+    tmp_path: Path,
+    mode: str,
+    checked_at: str | None,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_INSTALL_LINKING_AUTHORITY_MODE": mode,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+    if checked_at is not None:
+        env["FAKE_INSTALL_LINKING_AUTHORITY_CHECKED_AT"] = checked_at
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "InstallLinking runtime authority readiness failed" in result.stderr
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert any(
+        command.endswith(
+            "Chummer.Run.LoopbackProbe.dll "
+            "/api/ready/install-linking-authority"
+        )
+        for command in commands
+    )
+    assert not any("/usr/bin/curl" in command for command in commands)
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_candidate_started" in events
+    assert "journal:complete" not in events
+    assert "journal:recovered" in events
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+    cutover_root = Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).parent
+    assert not list(
+        cutover_root.glob("install-linking-authority-readiness-*.json")
+    )
+    assert "public_edge_overlay_transaction.py complete" not in python_log.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_guarded_deploy_reconciles_materializer_publish_then_nonzero_without_rollback(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_INSTALL_LINKING_MATERIALIZER_EXIT": "74",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == (
+        f"public_edge_portal_deployed {CANDIDATE_PORTAL_IMAGE_ID}"
+    )
+    assert (
+        "install_linking_public_acceptance_materializer_reconciled "
+        "exit_status=74 boundary_sha256="
+    ) in result.stderr
+    boundary = json.loads(
+        Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert boundary["phase"] == "public_acceptance_completed"
+    assert boundary["status"] == "pass"
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" in events
+    assert "journal:recovered" not in events
+    trusted_commands = trusted_python_log.read_text(encoding="utf-8").splitlines()
+    assert any(
+        "materialize_install_linking_cutover_boundary.py" in command
+        and "--phase public_acceptance_completed" in command
+        for command in trusted_commands
+    )
+    assert any(
+        "verify_install_linking_cutover_boundary.py" in command
+        and "--expected-phase public_acceptance_completed" in command
+        for command in trusted_commands
+    )
+
+
+def test_guarded_deploy_rolls_back_nonzero_materializer_with_mismatched_boundary(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    Path(env["FAKE_INSTALL_LINKING_FINAL_BOUNDARY"]).write_text(
+        '{"phase":"public_acceptance_completed","status":"pass","tampered":true}\n',
+        encoding="utf-8",
+    )
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_INSTALL_LINKING_MATERIALIZER_EXIT": "74",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    assert "materializer exact reconciliation failed" in result.stderr
+    assert "materializer_reconciled" not in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" in events
+    assert "journal:recovered" in events
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert not any(command.startswith("image rm ") for command in commands)
+
+
+def test_guarded_deploy_exit_trap_reconciles_accepted_boundary_before_rollback(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    stable_hash_state = tmp_path / "stable-hash-failed-once"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_INSTALL_LINKING_MATERIALIZER_EXIT": "74",
+            "FAKE_STABLE_HASH_FAIL_ONCE": "1",
+            "FAKE_STABLE_HASH_STATE": str(stable_hash_state),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    assert "materializer exact reconciliation failed" in result.stderr
+    assert "install_linking_public_acceptance_exit_reconciled" in result.stderr
+    assert stable_hash_state.is_file()
+    boundary = json.loads(
+        Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert boundary["phase"] == "public_acceptance_completed"
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" in events
+    assert "journal:recovered" not in events
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert not any(command.startswith("image rm ") for command in commands)
+
+
+@pytest.mark.parametrize("mutation", ("digest", "symlink"))
+def test_guarded_deploy_rejects_boundary_path_or_digest_tamper_before_mutation(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    boundary = Path(os.environ["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"])
+    env = os.environ.copy()
+    if mutation == "digest":
+        boundary.write_bytes(boundary.read_bytes() + b" ")
+        expected_message = "boundary verification failed before Docker mutation"
+    else:
+        alias = tmp_path / "boundary-alias.json"
+        alias.symlink_to(boundary)
+        env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"] = str(alias)
+        expected_message = "exact existing non-aliased path"
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert expected_message in result.stderr
+
+
+def test_guarded_deploy_rejects_unique_candidate_id_mismatch_before_tag_mutation(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_CANDIDATE_PORTAL_IMAGE_ID": MISMATCH_PORTAL_IMAGE_ID,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "differs from its independent pin" in result.stderr
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert any(
+        command.startswith("image inspect chummer-run-api:cutover-")
+        for command in commands
+    )
+    assert not any(command.startswith("image tag ") for command in commands)
+    assert not any(command.endswith(" stop chummer-run-cloudflared") for command in commands)
+
+
+def test_guarded_deploy_snapshots_a_t_promotes_b_u_and_retains_on_unknown_reproof(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTQUIESCE_EXIT": "70",
+            "FAKE_POSTQUIESCE_REASON": "remote_generation_changed",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    snapshot_command = next(
+        command
+        for command in python_log.read_text(encoding="utf-8").splitlines()
+        if "public_edge_overlay_transaction.py snapshot" in command
+    )
+    assert f"--prior-image-tag-id {PRIOR_PORTAL_IMAGE_ID}" in snapshot_command
+    assert f"--prior-tool-image-tag-id {PRIOR_TOOL_IMAGE_ID}" in snapshot_command
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    portal_promotion = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker:image tag chummer-run-api:cutover-")
+    )
+    tool_promotion = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith(
+            "docker:image tag chummer-install-linking-postgres-tool:cutover-"
+        )
+    )
+    assert events.index("journal:snapshot") < portal_promotion < tool_promotion
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" not in events
+    lock_root = tmp_path / "lock-state"
+    assert (lock_root / "public-edge-mutation.lock").is_dir()
+    assert (
+        lock_root
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    ).is_file()
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ("local_store_reappeared", "remote_generation_changed"),
+)
+def test_guarded_deploy_postquiesce_state_change_blocks_candidate_activation(
+    tmp_path: Path,
+    reason: str,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "FAKE_POSTQUIESCE_EXIT": "1",
+            "FAKE_POSTQUIESCE_REASON": reason,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_stopped" in events
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" not in events
+    lock_root = tmp_path / "lock-state"
+    assert (lock_root / "public-edge-mutation.lock").is_dir()
+    assert (
+        lock_root
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    ).is_file()
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert not any(" run -T -d " in command for command in commands)
+    assert "materialize_install_linking_cutover_boundary.py" not in trusted_python_log.read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ("sigkill", "oom", "missing", "malformed"),
+)
+def test_guarded_deploy_retains_authority_without_verified_postquiesce_outcome(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_POSTQUIESCE_MODE": mode,
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    assert "unknown_authority_retained" in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_stopped" in events
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" not in events
+    lock_root = tmp_path / "lock-state"
+    assert (lock_root / "public-edge-mutation.lock").is_dir()
+    assert (
+        lock_root
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    ).is_file()
+
+
+def test_guarded_deploy_rolls_back_only_verified_postquiesce_safe_fail(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_POSTQUIESCE_MODE": "safe_fail",
+            "FAKE_POSTQUIESCE_EXIT": "70",
+            "FAKE_POSTQUIESCE_REASON": "pre_start_validation_failed",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "verified safe failure (runner exit 70)" in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_stopped" in events
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" in events
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+
+
+def test_guarded_deploy_accepts_verified_postquiesce_pass_despite_runner_exit(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_POSTQUIESCE_MODE": "pass",
+            "FAKE_POSTQUIESCE_EXIT": "42",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:overlay_activated" in events
+    assert "journal:complete" in events
+    assert "journal:recovered" not in events
+
+
+def test_guarded_deploy_rejects_orphan_state_volume_consumer_before_reproof(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "FAKE_STATE_VOLUME_CONSUMER_RACE": "orphan_before",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "post-quiesce state-volume consumer inventory failed" in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_stopped" in events
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" in events
+    trusted_commands = trusted_python_log.read_text(encoding="utf-8").splitlines()
+    assert not any(
+        "run_install_linking_postgres_cutover.py" in command
+        and "--post-quiesce-reproof" in command
+        for command in trusted_commands
+    )
+
+
+def test_guarded_deploy_retains_authority_on_postreproof_rw_volume_consumer_race(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_STATE_VOLUME_CONSUMER_RACE": "rw_after",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                ROOT / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    assert "pre-activation state-volume consumer inventory is unknown" in result.stderr
+    assert "unknown_authority_retained" in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:portal_stopped" in events
+    assert "journal:phase:overlay_activated" not in events
+    assert "journal:recovered" not in events
+    lock_root = tmp_path / "lock-state"
+    assert (lock_root / "public-edge-mutation.lock").is_dir()
+    assert (
+        lock_root
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    ).is_file()
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    assert any(
+        command.endswith(f" {ORPHAN_STATE_CONSUMER_CONTAINER_ID}")
+        and command.startswith("container inspect --format {{json .Id}}")
+        for command in commands
+    )
+
+
+def test_guarded_deploy_fabricated_postdeploy_digest_cannot_finalize_acceptance(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "FAKE_POSTDEPLOY_DIGEST_TAMPER": "1",
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "public acceptance evidence verification failed" in result.stderr
+    trusted_commands = trusted_python_log.read_text(encoding="utf-8").splitlines()
+    assert not any(
+        "materialize_install_linking_cutover_boundary.py" in command
+        for command in trusted_commands
+    )
+    boundary = json.loads(
+        Path(env["CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY"]).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert boundary["phase"] == "validate_completed"
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" in events
+    assert "journal:recovered" in events
+
+
+@pytest.mark.parametrize(
     ("missing_name", "message"),
     (
         (
@@ -669,6 +1777,22 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
         (
             "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
             "externally supplied as a lowercase SHA-256",
+        ),
+        (
+            "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY",
+            "must be an absolute private receipt path",
+        ),
+        (
+            "CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256",
+            "independently supplied lowercase SHA-256",
+        ),
+        (
+            "CHUMMER_INSTALL_LINKING_CANDIDATE_IMAGE_ID",
+            "independently supplied full image ID",
+        ),
+        (
+            "CHUMMER_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID",
+            "independently supplied full image ID",
         ),
     ),
 )
@@ -873,6 +1997,44 @@ def test_guarded_deploy_rejects_ambient_execution_routing_before_authority(
     assert "rejects ambient execution routing" in result.stderr
     assert not docker_log.exists()
     assert not python_log.exists()
+
+
+def test_guarded_deploy_rejects_inherited_xtrace_without_leaking_canary(
+    tmp_path: Path,
+) -> None:
+    canary = "xtrace-secret-canary-6c4de7a2"
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "SHELLOPTS": "braceexpand:hashall:interactive-comments:xtrace",
+            "BASHOPTS": "extglob",
+            "BASH_XTRACEFD": "2",
+            "PS4": f"trace-{canary}-",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(python_log),
+        }
+    )
+
+    result = subprocess.run(
+        [str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "rejects ambient execution routing" in result.stderr
+    assert canary not in result.stdout
+    assert canary not in result.stderr
+    assert not docker_log.exists()
+    assert not python_log.exists()
+    script = DEPLOY.read_text(encoding="utf-8")
+    assert script.index("set +x") < script.index("ambient_routing_names=(")
+    assert script.index("ambient_routing_names=(") < script.index("secrets.token_hex")
 
 
 def test_guarded_deploy_authority_gate_precedes_selected_source_and_docker(
@@ -1217,7 +2379,9 @@ def test_guarded_deploy_uses_named_candidate_and_durable_recovery_on_failure(
         index
         for index, command in enumerate(commands)
         if command.startswith(
-            f"container exec {CANDIDATE_PORTAL_CONTAINER_ID} /usr/bin/curl "
+            f"container exec {CANDIDATE_PORTAL_CONTAINER_ID} "
+            "dotnet /app/loopback-probe/"
+            "Chummer.Run.LoopbackProbe.dll "
         )
     )
     assert candidate_running_index < publication_index
@@ -1306,6 +2470,178 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
     )
 
 
+def test_guarded_deploy_rejects_secret_key_in_postdeploy_child_receipt(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(
+        tmp_path,
+        inject_postdeploy_child_secret_key=True,
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "postdeploy code-deploy authority failed" in result.stderr
+    assert "hunter2" not in result.stdout
+    assert "hunter2" not in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" not in events
+    assert "candidate:restart-policy:unless-stopped" not in events
+    assert "journal:recovered" in events
+
+
+@pytest.mark.parametrize(
+    "secret_key",
+    (
+        "credentials",
+        "databaseCredentials",
+        "passwords",
+        "tokens",
+        "secrets",
+        "connectionString",
+        "connection_strings",
+        "dsn",
+    ),
+)
+def test_guarded_deploy_rejects_secret_alias_in_allowed_nested_postdeploy_field(
+    tmp_path: Path,
+    secret_key: str,
+) -> None:
+    source = make_fake_authority_source(
+        tmp_path,
+        inject_postdeploy_nested_secret_key=secret_key,
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "postdeploy code-deploy authority failed" in result.stderr
+    assert "hunter2" not in result.stdout
+    assert "hunter2" not in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" not in events
+    assert "candidate:restart-policy:unless-stopped" not in events
+    assert "journal:recovered" in events
+
+
+@pytest.mark.parametrize(
+    "secret_value",
+    (
+        "credentials: hunter2",
+        "https%3A%2F%2Fuser%3Ahunter2%40example.test%2F",
+    ),
+)
+def test_guarded_deploy_rejects_secret_assignment_value_in_nested_postdeploy_field(
+    tmp_path: Path,
+    secret_value: str,
+) -> None:
+    source = make_fake_authority_source(
+        tmp_path,
+        inject_postdeploy_nested_secret_value=secret_value,
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "postdeploy code-deploy authority failed" in result.stderr
+    assert "hunter2" not in result.stdout
+    assert "hunter2" not in result.stderr
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:complete" not in events
+    assert "candidate:restart-policy:unless-stopped" not in events
+    assert "journal:recovered" in events
+
+
 def test_guarded_deploy_rejects_candidate_image_mismatch_before_postdeploy(
     tmp_path: Path,
 ) -> None:
@@ -1316,6 +2652,7 @@ def test_guarded_deploy_rejects_candidate_image_mismatch_before_postdeploy(
     postdeploy_log = tmp_path / "postdeploy.json"
     docker_log = tmp_path / "docker.log"
     python_log = tmp_path / "python.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
     fake_docker = fake_bin / "docker"
     write_fake_blue_green_docker(fake_docker)
     env = os.environ.copy()
@@ -1324,6 +2661,7 @@ def test_guarded_deploy_rejects_candidate_image_mismatch_before_postdeploy(
             "PATH": f"{fake_bin}:{env['PATH']}",
             "FAKE_DOCKER_LOG": str(docker_log),
             "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
             "FAKE_CANDIDATE_MISMATCH": "1",
             "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
             "CHUMMER_RUN_SERVICES_SOURCE": str(source),
@@ -1346,6 +2684,10 @@ def test_guarded_deploy_rejects_candidate_image_mismatch_before_postdeploy(
     assert any(
         "public_edge_deploy_recovery.py" in command
         for command in python_log.read_text(encoding="utf-8").splitlines()
+    )
+    assert not any(
+        "materialize_install_linking_cutover_boundary.py" in command
+        for command in trusted_python_log.read_text(encoding="utf-8").splitlines()
     )
 
 
@@ -1454,7 +2796,7 @@ def test_guarded_deploy_compose_config_failure_prevents_image_build(
     assert all("buildx build" not in command for command in commands)
 
 
-def test_guarded_deploy_build_failure_journals_exact_prior_tag_for_recovery(
+def test_guarded_deploy_promotion_failure_journals_exact_prior_tags_for_recovery(
     tmp_path: Path,
 ) -> None:
     fake_bin = tmp_path / "bin"
@@ -1471,7 +2813,7 @@ def test_guarded_deploy_build_failure_journals_exact_prior_tag_for_recovery(
             "PATH": f"{fake_bin}:{env['PATH']}",
             "FAKE_DOCKER_LOG": str(docker_log),
             "FAKE_PYTHON_LOG": str(python_log),
-            "FAKE_DOCKER_FAILURE_PHASE": "build",
+            "FAKE_DOCKER_FAILURE_PHASE": "image_promotion",
             "CHUMMER_RUN_SERVICES_SOURCE": str(ROOT),
             "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": "/docker/chummercomplete",
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
@@ -1491,12 +2833,15 @@ def test_guarded_deploy_build_failure_journals_exact_prior_tag_for_recovery(
         check=False,
     )
 
-    assert result.returncode == 44
+    assert result.returncode == 1
     commands = docker_log.read_text(encoding="utf-8").splitlines()
-    build_index = next(
-        index for index, command in enumerate(commands) if command.startswith("buildx build ")
+    promotion_index = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("image tag chummer-run-api:cutover-")
     )
-    assert build_index >= 0
+    assert promotion_index >= 0
+    assert all("buildx build" not in command for command in commands)
     assert all(not command.endswith(" stop chummer-portal") for command in commands)
     python_commands = python_log.read_text(encoding="utf-8").splitlines()
     snapshot_command = next(
@@ -1505,6 +2850,7 @@ def test_guarded_deploy_build_failure_journals_exact_prior_tag_for_recovery(
         if "public_edge_overlay_transaction.py snapshot" in command
     )
     assert f"--prior-image-tag-id {PRIOR_PORTAL_IMAGE_ID}" in snapshot_command
+    assert f"--prior-tool-image-tag-id {PRIOR_TOOL_IMAGE_ID}" in snapshot_command
     current = json.loads(
         (
             Path(env["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"])
@@ -1667,7 +3013,7 @@ def test_guarded_deploy_rejects_unreviewed_compose_override_before_docker(
     )
 
     assert result.returncode == 2
-    assert "outside the audited source root" in result.stderr
+    assert "exact owner-controlled single-link Compose input" in result.stderr
     assert not docker_log.exists()
 
 
@@ -1750,10 +3096,14 @@ def test_guarded_deploy_fails_closed_when_prior_runtime_capture_fails(
         """#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
-case "$*" in *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;; esac
-case "$*" in
-  "image ls --quiet --no-trunc --filter reference=chummer-run-api:local") printf '%s\n' sha256:prior-image ;;
-  "image inspect chummer-run-api:local --format {{.Id}}") printf '%s\n' sha256:new-image ;;
+    case "$*" in *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;; esac
+    case "$*" in
+      "image inspect chummer-run-api:cutover-"*" --format {{.Id}}") printf '%s\n' "$FAKE_CANDIDATE_PORTAL_IMAGE_ID" ;;
+      "image inspect chummer-install-linking-postgres-tool:cutover-"*" --format {{.Id}}") printf '%s\n' "$FAKE_CANDIDATE_TOOL_IMAGE_ID" ;;
+      "image ls --quiet --no-trunc --filter reference=chummer-run-api:local") printf '%s\n' "$FAKE_PRIOR_PORTAL_IMAGE_ID" ;;
+      "image ls --quiet --no-trunc --filter reference=chummer-install-linking-postgres-tool:local") printf '%s\n' "$FAKE_PRIOR_TOOL_IMAGE_ID" ;;
+      "image inspect chummer-run-api:local --format {{.Id}}") printf '%s\n' "$FAKE_CANDIDATE_PORTAL_IMAGE_ID" ;;
+      "image inspect chummer-install-linking-postgres-tool:local --format {{.Id}}") printf '%s\n' "$FAKE_CANDIDATE_TOOL_IMAGE_ID" ;;
   *" ps --all -q chummer-portal")
     if [ "$FAKE_CAPTURE_FAILURE" = compose_ps ]; then exit 58; fi
     printf '%s\n' prior-portal

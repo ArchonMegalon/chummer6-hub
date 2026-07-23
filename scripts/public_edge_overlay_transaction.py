@@ -7,10 +7,12 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import stat
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +48,39 @@ CONTRACT_NAME = "chummer.public-edge.overlay-transaction/v1"
 ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME = (
     "chummer.public-edge.active-runtime-authority/v1"
 )
+INSTALL_LINKING_AUTHORITY_READINESS_CONTRACT_NAME = (
+    "chummer.install_linking_postgres_runtime_authority_readiness.v1"
+)
+INSTALL_LINKING_AUTHORITY_READINESS_FIELDS = {
+    "authorityIdentitySha256",
+    "checkedAtUtc",
+    "code",
+    "contractName",
+    "currentRoleMatches",
+    "leastPrivilegeValid",
+    "ready",
+    "runtimeRoleSha256",
+    "status",
+}
+ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
+    "contractName",
+    "generatedAtUtc",
+    "installLinkingAuthorityReadinessPath",
+    "installLinkingAuthorityReadinessSha256",
+    "portal",
+    "status",
+}
+ACTIVE_RUNTIME_PORTAL_FIELDS = {
+    "containerId",
+    "containerName",
+    "existed",
+    "imageId",
+    "proofAuthorityMountSha256",
+    "proofPublicMountSha256",
+    "wasRunning",
+}
+LOWERCASE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+MAX_INSTALL_LINKING_AUTHORITY_READINESS_BYTES = 16 * 1024
 TRANSACTION_PHASES = (
     "prepared",
     "image_build_started",
@@ -87,6 +122,35 @@ DEPLOY_OVERLAY_AUTHORITY_FIELDS = {
     "proofBindSourcePath",
     "stagingRoot",
 }
+
+APPARENT_SECRET_PATTERNS = (
+    re.compile(
+        rb"(?i)(?:password|passwd|pwd|token|secret|credential|account[_ -]?key|"
+        rb"accountkey|shared[_ -]?access[_ -]?(?:key|signature)|"
+        rb"client[_ -]?secret|private[_ -]?key|authorization|api[_ -]?key|"
+        rb"access[_ -]?key|sas[_ -]?key)\s*[:=]"
+    ),
+    re.compile(rb"://[^/\s:@]+:[^@\s/]+@"),
+    re.compile(rb"(?i)\bpostgres(?:ql)?://"),
+    re.compile(
+        rb"(?i)[?&](?:access_token|api[_-]?key|client_secret|password|"
+        rb"sharedaccesssignature|sig|token)="
+    ),
+    re.compile(
+        rb"(?i)-----BEGIN (?:[A-Z0-9 ]*PRIVATE KEY|CERTIFICATE)-----"
+    ),
+    re.compile(rb"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"),
+    re.compile(rb"(?i)\bBasic\s+[A-Za-z0-9+/=]{8,}"),
+    re.compile(rb"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
+    re.compile(rb"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    re.compile(rb"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
+    re.compile(rb"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
+    re.compile(rb"\bsk-[A-Za-z0-9_-]{20,}\b"),
+    re.compile(
+        rb"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\."
+        rb"[A-Za-z0-9_-]{8,}\b"
+    ),
+)
 
 
 def validate_runtime_prior_state(value: object) -> dict[str, Any]:
@@ -240,6 +304,178 @@ def active_runtime_authority_payload(
 def _load_object(path: Path, *, label: str) -> dict[str, Any]:
     payload, _metadata = overlay.read_stable_regular_bytes(path, label=label)
     return overlay.strict_json_object_bytes(payload, label=label)
+
+
+def _canonical_json_bytes(payload: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    ).encode("utf-8")
+
+
+def _reject_apparent_secret_values(payload: object, *, label: str) -> None:
+    if isinstance(payload, dict):
+        values = payload.values()
+    elif isinstance(payload, list):
+        values = payload
+    else:
+        values = ()
+    for value in values:
+        if isinstance(value, (dict, list)):
+            _reject_apparent_secret_values(value, label=label)
+        elif isinstance(value, str):
+            encoded = value.encode("utf-8", "strict")
+            if any(pattern.search(encoded) for pattern in APPARENT_SECRET_PATTERNS):
+                raise RuntimeError(f"{label} contains apparent secret material")
+
+
+def _require_utc_timestamp(value: object, *, label: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or "T" not in value
+        or not (value.endswith("Z") or value.endswith("+00:00"))
+    ):
+        raise RuntimeError(f"{label} timestamp is invalid")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RuntimeError(f"{label} timestamp is invalid") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
+        raise RuntimeError(f"{label} timestamp is not UTC")
+
+
+def _validate_owner_only_evidence_root(path: Path, *, label: str) -> Path:
+    normalized = overlay.normalized_absolute_path(path)
+    if path != normalized:
+        raise RuntimeError(f"{label} must be an exact canonical absolute path")
+    overlay.assert_no_symlink_components(normalized, label=label)
+    try:
+        metadata = normalized.lstat()
+    except OSError as exc:
+        raise RuntimeError(f"unable to inspect {label} {normalized}: {exc}") from exc
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise RuntimeError(f"{label} must be a caller-owned mode-0700 directory")
+    return normalized
+
+
+def _read_owner_only_canonical_json(
+    path: Path,
+    *,
+    label: str,
+    evidence_root: Path,
+    maximum_bytes: int,
+) -> tuple[dict[str, Any], str]:
+    normalized = overlay.normalized_absolute_path(path)
+    if path != normalized or not path.is_absolute():
+        raise RuntimeError(f"{label} path must be exact, canonical, and absolute")
+    normalized_root = _validate_owner_only_evidence_root(
+        evidence_root,
+        label="active runtime evidence root",
+    )
+    if normalized.parent != normalized_root:
+        raise RuntimeError(f"{label} must remain in the active runtime evidence root")
+    payload_bytes, metadata = overlay.read_stable_regular_bytes(
+        normalized,
+        label=label,
+        maximum_bytes=maximum_bytes,
+    )
+    if (
+        metadata.st_nlink != 1
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+    ):
+        raise RuntimeError(
+            f"{label} must be a caller-owned mode-0600 single-link regular file"
+        )
+    try:
+        path_metadata = normalized.lstat()
+    except OSError as exc:
+        raise RuntimeError(f"unable to re-inspect {label} {normalized}: {exc}") from exc
+    descriptor_identity = (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+    )
+    path_identity = (
+        path_metadata.st_dev,
+        path_metadata.st_ino,
+        path_metadata.st_size,
+        path_metadata.st_mtime_ns,
+        path_metadata.st_ctime_ns,
+        path_metadata.st_mode,
+        path_metadata.st_nlink,
+        path_metadata.st_uid,
+        path_metadata.st_gid,
+    )
+    if descriptor_identity != path_identity:
+        raise RuntimeError(f"{label} changed identity while it was being read")
+    payload = overlay.strict_json_object_bytes(payload_bytes, label=label)
+    if payload_bytes != _canonical_json_bytes(payload):
+        raise RuntimeError(f"{label} is not canonical JSON")
+    _reject_apparent_secret_values(payload, label=label)
+    return payload, hashlib.sha256(payload_bytes).hexdigest()
+
+
+def validate_install_linking_authority_readiness(
+    path: Path,
+    *,
+    expected_sha256: str,
+    evidence_root: Path,
+) -> tuple[Path, str, dict[str, Any]]:
+    if (
+        not isinstance(expected_sha256, str)
+        or LOWERCASE_SHA256_PATTERN.fullmatch(expected_sha256) is None
+    ):
+        raise RuntimeError(
+            "InstallLinking authority readiness SHA-256 pin is invalid"
+        )
+    payload, actual_sha256 = _read_owner_only_canonical_json(
+        path,
+        label="InstallLinking authority readiness",
+        evidence_root=evidence_root,
+        maximum_bytes=MAX_INSTALL_LINKING_AUTHORITY_READINESS_BYTES,
+    )
+    if actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            "InstallLinking authority readiness SHA-256 does not match its pin"
+        )
+    if (
+        set(payload) != INSTALL_LINKING_AUTHORITY_READINESS_FIELDS
+        or payload.get("contractName")
+        != INSTALL_LINKING_AUTHORITY_READINESS_CONTRACT_NAME
+        or payload.get("code") != "runtime_role_least_privilege"
+        or payload.get("status") != "pass"
+        or payload.get("ready") is not True
+        or payload.get("currentRoleMatches") is not True
+        or payload.get("leastPrivilegeValid") is not True
+        or not isinstance(payload.get("authorityIdentitySha256"), str)
+        or LOWERCASE_SHA256_PATTERN.fullmatch(
+            payload["authorityIdentitySha256"]
+        )
+        is None
+        or not isinstance(payload.get("runtimeRoleSha256"), str)
+        or LOWERCASE_SHA256_PATTERN.fullmatch(
+            payload["runtimeRoleSha256"]
+        )
+        is None
+    ):
+        raise RuntimeError("InstallLinking authority readiness contract is invalid")
+    _require_utc_timestamp(
+        payload.get("checkedAtUtc"),
+        label="InstallLinking authority readiness",
+    )
+    return overlay.normalized_absolute_path(path), actual_sha256, payload
 
 
 def _stable_file_sha256(path: Path, *, label: str) -> str:
@@ -622,6 +858,60 @@ def mark_phase(
             return payload
 
 
+def _portal_identity_matches_candidate(
+    payload: dict[str, Any],
+    *,
+    candidate_portal_container_id: str,
+    candidate_portal_container_name: str,
+    candidate_portal_image_id: str,
+) -> bool:
+    portal = payload.get("portal")
+    return bool(
+        isinstance(portal, dict)
+        and portal.get("containerId") == candidate_portal_container_id
+        and portal.get("containerName") == candidate_portal_container_name
+        and portal.get("imageId") == candidate_portal_image_id
+    )
+
+
+def _validate_candidate_active_runtime_authority(
+    payload: dict[str, Any],
+    *,
+    candidate_portal_container_id: str,
+    candidate_portal_container_name: str,
+    candidate_portal_image_id: str,
+    proof_mount_sha256: str,
+    readiness_path: Path,
+    readiness_sha256: str,
+) -> None:
+    portal = payload.get("portal")
+    if (
+        set(payload) != ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        or payload.get("contractName") != ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME
+        or payload.get("status") != "pass"
+        or payload.get("installLinkingAuthorityReadinessPath")
+        != str(readiness_path)
+        or payload.get("installLinkingAuthorityReadinessSha256")
+        != readiness_sha256
+        or not isinstance(portal, dict)
+        or set(portal) != ACTIVE_RUNTIME_PORTAL_FIELDS
+        or portal.get("existed") is not True
+        or portal.get("wasRunning") is not True
+        or portal.get("containerId") != candidate_portal_container_id
+        or portal.get("containerName") != candidate_portal_container_name
+        or portal.get("imageId") != candidate_portal_image_id
+        or portal.get("proofAuthorityMountSha256") != proof_mount_sha256
+        or portal.get("proofPublicMountSha256") != proof_mount_sha256
+    ):
+        raise RuntimeError(
+            "active runtime authority conflicts with the candidate readiness binding"
+        )
+    _require_utc_timestamp(
+        payload.get("generatedAtUtc"),
+        label="active runtime authority",
+    )
+
+
 def complete_transaction(
     *,
     source_root: Path,
@@ -631,13 +921,24 @@ def complete_transaction(
     candidate_portal_container_id: str,
     candidate_portal_container_name: str,
     candidate_portal_image_id: str,
+    install_linking_authority_readiness: Path,
+    install_linking_authority_readiness_sha256: str,
     shared_mutation_lock_token: str,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
     journal_path = overlay.normalized_absolute_path(journal_path)
-    runtime_authority_output = overlay.normalized_absolute_path(
+    normalized_runtime_authority_output = overlay.normalized_absolute_path(
         runtime_authority_output
+    )
+    if runtime_authority_output != normalized_runtime_authority_output:
+        raise RuntimeError(
+            "active runtime authority output must be an exact canonical path"
+        )
+    runtime_authority_output = normalized_runtime_authority_output
+    runtime_evidence_root = _validate_owner_only_evidence_root(
+        runtime_authority_output.parent,
+        label="active runtime evidence root",
     )
     with overlay.public_edge_mutation_lock(
         activate=True,
@@ -665,20 +966,94 @@ def complete_transaction(
                 raise RuntimeError(
                     "candidate portal authority conflicts with deployment journal"
                 )
-            active_authority = active_runtime_authority_payload(
-                portal_existed=True,
-                portal_container_id=candidate_portal_container_id,
-                portal_container_name=candidate_portal_container_name,
-                portal_image_id=candidate_portal_image_id,
-                portal_was_running=True,
-                proof_authority_mount_sha256=prior[
-                    "expectedRuntimeProofBindSourceSha256"
-                ],
-                proof_public_mount_sha256=prior[
-                    "expectedRuntimeProofBindSourceSha256"
-                ],
+            readiness_evidence_root = _validate_owner_only_evidence_root(
+                install_linking_authority_readiness.parent,
+                label="private cutover evidence root",
             )
-            overlay.atomic_write_json(runtime_authority_output, active_authority)
+            readiness_path, readiness_sha256, _readiness = (
+                validate_install_linking_authority_readiness(
+                    install_linking_authority_readiness,
+                    expected_sha256=(
+                        install_linking_authority_readiness_sha256
+                    ),
+                    evidence_root=readiness_evidence_root,
+                )
+            )
+            if readiness_path in {journal_path, runtime_authority_output}:
+                raise RuntimeError(
+                    "InstallLinking authority readiness path conflicts with "
+                    "transaction authority paths"
+                )
+            proof_mount_sha256 = prior[
+                "expectedRuntimeProofBindSourceSha256"
+            ]
+            existing_authority: dict[str, Any] | None = None
+            if (
+                runtime_authority_output.exists()
+                or runtime_authority_output.is_symlink()
+            ):
+                existing_authority, _existing_sha256 = (
+                    _read_owner_only_canonical_json(
+                        runtime_authority_output,
+                        label="active runtime authority",
+                        evidence_root=runtime_evidence_root,
+                        maximum_bytes=MAX_INSTALL_LINKING_AUTHORITY_READINESS_BYTES,
+                    )
+                )
+            if existing_authority is not None and _portal_identity_matches_candidate(
+                existing_authority,
+                candidate_portal_container_id=candidate_portal_container_id,
+                candidate_portal_container_name=candidate_portal_container_name,
+                candidate_portal_image_id=candidate_portal_image_id,
+            ):
+                _validate_candidate_active_runtime_authority(
+                    existing_authority,
+                    candidate_portal_container_id=candidate_portal_container_id,
+                    candidate_portal_container_name=candidate_portal_container_name,
+                    candidate_portal_image_id=candidate_portal_image_id,
+                    proof_mount_sha256=proof_mount_sha256,
+                    readiness_path=readiness_path,
+                    readiness_sha256=readiness_sha256,
+                )
+            else:
+                active_authority = active_runtime_authority_payload(
+                    portal_existed=True,
+                    portal_container_id=candidate_portal_container_id,
+                    portal_container_name=candidate_portal_container_name,
+                    portal_image_id=candidate_portal_image_id,
+                    portal_was_running=True,
+                    proof_authority_mount_sha256=proof_mount_sha256,
+                    proof_public_mount_sha256=proof_mount_sha256,
+                )
+                active_authority.update(
+                    {
+                        "installLinkingAuthorityReadinessPath": str(
+                            readiness_path
+                        ),
+                        "installLinkingAuthorityReadinessSha256": readiness_sha256,
+                    }
+                )
+                overlay.atomic_write_json(
+                    runtime_authority_output,
+                    active_authority,
+                )
+            published_authority, _published_sha256 = (
+                _read_owner_only_canonical_json(
+                    runtime_authority_output,
+                    label="active runtime authority",
+                    evidence_root=runtime_evidence_root,
+                    maximum_bytes=MAX_INSTALL_LINKING_AUTHORITY_READINESS_BYTES,
+                )
+            )
+            _validate_candidate_active_runtime_authority(
+                published_authority,
+                candidate_portal_container_id=candidate_portal_container_id,
+                candidate_portal_container_name=candidate_portal_container_name,
+                candidate_portal_image_id=candidate_portal_image_id,
+                proof_mount_sha256=proof_mount_sha256,
+                readiness_path=readiness_path,
+                readiness_sha256=readiness_sha256,
+            )
             journal_path.unlink()
             overlay.fsync_directory(journal_path.parent)
     return {
@@ -1168,6 +1543,15 @@ def parse_args() -> argparse.Namespace:
     complete_parser.add_argument("--candidate-portal-container-id", required=True)
     complete_parser.add_argument("--candidate-portal-container-name", required=True)
     complete_parser.add_argument("--candidate-portal-image-id", required=True)
+    complete_parser.add_argument(
+        "--install-linking-authority-readiness",
+        type=Path,
+        required=True,
+    )
+    complete_parser.add_argument(
+        "--install-linking-authority-readiness-sha256",
+        required=True,
+    )
     phase_parser.add_argument("--phase", choices=TRANSACTION_PHASES, required=True)
     return parser.parse_args()
 
@@ -1250,6 +1634,12 @@ def main() -> int:
                 candidate_portal_container_id=args.candidate_portal_container_id,
                 candidate_portal_container_name=args.candidate_portal_container_name,
                 candidate_portal_image_id=args.candidate_portal_image_id,
+                install_linking_authority_readiness=(
+                    args.install_linking_authority_readiness
+                ),
+                install_linking_authority_readiness_sha256=(
+                    args.install_linking_authority_readiness_sha256
+                ),
                 shared_mutation_lock_token=args.shared_mutation_lock_token,
             )
         else:
