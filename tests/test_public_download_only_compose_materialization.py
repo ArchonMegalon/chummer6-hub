@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -26,8 +27,6 @@ SOURCE_HEAD = subprocess.run(
     capture_output=True,
     text=True,
 ).stdout.strip()
-CERTIFICATE_SOURCE = "/tmp/cert.pfx"
-CERTIFICATE_PASSWORD_SOURCE = "/tmp/cert.pass"
 RUNTIME_PROOF_SOURCE = "/tmp/proof.json"
 APP_OVERLAY_SOURCE = "/tmp/public-download-app"
 FLEET_SOURCE = "/tmp/public-download-fleet"
@@ -36,8 +35,6 @@ PROJECTION_SOURCE = "/tmp/public-download-projection"
 FINAL_GOLD_SOURCE = "/tmp/final-gold.json"
 PROJECT_NAME = "public-download-op-1234"
 DIGESTS = {
-    "certificate": "2" * 64,
-    "certificate_password": "3" * 64,
     "app_overlay": "4" * 64,
     "fleet": "5" * 64,
     "shelf": "6" * 64,
@@ -46,6 +43,8 @@ DIGESTS = {
     "final_gold": "9" * 64,
 }
 VOLUMES = {
+    "app": "public-download-op-app",
+    "fleet": "public-download-op-fleet",
     "state": "public-download-op-state",
     "upload_sessions": "public-download-op-upload-sessions",
     "windows_proof": "public-download-op-windows-proof",
@@ -55,6 +54,25 @@ VOLUMES = {
     "proofs": "public-download-op-proofs",
     "shelf": "public-download-op-shelf",
 }
+
+
+def operation_secrets(tmp_path: Path) -> tuple[Path, Path, Path, str, str]:
+    operation_root = tmp_path / PROJECT_NAME
+    operation_root.mkdir(mode=0o700, exist_ok=True)
+    operation_root.chmod(0o700)
+    certificate = operation_root / "sidecar-data-protection.pfx"
+    password = operation_root / "sidecar-data-protection.password"
+    certificate.write_bytes(b"sidecar-only-certificate-fixture\n")
+    password.write_bytes(b"sidecar-only-password-fixture\n")
+    certificate.chmod(0o600)
+    password.chmod(0o600)
+    return (
+        operation_root,
+        certificate,
+        password,
+        hashlib.sha256(certificate.read_bytes()).hexdigest(),
+        hashlib.sha256(password.read_bytes()).hexdigest(),
+    )
 
 
 def materialize(
@@ -96,16 +114,27 @@ def materialize(
     return output, receipt
 
 
-def render(output: Path) -> str:
+def render(output: Path, tmp_path: Path) -> str:
+    (
+        _,
+        certificate_source,
+        certificate_password_source,
+        certificate_sha256,
+        certificate_password_sha256,
+    ) = operation_secrets(tmp_path)
     environment = {
         **os.environ,
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE": CERTIFICATE_SOURCE,
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": (
-            CERTIFICATE_PASSWORD_SOURCE
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_FILE": str(
+            certificate_source
         ),
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256": DIGESTS["certificate"],
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256": (
-            DIGESTS["certificate_password"]
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_FILE": str(
+            certificate_password_source
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256": (
+            certificate_sha256
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256": (
+            certificate_password_sha256
         ),
         "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR": APP_OVERLAY_SOURCE,
         "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": DIGESTS["app_overlay"],
@@ -123,6 +152,8 @@ def render(output: Path) -> str:
         ),
         "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE": FINAL_GOLD_SOURCE,
         "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256": DIGESTS["final_gold"],
+        "CHUMMER_PUBLIC_DOWNLOAD_APP_VOLUME": VOLUMES["app"],
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_VOLUME": VOLUMES["fleet"],
         "CHUMMER_PUBLIC_DOWNLOAD_STATE_VOLUME": VOLUMES["state"],
         "CHUMMER_PUBLIC_DOWNLOAD_UPLOAD_SESSIONS_VOLUME": (
             VOLUMES["upload_sessions"]
@@ -170,12 +201,21 @@ def validate(
     rendered: str,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
+    (
+        operation_root,
+        certificate_source,
+        certificate_password_source,
+        certificate_sha256,
+        certificate_password_sha256,
+    ) = operation_secrets(tmp_path)
     return subprocess.run(
         [
             sys.executable,
             str(VALIDATOR),
             "--project-name",
             PROJECT_NAME,
+            "--operation-root",
+            str(operation_root),
             "--operation",
             OPERATION,
             "--source-root",
@@ -193,13 +233,13 @@ def validate(
             "--shelf-sha256",
             DIGESTS["shelf"],
             "--certificate-source",
-            CERTIFICATE_SOURCE,
+            str(certificate_source),
             "--certificate-password-source",
-            CERTIFICATE_PASSWORD_SOURCE,
+            str(certificate_password_source),
             "--certificate-sha256",
-            DIGESTS["certificate"],
+            certificate_sha256,
             "--certificate-password-sha256",
-            DIGESTS["certificate_password"],
+            certificate_password_sha256,
             "--app-overlay-source",
             APP_OVERLAY_SOURCE,
             "--app-overlay-sha256",
@@ -220,6 +260,10 @@ def validate(
             FINAL_GOLD_SOURCE,
             "--final-gold-sha256",
             DIGESTS["final_gold"],
+            "--app-volume",
+            VOLUMES["app"],
+            "--fleet-volume",
+            VOLUMES["fleet"],
             "--state-volume",
             VOLUMES["state"],
             "--upload-sessions-volume",
@@ -270,11 +314,22 @@ def test_materialized_runtime_is_exact_isolated_portal_and_initializer_closure(
     assert "group_add" not in portal
     assert portal["network_mode"] == "bridge"
     assert portal["ports"] == ["172.17.0.1:18091:8080"]
+    assert "public-download-app:/app:ro" in portal["volumes"]
+    assert "public-download-fleet:/fleet-artifacts:ro" in portal["volumes"]
     assert "public-download-shelf:/downloads-source:ro" in portal["volumes"]
     assert portal["environment"]["CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED"] == (
         "false"
     )
     assert not any("TOKEN" in key for key in portal["environment"])
+    assert portal["environment"]["AllowedHosts"] == (
+        "chummer.run;www.chummer.run"
+    )
+    assert portal["environment"]["CHUMMER_PUBLIC_ALLOWED_HOSTS"] == (
+        "chummer.run;www.chummer.run"
+    )
+    assert "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256" not in (
+        initializer["environment"]
+    )
     assert portal["depends_on"] == {
         "chummer-public-download-init": {
             "condition": "service_completed_successfully"
@@ -303,6 +358,8 @@ def test_materialized_runtime_is_exact_isolated_portal_and_initializer_closure(
     assert "install-linking-postgres" not in serialized
     assert "chummer_install_linking_postgres" not in serialized
     assert set(payload["volumes"]) == {
+        "public-download-app",
+        "public-download-fleet",
         "public-download-state",
         "public-download-upload-sessions",
         "public-download-windows-proof",
@@ -342,6 +399,7 @@ def test_initializer_requires_and_seals_a_committed_active_shelf() -> None:
     assert ".release-shelf-activation-journal/$receipt_id" in script
     assert "targetPointerBase64" in script
     assert "cmp -s - \"$root/current.json\"" in script
+    assert "chummer.release-shelf-layout/v1" in script
     assert '"state"[[:space:]]*:[[:space:]]*"committed"' in script
     assert "chown -R 0:0 -- \"$destination\"" in script
     assert "chmod 0444" in script
@@ -352,7 +410,7 @@ def test_materialized_runtime_survives_real_compose_render_and_attestation(
     tmp_path: Path,
 ) -> None:
     output, receipt = materialize(tmp_path)
-    rendered = render(output)
+    rendered = render(output, tmp_path)
     payload = json.loads(rendered)
     assert set(payload["services"]) == {
         "chummer-portal",
@@ -365,9 +423,16 @@ def test_materialized_runtime_survives_real_compose_render_and_attestation(
     assert receipt["portalBuildAbsent"] is True
     assert receipt["initializerImageId"] == CANDIDATE_IMAGE_ID
     assert receipt["projectName"] == PROJECT_NAME
+    assert receipt["operationRoot"] == str(tmp_path / PROJECT_NAME)
+    assert receipt["runtimeInputs"]["certificateAuthority"] == (
+        "operation-bound-sidecar-only"
+    )
     assert receipt["publishedAddress"] == "172.17.0.1"
     assert receipt["publishedPort"] == 18091
     assert receipt["portalImageId"] == CANDIDATE_IMAGE_ID
+    assert receipt["portalAppCopiedReadOnly"] is True
+    assert receipt["portalFleetCopiedReadOnly"] is True
+    assert receipt["longRunningSourceBindsAbsent"] is True
     assert receipt["releaseShelfPreinitialized"] is True
     assert receipt["releaseShelfPortalReadOnly"] is True
     assert receipt["sourceHead"] == SOURCE_HEAD
@@ -538,6 +603,23 @@ def test_materializer_rejects_working_source_drift(tmp_path: Path) -> None:
             "environment allowlist drifted",
         ),
         (
+            lambda payload: payload["services"]["chummer-portal"][
+                "environment"
+            ].__setitem__("AllowedHosts", "chummer.run"),
+            "environment allowlist drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"][
+                "volumes"
+            ][0].update(
+                {
+                    "type": "bind",
+                    "source": APP_OVERLAY_SOURCE,
+                }
+            ),
+            "mount authority drifted",
+        ),
+        (
             lambda payload: payload["services"][
                 "chummer-public-download-init"
             ].__setitem__("cap_add", ["CHOWN", "SYS_ADMIN"]),
@@ -551,7 +633,7 @@ def test_runtime_validator_rejects_authority_drift(
     expected_error: str,
 ) -> None:
     output, receipt = materialize(tmp_path)
-    payload = json.loads(render(output))
+    payload = json.loads(render(output, tmp_path))
     mutation(payload)  # type: ignore[operator]
     completed = validate(
         tmp_path,
@@ -562,3 +644,27 @@ def test_runtime_validator_rejects_authority_drift(
     )
     assert completed.returncode != 0
     assert expected_error in completed.stderr
+
+
+def test_runtime_validator_rejects_sidecar_certificate_escape(
+    tmp_path: Path,
+) -> None:
+    output, receipt = materialize(tmp_path)
+    rendered = render(output, tmp_path)
+    _, certificate, _, _, _ = operation_secrets(tmp_path)
+    outside = tmp_path / "incumbent-data-protection.pfx"
+    outside.write_bytes(b"incumbent-authority\n")
+    outside.chmod(0o600)
+    certificate.unlink()
+    certificate.symlink_to(outside)
+
+    completed = validate(
+        tmp_path,
+        output=output,
+        receipt=receipt,
+        rendered=rendered,
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert "not contained by the operation root" in completed.stderr

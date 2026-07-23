@@ -48,6 +48,8 @@ REMOVED_PORTAL_MOUNT_TARGETS = {
 INITIALIZER_SERVICE = "chummer-public-download-init"
 PORTAL_SERVICE = "chummer-portal"
 LOGICAL_VOLUMES = {
+    "public-download-app": "CHUMMER_PUBLIC_DOWNLOAD_APP_VOLUME",
+    "public-download-fleet": "CHUMMER_PUBLIC_DOWNLOAD_FLEET_VOLUME",
     "public-download-state": "CHUMMER_PUBLIC_DOWNLOAD_STATE_VOLUME",
     "public-download-upload-sessions": (
         "CHUMMER_PUBLIC_DOWNLOAD_UPLOAD_SESSIONS_VOLUME"
@@ -69,8 +71,8 @@ PUBLIC_PORTAL_ENVIRONMENT = {
     "ASPNETCORE_ENVIRONMENT": "Production",
     "ASPNETCORE_HTTPS_PORT": "443",
     "CHUMMER_ENABLE_HTTPS_REDIRECTION": "false",
-    "AllowedHosts": "chummer.run",
-    "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+    "AllowedHosts": "chummer.run;www.chummer.run",
+    "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run;www.chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
     "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT": "/fleet-artifacts",
@@ -111,13 +113,13 @@ INITIALIZER_ENVIRONMENT = {
     "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_INIT": "true",
     "CHUMMER_PORTAL_UID": "1654",
     "CHUMMER_PORTAL_GID": "1654",
-    "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256": (
-        "${CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256:"
-        "?Set the reviewed certificate SHA-256}"
+    "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256:"
+        "?Set the operation-bound sidecar certificate SHA-256}"
     ),
-    "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256": (
-        "${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256:"
-        "?Set the reviewed certificate-password SHA-256}"
+    "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256": (
+        "${CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256:"
+        "?Set the operation-bound sidecar certificate-password SHA-256}"
     ),
     "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": (
         "${CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256:"
@@ -294,6 +296,8 @@ def required_environment(name: str, description: str) -> str:
 
 def initializer_mounts() -> list[str]:
     return [
+        "public-download-app:/app-staging",
+        "public-download-fleet:/fleet-staging",
         "public-download-state:/app/state",
         "public-download-upload-sessions:/release-upload-sessions",
         "public-download-windows-proof:/windows-proof-store",
@@ -307,15 +311,15 @@ def initializer_mounts() -> list[str]:
         "public-download-shelf:/downloads-source",
         (
             required_environment(
-                "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE",
-                "Set the reviewed PKCS#12 certificate source",
+                "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_FILE",
+                "Set the operation-bound sidecar PKCS#12 certificate",
             )
             + ":/runtime-inputs/data-protection-key-encryption.pfx:ro"
         ),
         (
             required_environment(
-                "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE",
-                "Set the reviewed certificate-password source",
+                "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_FILE",
+                "Set the operation-bound sidecar certificate password",
             )
             + ":/runtime-inputs/data-protection-key-encryption.password:ro"
         ),
@@ -366,22 +370,10 @@ def initializer_mounts() -> list[str]:
 
 def portal_mounts() -> list[str]:
     return [
-        (
-            required_environment(
-                "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR",
-                "Set the immutable portal app overlay",
-            )
-            + ":/app:ro"
-        ),
+        "public-download-app:/app:ro",
         "public-download-state:/app/state",
         "public-download-runtime-secrets:/run/chummer-secrets:ro",
-        (
-            required_environment(
-                "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE",
-                "Set the immutable fleet/static source",
-            )
-            + ":/fleet-artifacts:ro"
-        ),
+        "public-download-fleet:/fleet-artifacts:ro",
         "public-download-shelf:/downloads-source:ro",
         "public-download-upload-sessions:/release-upload-sessions",
         "public-download-windows-proof:/windows-proof-store",

@@ -233,7 +233,8 @@ require_active_release_shelf() {
   done
   [ "$(stat -c %s -- "$root/current.json")" -le 65536 ] \
     || fail "active release shelf current.json is oversized"
-  printf 'v1\n' | cmp -s - "$root/.release-shelf-layout-v1" \
+  printf 'chummer.release-shelf-layout/v1\n' \
+    | cmp -s - "$root/.release-shelf-layout-v1" \
     || fail "active release shelf layout marker bytes drifted"
   grep -Eq \
     '"schemaVersion"[[:space:]]*:[[:space:]]*"chummer.release-shelf.writer-policy/v1"' \
@@ -509,16 +510,16 @@ verify_secret_identity_boundary() {
 }
 
 run_public_download_initializer() {
-  certificate_sha="${CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256-}"
-  password_sha="${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256-}"
+  certificate_sha="${CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256-}"
+  password_sha="${CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256-}"
   app_sha="${CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256-}"
   fleet_sha="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256-}"
   shelf_sha="${CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256-}"
   projection_sha="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256-}"
   runtime_proof_sha="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
   final_gold_sha="${CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256-}"
-  validate_sha256 CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256 "$certificate_sha"
-  validate_sha256 CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256 "$password_sha"
+  validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256 "$certificate_sha"
+  validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256 "$password_sha"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256 "$app_sha"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256 "$fleet_sha"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256 "$shelf_sha"
@@ -543,8 +544,16 @@ run_public_download_initializer() {
   ensure_private_directory_as_portal_identity /app/state/core-workspaces
   ensure_private_directory_as_portal_identity /app/state/data-protection-keys-v2
 
-  verify_tree_sha256 /runtime-inputs/app "$app_sha" "app overlay"
-  verify_tree_sha256 /runtime-inputs/fleet "$fleet_sha" "fleet/static"
+  copy_immutable_tree \
+    /runtime-inputs/app \
+    /app-staging \
+    "$app_sha" \
+    "portal app"
+  copy_immutable_tree \
+    /runtime-inputs/fleet \
+    /fleet-staging \
+    "$fleet_sha" \
+    "fleet/static"
   copy_isolated_release_shelf \
     /runtime-inputs/shelf \
     /downloads-source \
@@ -567,8 +576,8 @@ run_public_download_initializer() {
     /runtime-inputs/data-protection-key-encryption.password \
     "$password_sha"
 
-  verify_tree_as_runtime_identity /runtime-inputs/app "app overlay"
-  verify_tree_as_runtime_identity /runtime-inputs/fleet "fleet/static"
+  verify_tree_as_runtime_identity /app-staging "copied portal app"
+  verify_tree_as_runtime_identity /fleet-staging "copied fleet/static"
   verify_tree_as_runtime_identity /downloads-source "isolated release shelf"
   verify_tree_as_runtime_identity /public-projection-staging "copied projection"
   verify_tree_as_runtime_identity /proofs-staging "copied runtime proofs"

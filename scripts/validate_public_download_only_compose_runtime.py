@@ -105,6 +105,8 @@ EXPECTED_INITIALIZER_KEYS = {
     "volumes",
 }
 LOGICAL_VOLUMES = {
+    "public-download-app": "app_volume",
+    "public-download-fleet": "fleet_volume",
     "public-download-state": "state_volume",
     "public-download-upload-sessions": "upload_sessions_volume",
     "public-download-windows-proof": "windows_proof_volume",
@@ -124,8 +126,8 @@ PUBLIC_PORTAL_ENVIRONMENT = {
     "ASPNETCORE_ENVIRONMENT": "Production",
     "ASPNETCORE_HTTPS_PORT": "443",
     "CHUMMER_ENABLE_HTTPS_REDIRECTION": "false",
-    "AllowedHosts": "chummer.run",
-    "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+    "AllowedHosts": "chummer.run;www.chummer.run",
+    "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run;www.chummer.run",
     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
     "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT": "/fleet-artifacts",
@@ -223,6 +225,38 @@ def read_owned_json(path: Path, label: str) -> tuple[dict[str, Any], bytes]:
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError(f"{label} is invalid") from exc
     return mapping(payload, label), raw
+
+
+def validate_operation_secret(
+    path: Path,
+    *,
+    operation_root: Path,
+    expected_sha256: str,
+    label: str,
+) -> str:
+    try:
+        canonical = path.resolve(strict=True)
+        canonical.relative_to(operation_root)
+        metadata = path.lstat()
+    except (OSError, ValueError) as exc:
+        raise ValueError(
+            f"{label} is not contained by the operation root"
+        ) from exc
+    if (
+        path.is_symlink()
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) & 0o077
+    ):
+        raise ValueError(f"{label} metadata is unsafe")
+    try:
+        observed_sha256 = hashlib.sha256(canonical.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise ValueError(f"{label} could not be read") from exc
+    if observed_sha256 != expected_sha256:
+        raise ValueError(f"{label} digest drifted")
+    return str(canonical)
 
 
 def validate_materialization_authority(
@@ -375,7 +409,7 @@ def expected_portal_mounts(
     fleet_source: str,
  ) -> list[dict[str, Any]]:
     return [
-        bind_mount(app_overlay_source, "/app", read_only=True),
+        volume_mount("public-download-app", "/app", read_only=True),
         volume_mount(
             "public-download-state",
             "/app/state",
@@ -386,7 +420,11 @@ def expected_portal_mounts(
             "/run/chummer-secrets",
             read_only=True,
         ),
-        bind_mount(fleet_source, "/fleet-artifacts", read_only=True),
+        volume_mount(
+            "public-download-fleet",
+            "/fleet-artifacts",
+            read_only=True,
+        ),
         volume_mount(
             "public-download-shelf",
             "/downloads-source",
@@ -432,6 +470,12 @@ def expected_initializer_mounts(
     final_gold_source: str,
 ) -> list[dict[str, Any]]:
     return [
+        volume_mount("public-download-app", "/app-staging", read_only=False),
+        volume_mount(
+            "public-download-fleet",
+            "/fleet-staging",
+            read_only=False,
+        ),
         volume_mount("public-download-state", "/app/state", read_only=False),
         volume_mount(
             "public-download-upload-sessions",
@@ -525,6 +569,7 @@ def validate(
     payload: dict[str, Any],
     *,
     project_name: str,
+    operation_root: str,
     operation: str,
     candidate_image_id: str,
     certificate_source: str,
@@ -639,8 +684,10 @@ def validate(
         "CHUMMER_PUBLIC_DOWNLOAD_RUNTIME_INIT": "true",
         "CHUMMER_PORTAL_UID": "1654",
         "CHUMMER_PORTAL_GID": "1654",
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_SHA256": certificate_sha256,
-        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_SHA256": (
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256": (
+            certificate_sha256
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_PASSWORD_SHA256": (
             certificate_password_sha256
         ),
         "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": app_overlay_sha256,
@@ -707,9 +754,13 @@ def validate(
         "operation": operation,
         "runtimeProfile": "public-download-only",
         "projectName": project_name,
+        "operationRoot": operation_root,
         "portalImageId": candidate_image_id,
         "initializerImageId": candidate_image_id,
         "initializerConstrained": True,
+        "portalAppCopiedReadOnly": True,
+        "portalFleetCopiedReadOnly": True,
+        "longRunningSourceBindsAbsent": True,
         "releaseShelfPreinitialized": True,
         "releaseShelfPortalReadOnly": True,
         "isolatedVolumes": {
@@ -737,6 +788,7 @@ def validate(
             },
             "certificateSha256": certificate_sha256,
             "certificatePasswordSha256": certificate_password_sha256,
+            "certificateAuthority": "operation-bound-sidecar-only",
         },
         "postgresServicesAbsent": True,
         "postgresEnvironmentAbsent": True,
@@ -779,6 +831,7 @@ def atomic_write(path: Path, payload: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-name", required=True)
+    parser.add_argument("--operation-root", type=Path, required=True)
     parser.add_argument("--operation", choices=tuple(POSTURES), required=True)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--source-head", required=True)
@@ -802,6 +855,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--final-gold-source", required=True)
     parser.add_argument("--final-gold-sha256", required=True)
     parser.add_argument("--state-volume", required=True)
+    parser.add_argument("--app-volume", required=True)
+    parser.add_argument("--fleet-volume", required=True)
     parser.add_argument("--upload-sessions-volume", required=True)
     parser.add_argument("--windows-proof-volume", required=True)
     parser.add_argument("--windows-proof-upload-volume", required=True)
@@ -844,7 +899,41 @@ def main(argv: list[str] | None = None) -> int:
         ):
             if SHA256_PATTERN.fullmatch(digest) is None:
                 raise ValueError(f"{label} is invalid")
+        try:
+            operation_root = args.operation_root.resolve(strict=True)
+            operation_root_metadata = args.operation_root.lstat()
+        except OSError as exc:
+            raise ValueError("operation root is unavailable") from exc
+        if (
+            not args.operation_root.is_absolute()
+            or args.operation_root.is_symlink()
+            or not stat.S_ISDIR(operation_root_metadata.st_mode)
+            or operation_root_metadata.st_uid != os.getuid()
+            or stat.S_IMODE(operation_root_metadata.st_mode) & 0o077
+            or operation_root.name != args.project_name
+        ):
+            raise ValueError(
+                "operation root is not private and project-bound"
+            )
+        certificate_source = validate_operation_secret(
+            Path(args.certificate_source),
+            operation_root=operation_root,
+            expected_sha256=args.certificate_sha256,
+            label="sidecar data-protection certificate",
+        )
+        certificate_password_source = validate_operation_secret(
+            Path(args.certificate_password_source),
+            operation_root=operation_root,
+            expected_sha256=args.certificate_password_sha256,
+            label="sidecar data-protection certificate password",
+        )
+        if certificate_source == certificate_password_source:
+            raise ValueError(
+                "sidecar data-protection certificate inputs are not distinct"
+            )
         volume_names = {
+            "app_volume": args.app_volume,
+            "fleet_volume": args.fleet_volume,
             "state_volume": args.state_volume,
             "upload_sessions_volume": args.upload_sessions_volume,
             "windows_proof_volume": args.windows_proof_volume,
@@ -877,12 +966,13 @@ def main(argv: list[str] | None = None) -> int:
         receipt = validate(
             payload,
             project_name=args.project_name,
+            operation_root=str(operation_root),
             operation=args.operation,
             candidate_image_id=args.candidate_image_id,
             shelf_source=args.shelf_source,
             shelf_sha256=args.shelf_sha256,
-            certificate_source=args.certificate_source,
-            certificate_password_source=args.certificate_password_source,
+            certificate_source=certificate_source,
+            certificate_password_source=certificate_password_source,
             certificate_sha256=args.certificate_sha256,
             certificate_password_sha256=args.certificate_password_sha256,
             app_overlay_source=args.app_overlay_source,
