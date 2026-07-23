@@ -18,7 +18,11 @@ HEALTHCHECK_CONTRACTS: dict[str, tuple[str, ...]] = {
     "chummer-public-blazor": ("curl", "http://127.0.0.1:8080/blazor/health"),
     "chummer-play-web": ("curl", "http://127.0.0.1:8080/health"),
     "chummer-run-identity": ("curl", "http://127.0.0.1:8080/health"),
-    "chummer-portal": ("curl", "http://127.0.0.1:8080/api/ready"),
+    "chummer-portal": (
+        "dotnet",
+        "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll",
+        "/api/ready",
+    ),
     "chummer-run-cloudflared": ("cloudflared", "tunnel", "127.0.0.1:2000", "ready"),
 }
 
@@ -50,12 +54,30 @@ MEMORY_LIMIT_CONTRACTS = {
 }
 
 CURL_RUNTIME_DOCKERFILES = (
-    RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Dockerfile",
     RUN_SERVICES_ROOT / "Chummer.Run.Identity" / "Dockerfile",
     WORKSPACE_ROOT / "chummer-play" / "src" / "Chummer.Play.Web" / "Dockerfile",
     WORKSPACE_ROOT / "chummer-presentation" / "Chummer.Api" / "Dockerfile",
     WORKSPACE_ROOT / "chummer-presentation" / "Chummer.Blazor" / "Dockerfile",
 )
+LOOPBACK_PROBE_SOURCE_CONTRACTS = {
+    RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Dockerfile": (
+        "COPY --from=build /app/loopback-probe /app/loopback-probe/",
+    ),
+    RUN_SERVICES_ROOT
+    / "Chummer.Run.LoopbackProbe"
+    / "Chummer.Run.LoopbackProbe.csproj": (
+        "<OutputType>Exe</OutputType>",
+        "<TargetFramework>net10.0</TargetFramework>",
+        "<RestoreLockedMode>true</RestoreLockedMode>",
+        "<UseAppHost>false</UseAppHost>",
+    ),
+    RUN_SERVICES_ROOT / "Chummer.Run.LoopbackProbe" / "Program.cs": (
+        '"http://127.0.0.1:8080/api/ready"',
+        'request.Headers.Host = "chummer.run";',
+        "AllowAutoRedirect = false",
+        "UseProxy = false",
+    ),
+}
 
 HEALTH_ROUTE_SOURCE_CONTRACTS = {
     RUN_SERVICES_ROOT / "scripts" / "support_progress_mock.py": (
@@ -195,7 +217,10 @@ def validate_runtime_sources() -> list[str]:
         if curl_install_marker not in dockerfile.read_text(encoding="utf-8"):
             failures.append(f"health-probed runtime does not install curl: {dockerfile}")
 
-    for source_path, required_markers in HEALTH_ROUTE_SOURCE_CONTRACTS.items():
+    for source_path, required_markers in {
+        **HEALTH_ROUTE_SOURCE_CONTRACTS,
+        **LOOPBACK_PROBE_SOURCE_CONTRACTS,
+    }.items():
         if not source_path.is_file():
             failures.append(f"health route source is missing: {source_path}")
             continue

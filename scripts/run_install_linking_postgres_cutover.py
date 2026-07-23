@@ -4,6 +4,13 @@
 This operator owns no provider API and never reads a provider token. It builds uniquely tagged
 candidate images, executes bounded Compose jobs from inspected stopped containers, and records
 enough immutable evidence for the cutover-boundary materializer to verify every phase.
+
+An explicitly selected synthetic workspace may replace canonical dependency paths. Every source
+must be a sealed, standalone Git repository beneath that root and bind an exact content digest,
+origin, and main commit. The ownership and mode seal prevents accidental or cross-user mutation;
+an actor already running as the operator UID can remove that seal and is outside this boundary.
+The final pre-execution bind narrows that mutation window but does not claim atomic pathname
+immunity from an actor already running as the operator UID.
 """
 
 from __future__ import annotations
@@ -24,13 +31,38 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 try:
+    from scripts.public_edge_build_policy import (
+        PUBLIC_EDGE_BUILD_ARG_NAMES,
+        PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
+        PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_STAGE_ORDER,
+        PUBLIC_EDGE_NAMED_CONTEXT_NAMES,
+        PUBLIC_EDGE_RAW_SERVICE_IMAGES,
+        PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES,
+        PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE,
+        docker_context_policy_findings,
+        docker_copy_from_reference,
+        docker_instruction_uses_mount,
+        docker_logical_instruction_records,
+        docker_logical_instructions,
+        dockerfile_parser_directive_findings,
+        public_edge_compose_build_syntax_failures,
+        public_edge_rendered_compose_failures,
+        rendered_build_contract_matches,
+    )
     from scripts.materialize_install_linking_cutover_boundary import (
         PHASE_EVIDENCE_CONTRACT,
         POSTQUIESCE_REPROOF_CONTRACT,
@@ -56,6 +88,31 @@ try:
     )
     from scripts.verify_install_linking_cutover_boundary import verify_boundary
 except ModuleNotFoundError:
+    from public_edge_build_policy import (
+        PUBLIC_EDGE_BUILD_ARG_NAMES,
+        PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
+        PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_STAGE_ORDER,
+        PUBLIC_EDGE_NAMED_CONTEXT_NAMES,
+        PUBLIC_EDGE_RAW_SERVICE_IMAGES,
+        PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES,
+        PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE,
+        docker_context_policy_findings,
+        docker_copy_from_reference,
+        docker_instruction_uses_mount,
+        docker_logical_instruction_records,
+        docker_logical_instructions,
+        dockerfile_parser_directive_findings,
+        public_edge_compose_build_syntax_failures,
+        public_edge_rendered_compose_failures,
+        rendered_build_contract_matches,
+    )
     from materialize_install_linking_cutover_boundary import (
         PHASE_EVIDENCE_CONTRACT,
         POSTQUIESCE_REPROOF_CONTRACT,
@@ -97,9 +154,6 @@ CANONICAL_BUILD_CONTEXT = Path("/docker/chummercomplete")
 CANONICAL_DOCKER_CONFIG_ROOT = Path(
     "/docker/chummercomplete/.state/public-edge-docker-cli"
 )
-CANONICAL_FLEET_MEDIA_CONTRACTS = Path(
-    "/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
-)
 CANONICAL_FLEET_MEDIA_REPOSITORY = Path(
     "/docker/fleet/repos/chummer-media-factory"
 )
@@ -107,12 +161,15 @@ CANONICAL_DESIGN_PRODUCT = Path("/docker/chummercomplete/chummer-design")
 CANONICAL_HUB_REGISTRY = Path(
     "/docker/chummercomplete/chummer-hub-registry"
 )
-CANONICAL_BUILD_CONTEXT_DOCKERIGNORE = (
-    CANONICAL_BUILD_CONTEXT / ".dockerignore"
-)
 BUILD_DEPENDENCY_PROVENANCE_CONTRACT = (
     "chummer.install_linking_postgres_build_dependency_provenance.v1"
 )
+SOURCE_CONTENT_MANIFEST_CONTRACT = (
+    "chummer.install_linking_postgres_source_content_manifest.v1"
+)
+MAX_SOURCE_FILE_BYTES = 256 * 1024 * 1024
+MAX_SOURCE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_SOURCE_FILE_COUNT = 200_000
 DOCKERFILE_FRONTEND_REFERENCE = (
     "docker/dockerfile:1.4@sha256:"
     "9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc"
@@ -181,6 +238,10 @@ CANONICAL_ORIGIN_URLS = {
         "https://github.com/ArchonMegalon/chummer6-media-factory.git"
     ),
 }
+SYNTHETIC_SOURCE_KIND = "standalone-git-repository"
+EXPECTED_NAMED_CONTEXT_COPY_INSTRUCTIONS_BY_STAGE = (
+    PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE
+)
 CANONICAL_PROJECT = "chummer6-hub"
 CANONICAL_DOCKER_CONTEXT = "default"
 CANONICAL_DOCKER_HOST = "unix:///var/run/docker.sock"
@@ -596,6 +657,7 @@ def hash_regular_file(
     *,
     owner_only: bool,
     maximum_bytes: int = 16 * 1024 * 1024,
+    allow_empty: bool = False,
 ) -> str:
     if not path.is_absolute():
         raise CutoverError("bound input must be absolute")
@@ -605,7 +667,7 @@ def hash_regular_file(
         stat.S_ISLNK(metadata.st_mode)
         or not stat.S_ISREG(metadata.st_mode)
         or metadata.st_nlink != 1
-        or metadata.st_size <= 0
+        or (not allow_empty and metadata.st_size <= 0)
         or metadata.st_size > maximum_bytes
         or (owner_only and (
             metadata.st_uid != os.getuid()
@@ -825,6 +887,265 @@ def read_private_canonical_json(
     return payload, sha256_bytes(raw)
 
 
+def require_safe_source_directory(path: Path, *, label: str) -> Path:
+    normalized = Path(os.path.abspath(path))
+    try:
+        metadata = normalized.lstat()
+        resolved = normalized.resolve(strict=True)
+    except OSError as exc:
+        raise CutoverError(f"{label} source directory is unavailable") from exc
+    if (
+        not path.is_absolute()
+        or resolved != normalized
+        or stat.S_ISLNK(metadata.st_mode)
+        or not stat.S_ISDIR(metadata.st_mode)
+    ):
+        raise CutoverError(
+            f"{label} source directory must be absolute and non-symlinked"
+        )
+    return normalized
+
+
+def require_path_within(
+    path: Path,
+    root: Path,
+    *,
+    label: str,
+    allow_root: bool = False,
+) -> None:
+    if path == root:
+        if allow_root:
+            return
+        raise CutoverError(f"{label} must be strictly beneath the synthetic root")
+    if root not in path.parents:
+        raise CutoverError(f"{label} is outside the approved synthetic root")
+
+
+def _source_file_record(root: Path, relative_path: str) -> dict[str, Any]:
+    relative = Path(relative_path)
+    if (
+        not relative_path
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or relative.as_posix() != relative_path
+    ):
+        raise CutoverError("source content contains an unsafe relative path")
+    path = root / relative
+    try:
+        before = path.lstat()
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise CutoverError("source content entry is unavailable") from exc
+    if (
+        resolved != path
+        or stat.S_ISLNK(before.st_mode)
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_size > MAX_SOURCE_FILE_BYTES
+    ):
+        raise CutoverError(
+            "source content entries must be non-symlinked regular files"
+        )
+    digest = hash_regular_file(
+        path,
+        owner_only=False,
+        maximum_bytes=MAX_SOURCE_FILE_BYTES,
+        allow_empty=True,
+    )
+    after = path.lstat()
+    if (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_nlink,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    ) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_nlink,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        raise CutoverError("source content entry changed while being hashed")
+    return {
+        "mode": f"{stat.S_IMODE(before.st_mode):04o}",
+        "path": relative_path,
+        "sha256": digest,
+        "size": before.st_size,
+    }
+
+
+def source_content_sha256(
+    root: Path,
+    relative_paths: Iterable[str],
+) -> tuple[str, int, str]:
+    entries: list[dict[str, Any]] = []
+    total_bytes = 0
+    for relative_path in sorted(set(relative_paths)):
+        record = _source_file_record(root, relative_path)
+        entries.append(record)
+        total_bytes += int(record["size"])
+        if (
+            len(entries) > MAX_SOURCE_FILE_COUNT
+            or total_bytes > MAX_SOURCE_TOTAL_BYTES
+        ):
+            raise CutoverError("source content manifest exceeds governed bounds")
+    if not entries:
+        raise CutoverError("source content manifest is empty")
+    file_set_sha256 = sha256_bytes(
+        "".join(f"{entry['path']}\n" for entry in entries).encode("utf-8")
+    )
+    digest = sha256_bytes(
+        canonical_json_bytes(
+            {
+                "contractName": SOURCE_CONTENT_MANIFEST_CONTRACT,
+                "entries": entries,
+            },
+            label="source content manifest",
+        )
+    )
+    return digest, len(entries), file_set_sha256
+
+
+def _synthetic_entry_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_uid,
+    )
+
+
+def validate_synthetic_workspace_root(root: Path) -> None:
+    metadata = root.lstat()
+    if metadata.st_uid != os.getuid():
+        raise CutoverError("synthetic workspace must be owned by the operator UID")
+    if stat.S_IMODE(metadata.st_mode) != 0o700:
+        raise CutoverError("synthetic workspace must have exact mode 0700")
+
+
+def validate_sealed_standalone_repository(repository: Path) -> None:
+    """Validate a read-only, current-UID tree with local unaliased Git storage."""
+
+    operator_uid = os.getuid()
+    git_root = repository / ".git"
+    try:
+        git_metadata = git_root.lstat()
+    except OSError as exc:
+        raise CutoverError(
+            "synthetic source has no local Git metadata directory"
+        ) from exc
+    if (
+        not stat.S_ISDIR(git_metadata.st_mode)
+        or stat.S_ISLNK(git_metadata.st_mode)
+    ):
+        raise CutoverError(
+            "synthetic source must use a real local .git directory"
+        )
+
+    def visit(directory: Path, *, require_content: bool) -> bool:
+        before = directory.lstat()
+        if (
+            not stat.S_ISDIR(before.st_mode)
+            or stat.S_ISLNK(before.st_mode)
+            or before.st_uid != operator_uid
+            or stat.S_IMODE(before.st_mode) & 0o222
+        ):
+            raise CutoverError(
+                "synthetic source directories must be operator-owned and sealed"
+            )
+        has_content = False
+        with os.scandir(directory) as iterator:
+            entries = sorted(iterator, key=lambda item: item.name)
+        for entry in entries:
+            path = directory / entry.name
+            metadata = path.lstat()
+            if (
+                stat.S_ISLNK(metadata.st_mode)
+                or metadata.st_uid != operator_uid
+                or stat.S_IMODE(metadata.st_mode) & 0o222
+            ):
+                raise CutoverError(
+                    "synthetic source entries must be operator-owned, non-symlinked, and sealed"
+                )
+            if stat.S_ISDIR(metadata.st_mode):
+                if path == git_root:
+                    visit(path, require_content=False)
+                    continue
+                child_has_content = visit(
+                    path,
+                    require_content=require_content,
+                )
+                has_content = has_content or child_has_content
+            elif stat.S_ISREG(metadata.st_mode):
+                if metadata.st_nlink != 1:
+                    raise CutoverError(
+                        "synthetic source files must have one unaliased link"
+                    )
+                has_content = True
+            else:
+                raise CutoverError("synthetic source contains a special file")
+        after = directory.lstat()
+        if _synthetic_entry_identity(before) != _synthetic_entry_identity(after):
+            raise CutoverError(
+                "synthetic source changed while its seal was inspected"
+            )
+        if require_content and not has_content:
+            raise CutoverError(
+                "synthetic source contains an unbound empty directory"
+            )
+        return has_content
+
+    visit(repository, require_content=True)
+    forbidden_git_indirections = (
+        git_root / "commondir",
+        git_root / "worktrees",
+        git_root / "shallow",
+        git_root / "info" / "grafts",
+        git_root / "objects" / "info" / "alternates",
+        git_root / "objects" / "info" / "http-alternates",
+    )
+    if any(path.exists() or path.is_symlink() for path in forbidden_git_indirections):
+        raise CutoverError(
+            "synthetic source uses forbidden shared, shallow, alternate, or grafted Git state"
+        )
+    promisor_packs = tuple((git_root / "objects" / "pack").glob("*.promisor"))
+    if promisor_packs:
+        raise CutoverError("synthetic source uses partial/promisor Git objects")
+
+
+_docker_logical_instruction_records = docker_logical_instruction_records
+
+
+def require_candidate_dockerfile_parser_policy(text: str) -> None:
+    exact_syntax, late_directives = dockerfile_parser_directive_findings(
+        text,
+        expected_syntax_directive=(
+            f"# syntax={DOCKERFILE_FRONTEND_REFERENCE}"
+        ),
+    )
+    if not exact_syntax or late_directives:
+        raise CutoverError(
+            "candidate Dockerfile parser directive contract drifted"
+        )
+
+
+def require_public_edge_compose_build_syntax(text: str) -> None:
+    failures = public_edge_compose_build_syntax_failures(text)
+    if failures:
+        raise CutoverError(
+            "raw Compose build authority drifted: " + failures[0]
+        )
+
+
 class CommandRunner:
     def __init__(
         self,
@@ -836,6 +1157,10 @@ class CommandRunner:
             "PATH": "/usr/bin:/bin",
             "HOME": str(docker_config_root / "home"),
             "DOCKER_CONFIG": str(docker_config_root / "config"),
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
             "LANG": "C",
             "LC_ALL": "C",
         }
@@ -893,6 +1218,120 @@ class CutoverInputs:
     expected_fleet_media_factory_head: str
     expected_build_context_dockerignore_sha256: str
     cutover_id: str
+    synthetic_workspace_root: Path | None = None
+    build_context_root: Path = CANONICAL_BUILD_CONTEXT
+    hub_registry_root: Path = CANONICAL_HUB_REGISTRY
+    design_product_root: Path = CANONICAL_DESIGN_PRODUCT
+    fleet_media_factory_root: Path = CANONICAL_FLEET_MEDIA_REPOSITORY
+    expected_run_services_content_sha256: str | None = None
+    expected_hub_registry_content_sha256: str | None = None
+    expected_design_product_content_sha256: str | None = None
+    expected_fleet_media_factory_content_sha256: str | None = None
+
+
+def validate_build_workspace_paths(inputs: CutoverInputs) -> None:
+    source_roots = {
+        "run-services-source": inputs.source_root,
+        "hub-registry": inputs.hub_registry_root,
+        "design-product": inputs.design_product_root,
+        "fleet-media-factory-contracts": inputs.fleet_media_factory_root,
+    }
+    content_pins = {
+        "run-services-source": inputs.expected_run_services_content_sha256,
+        "hub-registry": inputs.expected_hub_registry_content_sha256,
+        "design-product": inputs.expected_design_product_content_sha256,
+        "fleet-media-factory-contracts": (
+            inputs.expected_fleet_media_factory_content_sha256
+        ),
+    }
+    if inputs.synthetic_workspace_root is None:
+        if (
+            inputs.build_context_root != CANONICAL_BUILD_CONTEXT
+            or inputs.hub_registry_root != CANONICAL_HUB_REGISTRY
+            or inputs.design_product_root != CANONICAL_DESIGN_PRODUCT
+            or inputs.fleet_media_factory_root
+            != CANONICAL_FLEET_MEDIA_REPOSITORY
+            or any(value is not None for value in content_pins.values())
+        ):
+            raise CutoverError(
+                "noncanonical build sources require an approved synthetic root"
+            )
+        return
+
+    synthetic_root = require_safe_source_directory(
+        inputs.synthetic_workspace_root,
+        label="synthetic workspace",
+    )
+    validate_synthetic_workspace_root(synthetic_root)
+    build_context_root = require_safe_source_directory(
+        inputs.build_context_root,
+        label="build context",
+    )
+    require_path_within(
+        build_context_root,
+        synthetic_root,
+        label="build context",
+        allow_root=True,
+    )
+    if (
+        build_context_root != inputs.source_root
+        and build_context_root not in inputs.source_root.parents
+    ):
+        raise CutoverError(
+            "synthetic build context must contain the run-services source"
+        )
+    if (
+        inputs.build_context_root == CANONICAL_BUILD_CONTEXT
+        or inputs.hub_registry_root == CANONICAL_HUB_REGISTRY
+        or inputs.design_product_root == CANONICAL_DESIGN_PRODUCT
+        or inputs.fleet_media_factory_root
+        == CANONICAL_FLEET_MEDIA_REPOSITORY
+    ):
+        raise CutoverError(
+            "synthetic workspace cannot fall back to a canonical source path"
+        )
+    normalized_roots: dict[str, Path] = {}
+    for name, path in source_roots.items():
+        normalized = require_safe_source_directory(path, label=name)
+        require_path_within(normalized, synthetic_root, label=name)
+        validate_sealed_standalone_repository(normalized)
+        normalized_roots[name] = normalized
+    root_items = list(normalized_roots.items())
+    for index, (name, path) in enumerate(root_items):
+        for other_name, other_path in root_items[index + 1 :]:
+            if (
+                path == other_path
+                or path in other_path.parents
+                or other_path in path.parents
+            ):
+                raise CutoverError(
+                    "synthetic source repositories must be distinct siblings: "
+                    f"{name}, {other_name}"
+                )
+    for name, content_pin in content_pins.items():
+        if (
+            content_pin is None
+            or HEX_SHA256_PATTERN.fullmatch(content_pin) is None
+        ):
+            raise CutoverError(
+                f"{name} requires an exact synthetic content pin"
+            )
+
+
+def build_routing_environment(inputs: CutoverInputs) -> dict[str, str]:
+    return {
+        "CHUMMER_BUILD_CONCURRENCY": "1",
+        "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(inputs.build_context_root),
+        "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(inputs.source_root),
+        "CHUMMER_RUN_SERVICES_SOURCE": str(inputs.source_root),
+        "CHUMMER_HUB_REGISTRY_SOURCE": str(inputs.hub_registry_root),
+        "CHUMMER_DESIGN_PRODUCT_SOURCE": str(inputs.design_product_root),
+        "CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE": str(
+            inputs.fleet_media_factory_root
+            / "src"
+            / "Chummer.Media.Contracts"
+        ),
+    }
 
 
 class GovernedCutoverRunner:
@@ -1017,6 +1456,18 @@ class GovernedCutoverRunner:
         except UnicodeDecodeError as exc:
             raise CutoverError("build-source Git output was not UTF-8") from exc
 
+    def _git_optional_output(self, repository: Path, *arguments: str) -> str:
+        result = self.commands.run(
+            ["/usr/bin/git", "-C", str(repository), *arguments],
+            check=False,
+        )
+        if result.returncode not in {0, 1}:
+            raise CutoverError("optional build-source Git query failed")
+        try:
+            return result.stdout.decode("utf-8", "strict").strip()
+        except UnicodeDecodeError as exc:
+            raise CutoverError("build-source Git output was not UTF-8") from exc
+
     @staticmethod
     def _ignored_entry_is_docker_excluded(relative_path: str) -> bool:
         path = Path(relative_path)
@@ -1090,16 +1541,66 @@ class GovernedCutoverRunner:
         consumed_path: Path,
         expected_head: str,
         allow_docker_excluded_ignored: bool,
+        expected_content_sha256: str | None = None,
+        additional_content_paths: Sequence[str] = (),
     ) -> dict[str, Any]:
+        repository = require_safe_source_directory(
+            repository,
+            label=name,
+        )
+        consumed_path = require_safe_source_directory(
+            consumed_path,
+            label=f"{name} consumed",
+        )
         if (
-            not repository.is_absolute()
-            or repository.resolve(strict=True) != repository
-            or not consumed_path.is_absolute()
-            or consumed_path.resolve(strict=True) != consumed_path
-            or consumed_path != repository
+            consumed_path != repository
             and repository not in consumed_path.parents
         ):
             raise CutoverError(f"{name} build source path is unsafe")
+        if self.inputs.synthetic_workspace_root is not None:
+            validate_sealed_standalone_repository(repository)
+            if expected_content_sha256 is None:
+                raise CutoverError(
+                    f"{name} synthetic source requires an exact content pin"
+                )
+            replace_refs = self._git_output(
+                repository,
+                "for-each-ref",
+                "--format=%(refname)",
+                "refs/replace",
+            )
+            shallow = self._git_output(
+                repository,
+                "rev-parse",
+                "--is-shallow-repository",
+            )
+            promisor_configuration = self._git_optional_output(
+                repository,
+                "config",
+                "--local",
+                "--get-regexp",
+                (
+                    r"^(extensions\.partialclone|"
+                    r"remote\..*\.promisor|"
+                    r"remote\..*\.partialclonefilter)$"
+                ),
+            )
+            self.commands.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(repository),
+                    "fsck",
+                    "--strict",
+                    "--full",
+                    "--no-dangling",
+                    "--no-progress",
+                ]
+            )
+            if replace_refs or shallow != "false" or promisor_configuration:
+                raise CutoverError(
+                    f"{name} synthetic Git source uses replace, shallow, or promisor state"
+                )
         top_level = self._git_output(
             repository,
             "rev-parse",
@@ -1174,15 +1675,42 @@ class GovernedCutoverRunner:
             raise CutoverError(
                 f"{name} is not one clean, exact, canonical origin/main build source"
             )
+        if expected_content_sha256 is None:
+            return {
+                "consumedPathSha256": sha256_bytes(
+                    str(consumed_path).encode("utf-8")
+                ),
+                "contextFileSetSha256": sha256_bytes(
+                    "".join(
+                        f"{entry}\n" for entry in tracked_entries
+                    ).encode("utf-8")
+                ),
+                "head": head,
+                "ignoredInputCount": len(ignored_entries),
+                "originMain": origin_main,
+                "originUrlSha256": sha256_bytes(
+                    origin_url.encode("utf-8")
+                ),
+                "repositoryRootSha256": sha256_bytes(
+                    str(repository).encode("utf-8")
+                ),
+                "sensitivePathCount": 0,
+                "trackedInputCount": len(tracked_entries),
+            }
+        content_paths = sorted(
+            set(tracked_entries) | set(additional_content_paths)
+        )
+        content_sha256, content_count, context_file_set_sha256 = (
+            source_content_sha256(repository, content_paths)
+        )
+        if content_sha256 != expected_content_sha256:
+            raise CutoverError(f"{name} content digest does not match its exact pin")
         return {
             "consumedPathSha256": sha256_bytes(
                 str(consumed_path).encode("utf-8")
             ),
-            "contextFileSetSha256": sha256_bytes(
-                "".join(
-                    f"{entry}\n" for entry in tracked_entries
-                ).encode("utf-8")
-            ),
+            "contentSha256": content_sha256,
+            "contextFileSetSha256": context_file_set_sha256,
             "head": head,
             "ignoredInputCount": len(ignored_entries),
             "originMain": origin_main,
@@ -1191,8 +1719,30 @@ class GovernedCutoverRunner:
                 str(repository).encode("utf-8")
             ),
             "sensitivePathCount": 0,
-            "trackedInputCount": len(tracked_entries),
+            "sourceKind": SYNTHETIC_SOURCE_KIND,
+            "trackedInputCount": content_count,
         }
+
+    def _source_provenance(
+        self,
+        *,
+        name: str,
+        repository: Path,
+        consumed_path: Path,
+        expected_head: str,
+        expected_content_sha256: str | None,
+        allow_docker_excluded_ignored: bool,
+        additional_content_paths: Sequence[str] = (),
+    ) -> dict[str, Any]:
+        return self._git_source_provenance(
+            name=name,
+            repository=repository,
+            consumed_path=consumed_path,
+            expected_head=expected_head,
+            expected_content_sha256=expected_content_sha256,
+            allow_docker_excluded_ignored=allow_docker_excluded_ignored,
+            additional_content_paths=additional_content_paths,
+        )
 
     @staticmethod
     def _require_explicit_allowlist_dockerignore(
@@ -1220,6 +1770,9 @@ class GovernedCutoverRunner:
                 f"{label} Docker ignore is not an explicit allowlist"
             )
         return sha256_bytes(raw)
+
+    def _validate_build_workspace_paths(self) -> None:
+        validate_build_workspace_paths(self.inputs)
 
     @staticmethod
     def _validate_package_plane(
@@ -1311,12 +1864,26 @@ class GovernedCutoverRunner:
         return len(packages)
 
     def _capture_build_dependency_provenance(self) -> dict[str, Any]:
+        self._validate_build_workspace_paths()
         source = self.inputs.source_root
+        build_context_name = (
+            "synthetic-build-context"
+            if self.inputs.synthetic_workspace_root is not None
+            else "canonical-build-context"
+        )
         dockerfile_path = source / "Chummer.Run.Api" / "Dockerfile"
         dockerignore_path = source / "Chummer.Run.Api" / "Dockerfile.dockerignore"
         source_dockerignore_path = source / ".dockerignore"
-        design_dockerignore_path = CANONICAL_DESIGN_PRODUCT / ".dockerignore"
-        fleet_dockerignore_path = CANONICAL_FLEET_MEDIA_CONTRACTS / ".dockerignore"
+        design_dockerignore_path = (
+            self.inputs.design_product_root / ".dockerignore"
+        )
+        hub_dockerignore_path = self.inputs.hub_registry_root / ".dockerignore"
+        fleet_media_contracts = (
+            self.inputs.fleet_media_factory_root
+            / "src"
+            / "Chummer.Media.Contracts"
+        )
+        fleet_dockerignore_path = fleet_media_contracts / ".dockerignore"
 
         dockerfile = read_regular_file_bytes(
             dockerfile_path,
@@ -1326,6 +1893,39 @@ class GovernedCutoverRunner:
             dockerfile_text = dockerfile.decode("utf-8", "strict")
         except UnicodeDecodeError as exc:
             raise CutoverError("candidate Dockerfile is not UTF-8") from exc
+        require_candidate_dockerfile_parser_policy(dockerfile_text)
+        (
+            logical_instruction_records,
+            malformed_continuations,
+        ) = _docker_logical_instruction_records(dockerfile_text)
+        if malformed_continuations:
+            raise CutoverError(
+                "candidate Dockerfile has a malformed continuation"
+            )
+        logical_instructions = tuple(
+            instruction
+            for _line_number, instruction, _used_continuation
+            in logical_instruction_records
+        )
+        context_policy = docker_context_policy_findings(
+            logical_instruction_records
+        )
+        add_instructions = [
+            instruction
+            for instruction in logical_instructions
+            if re.match(r"ADD(?:\s|$)", instruction, flags=re.IGNORECASE)
+        ]
+        unqualified_copy_instructions = [
+            instruction
+            for instruction in logical_instructions
+            if re.match(r"COPY(?:\s|$)", instruction, flags=re.IGNORECASE)
+            and re.search(
+                r"--from(?:=|\s+)[^\s]+",
+                instruction,
+                flags=re.IGNORECASE,
+            )
+            is None
+        ]
         from_lines = [
             line.strip()
             for line in dockerfile_text.splitlines()
@@ -1353,6 +1953,16 @@ class GovernedCutoverRunner:
         if (
             first_line != f"# syntax={DOCKERFILE_FRONTEND_REFERENCE}"
             or from_lines != expected_from_lines
+            or add_instructions
+            or unqualified_copy_instructions
+            or not context_policy["exactReviewedCopySet"]
+            or context_policy["forbiddenContextUses"]
+            or context_policy["heredocUses"]
+            or context_policy["mountFromUses"]
+            or context_policy["noncopyFromUses"]
+            or context_policy["invalidCopyFromUses"]
+            or context_policy["continuationUses"]
+            or context_policy["onbuildUses"]
             or any(marker in dockerfile_text for marker in forbidden_install_markers)
             or dockerfile_text.count("--locked-mode") != 2
             or dockerfile_text.count("-p:RestoreAdditionalProjectSources=") != 2
@@ -1379,6 +1989,12 @@ class GovernedCutoverRunner:
                 "/app/loopback-probe/"
             )
             != 1
+            or dockerfile_text.count(
+                "COPY --from=hub-registry-source black-ledger/ "
+                "chummer-hub-registry/black-ledger/"
+            )
+            != 1
+            or "COPY chummer-hub-registry/black-ledger/" in dockerfile_text
             or "install-linking-postgres-tool" in dockerfile_text.split(
                 expected_from_lines[-1],
                 1,
@@ -1474,8 +2090,7 @@ class GovernedCutoverRunner:
             )
 
         media_project = read_regular_file_bytes(
-            CANONICAL_FLEET_MEDIA_CONTRACTS
-            / "Chummer.Media.Contracts.csproj",
+            fleet_media_contracts / "Chummer.Media.Contracts.csproj",
             maximum_bytes=1024 * 1024,
         )
         try:
@@ -1492,8 +2107,12 @@ class GovernedCutoverRunner:
             )
 
         context_policies = {
-            "canonical-build-context": {
-                "contextBoundary": "canonical-root-with-explicit-allowlist",
+            build_context_name: {
+                "contextBoundary": (
+                    "synthetic-root-with-explicit-allowlist"
+                    if self.inputs.synthetic_workspace_root is not None
+                    else "canonical-root-with-explicit-allowlist"
+                ),
                 "dockerignoreSha256": (
                     self.inputs.expected_build_context_dockerignore_sha256
                 ),
@@ -1521,6 +2140,12 @@ class GovernedCutoverRunner:
                 ),
                 "repositoryContained": True,
             },
+            "hub-registry-source": {
+                "contextBoundary": "exact-clean-repository",
+                "dockerignoreSha256": None,
+                "effectiveDockerignoreSha256": None,
+                "repositoryContained": True,
+            },
             "fleet-media-factory-contracts": {
                 "contextBoundary": "exact-clean-repository-subtree",
                 "dockerignoreSha256": None,
@@ -1544,6 +2169,10 @@ class GovernedCutoverRunner:
                 "repositoryContained": True,
             },
         }
+        if hub_dockerignore_path.exists():
+            raise CutoverError(
+                "hub registry context gained an unreviewed Docker ignore"
+            )
         if fleet_dockerignore_path.exists():
             raise CutoverError(
                 "fleet media context gained an unreviewed Docker ignore"
@@ -1588,7 +2217,13 @@ class GovernedCutoverRunner:
     def _capture_build_source_provenance(
         self,
     ) -> dict[str, dict[str, Any]]:
-        dockerignore = CANONICAL_BUILD_CONTEXT_DOCKERIGNORE
+        self._validate_build_workspace_paths()
+        build_context_name = (
+            "synthetic-build-context"
+            if self.inputs.synthetic_workspace_root is not None
+            else "canonical-build-context"
+        )
+        dockerignore = self.inputs.build_context_root / ".dockerignore"
         if (
             not dockerignore.is_absolute()
             or dockerignore.resolve(strict=True) != dockerignore
@@ -1596,40 +2231,59 @@ class GovernedCutoverRunner:
             != self.inputs.expected_build_context_dockerignore_sha256
         ):
             raise CutoverError(
-                "canonical Docker build-context ignore contract drifted"
+                "Docker build-context ignore contract drifted"
             )
         provenance = {
-            "run-services-source": self._git_source_provenance(
+            "run-services-source": self._source_provenance(
                 name="run-services-source",
                 repository=self.inputs.source_root,
                 consumed_path=self.inputs.source_root,
                 expected_head=self.inputs.expected_head,
+                expected_content_sha256=(
+                    self.inputs.expected_run_services_content_sha256
+                ),
                 allow_docker_excluded_ignored=True,
             ),
-            "hub-registry": self._git_source_provenance(
+            "hub-registry": self._source_provenance(
                 name="hub-registry",
-                repository=CANONICAL_HUB_REGISTRY,
-                consumed_path=CANONICAL_HUB_REGISTRY / "black-ledger",
+                repository=self.inputs.hub_registry_root,
+                consumed_path=self.inputs.hub_registry_root,
                 expected_head=self.inputs.expected_hub_registry_head,
-                allow_docker_excluded_ignored=True,
+                expected_content_sha256=(
+                    self.inputs.expected_hub_registry_content_sha256
+                ),
+                allow_docker_excluded_ignored=False,
             ),
-            "design-product": self._git_source_provenance(
+            "design-product": self._source_provenance(
                 name="design-product",
-                repository=CANONICAL_DESIGN_PRODUCT,
-                consumed_path=CANONICAL_DESIGN_PRODUCT / "products" / "chummer",
+                repository=self.inputs.design_product_root,
+                consumed_path=(
+                    self.inputs.design_product_root / "products" / "chummer"
+                ),
                 expected_head=self.inputs.expected_design_product_head,
+                expected_content_sha256=(
+                    self.inputs.expected_design_product_content_sha256
+                ),
                 allow_docker_excluded_ignored=False,
+                additional_content_paths=(".dockerignore",),
             ),
-            "fleet-media-factory-contracts": self._git_source_provenance(
+            "fleet-media-factory-contracts": self._source_provenance(
                 name="fleet-media-factory-contracts",
-                repository=CANONICAL_FLEET_MEDIA_REPOSITORY,
-                consumed_path=CANONICAL_FLEET_MEDIA_CONTRACTS,
+                repository=self.inputs.fleet_media_factory_root,
+                consumed_path=(
+                    self.inputs.fleet_media_factory_root
+                    / "src"
+                    / "Chummer.Media.Contracts"
+                ),
                 expected_head=self.inputs.expected_fleet_media_factory_head,
+                expected_content_sha256=(
+                    self.inputs.expected_fleet_media_factory_content_sha256
+                ),
                 allow_docker_excluded_ignored=False,
             ),
-            "canonical-build-context": {
+            build_context_name: {
                 "consumedPathSha256": sha256_bytes(
-                    str(CANONICAL_BUILD_CONTEXT).encode("utf-8")
+                    str(self.inputs.build_context_root).encode("utf-8")
                 ),
                 "dockerignoreSha256": (
                     self.inputs.expected_build_context_dockerignore_sha256
@@ -1641,7 +2295,9 @@ class GovernedCutoverRunner:
         }
         return provenance
 
-    def _validate_source(self) -> None:
+    def _bind_pinned_source_inputs(self) -> None:
+        """Rebind the exact local files that determine a Compose invocation."""
+        self._validate_build_workspace_paths()
         source = self.inputs.source_root
         if not source.is_absolute() or source.resolve(strict=True) != source:
             raise CutoverError("source root must be an absolute non-symlinked path")
@@ -1660,34 +2316,63 @@ class GovernedCutoverRunner:
             or actual_runner != self.inputs.runner_sha256
         ):
             raise CutoverError("an independently pinned cutover input digest drifted")
-        head = self.commands.run(
-            ["/usr/bin/git", "-C", str(source), "rev-parse", "HEAD"]
-        ).stdout.decode("ascii", "strict").strip()
-        upstream = self.commands.run(
-            [
-                "/usr/bin/git",
-                "-C",
-                str(source),
-                "rev-parse",
-                "refs/remotes/origin/main",
-            ]
-        ).stdout.decode("ascii", "strict").strip()
-        dirty = self.commands.run(
-            [
-                "/usr/bin/git",
-                "-C",
-                str(source),
-                "status",
-                "--porcelain=v1",
-                "--untracked-files=all",
-            ]
-        ).stdout
-        if (
-            head != self.inputs.expected_head
-            or upstream != self.inputs.expected_head
-            or dirty
-        ):
-            raise CutoverError("cutover source is not clean exact origin/main")
+        compose_payload = read_regular_file_bytes(
+            self.inputs.compose_file,
+            maximum_bytes=4 * 1024 * 1024,
+        )
+        if sha256_bytes(compose_payload) != actual_compose:
+            raise CutoverError("Compose input changed while being validated")
+        try:
+            compose_text = compose_payload.decode("utf-8", "strict")
+        except UnicodeDecodeError as exc:
+            raise CutoverError("Compose input is not strict UTF-8") from exc
+        require_public_edge_compose_build_syntax(compose_text)
+
+    def _validate_source(self) -> None:
+        self._bind_pinned_source_inputs()
+        source = self.inputs.source_root
+        if self.inputs.synthetic_workspace_root is None:
+            head = self.commands.run(
+                ["/usr/bin/git", "-C", str(source), "rev-parse", "HEAD"]
+            ).stdout.decode("ascii", "strict").strip()
+            upstream = self.commands.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(source),
+                    "rev-parse",
+                    "refs/remotes/origin/main",
+                ]
+            ).stdout.decode("ascii", "strict").strip()
+            dirty = self.commands.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(source),
+                    "status",
+                    "--porcelain=v1",
+                    "--untracked-files=all",
+                ]
+            ).stdout
+            if (
+                head != self.inputs.expected_head
+                or upstream != self.inputs.expected_head
+                or dirty
+            ):
+                raise CutoverError(
+                    "cutover source is not clean exact origin/main"
+                )
+        else:
+            self._source_provenance(
+                name="run-services-source",
+                repository=source,
+                consumed_path=source,
+                expected_head=self.inputs.expected_head,
+                expected_content_sha256=(
+                    self.inputs.expected_run_services_content_sha256
+                ),
+                allow_docker_excluded_ignored=True,
+            )
         docker_context = self.commands.run(
             self._docker(
                 "context",
@@ -1702,9 +2387,23 @@ class GovernedCutoverRunner:
         ):
             raise CutoverError("Docker context is not the canonical local daemon")
 
-    def _validate_rendered_compose(self) -> None:
+    def _validate_rendered_compose(
+        self,
+        *,
+        overrides: Iterable[Path] = (),
+        project: str = CANONICAL_PROJECT,
+        transient_service_keys: Mapping[str, Iterable[str]] | None = None,
+    ) -> None:
         rendered = self.commands.run(
-            self._compose("config", "--format", "json"),
+            self._compose(
+                "--profile",
+                "*",
+                "config",
+                "--format",
+                "json",
+                overrides=overrides,
+                project=project,
+            ),
             timeout=COMMAND_TIMEOUT_SECONDS,
         ).stdout
         try:
@@ -1716,39 +2415,57 @@ class GovernedCutoverRunner:
         if not isinstance(services, dict) or not isinstance(networks, dict):
             raise CutoverError("rendered Compose contract omitted services or networks")
         expected_additional_contexts = {
-            "design-product": str(CANONICAL_DESIGN_PRODUCT),
+            "design-product": str(self.inputs.design_product_root),
             "fleet-media-factory-contracts": str(
-                CANONICAL_FLEET_MEDIA_CONTRACTS
+                self.inputs.fleet_media_factory_root
+                / "src"
+                / "Chummer.Media.Contracts"
             ),
+            "hub-registry-source": str(self.inputs.hub_registry_root),
             "run-services-source": str(self.inputs.source_root),
         }
         expected_dockerfile = str(
             self.inputs.source_root / "Chummer.Run.Api" / "Dockerfile"
         )
         expected_images = {
-            "chummer-portal": self.portal_tag,
-            "chummer-install-linking-postgres-admin": self.tool_tag,
-            "chummer-install-linking-postgres-runtime-proof": self.tool_tag,
-            "chummer-install-linking-postgres-import-presence-proof": self.tool_tag,
+            service_name: (
+                self.portal_tag
+                if service_name == "chummer-portal"
+                else self.tool_tag
+            )
+            for service_name in PUBLIC_EDGE_BUILD_SERVICE_TARGETS
         }
+        rendered_policy_failures = public_edge_rendered_compose_failures(
+            payload,
+            expected_images=expected_images,
+            build_context=str(self.inputs.build_context_root),
+            dockerfile=expected_dockerfile,
+            additional_contexts=expected_additional_contexts,
+            transient_service_keys=transient_service_keys,
+        )
+        if rendered_policy_failures:
+            raise CutoverError(
+                "rendered build authority drifted: "
+                + rendered_policy_failures[0]
+            )
         for service_name, expected_image in expected_images.items():
             service = services.get(service_name)
             build = service.get("build") if isinstance(service, dict) else None
             if (
-                not isinstance(build, dict)
+                not isinstance(service, dict)
                 or service.get("image") != expected_image
-                or build.get("context") != str(CANONICAL_BUILD_CONTEXT)
-                or build.get("dockerfile") != expected_dockerfile
-                or build.get("additional_contexts") != expected_additional_contexts
-                or (
-                    service_name != "chummer-portal"
-                    and build.get("target") != "install-linking-postgres-tool-final"
+                or not rendered_build_contract_matches(
+                    build,
+                    service_name=service_name,
+                    build_context=str(self.inputs.build_context_root),
+                    dockerfile=expected_dockerfile,
+                    additional_contexts=expected_additional_contexts,
                 )
             ):
                 raise CutoverError(
                     f"rendered build authority drifted for {service_name}"
                 )
-            if service_name == "chummer-portal":
+            if service_name not in EXPECTED_CRITICAL_ENVIRONMENT_KEYS:
                 continue
             environment = service.get("environment")
             critical_keys = EXPECTED_CRITICAL_ENVIRONMENT_KEYS[service_name]
@@ -1869,6 +2586,50 @@ class GovernedCutoverRunner:
         self.public_network_name = public_name
         self.public_network_id = network_id
 
+    def _final_bind_compose_inputs(
+        self,
+        *,
+        job_override: Path | None = None,
+        job_service: str = "",
+        job_command: Sequence[str] = (),
+        container_name: str = "",
+        project: str = CANONICAL_PROJECT,
+    ) -> None:
+        """Bind the complete effective Compose authority immediately before dispatch."""
+        overrides = (job_override,) if job_override is not None else ()
+        transient_service_keys = (
+            {job_service: ("container_name",)}
+            if job_override is not None
+            else None
+        )
+        self._validate_source()
+        self._bind_existing_build_override()
+        if job_override is not None:
+            self._bind_job_override(
+                job_override,
+                service=job_service,
+                command=job_command,
+                container_name=container_name,
+            )
+        self._validate_rendered_compose(
+            overrides=overrides,
+            project=project,
+            transient_service_keys=transient_service_keys,
+        )
+        # Complete every slow source and Docker identity check after rendering,
+        # then make the bounded pinned-file checks below the final filesystem
+        # operation before the caller dispatches its preconstructed command.
+        self._validate_source()
+        self._bind_pinned_source_inputs()
+        self._bind_existing_build_override()
+        if job_override is not None:
+            self._bind_job_override(
+                job_override,
+                service=job_service,
+                command=job_command,
+                container_name=container_name,
+            )
+
     def _build_override_payload(self) -> dict[str, Any]:
         return {
             "services": {
@@ -1924,17 +2685,19 @@ class GovernedCutoverRunner:
 
     def _build_candidates(self) -> None:
         self._require_candidate_tags_absent()
-        source_provenance_before = self._capture_build_source_provenance()
         prior_portal = self._resolve_image(PORTAL_CANONICAL_TAG, allow_absent=True)
         prior_tool = self._resolve_image(TOOL_CANONICAL_TAG, allow_absent=True)
+        source_provenance_before = self._capture_build_source_provenance()
+        build_command = self._compose(
+            "--profile",
+            "install-linking-postgres-admin",
+            "build",
+            "chummer-portal",
+            "chummer-install-linking-postgres-admin",
+        )
+        self._final_bind_compose_inputs()
         self.commands.run(
-            self._compose(
-                "--profile",
-                "install-linking-postgres-admin",
-                "build",
-                "chummer-portal",
-                "chummer-install-linking-postgres-admin",
-            ),
+            build_command,
             timeout=BUILD_TIMEOUT_SECONDS,
         )
         self.candidate_image_id = self._resolve_image(self.portal_tag)
@@ -2001,22 +2764,14 @@ class GovernedCutoverRunner:
             evidence_receipt=evidence,
         )
 
-    def _job_override(
+    def _job_override_payload(
         self,
         *,
-        job_name: str,
         service: str,
         command: Sequence[str],
-    ) -> tuple[Path, str, str]:
-        project = self._job_project(job_name)
-        container_name = (
-            f"chummer-install-linking-cutover-{self.name_suffix}-"
-            f"{job_name.replace('_', '-')}"
-        )
-        if SAFE_NAME_PATTERN.fullmatch(container_name) is None:
-            raise CutoverError("deterministic container name is invalid")
-        path = self.inputs.receipt_root / f"compose.{job_name}.override.json"
-        payload = {
+        container_name: str,
+    ) -> dict[str, Any]:
+        return {
             "services": {
                 service: {
                     "command": list(command),
@@ -2034,6 +2789,49 @@ class GovernedCutoverRunner:
                 },
             },
         }
+
+    def _bind_job_override(
+        self,
+        path: Path,
+        *,
+        service: str,
+        command: Sequence[str],
+        container_name: str,
+    ) -> None:
+        expected = self._job_override_payload(
+            service=service,
+            command=command,
+            container_name=container_name,
+        )
+        payload, digest = read_private_canonical_json(path)
+        expected_digest = sha256_bytes(
+            canonical_json_bytes(expected, label=path.name)
+        )
+        if payload != expected or digest != expected_digest:
+            raise CutoverError(
+                "generated job Compose override identity drifted"
+            )
+
+    def _job_override(
+        self,
+        *,
+        job_name: str,
+        service: str,
+        command: Sequence[str],
+    ) -> tuple[Path, str, str]:
+        project = self._job_project(job_name)
+        container_name = (
+            f"chummer-install-linking-cutover-{self.name_suffix}-"
+            f"{job_name.replace('_', '-')}"
+        )
+        if SAFE_NAME_PATTERN.fullmatch(container_name) is None:
+            raise CutoverError("deterministic container name is invalid")
+        path = self.inputs.receipt_root / f"compose.{job_name}.override.json"
+        payload = self._job_override_payload(
+            service=service,
+            command=command,
+            container_name=container_name,
+        )
         write_private_json(path, payload)
         return path, container_name, project
 
@@ -2544,19 +3342,25 @@ class GovernedCutoverRunner:
             raise AmbiguousCutoverError(
                 f"deterministic operator container already exists: {container_name}"
             )
-        self.commands.run(
-            self._compose(
-                "--profile",
-                "install-linking-postgres-admin",
-                "create",
-                "--no-build",
-                "--no-recreate",
-                "--no-deps",
-                service,
-                overrides=(override,),
-                project=project,
-            )
+        create_command = self._compose(
+            "--profile",
+            "install-linking-postgres-admin",
+            "create",
+            "--no-build",
+            "--no-recreate",
+            "--no-deps",
+            service,
+            overrides=(override,),
+            project=project,
         )
+        self._final_bind_compose_inputs(
+            job_override=override,
+            job_service=service,
+            job_command=command,
+            container_name=container_name,
+            project=project,
+        )
+        self.commands.run(create_command)
         container_id, topology = self._inspect_container(
             container_name=container_name,
             service=service,
@@ -3202,6 +4006,15 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--post-quiesce-reproof", action="store_true")
     parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--synthetic-workspace-root", type=Path)
+    parser.add_argument("--build-context-root", type=Path)
+    parser.add_argument("--hub-registry-root", type=Path)
+    parser.add_argument("--design-product-root", type=Path)
+    parser.add_argument("--fleet-media-factory-root", type=Path)
+    parser.add_argument("--expected-run-services-content-sha256")
+    parser.add_argument("--expected-hub-registry-content-sha256")
+    parser.add_argument("--expected-design-product-content-sha256")
+    parser.add_argument("--expected-fleet-media-factory-content-sha256")
     parser.add_argument("--expected-head", required=True)
     parser.add_argument("--expected-compose-sha256", required=True)
     parser.add_argument("--env-file", type=Path, default=CANONICAL_ENV_FILE)
@@ -3246,6 +4059,59 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
     ):
         raise CutoverError("an externally selected cutover identity is invalid")
     source_root = Path(os.path.abspath(args.source_root))
+    synthetic_workspace_root = (
+        Path(os.path.abspath(args.synthetic_workspace_root))
+        if args.synthetic_workspace_root is not None
+        else None
+    )
+    synthetic_paths = (
+        args.build_context_root,
+        args.hub_registry_root,
+        args.design_product_root,
+        args.fleet_media_factory_root,
+    )
+    content_pins = (
+        args.expected_run_services_content_sha256,
+        args.expected_hub_registry_content_sha256,
+        args.expected_design_product_content_sha256,
+        args.expected_fleet_media_factory_content_sha256,
+    )
+    if synthetic_workspace_root is None:
+        if (
+            any(path is not None for path in synthetic_paths)
+            or any(pin is not None for pin in content_pins)
+        ):
+            raise CutoverError(
+                "synthetic source options require an approved synthetic root"
+            )
+        build_context_root = CANONICAL_BUILD_CONTEXT
+        hub_registry_root = CANONICAL_HUB_REGISTRY
+        design_product_root = CANONICAL_DESIGN_PRODUCT
+        fleet_media_factory_root = CANONICAL_FLEET_MEDIA_REPOSITORY
+    else:
+        if any(path is None for path in synthetic_paths):
+            raise CutoverError(
+                "synthetic workspace requires explicit build and dependency paths"
+            )
+        if any(
+            pin is None or HEX_SHA256_PATTERN.fullmatch(pin) is None
+            for pin in content_pins
+        ):
+            raise CutoverError(
+                "synthetic workspace requires exact content digest pins"
+            )
+        build_context_root = Path(
+            os.path.abspath(args.build_context_root)
+        )
+        hub_registry_root = Path(
+            os.path.abspath(args.hub_registry_root)
+        )
+        design_product_root = Path(
+            os.path.abspath(args.design_product_root)
+        )
+        fleet_media_factory_root = Path(
+            os.path.abspath(args.fleet_media_factory_root)
+        )
     env_file = Path(os.path.abspath(args.env_file))
     receipt_root = validate_private_directory(
         Path(os.path.abspath(args.receipt_root))
@@ -3332,7 +4198,7 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
         )
     elif boundary_output.parent != receipt_root:
         raise CutoverError("boundary output must be directly beneath the receipt root")
-    return CutoverInputs(
+    inputs = CutoverInputs(
         source_root=source_root,
         compose_file=source_root / "docker-compose.public-edge.yml",
         env_file=env_file,
@@ -3351,7 +4217,26 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
             args.expected_build_context_dockerignore_sha256
         ),
         cutover_id=args.cutover_id,
+        synthetic_workspace_root=synthetic_workspace_root,
+        build_context_root=build_context_root,
+        hub_registry_root=hub_registry_root,
+        design_product_root=design_product_root,
+        fleet_media_factory_root=fleet_media_factory_root,
+        expected_run_services_content_sha256=(
+            args.expected_run_services_content_sha256
+        ),
+        expected_hub_registry_content_sha256=(
+            args.expected_hub_registry_content_sha256
+        ),
+        expected_design_product_content_sha256=(
+            args.expected_design_product_content_sha256
+        ),
+        expected_fleet_media_factory_content_sha256=(
+            args.expected_fleet_media_factory_content_sha256
+        ),
     )
+    validate_build_workspace_paths(inputs)
+    return inputs
 
 
 def _signal_handler(signum: int, _frame: object) -> None:
@@ -3368,16 +4253,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             inputs,
             command_runner=CommandRunner(
                 docker_config_root=CANONICAL_DOCKER_CONFIG_ROOT,
-                routing_environment={
-                    "CHUMMER_BUILD_CONCURRENCY": "1",
-                    "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(
-                        CANONICAL_BUILD_CONTEXT
-                    ),
-                    "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(
-                        inputs.source_root
-                    ),
-                    "CHUMMER_RUN_SERVICES_SOURCE": str(inputs.source_root),
-                },
+                routing_environment=build_routing_environment(inputs),
             ),
         )
         if args.post_quiesce_reproof:
