@@ -2486,6 +2486,8 @@ def _retired_topology_a_parse_args(argv: list[str] | None = None) -> Config:
         "--candidate-import-authority-sha256",
         required=True,
     )
+    parser.add_argument("--direct-import-receipt", type=Path, required=True)
+    parser.add_argument("--direct-import-receipt-sha256", required=True)
     parser.add_argument("--release-channel-receipt", type=Path, required=True)
     parser.add_argument("--release-channel-receipt-sha256", required=True)
     parser.add_argument("--projection-snapshot-root", type=Path, required=True)
@@ -2563,6 +2565,11 @@ def _retired_topology_a_parse_args(argv: list[str] | None = None) -> Config:
         candidate_import_authority_sha256=(
             args.candidate_import_authority_sha256
         ),
+        direct_import_receipt=cutover_input(
+            args.direct_import_receipt,
+            "sealed direct-import receipt",
+        ),
+        direct_import_receipt_sha256=args.direct_import_receipt_sha256,
         release_channel_receipt=exact_input(args.release_channel_receipt),
         release_channel_receipt_sha256=args.release_channel_receipt_sha256,
         projection_snapshot_root=args.projection_snapshot_root.resolve(strict=True),
@@ -2654,6 +2661,8 @@ class SidecarConfig:
     release_candidate_root: Path
     candidate_import_authority: Path
     candidate_import_authority_sha256: str
+    direct_import_receipt: Path
+    direct_import_receipt_sha256: str
     manifest_closure_restoration_spec: Path
     manifest_closure_restoration_spec_sha256: str
     release_channel_receipt: Path
@@ -3605,6 +3614,10 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
             "candidate import authority",
         ),
         (
+            config.direct_import_receipt_sha256,
+            "direct-import receipt",
+        ),
+        (
             config.manifest_closure_restoration_spec_sha256,
             "manifest-closure restoration spec",
         ),
@@ -3637,6 +3650,12 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
             config.candidate_import_authority,
             config.candidate_import_authority_sha256,
             "candidate import authority",
+            False,
+        ),
+        (
+            config.direct_import_receipt,
+            config.direct_import_receipt_sha256,
+            "direct-import receipt",
             False,
         ),
         (
@@ -3698,6 +3717,13 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
     ):
         raise CutoverError(
             "candidate import authority is outside the selected projection snapshot"
+        )
+    if config.direct_import_receipt != (
+        config.release_candidate_root.parent
+        / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    ):
+        raise CutoverError(
+            "direct-import receipt is not adjacent to the sealed candidate bundle"
         )
     if config.release_channel_receipt != (
         config.projection_snapshot_root / "RELEASE_CHANNEL.generated.json"
@@ -3769,6 +3795,72 @@ def validate_release_candidate_authority(
     custody = authority.get("custody")
     if not isinstance(candidate, dict) or not isinstance(custody, dict):
         raise CutoverError("candidate import authority identity is unavailable")
+    direct_import_raw = stable_regular_bytes(
+        config.direct_import_receipt,
+        label="sealed direct-import receipt",
+        maximum_bytes=4 * 1024 * 1024,
+    )
+    if sha256_bytes(direct_import_raw) != config.direct_import_receipt_sha256:
+        raise CutoverError("direct-import receipt SHA-256 drifted")
+    try:
+        direct_import = projection_verifier._strict_json_object(
+            direct_import_raw,
+            label="sealed direct-import receipt",
+        )
+    except Exception as exc:
+        raise CutoverError("direct-import receipt is malformed") from exc
+    direct_import_keys = {
+        "compositionRequest",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "deployAuthorized",
+        "hubCandidateImportAuthority",
+        "platformScope",
+        "publicationAuthorized",
+        "registryCandidateReceipt",
+        "registryFinalizeAuthority",
+        "registryFinalizeReceipt",
+        "release",
+        "signature",
+        "sourceCommits",
+        "status",
+        "transport",
+        "uiScope",
+        "uploadAuthorized",
+    }
+    if (
+        set(direct_import) != direct_import_keys
+        or direct_import.get("contractName")
+        != "chummer6-ui.preview-nightly-unsigned-direct-import"
+        or direct_import.get("contractVersion") != 1
+        or direct_import.get("status") != "sealed_review_required"
+        or direct_import.get("platformScope") != "windows_only"
+        or direct_import.get("crossRunBitReproducible") is not False
+        or direct_import.get("signature")
+        != {
+            "policy": "preview_policy",
+            "required": False,
+            "status": "unsigned",
+        }
+        or any(
+            direct_import.get(name) is not False
+            for name in (
+                "publicationAuthorized",
+                "uploadAuthorized",
+                "deployAuthorized",
+            )
+        )
+        or direct_import.get("release")
+        != {"channel": "preview", "version": candidate.get("version")}
+        or direct_import.get("hubCandidateImportAuthority")
+        != {
+            "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+            "sha256": config.candidate_import_authority_sha256,
+            "sizeBytes": len(authority_raw),
+        }
+    ):
+        raise CutoverError("direct-import receipt authority posture drifted")
 
     try:
         inventory_raw = projection_verifier._candidate_embedded_bytes(
@@ -3805,7 +3897,7 @@ def validate_release_candidate_authority(
         if len(matching_scope) != 1:
             raise CutoverError("candidate unsigned scope custody is ambiguous")
         scope = projection_verifier._strict_json_object(
-            projection_verifier._candidate_embedded_bytes(
+            scope_raw := projection_verifier._candidate_embedded_bytes(
                 matching_scope[0],
                 label="candidate unsigned publication scope",
                 expected_path=scope_path,
@@ -3813,7 +3905,7 @@ def validate_release_candidate_authority(
             label="candidate unsigned publication scope",
         )
         registry_candidate = projection_verifier._strict_json_object(
-            projection_verifier._candidate_embedded_bytes(
+            registry_candidate_raw := projection_verifier._candidate_embedded_bytes(
                 custody.get("registryPrepareCandidateReceipt"),
                 label="candidate Registry PREPARE receipt",
                 expected_path=(
@@ -3842,6 +3934,72 @@ def validate_release_candidate_authority(
         raise CutoverError(
             "sealed release bundle custody validation failed"
         ) from exc
+
+    source_commits = direct_import.get("sourceCommits")
+    registry_commit = registry_candidate.get("registryCommit")
+    ui_commit = scope.get("sourceSha")
+    if (
+        not isinstance(source_commits, dict)
+        or set(source_commits) != {"hub", "registry", "ui"}
+        or any(
+            COMMIT.fullmatch(str(source_commits.get(name) or "")) is None
+            for name in ("hub", "registry", "ui")
+        )
+        or source_commits.get("hub") != config.source_head
+        or source_commits.get("registry") != registry_commit
+        or source_commits.get("ui") != ui_commit
+    ):
+        raise CutoverError(
+            "direct-import source commits do not bind Hub, Registry, and UI custody"
+        )
+
+    def reference(raw: bytes, path: str) -> dict[str, Any]:
+        return {
+            "path": path,
+            "sha256": sha256_bytes(raw),
+            "sizeBytes": len(raw),
+        }
+
+    registry_authority_raw = projection_verifier._candidate_embedded_bytes(
+        custody.get("registryFinalizeAuthority"),
+        label="candidate Registry FINALIZE authority",
+        expected_path=projection_verifier.CANDIDATE_REGISTRY_AUTHORITY_FILE,
+    )
+    registry_finalize_raw = projection_verifier._candidate_embedded_bytes(
+        custody.get("registryFinalizeReceipt"),
+        label="candidate Registry FINALIZE receipt",
+        expected_path=projection_verifier.CANDIDATE_REGISTRY_FINALIZE_FILE,
+    )
+    composition_raw = (
+        json.dumps(composition, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if (
+        direct_import.get("registryCandidateReceipt")
+        != reference(
+            registry_candidate_raw,
+            projection_verifier.CANDIDATE_REGISTRY_RECEIPT_FILE,
+        )
+        or direct_import.get("registryFinalizeAuthority")
+        != reference(
+            registry_authority_raw,
+            projection_verifier.CANDIDATE_REGISTRY_AUTHORITY_FILE,
+        )
+        or direct_import.get("registryFinalizeReceipt")
+        != reference(
+            registry_finalize_raw,
+            projection_verifier.CANDIDATE_REGISTRY_FINALIZE_FILE,
+        )
+        or direct_import.get("compositionRequest")
+        != reference(
+            composition_raw,
+            projection_verifier.CANDIDATE_UNSIGNED_COMPOSITION_FILE,
+        )
+        or direct_import.get("uiScope")
+        != reference(scope_raw, scope_path)
+    ):
+        raise CutoverError(
+            "direct-import receipt does not bind embedded Registry/UI custody"
+        )
 
     release_with_modes = [
         {**row, "mode": release_modes[str(row["path"])]}
@@ -3889,6 +4047,18 @@ def validate_release_candidate_authority(
     }
     if set(fresh_by_path) != set(expected_fresh):
         raise CutoverError("v3 authority freshDelta path closure drifted")
+    release_by_path = {
+        str(item["path"]): item for item in release_with_modes
+    }
+    for path, fresh_row in fresh_by_path.items():
+        release_row = release_by_path.get(path)
+        if release_row is None or any(
+            fresh_row.get(key) != release_row.get(key)
+            for key in ("mode", "sha256", "sizeBytes")
+        ):
+            raise CutoverError(
+                "v3 authority freshDelta differs from exact sealed bundle bytes"
+            )
     incumbent_by_path = {
         str(item["path"]): item for item in incumbent_with_modes
     }
@@ -3969,6 +4139,11 @@ def validate_release_candidate_authority(
         "contractName": authority["contractName"],
         "contractVersion": authority["contractVersion"],
         "candidateVersion": candidate["version"],
+        "sourceCommits": dict(source_commits),
+        "directImportReceipt": {
+            "path": str(config.direct_import_receipt),
+            "sha256": config.direct_import_receipt_sha256,
+        },
         "bundleIdentitySha256": candidate["bundleIdentitySha256"],
         "inventorySha256": candidate["inventorySha256"],
         "fileCount": candidate["fileCount"],
@@ -5161,12 +5336,31 @@ class TopologyBActions:
         return receipt
 
     def classify_recovery(self, config: SidecarConfig) -> str:
-        if config.cloudflare_committed_evidence.is_file():
+        if self.cloudflare.journal_path_present(
+            config.cloudflare_committed_evidence
+        ):
+            try:
+                committed = self.cloudflare.load_journal(
+                    config.cloudflare_committed_evidence
+                )
+            except Exception as exc:
+                raise RecoveryUncertain(
+                    "committed Cloudflare evidence is invalid"
+                ) from exc
+            if committed.get("phase") != "committed":
+                raise RecoveryUncertain(
+                    "committed Cloudflare evidence is not terminal"
+                )
             return "committed"
         if self.cloudflare.journal_path_present(config.cloudflare_journal):
-            journal = self.cloudflare.load_journal(
-                config.cloudflare_journal
-            )
+            try:
+                journal = self.cloudflare.load_journal(
+                    config.cloudflare_journal
+                )
+            except Exception as exc:
+                raise RecoveryUncertain(
+                    "live Cloudflare journal is invalid"
+                ) from exc
             if journal["phase"] == "committed":
                 return "committed"
             if journal["phase"] == "rolled-back":
@@ -5181,6 +5375,13 @@ class TopologyBActions:
                 raise RecoveryUncertain(
                     "Cloudflare recovery journal phase is unsupported"
                 )
+        elif self._state.get("phase") in {
+            "cloudflare-committed",
+            "active",
+        }:
+            raise RecoveryUncertain(
+                "operation recorded a committed route but terminal evidence is missing"
+            )
         return "rollback"
 
     def reconcile_committed(
@@ -5288,6 +5489,7 @@ def execute_topology_b(
 ) -> dict[str, Any]:
     action_boundary = actions if actions is not None else TopologyBActions(config)
     cloudflare_committed = False
+    cloudflare_transaction_started = False
     try:
         shelf = action_boundary.prepare_sidecar_release_shelf(config)
         data_protection = action_boundary.generate_sidecar_data_protection(
@@ -5325,6 +5527,7 @@ def execute_topology_b(
             phase="before-cloudflare",
             hosts=SIDECAR_HOSTS,
         )
+        cloudflare_transaction_started = True
         capture = action_boundary.capture_cloudflare(
             config,
             shelf,
@@ -5388,6 +5591,16 @@ def execute_topology_b(
         if cloudflare_committed:
             raise RecoveryUncertain(
                 "Cloudflare committed; active authority requires reconciliation"
+            ) from original
+        if not cloudflare_transaction_started:
+            try:
+                action_boundary.cleanup_sidecar_resources(config)
+            except Exception as cleanup_error:
+                raise RecoveryUncertain(
+                    "pre-Cloudflare sidecar cleanup is uncertain"
+                ) from cleanup_error
+            raise CutoverError(
+                "topology-B cutover failed before Cloudflare mutation"
             ) from original
         try:
             action_boundary.rollback_cloudflare(config)
@@ -5468,6 +5681,18 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
     parser.add_argument("--migration-candidate-root", type=Path, required=True)
     parser.add_argument("--migration-authority", type=Path, required=True)
     parser.add_argument("--migration-authority-sha256", required=True)
+    parser.add_argument("--release-candidate-root", type=Path, required=True)
+    parser.add_argument(
+        "--candidate-import-authority",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--candidate-import-authority-sha256",
+        required=True,
+    )
+    parser.add_argument("--direct-import-receipt", type=Path, required=True)
+    parser.add_argument("--direct-import-receipt-sha256", required=True)
     parser.add_argument(
         "--manifest-closure-restoration-spec",
         type=Path,
@@ -5482,6 +5707,11 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
     parser.add_argument("--projection-snapshot-root", type=Path, required=True)
     parser.add_argument("--projection-snapshot-id", required=True)
     parser.add_argument("--projection-snapshot-sha256", required=True)
+    parser.add_argument(
+        "--projection-snapshot-tree-sha256",
+        dest="projection_source_tree_sha256",
+        required=True,
+    )
     parser.add_argument("--projection-manifest-sha256", required=True)
     parser.add_argument("--runtime-proof-source", type=Path, required=True)
     parser.add_argument("--runtime-proof-sha256", required=True)
@@ -5589,6 +5819,22 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
             "migration authority",
         ),
         migration_authority_sha256=args.migration_authority_sha256,
+        release_candidate_root=cutover_input(
+            args.release_candidate_root,
+            "sealed release candidate",
+        ),
+        candidate_import_authority=cutover_input(
+            args.candidate_import_authority,
+            "candidate import authority",
+        ),
+        candidate_import_authority_sha256=(
+            args.candidate_import_authority_sha256
+        ),
+        direct_import_receipt=cutover_input(
+            args.direct_import_receipt,
+            "sealed direct-import receipt",
+        ),
+        direct_import_receipt_sha256=args.direct_import_receipt_sha256,
         manifest_closure_restoration_spec=cutover_input(
             args.manifest_closure_restoration_spec,
             "manifest-closure restoration spec",
@@ -5607,6 +5853,9 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
         ),
         projection_snapshot_id=args.projection_snapshot_id,
         projection_snapshot_sha256=args.projection_snapshot_sha256,
+        projection_source_tree_sha256=(
+            args.projection_source_tree_sha256
+        ),
         projection_manifest_sha256=args.projection_manifest_sha256,
         runtime_proof_source=cutover_input(
             args.runtime_proof_source,

@@ -176,6 +176,177 @@ def topology_b_config(tmp_path: Path) -> SimpleNamespace:
     )
 
 
+def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+
+    def directory(name: str) -> Path:
+        path = tmp_path / name
+        path.mkdir(parents=True)
+        return path
+
+    def document(path: Path) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+        return path
+
+    source_root = directory("source")
+    shelf_root = directory("canonical-shelf")
+    migration_candidate = directory("migration-candidate")
+    sealed_root = directory("sealed")
+    release_candidate = directory("sealed/bundle")
+    projection_root = directory("projection/public-projection-" + "1" * 64)
+    fleet_source = directory("fleet")
+    operation_parent = directory("operations")
+    operation_root = operation_parent / "chummer-public-download-op-a1b2c3d4"
+    active_root = directory("active-authority")
+    docker_root = directory("docker")
+    receipt_root = directory("receipts")
+    build_context = directory("build-context")
+    fleet_contracts = directory("fleet-contracts")
+    design_product = directory("design-product")
+
+    migration_authority = document(tmp_path / "migration-authority.json")
+    candidate_authority = document(
+        projection_root
+        / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+    )
+    direct_import = document(
+        sealed_root
+        / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    )
+    restoration_spec = document(tmp_path / "restoration-spec.json")
+    release_receipt = document(
+        projection_root / "RELEASE_CHANNEL.generated.json"
+    )
+    runtime_proof = document(
+        projection_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    final_gold = document(tmp_path / "final-gold.json")
+    cloudflare_credentials = document(tmp_path / "cloudflare.env")
+    active_authority = active_root / "topology-b-active.json"
+
+    semantic_sha256 = "1" * 64
+    tree_sha256 = "2" * 64
+    candidate_sha256 = "3" * 64
+    direct_import_sha256 = "4" * 64
+    monkeypatch.setattr(
+        controller,
+        "CANONICAL_RELEASE_SHELF_ROOT",
+        shelf_root,
+    )
+
+    config = controller.parse_args(
+        [
+            "--operation",
+            controller.CUTOVER_OPERATION,
+            "--source-root",
+            str(source_root),
+            "--source-head",
+            "a" * 40,
+            "--shared-mutation-lock-token",
+            "b" * 64,
+            "--shelf-root",
+            str(shelf_root),
+            "--migration-candidate-root",
+            str(migration_candidate),
+            "--migration-authority",
+            str(migration_authority),
+            "--migration-authority-sha256",
+            "5" * 64,
+            "--release-candidate-root",
+            str(release_candidate),
+            "--candidate-import-authority",
+            str(candidate_authority),
+            "--candidate-import-authority-sha256",
+            candidate_sha256,
+            "--direct-import-receipt",
+            str(direct_import),
+            "--direct-import-receipt-sha256",
+            direct_import_sha256,
+            "--manifest-closure-restoration-spec",
+            str(restoration_spec),
+            "--manifest-closure-restoration-spec-sha256",
+            "6" * 64,
+            "--release-channel-receipt",
+            str(release_receipt),
+            "--release-channel-receipt-sha256",
+            "7" * 64,
+            "--projection-snapshot-root",
+            str(projection_root),
+            "--projection-snapshot-id",
+            projection_root.name,
+            "--projection-snapshot-sha256",
+            semantic_sha256,
+            "--projection-snapshot-tree-sha256",
+            tree_sha256,
+            "--projection-manifest-sha256",
+            "8" * 64,
+            "--runtime-proof-source",
+            str(runtime_proof),
+            "--runtime-proof-sha256",
+            "9" * 64,
+            "--final-gold-source",
+            str(final_gold),
+            "--final-gold-sha256",
+            "a" * 64,
+            "--fleet-source",
+            str(fleet_source),
+            "--fleet-sha256",
+            "b" * 64,
+            "--operation-root",
+            str(operation_root),
+            "--active-runtime-authority",
+            str(active_authority),
+            "--docker-config-root",
+            str(docker_root),
+            "--cloudflare-credentials-file",
+            str(cloudflare_credentials),
+            "--cloudflare-account-id",
+            "account-id",
+            "--cloudflare-tunnel-id",
+            "tunnel-id",
+            "--receipt-root",
+            str(receipt_root),
+            "--base-url",
+            "https://chummer.run",
+            "--build-context",
+            str(build_context),
+            "--fleet-media-contracts",
+            str(fleet_contracts),
+            "--design-product-root",
+            str(design_product),
+            "--delivery-phase",
+            "windows-preview",
+        ]
+    )
+
+    assert config.release_candidate_root == release_candidate
+    assert config.candidate_import_authority == candidate_authority
+    assert config.candidate_import_authority_sha256 == candidate_sha256
+    assert config.direct_import_receipt == direct_import
+    assert config.direct_import_receipt_sha256 == direct_import_sha256
+    assert config.projection_snapshot_sha256 == semantic_sha256
+    assert config.projection_source_tree_sha256 == tree_sha256
+    assert semantic_sha256 != tree_sha256
+
+    wrapper = (
+        ROOT / "scripts" / "deploy_public_edge_portal.sh"
+    ).read_text(encoding="utf-8")
+    for flag in (
+        "--release-candidate-root",
+        "--candidate-import-authority",
+        "--candidate-import-authority-sha256",
+        "--direct-import-receipt",
+        "--direct-import-receipt-sha256",
+        "--projection-snapshot-sha256",
+        "--projection-snapshot-tree-sha256",
+    ):
+        assert flag in wrapper
+
+
 class RecordingActions:
     """Mocked action boundary approved for the topology-B controller."""
 

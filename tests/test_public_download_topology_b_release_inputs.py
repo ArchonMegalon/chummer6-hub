@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -288,8 +289,10 @@ def release_candidate_authority_fixture(
         "fullShelfInventory": release_with_modes,
         "freshDelta": fresh_delta,
         "retainedFromIncumbent": retained,
+        "sourceSha": "e" * 40,
     }
     registry = {
+        "registryCommit": "d" * 40,
         "compositionInputDocument": {
             "incumbentSnapshot": {
                 "fullShelfInventory": incumbent_with_modes,
@@ -306,6 +309,8 @@ def release_candidate_authority_fixture(
             "incumbentInventorySha256": "9" * 64,
         },
         "registryPrepareCandidateReceipt": {"token": "registry"},
+        "registryFinalizeAuthority": {"token": "registry-authority"},
+        "registryFinalizeReceipt": {"token": "registry-finalize"},
         "canonicalManifest": {"token": "canonical"},
         "compatibilityManifest": {"token": "compatibility"},
     }
@@ -330,8 +335,77 @@ def release_candidate_authority_fixture(
     authority_path.write_bytes(b"fixture candidate authority\n")
     release_receipt = projection_root / "RELEASE_CHANNEL.generated.json"
     release_receipt.write_bytes(canonical)
+    composition_raw = (
+        json.dumps(
+            registry["compositionInputDocument"],
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode()
+    direct_import = {
+        "compositionRequest": {
+            "path": "composition.json",
+            "sha256": hashlib.sha256(composition_raw).hexdigest(),
+            "sizeBytes": len(composition_raw),
+        },
+        "contractName": "chummer6-ui.preview-nightly-unsigned-direct-import",
+        "contractVersion": 1,
+        "crossRunBitReproducible": False,
+        "deployAuthorized": False,
+        "hubCandidateImportAuthority": {
+            "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+            "sha256": hashlib.sha256(authority_path.read_bytes()).hexdigest(),
+            "sizeBytes": len(authority_path.read_bytes()),
+        },
+        "platformScope": "windows_only",
+        "publicationAuthorized": False,
+        "registryCandidateReceipt": {
+            "path": "registry.json",
+            "sha256": hashlib.sha256(b"registry").hexdigest(),
+            "sizeBytes": len(b"registry"),
+        },
+        "registryFinalizeAuthority": {
+            "path": "registry-authority.json",
+            "sha256": hashlib.sha256(b"registry-authority").hexdigest(),
+            "sizeBytes": len(b"registry-authority"),
+        },
+        "registryFinalizeReceipt": {
+            "path": "registry-finalize.json",
+            "sha256": hashlib.sha256(b"registry-finalize").hexdigest(),
+            "sizeBytes": len(b"registry-finalize"),
+        },
+        "release": {"channel": "preview", "version": "fresh-windows"},
+        "signature": {
+            "policy": "preview_policy",
+            "required": False,
+            "status": "unsigned",
+        },
+        "sourceCommits": {
+            "hub": "c" * 40,
+            "registry": "d" * 40,
+            "ui": "e" * 40,
+        },
+        "status": "sealed_review_required",
+        "transport": {},
+        "uiScope": {
+            "path": "scope.json",
+            "sha256": hashlib.sha256(b"scope").hexdigest(),
+            "sizeBytes": len(b"scope"),
+        },
+        "uploadAuthorized": False,
+    }
+    direct_import_receipt = (
+        release_root.parent
+        / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    )
+    direct_import_receipt.write_text(
+        json.dumps(direct_import, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     config = SimpleNamespace(
         source_root=ROOT,
+        source_head="c" * 40,
         candidate_import_authority=authority_path,
         candidate_import_authority_sha256=hashlib.sha256(
             authority_path.read_bytes()
@@ -340,11 +414,18 @@ def release_candidate_authority_fixture(
         migration_candidate_root=incumbent_root,
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=hashlib.sha256(canonical).hexdigest(),
+        direct_import_receipt=direct_import_receipt,
+        direct_import_receipt_sha256=hashlib.sha256(
+            direct_import_receipt.read_bytes()
+        ).hexdigest(),
     )
 
     class ProjectionVerifier:
         CANDIDATE_UNSIGNED_SCOPE_FILE = "scope.json"
         CANDIDATE_REGISTRY_RECEIPT_FILE = "registry.json"
+        CANDIDATE_REGISTRY_AUTHORITY_FILE = "registry-authority.json"
+        CANDIDATE_REGISTRY_FINALIZE_FILE = "registry-finalize.json"
+        CANDIDATE_UNSIGNED_COMPOSITION_FILE = "composition.json"
 
         @staticmethod
         def _validate_candidate_import_authority(_raw: bytes) -> dict[str, Any]:
@@ -363,6 +444,8 @@ def release_candidate_authority_fixture(
                 "inventory": b"inventory",
                 "scope": b"scope",
                 "registry": b"registry",
+                "registry-authority": b"registry-authority",
+                "registry-finalize": b"registry-finalize",
                 "canonical": canonical,
                 "compatibility": compatibility,
             }[token]
@@ -371,6 +454,8 @@ def release_candidate_authority_fixture(
         def _strict_json_object(
             raw: bytes, *, label: str
         ) -> dict[str, Any]:
+            if raw.startswith(b"{"):
+                return json.loads(raw)
             return {
                 b"inventory": inventory,
                 b"scope": scope,
