@@ -113,6 +113,8 @@ python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
   --files-dir "$BUNDLE_DIR/files" \
   --manifest "$MANIFEST_PATH" \
   --manifest "$CANONICAL_MANIFEST_PATH" \
+  --require-embedded-bootstrap-metadata \
+  --require-manifest-row \
   --allow-empty
 
 case "$(printf '%s' "$ALLOW_PROOF_ONLY_VISUAL_HANDOFF" | tr '[:upper:]' '[:lower:]')" in

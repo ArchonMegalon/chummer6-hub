@@ -9,10 +9,13 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify-windows-installer-payloads.py"
 PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-download-bundle.sh"
+HTTP_PUBLISH_SCRIPT = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
 APPENDED_PAYLOAD_MAGIC = b"CHUMMER6PAYLOAD1"
 
 
@@ -38,9 +41,10 @@ def _windows_installer_stub_with_payload_metadata(
 ) -> bytes:
     return WINDOWS_INSTALLER_STUB + (
         "\n"
-        f"ChummerInstallerPayloadUrl={payload_download_url}\n"
-        f"ChummerInstallerPayloadSha256={payload_sha256}\n"
-        f"ChummerInstallerPayloadSizeBytes={payload_size_bytes}\n"
+        "CHUMMER6_BOOTSTRAP_METADATA\n"
+        f"payloadDownloadUrl={payload_download_url}\n"
+        f"payloadSha256={payload_sha256}\n"
+        f"payloadSizeBytes={payload_size_bytes}\n"
     ).encode("utf-8")
 
 
@@ -63,6 +67,7 @@ def _write_bundle_manifest(
     payload_size_bytes: int = 0,
     installer_mode: str = "bootstrap",
     payload_download_url: str | None = None,
+    installer_download_url: str | None = None,
     release_proof: dict | None = None,
 ) -> None:
     payload = {
@@ -73,7 +78,11 @@ def _write_bundle_manifest(
             {
                 "artifactId": "avalonia-win-x64-installer",
                 "fileName": installer_name,
-                "url": f"https://example.invalid/downloads/files/{installer_name}",
+                "url": (
+                    f"https://example.invalid/downloads/files/{installer_name}"
+                    if installer_download_url is None
+                    else installer_download_url
+                ),
                 "sha256": installer_sha256,
                 "sizeBytes": installer_size_bytes,
                 "kind": "installer",
@@ -120,7 +129,143 @@ def _write_payload_sidecar(
     )
 
 
-def _release_proof_for_windows_installer() -> dict:
+def _run_bootstrap_url_case(
+    tmp_path: Path,
+    *,
+    installer_download_url: str,
+    manifest_payload_url: str,
+    sidecar_download_url: str,
+    release_proof: dict | None = None,
+    embedded_download_url: str | None = None,
+    require_embedded_metadata: bool = False,
+    require_manifest_row: bool = False,
+    extra_installer_bytes: bytes = b"",
+    manifest_row_updates: dict | None = None,
+    manifest_row_removals: tuple[str, ...] = (),
+) -> subprocess.CompletedProcess[str]:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    installer_bytes = (
+        _windows_installer_stub_with_payload_metadata(
+            payload_download_url=embedded_download_url or sidecar_download_url,
+            payload_sha256=payload_sha256,
+            payload_size_bytes=len(payload_bytes),
+        )
+        if require_embedded_metadata
+        else WINDOWS_INSTALLER_STUB
+    )
+    installer_bytes += extra_installer_bytes
+    installer_path.write_bytes(installer_bytes)
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=sidecar_download_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes),
+        payload_name=payload_path.name,
+        payload_download_url=manifest_payload_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+        installer_download_url=installer_download_url,
+        release_proof=release_proof,
+    )
+    if manifest_row_updates or manifest_row_removals:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["downloads"][0].update(manifest_row_updates or {})
+        for key in manifest_row_removals:
+            manifest["downloads"][0].pop(key, None)
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    arguments = [
+        "python3",
+        str(VERIFY_SCRIPT),
+        "--files-dir",
+        str(files_dir),
+        "--manifest",
+        str(manifest_path),
+    ]
+    if require_embedded_metadata:
+        arguments.append("--require-embedded-bootstrap-metadata")
+    if require_manifest_row:
+        arguments.append("--require-manifest-row")
+    return subprocess.run(
+        arguments,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _write_bundled_installer_manifests(
+    tmp_path: Path,
+) -> tuple[Path, list[Path]]:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = tmp_path / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    installer_bytes = (
+        WINDOWS_INSTALLER_STUB
+        + payload_bytes
+        + struct.pack("<q", len(payload_bytes))
+        + APPENDED_PAYLOAD_MAGIC
+    )
+    installer_path.write_bytes(installer_bytes)
+    manifests = [tmp_path / "releases.json", tmp_path / "canonical.json"]
+    for manifest_path in manifests:
+        _write_bundle_manifest(
+            manifest_path,
+            installer_name=installer_path.name,
+            installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+            installer_size_bytes=len(installer_bytes),
+            payload_name=payload_path.name,
+            payload_download_url=(
+                f"https://example.invalid/downloads/files/{payload_path.name}"
+            ),
+            payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+            payload_size_bytes=len(payload_bytes),
+            installer_mode="bundled",
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["downloads"][0].update(
+            {
+                "installAccessClass": "open_public",
+                "previewPolicy": "preview_policy",
+                "signature": {
+                    "policy": "preview_policy",
+                    "required": False,
+                    "status": "unsigned",
+                },
+                "payloadAcquisitionMode": "embedded",
+                "version": "run-test",
+                "releaseVersion": "run-test",
+                "channel": "preview",
+                "channelId": "preview",
+            }
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return files_dir, manifests
+
+
+def _release_proof_for_windows_installer(
+    *, base_url: str = "https://chummer.run"
+) -> dict:
     generated_at = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     shipping_locales = ["en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn"]
     domain_coverage = {
@@ -133,7 +278,7 @@ def _release_proof_for_windows_installer() -> dict:
     return {
         "status": "passed",
         "generatedAt": generated_at,
-        "baseUrl": "https://chummer.run",
+        "baseUrl": base_url,
         "journeysPassed": [
             "install_claim_restore_continue",
             "build_explain_publish",
@@ -660,10 +805,840 @@ def test_windows_installer_verifier_rejects_manifest_payload_url_that_is_not_htt
     )
 
     assert result.returncode != 0
-    assert "manifest installerMode=bootstrap payloadDownloadUrl must be an absolute HTTPS URL" in result.stderr
+    assert (
+        "manifest installerMode=bootstrap payloadDownloadUrl must be a "
+        "lossless canonical absolute HTTPS URL or /downloads/... site path"
+    ) in result.stderr
 
 
-def test_windows_installer_verifier_rejects_manifest_payload_url_that_is_relative(tmp_path: Path) -> None:
+def test_windows_installer_verifier_accepts_canonical_site_manifest_url_with_absolute_sidecar_url(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    relative_url = f"/downloads/files/{payload_path.name}"
+    absolute_url = f"https://example.invalid{relative_url}"
+    installer_bytes = _windows_installer_stub_with_payload_metadata(
+        payload_download_url=absolute_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+    installer_path.write_bytes(installer_bytes)
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=absolute_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes),
+        payload_name=payload_path.name,
+        payload_download_url=relative_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifest_path),
+            "--require-embedded-bootstrap-metadata",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
+def test_windows_installer_verifier_accepts_release_proof_origin_for_site_relative_urls(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://example.invalid"},
+        require_embedded_metadata=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
+def test_windows_installer_verifier_accepts_effective_default_https_port_origin(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid:443/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=(
+            f"https://example.invalid:443/downloads/files/{payload_name}"
+        ),
+        release_proof={"baseUrl": "https://example.invalid"},
+        require_embedded_metadata=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://127.0.0.1",
+        "https://[2001:db8::1]",
+    ],
+)
+def test_windows_installer_verifier_accepts_canonical_ip_authority(
+    tmp_path: Path,
+    origin: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"{origin}/downloads/files/{payload_name}",
+        release_proof={"baseUrl": origin},
+        require_embedded_metadata=True,
+        require_manifest_row=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "windows_installer_payload_gate:ok checked=1" in result.stdout
+
+
+def test_windows_installer_verifier_accepts_equal_installer_url_aliases(
+    tmp_path: Path,
+) -> None:
+    installer_url = (
+        "https://example.invalid/downloads/files/"
+        "chummer-avalonia-win-x64-installer.exe"
+    )
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=installer_url,
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        manifest_row_updates={"downloadUrl": installer_url},
+        require_manifest_row=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    ("manifest_row_updates", "manifest_row_removals", "alias_failure"),
+    [
+        ({}, ("url",), None),
+        ({"url": ""}, (), None),
+        (
+            {"url": None},
+            (),
+            "manifest Windows installer URL alias url must be a string",
+        ),
+        (
+            {"url": 7},
+            (),
+            "manifest Windows installer URL alias url must be a string",
+        ),
+    ],
+)
+def test_windows_installer_verifier_strict_mode_requires_installer_download_url(
+    tmp_path: Path,
+    manifest_row_updates: dict,
+    manifest_row_removals: tuple[str, ...],
+    alias_failure: str | None,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://example.invalid"},
+        manifest_row_updates=manifest_row_updates,
+        manifest_row_removals=manifest_row_removals,
+        require_manifest_row=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Windows installer row requires a nonempty canonical downloadUrl/url"
+        in result.stderr
+    )
+    if alias_failure:
+        assert alias_failure in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("manifest_row_updates", "expected_failure"),
+    [
+        (
+            {
+                "downloadUrl": (
+                    "https://attacker.invalid/downloads/files/"
+                    "chummer-avalonia-win-x64-installer.exe"
+                )
+            },
+            "manifest Windows installer URL aliases downloadUrl/url must agree exactly",
+        ),
+        (
+            {"downloadUrl": 7},
+            "manifest Windows installer URL alias downloadUrl must be a string",
+        ),
+        (
+            {"name": "chummer-attacker-win-x64-installer.exe"},
+            "manifest Windows installer file name aliases fileName/name must agree exactly",
+        ),
+        (
+            {"id": "attacker-win-x64-installer"},
+            "manifest Windows installer artifact identity aliases artifactId/id must agree exactly",
+        ),
+        (
+            {"payloadName": "attacker-payload.zip"},
+            "manifest Windows payload file name aliases payloadFileName/payloadName must agree exactly",
+        ),
+    ],
+)
+def test_windows_installer_verifier_rejects_manifest_alias_disagreement_matrix(
+    tmp_path: Path,
+    manifest_row_updates: dict,
+    expected_failure: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        manifest_row_updates=manifest_row_updates,
+        require_manifest_row=True,
+    )
+
+    assert result.returncode != 0
+    assert expected_failure in result.stderr
+
+
+def test_windows_installer_verifier_rejects_installer_url_basename_drift(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-other-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        require_manifest_row=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest Windows installer downloadUrl basename must match fileName exactly"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_rejects_site_relative_urls_without_trusted_origin(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+    )
+
+    assert result.returncode != 0
+    assert "manifest bootstrap URL authority is missing" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_sidecar_origin_not_manifest_authority(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://attacker.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://example.invalid"},
+    )
+
+    assert result.returncode != 0
+    assert (
+        "bootstrap payload sidecar metadata downloadUrl does not match "
+        "manifest payloadDownloadUrl"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_rejects_absolute_payload_origin_not_installer_authority(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    attacker_url = f"https://attacker.invalid/downloads/files/{payload_name}"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=attacker_url,
+        sidecar_download_url=attacker_url,
+    )
+
+    assert result.returncode != 0
+    assert "manifest payloadDownloadUrl must use the trusted manifest origin" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_disagreeing_manifest_origins(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://other.invalid"},
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest installer downloadUrl and releaseProof.baseUrl origins must all agree"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_rejects_disagreeing_origins_across_manifests(
+    tmp_path: Path,
+) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    relative_installer_url = f"/downloads/files/{installer_path.name}"
+    relative_payload_url = f"/downloads/files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=f"https://example.invalid{relative_payload_url}",
+    )
+    manifests = [tmp_path / "canonical.json", tmp_path / "compatibility.json"]
+    for manifest, origin in zip(
+        manifests,
+        ("https://example.invalid", "https://attacker.invalid"),
+        strict=True,
+    ):
+        _write_bundle_manifest(
+            manifest,
+            installer_name=installer_path.name,
+            installer_sha256=hashlib.sha256(WINDOWS_INSTALLER_STUB).hexdigest(),
+            installer_size_bytes=len(WINDOWS_INSTALLER_STUB),
+            payload_name=payload_path.name,
+            payload_download_url=relative_payload_url,
+            payload_sha256=payload_sha256,
+            payload_size_bytes=len(payload_bytes),
+            installer_download_url=relative_installer_url,
+            release_proof={"baseUrl": origin},
+        )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifests[0]),
+            "--manifest",
+            str(manifests[1]),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest installer downloadUrl and releaseProof.baseUrl origins must all agree"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_strict_mode_rejects_empty_manifest_with_attacker_origin(
+    tmp_path: Path,
+) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=payload_url,
+    )
+    valid_manifest = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        valid_manifest,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(WINDOWS_INSTALLER_STUB).hexdigest(),
+        installer_size_bytes=len(WINDOWS_INSTALLER_STUB),
+        payload_name=payload_path.name,
+        payload_download_url=payload_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+    empty_manifest = tmp_path / "canonical.json"
+    empty_manifest.write_text(
+        json.dumps(
+            {
+                "releaseProof": {"baseUrl": "https://attacker.invalid"},
+                "artifacts": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(valid_manifest),
+            "--manifest",
+            str(empty_manifest),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "canonical.json: must contain exactly one row" in result.stderr
+    assert "supplied release manifest URL authority origins must all agree" in result.stderr
+
+
+def test_windows_installer_verifier_strict_mode_validates_empty_manifest_root(
+    tmp_path: Path,
+) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=payload_url,
+    )
+    empty_manifest = tmp_path / "canonical.json"
+    empty_manifest.write_text(
+        json.dumps(
+            {
+                "releaseProof": {
+                    "baseUrl": "https://user@attacker.invalid",
+                },
+                "artifacts": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(empty_manifest),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "canonical.json: must contain exactly one row" in result.stderr
+    assert (
+        "canonical.json: releaseProof.baseUrl must be one lossless canonical HTTPS origin"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_strict_mode_rejects_duplicate_row_in_one_manifest(
+    tmp_path: Path,
+) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=payload_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(WINDOWS_INSTALLER_STUB).hexdigest(),
+        installer_size_bytes=len(WINDOWS_INSTALLER_STUB),
+        payload_name=payload_path.name,
+        payload_download_url=payload_url,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["downloads"].append(dict(manifest["downloads"][0]))
+    manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifest_path),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "must contain exactly one row for every checked Windows installer" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "installer_download_url",
+    [
+        "//example.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "http://example.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "https://user@example.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "https://EXAMPLE.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "https://example.invalid:444/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "https://example.invalid:99999/downloads/files/chummer-avalonia-win-x64-installer.exe",
+        "https://example.invalid/downloads//chummer-avalonia-win-x64-installer.exe",
+        "https://example.invalid/downloads/files/%63hummer-avalonia-win-x64-installer.exe",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe?",
+        "https://example.invalid/downloads/files/chummer avalonia-win-x64-installer.exe",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-installer.exe\x00",
+    ],
+)
+def test_windows_installer_verifier_rejects_noncanonical_installer_url_matrix(
+    tmp_path: Path,
+    installer_download_url: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=installer_download_url,
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://example.invalid"},
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest Windows installer downloadUrl must be a lossless canonical "
+        "absolute HTTPS URL or /downloads/... site path"
+    ) in result.stderr
+
+
+@pytest.mark.parametrize(
+    "manifest_payload_url",
+    [
+        "//example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://user@example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://EXAMPLE.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid:444/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip?",
+        "/downloads//files/chummer-avalonia-win-x64-payload.zip",
+        "/downloads/./files/chummer-avalonia-win-x64-payload.zip",
+        "/downloads/files/../chummer-avalonia-win-x64-payload.zip",
+        "/downloads/files/%63hummer-avalonia-win-x64-payload.zip",
+        "/downloads/files\\chummer-avalonia-win-x64-payload.zip",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip;",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip?",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip#",
+        "/downloads/files/chummer avalonia-win-x64-payload.zip",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip\x00",
+        "/downloads/files/chummer-avalonia-win-x64-payload.zip\x1f",
+        "/downloads/files/",
+    ],
+)
+def test_windows_installer_verifier_rejects_noncanonical_manifest_payload_url_matrix(
+    tmp_path: Path,
+    manifest_payload_url: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=manifest_payload_url,
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest installerMode=bootstrap payloadDownloadUrl must be a "
+        "lossless canonical absolute HTTPS URL or /downloads/... site path"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_requires_embedded_absolute_sidecar_url_exactly(
+    tmp_path: Path,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    sidecar_url = f"https://example.invalid/downloads/files/{payload_name}"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=sidecar_url,
+        release_proof={"baseUrl": "https://example.invalid"},
+        embedded_download_url=(
+            "https://example.invalid/downloads/files/not-the-payload.zip"
+        ),
+        require_embedded_metadata=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "bootstrap installer embedded payloadDownloadUrl metadata does not equal "
+        "validated metadata"
+    ) in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("label", "extra_installer_bytes", "malformed"),
+    [
+        (
+            "payloadDownloadUrl",
+            (
+                b"\npayloadDownloadUrl=https://example.invalid/downloads/files/"
+                b"chummer-avalonia-win-x64-payload.zip\n"
+            ),
+            False,
+        ),
+        (
+            "payloadSha256",
+            b"\npayloadSha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+            False,
+        ),
+        ("payloadSizeBytes", b"\npayloadSizeBytes=123\n", False),
+        (
+            "payloadDownloadUrl",
+            (
+                b"XpayloadDownloadUrl=https://attacker.invalid/downloads/files/"
+                b"chummer-avalonia-win-x64-payload.zip\n"
+            ),
+            True,
+        ),
+        (
+            "payloadDownloadUrl",
+            (
+                b"\npayloadDownloadUrl=https://attacker.invalid/downloads/files/"
+                b"chummer-avalonia-win-x64-payload.zip"
+            ),
+            True,
+        ),
+    ],
+)
+def test_windows_installer_verifier_rejects_duplicate_or_malformed_embedded_metadata(
+    tmp_path: Path,
+    label: str,
+    extra_installer_bytes: bytes,
+    malformed: bool,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": "https://example.invalid"},
+        require_embedded_metadata=True,
+        require_manifest_row=True,
+        extra_installer_bytes=extra_installer_bytes,
+    )
+
+    assert result.returncode != 0
+    assert (
+        f"bootstrap installer must contain exactly one embedded {label} "
+        "metadata occurrence"
+    ) in result.stderr
+    if malformed:
+        assert f"embedded {label} metadata is malformed" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "sidecar_download_url",
+    [
+        "http://example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "//example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://user@example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid:444/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid:99999/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://EXAMPLE.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid/downloads/files/%63hummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip?",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip#",
+        "https://example.invalid/downloads/files/chummer avalonia-win-x64-payload.zip",
+        "https://example.invalid/downloads//chummer-avalonia-win-x64-payload.zip",
+        "https://example.invalid/downloads/files/chummer-avalonia-win-x64-payload.zip\x00",
+    ],
+)
+def test_windows_installer_verifier_rejects_noncanonical_sidecar_url_matrix(
+    tmp_path: Path,
+    sidecar_download_url: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "https://example.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=sidecar_download_url,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "bootstrap payload sidecar metadata downloadUrl must be a lossless "
+        "canonical absolute HTTPS URL"
+    ) in result.stderr
+
+
+@pytest.mark.parametrize(
+    "proof_base_url",
+    [
+        "http://example.invalid",
+        "https://user@example.invalid",
+        "https://EXAMPLE.invalid",
+        "https://-",
+        "https://.",
+        "https://foo..bar",
+        "https://foo.invalid.",
+        "https://caf\u00e9.invalid",
+        "https://xn--caf-dma.invalid",
+        "https://127.1",
+        "https://0x7f000001",
+        "https://127.000.0.1",
+        "https://foo_bar.invalid",
+        "https://-foo.invalid",
+        "https://foo-.invalid",
+        f"https://{'a' * 64}.invalid",
+        "https://example.invalid:444",
+        "https://example.invalid:99999",
+        "https://example.invalid/",
+        "https://example.invalid?",
+        "https://example.invalid#",
+        "https://example.invalid ",
+        "https://example.invalid\x00",
+    ],
+)
+def test_windows_installer_verifier_rejects_noncanonical_release_proof_origin_matrix(
+    tmp_path: Path,
+    proof_base_url: str,
+) -> None:
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    result = _run_bootstrap_url_case(
+        tmp_path,
+        installer_download_url=(
+            "/downloads/files/chummer-avalonia-win-x64-installer.exe"
+        ),
+        manifest_payload_url=f"/downloads/files/{payload_name}",
+        sidecar_download_url=f"https://example.invalid/downloads/files/{payload_name}",
+        release_proof={"baseUrl": proof_base_url},
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest releaseProof.baseUrl must be one lossless canonical HTTPS origin"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_rejects_relative_sidecar_download_url(tmp_path: Path) -> None:
     files_dir = tmp_path / "files"
     files_dir.mkdir()
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
@@ -696,7 +1671,48 @@ def test_windows_installer_verifier_rejects_manifest_payload_url_that_is_relativ
     )
 
     assert result.returncode != 0
-    assert "manifest installerMode=bootstrap payloadDownloadUrl must be an absolute HTTPS URL" in result.stderr
+    assert (
+        "bootstrap payload sidecar metadata downloadUrl must be a lossless "
+        "canonical absolute HTTPS URL"
+    ) in result.stderr
+
+
+def test_windows_installer_verifier_rejects_noncanonical_site_manifest_url(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    relative_url = f"/downloads/files/../files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_download_url=relative_url,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        ["python3", str(VERIFY_SCRIPT), "--files-dir", str(files_dir), "--manifest", str(manifest_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "manifest installerMode=bootstrap payloadDownloadUrl must be a "
+        "lossless canonical absolute HTTPS URL or /downloads/... site path"
+    ) in result.stderr
 
 
 def test_windows_installer_verifier_rejects_bulk_bootstrap_installer(tmp_path: Path) -> None:
@@ -739,6 +1755,142 @@ def test_windows_installer_verifier_rejects_bulk_bootstrap_installer(tmp_path: P
     assert result.returncode != 0
     assert "manifest installerMode=bootstrap but installer size" in result.stderr
     assert "is not smaller than payloadSizeBytes" in result.stderr
+
+
+def test_windows_installer_verifier_accepts_cross_manifest_schema_aliases(
+    tmp_path: Path,
+) -> None:
+    files_dir, manifests = _write_bundled_installer_manifests(tmp_path)
+    canonical = json.loads(manifests[1].read_text(encoding="utf-8"))
+    row = canonical["downloads"][0]
+    row["downloadUrl"] = row.pop("url")
+    row["id"] = row.pop("artifactId")
+    row["name"] = row.pop("fileName")
+    row["payloadName"] = row.pop("payloadFileName")
+    manifests[1].write_text(
+        json.dumps(canonical, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifests[0]),
+            "--manifest",
+            str(manifests[1]),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    ("field", "mutated_value"),
+    [
+        ("artifactId", "other-win-x64-installer"),
+        ("sha256", "0" * 64),
+        ("sizeBytes", 1),
+        ("installAccessClass", "private"),
+        ("previewPolicy", "stable_policy"),
+        (
+            "signature",
+            {
+                "policy": "stable_policy",
+                "required": True,
+                "status": "signed",
+            },
+        ),
+        (
+            "url",
+            "https://attacker.invalid/downloads/files/"
+            "chummer-avalonia-win-x64-installer.exe",
+        ),
+        ("payloadFileName", "other-payload.zip"),
+        (
+            "payloadDownloadUrl",
+            "https://example.invalid/downloads/files/other-payload.zip",
+        ),
+        ("payloadSha256", "0" * 64),
+        ("payloadSizeBytes", 1),
+        ("payloadAcquisitionMode", "download"),
+        ("installerMode", "bootstrap"),
+        ("version", "other-version"),
+    ],
+)
+def test_windows_installer_verifier_rejects_cross_manifest_bundled_identity_drift(
+    tmp_path: Path,
+    field: str,
+    mutated_value: object,
+) -> None:
+    files_dir, manifests = _write_bundled_installer_manifests(tmp_path)
+    compatibility = json.loads(manifests[1].read_text(encoding="utf-8"))
+    compatibility["downloads"][0][field] = mutated_value
+    manifests[1].write_text(
+        json.dumps(compatibility, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifests[0]),
+            "--manifest",
+            str(manifests[1]),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "normalized Windows installer row disagrees" in result.stderr
+
+
+def test_windows_installer_verifier_surfaces_bundled_manifest_conflicts_without_strict_mode(
+    tmp_path: Path,
+) -> None:
+    files_dir, manifests = _write_bundled_installer_manifests(tmp_path)
+    compatibility = json.loads(manifests[1].read_text(encoding="utf-8"))
+    compatibility["downloads"][0]["previewPolicy"] = "stable_policy"
+    manifests[1].write_text(
+        json.dumps(compatibility, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifests[0]),
+            "--manifest",
+            str(manifests[1]),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "supplied release manifests disagree on the Windows installer row"
+        in result.stderr
+    )
 
 
 def test_windows_installer_verifier_accepts_appended_payload(tmp_path: Path) -> None:
@@ -787,6 +1939,20 @@ def test_publish_download_bundle_fails_before_promotion_when_windows_payload_is_
     assert "no appended payload and no bootstrap sidecar" in result.stderr
 
 
+def test_http_publisher_requires_manifest_bound_embedded_bootstrap_metadata() -> None:
+    script = HTTP_PUBLISH_SCRIPT.read_text(encoding="utf-8")
+    invocation_start = script.index(
+        'python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py"'
+    )
+    invocation_end = script.index("\n\n", invocation_start)
+    invocation = script[invocation_start:invocation_end]
+
+    assert "--manifest \"$MANIFEST_PATH\"" in invocation
+    assert "--manifest \"$CANONICAL_MANIFEST_PATH\"" in invocation
+    assert "--require-embedded-bootstrap-metadata" in invocation
+    assert "--require-manifest-row" in invocation
+
+
 def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_path: Path) -> None:
     bundle_dir = tmp_path / "bundle"
     files_dir = bundle_dir / "files"
@@ -818,7 +1984,9 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
         payload_download_url=payload_url,
         payload_sha256=payload_sha256,
         payload_size_bytes=len(payload_bytes),
-        release_proof=_release_proof_for_windows_installer(),
+        release_proof=_release_proof_for_windows_installer(
+            base_url="https://example.invalid"
+        ),
     )
     _write_startup_smoke_receipt(bundle_dir / "startup-smoke", installer_path)
 
