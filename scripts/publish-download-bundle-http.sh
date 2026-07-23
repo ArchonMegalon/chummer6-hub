@@ -49,15 +49,17 @@ ARTIFACT_FACTORY_LAUNCHER="$SCRIPT_DIR/launch_artifact_factory_source_pack_batch
 UPLOAD_ATTEMPT_RECEIPT_HELPER="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_HELPER:-$SCRIPT_DIR/release/release_upload_attempt_receipt.py}"
 UPLOAD_ATTEMPT_RECEIPT_PATH="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$BUNDLE_DIR/release-upload-handoff.json}"
 STAGE_RESPONSE_PATH="${CHUMMER_RELEASE_UPLOAD_STAGE_RESPONSE_PATH:-$BUNDLE_DIR/release-stage-response.json}"
+STAGED_PROBE_TOKEN_PATH="${CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE:-}"
 
 # Keep inherited bearer credentials out of every preflight/materializer child.
 # Bash preserves an inherited export attribute across ordinary assignment, so
 # explicitly de-export the private shell copies before invoking any child.
-export -n TOKEN TOKEN_FILE ARTIFACT_FACTORY_TOKEN 2>/dev/null || true
+export -n TOKEN TOKEN_FILE STAGED_PROBE_TOKEN_PATH ARTIFACT_FACTORY_TOKEN 2>/dev/null || true
 unset \
   CHUMMER_RELEASE_UPLOAD_TOKEN \
   CHUMMER_RELEASE_UPLOAD_TOKEN_FILE \
   CHUMMER_RELEASE_UPLOAD_TOKEN_PATH \
+  CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE \
   CHUMMER_RELEASE_UPLOAD_TICKET \
   CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
   CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
@@ -169,6 +171,113 @@ case "$(printf '%s' "$STAGE_ONLY" | tr '[:upper:]' '[:lower:]')" in
     exit 1
     ;;
 esac
+
+preflight_staged_probe_token_path() {
+  local output_path="${1:-}"
+  python3 - \
+    "$output_path" \
+    "$BUNDLE_DIR" \
+    "$UPLOAD_ATTEMPT_RECEIPT_PATH" \
+    "$STAGE_RESPONSE_PATH" <<'PY'
+from __future__ import annotations
+
+import os
+import stat
+import sys
+from pathlib import Path
+
+output_text = str(sys.argv[1]).strip()
+if not output_text:
+    raise SystemExit(
+        "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE is required for stage-only uploads."
+    )
+
+output_path = Path(output_text)
+if not output_path.is_absolute():
+    raise SystemExit(
+        "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE must be an absolute path."
+    )
+
+normalized_output = Path(os.path.abspath(output_path))
+if normalized_output != output_path:
+    raise SystemExit(
+        "CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE must not contain path traversal."
+    )
+
+try:
+    bundle_root = Path(sys.argv[2]).resolve(strict=True)
+except (OSError, RuntimeError) as exc:
+    raise SystemExit("The upload bundle could not be resolved safely.") from exc
+
+parent = normalized_output.parent
+try:
+    parent_metadata = parent.lstat()
+except OSError as exc:
+    raise SystemExit(
+        "The staged probe token handoff parent must already exist."
+    ) from exc
+
+if (
+    not stat.S_ISDIR(parent_metadata.st_mode)
+    or stat.S_ISLNK(parent_metadata.st_mode)
+    or parent_metadata.st_uid != os.geteuid()
+    or stat.S_IMODE(parent_metadata.st_mode) & 0o077
+    or stat.S_IMODE(parent_metadata.st_mode) & 0o300 != 0o300
+):
+    raise SystemExit(
+        "The staged probe token handoff parent must be a current-owner, "
+        "non-symlink private directory."
+    )
+
+try:
+    resolved_parent = parent.resolve(strict=True)
+    if resolved_parent != parent:
+        raise SystemExit(
+            "The staged probe token handoff parent must not traverse symlinks."
+        )
+except (OSError, RuntimeError) as exc:
+    raise SystemExit(
+        "The staged probe token handoff parent could not be resolved safely."
+    ) from exc
+
+canonical_output = resolved_parent / normalized_output.name
+try:
+    canonical_output.relative_to(bundle_root)
+except ValueError:
+    pass
+else:
+    raise SystemExit(
+        "The staged probe token handoff must be outside the upload bundle."
+    )
+
+try:
+    reserved_paths = {
+        Path(os.path.abspath(path_text)).resolve(strict=False)
+        for path_text in sys.argv[3:5]
+    }
+except (OSError, RuntimeError) as exc:
+    raise SystemExit(
+        "The configured release receipt targets could not be resolved safely."
+    ) from exc
+if canonical_output in reserved_paths:
+    raise SystemExit(
+        "The staged probe token handoff must be distinct from public or sanitized receipts."
+    )
+
+try:
+    normalized_output.lstat()
+except FileNotFoundError:
+    pass
+except OSError as exc:
+    raise SystemExit(
+        "The staged probe token handoff target could not be inspected safely."
+    ) from exc
+else:
+    raise SystemExit(
+        "The staged probe token handoff target must not already exist."
+    )
+PY
+}
 
 array_count() {
   local array_name="${1:-}"
@@ -705,19 +814,25 @@ PY
 
 sanitize_release_upload_response_stream() {
   local output_path="$1"
+  local probe_token_path="${2:-}"
+  local require_probe_token="${3:-0}"
   python3 -c '
 from __future__ import annotations
 
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 output_path = Path(sys.argv[1])
 max_bytes = int(sys.argv[2])
+probe_token_text = str(sys.argv[3]).strip()
+require_probe_token = sys.argv[4] == "1"
+probe_token_path = Path(probe_token_text) if probe_token_text else None
 raw = bytearray()
 tail = bytearray()
 total_bytes = 0
@@ -742,6 +857,7 @@ overflow = stream_overflow or len(body) > max_bytes
 
 safe_scalar = re.compile(r"^[A-Za-z0-9._:/+ -]{1,2048}$")
 safe_identifier = re.compile(r"^[A-Za-z0-9._:+-]{1,200}$")
+safe_probe_token = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 endpoint_fields = {
     "filesUrl", "FilesUrl", "files_url", "files",
     "chunksUrl", "ChunksUrl", "chunks_url", "chunks",
@@ -761,6 +877,8 @@ scalar_fields = (
 
 def safe_url(value: object, *, allow_relative: bool) -> str | None:
     if not isinstance(value, str) or not (1 <= len(value) <= 2048):
+        return None
+    if reflects_probe_token(value):
         return None
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
         return None
@@ -786,16 +904,65 @@ else:
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         summary["responseSuppressed"] = "non_json"
 
+redaction_probe_token: str | None = None
+probe_token: str | None = None
+if isinstance(payload, dict):
+    candidate_probe_token = payload.get("probeToken")
+    if isinstance(candidate_probe_token, str) and candidate_probe_token:
+        redaction_probe_token = candidate_probe_token
+
+if require_probe_token and status_match and status_code.startswith("2"):
+    if (
+        probe_token_path is None
+        or redaction_probe_token is None
+        or safe_probe_token.fullmatch(redaction_probe_token) is None
+    ):
+        raise SystemExit(66)
+    probe_token = redaction_probe_token
+
+def reflects_probe_token(value: object) -> bool:
+    if redaction_probe_token is None:
+        return False
+    if isinstance(value, str):
+        decoded_value = value
+        if redaction_probe_token in decoded_value:
+            return True
+        for _ in range(8):
+            decoded_once = unquote(decoded_value)
+            if decoded_once == decoded_value:
+                break
+            if redaction_probe_token in decoded_once:
+                return True
+            decoded_value = decoded_once
+        return False
+    if isinstance(value, (bool, int)):
+        return redaction_probe_token in str(value)
+    if isinstance(value, dict):
+        return any(
+            reflects_probe_token(key) or reflects_probe_token(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(reflects_probe_token(item) for item in value)
+    return False
+
 if isinstance(payload, dict):
     for field_name in scalar_fields:
         value = payload.get(field_name)
-        if isinstance(value, bool) or isinstance(value, int):
+        if (
+            (isinstance(value, bool) or isinstance(value, int))
+            and not reflects_probe_token(value)
+        ):
             summary[field_name] = value
         elif field_name in endpoint_fields:
             safe_value = safe_url(value, allow_relative=True)
             if safe_value is not None:
                 summary[field_name] = safe_value
-        elif isinstance(value, str) and safe_scalar.fullmatch(value):
+        elif (
+            isinstance(value, str)
+            and safe_scalar.fullmatch(value)
+            and not reflects_probe_token(value)
+        ):
             summary[field_name] = value
 
     for field_name in ("installDispatchUrls", "directFileUrls"):
@@ -808,17 +975,100 @@ if isinstance(payload, dict):
     if isinstance(promoted_ids, list):
         summary["promotedArtifactIds"] = [
             item for item in promoted_ids[:512]
-            if isinstance(item, str) and safe_identifier.fullmatch(item)
+            if (
+                isinstance(item, str)
+                and safe_identifier.fullmatch(item)
+                and not reflects_probe_token(item)
+            )
         ]
     candidate_ids = payload.get("candidateArtifactIds")
     if isinstance(candidate_ids, list):
         summary["candidateArtifactIds"] = [
             item for item in candidate_ids[:512]
-            if isinstance(item, str) and safe_identifier.fullmatch(item)
+            if (
+                isinstance(item, str)
+                and safe_identifier.fullmatch(item)
+                and not reflects_probe_token(item)
+            )
         ]
     summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 2)
 elif isinstance(payload, list):
     summary["itemCount"] = len(payload)
+
+if reflects_probe_token(summary):
+    summary = {
+        "responseSanitized": True,
+        "responseSuppressed": "probe_token_reflection",
+    }
+
+if require_probe_token and status_match and status_code.startswith("2"):
+    if probe_token_path is None or probe_token is None:
+        raise SystemExit(66)
+
+    parent = probe_token_path.parent
+    parent_flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        parent_flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        parent_flags |= os.O_NOFOLLOW
+    directory_fd = os.open(parent, parent_flags)
+    created = False
+    try:
+        parent_metadata = os.fstat(directory_fd)
+        if (
+            not stat.S_ISDIR(parent_metadata.st_mode)
+            or parent_metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(parent_metadata.st_mode) & 0o077
+            or stat.S_IMODE(parent_metadata.st_mode) & 0o300 != 0o300
+        ):
+            raise OSError("unsafe staged probe token parent")
+
+        output_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_CLOEXEC"):
+            output_flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            output_flags |= os.O_NOFOLLOW
+        probe_fd = os.open(
+            probe_token_path.name,
+            output_flags,
+            0o600,
+            dir_fd=directory_fd,
+        )
+        created = True
+        try:
+            probe_metadata = os.fstat(probe_fd)
+            if (
+                not stat.S_ISREG(probe_metadata.st_mode)
+                or probe_metadata.st_uid != os.geteuid()
+                or stat.S_IMODE(probe_metadata.st_mode) != 0o600
+                or probe_metadata.st_nlink != 1
+            ):
+                raise OSError("unsafe staged probe token handoff")
+            encoded_probe_token = (probe_token + "\n").encode("ascii")
+            view = memoryview(encoded_probe_token)
+            while view:
+                written = os.write(probe_fd, view)
+                if written <= 0:
+                    raise OSError("staged probe token handoff write failed")
+                view = view[written:]
+            os.fsync(probe_fd)
+        except BaseException:
+            os.close(probe_fd)
+            probe_fd = -1
+            raise
+        finally:
+            if probe_fd >= 0:
+                os.close(probe_fd)
+        os.fsync(directory_fd)
+    except BaseException:
+        if created:
+            try:
+                os.unlink(probe_token_path.name, dir_fd=directory_fd)
+            except OSError:
+                pass
+        raise
+    finally:
+        os.close(directory_fd)
 
 if output_path == Path("/dev/null"):
     print(status_code)
@@ -848,18 +1098,23 @@ finally:
 print(status_code)
 if not status_match:
     raise SystemExit(65)
-' "$output_path" "$MAX_RESPONSE_BYTES"
+' "$output_path" "$MAX_RESPONSE_BYTES" "$probe_token_path" "$require_probe_token"
 }
 
-request_json() {
+request_json_internal() {
   local response_path="$1"
   local label="$2"
   local url="$3"
-  shift 3
+  local probe_token_path="$4"
+  local require_probe_token="$5"
+  shift 5
   local http_status=""
   if ! http_status="$(authenticated_curl -sS --max-filesize "$MAX_RESPONSE_BYTES" \
       --write-out $'\nCHUMMER_HTTP_STATUS:%{http_code}' "$@" "$url" \
-      | sanitize_release_upload_response_stream "$response_path")"; then
+      | sanitize_release_upload_response_stream \
+          "$response_path" \
+          "$probe_token_path" \
+          "$require_probe_token")"; then
     echo "$label failed." >&2
     [[ -f "$response_path" ]] && print_sanitized_response "$response_path" >&2 || true
     return 22
@@ -869,6 +1124,23 @@ request_json() {
     print_sanitized_response "$response_path" >&2 || true
     return 22
   fi
+}
+
+request_json() {
+  local response_path="$1"
+  local label="$2"
+  local url="$3"
+  shift 3
+  request_json_internal "$response_path" "$label" "$url" "" "0" "$@"
+}
+
+request_stage_json() {
+  local response_path="$1"
+  local label="$2"
+  local url="$3"
+  local probe_token_path="$4"
+  shift 4
+  request_json_internal "$response_path" "$label" "$url" "$probe_token_path" "1" "$@"
 }
 
 verify_route() {
@@ -1000,7 +1272,7 @@ if to_bool "$DRY_RUN"; then
   echo
   if (( STAGE_ONLY == 1 )); then
     echo "Exact inert stage command:"
-    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY=1 CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+    echo "CHUMMER_RELEASE_UPLOAD_STAGE_ONLY=1 CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' CHUMMER_RELEASE_UPLOAD_STAGED_PROBE_TOKEN_FILE='<owner-private-path>' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
   else
     echo "Exact live publish command:"
     echo "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='$VERIFY_URL' CHUMMER_RELEASE_UPLOAD_TOKEN_FILE='$TOKEN_FILE' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
@@ -1012,6 +1284,10 @@ fi
 if [[ ! -f "$UPLOAD_ATTEMPT_RECEIPT_HELPER" || -L "$UPLOAD_ATTEMPT_RECEIPT_HELPER" ]]; then
   echo "Durable upload-attempt receipt helper is missing or unsafe: $UPLOAD_ATTEMPT_RECEIPT_HELPER" >&2
   exit 1
+fi
+
+if (( STAGE_ONLY == 1 )); then
+  preflight_staged_probe_token_path "$STAGED_PROBE_TOKEN_PATH"
 fi
 
 python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" preflight \
@@ -1059,7 +1335,9 @@ request_common=(
   -H "Accept: application/json"
 )
 
-canonicalize_bundle_release_channel_registries
+if (( STAGE_ONLY == 0 )); then
+  canonicalize_bundle_release_channel_registries
+fi
 
 upload_files=()
 while IFS= read -r file_path; do
@@ -1188,7 +1466,15 @@ done < <(array_values_nul upload_files)
 record_upload_attempt_state uploaded
 if (( STAGE_ONLY == 1 )); then
   record_upload_attempt_state stage_request_started
-  if ! request_json "$response_json" "stage upload session" "$stage_url" "${request_common[@]}" -X POST; then
+  # The server may renew the probe grant for an already-staged receipt. Keep
+  # every returned grant in a fresh handoff instead of overwriting an older one.
+  if ! request_stage_json \
+      "$response_json" \
+      "stage upload session" \
+      "$stage_url" \
+      "$STAGED_PROBE_TOKEN_PATH" \
+      "${request_common[@]}" \
+      -X POST; then
     record_upload_attempt_state stage_outcome_unknown || true
     echo "Release stage outcome is unknown. Do not create another session and do not invoke /complete; reconcile the stage_outcome_unknown handoff at $UPLOAD_ATTEMPT_RECEIPT_PATH against the same /stage endpoint." >&2
     exit 1
@@ -1203,6 +1489,7 @@ if (( STAGE_ONLY == 1 )); then
   fi
   echo "Candidate staged inertly for exact scope $EXACT_WINDOWS_STAGE_SCOPE."
   echo "Durable stage response: $STAGE_RESPONSE_PATH"
+  echo "Private staged probe token handoff: $STAGED_PROBE_TOKEN_PATH"
   echo "Use materialize_staged_release_finalizer_handoff.py and the owner-only finalize_staged_release.py lane for any later authority advance or activation. This command grants neither."
   print_sanitized_response "$response_json" || echo "(stage response display suppressed)"
   exit 0
