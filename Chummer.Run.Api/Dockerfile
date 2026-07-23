@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc
 FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS public-pwa-proof
 WORKDIR /proof
 COPY --from=run-services-source scripts/validate_public_pwa_proof_authority.py scripts/validate_public_pwa_proof_authority.py
@@ -42,6 +42,8 @@ COPY --from=hub-package-feed /opt/chummer-package-feed /opt/chummer-package-feed
 COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.Run.Api/packages.lock.json chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
+COPY --from=run-services-source Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj chummer.run-services/Chummer.Run.LoopbackProbe/
+COPY --from=run-services-source Chummer.Run.LoopbackProbe/packages.lock.json chummer.run-services/Chummer.Run.LoopbackProbe/
 COPY --from=run-services-source Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj chummer.run-services/Chummer.Campaign.Contracts/
 COPY --from=run-services-source Chummer.Campaign.Contracts/packages.lock.json chummer.run-services/Chummer.Campaign.Contracts/
 COPY --from=run-services-source Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
@@ -59,8 +61,16 @@ RUN dotnet restore chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chu
     --no-cache \
     -p:ChummerPackageFeed= \
     -p:RestoreAdditionalProjectSources=
+RUN dotnet restore chummer.run-services/Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj \
+    --configfile /tmp/chummer-package-feed.NuGet.Config \
+    --packages /tmp/chummer-nuget/packages \
+    --locked-mode \
+    --no-cache \
+    -p:ChummerPackageFeed= \
+    -p:RestoreAdditionalProjectSources=
 COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
+COPY --from=run-services-source Chummer.Run.LoopbackProbe/ chummer.run-services/Chummer.Run.LoopbackProbe/
 COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/
 COPY --from=run-services-source Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
 COPY --from=run-services-source Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
@@ -83,6 +93,7 @@ RUN nice -n 10 dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.M
  && nice -n 10 dotnet build /src/chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj -c Release --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false
 RUN nice -n 10 dotnet publish -c Release -o /app/publish --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false -p:ChummerMediaContractsAssembly=/src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/net10.0/Chummer.Media.Contracts.dll
 RUN nice -n 10 dotnet publish /src/chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj -c Release -o /app/install-linking-postgres-tool --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false -p:ChummerMediaContractsAssembly=/src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/net10.0/Chummer.Media.Contracts.dll
+RUN nice -n 10 dotnet publish /src/chummer.run-services/Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj -c Release -o /app/loopback-probe --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
 RUN test -f /app/publish/wwwroot/service-worker.js \
  && grep -Fq 'const CACHE_VERSION = "v19";' /app/publish/wwwroot/service-worker.js \
  && grep -Fq 'const CACHE_CONTRACT = "run-api-projection-v2";' /app/publish/wwwroot/service-worker.js \
@@ -94,7 +105,7 @@ RUN test -f /app/publish/wwwroot/service-worker.js \
  && ! grep -Fq 'self.clients.claim()' /app/publish/wwwroot/service-worker.js \
  && ! grep -Fq '"/mobile-turn-companion.js"' /app/publish/wwwroot/service-worker.js
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS install-linking-postgres-tool-final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS install-linking-postgres-tool-final
 ARG CHUMMER_RUNTIME_UID=1654
 ARG CHUMMER_RUNTIME_GID=1654
 WORKDIR /app
@@ -103,16 +114,14 @@ RUN set -eu; link="$(find -P /app -xdev -type l -print -quit)"; test -z "$link";
 USER ${CHUMMER_RUNTIME_UID}:${CHUMMER_RUNTIME_GID}
 ENTRYPOINT ["/bin/sh", "-c", "umask 077 && exec dotnet Chummer.InstallLinking.Postgres.Tool.dll \"$@\"", "install-linking-postgres-tool"]
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS final
 ARG CHUMMER_RUNTIME_UID=1654
 ARG CHUMMER_RUNTIME_GID=1654
 WORKDIR /app
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/* \
- && command -v setpriv >/dev/null
+RUN command -v setpriv >/dev/null
 COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh
 COPY --from=build /app/publish .
+COPY --from=build /app/loopback-probe /app/loopback-probe/
 COPY --from=build /src/chummer.run-services/.codex-design /app/.codex-design
 COPY --from=build /src/chummer-hub-registry/black-ledger /app/black-ledger
 COPY --from=design-product products/chummer/ /app/.codex-design/product/

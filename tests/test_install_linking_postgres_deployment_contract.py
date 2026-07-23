@@ -99,6 +99,11 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             "!Chummer.InstallLinking.Postgres.Tool/Program.cs",
             "Chummer.InstallLinking.Postgres.Tool/bin/**",
             "Chummer.InstallLinking.Postgres.Tool/obj/**",
+            "!Chummer.Run.LoopbackProbe/Chummer.Run.LoopbackProbe.csproj",
+            "!Chummer.Run.LoopbackProbe/packages.lock.json",
+            "!Chummer.Run.LoopbackProbe/Program.cs",
+            "Chummer.Run.LoopbackProbe/bin/**",
+            "Chummer.Run.LoopbackProbe/obj/**",
             "!scripts/validate_public_pwa_proof_authority.py",
             "!scripts/verify_public_pwa_static_assets.py",
             "!scripts/generate_public_play_worker_projection.py",
@@ -196,6 +201,29 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             "install-linking-postgres-tool",
             dockerfile[api_stage:],
         )
+        self.assertIn(
+            "COPY --from=build /app/loopback-probe /app/loopback-probe/",
+            dockerfile[api_stage:],
+        )
+
+        probe_root = ROOT / "Chummer.Run.LoopbackProbe"
+        project = (
+            probe_root / "Chummer.Run.LoopbackProbe.csproj"
+        ).read_text(encoding="utf-8")
+        program = (probe_root / "Program.cs").read_text(encoding="utf-8")
+        for marker in (
+            "<PackageReference",
+            "<ProjectReference",
+            "<FrameworkReference",
+        ):
+            self.assertNotIn(marker, project)
+        for marker in (
+            "Chummer.InstallLinking",
+            "Npgsql",
+            "Environment.GetEnvironmentVariable",
+            "System.Data",
+        ):
+            self.assertNotIn(marker, program)
 
     def test_compose_does_not_embed_postgres(self) -> None:
         postgres_images = [

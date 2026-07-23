@@ -183,6 +183,7 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("scripts") / "verify_public_pwa_static_assets.py",
         Path("Chummer.Run.Api"),
         Path("Chummer.InstallLinking.Postgres.Tool"),
+        Path("Chummer.Run.LoopbackProbe"),
         Path("Chummer.Campaign.Contracts"),
         Path("Chummer.Control.Contracts"),
         Path("Chummer.Play.Contracts"),
@@ -211,6 +212,12 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("src") / "Chummer.Media.Contracts",
     ),
 }
+REQUIRED_STAGING_RUNTIME_PAYLOAD_RELATIVE_PATHS = (
+    Path("Chummer.Run.Api.dll"),
+    Path("loopback-probe") / "Chummer.Run.LoopbackProbe.dll",
+    Path("loopback-probe") / "Chummer.Run.LoopbackProbe.deps.json",
+    Path("loopback-probe") / "Chummer.Run.LoopbackProbe.runtimeconfig.json",
+)
 ISOLATED_OVERLAY_PAYLOAD_COPY_MAP = {
     Path("chummer.run-services"): (
         Path(".codex-design"),
@@ -241,9 +248,14 @@ ISOLATED_BUILD_IGNORED_NAMES = frozenset(
         "obj",
     }
 )
-REQUIRED_COMPOSE_MOUNTPOINTS = (
+# The CURRENT runtime proof is mounted at /proofs, outside the read-only /app
+# overlay. Its generated source-tree compatibility path remains excluded from
+# build-input identity, but no placeholder or fingerprint exclusion belongs in
+# the staged /app payload.
+RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS = (
     Path("wwwroot") / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
 )
+REQUIRED_COMPOSE_MOUNTPOINTS: tuple[Path, ...] = ()
 REQUIRED_LANDING_MARKERS = {
     "buildPublicInstallHandoff": (
         'href="/build" data-mobile-app-handoff="build-mobile-app-handoff" '
@@ -1480,7 +1492,7 @@ def build_input_rows(source_root: Path) -> list[dict[str, Any]]:
             )
     runtime_mounted_paths = {
         str(source_relative_root / "Chummer.Run.Api" / relative_path).replace(os.sep, "/")
-        for relative_path in REQUIRED_COMPOSE_MOUNTPOINTS
+        for relative_path in RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS
     }
     rows = [row for row in rows if str(row.get("path") or "") not in runtime_mounted_paths]
     rows.sort(key=lambda row: str(row["path"]))
@@ -3339,7 +3351,10 @@ def activate_overlay_tree(
 
 
 def staging_overlay_ready(staging_root: Path) -> bool:
-    return (staging_root / "Chummer.Run.Api.dll").is_file()
+    return all(
+        (staging_root / relative_path).is_file()
+        for relative_path in REQUIRED_STAGING_RUNTIME_PAYLOAD_RELATIVE_PATHS
+    )
 
 
 def ensure_required_compose_mountpoints(root: Path) -> list[str]:
@@ -4292,6 +4307,36 @@ def _verify_published_overlay_with_budget(
             "verificationPrograms": verification_programs_before,
             "verificationProgramsMatch": True,
         }
+    missing_probe_payload = [
+        str(relative_path).replace(os.sep, "/")
+        for relative_path in REQUIRED_STAGING_RUNTIME_PAYLOAD_RELATIVE_PATHS[1:]
+        if not (staging_root / relative_path).is_file()
+    ]
+    if missing_probe_payload:
+        return {
+            "status": "fail",
+            "reason": "published_loopback_probe_missing_runtime_payload",
+            "baseUrl": "",
+            "receiptPath": str(verification_receipt_path),
+            "exitCode": None,
+            "receiptStatus": "",
+            "probeError": "",
+            "missingRuntimePayloadPaths": missing_probe_payload,
+            "releaseChannelReceiptPath": str(release_channel_receipt),
+            "releaseChannelReceiptSnapshotPath": str(
+                release_channel_receipt
+            ),
+            "releaseChannelReceiptSha256Expected": (
+                release_channel_receipt_sha256
+            ),
+            "releaseChannelReceiptSha256Actual": "",
+            "releaseChannelReceiptSha256Matches": False,
+            "verificationInvocationId": verification_invocation_id,
+            "receiptInvocationMatchesCurrent": False,
+            "receiptProcessResultConsistent": False,
+            "verificationPrograms": verification_programs_before,
+            "verificationProgramsMatch": True,
+        }
 
     port = pick_free_port()
     base_url = f"http://127.0.0.1:{port}"
@@ -4950,7 +4995,7 @@ def materialize(
                     stderr=publish_skip_reason + "\n",
                 )
         else:
-            publish_skip_reason = "staging_overlay_missing_app_dll"
+            publish_skip_reason = "staging_overlay_missing_runtime_payload"
             publish = subprocess.CompletedProcess(
                 args=publish_command,
                 returncode=1,
@@ -4977,6 +5022,7 @@ def materialize(
             "-p:BuildInParallel=false",
             "-p:UseSharedCompilation=false",
             "-p:ChummerDesktopRuntimeIdentifiers=",
+            "-p:PublishPublicEdgeLoopbackProbe=true",
         ]
         if run_command_fn is run_command:
             publish = run_command_fn(
@@ -4986,6 +5032,18 @@ def materialize(
             )
         else:
             publish = run_command_fn(publish_command, cwd=build_source_root)
+
+    if publish.returncode == 0 and not staging_overlay_ready(staging_root):
+        publish_skip_reason = "staging_overlay_missing_runtime_payload"
+        publish = subprocess.CompletedProcess(
+            args=publish.args,
+            returncode=1,
+            stdout=publish.stdout,
+            stderr=(
+                publish.stderr
+                + "published overlay is missing required runtime payload\n"
+            ),
+        )
 
     if not reuse_staging:
         current_source_fingerprint = source_fingerprint(source_root)
