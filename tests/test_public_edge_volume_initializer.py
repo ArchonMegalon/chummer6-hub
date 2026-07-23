@@ -29,6 +29,10 @@ def test_initializer_is_fail_closed_and_never_chowns_downloads_bind() -> None:
         "ensure_private_directory_as_portal_identity /app/state/core-workspaces"
         in script
     )
+    assert (
+        "ensure_private_directory_as_portal_identity "
+        "/app/state/data-protection-keys-v2"
+    ) in script
     assert all(
         "/downloads-source" not in line
         for line in script.splitlines()
@@ -87,6 +91,12 @@ def test_initializer_service_is_root_only_and_portal_remains_nonroot() -> None:
     assert portal["environment"][
         "Chummer__CoreGmCharacterEdits__WorkspaceStorePath"
     ] == "/app/state/core-workspaces"
+    assert portal["environment"]["CHUMMER_DATA_PROTECTION_KEYS_PATH"] == (
+        "/app/state/data-protection-keys-v2"
+    )
+    assert services["chummer-install-linking-postgres-import"]["environment"][
+        "CHUMMER_DATA_PROTECTION_KEYS_PATH"
+    ] == "/app/state/data-protection-keys-v2"
 
 
 def test_portal_image_contains_initializer_and_setpriv_contract() -> None:

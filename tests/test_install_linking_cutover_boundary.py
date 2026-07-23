@@ -50,7 +50,7 @@ def advance(module, output: Path, active_build_info: Path, phase: str):
     )
 
 
-def test_boundary_receipt_advances_sequentially_and_records_recovery_truth(
+def test_boundary_rejects_isolated_v2_acceptance_after_legacy_import(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -58,17 +58,25 @@ def test_boundary_receipt_advances_sequentially_and_records_recovery_truth(
     output.touch(mode=0o600)
     active_build_info = build_info(tmp_path)
 
-    for phase in module.PHASES:
+    for phase in module.PHASES[:-1]:
         receipt = advance(module, output, active_build_info, phase)
 
     persisted = json.loads(output.read_text(encoding="utf-8"))
-    assert receipt["status"] == "pass"
-    assert persisted["phase"] == "public_acceptance_completed"
+    with pytest.raises(ValueError, match="requires the explicit no-local-store"):
+        advance(
+            module,
+            output,
+            active_build_info,
+            "public_acceptance_completed",
+        )
+
+    assert receipt["status"] == "in_progress"
+    assert persisted["phase"] == "validate_completed"
     assert persisted["irreversibleDatabaseBoundaryMayHaveBeenEntered"] is True
     assert persisted["automaticDatabaseRollbackAllowed"] is False
     assert persisted["recoveryAuthority"] == {
         "mode": "postgres_pitr_or_governed_recovery",
-        "portalAndTunnelMustRemainStoppedUntilAccepted": False,
+        "portalAndTunnelMustRemainStoppedUntilAccepted": True,
         "preserveFailedAuthorityAndLogs": True,
         "localMirrorRollbackAllowed": False,
         "schemaOrGenerationRewindAllowed": False,
@@ -79,11 +87,17 @@ def test_boundary_receipt_advances_sequentially_and_records_recovery_truth(
     assert persisted["importCompleted"] is True
     assert persisted["importSkippedNoLocalStore"] is False
     assert persisted["localStorePresentAtCutover"] is True
-    assert persisted["sequence"] == len(module.PHASES)
-    assert persisted["previousPhase"] == "validate_completed"
+    assert persisted["dataProtectionKeyRingPosture"] == (
+        "isolated_v2_requires_no_legacy_import"
+    )
+    assert persisted["sequence"] == len(module.PHASES) - 1
+    assert persisted["previousPhase"] == "import_completed"
     assert len(persisted["previousReceiptSha256"]) == 64
     assert os.stat(output).st_mode & 0o777 == 0o600
-    phase_receipts = [output.with_name(f"{output.name}.{phase}.json") for phase in module.PHASES]
+    phase_receipts = [
+        output.with_name(f"{output.name}.{phase}.json")
+        for phase in module.PHASES[:-1]
+    ]
     assert all(path.is_file() for path in phase_receipts)
     assert all(os.stat(path).st_mode & 0o777 == 0o600 for path in phase_receipts)
     for index, path in enumerate(phase_receipts):
@@ -118,6 +132,9 @@ def test_boundary_receipt_records_no_local_store_branch_before_validation(
     assert receipt["importCompleted"] is False
     assert receipt["importSkippedNoLocalStore"] is True
     assert receipt["localStorePresentAtCutover"] is False
+    assert receipt["dataProtectionKeyRingPosture"] == (
+        "isolated_v2_requires_no_legacy_import"
+    )
     assert receipt["validateCompleted"] is True
     skipped_receipt = output.with_name(
         f"{output.name}.{module.IMPORT_SKIPPED_PHASE}.json"

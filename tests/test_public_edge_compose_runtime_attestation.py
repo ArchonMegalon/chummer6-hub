@@ -152,6 +152,9 @@ def rendered_compose(
                 ],
                 "environment": {
                     "AllowedHosts": "chummer.run",
+                    "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
+                        "/app/state/data-protection-keys-v2"
+                    ),
                     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
                     "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
                     "CHUMMER_PUBLIC_CANON_ROOT": "/app",
@@ -299,7 +302,9 @@ def rendered_compose(
                 "extra_hosts": ["db.example.net=34.107.1.2"],
                 "environment": {
                     "ASPNETCORE_ENVIRONMENT": "Production",
-                    "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys",
+                    "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
+                        "/app/state/data-protection-keys-v2"
+                    ),
                     "CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH": (
                         "/run/chummer-secrets/data-protection-key-encryption.pfx"
                     ),
@@ -422,6 +427,50 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
     assert "environment" not in receipt
     assert "volumes" not in receipt
     assert os.stat(output).st_mode & 0o777 == 0o600
+
+
+def test_compose_attestation_accepts_consistent_nonroot_operator_identity(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root, projection_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+    )
+    services = payload["services"]
+    services["chummer-portal-volume-init"]["environment"] = {
+        "CHUMMER_PORTAL_UID": "1000",
+        "CHUMMER_PORTAL_GID": "1000",
+    }
+    for service_name in (
+        "chummer-portal",
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-import",
+    ):
+        service = services[service_name]
+        service["user"] = "1000:1000"
+        service["build"]["args"]["CHUMMER_RUNTIME_UID"] = "1000"
+        service["build"]["args"]["CHUMMER_RUNTIME_GID"] = "1000"
+
+    receipt = module.validate_runtime(
+        payload,
+        project_name="chummer6-hub",
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        projection_root=projection_root,
+        runtime_proof_bind_source=fixture_runtime_proof(projection_root),
+        published_port=8091,
+    )
+
+    assert receipt["status"] == "pass"
+    assert all(
+        build["runtimeIdentityConsistent"] is True
+        for build in receipt["builds"].values()
+    )
 
 
 @pytest.mark.parametrize(
@@ -947,6 +996,20 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
                 CHUMMER_PUBLIC_PLAY_PROXY_URL="https://retired.invalid"
             ),
             "forbidden retired proxy key",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"]["environment"].update(
+                CHUMMER_DATA_PROTECTION_KEYS_PATH="/app/state/data-protection-keys"
+            ),
+            "CHUMMER_DATA_PROTECTION_KEYS_PATH",
+        ),
+        (
+            lambda payload: payload["services"][
+                "chummer-install-linking-postgres-import"
+            ]["environment"].update(
+                CHUMMER_DATA_PROTECTION_KEYS_PATH="/app/state/data-protection-keys"
+            ),
+            "import environment",
         ),
         (
             lambda payload: payload["services"]["chummer-install-linking-postgres-admin"][

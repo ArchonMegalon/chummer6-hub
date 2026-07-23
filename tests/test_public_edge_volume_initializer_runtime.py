@@ -11,8 +11,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "chummer-run-api:local"
 SCRIPT = ROOT / "scripts" / "initialize-public-edge-volumes.sh"
-PORTAL_UID = 1654
-PORTAL_GID = 1654
+PORTAL_UID = 1000
+PORTAL_GID = 1000
 
 
 def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -49,8 +49,16 @@ def test_initializer_migrates_named_volumes_and_only_probes_downloads_bind(tmp_p
     downloads_owner_before = (downloads.stat().st_uid, downloads.stat().st_gid)
 
     try:
-        for volume in volumes:
+        for index, volume in enumerate(volumes):
             docker("volume", "create", volume)
+            legacy_fixture = (
+                "mkdir -p /fixture/data-protection-keys; "
+                "printf %s legacy-plaintext-key-bytes > "
+                "/fixture/data-protection-keys/key-legacy.xml; "
+                "chown -R 1000:1000 /fixture/data-protection-keys; "
+                if index == 0
+                else ""
+            )
             docker(
                 "run",
                 "--rm",
@@ -64,7 +72,9 @@ def test_initializer_migrates_named_volumes_and_only_probes_downloads_bind(tmp_p
                 "-eu",
                 "-c",
                 "mkdir -p /fixture/legacy/nested; : > /fixture/legacy/nested/data; "
-                "chown -R 1000:1000 /fixture; chmod 700 /fixture /fixture/legacy /fixture/legacy/nested",
+                "chown -R 1001:1001 /fixture; "
+                f"{legacy_fixture}"
+                "chmod 700 /fixture /fixture/legacy /fixture/legacy/nested",
             )
 
         command = [
@@ -136,6 +146,27 @@ def test_initializer_migrates_named_volumes_and_only_probes_downloads_bind(tmp_p
             "test -z \"$(find /fixture/core-workspaces -mindepth 1 -print -quit)\"",
         )
         assert core_workspace_root.stdout.strip() == (
+            f"{PORTAL_UID}:{PORTAL_GID}:700:directory"
+        )
+
+        data_protection_roots = docker(
+            "run",
+            "--rm",
+            "--user",
+            "0:0",
+            "--entrypoint",
+            "/bin/sh",
+            "-v",
+            f"{volumes[0]}:/fixture:ro",
+            IMAGE,
+            "-eu",
+            "-c",
+            "stat -c '%u:%g:%a:%F' /fixture/data-protection-keys-v2; "
+            "test -z \"$(find /fixture/data-protection-keys-v2 -mindepth 1 -print -quit)\"; "
+            "test \"$(cat /fixture/data-protection-keys/key-legacy.xml)\" = "
+            "\"legacy-plaintext-key-bytes\"",
+        )
+        assert data_protection_roots.stdout.strip() == (
             f"{PORTAL_UID}:{PORTAL_GID}:700:directory"
         )
 

@@ -258,7 +258,10 @@ services:
       # Core's delegated GM edit boundary requires an explicit, pre-provisioned
       # directory and never falls back to temporary or in-memory character state.
       Chummer__CoreGmCharacterEdits__WorkspaceStorePath: /app/state/core-workspaces
-      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      # The certificate-protected release ring is intentionally isolated from the
+      # incumbent plaintext ring at /app/state/data-protection-keys. Keeping the
+      # legacy bytes untouched preserves exact incumbent rollback.
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys-v2
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
       # PostgreSQL is the cross-host rollback authority, but the process-local mutation model still
@@ -702,7 +705,9 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,mode=1777
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      # Import must use the same certificate-protected ring as the portal. The
+      # legacy plaintext ring remains present in the state volume but is never selected.
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys-v2
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json

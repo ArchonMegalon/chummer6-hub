@@ -156,6 +156,7 @@ do
 done
 
 ensure_private_directory_as_portal_identity /app/state/core-workspaces
+ensure_private_directory_as_portal_identity /app/state/data-protection-keys-v2
 
 # /downloads-source is a host bind and remains operator-owned. Prove access as the
 # portal identity, but never change its ownership or modes from inside the container.
