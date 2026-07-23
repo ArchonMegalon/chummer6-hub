@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -482,6 +484,70 @@ def test_prepare_binds_every_shelf_url_and_records_complete_inventory(tmp_path: 
         "release-evidence/test.json",
     }
     MODULE.verify_generation(generation, pointer)
+
+
+def test_prepare_server_active_layout_binds_committed_initial_authority(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    prepared = tmp_path / "prepared"
+
+    receipt = MODULE.prepare_server_active_layout(
+        candidate,
+        prepared,
+        generation_id="generation-sidecar",
+        activated_at="2026-07-24T01:00:00Z",
+        activation_receipt_id="activation-sidecar",
+    )
+
+    pointer_bytes = (prepared / MODULE.CURRENT_POINTER).read_bytes()
+    pointer = json.loads(pointer_bytes)
+    journal_root = (
+        prepared
+        / MODULE.ACTIVATION_JOURNAL_DIRECTORY
+        / "activation-sidecar"
+    )
+    intent_bytes = (journal_root / MODULE.ACTIVATION_JOURNAL_INTENT).read_bytes()
+    intent = json.loads(intent_bytes)
+    outcome = json.loads(
+        (journal_root / MODULE.ACTIVATION_JOURNAL_OUTCOME).read_bytes()
+    )
+    assert (prepared / MODULE.LAYOUT_MARKER).read_bytes() == (
+        MODULE.SERVER_LAYOUT_MARKER_BYTES
+    )
+    assert json.loads((prepared / MODULE.WRITER_POLICY).read_bytes()) == {
+        "schemaVersion": MODULE.SERVER_WRITER_POLICY_SCHEMA,
+        "mode": MODULE.SERVER_WRITER_POLICY_MODE,
+    }
+    assert stat.S_IMODE((prepared / MODULE.PROMOTION_LOCK).stat().st_mode) == 0o600
+    assert intent["intent"]["previousGenerationId"] is None
+    assert intent["intent"]["previousPointerSha256"] is None
+    assert intent["intent"]["targetPointerBase64"] == intent["targetPointerBase64"]
+    assert base64.b64decode(intent["targetPointerBase64"]) == pointer_bytes
+    serialized_intent = (
+        intent_bytes[:-1] if intent_bytes.endswith(b"\n") else intent_bytes
+    )
+    assert outcome == {
+        "schemaVersion": MODULE.ACTIVATION_OUTCOME_SCHEMA,
+        "state": "committed",
+        "activationReceiptId": "activation-sidecar",
+        "intentSha256": (
+            "sha256:" + hashlib.sha256(serialized_intent).hexdigest()
+        ),
+        "resolvedAtUtc": "2026-07-24T01:00:00Z",
+    }
+    assert receipt["pointer"] == pointer
+    assert receipt["pointerSha256"] == MODULE.sha256_file(
+        prepared / MODULE.CURRENT_POINTER
+    )
+    assert (
+        (prepared / MODULE.CANONICAL_MANIFEST).read_bytes()
+        == (candidate / MODULE.CANONICAL_MANIFEST).read_bytes()
+    )
+    assert (
+        (prepared / MODULE.COMPATIBILITY_MANIFEST).read_bytes()
+        == (candidate / MODULE.COMPATIBILITY_MANIFEST).read_bytes()
+    )
 
 
 def test_filesystem_writer_refuses_server_journal_policy_before_staging(tmp_path: Path) -> None:
