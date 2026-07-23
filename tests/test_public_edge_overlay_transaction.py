@@ -1244,6 +1244,58 @@ module.complete_transaction(
     )
 
 
+def test_public_download_only_completion_neither_requires_nor_claims_install_linking_authority(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        source_root,
+        active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(module, tmp_path)
+    for phase in module.TRANSACTION_PHASES[1:]:
+        module.mark_phase(
+            source_root=source_root,
+            active_root=active_root,
+            journal_path=journal,
+            phase=phase,
+            shared_mutation_lock_token="9" * 64,
+        )
+    evidence_root = tmp_path / "runtime-evidence"
+    evidence_root.mkdir(mode=0o700)
+    evidence_root.chmod(0o700)
+    authority_path = evidence_root / "active-runtime-authority.json"
+
+    receipt = module.complete_transaction(
+        source_root=source_root,
+        active_root=active_root,
+        journal_path=journal,
+        runtime_authority_output=authority_path,
+        candidate_portal_container_id=CANDIDATE_PORTAL_ID,
+        candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
+        candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
+        install_linking_authority_readiness=None,
+        install_linking_authority_readiness_sha256=None,
+        shared_mutation_lock_token="9" * 64,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
+
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    assert receipt["runtimeProfile"] == "public-download-only"
+    assert set(authority) == (
+        module.PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS
+    )
+    assert authority["runtimeProfile"] == "public-download-only"
+    assert "installLinkingAuthorityReadinessPath" not in authority
+    assert "installLinkingAuthorityReadinessSha256" not in authority
+    assert not journal.exists()
+
+
 def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
     script_path = ROOT / "scripts" / "deploy_public_edge_portal.sh"
     script = script_path.read_text(encoding="utf-8")
@@ -1318,8 +1370,8 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
         "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied"
         not in script
     )
-    assert script.count('--release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"') == 7
-    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 7
+    assert script.count('--release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"') == 8
+    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 8
     assert "public_edge_deploy_recovery.py" in script
     assert "run_deploy_recovery" in script
     assert 'DEPLOY_OPERATION="${1:-deploy}"' in script

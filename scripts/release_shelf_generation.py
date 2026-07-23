@@ -18,11 +18,12 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator
+from typing import Any, BinaryIO, Iterator
 from urllib.parse import quote, unquote, urlsplit
 from urllib.request import Request, urlopen
 
@@ -73,6 +74,40 @@ PROOF_ROUTE_KEYS = frozenset({"proofRoutes", "proof_routes"})
 
 class ReleaseShelfError(RuntimeError):
     """Raised when a shelf or candidate fails closed."""
+
+
+class _PromotionLockLease:
+    """Opaque proof that this process still owns the canonical shelf lock."""
+
+    __slots__ = ("_handle", "_lock_path", "_identity")
+
+    def __init__(self, handle: BinaryIO, lock_path: Path) -> None:
+        self._handle = handle
+        self._lock_path = lock_path
+        metadata = os.fstat(handle.fileno())
+        self._identity = (metadata.st_dev, metadata.st_ino)
+
+    def validate_for(self, shelf_root: Path) -> None:
+        expected = (shelf_root.resolve(strict=True) / PROMOTION_LOCK)
+        if expected != self._lock_path:
+            raise ReleaseShelfError(
+                "promotion lock lease is bound to a different release shelf"
+            )
+        try:
+            opened = os.fstat(self._handle.fileno())
+            linked = self._lock_path.lstat()
+        except (OSError, ValueError) as exc:
+            raise ReleaseShelfError("promotion lock lease is no longer active") from exc
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(linked.st_mode)
+            or (opened.st_dev, opened.st_ino) != self._identity
+            or (linked.st_dev, linked.st_ino) != self._identity
+            or opened.st_nlink != 1
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o600
+        ):
+            raise ReleaseShelfError("promotion lock lease identity changed")
 
 
 def refuse_server_managed_filesystem_shelf(shelf_root: Path) -> None:
@@ -1026,13 +1061,37 @@ def resolve_shelf_root(shelf_root: Path) -> tuple[str, Path, dict[str, Any] | No
 
 
 @contextlib.contextmanager
-def promotion_lock(shelf_root: Path) -> Iterator[None]:
+def promotion_lock(shelf_root: Path) -> Iterator[_PromotionLockLease]:
     shelf_root.mkdir(parents=True, exist_ok=True)
+    shelf_root = shelf_root.resolve(strict=True)
     lock_path = shelf_root / PROMOTION_LOCK
-    with lock_path.open("a+b") as handle:
+    flags = (
+        os.O_RDWR
+        | os.O_APPEND
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(lock_path, flags, 0o600)
+    with os.fdopen(descriptor, "a+b") as handle:
+        opened = os.fstat(handle.fileno())
+        linked = lock_path.lstat()
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(linked.st_mode)
+            or (opened.st_dev, opened.st_ino) != (linked.st_dev, linked.st_ino)
+            or opened.st_nlink != 1
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o600
+        ):
+            raise ReleaseShelfError("release shelf promotion lock is unsafe")
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        lease = _PromotionLockLease(
+            handle,
+            lock_path,
+        )
         try:
-            yield
+            yield lease
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -1073,6 +1132,7 @@ def activate_filesystem(
     generation_id: str | None = None,
     activated_at: str | None = None,
     activation_receipt_id: str | None = None,
+    promotion_lease: _PromotionLockLease | None = None,
 ) -> dict[str, Any]:
     shelf_root.mkdir(parents=True, exist_ok=True)
     refuse_server_managed_filesystem_shelf(shelf_root)
@@ -1090,6 +1150,7 @@ def activate_filesystem(
             stage_parent,
             shelf_root,
             initialize_layout=initialize_layout,
+            promotion_lease=promotion_lease,
         )
     finally:
         shutil.rmtree(stage_parent, ignore_errors=True)
@@ -1100,6 +1161,7 @@ def activate_prepared_filesystem(
     shelf_root: Path,
     *,
     initialize_layout: bool,
+    promotion_lease: _PromotionLockLease | None = None,
 ) -> dict[str, Any]:
     shelf_root.mkdir(parents=True, exist_ok=True)
     pointer = load_pointer(prepared_root / CURRENT_POINTER)
@@ -1108,7 +1170,16 @@ def activate_prepared_filesystem(
     verify_generation(prepared_generation, pointer)
     if prepared_root.stat().st_dev != shelf_root.stat().st_dev:
         raise ReleaseShelfError("prepared generation and current.json must share one filesystem")
-    with promotion_lock(shelf_root):
+    if promotion_lease is not None:
+        promotion_lease.validate_for(shelf_root)
+        lock_scope: contextlib.AbstractContextManager[object] = contextlib.nullcontext(
+            promotion_lease
+        )
+    else:
+        lock_scope = promotion_lock(shelf_root)
+    with lock_scope:
+        if promotion_lease is not None:
+            promotion_lease.validate_for(shelf_root)
         refuse_server_managed_filesystem_shelf(shelf_root)
         state, _, _ = resolve_shelf_root(shelf_root)
         if state == "legacy" and not initialize_layout:

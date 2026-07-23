@@ -101,6 +101,7 @@ class DockerRuntime:
         public_projection_snapshot_root: Path,
         runtime_proof_bind_source: Path,
         published_port: int,
+        runtime_profile: str = transaction.FULL_RUNTIME_PROFILE,
     ) -> None:
         self.environment = {
             "PATH": "/usr/bin:/bin",
@@ -141,6 +142,7 @@ class DockerRuntime:
             str(source_root),
         ]
         self.project_name = project_name
+        self.runtime_profile = runtime_profile
 
     def _run(self, command: list[str], *, label: str) -> str:
         completed = subprocess.run(
@@ -205,10 +207,30 @@ class DockerRuntime:
         )
 
     def service_container(self, service: str) -> str:
-        output = self._run(
-            [*self.compose_base, "ps", "--all", "-q", service],
-            label=f"resolve {service} container",
-        )
+        if (
+            self.runtime_profile
+            == transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        ):
+            output = self._run(
+                [
+                    *self.docker_base,
+                    "container",
+                    "ls",
+                    "--all",
+                    "--quiet",
+                    "--no-trunc",
+                    "--filter",
+                    f"label=com.docker.compose.project={self.project_name}",
+                    "--filter",
+                    f"label=com.docker.compose.service={service}",
+                ],
+                label=f"resolve {service} container by exact Compose labels",
+            )
+        else:
+            output = self._run(
+                [*self.compose_base, "ps", "--all", "-q", service],
+                label=f"resolve {service} container",
+            )
         identities = tuple(line for line in output.splitlines() if line)
         if len(identities) > 1:
             raise RuntimeError(f"Docker recovery {service} container is ambiguous")
@@ -759,6 +781,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--published-port", type=int, required=True)
     parser.add_argument("--portal-image-tag", required=True)
     parser.add_argument("--tool-image-tag", required=True)
+    parser.add_argument(
+        "--runtime-profile",
+        choices=(
+            transaction.FULL_RUNTIME_PROFILE,
+            transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+        ),
+        default=transaction.FULL_RUNTIME_PROFILE,
+    )
     return parser.parse_args(argv)
 
 
@@ -837,6 +867,7 @@ def main(argv: list[str] | None = None) -> int:
             public_projection_snapshot_root=projection_snapshot_root,
             runtime_proof_bind_source=authenticated_runtime_proof,
             published_port=args.published_port,
+            runtime_profile=args.runtime_profile,
         )
         candidate_proof_snapshot = Path(
             deploy_authority["candidateProofBindSourceSnapshot"]

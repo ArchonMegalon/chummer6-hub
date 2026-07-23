@@ -6,6 +6,7 @@ import json
 import hashlib
 import os
 from pathlib import Path
+import shutil
 import sys
 
 import pytest
@@ -83,6 +84,62 @@ def prepare_requested(module, tmp_path: Path):
     prestate = module.prepare(shelf, state, "a" * 40)
     start = module.request_start(shelf, state)
     return shelf, state, payloads, prestate, start
+
+
+def public_download_migration_inputs(module, tmp_path: Path):
+    shelf = tmp_path / "downloads"
+    write_legacy_shelf(shelf)
+    stale_payloads = {
+        "files/stale-win.payload.zip": b"stale-unreferenced-payload\n",
+        "files/stale-win.payload.zip.json": b'{"status":"stale"}\n',
+    }
+    for relative, raw in stale_payloads.items():
+        path = shelf / relative
+        path.write_bytes(raw)
+    candidate = tmp_path / "sealed-incumbent-candidate"
+    shutil.copytree(shelf, candidate)
+    for relative in stale_payloads:
+        (candidate / relative).unlink()
+
+    with module.anchored_directory(
+        shelf,
+        "release shelf root",
+    ) as anchored_shelf, module.anchored_directory(
+        candidate,
+        "migration candidate",
+    ) as anchored_candidate:
+        snapshot = module.capture_legacy_snapshot_fd(
+            anchored_shelf,
+            allow_aborted_history=False,
+        )
+        candidate_snapshot = module._capture_public_download_candidate(
+            anchored_candidate,
+            shelf=anchored_shelf,
+            shelf_snapshot=snapshot,
+        )
+    source_head = "d" * 40
+    authority = module._expected_public_download_migration_authority(
+        source_head=source_head,
+        shelf_snapshot=snapshot,
+        candidate_snapshot=candidate_snapshot,
+    )
+    authority_path = tmp_path / "migration-authority.json"
+    authority_raw = write_json(authority_path, authority)
+    receipts = tmp_path / "deploy-receipts"
+    receipts.mkdir(mode=0o700)
+    receipts.chmod(0o700)
+    state = receipts / "initial-public-download-migration"
+    return {
+        "shelf": shelf,
+        "candidate": candidate,
+        "state": state,
+        "source_head": source_head,
+        "authority": authority_path,
+        "authority_sha256": sha256(authority_raw),
+        "generation_id": "generation-public-download-initial",
+        "activation_receipt_id": "activation-public-download-initial",
+        "stale_payloads": stale_payloads,
+    }
 
 
 def materialize_committed_cutover(module, shelf: Path, payloads: dict[str, bytes]):
@@ -633,6 +690,116 @@ def materialize_final_evidence(module, tmp_path: Path):
     module.snapshot_evidence("postdeploy", postdeploy_source, postdeploy)
     module.snapshot_evidence("active-runtime", active_source, active)
     return compose, readiness, postdeploy, active, candidate
+
+
+def test_public_download_migration_activates_clean_generation_without_touching_stale_legacy_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    fixture = public_download_migration_inputs(module, tmp_path)
+
+    prestate = module.prepare_public_download_migration(
+        fixture["shelf"],
+        fixture["state"],
+        fixture["candidate"],
+        fixture["authority"],
+        fixture["authority_sha256"],
+        fixture["source_head"],
+        fixture["generation_id"],
+        fixture["activation_receipt_id"],
+    )
+    module.request_public_download_migration_start(
+        fixture["shelf"],
+        fixture["state"],
+        fixture["candidate"],
+    )
+    generation_module = module._load_release_shelf_generation_module()
+    generation_module.activate_filesystem(
+        fixture["candidate"],
+        fixture["shelf"],
+        initialize_layout=True,
+        generation_id=fixture["generation_id"],
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id=fixture["activation_receipt_id"],
+    )
+
+    poststate = module.verify_public_download_migration(
+        fixture["shelf"],
+        fixture["state"],
+        fixture["candidate"],
+    )
+
+    assert prestate["runtimeProfile"] == "public-download-only"
+    assert poststate["classification"] == "committed"
+    assert poststate["legacyTopLevelBytesUnchanged"] is True
+    assert poststate["excludedLegacyFilesAbsentFromGeneration"] is True
+    assert {
+        row["path"] for row in poststate["excludedLegacyFiles"]
+    } == set(fixture["stale_payloads"])
+    for relative, raw in fixture["stale_payloads"].items():
+        assert (fixture["shelf"] / relative).read_bytes() == raw
+        assert not (
+            fixture["shelf"]
+            / "generations"
+            / fixture["generation_id"]
+            / relative
+        ).exists()
+    assert (
+        fixture["shelf"] / "current.json"
+    ).is_file()
+    assert (
+        fixture["shelf"] / ".release-shelf-layout-v1"
+    ).read_bytes() == b"v1\n"
+
+
+def test_public_download_migration_rejects_authority_or_incumbent_candidate_drift(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    fixture = public_download_migration_inputs(module, tmp_path)
+    module.prepare_public_download_migration(
+        fixture["shelf"],
+        fixture["state"],
+        fixture["candidate"],
+        fixture["authority"],
+        fixture["authority_sha256"],
+        fixture["source_head"],
+        fixture["generation_id"],
+        fixture["activation_receipt_id"],
+    )
+    fixture["authority"].write_bytes(
+        fixture["authority"].read_bytes() + b" "
+    )
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="independent SHA-256 pin",
+    ):
+        module.request_public_download_migration_start(
+            fixture["shelf"],
+            fixture["state"],
+            fixture["candidate"],
+        )
+
+    second_root = tmp_path / "second"
+    second_root.mkdir()
+    second = public_download_migration_inputs(module, second_root)
+    (second["candidate"] / "RELEASE_CHANNEL.generated.json").write_bytes(
+        b'{"status":"arbitrary-local-candidate"}\n'
+    )
+    with pytest.raises(
+        module.CutoverAttestationError,
+        match="byte-identical",
+    ):
+        module.prepare_public_download_migration(
+            second["shelf"],
+            second["state"],
+            second["candidate"],
+            second["authority"],
+            second["authority_sha256"],
+            second["source_head"],
+            second["generation_id"],
+            second["activation_receipt_id"],
+        )
 
 
 def test_prepare_and_request_start_bind_complete_legacy_inventory(tmp_path: Path) -> None:

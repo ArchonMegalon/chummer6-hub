@@ -202,40 +202,116 @@ internal static class Program
         string[] properties =
         [
             "contractName",
+            "service",
             "ready",
             "status",
-            "generatedAt",
             "servingReady",
             "overallReady",
+            "overallStatus",
             "publicationReady",
-            "installLinkingReady",
-            "installLinkingCode",
+            "publicationChecksConfigured",
+            "generatedAt",
+            "checks",
             "releaseShelf"
         ];
         return HasExactProperties(root, properties)
             && HasString(
                 root,
                 "contractName",
-                "chummer.public-downloads-readiness.v1")
+                "chummer.run.api.public_downloads_readiness.v1")
+            && HasString(root, "service", "chummer.run.api")
             && HasBoolean(root, "ready", expected: true)
             && HasString(root, "status", "pass")
-            && HasTimestamp(root, "generatedAt")
             && HasBoolean(root, "servingReady", expected: true)
             && HasBoolean(root, "overallReady", expected: false)
+            && HasString(root, "overallStatus", "fail")
             && HasBoolean(root, "publicationReady", expected: false)
-            && HasBoolean(root, "installLinkingReady", expected: false)
-            && TryGetString(
+            && HasBooleanValue(
                 root,
-                "installLinkingCode",
-                out string? installLinkingCode)
-            && IsSafeCode(installLinkingCode)
+                "publicationChecksConfigured",
+                out bool publicationChecksConfigured)
+            && HasTimestamp(root, "generatedAt")
+            && root.TryGetProperty("checks", out JsonElement checks)
+            && ValidatePublicDownloadsChecks(checks)
             && root.TryGetProperty(
                 "releaseShelf",
                 out JsonElement releaseShelf)
             && ValidateReleaseShelf(
                 releaseShelf,
                 expectedPublicationReady: false,
-                expectedPublicationChecksConfigured: true);
+                expectedPublicationChecksConfigured:
+                    publicationChecksConfigured)
+            && ValidatePublicDownloadsPublicationChecks(releaseShelf);
+    }
+
+    private static bool ValidatePublicDownloadsChecks(JsonElement checks)
+    {
+        var expected = new Dictionary<string, bool>(StringComparer.Ordinal)
+        {
+            ["data_protection_storage"] = true,
+            ["install_linking_store"] = false,
+            ["release_shelf"] = true,
+            ["canonical_release_manifest"] = true
+        };
+        if (checks.ValueKind != JsonValueKind.Array
+            || checks.GetArrayLength() != expected.Count)
+        {
+            return false;
+        }
+
+        var observed = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement check in checks.EnumerateArray())
+        {
+            string[] properties = ["name", "passed", "status", "code"];
+            if (!HasExactProperties(check, properties)
+                || !TryGetString(check, "name", out string? name)
+                || !expected.TryGetValue(name, out bool passed)
+                || !observed.Add(name)
+                || !HasBoolean(check, "passed", passed)
+                || !HasString(check, "status", passed ? "pass" : "fail")
+                || !TryGetString(check, "code", out string? code)
+                || !IsSafeCode(code))
+            {
+                return false;
+            }
+        }
+
+        return observed.SetEquals(expected.Keys);
+    }
+
+    private static bool ValidatePublicDownloadsPublicationChecks(
+        JsonElement releaseShelf)
+    {
+        if (!releaseShelf.TryGetProperty(
+                "publicationChecks",
+                out JsonElement checks)
+            || checks.ValueKind != JsonValueKind.Array
+            || checks.GetArrayLength() != 2)
+        {
+            return false;
+        }
+
+        var observed = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (JsonElement check in checks.EnumerateArray())
+        {
+            string[] properties = ["name", "ready", "status", "code"];
+            if (!HasExactProperties(check, properties)
+                || !TryGetString(check, "name", out string? name)
+                || !HasBooleanValue(check, "ready", out bool ready)
+                || !observed.TryAdd(name, ready)
+                || !HasString(check, "status", ready ? "ready" : "blocked")
+                || !TryGetString(check, "code", out string? code)
+                || !IsSafeCode(code))
+            {
+                return false;
+            }
+        }
+
+        return observed.Count == 2
+            && observed.TryGetValue("release_shelf_serving", out bool serving)
+            && serving
+            && observed.TryGetValue("install_linking_store", out bool linking)
+            && !linking;
     }
 
     private static bool ValidateReady(JsonElement root)

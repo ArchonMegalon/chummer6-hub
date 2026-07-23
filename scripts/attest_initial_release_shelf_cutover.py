@@ -3452,6 +3452,38 @@ def _validate_public_download_prestate(
     )
 
 
+def _revalidate_public_download_migration_authority(
+    prestate: dict[str, Any],
+) -> None:
+    path = Path(
+        require_string(
+            prestate.get("migrationAuthorityPath"),
+            "public-download migration authority path",
+        )
+    )
+    pin = require_sha256(
+        prestate.get("migrationAuthoritySha256"),
+        "public-download migration authority pin",
+    )
+    payload, raw = _read_public_download_migration_authority(path, pin)
+    expected = _expected_public_download_migration_authority(
+        source_head=require_string(
+            prestate.get("sourceHead"),
+            "public-download migration sourceHead",
+        ),
+        shelf_snapshot=prestate["shelfSnapshot"],
+        candidate_snapshot=prestate["candidateSnapshot"],
+    )
+    if (
+        not strict_python_equal(payload, expected)
+        or prestate.get("migrationAuthorityDocumentSha256")
+        != f"sha256:{digest_bytes(raw)}"
+    ):
+        raise CutoverAttestationError(
+            "public-download migration authority changed after prestate"
+        )
+
+
 def prepare_public_download_migration(
     shelf_root: Path,
     state_root: Path,
@@ -3659,6 +3691,7 @@ def request_public_download_migration_start(
             shelf=shelf,
             candidate=candidate,
         )
+        _revalidate_public_download_migration_authority(prestate)
         live_snapshot = capture_legacy_snapshot_fd(
             shelf,
             allow_aborted_history=False,
@@ -3716,6 +3749,7 @@ def _verify_public_download_migration_live(
     candidate: AnchoredDirectory,
     prestate: dict[str, Any],
 ) -> dict[str, Any]:
+    _revalidate_public_download_migration_authority(prestate)
     marker = read_regular_file_at(
         shelf.fd,
         MARKER_NAME,
@@ -3760,6 +3794,21 @@ def _verify_public_download_migration_live(
     generation_root = (
         shelf.path / GENERATIONS_NAME / generation_id
     )
+    generations_fd = _open_child_directory(
+        shelf.fd,
+        GENERATIONS_NAME,
+        "filesystem release generations root",
+    )
+    try:
+        if directory_entry_names(
+            generations_fd,
+            "filesystem release generations root",
+        ) != [generation_id]:
+            raise CutoverAttestationError(
+                "filesystem migration requires exactly its pinned generation"
+            )
+    finally:
+        os.close(generations_fd)
     module = _load_release_shelf_generation_module()
     try:
         validated_pointer = module.validate_pointer_payload(pointer)

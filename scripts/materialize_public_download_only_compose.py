@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import tempfile
 from typing import Any
 
@@ -17,12 +18,13 @@ import yaml
 
 
 CONTRACT_NAME = "chummer.public-download-only-compose-materialization/v1"
-PUBLIC_DOWNLOAD_IMAGE = re.compile(
-    r"^chummer-run-api:public-download-[0-9a-f]{16}-[a-z0-9]{8}$"
-)
+IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+SOURCE_HEAD_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+BASE_COMPOSE_NAME = "docker-compose.public-edge.yml"
+PROFILE_COMPOSE_NAME = "docker-compose.public-downloads.yml"
 POSTURES = {
-    "initial-release-shelf-public-download-cutover": ("false", "true"),
-    "initial-release-shelf-public-download-cutover-recover": ("false", "false"),
+    "initial-release-shelf-public-download-cutover": ("true", "false"),
+    "initial-release-shelf-public-download-cutover-recover": ("true", "false"),
     "initial-release-shelf-public-download-steady": ("true", "false"),
 }
 REMOVED_SERVICES = {
@@ -64,6 +66,9 @@ PUBLIC_DOWNLOAD_HEALTHCHECK = {
         "/api/ready/public-downloads",
     ],
 }
+PUBLIC_DOWNLOAD_PROFILE_HEALTHCHECK = {
+    "test": PUBLIC_DOWNLOAD_HEALTHCHECK["test"],
+}
 
 
 def require_mapping(value: object, label: str) -> dict[str, Any]:
@@ -82,6 +87,114 @@ def mount_target(value: object) -> str:
     return ""
 
 
+def mount_source(value: object) -> str:
+    if isinstance(value, str):
+        return value.split(":", 1)[0]
+    if isinstance(value, dict):
+        source = value.get("source")
+        return source if isinstance(source, str) else ""
+    return ""
+
+
+def validate_profile_source(
+    source: Path,
+    *,
+    raw: bytes,
+    base_portal: dict[str, Any],
+) -> str:
+    try:
+        text = raw.decode("utf-8")
+    except (UnicodeError, yaml.YAMLError) as exc:
+        raise ValueError(
+            "public-downloads Compose profile is unavailable or invalid"
+        ) from exc
+    reset_list_line = "    extra_hosts: !reset []"
+    override_line = "    volumes: !override"
+    reset_null_suffix = ": !reset null"
+    if (
+        text.count(reset_list_line) != 1
+        or text.count(override_line) != 1
+        or text.count(reset_null_suffix) != 5
+        or text.count("!reset") != 6
+        or text.count("!override") != 1
+    ):
+        raise ValueError(
+            "public-downloads Compose profile tag closure drifted"
+        )
+    normalized_text = text.replace(reset_list_line, "    extra_hosts: []")
+    normalized_text = normalized_text.replace(
+        override_line,
+        "    volumes:",
+    )
+    normalized_text = normalized_text.replace(reset_null_suffix, ": null")
+    try:
+        payload = yaml.safe_load(normalized_text)
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            "public-downloads Compose profile is unavailable or invalid"
+        ) from exc
+    root = require_mapping(payload, "public-downloads Compose profile")
+    if set(root) != {"services"}:
+        raise ValueError("public-downloads Compose profile root drifted")
+    services = require_mapping(
+        root.get("services"),
+        "public-downloads Compose profile services",
+    )
+    if set(services) != {"chummer-portal"}:
+        raise ValueError("public-downloads Compose profile service closure drifted")
+    portal = require_mapping(
+        services.get("chummer-portal"),
+        "public-downloads Compose profile portal",
+    )
+    expected_fields = {
+        "profiles",
+        "extra_hosts",
+        "environment",
+        "volumes",
+        "healthcheck",
+    }
+    if set(portal) != expected_fields:
+        raise ValueError("public-downloads Compose profile portal fields drifted")
+    if portal.get("profiles") != ["public-downloads"]:
+        raise ValueError("public-downloads Compose profile selector drifted")
+    if portal.get("extra_hosts") != []:
+        raise ValueError(
+            "public-downloads extra_hosts reset contract drifted"
+        )
+    environment = require_mapping(
+        portal.get("environment"),
+        "public-downloads Compose profile environment",
+    )
+    expected_reset_environment = (
+        REMOVED_PORTAL_ENVIRONMENT
+        - {"CHUMMER_INSTALL_LINKING_STORE_PATH"}
+    )
+    if set(environment) != expected_reset_environment:
+        raise ValueError(
+            "public-downloads Compose profile PostgreSQL environment closure drifted"
+        )
+    for name, value in environment.items():
+        if value is not None:
+            raise ValueError(
+                f"public-downloads environment {name} reset contract drifted"
+            )
+    base_volumes = base_portal.get("volumes")
+    if not isinstance(base_volumes, list):
+        raise ValueError("canonical portal volumes must be a sequence")
+    expected_volumes = [
+        item
+        for item in base_volumes
+        if mount_target(item) not in REMOVED_PORTAL_MOUNT_TARGETS
+    ]
+    if portal.get("volumes") != expected_volumes:
+        raise ValueError(
+            "public-downloads volumes override contract drifted"
+        )
+    if portal.get("healthcheck") != PUBLIC_DOWNLOAD_PROFILE_HEALTHCHECK:
+        raise ValueError("public-downloads Compose profile healthcheck drifted")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _contains_install_linking_postgres(value: object) -> bool:
     if isinstance(value, dict):
         return any(
@@ -97,14 +210,17 @@ def _contains_install_linking_postgres(value: object) -> bool:
 def materialize(
     source: Path,
     *,
-    candidate_image: str,
+    profile_source: Path,
+    source_raw: bytes,
+    profile_raw: bytes,
+    candidate_image_id: str,
     operation: str,
-) -> dict[str, Any]:
-    if PUBLIC_DOWNLOAD_IMAGE.fullmatch(candidate_image) is None:
-        raise ValueError("candidate image is not a unique public-download tag")
+) -> tuple[dict[str, Any], str, str]:
+    if IMAGE_ID_PATTERN.fullmatch(candidate_image_id) is None:
+        raise ValueError("candidate image is not an immutable Docker image ID")
     try:
-        payload = yaml.safe_load(source.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, yaml.YAMLError) as exc:
+        payload = yaml.safe_load(source_raw.decode("utf-8"))
+    except (UnicodeError, yaml.YAMLError) as exc:
         raise ValueError("canonical Compose source is unavailable or invalid") from exc
     root = require_mapping(payload, "Compose document")
     services = require_mapping(root.get("services"), "Compose services")
@@ -123,9 +239,16 @@ def materialize(
         raise ValueError("canonical portal image/build contract drifted")
     if initializer.get("image") != "chummer-run-api:local":
         raise ValueError("canonical portal initializer image contract drifted")
-    portal["image"] = candidate_image
-    initializer["image"] = candidate_image
+    profile_sha256 = validate_profile_source(
+        profile_source,
+        raw=profile_raw,
+        base_portal=portal,
+    )
+    portal["image"] = candidate_image_id
     del portal["build"]
+    if "depends_on" not in portal:
+        raise ValueError("canonical portal dependency contract drifted")
+    del portal["depends_on"]
 
     environment = require_mapping(
         portal.get("environment"),
@@ -151,7 +274,7 @@ def materialize(
         or "CHUMMER_INSTALL_LINKING_POSTGRES_IP" not in str(extra_hosts[1])
     ):
         raise ValueError("canonical portal PostgreSQL host mapping contract drifted")
-    portal["extra_hosts"] = ["host.docker.internal:host-gateway"]
+    del portal["extra_hosts"]
 
     volumes = portal.get("volumes")
     if not isinstance(volumes, list):
@@ -172,11 +295,122 @@ def materialize(
     if portal.get("healthcheck") != EXPECTED_BASE_HEALTHCHECK:
         raise ValueError("canonical portal healthcheck contract drifted")
     portal["healthcheck"] = PUBLIC_DOWNLOAD_HEALTHCHECK
+    portal["profiles"] = ["public-downloads"]
+
+    root_volumes = require_mapping(
+        root.get("volumes"),
+        "canonical Compose volumes",
+    )
+    named_volumes = {
+        mount_source(item)
+        for item in portal["volumes"]
+        if mount_source(item)
+        and not mount_source(item).startswith(("/", ".", "${"))
+    }
+    if not named_volumes or not named_volumes.issubset(root_volumes):
+        raise ValueError("canonical portal named-volume closure drifted")
+    portal_networks = require_mapping(
+        portal.get("networks"),
+        "canonical portal networks",
+    )
+    root_networks = require_mapping(
+        root.get("networks"),
+        "canonical Compose networks",
+    )
+    if not portal_networks or not set(portal_networks).issubset(root_networks):
+        raise ValueError("canonical portal network closure drifted")
+    root = {
+        "services": {"chummer-portal": portal},
+        "volumes": {
+            name: root_volumes[name] for name in sorted(named_volumes)
+        },
+        "networks": {
+            name: root_networks[name] for name in portal_networks
+        },
+    }
     if _contains_install_linking_postgres(root):
         raise ValueError(
             "public-download-only Compose projection retained PostgreSQL material"
         )
-    return root
+    return root, hashlib.sha256(source_raw).hexdigest(), profile_sha256
+
+
+def verify_revision_bound_sources(
+    source_root: Path,
+    *,
+    source_head: str,
+    source: Path,
+    profile_source: Path,
+) -> tuple[Path, Path, Path, bytes, bytes]:
+    if SOURCE_HEAD_PATTERN.fullmatch(source_head) is None:
+        raise ValueError("source HEAD must be a lowercase full 40-hex commit")
+    try:
+        canonical_root = source_root.resolve(strict=True)
+        canonical_source = source.resolve(strict=True)
+        canonical_profile = profile_source.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError("revision-bound Compose source is unavailable") from exc
+    expected_source = canonical_root / BASE_COMPOSE_NAME
+    expected_profile = canonical_root / PROFILE_COMPOSE_NAME
+    if (
+        source.is_symlink()
+        or profile_source.is_symlink()
+        or canonical_source != expected_source
+        or canonical_profile != expected_profile
+    ):
+        raise ValueError("Compose sources are not the canonical source-root files")
+    try:
+        observed_head = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(canonical_root),
+                "rev-parse",
+                "--verify",
+                "HEAD^{commit}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError("source HEAD could not be independently verified") from exc
+    if observed_head != source_head:
+        raise ValueError("source HEAD does not match the checked-out commit")
+    source_buffers: list[bytes] = []
+    for path, relative in (
+        (canonical_source, BASE_COMPOSE_NAME),
+        (canonical_profile, PROFILE_COMPOSE_NAME),
+    ):
+        try:
+            committed = subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(canonical_root),
+                    "show",
+                    f"{source_head}:{relative}",
+                ],
+                check=True,
+                capture_output=True,
+                timeout=10,
+            ).stdout
+            working = path.read_bytes()
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ValueError(
+                f"{relative} could not be verified against source HEAD"
+            ) from exc
+        if working != committed:
+            raise ValueError(f"{relative} is not byte-identical to source HEAD")
+        source_buffers.append(working)
+    return (
+        canonical_root,
+        canonical_source,
+        canonical_profile,
+        source_buffers[0],
+        source_buffers[1],
+    )
 
 
 def atomic_write(path: Path, body: bytes) -> None:
@@ -210,31 +444,66 @@ def atomic_write(path: Path, body: bytes) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--source-head", required=True)
     parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--profile-source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--candidate-image", required=True)
+    parser.add_argument("--receipt-output", type=Path, required=True)
+    parser.add_argument("--candidate-image-id", required=True)
     parser.add_argument("--operation", choices=tuple(POSTURES), required=True)
     args = parser.parse_args(argv)
     try:
-        projected = materialize(
-            args.source,
-            candidate_image=args.candidate_image,
+        (
+            source_root,
+            source,
+            profile_source,
+            source_raw,
+            profile_raw,
+        ) = verify_revision_bound_sources(
+            args.source_root,
+            source_head=args.source_head,
+            source=args.source,
+            profile_source=args.profile_source,
+        )
+        projected, base_sha256, profile_sha256 = materialize(
+            source,
+            profile_source=profile_source,
+            source_raw=source_raw,
+            profile_raw=profile_raw,
+            candidate_image_id=args.candidate_image_id,
             operation=args.operation,
         )
-        body = yaml.safe_dump(
-            projected,
-            allow_unicode=False,
-            default_flow_style=False,
-            sort_keys=False,
+        body = (
+            json.dumps(
+                projected,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
         ).encode("utf-8")
         atomic_write(args.output, body)
         receipt = {
             "contractName": CONTRACT_NAME,
             "status": "pass",
             "operation": args.operation,
-            "candidateImage": args.candidate_image,
+            "sourceRoot": str(source_root),
+            "sourceHead": args.source_head,
+            "baseComposeSource": str(source),
+            "baseComposeSourceSha256": base_sha256,
+            "profileSource": str(profile_source),
+            "profileSourceSha256": profile_sha256,
+            "candidateImageId": args.candidate_image_id,
             "composeSha256": hashlib.sha256(body).hexdigest(),
         }
+        atomic_write(
+            args.receipt_output,
+            (
+                json.dumps(receipt, indent=2, sort_keys=True, allow_nan=False)
+                + "\n"
+            ).encode("utf-8"),
+        )
     except (OSError, UnicodeError, ValueError, yaml.YAMLError) as exc:
         print(f"public_download_only_compose: {exc}", file=os.sys.stderr)
         return 1

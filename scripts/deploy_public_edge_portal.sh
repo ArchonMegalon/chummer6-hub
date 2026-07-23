@@ -15,19 +15,23 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2; exit 2 ;;
+  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
+PUBLIC_DOWNLOAD_ONLY_OPERATION=0
 if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=1
+elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover \
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover ]]; then
+  PUBLIC_DOWNLOAD_ONLY_OPERATION=1
 fi
 
 readonly TRUSTED_GIT="/usr/bin/git"
@@ -186,6 +190,8 @@ CANONICAL_DEPLOY_RECEIPT_ROOT="$DEPLOY_LOCK_ROOT/public-edge-deploy-receipts"
 CANONICAL_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-runtime-authority.json"
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
 CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-cutover"
+PUBLIC_DOWNLOAD_CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-public-download-cutover"
+PUBLIC_DOWNLOAD_CANDIDATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-public-download-candidate"
 CANONICAL_RELEASE_SHELF_ROOT="/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 CUTOVER_RECOVERY_REEXEC=0
 CUTOVER_STEADY_HANDOFF=0
@@ -288,7 +294,7 @@ RUNTIME_PROOF_BIND_SOURCE=""
 AUTHENTICATED_RUNTIME_PROOF_SHA256=""
 RELEASE_CHANNEL_RECEIPT=""
 AUTHENTICATED_RELEASE_CHANNEL_SHA256=""
-if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+if ((RECOVERY_ROUTE_REQUESTED == 0 || PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
 if [[ ! "$RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be externally supplied as a lowercase SHA-256" >&2
   exit 2
@@ -795,6 +801,129 @@ if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_RECEIPT_ROOT")" \
 fi
 if [[ -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
+fi
+if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+  PUBLIC_DOWNLOAD_CONTROLLER="$SOURCE_ROOT/scripts/deploy_public_download_only_cutover.py"
+  PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY-}"
+  PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256-}"
+  PUBLIC_DOWNLOAD_CERTIFICATE_INPUT="${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE-}"
+  PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT="${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE-}"
+  if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || ! -O "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || "$("$TRUSTED_STAT" -c '%h' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" != 1 ]]; then
+    echo "audited public-download cutover controller is unsafe" >&2
+    exit 2
+  fi
+  if ! public_download_controller_mode="$("$TRUSTED_STAT" -c '%a' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" \
+    || [[ ! "$public_download_controller_mode" =~ ^[0-7]{3,4}$ ]] \
+    || (( (8#$public_download_controller_mode & 8#022) != 0 )); then
+    echo "audited public-download cutover controller is group- or world-writable" >&2
+    exit 2
+  fi
+  if [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" != /* \
+    || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *$'\n'* \
+    || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *'|'* \
+    || ! "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "public-download migration authority path and independent SHA-256 are required" >&2
+    exit 2
+  fi
+  if ! PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$(
+    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
+  )" \
+    || [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY" \
+      != "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" ]]; then
+    echo "public-download migration authority must be an exact canonical path" >&2
+    exit 2
+  fi
+  if [[ "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" != /* \
+    || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" != /* ]]; then
+    echo "public-download runtime requires exact certificate and password-file paths" >&2
+    exit 2
+  fi
+  if ! PUBLIC_DOWNLOAD_CERTIFICATE="$(
+    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT"
+  )" \
+    || ! PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD="$(
+      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT"
+    )" \
+    || [[ "$PUBLIC_DOWNLOAD_CERTIFICATE" != "$PUBLIC_DOWNLOAD_CERTIFICATE_INPUT" \
+      || "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD" \
+        != "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD_INPUT" ]]; then
+    echo "public-download certificate inputs must be exact canonical paths" >&2
+    exit 2
+  fi
+  if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    || (-e "$CANONICAL_DOCKER_CONFIG_ROOT" \
+      && (! -d "$CANONICAL_DOCKER_CONFIG_ROOT" || ! -O "$CANONICAL_DOCKER_CONFIG_ROOT")) ]]; then
+    echo "canonical public edge Docker configuration root is unsafe" >&2
+    exit 2
+  fi
+  "$TRUSTED_INSTALL" -d -m 0700 -- \
+    "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/home" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/config"
+  "$TRUSTED_CHMOD" 0700 -- \
+    "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/home" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/config"
+  public_download_controller_args=(
+    --operation "$DEPLOY_OPERATION"
+    --source-root "$SOURCE_ROOT"
+    --source-head "${EXPECTED_HEAD,,}"
+    --shared-mutation-lock-token "$deploy_lock_owner_token"
+    --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT"
+    --migration-state-root "$PUBLIC_DOWNLOAD_CUTOVER_STATE_ROOT"
+    --migration-candidate-root "$PUBLIC_DOWNLOAD_CANDIDATE_ROOT"
+    --migration-authority "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY"
+    --migration-authority-sha256 "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256"
+    --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
+    --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+    --projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT"
+    --projection-snapshot-id "$PUBLIC_PROJECTION_SNAPSHOT_ID"
+    --projection-snapshot-sha256 "$PUBLIC_PROJECTION_SNAPSHOT_SHA256"
+    --projection-manifest-sha256 "$PUBLIC_PROJECTION_MANIFEST_SHA256"
+    --runtime-proof-source "$RUNTIME_PROOF_BIND_SOURCE"
+    --runtime-proof-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
+    --certificate-file "$PUBLIC_DOWNLOAD_CERTIFICATE"
+    --certificate-password-file "$PUBLIC_DOWNLOAD_CERTIFICATE_PASSWORD"
+    --overlay-root "$OVERLAY_ROOT"
+    --overlay-staging-root "$OVERLAY_STAGING_ROOT"
+    --overlay-backup-root "$OVERLAY_BACKUP_ROOT"
+    --overlay-build-root "$OVERLAY_BUILD_ROOT"
+    --transaction-journal "$OVERLAY_PRIOR_STATE_OUTPUT"
+    --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY"
+    --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT"
+    --env-file "$ENV_FILE"
+    --receipt-root "$CANONICAL_DEPLOY_RECEIPT_ROOT"
+    --base-url "$BASE_URL"
+    --build-context "$BUILD_CONTEXT"
+    --fleet-media-contracts "$FLEET_MEDIA_CONTRACTS"
+    --design-product-root "$DESIGN_PRODUCT_ROOT"
+    --ready-timeout-seconds "$PORTAL_READY_TIMEOUT_SECONDS"
+  )
+  public_download_controller_status=0
+  "$TRUSTED_ENV" -i \
+    PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+    "$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    "${public_download_controller_args[@]}" \
+    || public_download_controller_status=$?
+  if ((public_download_controller_status == 76)); then
+    deploy_lock_active=0
+    echo "public-download recovery is uncertain; authenticated mutation lock retained" >&2
+    exit 76
+  fi
+  if ((public_download_controller_status != 0)); then
+    echo "public-download cutover failed after exact recovery or before live mutation" >&2
+    exit "$public_download_controller_status"
+  fi
+  if ! release_deploy_lock; then
+    deploy_lock_active=0
+    trap - EXIT
+    echo "public-download cutover completed but deployment lock release failed" >&2
+    exit 70
+  fi
+  trap - EXIT
+  exit 0
 fi
 INSTALL_LINKING_CUTOVER_BOUNDARY=""
 if ((RECOVERY_ROUTE_REQUESTED == 0)); then
