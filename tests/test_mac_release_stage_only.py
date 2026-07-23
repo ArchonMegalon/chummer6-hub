@@ -683,7 +683,12 @@ def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path
     generator = hub_alias / "scripts" / "materialize_hub_local_release_proof.py"
     generator.parent.mkdir(parents=True)
     generator.write_text(
-        "import sys\n"
+        "import os, pathlib, stat, sys\n"
+        "lock_path = pathlib.Path(os.environ['CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH'])\n"
+        "assert stat.S_IMODE(lock_path.parent.stat().st_mode) == 0o700\n"
+        "pathlib.Path(os.environ['LOCK_CAPTURE_PATH']).write_text(\n"
+        "    str(lock_path), encoding='utf-8')\n"
+        "print('safe-preamble-' + ('x' * 32768), file=sys.stderr)\n"
         "print('Authorization: Bearer leaked-ticket', file=sys.stderr)\n"
         "print('token=plain-secret', file=sys.stderr)\n"
         "print('eyJ1bmxhYmVsZWQ.abcdefghijklmnop.qrstuvwxyz12345', file=sys.stderr)\n"
@@ -693,14 +698,17 @@ def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path
     )
     temp_root = tmp_path / "tmp"
     temp_root.mkdir()
+    temp_root.chmod(0o1777)
+    lock_capture_path = tmp_path / "lock-path.txt"
     environment = hub_projection_authority_environment(tmp_path)
     environment.update(
         {
             "CHUMMER_RELEASE_PYTHON": sys.executable,
+            "LOCK_CAPTURE_PATH": str(lock_capture_path),
             "TMPDIR": str(temp_root),
         }
     )
-    output = tmp_path / "proof.json"
+    output = temp_root / "proof.json"
 
     result = run_sourced(
         'trap cleanup_bootstrap_tmp_paths EXIT; '
@@ -718,6 +726,12 @@ def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path
     assert "/Users/operator" not in result.stdout + result.stderr
     assert "<redacted>" in result.stderr
     assert "<local-path>" in result.stderr
+    assert len(result.stderr.encode("utf-8")) < 17_000
+    mutation_lock_path = Path(lock_capture_path.read_text(encoding="utf-8"))
+    assert mutation_lock_path.name == "public-edge-mutation.lock"
+    assert mutation_lock_path.parent.parent == temp_root
+    assert "/docker/" not in str(mutation_lock_path)
+    assert not mutation_lock_path.parent.exists()
     assert list(temp_root.iterdir()) == []
 
 
@@ -974,11 +988,16 @@ esac
 
 def test_hosted_upload_uses_stdin_config_without_credential_file() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    cleanup_init_index = bootstrap.index("bootstrap_tmp_paths=()")
     main_index = bootstrap.index("main() {")
-    cleanup_init_index = bootstrap.index("bootstrap_tmp_paths=()", main_index)
-    cleanup_trap_index = bootstrap.index("trap cleanup_bootstrap_tmp_paths EXIT", cleanup_init_index)
+    cleanup_trap_index = bootstrap.index("trap cleanup_bootstrap_tmp_paths EXIT", main_index)
+    auth_capture_index = bootstrap.index(
+        "capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source",
+        cleanup_trap_index,
+    )
 
-    assert cleanup_init_index < cleanup_trap_index
+    assert cleanup_init_index < main_index < cleanup_trap_index < auth_capture_index
+    assert bootstrap.count("bootstrap_tmp_paths=()") == 1
     assert 'release_upload_curl_config="$(mktemp)"' not in bootstrap
     assert (
         'write_release_upload_curl_config "$release_upload_auth_value" \\\n'

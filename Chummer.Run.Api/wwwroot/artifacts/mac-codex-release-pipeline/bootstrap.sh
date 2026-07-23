@@ -133,7 +133,11 @@ cleanup_bootstrap_tmp_paths() {
   local path
   if (( $(array_count bootstrap_tmp_paths) > 0 )); then
     while IFS= read -r -d '' path; do
-      [[ -f "$path" ]] && rm -f "$path"
+      if [[ -f "$path" || -L "$path" ]]; then
+        rm -f "$path"
+      elif [[ -d "$path" ]]; then
+        rmdir "$path" 2>/dev/null || true
+      fi
     done < <(array_values_nul bootstrap_tmp_paths)
   fi
 
@@ -214,13 +218,20 @@ import sys
 
 limit = 16384
 kept = bytearray()
+truncated = False
 while True:
     chunk = sys.stdin.buffer.read(65536)
     if not chunk:
         break
-    if len(kept) < limit:
-        kept.extend(chunk[: limit - len(kept)])
+    kept.extend(chunk)
+    if len(kept) > limit:
+        del kept[:-limit]
+        truncated = True
 text = bytes(kept).decode("utf-8", errors="replace")
+if truncated:
+    _, separator, text = text.partition("\n")
+    if not separator:
+        text = ""
 text = re.sub(r"(?i)(authorization\s*:\s*bearer\s+)[^\s\"]+", r"\1<redacted>", text)
 text = re.sub(r"(?i)\b(token|ticket|api[_-]?key|secret|password)\s*[:=]\s*[^\s,;]+", r"\1=<redacted>", text)
 text = re.sub(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]{8,})?\b", "<redacted-token>", text)
@@ -1999,7 +2010,8 @@ generate_hub_local_release_proof() {
   local timeout_seconds="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}"
   local skip_rebuild="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}"
   local python_bin="${RELEASE_PYTHON_BIN:-}"
-  local mutation_lock_path="${CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH:-$(dirname "$output_path")/.hub-local-proof-mutation.lock}"
+  local mutation_lock_root=""
+  local mutation_lock_path=""
   local diagnostic_path=""
   local generator_status=0
   local sanitizer_status=0
@@ -2012,6 +2024,12 @@ generate_hub_local_release_proof() {
 
   if [[ -f "$generator_path" ]]; then
     require_hub_projection_authority_handoffs "$python_bin"
+    mutation_lock_root="$(mktemp -d "${TMPDIR:-/tmp}/chummer-hub-local-proof-lock.XXXXXX")" \
+      || die "unable to create a private temporary root for Hub proof mutation authority"
+    chmod 700 "$mutation_lock_root" \
+      || die "unable to secure the private temporary root for Hub proof mutation authority"
+    mutation_lock_path="$mutation_lock_root/public-edge-mutation.lock"
+    bootstrap_tmp_paths+=("$mutation_lock_path" "$mutation_lock_root")
     diagnostic_path="$(mktemp)"
     bootstrap_tmp_paths+=("$diagnostic_path")
     set +e
@@ -5241,7 +5259,6 @@ PY
 }
 
 main() {
-  bootstrap_tmp_paths=()
   trap cleanup_bootstrap_tmp_paths EXIT
 
   local release_scope_source="${CHUMMER_RELEASE_SCOPE_DECISION_PATH:-}"
