@@ -233,7 +233,7 @@ require_active_release_shelf() {
   done
   [ "$(stat -c %s -- "$root/current.json")" -le 65536 ] \
     || fail "active release shelf current.json is oversized"
-  printf 'chummer.release-shelf-layout/v1\n' \
+  printf 'v1\n' \
     | cmp -s - "$root/.release-shelf-layout-v1" \
     || fail "active release shelf layout marker bytes drifted"
   grep -Eq \
@@ -241,7 +241,7 @@ require_active_release_shelf() {
     "$root/.release-shelf-writer-policy.json" \
     || fail "active release shelf writer-policy schema drifted"
   grep -Eq \
-    '"mode"[[:space:]]*:[[:space:]]*"server-journal-v1"' \
+    '"mode"[[:space:]]*:[[:space:]]*"sidecar-readonly-v1"' \
     "$root/.release-shelf-writer-policy.json" \
     || fail "active release shelf writer-policy mode drifted"
   grep -Eq \
@@ -255,18 +255,9 @@ require_active_release_shelf() {
       generationId \
       "active release shelf current.json"
   )"
-  receipt_id="$(
-    require_single_json_safe_string \
-      "$root/current.json" \
-      activationReceiptId \
-      "active release shelf current.json"
-  )"
   generation_root="$root/generations/$generation_id"
-  receipt_root="$root/.release-shelf-activation-journal/$receipt_id"
   [ -d "$generation_root" ] && [ ! -L "$generation_root" ] \
     || fail "active release shelf current generation is unavailable"
-  [ -d "$receipt_root" ] && [ ! -L "$receipt_root" ] \
-    || fail "active release shelf committed receipt is unavailable"
   for required_file in \
     activation-candidate.json \
     RELEASE_CHANNEL.generated.json \
@@ -275,54 +266,6 @@ require_active_release_shelf() {
     require_regular_input "$generation_root/$required_file" \
       "active generation $required_file"
   done
-  require_regular_input "$receipt_root/intent.json" \
-    "active release shelf activation intent"
-  require_regular_input "$receipt_root/outcome.json" \
-    "active release shelf activation outcome"
-
-  intent_generation="$(
-    require_single_json_safe_string \
-      "$receipt_root/intent.json" \
-      generationId \
-      "active release shelf activation intent"
-  )"
-  intent_receipt="$(
-    require_single_json_safe_string \
-      "$receipt_root/intent.json" \
-      activationReceiptId \
-      "active release shelf activation intent"
-  )"
-  outcome_receipt="$(
-    require_single_json_safe_string \
-      "$receipt_root/outcome.json" \
-      activationReceiptId \
-      "active release shelf activation outcome"
-  )"
-  [ "$intent_generation" = "$generation_id" ] \
-    || fail "active release shelf intent generation disagrees with current.json"
-  [ "$intent_receipt" = "$receipt_id" ] \
-    || fail "active release shelf intent receipt disagrees with current.json"
-  [ "$outcome_receipt" = "$receipt_id" ] \
-    || fail "active release shelf outcome receipt disagrees with current.json"
-  grep -Eq '"state"[[:space:]]*:[[:space:]]*"committed"' \
-    "$receipt_root/outcome.json" \
-    || fail "active release shelf receipt is not committed"
-
-  target_pointer_values="$(
-    grep -Eo \
-      '"targetPointerBase64"[[:space:]]*:[[:space:]]*"[A-Za-z0-9+/=]+"' \
-      "$receipt_root/intent.json" \
-      | sed -E 's/^[^:]+:[[:space:]]*"([^"]+)"$/\1/' \
-      | LC_ALL=C sort -u
-  )" || fail "active release shelf target pointer could not be inspected"
-  [ -n "$target_pointer_values" ] \
-    || fail "active release shelf intent omits target pointer authority"
-  [ "$(printf '%s\n' "$target_pointer_values" | wc -l)" -eq 1 ] \
-    || fail "active release shelf intent has conflicting target pointers"
-  printf '%s' "$target_pointer_values" \
-    | base64 -d \
-    | cmp -s - "$root/current.json" \
-    || fail "active release shelf receipt does not bind current.json bytes"
 }
 
 reset_runtime_input_root() {

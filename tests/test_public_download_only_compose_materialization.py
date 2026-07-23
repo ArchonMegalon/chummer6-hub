@@ -389,18 +389,19 @@ def test_materialized_runtime_is_exact_isolated_portal_and_initializer_closure(
     assert authority["candidateImageId"] == CANDIDATE_IMAGE_ID
 
 
-def test_initializer_requires_and_seals_a_committed_active_shelf() -> None:
+def test_initializer_requires_and_seals_a_read_only_current_shelf() -> None:
     script = INITIALIZER.read_text(encoding="utf-8")
 
     assert "require_active_release_shelf \"$source\"" in script
     assert "require_active_release_shelf \"$destination\"" in script
     assert ".release-shelf-layout-v1" in script
     assert ".release-shelf-writer-policy.json" in script
-    assert ".release-shelf-activation-journal/$receipt_id" in script
-    assert "targetPointerBase64" in script
-    assert "cmp -s - \"$root/current.json\"" in script
-    assert "chummer.release-shelf-layout/v1" in script
-    assert '"state"[[:space:]]*:[[:space:]]*"committed"' in script
+    assert "activation-candidate.json" in script
+    assert "sidecar-readonly-v1" in script
+    assert "printf 'v1\\n'" in script
+    assert ".release-shelf-activation-journal" not in script
+    assert "targetPointerBase64" not in script
+    assert "server-journal-v1" not in script
     assert "chown -R 0:0 -- \"$destination\"" in script
     assert "chmod 0444" in script
     assert "chmod 0555" in script

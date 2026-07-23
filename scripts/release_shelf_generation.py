@@ -10,7 +10,6 @@ single ``current.json`` authority pointer.
 from __future__ import annotations
 
 import argparse
-import base64
 import contextlib
 import copy
 import fcntl
@@ -39,12 +38,7 @@ ACTIVATION_STAGE_PREFIX = ".release-shelf-stage-"
 WRITER_POLICY = ".release-shelf-writer-policy.json"
 SERVER_WRITER_POLICY_SCHEMA = "chummer.release-shelf.writer-policy/v1"
 SERVER_WRITER_POLICY_MODE = "server-journal-v1"
-SERVER_LAYOUT_MARKER_BYTES = b"chummer.release-shelf-layout/v1\n"
-ACTIVATION_JOURNAL_DIRECTORY = ".release-shelf-activation-journal"
-ACTIVATION_JOURNAL_INTENT = "intent.json"
-ACTIVATION_JOURNAL_OUTCOME = "outcome.json"
-ACTIVATION_INTENT_SCHEMA = "chummer.release-shelf.activation-intent/v1"
-ACTIVATION_OUTCOME_SCHEMA = "chummer.release-shelf.activation-outcome/v1"
+SIDECAR_WRITER_POLICY_MODE = "sidecar-readonly-v1"
 CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
 COMPATIBILITY_MANIFEST = "releases.json"
 PUBLICATION_SCOPE = "PUBLICATION_SCOPE.generated.json"
@@ -1873,7 +1867,7 @@ def prepare_layout(
     return pointer
 
 
-def prepare_server_active_layout(
+def prepare_sidecar_active_layout(
     candidate_root: Path,
     output_root: Path,
     *,
@@ -1881,11 +1875,11 @@ def prepare_server_active_layout(
     activated_at: str,
     activation_receipt_id: str,
 ) -> dict[str, Any]:
-    """Materialize one complete, already-committed initial server shelf.
+    """Materialize one complete current generation for a read-only sidecar.
 
-    This is the offline authority lane for the isolated public-download sidecar.
-    It creates no live mutation window: the complete shelf is assembled before
-    the sidecar initializer copies and seals it into an operation-bound volume.
+    No server activation is claimed. The current generation is assembled and
+    verified offline, while the controller retains the external authority
+    receipt that pins every digest before routing can change.
     """
 
     pointer = prepare_layout(
@@ -1900,10 +1894,6 @@ def prepare_server_active_layout(
         output_root / GENERATIONS_DIRECTORY / str(pointer["generationId"])
     )
 
-    marker_path = output_root / LAYOUT_MARKER
-    marker_path.write_bytes(SERVER_LAYOUT_MARKER_BYTES)
-    marker_path.chmod(PUBLIC_METADATA_FILE_MODE)
-
     for name in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
         source = candidate_root / name
         destination = output_root / name
@@ -1914,75 +1904,16 @@ def prepare_server_active_layout(
         output_root / WRITER_POLICY,
         {
             "schemaVersion": SERVER_WRITER_POLICY_SCHEMA,
-            "mode": SERVER_WRITER_POLICY_MODE,
+            "mode": SIDECAR_WRITER_POLICY_MODE,
         },
         mode=0o600,
     )
-    promotion_lock_path = output_root / PROMOTION_LOCK
-    promotion_lock_path.touch(mode=0o600, exist_ok=False)
-    promotion_lock_path.chmod(0o600)
 
     pointer_path = output_root / CURRENT_POINTER
     pointer_bytes = pointer_path.read_bytes()
-    pointer_base64 = base64.b64encode(pointer_bytes).decode("ascii")
     pointer_sha256 = hashlib.sha256(pointer_bytes).hexdigest()
-    prepared_at = str(pointer["activatedAt"])
-    intent_identity: dict[str, Any] = {
-        "operation": "promotion",
-        "previousGenerationId": None,
-        "previousPointerSha256": None,
-        "generationId": pointer["generationId"],
-        "activationReceiptId": pointer["activationReceiptId"],
-        "releaseVersion": pointer["releaseVersion"],
-        "channel": pointer["channel"],
-        "publishedAt": pointer["publishedAt"],
-        "inventoryDigest": pointer["inventoryDigest"],
-        "pointerSha256": f"sha256:{pointer_sha256}",
-        "preparedAtUtc": prepared_at,
-        "previousPointerBase64": None,
-        "targetPointerBase64": pointer_base64,
-        "exactIncomingDesktopScope": None,
-    }
-    intent = {
-        "schemaVersion": ACTIVATION_INTENT_SCHEMA,
-        "state": "prepared",
-        "intent": intent_identity,
-        "previousPointerBase64": None,
-        "targetPointerBase64": pointer_base64,
-    }
-    receipt_root = (
-        output_root
-        / ACTIVATION_JOURNAL_DIRECTORY
-        / str(pointer["activationReceiptId"])
-    )
-    receipt_root.mkdir(parents=True, mode=0o700)
-    receipt_root.parent.chmod(0o700)
-    receipt_root.chmod(0o700)
-    intent_path = receipt_root / ACTIVATION_JOURNAL_INTENT
-    write_json(intent_path, intent, mode=0o600)
-    intent_bytes = intent_path.read_bytes()
-    serialized_intent = (
-        intent_bytes[:-1] if intent_bytes.endswith(b"\n") else intent_bytes
-    )
-    write_json(
-        receipt_root / ACTIVATION_JOURNAL_OUTCOME,
-        {
-            "schemaVersion": ACTIVATION_OUTCOME_SCHEMA,
-            "state": "committed",
-            "activationReceiptId": pointer["activationReceiptId"],
-            "intentSha256": (
-                f"sha256:{hashlib.sha256(serialized_intent).hexdigest()}"
-            ),
-            "resolvedAtUtc": prepared_at,
-        },
-        mode=0o600,
-    )
 
     verify_generation(generation_root, pointer)
-    if base64.b64decode(pointer_base64, validate=True) != pointer_bytes:
-        raise ReleaseShelfError(
-            "activation journal target pointer bytes changed during preparation"
-        )
     for path in (
         output_root / CANONICAL_MANIFEST,
         output_root / COMPATIBILITY_MANIFEST,
@@ -1995,11 +1926,16 @@ def prepare_server_active_layout(
     return {
         "pointer": pointer,
         "pointerSha256": pointer_sha256,
-        "activationIntentSha256": hashlib.sha256(serialized_intent).hexdigest(),
         "activationCandidateSha256": sha256_file(
             generation_root / ACTIVATION_CANDIDATE
         ),
-        "writerPolicy": SERVER_WRITER_POLICY_MODE,
+        "canonicalMirrorSha256": sha256_file(
+            output_root / CANONICAL_MANIFEST
+        ),
+        "compatibilityMirrorSha256": sha256_file(
+            output_root / COMPATIBILITY_MANIFEST
+        ),
+        "writerPolicy": SIDECAR_WRITER_POLICY_MODE,
     }
 
 
