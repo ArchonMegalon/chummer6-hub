@@ -1,8 +1,6 @@
 *
 
-!chummer-hub-registry/
-!chummer-hub-registry/black-ledger/
-!chummer-hub-registry/black-ledger/**
+!.dockerignore
 
 **/.git/
 **/.env

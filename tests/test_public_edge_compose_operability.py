@@ -69,6 +69,24 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
+    def test_portal_healthcheck_requires_the_dedicated_dotnet_loopback_probe(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-portal"]["healthcheck"]["test"] = [
+            "CMD",
+            "curl",
+            "--fail",
+            "http://127.0.0.1:8080/api/ready",
+        ]
+
+        failures = module.validate_compose(payload)
+
+        self.assertIn(
+            "chummer-portal healthcheck is missing required fragment: "
+            "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll",
+            failures,
+        )
+
     def test_started_only_dependency_fails_closed(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

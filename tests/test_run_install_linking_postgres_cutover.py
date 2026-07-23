@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import replace
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 
 import pytest
@@ -38,6 +42,23 @@ class FakeCommands:
         return self.callback(*call)
 
 
+def unseal_test_repository(repository: Path) -> None:
+    for directory, _directory_names, file_names in os.walk(repository):
+        Path(directory).chmod(0o755)
+        for file_name in file_names:
+            (Path(directory) / file_name).chmod(0o644)
+
+
+def seal_test_repository(repository: Path) -> None:
+    for directory, _directory_names, file_names in os.walk(
+        repository,
+        topdown=False,
+    ):
+        for file_name in file_names:
+            (Path(directory) / file_name).chmod(0o444)
+        Path(directory).chmod(0o555)
+
+
 def make_runner(module, tmp_path: Path, commands: FakeCommands):
     tmp_path.chmod(0o700)
     source = tmp_path / "source"
@@ -64,6 +85,709 @@ def make_runner(module, tmp_path: Path, commands: FakeCommands):
     runner.public_network_name = "chummer5a_default"
     runner.public_network_id = NETWORK_ID
     return runner
+
+
+def make_synthetic_runner(module, tmp_path: Path, commands: FakeCommands):
+    base = make_runner(module, tmp_path, commands)
+    workspace = tmp_path / "synthetic"
+    source = workspace / "run-services"
+    build_context = source
+    hub_registry = workspace / "hub-registry"
+    design_product = workspace / "design-product"
+    fleet_media_factory = workspace / "fleet-media-factory"
+    for path in (
+        source,
+        hub_registry,
+        design_product,
+        fleet_media_factory,
+    ):
+        path.mkdir(parents=True)
+        (path / ".git").mkdir()
+        (path / "fixture.txt").write_text("sealed fixture\n", encoding="utf-8")
+        seal_test_repository(path)
+    workspace.chmod(0o700)
+    inputs = replace(
+        base.inputs,
+        source_root=source,
+        compose_file=source / "docker-compose.public-edge.yml",
+        synthetic_workspace_root=workspace,
+        build_context_root=build_context,
+        hub_registry_root=hub_registry,
+        design_product_root=design_product,
+        fleet_media_factory_root=fleet_media_factory,
+        expected_run_services_content_sha256="9" * 64,
+        expected_hub_registry_content_sha256="a" * 64,
+        expected_design_product_content_sha256="b" * 64,
+        expected_fleet_media_factory_content_sha256="c" * 64,
+    )
+    return module.GovernedCutoverRunner(
+        inputs,
+        command_runner=commands,
+    )
+
+
+def git_provenance_callback(
+    module,
+    repository: Path,
+    *,
+    expected_head: str,
+    observed_head: str | None = None,
+    dirty: bytes = b"",
+    replace_refs: bytes = b"",
+    shallow: bytes = b"false\n",
+    promisor_configuration: bytes = b"",
+):
+    def callback(arguments, _timeout, _check):
+        command = arguments[3:]
+        if command == ["rev-parse", "--show-toplevel"]:
+            output = f"{repository}\n".encode()
+        elif command == ["rev-parse", "HEAD"]:
+            output = f"{observed_head or expected_head}\n".encode()
+        elif command == ["rev-parse", "refs/remotes/origin/main"]:
+            output = f"{expected_head}\n".encode()
+        elif command == ["remote", "get-url", "origin"]:
+            output = (
+                b"https://github.com/ArchonMegalon/"
+                b"chummer6-hub-registry.git\n"
+            )
+        elif command[:3] == [
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ]:
+            return module.CommandResult(0, dirty, b"")
+        elif command[:4] == [
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+        ]:
+            output = b""
+        elif command[:2] == ["ls-files", "-z"]:
+            output = b"black-ledger/source.txt\0"
+        elif command == [
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/replace",
+        ]:
+            output = replace_refs
+        elif command == ["rev-parse", "--is-shallow-repository"]:
+            output = shallow
+        elif command[:3] == ["config", "--local", "--get-regexp"]:
+            return module.CommandResult(
+                0 if promisor_configuration else 1,
+                promisor_configuration,
+                b"",
+            )
+        elif command == [
+            "fsck",
+            "--strict",
+            "--full",
+            "--no-dangling",
+            "--no-progress",
+        ]:
+            output = b""
+        else:
+            raise AssertionError(command)
+        return module.CommandResult(0, output, b"")
+
+    return callback
+
+
+def prepare_hub_provenance_fixture(module, runner) -> tuple[Path, Path, str]:
+    repository = runner.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    consumed = repository / "black-ledger"
+    consumed.mkdir(exist_ok=True)
+    (consumed / "source.txt").write_text("exact\n", encoding="utf-8")
+    seal_test_repository(repository)
+    content_sha256, _count, _file_set = module.source_content_sha256(
+        repository,
+        ["black-ledger/source.txt"],
+    )
+    return repository, consumed, content_sha256
+
+
+def test_default_workspace_contract_preserves_canonical_dependencies(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+
+    runner._validate_build_workspace_paths()
+
+    assert runner.inputs.synthetic_workspace_root is None
+    assert runner.inputs.build_context_root == module.CANONICAL_BUILD_CONTEXT
+    assert runner.inputs.hub_registry_root == module.CANONICAL_HUB_REGISTRY
+    assert runner.inputs.design_product_root == module.CANONICAL_DESIGN_PRODUCT
+    assert (
+        runner.inputs.fleet_media_factory_root
+        == module.CANONICAL_FLEET_MEDIA_REPOSITORY
+    )
+
+
+def test_synthetic_workspace_rejects_symlinked_dependency(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    commands = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_synthetic_runner(module, tmp_path, commands)
+    linked = runner.inputs.synthetic_workspace_root / "hub-linked"
+    linked.symlink_to(runner.inputs.hub_registry_root, target_is_directory=True)
+    runner = module.GovernedCutoverRunner(
+        replace(runner.inputs, hub_registry_root=linked),
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="non-symlinked"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_requires_exact_private_root_mode(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    runner.inputs.synthetic_workspace_root.chmod(0o750)
+
+    with pytest.raises(module.CutoverError, match="exact mode 0700"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_rejects_writable_source_tree(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    runner.inputs.hub_registry_root.chmod(0o755)
+
+    with pytest.raises(module.CutoverError, match="operator-owned and sealed"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_rejects_nonoperator_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    actual_uid = os.getuid()
+    monkeypatch.setattr(module.os, "getuid", lambda: actual_uid + 1)
+
+    with pytest.raises(module.CutoverError, match="owned by the operator UID"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_rejects_linked_worktree_git_file(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    repository = runner.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    (repository / ".git").rmdir()
+    (repository / ".git").write_text(
+        "gitdir: /shared/repository/.git/worktrees/hub\n",
+        encoding="utf-8",
+    )
+    seal_test_repository(repository)
+
+    with pytest.raises(module.CutoverError, match="real local .git directory"):
+        runner._validate_build_workspace_paths()
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        ".git/commondir",
+        ".git/shallow",
+        ".git/info/grafts",
+        ".git/objects/info/alternates",
+        ".git/objects/info/http-alternates",
+        ".git/objects/pack/pack-test.promisor",
+    ),
+)
+def test_synthetic_workspace_rejects_shared_or_incomplete_git_storage(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    repository = runner.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    path = repository / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("forbidden\n", encoding="utf-8")
+    seal_test_repository(repository)
+
+    with pytest.raises(
+        module.CutoverError,
+        match="forbidden|partial/promisor",
+    ):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_rejects_dependency_outside_approved_root(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    commands = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_synthetic_runner(module, tmp_path, commands)
+    outside = tmp_path / "outside-design"
+    outside.mkdir()
+    runner = module.GovernedCutoverRunner(
+        replace(runner.inputs, design_product_root=outside),
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="outside"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_workspace_rejects_canonical_dependency_fallback(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    commands = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_synthetic_runner(module, tmp_path, commands)
+    runner = module.GovernedCutoverRunner(
+        replace(
+            runner.inputs,
+            hub_registry_root=module.CANONICAL_HUB_REGISTRY,
+        ),
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="cannot fall back"):
+        runner._validate_build_workspace_paths()
+
+
+def test_synthetic_routing_environment_closes_every_build_source(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    runner = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+
+    environment = module.build_routing_environment(runner.inputs)
+
+    assert environment["CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT"] == str(
+        runner.inputs.build_context_root
+    )
+    assert environment["CHUMMER_RUN_SERVICES_SOURCE"] == str(
+        runner.inputs.source_root
+    )
+    assert environment["CHUMMER_HUB_REGISTRY_SOURCE"] == str(
+        runner.inputs.hub_registry_root
+    )
+    assert environment["CHUMMER_DESIGN_PRODUCT_SOURCE"] == str(
+        runner.inputs.design_product_root
+    )
+    assert environment[
+        "CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE"
+    ] == str(
+        runner.inputs.fleet_media_factory_root
+        / "src"
+        / "Chummer.Media.Contracts"
+    )
+
+
+@pytest.mark.parametrize(
+    ("dirty", "observed_head"),
+    (
+        (b" M black-ledger/source.txt\n", None),
+        (b"", "8" * 40),
+    ),
+)
+def test_synthetic_git_dependency_rejects_dirty_or_mismatched_ref(
+    tmp_path: Path,
+    dirty: bytes,
+    observed_head: str | None,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_synthetic_runner(module, tmp_path, placeholder)
+    repository = runner.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    consumed = repository / "black-ledger"
+    consumed.mkdir()
+    (consumed / "source.txt").write_text("exact\n", encoding="utf-8")
+    seal_test_repository(repository)
+    content_sha256, _count, _file_set = module.source_content_sha256(
+        repository,
+        ["black-ledger/source.txt"],
+    )
+    expected_head = runner.inputs.expected_hub_registry_head
+    commands = FakeCommands(
+        git_provenance_callback(
+            module,
+            repository,
+            expected_head=expected_head,
+            observed_head=observed_head,
+            dirty=dirty,
+        )
+    )
+    runner = module.GovernedCutoverRunner(
+        runner.inputs,
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="clean, exact"):
+        runner._git_source_provenance(
+            name="hub-registry",
+            repository=repository,
+            consumed_path=consumed,
+            expected_head=expected_head,
+            expected_content_sha256=content_sha256,
+            allow_docker_excluded_ignored=False,
+        )
+
+
+def test_synthetic_git_dependency_rejects_content_pin_mismatch(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_synthetic_runner(module, tmp_path, placeholder)
+    repository = runner.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    consumed = repository / "black-ledger"
+    consumed.mkdir()
+    (consumed / "source.txt").write_text("exact\n", encoding="utf-8")
+    seal_test_repository(repository)
+    expected_head = runner.inputs.expected_hub_registry_head
+    commands = FakeCommands(
+        git_provenance_callback(
+            module,
+            repository,
+            expected_head=expected_head,
+        )
+    )
+    runner = module.GovernedCutoverRunner(
+        runner.inputs,
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="content digest"):
+        runner._git_source_provenance(
+            name="hub-registry",
+            repository=repository,
+            consumed_path=consumed,
+            expected_head=expected_head,
+            expected_content_sha256="f" * 64,
+            allow_docker_excluded_ignored=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "hostile_state",
+    ("replace", "shallow", "promisor"),
+)
+def test_synthetic_git_dependency_rejects_hostile_repository_state(
+    tmp_path: Path,
+    hostile_state: str,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    base = make_synthetic_runner(module, tmp_path, placeholder)
+    repository, consumed, content_sha256 = prepare_hub_provenance_fixture(
+        module,
+        base,
+    )
+    commands = FakeCommands(
+        git_provenance_callback(
+            module,
+            repository,
+            expected_head=base.inputs.expected_hub_registry_head,
+            replace_refs=(
+                b"refs/replace/1111111111111111111111111111111111111111\n"
+                if hostile_state == "replace"
+                else b""
+            ),
+            shallow=(
+                b"true\n" if hostile_state == "shallow" else b"false\n"
+            ),
+            promisor_configuration=(
+                b"remote.origin.promisor true\n"
+                if hostile_state == "promisor"
+                else b""
+            ),
+        )
+    )
+    runner = module.GovernedCutoverRunner(
+        base.inputs,
+        command_runner=commands,
+    )
+
+    with pytest.raises(
+        module.CutoverError,
+        match="replace, shallow, or promisor",
+    ):
+        runner._git_source_provenance(
+            name="hub-registry",
+            repository=repository,
+            consumed_path=consumed,
+            expected_head=runner.inputs.expected_hub_registry_head,
+            expected_content_sha256=content_sha256,
+            allow_docker_excluded_ignored=False,
+        )
+
+
+def test_synthetic_git_dependency_requires_strict_full_object_verification(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    base = make_synthetic_runner(module, tmp_path, placeholder)
+    repository, consumed, content_sha256 = prepare_hub_provenance_fixture(
+        module,
+        base,
+    )
+    commands = FakeCommands(
+        git_provenance_callback(
+            module,
+            repository,
+            expected_head=base.inputs.expected_hub_registry_head,
+        )
+    )
+    runner = module.GovernedCutoverRunner(
+        base.inputs,
+        command_runner=commands,
+    )
+
+    provenance = runner._git_source_provenance(
+        name="hub-registry",
+        repository=repository,
+        consumed_path=consumed,
+        expected_head=runner.inputs.expected_hub_registry_head,
+        expected_content_sha256=content_sha256,
+        allow_docker_excluded_ignored=False,
+    )
+
+    assert provenance["sourceKind"] == module.SYNTHETIC_SOURCE_KIND
+    assert any(
+        call[0][-5:]
+        == ["fsck", "--strict", "--full", "--no-dangling", "--no-progress"]
+        for call in commands.calls
+    )
+
+
+def test_real_sealed_standalone_git_repository_passes_strict_provenance(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    base = make_synthetic_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    repository = base.inputs.hub_registry_root
+    unseal_test_repository(repository)
+    shutil.rmtree(repository / ".git")
+    (repository / "fixture.txt").unlink()
+    subprocess.run(
+        ["/usr/bin/git", "init", "--initial-branch=main", str(repository)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "config", "user.name", "Test"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "config",
+            "user.email",
+            "test@example.invalid",
+        ],
+        check=True,
+    )
+    consumed = repository / "black-ledger"
+    consumed.mkdir()
+    (consumed / "source.txt").write_text("exact\n", encoding="utf-8")
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "add", "--all"],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "commit", "-m", "fixture"],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "remote",
+            "add",
+            "origin",
+            module.CANONICAL_ORIGIN_URLS["hub-registry"],
+        ],
+        check=True,
+    )
+    head = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "update-ref",
+            "refs/remotes/origin/main",
+            head,
+        ],
+        check=True,
+    )
+    seal_test_repository(repository)
+    content_sha256, _count, _file_set = module.source_content_sha256(
+        repository,
+        ["black-ledger/source.txt"],
+    )
+    runner = module.GovernedCutoverRunner(
+        replace(
+            base.inputs,
+            expected_hub_registry_head=head,
+            expected_hub_registry_content_sha256=content_sha256,
+        ),
+        command_runner=module.CommandRunner(
+            docker_config_root=tmp_path / "docker-config",
+        ),
+    )
+
+    provenance = runner._git_source_provenance(
+        name="hub-registry",
+        repository=repository,
+        consumed_path=consumed,
+        expected_head=head,
+        expected_content_sha256=content_sha256,
+        allow_docker_excluded_ignored=False,
+    )
+
+    assert provenance["head"] == head
+    assert provenance["originMain"] == head
+    assert provenance["contentSha256"] == content_sha256
+
+
+def test_synthetic_git_dependency_rejects_content_drift_after_pin(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    placeholder = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    base = make_synthetic_runner(module, tmp_path, placeholder)
+    repository, consumed, content_sha256 = prepare_hub_provenance_fixture(
+        module,
+        base,
+    )
+    unseal_test_repository(repository)
+    (consumed / "source.txt").write_text("drifted\n", encoding="utf-8")
+    seal_test_repository(repository)
+    commands = FakeCommands(
+        git_provenance_callback(
+            module,
+            repository,
+            expected_head=base.inputs.expected_hub_registry_head,
+        )
+    )
+    runner = module.GovernedCutoverRunner(
+        base.inputs,
+        command_runner=commands,
+    )
+
+    with pytest.raises(module.CutoverError, match="content digest"):
+        runner._git_source_provenance(
+            name="hub-registry",
+            repository=repository,
+            consumed_path=consumed,
+            expected_head=runner.inputs.expected_hub_registry_head,
+            expected_content_sha256=content_sha256,
+            allow_docker_excluded_ignored=False,
+        )
+
+
+def test_archive_source_mode_is_not_exposed() -> None:
+    module = load_module()
+
+    assert not hasattr(module, "SOURCE_ARCHIVE_AUTHORITY_CONTRACT")
+    assert not hasattr(module.GovernedCutoverRunner, "_archive_source_provenance")
+
+
+def test_compose_exposes_all_cutover_build_sources_with_canonical_defaults() -> None:
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(
+        encoding="utf-8"
+    )
+    dockerfile = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert compose.count(
+        "${CHUMMER_HUB_REGISTRY_SOURCE:-"
+        "/docker/chummercomplete/chummer-hub-registry}"
+    ) == 5
+    assert compose.count(
+        "${CHUMMER_DESIGN_PRODUCT_SOURCE:-"
+        "/docker/chummercomplete/chummer-design}"
+    ) == 5
+    assert compose.count(
+        "${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-"
+        "/docker/fleet/repos/chummer-media-factory/src/"
+        "Chummer.Media.Contracts}"
+    ) >= 6
+    assert (
+        "COPY --from=hub-registry-source black-ledger/ "
+        "chummer-hub-registry/black-ledger/"
+    ) in dockerfile
+    assert "COPY chummer-hub-registry/black-ledger/" not in dockerfile
 
 
 @pytest.mark.parametrize(
@@ -297,6 +1021,9 @@ def test_candidate_build_rejects_external_source_drift_during_build(
             return None
 
         def _validate_rendered_compose(self):
+            return None
+
+        def _revalidate_compose_inputs(self, **_kwargs):
             return None
 
     commands = FakeCommands(
@@ -676,6 +1403,9 @@ def test_start_latency_consumes_the_single_monotonic_job_budget(
             path = self.inputs.receipt_root / "job-receipt.json"
             return path, "f" * 64
 
+        def _revalidate_compose_inputs(self, **_kwargs):
+            return None
+
     commands = FakeCommands(callback)
     base = make_runner(module, tmp_path, commands)
     runner = Harness(base.inputs, command_runner=commands)
@@ -798,3 +1528,727 @@ def test_lease_release_failure_cannot_leave_a_false_passing_receipt(
     with pytest.raises(module.AmbiguousCutoverError):
         runner.run()
     assert statuses == ["unknown"]
+
+
+def docker_context_policy_for_text(module, text: str) -> dict[str, object]:
+    records, malformed_continuations = (
+        module._docker_logical_instruction_records(text)
+    )
+    assert not malformed_continuations
+    return module.docker_context_policy_findings(records)
+
+
+def test_runtime_docker_context_policy_accepts_only_the_reviewed_copy_set() -> None:
+    module = load_module()
+    dockerfile_text = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    findings = docker_context_policy_for_text(module, dockerfile_text)
+
+    assert findings["exactReviewedCopySet"] is True
+    for key in (
+        "forbiddenContextUses",
+        "heredocUses",
+        "mountFromUses",
+        "noncopyFromUses",
+        "invalidCopyFromUses",
+        "continuationUses",
+    ):
+        assert findings[key] == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "finding_key"),
+    (
+        ("literal_run_mount", "mountFromUses"),
+        ("variable_run_mount", "mountFromUses"),
+        ("onbuild_mount", "mountFromUses"),
+        ("onbuild_copy", "forbiddenContextUses"),
+        ("context_from", "forbiddenContextUses"),
+        ("stage_alias_collision", "forbiddenContextUses"),
+        ("arg_context_literal", "forbiddenContextUses"),
+        ("copy_from_variable", "invalidCopyFromUses"),
+        ("noncopy_from_option", "noncopyFromUses"),
+        ("case_variant", "forbiddenContextUses"),
+        ("continuation_variant", "continuationUses"),
+        ("heredoc", "heredocUses"),
+    ),
+)
+def test_runtime_docker_context_policy_rejects_every_other_selection_form(
+    mutation: str,
+    finding_key: str,
+) -> None:
+    module = load_module()
+    original = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    final_from = (
+        "FROM "
+        + module.DOCKER_BASE_IMAGE_REFERENCES["final"]
+        + " AS final"
+    )
+    reviewed_copy = next(
+        instruction
+        for instruction in (
+            module.EXPECTED_NAMED_CONTEXT_COPY_INSTRUCTIONS_BY_STAGE[
+                "public-pwa-proof"
+            ]
+        )
+        if "validate_public_pwa_proof_authority.py" in instruction
+    )
+    injected_instructions = {
+        "literal_run_mount": (
+            "RUN --mount=type=bind,from=run-services-source,"
+            "source=.,target=/mnt true"
+        ),
+        "variable_run_mount": (
+            "RUN --mount=type=bind,from=${SOURCE},source=.,target=/mnt true"
+        ),
+        "onbuild_mount": (
+            "ONBUILD RUN --mount=type=bind,from=${SOURCE},"
+            "source=.,target=/mnt true"
+        ),
+        "onbuild_copy": (
+            "ONBUILD COPY --from=hub-registry-source "
+            "black-ledger/ /tmp/black-ledger/"
+        ),
+        "context_from": "FROM run-services-source AS bypass",
+        "arg_context_literal": "ARG SOURCE=design-product",
+        "copy_from_variable": (
+            "COPY --from=${SOURCE} README.md /tmp/unreviewed"
+        ),
+        "noncopy_from_option": "RUN echo --from=run-services-source",
+        "heredoc": "RUN <<EOF\ntrue\nEOF",
+    }
+    if mutation in injected_instructions:
+        mutated = original.replace(
+            final_from + "\n",
+            final_from + "\n" + injected_instructions[mutation] + "\n",
+            1,
+        )
+    elif mutation == "stage_alias_collision":
+        mutated = original.replace(
+            final_from,
+            final_from.rsplit(" AS ", 1)[0] + " AS design-product",
+            1,
+        )
+    elif mutation == "case_variant":
+        mutated = original.replace(
+            reviewed_copy,
+            reviewed_copy.replace(
+                "run-services-source",
+                "RUN-SERVICES-SOURCE",
+            ),
+            1,
+        )
+    elif mutation == "continuation_variant":
+        mutated = original.replace(
+            reviewed_copy,
+            reviewed_copy.replace(
+                "run-services-source",
+                "run-services-\\\nsource",
+            ),
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled Docker context mutation: {mutation}")
+    assert mutated != original
+
+    findings = docker_context_policy_for_text(module, mutated)
+
+    assert findings[finding_key]
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    (
+        (
+            "RUN --mount=type=bind,"
+            "source=chummer-hub-registry/black-ledger,"
+            "target=/mnt,ro cp -a /mnt /tmp/unreviewed-ledger"
+        ),
+        "RUN --mount=type=cache,target=/root/.cache true",
+        "RUN --mount=type=secret,id=release-key,target=/run/key true",
+        "RUN --mount=type=ssh,id=default true",
+        (
+            "RUN --mount=target=/mnt,"
+            "source=chummer-hub-registry/black-ledger,"
+            "type=bind,ro cp -a /mnt /tmp/unreviewed-ledger"
+        ),
+        "RUN --network=none --mount=type=cache,target=/root/.cache true",
+        "rUn --MoUnT=TyPe=CaChE,TaRgEt=/root/.cache true",
+        "RUN\t--mount=type=cache,target=/root/.cache true",
+        "RUN --mount\t=\ttype=ssh,id=default true",
+        "RUN --mount=type=cache,\\\n    target=/root/.cache true",
+        "RUN \\\n    --mount=type=ssh,id=default true",
+        "RUN --mou\\\nnt=type=cache,target=/root/.cache true",
+    ),
+)
+def test_runtime_docker_context_policy_rejects_every_run_mount_form(
+    instruction: str,
+) -> None:
+    module = load_module()
+    original = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    insertion_point = (
+        "COPY --from=public-pwa-proof "
+        "/proof/public-pwa-proof-authority.receipt.json "
+        "/tmp/public-pwa-proof-authority.receipt.json\n"
+    )
+    mutated = original.replace(
+        insertion_point,
+        insertion_point + instruction + "\n",
+        1,
+    )
+
+    findings = docker_context_policy_for_text(module, mutated)
+
+    assert findings["mountFromUses"]
+    if "\\\n" in instruction:
+        assert findings["continuationUses"]
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    (
+        "ONBUILD",
+        "ONBUILD RUN true",
+        (
+            "ONBUILD COPY --from=run-services-source "
+            "Chummer.Run.Api/ /tmp/unreviewed/"
+        ),
+        "ONBUILD ADD https://example.invalid/payload /tmp/payload",
+        "ONBUILD RUN --mount=type=cache,target=/root/.cache true",
+        "oNbUiLd\tRuN true",
+        "ONBUILD " + "\\\n" + "    RUN true",
+        "ONBU" + "\\\n" + "ILD RUN true",
+    ),
+)
+def test_runtime_docker_policy_rejects_every_onbuild_form(
+    instruction: str,
+) -> None:
+    module = load_module()
+    original = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    insertion_point = (
+        "COPY --from=public-pwa-proof "
+        "/proof/public-pwa-proof-authority.receipt.json "
+        "/tmp/public-pwa-proof-authority.receipt.json\n"
+    )
+    mutated = original.replace(
+        insertion_point,
+        insertion_point + instruction + "\n",
+        1,
+    )
+
+    findings = docker_context_policy_for_text(module, mutated)
+
+    assert findings["onbuildUses"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "unreviewed_frontend",
+        "late_syntax",
+        "escape_backtick",
+        "mixed_whitespace_escape",
+    ),
+)
+def test_runtime_dockerfile_parser_policy_rejects_syntax_switches(
+    mutation: str,
+) -> None:
+    module = load_module()
+    original = (ROOT / "Chummer.Run.Api" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    exact_syntax = f"# syntax={module.DOCKERFILE_FRONTEND_REFERENCE}"
+    if mutation == "unreviewed_frontend":
+        mutated = original.replace(
+            exact_syntax,
+            "# syntax=docker/dockerfile:1.7",
+            1,
+        )
+    elif mutation == "late_syntax":
+        mutated = original.replace(
+            exact_syntax + "\n",
+            exact_syntax + "\n# syntax=docker/dockerfile:1.7\n",
+            1,
+        )
+    elif mutation in {"escape_backtick", "mixed_whitespace_escape"}:
+        escape_directive = (
+            "# escape=`"
+            if mutation == "escape_backtick"
+            else "\t#\tescape \t= `"
+        )
+        mutated = original.replace(
+            exact_syntax + "\n",
+            exact_syntax + "\n" + escape_directive + "\n",
+            1,
+        )
+        insertion_point = (
+            "COPY --from=public-pwa-proof "
+            "/proof/public-pwa-proof-authority.receipt.json "
+            "/tmp/public-pwa-proof-authority.receipt.json\n"
+        )
+        mutated = mutated.replace(
+            insertion_point,
+            insertion_point
+            + "RUN --mou`\n"
+            + "nt=type=bind,source=chummer-hub-registry/black-ledger,"
+            + "target=/mnt cp -a /mnt /tmp/unreviewed-ledger\n",
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled parser directive mutation: {mutation}")
+
+    with pytest.raises(
+        module.CutoverError,
+        match="parser directive contract drifted",
+    ):
+        module.require_candidate_dockerfile_parser_policy(mutated)
+
+
+def reviewed_rendered_build(
+    *,
+    service_name: str,
+) -> tuple[dict[str, object], dict[str, str]]:
+    additional_contexts = {
+        "design-product": "/synthetic/design-product",
+        "fleet-media-factory-contracts": (
+            "/synthetic/fleet-media-factory/src/Chummer.Media.Contracts"
+        ),
+        "hub-registry-source": "/synthetic/hub-registry",
+        "run-services-source": "/synthetic/run-services",
+    }
+    build: dict[str, object] = {
+        "additional_contexts": additional_contexts,
+        "args": {
+            "CHUMMER_BUILD_CONCURRENCY": "1",
+            "CHUMMER_RUNTIME_GID": "1654",
+            "CHUMMER_RUNTIME_UID": "1654",
+        },
+        "context": "/synthetic/run-services",
+        "dockerfile": (
+            "/synthetic/run-services/Chummer.Run.Api/Dockerfile"
+        ),
+    }
+    if service_name != "chummer-portal":
+        build["target"] = "install-linking-postgres-tool-final"
+    return build, additional_contexts
+
+
+def test_runtime_rendered_build_contract_accepts_all_cutover_services() -> None:
+    module = load_module()
+    services = (
+        "chummer-portal",
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-runtime-proof",
+        "chummer-install-linking-postgres-import-presence-proof",
+        "chummer-install-linking-postgres-import",
+    )
+
+    for service_name in services:
+        build, additional_contexts = reviewed_rendered_build(
+            service_name=service_name
+        )
+        assert module.rendered_build_contract_matches(
+            build,
+            service_name=service_name,
+            build_context="/synthetic/run-services",
+            dockerfile=(
+                "/synthetic/run-services/Chummer.Run.Api/Dockerfile"
+            ),
+            additional_contexts=additional_contexts,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "dockerfile_inline",
+        "pull",
+        "alternate_dockerfile",
+        "context_selector_arg",
+        "context_selector_value",
+        "alternate_target",
+    ),
+)
+def test_runtime_rendered_build_contract_rejects_alternate_authority(
+    mutation: str,
+) -> None:
+    module = load_module()
+    service_name = "chummer-install-linking-postgres-admin"
+    build, additional_contexts = reviewed_rendered_build(
+        service_name=service_name
+    )
+    if mutation == "dockerfile_inline":
+        build["dockerfile_inline"] = "FROM scratch"
+    elif mutation == "pull":
+        build["pull"] = True
+    elif mutation == "alternate_dockerfile":
+        build["dockerfile"] = "/tmp/unreviewed.Dockerfile"
+    elif mutation == "context_selector_arg":
+        build_args = build["args"]
+        assert isinstance(build_args, dict)
+        build_args["SOURCE_CONTEXT"] = "run-services-source"
+    elif mutation == "context_selector_value":
+        build_args = build["args"]
+        assert isinstance(build_args, dict)
+        build_args["CHUMMER_RUNTIME_UID"] = "run-services-source"
+    elif mutation == "alternate_target":
+        build["target"] = "final"
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled rendered build mutation: {mutation}")
+
+    assert not module.rendered_build_contract_matches(
+        build,
+        service_name=service_name,
+        build_context="/synthetic/run-services",
+        dockerfile="/synthetic/run-services/Chummer.Run.Api/Dockerfile",
+        additional_contexts=additional_contexts,
+    )
+
+
+def reviewed_rendered_compose(
+    module,
+) -> tuple[dict[str, object], dict[str, str], dict[str, str]]:
+    expected_images = dict(module.PUBLIC_EDGE_RAW_SERVICE_IMAGES)
+    services: dict[str, dict[str, object]] = {
+        service_name: {"build": {}}
+        for service_name in module.PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES
+        if service_name not in module.PUBLIC_EDGE_BUILD_SERVICE_TARGETS
+    }
+    additional_contexts: dict[str, str] = {}
+    for service_name in module.PUBLIC_EDGE_BUILD_SERVICE_TARGETS:
+        build, service_contexts = reviewed_rendered_build(
+            service_name=service_name
+        )
+        additional_contexts = service_contexts
+        service = {
+            key: None
+            for key in module.PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE[
+                service_name
+            ]
+        }
+        service["build"] = build
+        service["image"] = expected_images[service_name]
+        expected_profiles = module.PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE[
+            service_name
+        ]
+        if expected_profiles:
+            service["profiles"] = list(expected_profiles)
+        services[service_name] = service
+    return {"services": services}, expected_images, additional_contexts
+
+
+def test_runtime_rendered_compose_accepts_only_the_exact_build_authority() -> None:
+    module = load_module()
+    payload, expected_images, additional_contexts = (
+        reviewed_rendered_compose(module)
+    )
+
+    failures = module.public_edge_rendered_compose_failures(
+        payload,
+        expected_images=expected_images,
+        build_context="/synthetic/run-services",
+        dockerfile="/synthetic/run-services/Chummer.Run.Api/Dockerfile",
+        additional_contexts=additional_contexts,
+    )
+
+    assert failures == []
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "included_build_service",
+        "build_pull",
+        "pull_policy",
+        "platform",
+        "profiles",
+        "develop",
+        "provider",
+        "models",
+        "image",
+        "tool_profiles",
+    ),
+)
+def test_runtime_rendered_compose_rejects_every_unreviewed_build_selector(
+    mutation: str,
+) -> None:
+    module = load_module()
+    payload, expected_images, additional_contexts = (
+        reviewed_rendered_compose(module)
+    )
+    services = payload["services"]
+    assert isinstance(services, dict)
+    portal = services["chummer-portal"]
+    assert isinstance(portal, dict)
+    if mutation == "included_build_service":
+        services["included-sixth-build"] = {
+            "build": {"context": "/unreviewed"}
+        }
+    elif mutation == "build_pull":
+        build = portal["build"]
+        assert isinstance(build, dict)
+        build["pull"] = True
+    elif mutation in {
+        "pull_policy",
+        "platform",
+        "profiles",
+        "develop",
+        "provider",
+        "models",
+    }:
+        values: dict[str, object] = {
+            "pull_policy": "always",
+            "platform": "linux/amd64",
+            "profiles": ["unreviewed-build"],
+            "develop": {},
+            "provider": {"type": "unreviewed"},
+            "models": {},
+        }
+        portal[mutation] = values[mutation]
+    elif mutation == "image":
+        portal["image"] = "unreviewed.invalid/portal:latest"
+    elif mutation == "tool_profiles":
+        tool = services["chummer-install-linking-postgres-admin"]
+        assert isinstance(tool, dict)
+        tool["profiles"] = ["unreviewed-build"]
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled rendered mutation: {mutation}")
+
+    failures = module.public_edge_rendered_compose_failures(
+        payload,
+        expected_images=expected_images,
+        build_context="/synthetic/run-services",
+        dockerfile="/synthetic/run-services/Chummer.Run.Api/Dockerfile",
+        additional_contexts=additional_contexts,
+    )
+
+    assert failures
+
+
+def test_compose_input_revalidation_binds_every_effective_file_twice(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    events: list[object] = []
+
+    class Harness(module.GovernedCutoverRunner):
+        def _validate_source(self):
+            events.append("source")
+
+        def _bind_existing_build_override(self):
+            events.append("build-override")
+
+        def _bind_job_override(self, path, **kwargs):
+            events.append(("job-override", path, kwargs))
+
+        def _validate_rendered_compose(self, **kwargs):
+            events.append(("rendered", kwargs))
+
+    base = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    runner = Harness(base.inputs, command_runner=base.commands)
+    override = tmp_path / "job.override.json"
+    command = ("prove-empty-authority",)
+
+    runner._revalidate_compose_inputs(
+        job_override=override,
+        job_service="chummer-install-linking-postgres-runtime-proof",
+        job_command=command,
+        container_name="cutover-job",
+        project="chummer6-ilpg-test",
+    )
+
+    assert [event if isinstance(event, str) else event[0] for event in events] == [
+        "source",
+        "build-override",
+        "job-override",
+        "rendered",
+        "source",
+        "build-override",
+        "job-override",
+    ]
+    rendered = events[3]
+    assert isinstance(rendered, tuple)
+    assert rendered[1] == {
+        "overrides": (override,),
+        "project": "chummer6-ilpg-test",
+        "transient_service_keys": {
+            "chummer-install-linking-postgres-runtime-proof": (
+                "container_name",
+            )
+        },
+    }
+
+
+def test_generated_job_override_is_exactly_sealed_before_create(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    commands = FakeCommands(
+        lambda *_args: module.CommandResult(0, b"", b"")
+    )
+    runner = make_runner(module, tmp_path, commands)
+    command = ("prove-empty-authority",)
+    override, container_name, _project = runner._job_override(
+        job_name="prove-empty-authority",
+        service="chummer-install-linking-postgres-runtime-proof",
+        command=command,
+    )
+    runner._bind_job_override(
+        override,
+        service="chummer-install-linking-postgres-runtime-proof",
+        command=command,
+        container_name=container_name,
+    )
+    tampered = runner._job_override_payload(
+        service="chummer-install-linking-postgres-runtime-proof",
+        command=command,
+        container_name=container_name,
+    )
+    service = tampered["services"][
+        "chummer-install-linking-postgres-runtime-proof"
+    ]
+    assert isinstance(service, dict)
+    service["pull_policy"] = "always"
+    module.write_private_json(override, tampered, replace=True)
+
+    with pytest.raises(
+        module.CutoverError,
+        match="job Compose override identity drifted",
+    ):
+        runner._bind_job_override(
+            override,
+            service="chummer-install-linking-postgres-runtime-proof",
+            command=command,
+            container_name=container_name,
+        )
+
+
+def test_build_and_create_commands_are_immediately_preceded_by_revalidation(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+
+    class StopAtCompose(RuntimeError):
+        pass
+
+    build_events: list[str] = []
+
+    class BuildHarness(module.GovernedCutoverRunner):
+        def _require_candidate_tags_absent(self):
+            return None
+
+        def _resolve_image(self, _tag, *, allow_absent=False):
+            return ""
+
+        def _revalidate_compose_inputs(self, **_kwargs):
+            build_events.append("revalidate")
+
+        def _capture_build_source_provenance(self):
+            build_events.append("source-provenance")
+            return {}
+
+    def build_callback(_arguments, _timeout, _check):
+        build_events.append("compose-build")
+        raise StopAtCompose
+
+    build_commands = FakeCommands(build_callback)
+    build_root = tmp_path / "build"
+    build_root.mkdir()
+    base = make_runner(module, build_root, build_commands)
+    build_runner = BuildHarness(
+        base.inputs,
+        command_runner=build_commands,
+    )
+
+    with pytest.raises(StopAtCompose):
+        build_runner._build_candidates()
+    assert build_events == [
+        "revalidate",
+        "source-provenance",
+        "compose-build",
+    ]
+
+    create_events: list[str] = []
+    command_count = 0
+
+    def create_callback(_arguments, _timeout, _check):
+        nonlocal command_count
+        command_count += 1
+        if command_count == 1:
+            return module.CommandResult(1, b"", b"")
+        create_events.append("compose-create")
+        raise StopAtCompose
+
+    class CreateHarness(module.GovernedCutoverRunner):
+        def _job_override(self, **_kwargs):
+            return (
+                self.inputs.receipt_root / "override.json",
+                "cutover-job",
+                "chummer6-ilpg-test",
+            )
+
+        def _revalidate_compose_inputs(self, **_kwargs):
+            create_events.append("revalidate")
+
+    create_commands = FakeCommands(create_callback)
+    create_root = tmp_path / "create"
+    create_root.mkdir()
+    base = make_runner(module, create_root, create_commands)
+    create_runner = CreateHarness(
+        base.inputs,
+        command_runner=create_commands,
+    )
+
+    with pytest.raises(StopAtCompose):
+        create_runner._run_job(
+            job_name="prove-empty-authority",
+            service="chummer-install-linking-postgres-runtime-proof",
+            command=("prove-empty-authority",),
+            proof_contract=(
+                "chummer.install_linking_postgres_empty_authority_proof.v1"
+            ),
+        )
+    assert create_events == ["revalidate", "compose-create"]
+
+
+def test_rendered_compose_policy_expands_every_profile(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    captured: list[list[str]] = []
+
+    def callback(arguments, _timeout, _check):
+        captured.append(arguments)
+        return module.CommandResult(0, b"{}", b"")
+
+    commands = FakeCommands(callback)
+    runner = make_runner(module, tmp_path, commands)
+
+    with pytest.raises(
+        module.CutoverError,
+        match="omitted services or networks",
+    ):
+        runner._validate_rendered_compose()
+
+    assert len(captured) == 1
+    command = captured[0]
+    profile_index = command.index("--profile")
+    assert command[profile_index : profile_index + 5] == [
+        "--profile",
+        "*",
+        "config",
+        "--format",
+        "json",
+    ]

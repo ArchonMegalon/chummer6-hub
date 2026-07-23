@@ -23,6 +23,31 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 try:
+    from scripts.public_edge_build_policy import (
+        PUBLIC_EDGE_BUILD_ARG_NAMES,
+        PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
+        PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
+        PUBLIC_EDGE_NAMED_CONTEXT_NAMES,
+        PUBLIC_EDGE_RAW_SERVICE_IMAGES,
+        PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES,
+        PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE,
+        docker_context_policy_findings,
+        docker_copy_from_reference,
+        docker_instruction_uses_mount,
+        docker_logical_instruction_records,
+        docker_logical_instructions,
+        dockerfile_parser_directive_findings,
+        public_edge_compose_build_syntax_failures,
+        public_edge_rendered_compose_failures,
+        rendered_build_contract_matches,
+    )
     from scripts.strict_json_contract import (
         StrictJsonContractError,
         canonical_json_bytes,
@@ -36,6 +61,31 @@ try:
         resolve_current_snapshot,
     )
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from public_edge_build_policy import (
+        PUBLIC_EDGE_BUILD_ARG_NAMES,
+        PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_BUILD_SERVICE_TARGETS,
+        PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS,
+        PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE as SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE as SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE as SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE,
+        PUBLIC_EDGE_DOCKER_STAGE_ORDER as SHARED_DOCKER_STAGE_ORDER,
+        PUBLIC_EDGE_NAMED_CONTEXT_NAMES,
+        PUBLIC_EDGE_RAW_SERVICE_IMAGES,
+        PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES,
+        PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE,
+        PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE,
+        docker_context_policy_findings,
+        docker_copy_from_reference,
+        docker_instruction_uses_mount,
+        docker_logical_instruction_records,
+        docker_logical_instructions,
+        dockerfile_parser_directive_findings,
+        public_edge_compose_build_syntax_failures,
+        public_edge_rendered_compose_failures,
+        rendered_build_contract_matches,
+    )
     from strict_json_contract import (
         StrictJsonContractError,
         canonical_json_bytes,
@@ -700,53 +750,13 @@ PUBLIC_EDGE_DOCKER_TOOL_FINAL_FROM = (
     "install-linking-postgres-tool-final"
 )
 PUBLIC_EDGE_DOCKER_FINAL_FROM = f"FROM {PUBLIC_EDGE_DOCKER_ASPNET_IMAGE} AS final"
-PUBLIC_EDGE_DOCKER_STAGE_ORDER = (
-    PUBLIC_EDGE_DOCKER_PROOF_STAGE,
-    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
-    PUBLIC_EDGE_DOCKER_BUILD_STAGE,
-    PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
-    PUBLIC_EDGE_DOCKER_FINAL_STAGE,
+PUBLIC_EDGE_DOCKER_STAGE_ORDER = SHARED_DOCKER_STAGE_ORDER
+PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = (
+    SHARED_DOCKER_NAMED_CONTEXTS_BY_STAGE
 )
-PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
-    PUBLIC_EDGE_DOCKER_PROOF_STAGE: frozenset({"run-services-source"}),
-    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset({"run-services-source"}),
-    PUBLIC_EDGE_DOCKER_BUILD_STAGE: frozenset(
-        {"run-services-source", "fleet-media-factory-contracts"}
-    ),
-    PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE: frozenset(),
-    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset(
-        {"design-product", "run-services-source"}
-    ),
-}
-PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
-    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset(
-        {
-            "COPY --from=run-services-source global.json global.json",
-            "COPY --from=run-services-source scripts/ai/bootstrap-hub-package-feed.py scripts/ai/bootstrap-hub-package-feed.py",
-            "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
-        }
-    ),
-    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset(
-        {
-            "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
-            "COPY --from=design-product products/chummer/ /app/.codex-design/product/",
-        }
-    ),
-}
-PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE = {
-    PUBLIC_EDGE_DOCKER_PROOF_STAGE: frozenset(),
-    PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE: frozenset(
-        {PUBLIC_EDGE_DOCKER_PROOF_STAGE}
-    ),
-    PUBLIC_EDGE_DOCKER_BUILD_STAGE: frozenset(
-        {
-            PUBLIC_EDGE_DOCKER_PROOF_STAGE,
-            PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE,
-        }
-    ),
-    PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE: frozenset({PUBLIC_EDGE_DOCKER_BUILD_STAGE}),
-    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset({PUBLIC_EDGE_DOCKER_BUILD_STAGE}),
-}
+PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE = (
+    SHARED_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE
+)
 PUBLIC_EDGE_DOCKER_PYTHON_IMAGE = (
     "python:3.12-slim@sha256:"
     "c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28"
@@ -819,6 +829,9 @@ PUBLIC_EDGE_DOCKER_PACKAGE_FEED_STAGE_INSTRUCTIONS = (
     "COPY --from=run-services-source eng/package-plane.lock.json eng/package-plane.lock.json",
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_BOOTSTRAP_RUN,
 )
+PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = (
+    SHARED_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE
+)
 PUBLIC_EDGE_DOCKER_STAGE_FROM_INSTRUCTIONS = (
     PUBLIC_EDGE_DOCKER_PROOF_STAGE_INSTRUCTIONS[0],
     PUBLIC_EDGE_DOCKER_PACKAGE_FEED_FROM,
@@ -867,24 +880,32 @@ PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS = {
     "run-services-source": (
         "${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}"
     ),
-    "fleet-media-factory-contracts": (
-        "/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
+    "hub-registry-source": (
+        "${CHUMMER_HUB_REGISTRY_SOURCE:-"
+        "/docker/chummercomplete/chummer-hub-registry}"
     ),
-    "design-product": "/docker/chummercomplete/chummer-design",
+    "fleet-media-factory-contracts": (
+        "${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-"
+        "/docker/fleet/repos/chummer-media-factory/src/"
+        "Chummer.Media.Contracts}"
+    ),
+    "design-product": (
+        "${CHUMMER_DESIGN_PRODUCT_SOURCE:-"
+        "/docker/chummercomplete/chummer-design}"
+    ),
+}
+PUBLIC_EDGE_COMPOSE_BUILD_ARGS = {
+    "CHUMMER_BUILD_CONCURRENCY": "${CHUMMER_BUILD_CONCURRENCY:-1}",
+    "CHUMMER_RUNTIME_UID": "${CHUMMER_PORTAL_UID:-1654}",
+    "CHUMMER_RUNTIME_GID": "${CHUMMER_PORTAL_GID:-1654}",
 }
 PUBLIC_EDGE_COMPOSE_BUILD_SERVICE_CONTRACTS = {
-    PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE: {
-        "target": "",
+    service_name: {
+        "target": target,
         "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
-    },
-    "chummer-install-linking-postgres-admin": {
-        "target": PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
-        "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
-    },
-    "chummer-install-linking-postgres-import": {
-        "target": PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
-        "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
-    },
+        "buildArgs": PUBLIC_EDGE_COMPOSE_BUILD_ARGS,
+    }
+    for service_name, target in PUBLIC_EDGE_BUILD_SERVICE_TARGETS.items()
 }
 PUBLIC_EDGE_DOCKER_RESERVED_CONTEXT_NAMES = frozenset(
     {
@@ -1141,66 +1162,33 @@ def _docker_from_instruction_parts(line: str) -> tuple[str, str]:
     return match.group(1), (match.group(2) or "").lower()
 
 
+_docker_logical_instruction_records = docker_logical_instruction_records
+
+
 def _docker_logical_instructions(
     lines: list[str],
     *,
     first_line_number: int,
 ) -> tuple[list[tuple[int, str]], list[int]]:
-    instructions: list[tuple[int, str]] = []
-    malformed_continuations: list[int] = []
-    pending_parts: list[str] = []
-    pending_line_number = 0
-    for line_number, raw_line in enumerate(lines, start=first_line_number):
-        stripped = raw_line.strip()
-        if not pending_parts and (not stripped or stripped.startswith("#")):
-            continue
-        if pending_parts and (not stripped or stripped.startswith("#")):
-            malformed_continuations.append(pending_line_number)
-            pending_parts = []
-            pending_line_number = 0
-            continue
-        continued = raw_line.rstrip().endswith("\\")
-        segment = raw_line.rstrip()
-        if continued:
-            segment = segment[:-1]
-        if not pending_parts:
-            pending_line_number = line_number
-        pending_parts.append(segment)
-        if continued:
-            continue
-        instructions.append((pending_line_number, "".join(pending_parts).strip()))
-        pending_parts = []
-        pending_line_number = 0
-    if pending_parts:
-        malformed_continuations.append(pending_line_number)
-    return instructions, malformed_continuations
+    records, malformed_continuations = (
+        _docker_logical_instruction_records(
+            "\n".join(lines),
+            first_line_number=first_line_number,
+        )
+    )
+    return (
+        [
+            (line_number, instruction)
+            for line_number, instruction, _used_continuation in records
+        ],
+        malformed_continuations,
+    )
 
 
-def _docker_copy_from_reference(line: str) -> tuple[str | None, bool]:
-    match = re.match(r"COPY\s+(.+)", line, flags=re.IGNORECASE)
-    if match is None:
-        return None, False
-    tokens = match.group(1).split()
-    from_references: list[str] = []
-    option_count = 0
-    for token in tokens:
-        if not token.startswith("--"):
-            break
-        option_count += 1
-        lower_token = token.lower()
-        if lower_token.startswith("--from="):
-            reference = token.split("=", 1)[1]
-            if not reference:
-                return None, True
-            from_references.append(reference)
-        elif lower_token == "--from":
-            return None, True
-    positional_tokens = tokens[option_count:]
-    if any("--from" in token.lower() for token in positional_tokens):
-        return None, True
-    if len(from_references) > 1:
-        return None, True
-    return (from_references[0] if from_references else None), False
+_docker_context_policy_findings = docker_context_policy_findings
+
+
+_docker_copy_from_reference = docker_copy_from_reference
 
 
 def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
@@ -1233,21 +1221,16 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         }
 
     lines = text.splitlines()
-    exact_header = bool(lines) and lines[0] == PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE
+    exact_header, late_directive_lines = dockerfile_parser_directive_findings(
+        text,
+        expected_syntax_directive=PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE,
+    )
     if not exact_header:
         failures.append(
             "Dockerfile must begin with the exact digest-pinned frontend directive"
         )
 
-    late_directives = [
-        line_number
-        for line_number, line in enumerate(lines[1:], start=2)
-        if re.fullmatch(
-            r"\s*#\s*(?:syntax|escape|check)\s*=.*",
-            line,
-            flags=re.IGNORECASE,
-        )
-    ]
+    late_directives = list(late_directive_lines)
     if late_directives:
         failures.append("Dockerfile parser directives are forbidden after the exact header")
 
@@ -1259,12 +1242,49 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     if heredoc_lines:
         failures.append("Dockerfile heredoc syntax is forbidden by the proof-stage contract")
 
-    logical_instructions, malformed_continuations = _docker_logical_instructions(
-        lines[1:],
-        first_line_number=2,
+    logical_instruction_records, malformed_continuations = (
+        _docker_logical_instruction_records(
+            "\n".join(lines[1:]),
+            first_line_number=2,
+        )
     )
+    logical_instructions = [
+        (line_number, instruction)
+        for line_number, instruction, _used_continuation
+        in logical_instruction_records
+    ]
     if malformed_continuations:
         failures.append("Dockerfile contains an ambiguous or dangling line continuation")
+    context_policy = _docker_context_policy_findings(
+        logical_instruction_records
+    )
+    if context_policy["onbuildUses"]:
+        failures.append("Dockerfile ONBUILD instructions are forbidden")
+    if context_policy["forbiddenContextUses"]:
+        failures.append(
+            "named build contexts may appear only in exact reviewed COPY instructions"
+        )
+    if context_policy["mountFromUses"]:
+        failures.append(
+            "Dockerfile RUN/ONBUILD --mount instructions are forbidden"
+        )
+    if context_policy["noncopyFromUses"]:
+        failures.append(
+            "Dockerfile --from options are forbidden outside COPY"
+        )
+    if context_policy["invalidCopyFromUses"]:
+        failures.append(
+            "Dockerfile COPY --from must name one exact literal earlier stage "
+            "or reviewed named context"
+        )
+    if context_policy["continuationUses"]:
+        failures.append(
+            "Dockerfile context selection must not use line continuations"
+        )
+    if context_policy["heredocUses"] and not heredoc_lines:
+        failures.append(
+            "Dockerfile logical heredoc syntax is forbidden"
+        )
     logical_instruction_text = [line for _, line in logical_instructions]
     stage_from_instructions = tuple(
         line
@@ -1356,6 +1376,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     stage_dependencies: dict[str, set[str]] = {}
     copy_from_references: list[dict[str, Any]] = []
     malformed_copy_from_lines: list[int] = []
+    unqualified_copy_lines: list[int] = []
     unknown_copy_from_references: list[tuple[int, str]] = []
     invalid_named_context_copies: list[tuple[int, str, str]] = []
     named_context_copy_lines_by_stage: dict[str, list[str]] = {}
@@ -1375,6 +1396,7 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     final_payload_mode_stages: list[str] = []
     other_proof_copies: list[int] = []
     pre_stage_instructions: list[int] = []
+    add_instruction_lines: list[int] = []
     for line_number, line in logical_instructions:
         if re.match(r"FROM(?:\s|$)", line, flags=re.IGNORECASE):
             current_stage += 1
@@ -1429,13 +1451,17 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             tool_payload_mode_stages.append(current_alias)
         if line == PUBLIC_EDGE_DOCKER_FINAL_PAYLOAD_MODE_RUN:
             final_payload_mode_stages.append(current_alias)
-        if not re.match(r"COPY(?:\s|$)", line, flags=re.IGNORECASE):
+        if re.match(r"ADD(?:\s|$)", line, flags=re.IGNORECASE):
+            add_instruction_lines.append(line_number)
+        if not re.match(r"(?:COPY|ADD)(?:\s|$)", line, flags=re.IGNORECASE):
             continue
         copy_from_reference, malformed_copy_from = _docker_copy_from_reference(line)
         if malformed_copy_from:
             malformed_copy_from_lines.append(line_number)
             continue
         if copy_from_reference is None:
+            if re.match(r"COPY(?:\s|$)", line, flags=re.IGNORECASE):
+                unqualified_copy_lines.append(line_number)
             continue
         reference = copy_from_reference.lower()
         reference_kind = "unknown"
@@ -1488,6 +1514,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
 
     if pre_stage_instructions:
         failures.append("global instructions before the first FROM are forbidden")
+    if add_instruction_lines:
+        failures.append("Dockerfile ADD instructions are forbidden")
     if proof_stage_count != 1:
         failures.append("Dockerfile must contain exactly one public-pwa-proof stage alias")
     if package_feed_stage_count != 1:
@@ -1583,11 +1611,15 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         )
     if malformed_copy_from_lines:
         failures.append("every Docker COPY --from reference must use one exact literal value")
+    if unqualified_copy_lines:
+        failures.append("every Docker COPY must use one exact --from reference")
     if unknown_copy_from_references or invalid_named_context_copies:
         failures.append(
             "Dockerfile COPY --from references must name an allowed earlier stage or named context"
         )
-    exact_required_named_context_copies = True
+    exact_required_named_context_copies = bool(
+        context_policy["exactReviewedCopySet"]
+    )
     for stage, expected_copies in PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE.items():
         actual_copies = named_context_copy_lines_by_stage.get(stage, [])
         if set(actual_copies) != set(expected_copies) or len(actual_copies) != len(expected_copies):
@@ -1657,9 +1689,11 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     checks = {
         "exactSyntaxDirective": exact_header,
         "noLateParserDirectives": not late_directives,
-        "noHeredoc": not heredoc_lines,
+        "noHeredoc": not heredoc_lines and not context_policy["heredocUses"],
         "validLogicalInstructions": not malformed_continuations,
         "noGlobalInstructions": not pre_stage_instructions,
+        "noOnbuildInstructions": not context_policy["onbuildUses"],
+        "noAddInstructions": not add_instruction_lines,
         "exactProofStage": exact_proof_stage,
         "exactPackageFeedStage": exact_package_feed_stage,
         "exactStageHeaders": exact_stage_headers,
@@ -1691,10 +1725,23 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "exactFinalPayloadMode": exact_final_payload_mode,
         "exactCopyFromReferences": not (
             malformed_copy_from_lines
+            or unqualified_copy_lines
             or unknown_copy_from_references
             or invalid_named_context_copies
             or invalid_copy_from_stages
             or forward_copy_from_references
+        ),
+        "noUnqualifiedCopies": not unqualified_copy_lines,
+        "namedContextsOnlyInReviewedCopies": not (
+            context_policy["forbiddenContextUses"]
+        ),
+        "noMountFromInstructions": not context_policy["mountFromUses"],
+        "noNonCopyFromOptions": not context_policy["noncopyFromUses"],
+        "noContextSelectingCopyFromIndirection": not (
+            context_policy["invalidCopyFromUses"]
+        ),
+        "noContextSelectionContinuations": not (
+            context_policy["continuationUses"]
         ),
         "exactRequiredNamedContextCopies": exact_required_named_context_copies,
         "packageFeedDependsOnProof": package_feed_depends_on_proof,
@@ -1786,16 +1833,38 @@ def _parse_public_pwa_compose_build_bindings(
     text: str,
     *,
     service_name: str = PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE,
-) -> tuple[str, str, str, dict[str, str], list[str]]:
+) -> tuple[
+    str,
+    str,
+    str,
+    dict[str, str],
+    dict[str, str],
+    set[str],
+    list[str],
+]:
     lines = text.splitlines()
-    failures: list[str] = []
+    failures = public_edge_compose_build_syntax_failures(
+        text,
+        service_name=service_name,
+    )
     service_indexes = [
         index
         for index, raw_line in enumerate(lines)
         if raw_line == f"  {service_name}:"
     ]
     if len(service_indexes) != 1:
-        return "", "", "", {}, [f"Compose must declare {service_name} exactly once"]
+        return (
+            "",
+            "",
+            "",
+            {},
+            {},
+            set(),
+            [
+                *failures,
+                f"Compose must declare {service_name} exactly once",
+            ],
+        )
     service_start = service_indexes[0]
     service_end = len(lines)
     for index in range(service_start + 1, len(lines)):
@@ -1812,7 +1881,18 @@ def _parse_public_pwa_compose_build_bindings(
         if lines[index] == "    build:"
     ]
     if len(build_indexes) != 1:
-        return "", "", "", {}, [f"Compose {service_name} must declare build exactly once"]
+        return (
+            "",
+            "",
+            "",
+            {},
+            {},
+            set(),
+            [
+                *failures,
+                f"Compose {service_name} must declare build exactly once",
+            ],
+        )
     build_start = build_indexes[0]
     build_end = service_end
     for index in range(build_start + 1, service_end):
@@ -1838,34 +1918,59 @@ def _parse_public_pwa_compose_build_bindings(
     build_context = build_entries.get("context", (-1, ""))[1]
     dockerfile = build_entries.get("dockerfile", (-1, ""))[1]
     target = build_entries.get("target", (-1, ""))[1]
-    contexts_entry = build_entries.get("additional_contexts")
-    if contexts_entry is None or contexts_entry[1]:
-        failures.append(f"Compose {service_name} additional_contexts mapping is missing")
-        return build_context, dockerfile, target, {}, failures
-    contexts_start = contexts_entry[0]
-    bindings: dict[str, str] = {}
-    duplicate_context_names: set[str] = set()
-    for index in range(contexts_start + 1, build_end):
-        raw_line = lines[index]
-        stripped = raw_line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        indentation = len(raw_line) - len(raw_line.lstrip(" "))
-        if indentation <= 6:
-            break
-        entry = _compose_mapping_entry(raw_line, indent=8)
-        if entry is None:
+
+    def parse_nested_mapping(
+        key: str,
+        *,
+        label: str,
+    ) -> dict[str, str]:
+        mapping_entry = build_entries.get(key)
+        if mapping_entry is None or mapping_entry[1]:
             failures.append(
-                f"Compose {service_name} additional_contexts contains a non-literal entry"
+                f"Compose {service_name} {label} mapping is missing"
             )
-            continue
-        name, value = entry
-        if name in bindings:
-            duplicate_context_names.add(name)
-        bindings[name] = value
-    if duplicate_context_names:
-        failures.append(f"Compose {service_name} additional_contexts contains duplicate names")
-    return build_context, dockerfile, target, bindings, failures
+            return {}
+        mapping_start = mapping_entry[0]
+        values: dict[str, str] = {}
+        duplicate_names: set[str] = set()
+        for index in range(mapping_start + 1, build_end):
+            raw_line = lines[index]
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            indentation = len(raw_line) - len(raw_line.lstrip(" "))
+            if indentation <= 6:
+                break
+            entry = _compose_mapping_entry(raw_line, indent=8)
+            if entry is None:
+                failures.append(
+                    f"Compose {service_name} {label} contains a non-literal entry"
+                )
+                continue
+            name, value = entry
+            if name in values:
+                duplicate_names.add(name)
+            values[name] = value
+        if duplicate_names:
+            failures.append(
+                f"Compose {service_name} {label} contains duplicate names"
+            )
+        return values
+
+    bindings = parse_nested_mapping(
+        "additional_contexts",
+        label="additional_contexts",
+    )
+    build_args = parse_nested_mapping("args", label="build args")
+    return (
+        build_context,
+        dockerfile,
+        target,
+        bindings,
+        build_args,
+        set(build_entries),
+        failures,
+    )
 
 
 def _validate_public_pwa_compose_service_contract(
@@ -1874,9 +1979,19 @@ def _validate_public_pwa_compose_service_contract(
     service_name: str,
     expected_target: str,
     expected_bindings: dict[str, str],
+    expected_build_args: dict[str, str],
 ) -> dict[str, Any]:
-    build_context, dockerfile, target, actual_bindings, failures = (
-        _parse_public_pwa_compose_build_bindings(text, service_name=service_name)
+    (
+        build_context,
+        dockerfile,
+        target,
+        actual_bindings,
+        actual_build_args,
+        actual_build_keys,
+        failures,
+    ) = _parse_public_pwa_compose_build_bindings(
+        text,
+        service_name=service_name,
     )
     contexts_are_mapping = not any(
         "additional_contexts" in failure for failure in failures
@@ -1900,12 +2015,30 @@ def _validate_public_pwa_compose_service_contract(
         and len(actual_bindings) == len(expected_bindings)
         and all(binding_matches.values())
     )
+    expected_build_keys = {
+        "additional_contexts",
+        "args",
+        "context",
+        "dockerfile",
+    }
+    if expected_target:
+        expected_build_keys.add("target")
+    exact_build_keys = actual_build_keys == expected_build_keys
+    exact_build_args = actual_build_args == expected_build_args
     if build_context != PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT:
         failures.append(f"Compose {service_name} build context drifted")
     if dockerfile != PUBLIC_EDGE_COMPOSE_DOCKERFILE:
         failures.append(f"Compose {service_name} Dockerfile binding drifted")
     if target != expected_target:
         failures.append(f"Compose {service_name} build target drifted")
+    if not exact_build_keys:
+        failures.append(
+            f"Compose {service_name} build keys drifted or dockerfile_inline is present"
+        )
+    if not exact_build_args:
+        failures.append(
+            f"Compose {service_name} build args drifted from the closed contract"
+        )
     if not contexts_are_mapping:
         failures.append(f"Compose {service_name} additional_contexts must be a mapping")
     if not exact_bindings:
@@ -1918,6 +2051,8 @@ def _validate_public_pwa_compose_service_contract(
         "exactBuildContext": build_context == PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT,
         "exactDockerfile": dockerfile == PUBLIC_EDGE_COMPOSE_DOCKERFILE,
         "exactTarget": target == expected_target,
+        "exactBuildKeys": exact_build_keys,
+        "exactBuildArgs": exact_build_args,
         "contextsAreMapping": contexts_are_mapping,
         "exactNamedContextBindings": exact_bindings,
         "noReservedContextNames": not reserved_names,
@@ -1929,6 +2064,10 @@ def _validate_public_pwa_compose_service_contract(
         "dockerfile": dockerfile,
         "target": target,
         "expectedTarget": expected_target,
+        "buildArgs": actual_build_args,
+        "expectedBuildArgs": expected_build_args,
+        "buildKeys": sorted(actual_build_keys),
+        "expectedBuildKeys": sorted(expected_build_keys),
         "bindings": actual_bindings,
         "expectedBindings": expected_bindings,
         "bindingMatches": binding_matches,
@@ -1975,6 +2114,7 @@ def validate_public_pwa_compose_context_contract(path: Path) -> dict[str, Any]:
             service_name=service_name,
             expected_target=str(expected["target"]),
             expected_bindings=dict(expected["namedContexts"]),
+            expected_build_args=dict(expected["buildArgs"]),
         )
         service_contracts[service_name] = service_contract
         failures.extend(service_contract["failures"])

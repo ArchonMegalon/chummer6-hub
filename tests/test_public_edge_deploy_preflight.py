@@ -18,6 +18,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "check_public_edge_deploy_preflight.py"
+CUTOVER_SCRIPT = (
+    REPO_ROOT / "scripts" / "run_install_linking_postgres_cutover.py"
+)
 MATERIALIZER_SCRIPT = REPO_ROOT / "scripts/materialize_hub_local_release_proof.py"
 COMPOSE_SOURCE_ATTESTOR = (
     REPO_ROOT / "scripts/attest_public_edge_compose_source.py"
@@ -33,6 +36,16 @@ def load_module():
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_cutover_module():
+    name = "run_install_linking_postgres_cutover_compose_policy_test"
+    spec = importlib.util.spec_from_file_location(name, CUTOVER_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -1365,8 +1378,10 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "exactSyntaxDirective": True,
         "noLateParserDirectives": True,
         "noHeredoc": True,
-        "validLogicalInstructions": True,
-        "noGlobalInstructions": True,
+            "validLogicalInstructions": True,
+            "noGlobalInstructions": True,
+            "noOnbuildInstructions": True,
+            "noAddInstructions": True,
         "exactProofStage": True,
         "exactPackageFeedStage": True,
         "exactStageHeaders": True,
@@ -1391,6 +1406,12 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "exactToolPayloadMode": True,
         "exactFinalPayloadMode": True,
         "exactCopyFromReferences": True,
+        "noUnqualifiedCopies": True,
+        "namedContextsOnlyInReviewedCopies": True,
+        "noMountFromInstructions": True,
+        "noNonCopyFromOptions": True,
+        "noContextSelectingCopyFromIndirection": True,
+        "noContextSelectionContinuations": True,
         "exactRequiredNamedContextCopies": True,
         "packageFeedDependsOnProof": True,
         "buildDependsOnPackageFeed": True,
@@ -1400,6 +1421,325 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "allTargetsProofGated": True,
     }
     assert not contract["failures"]
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    (
+        "COPY --from=hub-registry-source README.md /tmp/unreviewed-hub-input",
+        "COPY --from=design-product products/chummer/ /tmp/unreviewed-design-input/",
+        "COPY --from=fleet-media-factory-contracts . /tmp/unreviewed-media-input/",
+        "COPY --from=run-services-source README.md /tmp/unreviewed-run-input",
+        "ADD --from=run-services-source README.md /tmp/unreviewed-add-input",
+    ),
+)
+def test_public_pwa_docker_contract_rejects_every_extra_named_context_copy_or_add(
+    tmp_path: Path,
+    instruction: str,
+) -> None:
+    module = load_module()
+    source_root = write_complete_marker_source_tree(module, tmp_path / "source")
+    dockerfile = source_root / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH
+    original = dockerfile.read_text(encoding="utf-8")
+    insertion_stage = (
+        module.PUBLIC_EDGE_DOCKER_FINAL_FROM
+        if "--from=design-product" in instruction
+        else module.PUBLIC_EDGE_DOCKER_TOOL_FINAL_FROM
+    ) + "\n"
+    assert insertion_stage in original
+    dockerfile.write_text(
+        original.replace(
+            insertion_stage,
+            insertion_stage + instruction + "\n"
+            if "--from=design-product" in instruction
+            else instruction + "\n" + insertion_stage,
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    if instruction.startswith("ADD "):
+        assert contract["checks"]["noAddInstructions"] is False
+    else:
+        assert contract["checks"]["exactRequiredNamedContextCopies"] is False
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed_check"),
+    (
+        ("literal_run_mount", "namedContextsOnlyInReviewedCopies"),
+        ("variable_run_mount", "noMountFromInstructions"),
+        ("onbuild_mount", "noMountFromInstructions"),
+        ("onbuild_copy", "namedContextsOnlyInReviewedCopies"),
+        ("context_from", "namedContextsOnlyInReviewedCopies"),
+        ("stage_alias_collision", "namedContextsOnlyInReviewedCopies"),
+        ("arg_context_literal", "namedContextsOnlyInReviewedCopies"),
+        ("copy_from_variable", "noContextSelectingCopyFromIndirection"),
+        ("noncopy_from_option", "noNonCopyFromOptions"),
+        ("case_variant", "namedContextsOnlyInReviewedCopies"),
+        ("continuation_variant", "noContextSelectionContinuations"),
+        ("heredoc", "noHeredoc"),
+    ),
+)
+def test_public_pwa_docker_contract_rejects_every_other_context_selection_form(
+    tmp_path: Path,
+    mutation: str,
+    failed_check: str,
+) -> None:
+    module = load_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    final_from = module.PUBLIC_EDGE_DOCKER_FINAL_FROM
+    reviewed_copy = next(
+        instruction
+        for instruction in (
+            module.PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE[
+                module.PUBLIC_EDGE_DOCKER_PROOF_STAGE
+            ]
+        )
+        if "validate_public_pwa_proof_authority.py" in instruction
+    )
+    injected_instructions = {
+        "literal_run_mount": (
+            "RUN --mount=type=bind,from=run-services-source,"
+            "source=.,target=/mnt true"
+        ),
+        "variable_run_mount": (
+            "RUN --mount=type=bind,from=${SOURCE},source=.,target=/mnt true"
+        ),
+        "onbuild_mount": (
+            "ONBUILD RUN --mount=type=bind,from=${SOURCE},"
+            "source=.,target=/mnt true"
+        ),
+        "onbuild_copy": (
+            "ONBUILD COPY --from=hub-registry-source "
+            "black-ledger/ /tmp/black-ledger/"
+        ),
+        "context_from": "FROM run-services-source AS bypass",
+        "arg_context_literal": "ARG SOURCE=design-product",
+        "copy_from_variable": (
+            "COPY --from=${SOURCE} README.md /tmp/unreviewed"
+        ),
+        "noncopy_from_option": (
+            "RUN echo --from=run-services-source"
+        ),
+        "heredoc": "RUN <<EOF\ntrue\nEOF",
+    }
+    if mutation in injected_instructions:
+        mutated = original.replace(
+            final_from + "\n",
+            final_from + "\n" + injected_instructions[mutation] + "\n",
+            1,
+        )
+    elif mutation == "stage_alias_collision":
+        mutated = original.replace(
+            final_from,
+            final_from.rsplit(" AS ", 1)[0] + " AS design-product",
+            1,
+        )
+    elif mutation == "case_variant":
+        mutated = original.replace(
+            reviewed_copy,
+            reviewed_copy.replace(
+                "run-services-source",
+                "RUN-SERVICES-SOURCE",
+            ),
+            1,
+        )
+    elif mutation == "continuation_variant":
+        mutated = original.replace(
+            reviewed_copy,
+            reviewed_copy.replace(
+                "run-services-source",
+                "run-services-\\\nsource",
+            ),
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled Docker context mutation: {mutation}")
+    assert mutated != original
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"][failed_check] is False
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    (
+        (
+            "RUN --mount=type=bind,"
+            "source=chummer-hub-registry/black-ledger,"
+            "target=/mnt,ro cp -a /mnt /tmp/unreviewed-ledger"
+        ),
+        "RUN --mount=type=cache,target=/root/.cache true",
+        "RUN --mount=type=secret,id=release-key,target=/run/key true",
+        "RUN --mount=type=ssh,id=default true",
+        (
+            "RUN --mount=target=/mnt,"
+            "source=chummer-hub-registry/black-ledger,"
+            "type=bind,ro cp -a /mnt /tmp/unreviewed-ledger"
+        ),
+        "RUN --network=none --mount=type=cache,target=/root/.cache true",
+        "rUn --MoUnT=TyPe=CaChE,TaRgEt=/root/.cache true",
+        "RUN\t--mount=type=cache,target=/root/.cache true",
+        "RUN --mount\t=\ttype=ssh,id=default true",
+        "RUN --mount=type=cache,\\\n    target=/root/.cache true",
+        "RUN \\\n    --mount=type=ssh,id=default true",
+        "RUN --mou\\\nnt=type=cache,target=/root/.cache true",
+    ),
+)
+def test_public_pwa_docker_contract_rejects_every_run_mount_form(
+    tmp_path: Path,
+    instruction: str,
+) -> None:
+    module = load_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    insertion_point = module.PUBLIC_EDGE_DOCKER_RECEIPT_COPY + "\n"
+    mutated = original.replace(
+        insertion_point,
+        insertion_point + instruction + "\n",
+        1,
+    )
+    assert mutated != original
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"]["noMountFromInstructions"] is False
+    if "\\\n" in instruction:
+        assert contract["checks"]["noContextSelectionContinuations"] is False
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    (
+        "ONBUILD",
+        "ONBUILD RUN true",
+        (
+            "ONBUILD COPY --from=run-services-source "
+            "Chummer.Run.Api/ /tmp/unreviewed/"
+        ),
+        "ONBUILD ADD https://example.invalid/payload /tmp/payload",
+        "ONBUILD RUN --mount=type=cache,target=/root/.cache true",
+        "oNbUiLd\tRuN true",
+        "ONBUILD " + "\\\n" + "    RUN true",
+        "ONBU" + "\\\n" + "ILD RUN true",
+    ),
+)
+def test_public_pwa_docker_contract_rejects_every_onbuild_form(
+    tmp_path: Path,
+    instruction: str,
+) -> None:
+    module = load_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    insertion_point = module.PUBLIC_EDGE_DOCKER_RECEIPT_COPY + "\n"
+    mutated = original.replace(
+        insertion_point,
+        insertion_point + instruction + "\n",
+        1,
+    )
+    assert mutated != original
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+    records, malformed_continuations = (
+        module._docker_logical_instruction_records(mutated)
+    )
+    shared_findings = module._docker_context_policy_findings(records)
+
+    assert not malformed_continuations
+    assert contract["status"] == "fail"
+    assert contract["checks"]["noOnbuildInstructions"] is False
+    assert shared_findings["onbuildUses"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed_check"),
+    (
+        ("unreviewed_frontend", "exactSyntaxDirective"),
+        ("late_syntax", "noLateParserDirectives"),
+        ("escape_backtick", "noLateParserDirectives"),
+        ("mixed_whitespace_escape", "noLateParserDirectives"),
+    ),
+)
+def test_public_pwa_docker_contract_rejects_parser_syntax_switches(
+    tmp_path: Path,
+    mutation: str,
+    failed_check: str,
+) -> None:
+    module = load_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_DOCKERFILE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    if mutation == "unreviewed_frontend":
+        mutated = original.replace(
+            module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE,
+            "# syntax=docker/dockerfile:1.7",
+            1,
+        )
+    elif mutation == "late_syntax":
+        mutated = original.replace(
+            module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE + "\n",
+            module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE
+            + "\n# syntax=docker/dockerfile:1.7\n",
+            1,
+        )
+    elif mutation in {"escape_backtick", "mixed_whitespace_escape"}:
+        escape_directive = (
+            "# escape=`"
+            if mutation == "escape_backtick"
+            else "\t#\tescape \t= `"
+        )
+        mutated = original.replace(
+            module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE + "\n",
+            module.PUBLIC_EDGE_DOCKERFILE_SYNTAX_DIRECTIVE
+            + "\n"
+            + escape_directive
+            + "\n",
+            1,
+        )
+        insertion_point = module.PUBLIC_EDGE_DOCKER_RECEIPT_COPY + "\n"
+        mutated = mutated.replace(
+            insertion_point,
+            insertion_point
+            + "RUN --mou`\n"
+            + "nt=type=bind,source=chummer-hub-registry/black-ledger,"
+            + "target=/mnt cp -a /mnt /tmp/unreviewed-ledger\n",
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled parser directive mutation: {mutation}")
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_docker_build_contract(dockerfile)
+
+    assert contract["status"] == "fail"
+    assert contract["checks"][failed_check] is False
+
+
+def test_public_pwa_primary_context_exposes_no_source_repository() -> None:
+    dockerignore = (
+        REPO_ROOT / "Chummer.Run.Api" / "Dockerfile.dockerignore"
+    ).read_text(encoding="utf-8")
+
+    assert "!chummer-hub-registry" not in dockerignore
+    assert dockerignore.splitlines()[:3] == ["*", "", "!.dockerignore"]
 
 
 @pytest.mark.parametrize(
@@ -1768,7 +2108,8 @@ def test_public_pwa_compose_contract_requires_exact_named_context_bindings(
     compose = source_root / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
     original = compose.read_text(encoding="utf-8")
     design_line = (
-        "        design-product: /docker/chummercomplete/chummer-design\n"
+        "        design-product: "
+        f"{module.PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS['design-product']}\n"
     )
     expected_actual_bindings = dict(module.PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS)
     run_services_value = module.PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS[
@@ -1820,6 +2161,8 @@ def test_public_pwa_compose_contract_requires_exact_named_context_bindings(
     "service_name",
     (
         "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-runtime-proof",
+        "chummer-install-linking-postgres-import-presence-proof",
         "chummer-install-linking-postgres-import",
     ),
 )
@@ -1879,6 +2222,882 @@ def test_public_pwa_compose_contract_closes_operator_build_source_bindings(
     assert contract["status"] == "fail"
     assert contract["serviceContracts"][service_name]["status"] == "fail"
     assert contract["serviceContracts"]["chummer-portal"]["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    "service_name",
+    (
+        "chummer-portal",
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-runtime-proof",
+        "chummer-install-linking-postgres-import-presence-proof",
+        "chummer-install-linking-postgres-import",
+    ),
+)
+@pytest.mark.parametrize(
+    ("mutation", "failed_check"),
+    (
+        ("dockerfile_inline", "exactBuildKeys"),
+        ("alternate_dockerfile", "exactDockerfile"),
+        ("context_selector_arg", "exactBuildArgs"),
+    ),
+)
+def test_public_pwa_compose_contract_rejects_alternate_build_authority(
+    tmp_path: Path,
+    service_name: str,
+    mutation: str,
+    failed_check: str,
+) -> None:
+    module = load_module()
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    service_start = original.index(f"  {service_name}:\n")
+    next_service = re.search(
+        r"(?m)^  [A-Za-z0-9_.-]+:\s*$",
+        original[service_start + 3 :],
+    )
+    service_end = (
+        service_start + 3 + next_service.start()
+        if next_service is not None
+        else len(original)
+    )
+    block = original[service_start:service_end]
+    if mutation == "dockerfile_inline":
+        mutated_block = block.replace(
+            "    build:\n",
+            "    build:\n"
+            "      dockerfile_inline: |\n"
+            "        FROM scratch\n",
+            1,
+        )
+    elif mutation == "alternate_dockerfile":
+        mutated_block = block.replace(
+            f"      dockerfile: {module.PUBLIC_EDGE_COMPOSE_DOCKERFILE}\n",
+            "      dockerfile: /tmp/unreviewed.Dockerfile\n",
+            1,
+        )
+    elif mutation == "context_selector_arg":
+        mutated_block = block.replace(
+            "      args:\n",
+            "      args:\n"
+            "        SOURCE_CONTEXT: run-services-source\n",
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled Compose mutation: {mutation}")
+    assert mutated_block != block
+    compose.write_text(
+        original[:service_start] + mutated_block + original[service_end:],
+        encoding="utf-8",
+    )
+
+    contract = module.validate_public_pwa_compose_context_contract(compose)
+    service_contract = contract["serviceContracts"][service_name]
+
+    assert contract["status"] == "fail"
+    assert service_contract["status"] == "fail"
+    assert service_contract["checks"][failed_check] is False
+
+
+def mutate_portal_compose_build_syntax(
+    module,
+    original: str,
+    mutation: str,
+) -> str:
+    if mutation == "top_level_include":
+        return "include:\n  - ./included-build.yml\n\n" + original
+    if mutation == "explicit_top_level_duplicate":
+        return "? services\n: {}\n" + original
+    if mutation == "quoted_top_level_duplicate":
+        return '"services": {}\n' + original
+    if mutation == "yaml_directive":
+        return "%YAML 1.2\n---\n" + original
+    if mutation == "yaml_tag_directive":
+        return "%TAG !review! tag:example.invalid,2026:\n---\n" + original
+    if mutation == "document_start":
+        return "---\n" + original
+    if mutation == "document_end":
+        return "...\n" + original
+    if mutation == "direct_sixth_build":
+        return original.replace(
+            "services:\n",
+            "services:\n"
+            "  direct-sixth-build:\n"
+            "    image: unreviewed.invalid/direct:latest\n"
+            "    build:\n"
+            "      context: .\n",
+            1,
+        )
+    if mutation == "tabbed_top_level_key":
+        return original.replace("services:\n", "\tservices:\n", 1)
+    if mutation == "spaced_top_level_key":
+        return original.replace("services:\n", "services :\n", 1)
+    service_name = "chummer-portal"
+    service_start = original.index(f"  {service_name}:\n")
+    next_service = re.search(
+        r"(?m)^  [A-Za-z0-9_.-]+:\s*$",
+        original[service_start + 3 :],
+    )
+    service_end = (
+        service_start + 3 + next_service.start()
+        if next_service is not None
+        else len(original)
+    )
+    block = original[service_start:service_end]
+    prefix = ""
+    build_context_line = (
+        f"      context: {module.PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT}\n"
+    )
+    build_concurrency_line = (
+        "        CHUMMER_BUILD_CONCURRENCY: "
+        "${CHUMMER_BUILD_CONCURRENCY:-1}\n"
+    )
+    if mutation == "explicit_pull":
+        mutated_block = block.replace(
+            "    build:\n",
+            "    build:\n      ? pull\n      : true\n",
+            1,
+        )
+    elif mutation == "explicit_dockerfile_inline":
+        mutated_block = block.replace(
+            "    build:\n",
+            "    build:\n"
+            "      ? dockerfile_inline\n"
+            "      : |\n"
+            "          FROM scratch\n",
+            1,
+        )
+    elif mutation == "pull":
+        mutated_block = block.replace(
+            "    build:\n",
+            "    build:\n      pull: true\n",
+            1,
+        )
+    elif mutation == "quoted_build_key":
+        mutated_block = block.replace(
+            "    build:\n",
+            '    "build":\n',
+            1,
+        )
+    elif mutation == "quoted_context_key":
+        mutated_block = block.replace(
+            build_context_line,
+            build_context_line.replace("context:", '"context":', 1),
+            1,
+        )
+    elif mutation == "quoted_nested_key":
+        mutated_block = block.replace(
+            build_concurrency_line,
+            build_concurrency_line.replace(
+                "CHUMMER_BUILD_CONCURRENCY:",
+                '"CHUMMER_BUILD_CONCURRENCY":',
+                1,
+            ),
+            1,
+        )
+    elif mutation == "merge":
+        prefix = "x-review-build: &review-build\n  pull: true\n\n"
+        mutated_block = block.replace(
+            "    build:\n",
+            "    build:\n      <<: *review-build\n",
+            1,
+        )
+    elif mutation == "anchor":
+        mutated_block = block.replace(
+            build_context_line,
+            build_context_line.replace(
+                "context: ",
+                "context: &review-context ",
+                1,
+            ),
+            1,
+        )
+    elif mutation == "alias":
+        prefix = (
+            "x-review-context: &review-context "
+            f"{module.PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT}\n\n"
+        )
+        mutated_block = block.replace(
+            build_context_line,
+            "      context: *review-context\n",
+            1,
+        )
+    elif mutation == "tag":
+        mutated_block = block.replace(
+            build_context_line,
+            build_context_line.replace("context: ", "context: !!str ", 1),
+            1,
+        )
+    elif mutation == "duplicate_build_key":
+        mutated_block = block.replace(
+            "    build:\n",
+            '    "build": {}\n    build:\n',
+            1,
+        )
+    elif mutation == "quoted_duplicate_service":
+        return (
+            original[:service_start]
+            + '  "chummer-portal": {}\n'
+            + original[service_start:]
+        )
+    elif mutation == "quoted_service_key":
+        mutated_block = block.replace(
+            "  chummer-portal:\n",
+            '  "chummer-portal":\n',
+            1,
+        )
+    elif mutation == "explicit_service_key":
+        mutated_block = block.replace(
+            "  chummer-portal:\n",
+            "  ? chummer-portal\n  :\n",
+            1,
+        )
+    elif mutation == "explicit_nested_arg":
+        mutated_block = block.replace(
+            "      args:\n",
+            "      args:\n"
+            "        ? SOURCE_CONTEXT\n"
+            "        : run-services-source\n",
+            1,
+        )
+    elif mutation in {
+        "pull_policy",
+        "platform",
+        "profiles",
+        "develop",
+        "provider",
+        "models",
+    }:
+        selector_lines = {
+            "pull_policy": "    pull_policy: always\n",
+            "platform": "    platform: linux/amd64\n",
+            "profiles": '    profiles: ["unreviewed-build"]\n',
+            "develop": "    develop: {}\n",
+            "provider": "    provider: {type: unreviewed}\n",
+            "models": "    models: {}\n",
+        }
+        mutated_block = block.replace(
+            "    image: chummer-run-api:local\n",
+            "    image: chummer-run-api:local\n"
+            + selector_lines[mutation],
+            1,
+        )
+    elif mutation == "image":
+        mutated_block = block.replace(
+            "    image: chummer-run-api:local\n",
+            "    image: unreviewed.invalid/portal:latest\n",
+            1,
+        )
+    elif mutation == "same_file_extends":
+        mutated_block = block.replace(
+            "    image: chummer-run-api:local\n",
+            "    image: chummer-run-api:local\n"
+            "    extends:\n"
+            "      service: unreviewed-build-parent\n",
+            1,
+        )
+        mutated = (
+            original[:service_start]
+            + mutated_block
+            + original[service_end:]
+        )
+        return mutated.replace(
+            "services:\n",
+            "services:\n"
+            "  unreviewed-build-parent:\n"
+            "    image: unreviewed.invalid/base:latest\n"
+            "    build:\n"
+            "      context: .\n"
+            "      pull: true\n",
+            1,
+        )
+    elif mutation in {
+        "external_extends_build_pull",
+        "external_extends_pull_policy",
+        "external_extends_platform",
+    }:
+        external_files = {
+            "external_extends_build_pull": "external-build-pull.yml",
+            "external_extends_pull_policy": "external-pull-policy.yml",
+            "external_extends_platform": "external-platform.yml",
+        }
+        mutated_block = block.replace(
+            "    image: chummer-run-api:local\n",
+            "    image: chummer-run-api:local\n"
+            "    extends:\n"
+            f"      file: ./{external_files[mutation]}\n"
+            "      service: unreviewed-build-parent\n",
+            1,
+        )
+    else:  # pragma: no cover - the parameter list is closed by callers.
+        raise AssertionError(f"Unhandled raw Compose mutation: {mutation}")
+    assert mutated_block != block
+    return (
+        prefix
+        + original[:service_start]
+        + mutated_block
+        + original[service_end:]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "explicit_pull",
+        "explicit_dockerfile_inline",
+        "pull",
+        "quoted_build_key",
+        "quoted_context_key",
+        "quoted_nested_key",
+        "merge",
+        "anchor",
+        "alias",
+        "tag",
+        "duplicate_build_key",
+        "quoted_duplicate_service",
+        "quoted_service_key",
+        "explicit_service_key",
+        "explicit_nested_arg",
+        "top_level_include",
+        "explicit_top_level_duplicate",
+        "quoted_top_level_duplicate",
+        "yaml_directive",
+        "yaml_tag_directive",
+        "document_start",
+        "document_end",
+        "direct_sixth_build",
+        "tabbed_top_level_key",
+        "spaced_top_level_key",
+        "pull_policy",
+        "platform",
+        "profiles",
+        "develop",
+        "provider",
+        "models",
+        "image",
+        "same_file_extends",
+        "external_extends_build_pull",
+        "external_extends_pull_policy",
+        "external_extends_platform",
+    ),
+)
+def test_public_pwa_compose_raw_syntax_fails_closed_in_static_and_runtime_policy(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    mutated = mutate_portal_compose_build_syntax(
+        module,
+        original,
+        mutation,
+    )
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    compose.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_compose_context_contract(compose)
+
+    assert contract["status"] == "fail"
+    assert contract["serviceContracts"]["chummer-portal"]["status"] == "fail"
+    with pytest.raises(
+        cutover_module.CutoverError,
+        match="raw Compose build authority drifted",
+    ):
+        cutover_module.require_public_edge_compose_build_syntax(mutated)
+
+
+@pytest.mark.parametrize(
+    "service_name",
+    (
+        "chummer-portal",
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-runtime-proof",
+        "chummer-install-linking-postgres-import-presence-proof",
+        "chummer-install-linking-postgres-import",
+    ),
+)
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "extra_selector",
+        "image",
+        "profiles",
+    ),
+)
+def test_every_governed_service_has_one_exact_raw_selection_contract(
+    tmp_path: Path,
+    service_name: str,
+    mutation: str,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    image = module.PUBLIC_EDGE_RAW_SERVICE_IMAGES[service_name]
+    service_prefix = f"  {service_name}:\n    image: {image}\n"
+    assert service_prefix in original
+    if mutation == "extra_selector":
+        replacement = service_prefix + "    pull_policy: always\n"
+    elif mutation == "image":
+        replacement = service_prefix.replace(
+            f"image: {image}",
+            "image: unreviewed.invalid/service:latest",
+            1,
+        )
+    elif mutation == "profiles":
+        if service_name == "chummer-portal":
+            replacement = (
+                service_prefix + '    profiles: ["unreviewed-build"]\n'
+            )
+        else:
+            profile_line = (
+                '    profiles: ["install-linking-postgres-admin"]\n'
+            )
+            service_prefix += profile_line
+            assert service_prefix in original
+            replacement = service_prefix.replace(
+                profile_line,
+                '    profiles: ["unreviewed-build"]\n',
+                1,
+            )
+    else:  # pragma: no cover - the parameter list is closed above.
+        raise AssertionError(f"Unhandled service mutation: {mutation}")
+    mutated = original.replace(service_prefix, replacement, 1)
+    assert mutated != original
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    compose.write_text(mutated, encoding="utf-8")
+
+    contract = module.validate_public_pwa_compose_context_contract(compose)
+
+    assert contract["status"] == "fail"
+    assert contract["serviceContracts"][service_name]["status"] == "fail"
+    with pytest.raises(
+        cutover_module.CutoverError,
+        match="raw Compose build authority drifted",
+    ):
+        cutover_module.require_public_edge_compose_build_syntax(mutated)
+
+
+def test_static_and_runtime_build_policies_share_one_authority() -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+
+    shared_policy_names = (
+        "PUBLIC_EDGE_BUILD_ARG_NAMES",
+        "PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE",
+        "PUBLIC_EDGE_BUILD_SERVICE_TARGETS",
+        "PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS",
+        "PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE",
+        "PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE",
+        "PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE",
+        "PUBLIC_EDGE_DOCKER_STAGE_ORDER",
+        "PUBLIC_EDGE_NAMED_CONTEXT_NAMES",
+        "PUBLIC_EDGE_RAW_SERVICE_IMAGES",
+        "PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE",
+        "PUBLIC_EDGE_RENDERED_BUILD_SERVICE_NAMES",
+        "PUBLIC_EDGE_RENDERED_SERVICE_KEYS_BY_SERVICE",
+        "PUBLIC_EDGE_SERVICE_PROFILES_BY_SERVICE",
+        "docker_context_policy_findings",
+        "docker_copy_from_reference",
+        "docker_instruction_uses_mount",
+        "docker_logical_instruction_records",
+        "docker_logical_instructions",
+        "dockerfile_parser_directive_findings",
+        "public_edge_compose_build_syntax_failures",
+        "public_edge_rendered_compose_failures",
+        "rendered_build_contract_matches",
+    )
+    for name in shared_policy_names:
+        assert getattr(module, name) is getattr(cutover_module, name), name
+    assert (
+        module._docker_context_policy_findings
+        is cutover_module.docker_context_policy_findings
+    )
+    assert (
+        module._docker_copy_from_reference
+        is cutover_module.docker_copy_from_reference
+    )
+    assert (
+        module._docker_logical_instruction_records
+        is cutover_module._docker_logical_instruction_records
+    )
+    assert (
+        cutover_module.EXPECTED_NAMED_CONTEXT_COPY_INSTRUCTIONS_BY_STAGE
+        is module.PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE
+    )
+    assert (
+        set(module.PUBLIC_EDGE_COMPOSE_BUILD_SERVICE_CONTRACTS)
+        == set(cutover_module.PUBLIC_EDGE_BUILD_SERVICE_TARGETS)
+    )
+
+
+def render_synthetic_compose_config(
+    compose: Path,
+    tmp_path: Path,
+) -> subprocess.CompletedProcess[str]:
+    synthetic_root = tmp_path / "render-synthetic"
+    run_services = synthetic_root / "run-services"
+    hub_registry = synthetic_root / "hub-registry"
+    design_product = synthetic_root / "design-product"
+    fleet_contracts = (
+        synthetic_root
+        / "fleet-media-factory"
+        / "src"
+        / "Chummer.Media.Contracts"
+    )
+    for path in (run_services, hub_registry, design_product, fleet_contracts):
+        path.mkdir(parents=True, exist_ok=True)
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "LANG": "C",
+        "LC_ALL": "C",
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE": str(tmp_path / "cert"),
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": str(
+            tmp_path / "cert-password"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE": "cutover",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME": "db.example",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_IP": "127.0.0.1",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE": str(
+            tmp_path / "migrator"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_PORT": "5432",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE": str(
+            tmp_path / "runtime"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE": "runtime",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE": str(tmp_path / "ca"),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": str(
+            tmp_path / "projection"
+        ),
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(tmp_path / "proof"),
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN": "test-only",
+        "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(synthetic_root),
+        "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(run_services),
+        "CHUMMER_RUN_SERVICES_SOURCE": str(run_services),
+        "CHUMMER_HUB_REGISTRY_SOURCE": str(hub_registry),
+        "CHUMMER_DESIGN_PRODUCT_SOURCE": str(design_product),
+        "CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE": str(fleet_contracts),
+    }
+    return subprocess.run(
+        [
+            "/usr/bin/docker",
+            "compose",
+            "--env-file",
+            "/dev/null",
+            "--profile",
+            "*",
+            "-f",
+            str(compose),
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=REPO_ROOT,
+        env=environment,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "explicit_pull",
+        "pull",
+        "quoted_build_key",
+        "quoted_context_key",
+        "quoted_nested_key",
+        "merge",
+        "anchor",
+        "alias",
+        "tag",
+        "quoted_service_key",
+        "explicit_service_key",
+        "pull_policy",
+        "platform",
+        "profiles",
+        "same_file_extends",
+        "direct_sixth_build",
+    ),
+)
+def test_renderable_compose_syntax_is_rejected_before_runtime_build(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    mutated = mutate_portal_compose_build_syntax(
+        module,
+        original,
+        mutation,
+    )
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    compose.write_text(mutated, encoding="utf-8")
+
+    completed = render_synthetic_compose_config(compose, tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    with pytest.raises(
+        cutover_module.CutoverError,
+        match="raw Compose build authority drifted",
+    ):
+        cutover_module.require_public_edge_compose_build_syntax(mutated)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "external_payload", "rendered_path", "expected"),
+    (
+        (
+            "external_extends_build_pull",
+            "services:\n"
+            "  unreviewed-build-parent:\n"
+            "    image: chummer-run-api:local\n"
+            "    build:\n"
+            "      context: .\n"
+            "      pull: true\n",
+            ("build", "pull"),
+            True,
+        ),
+        (
+            "external_extends_pull_policy",
+            "services:\n"
+            "  unreviewed-build-parent:\n"
+            "    image: chummer-run-api:local\n"
+            "    pull_policy: always\n",
+            ("pull_policy",),
+            "always",
+        ),
+        (
+            "external_extends_platform",
+            "services:\n"
+            "  unreviewed-build-parent:\n"
+            "    image: chummer-run-api:local\n"
+            "    platform: linux/amd64\n",
+            ("platform",),
+            "linux/amd64",
+        ),
+    ),
+)
+def test_external_extends_semantics_are_rejected_before_compose(
+    tmp_path: Path,
+    mutation: str,
+    external_payload: str,
+    rendered_path: tuple[str, ...],
+    expected: object,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    mutated = mutate_portal_compose_build_syntax(
+        module,
+        original,
+        mutation,
+    )
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    compose.write_text(mutated, encoding="utf-8")
+    external_name = {
+        "external_extends_build_pull": "external-build-pull.yml",
+        "external_extends_pull_policy": "external-pull-policy.yml",
+        "external_extends_platform": "external-platform.yml",
+    }[mutation]
+    (tmp_path / external_name).write_text(
+        external_payload,
+        encoding="utf-8",
+    )
+
+    completed = render_synthetic_compose_config(compose, tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    selected: object = json.loads(completed.stdout)["services"][
+        "chummer-portal"
+    ]
+    for key in rendered_path:
+        assert isinstance(selected, dict)
+        selected = selected[key]
+    assert selected == expected
+    with pytest.raises(
+        cutover_module.CutoverError,
+        match="raw Compose build authority drifted",
+    ):
+        cutover_module.require_public_edge_compose_build_syntax(mutated)
+
+
+def test_top_level_include_cannot_add_a_sixth_governed_build_source(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    cutover_module = load_cutover_module()
+    original = (
+        REPO_ROOT / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    ).read_text(encoding="utf-8")
+    mutated = mutate_portal_compose_build_syntax(
+        module,
+        original,
+        "top_level_include",
+    )
+    compose = tmp_path / "docker-compose.public-edge.yml"
+    compose.write_text(mutated, encoding="utf-8")
+    (tmp_path / "included-build.yml").write_text(
+        "services:\n"
+        "  included-sixth-build:\n"
+        "    image: unreviewed.invalid/included:latest\n"
+        "    build:\n"
+        "      context: .\n",
+        encoding="utf-8",
+    )
+
+    completed = render_synthetic_compose_config(compose, tmp_path)
+
+    assert completed.returncode == 0, completed.stderr
+    assert "included-sixth-build" in json.loads(completed.stdout)["services"]
+    with pytest.raises(
+        cutover_module.CutoverError,
+        match="raw Compose build authority drifted",
+    ):
+        cutover_module.require_public_edge_compose_build_syntax(mutated)
+
+
+def test_real_compose_interpolation_routes_every_cutover_build_context(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    synthetic_root = tmp_path / "synthetic"
+    run_services = synthetic_root / "run-services"
+    hub_registry = synthetic_root / "hub-registry"
+    design_product = synthetic_root / "design-product"
+    fleet_contracts = (
+        synthetic_root
+        / "fleet-media-factory"
+        / "src"
+        / "Chummer.Media.Contracts"
+    )
+    for path in (run_services, hub_registry, design_product, fleet_contracts):
+        path.mkdir(parents=True, exist_ok=True)
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "LANG": "C",
+        "LC_ALL": "C",
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE": str(tmp_path / "cert"),
+        "CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE": str(
+            tmp_path / "cert-password"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_DATABASE": "cutover",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME": "db.example",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_IP": "127.0.0.1",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE": str(
+            tmp_path / "migrator"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_PORT": "5432",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE": str(
+            tmp_path / "runtime"
+        ),
+        "CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE": "runtime",
+        "CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE": str(tmp_path / "ca"),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": str(
+            tmp_path / "projection"
+        ),
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(tmp_path / "proof"),
+        "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+        "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN": "test-only",
+        "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(synthetic_root),
+        "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(run_services),
+        "CHUMMER_RUN_SERVICES_SOURCE": str(run_services),
+        "CHUMMER_HUB_REGISTRY_SOURCE": str(hub_registry),
+        "CHUMMER_DESIGN_PRODUCT_SOURCE": str(design_product),
+        "CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE": str(fleet_contracts),
+    }
+    completed = subprocess.run(
+        [
+            "/usr/bin/docker",
+            "compose",
+            "--env-file",
+            "/dev/null",
+            "--profile",
+            "*",
+            "-f",
+            str(REPO_ROOT / "docker-compose.public-edge.yml"),
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=REPO_ROOT,
+        env=environment,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    rendered = json.loads(completed.stdout)
+    expected_contexts = {
+        "design-product": str(design_product),
+        "fleet-media-factory-contracts": str(fleet_contracts),
+        "hub-registry-source": str(hub_registry),
+        "run-services-source": str(run_services),
+    }
+    services = (
+        "chummer-portal",
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-runtime-proof",
+        "chummer-install-linking-postgres-import-presence-proof",
+        "chummer-install-linking-postgres-import",
+    )
+    for service_name in services:
+        build = rendered["services"][service_name]["build"]
+        expected_build_keys = {
+            "additional_contexts",
+            "args",
+            "context",
+            "dockerfile",
+        }
+        if service_name != "chummer-portal":
+            expected_build_keys.add("target")
+        assert set(build) == expected_build_keys
+        assert build["args"] == {
+            "CHUMMER_BUILD_CONCURRENCY": "1",
+            "CHUMMER_RUNTIME_GID": "1654",
+            "CHUMMER_RUNTIME_UID": "1654",
+        }
+        assert build["context"] == str(synthetic_root)
+        assert build["dockerfile"] == str(
+            run_services / "Chummer.Run.Api" / "Dockerfile"
+        )
+        assert build["additional_contexts"] == expected_contexts
+        assert build.get("target") == (
+            None
+            if service_name == "chummer-portal"
+            else "install-linking-postgres-tool-final"
+        )
+    assert module.public_edge_rendered_compose_failures(
+        rendered,
+        expected_images=module.PUBLIC_EDGE_RAW_SERVICE_IMAGES,
+        build_context=str(synthetic_root),
+        dockerfile=str(
+            run_services / "Chummer.Run.Api" / "Dockerfile"
+        ),
+        additional_contexts=expected_contexts,
+    ) == []
 
 
 def test_public_pwa_reviewed_authority_rejects_duplicate_fields(tmp_path: Path) -> None:

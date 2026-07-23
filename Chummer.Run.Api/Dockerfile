@@ -77,7 +77,7 @@ COPY --from=run-services-source Chummer.Run.Contracts/ chummer.run-services/Chum
 COPY --from=run-services-source .codex-design/ chummer.run-services/.codex-design/
 COPY --from=run-services-source Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
 COPY --from=run-services-source Chummer.World.Contracts/ chummer.run-services/Chummer.World.Contracts/
-COPY chummer-hub-registry/black-ledger/ chummer-hub-registry/black-ledger/
+COPY --from=hub-registry-source black-ledger/ chummer-hub-registry/black-ledger/
 COPY --from=fleet-media-factory-contracts . fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN rm -rf /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin \
            /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/obj \

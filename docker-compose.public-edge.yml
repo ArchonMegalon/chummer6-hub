@@ -132,7 +132,7 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Identity/Dockerfile
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     environment:
@@ -216,8 +216,9 @@ services:
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
-        design-product: /docker/chummercomplete/chummer-design
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
+        design-product: ${CHUMMER_DESIGN_PRODUCT_SOURCE:-/docker/chummercomplete/chummer-design}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
@@ -647,8 +648,9 @@ services:
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
-        design-product: /docker/chummercomplete/chummer-design
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
+        design-product: ${CHUMMER_DESIGN_PRODUCT_SOURCE:-/docker/chummercomplete/chummer-design}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
@@ -693,8 +695,9 @@ services:
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
-        design-product: /docker/chummercomplete/chummer-design
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
+        design-product: ${CHUMMER_DESIGN_PRODUCT_SOURCE:-/docker/chummercomplete/chummer-design}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
@@ -737,8 +740,9 @@ services:
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
-        design-product: /docker/chummercomplete/chummer-design
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
+        design-product: ${CHUMMER_DESIGN_PRODUCT_SOURCE:-/docker/chummercomplete/chummer-design}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
@@ -771,8 +775,9 @@ services:
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
-        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
-        design-product: /docker/chummercomplete/chummer-design
+        hub-registry-source: ${CHUMMER_HUB_REGISTRY_SOURCE:-/docker/chummercomplete/chummer-hub-registry}
+        fleet-media-factory-contracts: ${CHUMMER_FLEET_MEDIA_FACTORY_CONTRACTS_SOURCE:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}
+        design-product: ${CHUMMER_DESIGN_PRODUCT_SOURCE:-/docker/chummercomplete/chummer-design}
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
         CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
