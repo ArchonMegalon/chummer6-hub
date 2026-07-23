@@ -636,14 +636,25 @@ def test_strict_delivery_rejects_redirect(
         fixture.verify()
 
 
-def test_strict_delivery_rejects_same_size_corruption(
+@pytest.mark.parametrize(
+    "artifact",
+    ("installer", "payload", "sidecar"),
+)
+def test_strict_delivery_rejects_same_size_corruption_for_every_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    artifact: str,
 ) -> None:
     fixture = DeliveryFixture(tmp_path)
-    corrupted = bytes([fixture.payload_bytes[0] ^ 1]) + fixture.payload_bytes[1:]
-    fixture.responses[fixture.payload_url] = StreamResponse(
-        fixture.payload_url,
+    target_url = {
+        "installer": fixture.installer_url,
+        "payload": fixture.payload_url,
+        "sidecar": fixture.sidecar_url,
+    }[artifact]
+    original = fixture.responses[target_url].body
+    corrupted = bytes([original[0] ^ 1]) + original[1:]
+    fixture.responses[target_url] = StreamResponse(
+        target_url,
         corrupted,
         generation=fixture.generation,
     )
@@ -682,17 +693,59 @@ def test_strict_delivery_rejects_absent_or_mismatched_content_length(
         ("Location", "https://example.invalid/elsewhere"),
     ],
 )
-def test_strict_delivery_rejects_cookie_auth_or_location_headers(
+@pytest.mark.parametrize(
+    "artifact",
+    ("installer", "payload", "sidecar"),
+)
+def test_strict_delivery_rejects_cookie_auth_or_location_headers_for_every_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     header: str,
     value: str,
+    artifact: str,
 ) -> None:
     fixture = DeliveryFixture(tmp_path)
-    fixture.responses[fixture.installer_url].headers[header] = value
+    target_url = {
+        "installer": fixture.installer_url,
+        "payload": fixture.payload_url,
+        "sidecar": fixture.sidecar_url,
+    }[artifact]
+    fixture.responses[target_url].headers[header] = value
     fixture.install(monkeypatch)
 
     with pytest.raises(ValueError, match=f"forbidden response header {header}"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    "header,value",
+    [
+        ("Authorization", "Bearer ambient"),
+        ("Cookie", "session=ambient"),
+        ("Proxy-Authorization", "Basic ambient"),
+    ],
+)
+@pytest.mark.parametrize(
+    "artifact",
+    ("installer", "payload", "sidecar"),
+)
+def test_strict_delivery_rejects_request_credentials_for_every_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    header: str,
+    value: str,
+    artifact: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    target_url = {
+        "installer": fixture.installer_url,
+        "payload": fixture.payload_url,
+        "sidecar": fixture.sidecar_url,
+    }[artifact]
+    fixture.responses[target_url].request.headers[header] = value
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match=f"request carried credential header {header}"):
         fixture.verify()
 
 
