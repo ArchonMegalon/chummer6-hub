@@ -19,6 +19,9 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
     internal const string ManifestPath = "RELEASE_CHANNEL.json";
     internal const string ReleaseDecisionPath = "RELEASE_DECISION.json";
     internal const string PreviewDecisionContract = "chummer.preview-release-decision/v1";
+    internal const string PreviewDecisionContractV2 = "chummer.preview-release-decision/v2";
+    internal const string PublicPreviewByteHandoffContract =
+        "chummer.public-preview-byte-handoff/v1";
     internal const string StableDecisionContract = "chummer.final_gold_graph";
     internal const int StableDecisionContractVersion = 2;
 
@@ -59,11 +62,23 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
     private static readonly HashSet<string> PreviewDecisionFields =
     [
         "contractName", "generatedAt", "status", "releaseDecisionStatus", "verdict",
-        "releaseVersion", "channel", "platforms", "primaryHeadByPlatform",
+        "releaseVersion", "releaseScopeDecisionSha256", "channel", "platforms", "primaryHeadByPlatform",
         "fallbackHeadsByPlatform", "artifactAccessClass", "supportOwner", "nextActions",
         "registryCommit", "manifestSha256", "authoritySnapshotSha256",
         "candidateDecisionStatus", "candidateDecisionSha256", "manifestGeneratedAt",
         "scorecardSha256", "convergenceSha256", "blockingFindings"
+    ];
+    private static readonly HashSet<string> PreviewDecisionV2Fields =
+        new(PreviewDecisionFields, StringComparer.Ordinal)
+        {
+            "artifactHandoff"
+        };
+    private static readonly HashSet<string> PublicPreviewByteHandoffFields =
+    [
+        "contractName", "status", "sourcePublicationState",
+        "releaseScopeDecisionSha256", "releaseVersion", "channel",
+        "artifactId", "head", "platform", "rid", "arch", "sha256", "sizeBytes",
+        "artifactAccessClass", "signingRequirement", "downloadUrl", "publicInstallRoute"
     ];
     private static readonly HashSet<string> StableDecisionFields =
     [
@@ -416,7 +431,7 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
             throw Invalid("Registry SNAPSHOT.json downloadAccessPosture contradicts the promoted artifacts.");
         }
 
-        ValidateReleaseDecision(
+        ReleaseDecisionBinding releaseDecisionBinding = ValidateReleaseDecision(
             decision,
             releaseVersion,
             channel,
@@ -465,7 +480,12 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
             ManifestSha256: manifestSha256,
             RegistryCommit: registryCommit,
             ReleaseDecisionStatus: releaseDecisionStatus,
-            ReleaseDecisionSha256: releaseDecisionSha256);
+            ReleaseDecisionSha256: releaseDecisionSha256)
+        {
+            ReleaseScopeDecisionSha256 =
+                releaseDecisionBinding.ReleaseScopeDecisionSha256,
+            ArtifactHandoff = releaseDecisionBinding.ArtifactHandoff
+        };
     }
 
     private static JsonDocument ParseStrict(ReadOnlyMemory<byte> bytes, string label)
@@ -554,7 +574,7 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         }
     }
 
-    private static void ValidateReleaseDecision(
+    private static ReleaseDecisionBinding ValidateReleaseDecision(
         JsonElement decision,
         string releaseVersion,
         string channel,
@@ -579,11 +599,14 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
 
         if (decision.TryGetProperty("contractName", out JsonElement previewContract))
         {
-            ValidatePreviewDecision(
+            return ValidatePreviewDecision(
                 decision,
                 previewContract,
                 releaseVersion,
                 channel,
+                releaseStatus,
+                rolloutState,
+                supportabilityState,
                 availablePlatforms,
                 primaryHeads,
                 artifacts,
@@ -593,7 +616,6 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
                 registryCommit,
                 releaseDecisionStatus,
                 supportOwner);
-            return;
         }
 
         if (decision.TryGetProperty("contract_name", out JsonElement stableContract))
@@ -615,17 +637,22 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
                 manifestSha256,
                 registryCommit,
                 releaseDecisionStatus);
-            return;
+            return new(
+                PublicReleaseTruthProjectionDto.Missing,
+                ArtifactHandoff: null);
         }
 
         throw Invalid("Registry RELEASE_DECISION.json must use an accepted preview or stable decision contract.");
     }
 
-    private static void ValidatePreviewDecision(
+    private static ReleaseDecisionBinding ValidatePreviewDecision(
         JsonElement decision,
         JsonElement contract,
         string releaseVersion,
         string channel,
+        string releaseStatus,
+        string rolloutState,
+        string supportabilityState,
         IReadOnlyList<string> availablePlatforms,
         IReadOnlyDictionary<string, string> primaryHeads,
         IReadOnlyList<AuthorityArtifact> artifacts,
@@ -636,15 +663,25 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         string releaseDecisionStatus,
         string supportOwner)
     {
-        if (contract.ValueKind != JsonValueKind.String
-            || !string.Equals(contract.GetString(), PreviewDecisionContract, StringComparison.Ordinal)
+        string? previewContract = contract.ValueKind == JsonValueKind.String
+            ? contract.GetString()
+            : null;
+        bool publicByteHandoffContract =
+            string.Equals(previewContract, PreviewDecisionContractV2, StringComparison.Ordinal);
+        if (previewContract is not PreviewDecisionContract and not PreviewDecisionContractV2
             || decision.TryGetProperty("contract_name", out _)
             || decision.TryGetProperty("contract_version", out _)
             || decision.TryGetProperty("release_authority", out _))
         {
             throw Invalid("Registry RELEASE_DECISION.json preview contract discriminator is invalid or ambiguous.");
         }
-        RequireExactObject(decision, PreviewDecisionFields, "Registry RELEASE_DECISION.json preview decision");
+        RequireExactObject(
+            decision,
+            publicByteHandoffContract ? PreviewDecisionV2Fields : PreviewDecisionFields,
+            "Registry RELEASE_DECISION.json preview decision");
+        string releaseScopeDecisionSha256 = RequireDecisionSha256(
+            decision,
+            "releaseScopeDecisionSha256");
 
         string decisionStatus = RequireDecisionString(decision, "releaseDecisionStatus");
         if (decisionStatus is not ("review_required" or "preview_ready")
@@ -767,6 +804,128 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         {
             throw Invalid("Registry RELEASE_DECISION.json candidate closure must be either an empty review seed or a complete predecessor triple.");
         }
+
+        PublicPreviewByteHandoffDto? artifactHandoff = publicByteHandoffContract
+            ? ValidatePublicPreviewByteHandoff(
+                decision.GetProperty("artifactHandoff"),
+                releaseScopeDecisionSha256,
+                releaseVersion,
+                channel,
+                releaseStatus,
+                rolloutState,
+                supportabilityState,
+                decisionStatus,
+                artifacts,
+                artifactCount,
+                downloadAccessPosture)
+            : null;
+        return new(releaseScopeDecisionSha256, artifactHandoff);
+    }
+
+    private static PublicPreviewByteHandoffDto ValidatePublicPreviewByteHandoff(
+        JsonElement value,
+        string releaseScopeDecisionSha256,
+        string releaseVersion,
+        string channel,
+        string releaseStatus,
+        string rolloutState,
+        string supportabilityState,
+        string releaseDecisionStatus,
+        IReadOnlyList<AuthorityArtifact> artifacts,
+        int artifactCount,
+        string downloadAccessPosture)
+    {
+        const string label = "Registry RELEASE_DECISION.json artifactHandoff";
+        RequireExactObject(value, PublicPreviewByteHandoffFields, label);
+        if (releaseDecisionStatus != "review_required"
+            || channel != "preview"
+            || releaseStatus != "published"
+            || rolloutState != "public_release_review_required"
+            || supportabilityState != "review_required"
+            || artifactCount != 1
+            || artifacts.Count != 1
+            || downloadAccessPosture != "open_public")
+        {
+            throw Invalid(
+                "Registry RELEASE_DECISION.json v2 byte handoff requires one published " +
+                "open-public preview artifact under the exact canonical review posture.");
+        }
+
+        AuthorityArtifact artifact = artifacts[0];
+        string contractName = RequireString(value, "contractName", MaximumTokenLength, label);
+        string status = RequireCanonicalToken(value, "status", label);
+        string sourcePublicationState = RequireCanonicalToken(
+            value,
+            "sourcePublicationState",
+            label);
+        string scopeSha256 = RequireSha256(
+            value,
+            "releaseScopeDecisionSha256",
+            label);
+        string boundReleaseVersion = RequirePortableIdentifier(
+            value,
+            "releaseVersion",
+            label);
+        string boundChannel = RequireCanonicalToken(value, "channel", label);
+        string artifactId = RequireAuthorityToken(value, "artifactId", label);
+        string head = RequireAuthorityToken(value, "head", label);
+        string platform = RequireAuthorityToken(value, "platform", label);
+        string rid = RequireAuthorityToken(value, "rid", label);
+        string arch = RequireAuthorityToken(value, "arch", label);
+        string sha256 = RequireSha256(value, "sha256", label);
+        long sizeBytes = RequirePositiveLong(value, "sizeBytes", label);
+        string accessClass = RequireCanonicalToken(value, "artifactAccessClass", label);
+        string signingRequirement = RequireCanonicalToken(
+            value,
+            "signingRequirement",
+            label);
+        string downloadUrl = RequirePublicPreviewDownloadUrl(value, label);
+        string publicInstallRoute = RequirePublicPreviewInstallRoute(
+            value,
+            artifactId,
+            label);
+        if (contractName != PublicPreviewByteHandoffContract
+            || status != "approved_public_preview_bytes"
+            || sourcePublicationState != "preview"
+            || !FixedTimeDigestEquals(scopeSha256, releaseScopeDecisionSha256)
+            || boundReleaseVersion != releaseVersion
+            || boundChannel != channel
+            || artifactId != artifact.ArtifactId
+            || head != artifact.Head
+            || platform != artifact.Platform
+            || rid != artifact.Rid
+            || arch != artifact.Arch
+            || !FixedTimeDigestEquals(sha256, artifact.Sha256)
+            || sizeBytes != artifact.SizeBytes
+            || accessClass != artifact.InstallAccessClass
+            || accessClass != "open_public"
+            || signingRequirement != "preview_unsigned_allowed"
+            || downloadUrl != artifact.DownloadUrl
+            || publicInstallRoute != artifact.PublicInstallRoute)
+        {
+            throw Invalid(
+                "Registry RELEASE_DECISION.json artifactHandoff does not exactly bind " +
+                "the approved review-required public preview artifact.");
+        }
+
+        return new(
+            contractName,
+            status,
+            sourcePublicationState,
+            scopeSha256,
+            boundReleaseVersion,
+            boundChannel,
+            artifactId,
+            head,
+            platform,
+            rid,
+            arch,
+            sha256,
+            sizeBytes,
+            accessClass,
+            signingRequirement,
+            downloadUrl,
+            publicInstallRoute);
     }
 
     private static void ValidateStableDecision(
@@ -1759,6 +1918,83 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         return route;
     }
 
+    private static string RequirePublicPreviewDownloadUrl(JsonElement source, string label)
+    {
+        string route = RequireString(
+            source,
+            "downloadUrl",
+            MaximumUrlLength,
+            label);
+        string[] segments = route.Split('/', StringSplitOptions.None);
+        if (segments.Length != 6
+            || segments[0].Length != 0
+            || segments[1] != "downloads"
+            || segments[2] != "g"
+            || segments[4] != "files"
+            || route.Contains('?')
+            || route.Contains('#')
+            || route.Contains('\\')
+            || route.Any(static character =>
+                char.IsWhiteSpace(character) || char.IsControl(character))
+            || HasUnsafeDecodedRouteSegment(segments[3])
+            || HasUnsafeDecodedRouteSegment(segments[5]))
+        {
+            throw Invalid(
+                $"{label} downloadUrl must be a canonical root-relative " +
+                "/downloads/g/<generation>/files/<file> route.");
+        }
+
+        return route;
+    }
+
+    private static string RequirePublicPreviewInstallRoute(
+        JsonElement source,
+        string artifactId,
+        string label)
+    {
+        string route = RequireString(
+            source,
+            "publicInstallRoute",
+            MaximumUrlLength,
+            label);
+        if (!string.Equals(
+                route,
+                $"/downloads/install/{artifactId}",
+                StringComparison.Ordinal))
+        {
+            throw Invalid(
+                $"{label} publicInstallRoute must exactly bind its public artifact ID.");
+        }
+
+        return route;
+    }
+
+    private static bool HasUnsafeDecodedRouteSegment(string segment)
+    {
+        if (segment.Length == 0
+            || segment.Contains('/')
+            || segment.Contains('\\')
+            || segment.Any(static character =>
+                char.IsWhiteSpace(character) || char.IsControl(character)))
+        {
+            return true;
+        }
+
+        try
+        {
+            string decoded = Uri.UnescapeDataString(segment);
+            return decoded is "." or ".."
+                || decoded.Contains('/')
+                || decoded.Contains('\\')
+                || decoded.Any(static character =>
+                    char.IsWhiteSpace(character) || char.IsControl(character));
+        }
+        catch (UriFormatException)
+        {
+            return true;
+        }
+    }
+
     private static SortedDictionary<string, string> RequirePrimaryHeads(
         JsonElement primaryHeads,
         IReadOnlyList<string> availablePlatforms,
@@ -1939,4 +2175,8 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
         long SizeBytes,
         string PublicInstallRoute,
         string InstallAccessClass);
+
+    private sealed record ReleaseDecisionBinding(
+        string ReleaseScopeDecisionSha256,
+        PublicPreviewByteHandoffDto? ArtifactHandoff);
 }

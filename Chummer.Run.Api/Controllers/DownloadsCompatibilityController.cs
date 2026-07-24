@@ -1127,10 +1127,16 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         bool generationBound,
         CancellationToken cancellationToken)
     {
+        PublicReleaseTruthProjectionDto? releaseTruth =
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
+        bool reviewRequiredPublicByteHandoff =
+            releaseTruth?.ReviewRequiredPublicByteHandoffsAllowed == true;
         ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByPath(snapshot, path);
         if (resolution.Failure == ArtifactDeliveryFailure.NotFound)
         {
-            return DownloadAurPackageFile(snapshot, path);
+            return reviewRequiredPublicByteHandoff
+                ? NotFound()
+                : DownloadAurPackageFile(snapshot, path);
         }
 
         if (!resolution.Allowed)
@@ -1138,11 +1144,52 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return ArtifactDeliveryDenied(resolution);
         }
 
+        if (reviewRequiredPublicByteHandoff
+            && (releaseTruth?.ArtifactHandoff is not PublicPreviewByteHandoffDto artifactHandoff
+                || !MatchesReviewRequiredPublicByteHandoff(
+                    resolution.Binding!,
+                    artifactHandoff)))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "review_required_public_byte_handoff_binding_mismatch",
+                message = "The review-required release authority does not permit this artifact handoff."
+            });
+        }
+
         return await DownloadResolvedBindingFromSnapshot(
             resolution.Binding!,
             generationBoundRawPath: generationBound,
             isRawArtifactPath: true,
             cancellationToken);
+    }
+
+    private static bool MatchesReviewRequiredPublicByteHandoff(
+        ArtifactDeliveryBinding binding,
+        PublicPreviewByteHandoffDto artifactHandoff)
+    {
+        PublicReleaseArtifactDto artifact = binding.Artifact;
+        string platform = string.IsNullOrWhiteSpace(artifact.PlatformId)
+            ? artifact.Platform
+            : artifact.PlatformId;
+        return string.Equals(binding.Manifest.Version, artifactHandoff.ReleaseVersion, StringComparison.Ordinal)
+            && string.Equals(binding.Manifest.Channel, artifactHandoff.Channel, StringComparison.Ordinal)
+            && string.Equals(binding.ArtifactId, artifactHandoff.ArtifactId, StringComparison.Ordinal)
+            && string.Equals(artifact.Head, artifactHandoff.Head, StringComparison.Ordinal)
+            && string.Equals(platform, artifactHandoff.Platform, StringComparison.Ordinal)
+            && string.Equals(artifact.Rid, artifactHandoff.Rid, StringComparison.Ordinal)
+            && string.Equals(artifact.Arch, artifactHandoff.Arch, StringComparison.Ordinal)
+            && string.Equals(artifact.Sha256, artifactHandoff.Sha256, StringComparison.Ordinal)
+            && artifact.SizeBytes == artifactHandoff.SizeBytes
+            && string.Equals(artifact.Url, artifactHandoff.DownloadUrl, StringComparison.Ordinal)
+            && string.Equals(
+                binding.InstallAccessClass,
+                artifactHandoff.ArtifactAccessClass,
+                StringComparison.Ordinal)
+            && string.Equals(
+                binding.InstallAccessClass,
+                "open_public",
+                StringComparison.Ordinal);
     }
 
     private async Task<IActionResult> DownloadResolvedBindingFromSnapshot(

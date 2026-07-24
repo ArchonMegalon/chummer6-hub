@@ -410,6 +410,81 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     }
 
     [Fact]
+    public async Task ReviewRequiredPublicByteHandoffServesOnlyBoundRawArtifactRoles()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        fixture.SetReleaseTruth(BuildReviewRequiredPublicByteHandoff(manifest, artifact));
+
+        IActionResult installer = await fixture.Controller.DownloadFile(
+            GenerationFixture.PublicWindowsFileName,
+            CancellationToken.None);
+        Assert.Equal("artifact-windows-public", await ReadFileResultAsync(installer));
+
+        IActionResult payload = await fixture.Controller.DownloadGenerationFile(
+            GenerationFixture.PublicWindowsGenerationId,
+            GenerationFixture.PayloadFileName,
+            CancellationToken.None);
+        Assert.Equal("payload-windows-public", await ReadFileResultAsync(payload));
+
+        IActionResult metadata = await fixture.Controller.DownloadGenerationFile(
+            GenerationFixture.PublicWindowsGenerationId,
+            GenerationFixture.PayloadFileName + ".json",
+            CancellationToken.None);
+        Assert.IsType<FileStreamResult>(metadata).FileStream.Dispose();
+
+        IActionResult unrelated = await fixture.Controller.DownloadFile(
+            GenerationFixture.AurPkgbuildFileName,
+            CancellationToken.None);
+        Assert.IsType<NotFoundResult>(unrelated);
+    }
+
+    [Fact]
+    public async Task ReviewRequiredPublicByteHandoffFailsClosedOnShelfBindingDrift()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto projection =
+            BuildReviewRequiredPublicByteHandoff(manifest, artifact);
+        fixture.SetReleaseTruth(projection with
+        {
+            ArtifactHandoff = projection.ArtifactHandoff! with
+            {
+                Sha256 = new string('f', 64)
+            }
+        });
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            GenerationFixture.PublicWindowsFileName,
+            CancellationToken.None);
+
+        ObjectResult blocked = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, blocked.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReviewRequiredPublicByteHandoffStillHonorsGlobalRevocation()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        fixture.SetReleaseTruth(BuildReviewRequiredPublicByteHandoff(manifest, artifact));
+        fixture.RevokeArtifact(GenerationFixture.ArtifactId);
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            GenerationFixture.PublicWindowsFileName,
+            CancellationToken.None);
+
+        ObjectResult blocked = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status410Gone, blocked.StatusCode);
+    }
+
+    [Fact]
     public async Task CompletionClaimsStayBoundToPromotedGenerationWhenCurrentShelfAdvances()
     {
         using GenerationFixture fixture = new();
@@ -461,6 +536,54 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         Assert.Equal("artifact-a", await ReadFileResultAsync(retainedA));
     }
 
+    private static PublicReleaseTruthProjectionDto BuildReviewRequiredPublicByteHandoff(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto artifact)
+    {
+        const string scopeSha256 =
+            "d24e00334e53c8ca159d5dac93275374b6ac8d7798d13ec9548abcf53a6bc8cb";
+        return new(
+            ContractName: PublicReleaseTruthProjectionDto.Schema,
+            ReleaseVersion: manifest.Version,
+            Channel: "preview",
+            ReleaseStatus: "published",
+            RolloutState: "public_release_review_required",
+            SupportabilityState: "review_required",
+            AvailablePlatforms: ["windows"],
+            PrimaryHeadByPlatform: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["windows"] = "avalonia"
+            },
+            ArtifactCount: 1,
+            DownloadAccessPosture: "open_public",
+            KnownIssueSummary: "Preview remains review-required.",
+            ManifestSha256: new string('a', 64),
+            RegistryCommit: new string('b', 40),
+            ReleaseDecisionStatus: "review_required",
+            ReleaseDecisionSha256: new string('c', 64))
+        {
+            ReleaseScopeDecisionSha256 = scopeSha256,
+            ArtifactHandoff = new PublicPreviewByteHandoffDto(
+                ContractName: "chummer.public-preview-byte-handoff/v1",
+                Status: "approved_public_preview_bytes",
+                SourcePublicationState: "preview",
+                ReleaseScopeDecisionSha256: scopeSha256,
+                ReleaseVersion: manifest.Version,
+                Channel: "preview",
+                ArtifactId: artifact.Id,
+                Head: artifact.Head!,
+                Platform: artifact.PlatformId!,
+                Rid: artifact.Rid!,
+                Arch: artifact.Arch!,
+                Sha256: artifact.Sha256,
+                SizeBytes: artifact.SizeBytes!.Value,
+                ArtifactAccessClass: artifact.InstallAccessClass!,
+                SigningRequirement: "preview_unsigned_allowed",
+                DownloadUrl: artifact.Url,
+                PublicInstallRoute: $"/downloads/install/{artifact.Id}")
+        };
+    }
+
     private static async Task<string> ReadFileResultAsync(IActionResult result)
     {
         FileStreamResult file = Assert.IsType<FileStreamResult>(result);
@@ -476,6 +599,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         public const string PayloadFileName = "chummer-shared-payload.zip";
         public const string ProtectedGenerationId = "generation-protected-b";
         public const string StableOpenGenerationId = "generation-stable-open";
+        public const string PublicWindowsGenerationId = "generation-windows-public";
+        public const string PublicWindowsFileName = "chummer-windows-public-installer.exe";
         public const string WindowsProofArtifactId = "avalonia-win-x64-installer";
         public const string WindowsProofFileName = "chummer-avalonia-win-x64-installer.exe";
         public const string AurPkgbuildFileName = "chummer6-bin.PKGBUILD";
@@ -509,6 +634,18 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 "payload-stable-open",
                 "open_public",
                 stableSidecarWithSemanticManifest: true);
+            WriteGeneration(
+                PublicWindowsGenerationId,
+                "run-windows-public",
+                "artifact-windows-public",
+                "payload-windows-public",
+                "open_public",
+                platform: "windows",
+                rid: "win-x64",
+                arch: "x64",
+                kind: "installer",
+                artifactFileName: PublicWindowsFileName,
+                useRawDownloadUrl: true);
             Activate("generation-a");
 
             Configuration = new ConfigurationBuilder()
@@ -600,6 +737,10 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             Controller.ControllerContext = new ControllerContext { HttpContext = context };
             _httpContextAccessor.HttpContext = context;
         }
+
+        public void SetReleaseTruth(PublicReleaseTruthProjectionDto projection)
+            => Controller.HttpContext.Items[
+                PublicReleaseTruthProjectionMiddleware.HttpContextItemKey] = projection;
 
         public void RevokeArtifact(string artifactId)
             => Configuration["CHUMMER_RELEASE_REVOKED_ARTIFACT_IDS"] = artifactId;
@@ -705,13 +846,19 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string artifactText,
             string payloadText,
             string installAccessClass,
-            bool stableSidecarWithSemanticManifest = false)
+            bool stableSidecarWithSemanticManifest = false,
+            string platform = "macos",
+            string rid = "osx-arm64",
+            string arch = "arm64",
+            string kind = "dmg",
+            string artifactFileName = FileName,
+            bool useRawDownloadUrl = false)
         {
             string generationRoot = Path.Combine(_downloadsRoot, "generations", generationId);
             string filesRoot = Path.Combine(generationRoot, "files");
             Directory.CreateDirectory(filesRoot);
             byte[] artifactBytes = Encoding.UTF8.GetBytes(artifactText);
-            string artifactPath = Path.Combine(filesRoot, FileName);
+            string artifactPath = Path.Combine(filesRoot, artifactFileName);
             File.WriteAllBytes(artifactPath, artifactBytes);
             string artifactSha256 = Convert.ToHexStringLower(SHA256.HashData(artifactBytes));
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payloadText);
@@ -724,6 +871,9 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string sidecarPayloadUrl = stableSidecarWithSemanticManifest
                 ? $"https://chummer.run/downloads/files/{PayloadFileName}"
                 : payloadUrl;
+            string artifactDownloadUrl = useRawDownloadUrl
+                ? $"/downloads/g/{generationId}/files/{artifactFileName}"
+                : $"/downloads/g/{generationId}/install/{ArtifactId}";
             var payloadSidecar = new Dictionary<string, object?>
             {
                 ["contractName"] = "chummer6-ui.windows_bootstrap_payload",
@@ -731,7 +881,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 ["downloadUrl"] = sidecarPayloadUrl,
                 ["sha256"] = payloadSha256,
                 ["sizeBytes"] = payloadBytes.Length,
-                ["installerFileName"] = FileName,
+                ["installerFileName"] = artifactFileName,
                 ["releaseVersion"] = version
             };
             if (stableSidecarWithSemanticManifest)
@@ -747,7 +897,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 generationRoot,
                 generationId,
                 artifactSha256,
-                artifactBytes.LongLength);
+                artifactBytes.LongLength,
+                artifactFileName);
 
             var canonical = new Dictionary<string, object?>
             {
@@ -763,13 +914,13 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                     {
                         ["artifactId"] = ArtifactId,
                         ["head"] = "avalonia",
-                        ["platform"] = "macos",
-                        ["rid"] = "osx-arm64",
-                        ["arch"] = "arm64",
-                        ["kind"] = "dmg",
+                        ["platform"] = platform,
+                        ["rid"] = rid,
+                        ["arch"] = arch,
+                        ["kind"] = kind,
                         ["platformLabel"] = "Shared account-required installer",
-                        ["fileName"] = FileName,
-                        ["downloadUrl"] = $"/downloads/g/{generationId}/install/{ArtifactId}",
+                        ["fileName"] = artifactFileName,
+                        ["downloadUrl"] = artifactDownloadUrl,
                         ["payloadFileName"] = PayloadFileName,
                         ["payloadDownloadUrl"] = payloadUrl,
                         ["payloadSha256"] = payloadSha256,
@@ -792,8 +943,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                     new Dictionary<string, object?>
                     {
                         ["id"] = ArtifactId,
-                        ["platform"] = "macos",
-                        ["url"] = $"/downloads/g/{generationId}/install/{ArtifactId}",
+                        ["platform"] = platform,
+                        ["url"] = artifactDownloadUrl,
                         ["payloadFileName"] = PayloadFileName,
                         ["payloadDownloadUrl"] = payloadUrl,
                         ["payloadSha256"] = payloadSha256,
@@ -801,11 +952,11 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["sha256"] = artifactSha256,
                         ["sizeBytes"] = artifactBytes.Length,
                         ["head"] = "avalonia",
-                        ["platformId"] = "macos",
-                        ["rid"] = "osx-arm64",
-                        ["arch"] = "arm64",
-                        ["kind"] = "dmg",
-                        ["fileName"] = FileName,
+                        ["platformId"] = platform,
+                        ["rid"] = rid,
+                        ["arch"] = arch,
+                        ["kind"] = kind,
+                        ["fileName"] = artifactFileName,
                         ["installAccessClass"] = installAccessClass
                     }
                 }
@@ -874,7 +1025,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string generationRoot,
             string generationId,
             string upstreamSha256,
-            long upstreamSizeBytes)
+            long upstreamSizeBytes,
+            string upstreamFileName)
         {
             string filesRoot = Path.Combine(generationRoot, "files");
             string sourceArchivePath = Path.Combine(filesRoot, "chummer6-bin-aur-source.tar.gz");
@@ -911,8 +1063,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                             srcinfoUrl = prefix + Path.GetFileName(srcinfoPath),
                             srcinfoSha256 = Sha256(srcinfoPath),
                             upstreamArtifactId = ArtifactId,
-                            upstreamArtifactFileName = FileName,
-                            upstreamArtifactUrl = prefix + FileName,
+                            upstreamArtifactFileName = upstreamFileName,
+                            upstreamArtifactUrl = prefix + upstreamFileName,
                             upstreamArtifactSha256 = upstreamSha256,
                             upstreamArtifactSizeBytes = upstreamSizeBytes
                         }
