@@ -12,6 +12,59 @@ namespace Chummer.Tests;
 public sealed class PublicReleaseManifestServiceTests
 {
     [Fact]
+    public void InvalidProjectionStillDowngradesOptimisticLayoutV1KnownIssue()
+    {
+        var snapshot = ReleaseShelfSnapshot.Active(
+            downloadsRoot: "/tmp/layout-v1-optimistic-control",
+            physicalRoot: "/tmp/layout-v1-optimistic-control/generations/g-control",
+            generationId: "g-control",
+            releaseVersion: "run-control",
+            channel: "preview",
+            publishedAt: DateTimeOffset.Parse("2026-07-24T12:00:00Z"),
+            activatedAt: DateTimeOffset.Parse("2026-07-24T12:01:00Z"),
+            activationReceiptId: "activation-control",
+            canonicalManifestSha256: new string('a', 64),
+            compatibilityManifestSha256: new string('b', 64),
+            inventoryDigest: new string('c', 64),
+            pointerDigest: new string('d', 64),
+            inventory: new Dictionary<string, ReleaseShelfInventoryEntry>(
+                StringComparer.Ordinal),
+            explicitGeneration: false);
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-control",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-07-24T12:00:00Z"),
+            Downloads: [],
+            Status: "published",
+            RolloutState: "promoted_preview",
+            SupportabilityState: "preview_supported",
+            KnownIssueSummary: "Known caution.");
+        var invalidProjection = new PublicProjectionOutputSnapshot(
+            IsConfigured: true,
+            IsValid: false,
+            FailureReason: "candidate projection leaf is not a CURRENT root",
+            SnapshotId: null,
+            SnapshotSha256: null,
+            Path: null,
+            Sha256: null,
+            Payload: null);
+
+        PublicReleaseManifestDto guarded =
+            PublicReleaseManifestService.ApplyPublicProjectionSnapshotGuard(
+                manifest,
+                snapshot,
+                invalidProjection);
+
+        Assert.Equal("review_required", guarded.ProofStatus);
+        Assert.Equal("public_release_review_required", guarded.RolloutState);
+        Assert.Equal("review_required", guarded.SupportabilityState);
+        Assert.Contains(
+            "Current public projection authentication is incomplete",
+            guarded.KnownIssueSummary,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ConfiguredInvalidCurrentProjectionPreservesReleaseFreeze()
     {
         using var fixture = new PublicReleaseManifestFixture();
