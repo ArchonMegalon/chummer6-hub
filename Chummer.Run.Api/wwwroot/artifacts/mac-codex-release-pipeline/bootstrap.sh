@@ -6342,7 +6342,6 @@ PY
   [[ -z "${CHUMMER_RELEASE_SUPPORT_OWNER:-}" \
       || "${CHUMMER_RELEASE_SUPPORT_OWNER}" == "$approved_release_support_owner" ]] \
     || die "CHUMMER_RELEASE_SUPPORT_OWNER disagrees with the approved release scope"
-  local release_authority_support_owner="$approved_release_support_owner"
   local release_authority_registry_commit
   local release_authority_envelope_dir="$release_evidence_dir/.authority-envelope-$release_generation_id"
   release_authority_registry_commit="$(git -C "$registry_repo" rev-parse HEAD)"
@@ -6363,10 +6362,11 @@ PY
   log "materializing review-required Registry authority for the exact generation-projected nightly"
   command "$RELEASE_PYTHON_BIN" "$release_authority_materializer" \
     --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --release-scope-decision "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --expected-release-scope-decision-sha256 "$release_scope_expected_sha256" \
     --output-dir "$release_authority_envelope_dir" \
     --registry-commit "$release_authority_registry_commit" \
     --decision-status review_required \
-    --support-owner "$release_authority_support_owner" \
     --generated-at "$published_at" \
     --next-action "Run exact immutable-generation and CURRENT convergence after activation, then close preview readiness from those receipts." \
     --blocking-finding "Postdeploy convergence proof is pending for this newly built nightly generation." \
@@ -6374,6 +6374,8 @@ PY
     > "$release_evidence_dir/AUTHORITY_MATERIALIZATION.generated.json"
   command "$RELEASE_PYTHON_BIN" "$release_authority_verifier" \
     --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --release-scope-decision "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    --expected-release-scope-decision-sha256 "$release_scope_expected_sha256" \
     --current "$release_authority_envelope_dir/CURRENT.json" \
     --snapshot "$release_authority_envelope_dir/SNAPSHOT.json" \
     --decision "$release_authority_envelope_dir/RELEASE_DECISION.json" \

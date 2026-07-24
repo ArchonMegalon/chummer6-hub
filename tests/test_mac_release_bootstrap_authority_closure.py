@@ -44,6 +44,32 @@ def test_downloaded_bootstrap_stages_and_privately_probes_before_stopping() -> N
     assert 'verifying all CURRENT release-facing routes' not in main
 
 
+def test_registry_authority_tools_bind_the_exact_approved_release_scope() -> None:
+    source = load_bootstrap()
+    materialize_start = source.index(
+        'command "$RELEASE_PYTHON_BIN" "$release_authority_materializer"'
+    )
+    verify_start = source.index(
+        'command "$RELEASE_PYTHON_BIN" "$release_authority_verifier"',
+        materialize_start,
+    )
+    copy_start = source.index(
+        "  for release_authority_file in CURRENT.json SNAPSHOT.json RELEASE_DECISION.json;",
+        verify_start,
+    )
+    materialize = source[materialize_start:verify_start]
+    verify = source[verify_start:copy_start]
+    required = (
+        '--release-scope-decision "$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json"',
+        '--expected-release-scope-decision-sha256 "$release_scope_expected_sha256"',
+    )
+
+    for invocation in (materialize, verify):
+        for argument in required:
+            assert argument in invocation
+        assert "--support-owner" not in invocation
+
+
 def test_http_upload_seals_stage_endpoint_and_never_calls_legacy_complete() -> None:
     source = load_bootstrap()
     start = source.index("upload_release_bundle_http() {")
