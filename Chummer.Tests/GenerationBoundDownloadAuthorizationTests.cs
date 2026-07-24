@@ -352,6 +352,33 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     }
 
     [Fact]
+    public void ForcedAccountPolicyCannotUseOpenPublicStableSidecarException()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.StableOpenGenerationId);
+        ReleaseShelfSnapshot snapshot = fixture.ManifestService.CaptureShelfSnapshot();
+
+        ArtifactDeliveryResolution openPublic = fixture.DeliveryPolicy.ResolveByArtifactId(
+            snapshot,
+            GenerationFixture.ArtifactId,
+            ArtifactDeliveryRoles.PayloadMetadata);
+        Assert.True(openPublic.Allowed);
+
+        fixture.SetConfiguration(
+            "CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS",
+            "true");
+        ArtifactDeliveryResolution forcedAccount =
+            fixture.DeliveryPolicy.ResolveByArtifactId(
+                snapshot,
+                GenerationFixture.ArtifactId,
+                ArtifactDeliveryRoles.PayloadMetadata);
+
+        Assert.False(forcedAccount.Allowed);
+        Assert.Equal(ArtifactDeliveryFailure.InvalidContract, forcedAccount.Failure);
+        Assert.Equal("artifact_delivery_contract_invalid", forcedAccount.Code);
+    }
+
+    [Fact]
     public async Task ChannelWideCurrentRevocationBlocksArtifactOnlyPresentInRetainedGeneration()
     {
         using GenerationFixture fixture = new();
@@ -448,6 +475,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         public const string FileName = "chummer-shared-installer.dmg";
         public const string PayloadFileName = "chummer-shared-payload.zip";
         public const string ProtectedGenerationId = "generation-protected-b";
+        public const string StableOpenGenerationId = "generation-stable-open";
         public const string WindowsProofArtifactId = "avalonia-win-x64-installer";
         public const string WindowsProofFileName = "chummer-avalonia-win-x64-installer.exe";
         public const string AurPkgbuildFileName = "chummer6-bin.PKGBUILD";
@@ -474,6 +502,13 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 "artifact-protected-b",
                 "payload-protected-b",
                 "account_required");
+            WriteGeneration(
+                StableOpenGenerationId,
+                "run-stable-open",
+                "artifact-stable-open",
+                "payload-stable-open",
+                "open_public",
+                stableSidecarWithSemanticManifest: true);
             Activate("generation-a");
 
             Configuration = new ConfigurationBuilder()
@@ -669,7 +704,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string version,
             string artifactText,
             string payloadText,
-            string installAccessClass)
+            string installAccessClass,
+            bool stableSidecarWithSemanticManifest = false)
         {
             string generationRoot = Path.Combine(_downloadsRoot, "generations", generationId);
             string filesRoot = Path.Combine(generationRoot, "files");
@@ -682,14 +718,19 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string payloadPath = Path.Combine(filesRoot, PayloadFileName);
             File.WriteAllBytes(payloadPath, payloadBytes);
             string payloadSha256 = Convert.ToHexStringLower(SHA256.HashData(payloadBytes));
-            string payloadUrl = $"/downloads/g/{generationId}/files/{PayloadFileName}";
+            string payloadUrl = stableSidecarWithSemanticManifest
+                ? $"/downloads/g/{generationId}/install/{ArtifactId}/payload"
+                : $"/downloads/g/{generationId}/files/{PayloadFileName}";
+            string sidecarPayloadUrl = stableSidecarWithSemanticManifest
+                ? $"https://chummer.run/downloads/files/{PayloadFileName}"
+                : payloadUrl;
             File.WriteAllText(
                 Path.Combine(filesRoot, PayloadFileName + ".json"),
                 JsonSerializer.Serialize(new Dictionary<string, object?>
                 {
                     ["contractName"] = "chummer6-ui.windows_bootstrap_payload",
                     ["fileName"] = PayloadFileName,
-                    ["downloadUrl"] = payloadUrl,
+                    ["downloadUrl"] = sidecarPayloadUrl,
                     ["sha256"] = payloadSha256,
                     ["sizeBytes"] = payloadBytes.Length,
                     ["installerFileName"] = FileName,
