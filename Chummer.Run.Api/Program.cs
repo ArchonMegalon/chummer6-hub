@@ -23,6 +23,8 @@ builder.AddHubRequestObservability();
 var publicOriginPolicy = PublicCanonicalOriginPolicy.Create(builder.Configuration, builder.Environment);
 var releaseUploadQuotaOptions = ReleaseUploadQuotaOptions.FromConfiguration(builder.Configuration);
 var windowsProofUploadOptions = WindowsProofUploadOptions.FromConfiguration(builder.Configuration);
+var publicDownloadOnlyRuntime = builder.Environment.IsProduction()
+    && builder.Configuration.GetValue<bool>("CHUMMER_PUBLIC_DOWNLOAD_ONLY");
 // Keep ASP.NET Core's host filter and the application policy on the same normalized,
 // explicit allowlist. Program startup has already rejected wildcard/invalid values.
 builder.Configuration["AllowedHosts"] = publicOriginPolicy.AllowedHostsConfiguration;
@@ -391,9 +393,9 @@ app.MapMethods("/api/ready", new[] { HttpMethods.Get, HttpMethods.Head }, (
         deploymentIdentity);
     return Results.Json(
         combinedReport,
-        statusCode: combinedReport.Ready
-            ? StatusCodes.Status200OK
-            : StatusCodes.Status503ServiceUnavailable);
+        statusCode: PublicDownloadsReadinessEndpoint.ResolveGlobalStatusCode(
+            combinedReport.Ready,
+            publicDownloadOnlyRuntime));
 });
 app.MapMethods("/api/ready/public-downloads", new[] { HttpMethods.Get, HttpMethods.Head }, (
     HubDeepReadinessService readiness,

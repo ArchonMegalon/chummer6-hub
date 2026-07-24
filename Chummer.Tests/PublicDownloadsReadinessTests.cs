@@ -7,6 +7,23 @@ namespace Chummer.Tests;
 
 public sealed class PublicDownloadsReadinessTests
 {
+    [Theory]
+    [InlineData(true, false, StatusCodes.Status200OK)]
+    [InlineData(false, false, StatusCodes.Status503ServiceUnavailable)]
+    [InlineData(true, true, StatusCodes.Status503ServiceUnavailable)]
+    [InlineData(false, true, StatusCodes.Status503ServiceUnavailable)]
+    public void Global_readiness_never_claims_ready_in_public_download_only_runtime(
+        bool ready,
+        bool publicDownloadOnlyRuntime,
+        int expectedStatusCode)
+    {
+        Assert.Equal(
+            expectedStatusCode,
+            PublicDownloadsReadinessEndpoint.ResolveGlobalStatusCode(
+                ready,
+                publicDownloadOnlyRuntime));
+    }
+
     [Fact]
     public void Serving_ready_returns_200_without_claiming_overall_or_publication_readiness()
     {
