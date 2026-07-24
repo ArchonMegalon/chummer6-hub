@@ -204,6 +204,14 @@ FRESH_WINDOWS_PATHS = (
     "files/chummer-avalonia-win-x64-payload.zip",
     "files/chummer-avalonia-win-x64-payload.zip.json",
 )
+REAL_V6_INSTALLER_SHA256 = (
+    "8b2f2c4a37f72f202ff7af1b3eed5af0cc32138496f25ad9ae5512a2048d0f4a"
+)
+REAL_V6_INSTALLER_SIZE_BYTES = 2_734_880
+REAL_V6_PAYLOAD_SHA256 = (
+    "22464a462bf72e0b24efd686ddb2a66114bccde0f98b82273e15f7335a35582e"
+)
+REAL_V6_PAYLOAD_SIZE_BYTES = 51_231_862
 
 
 def write_review_bound_candidate(
@@ -219,13 +227,15 @@ def write_review_bound_candidate(
 
     generation_id = "g-20260724T152516Z-6907464d-c779a59"
     release_version = "run-20260723-230227"
-    scope_sha256 = "d24e0033" + "0" * 56
-    registry_commit = "c779a59" + "0" * 33
+    scope_sha256 = (
+        "d24e0033b9e6aadb82c754202be8fd514303ed0a7bdb83a1ee7c22d6978718ee"
+    )
+    registry_commit = "c779a59afca81858e62d727499e2daeab89b4f0d"
     installer = b"fixture installer bytes\n"
     payload = b"fixture payload bytes\n"
     sidecar = b'{"fixture":"payload-sidecar"}\n'
-    installer_sha256 = hashlib.sha256(installer).hexdigest()
-    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    installer_sha256 = REAL_V6_INSTALLER_SHA256
+    payload_sha256 = REAL_V6_PAYLOAD_SHA256
     installer_name = "chummer-avalonia-win-x64-installer.exe"
     payload_name = "chummer-avalonia-win-x64-payload.zip"
     artifact_id = "avalonia-win-x64-installer"
@@ -240,7 +250,7 @@ def write_review_bound_candidate(
         "fileName": installer_name,
         "downloadUrl": download_url,
         "sha256": installer_sha256,
-        "sizeBytes": len(installer),
+        "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
         "head": "avalonia",
         "platform": "windows",
         "rid": "win-x64",
@@ -250,7 +260,7 @@ def write_review_bound_candidate(
         "installAccessClass": "open_public",
         "payloadFileName": payload_name,
         "payloadSha256": payload_sha256,
-        "payloadSizeBytes": len(payload),
+        "payloadSizeBytes": REAL_V6_PAYLOAD_SIZE_BYTES,
     }
     canonical = {
         "version": release_version,
@@ -316,7 +326,7 @@ def write_review_bound_candidate(
         "rid": "win-x64",
         "arch": "x64",
         "sha256": installer_sha256,
-        "sizeBytes": len(installer),
+        "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
         "artifactAccessClass": "open_public",
         "signingRequirement": "preview_unsigned_allowed",
         "downloadUrl": download_url,
@@ -375,7 +385,7 @@ def write_review_bound_candidate(
                 "kind": "installer",
                 "downloadUrl": download_url,
                 "sha256": installer_sha256,
-                "sizeBytes": len(installer),
+                "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
                 "compatibilityState": "compatible",
                 "promotionState": "promoted",
                 "publicationScope": "signed-in-and-public",
@@ -432,7 +442,7 @@ def write_review_bound_candidate(
         "fileName": installer_name,
         "artifactRelativePath": f"files/{installer_name}",
         "bootstrapPayloadSha256": payload_sha256,
-        "bootstrapPayloadSizeBytes": len(payload),
+        "bootstrapPayloadSizeBytes": REAL_V6_PAYLOAD_SIZE_BYTES,
         "bootstrapPayloadFileName": payload_name,
     }
     evidence_payloads[
@@ -547,6 +557,26 @@ def rewrite_review_authority(
     current_path.chmod(0o400)
 
 
+def rewrite_startup_smoke(
+    candidate_root: Path,
+    *,
+    mutate: Any,
+) -> None:
+    smoke_path = (
+        candidate_root
+        / controller.SCOPE_BOUND_STARTUP_SMOKE_PATH
+    )
+    receipt = json.loads(smoke_path.read_bytes())
+    mutate(receipt)
+    raw = (
+        json.dumps(receipt, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    smoke_path.chmod(0o600)
+    smoke_path.write_bytes(raw)
+    smoke_path.chmod(0o400)
+
+
 def test_scope_bound_full_candidate_accepts_only_authenticated_adjuncts(
     tmp_path: Path,
 ) -> None:
@@ -585,6 +615,124 @@ def test_scope_bound_full_candidate_accepts_only_authenticated_adjuncts(
         "downloadUrl"
     ].startswith(f"/downloads/g/{authority['generationId']}/")
     assert smoke["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("drift", "expected_error"),
+    (
+        ("artifact_count_bool", "snapshot contradicts"),
+        ("snapshot_size_decimal", "artifact binding drifted"),
+        ("handoff_size_decimal", "artifact handoff drifted"),
+    ),
+)
+def test_scope_bound_review_authority_rejects_real_v6_numeric_type_drift(
+    tmp_path: Path,
+    drift: str,
+    expected_error: str,
+) -> None:
+    root, inventory, candidate, canonical_raw, authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    if drift == "artifact_count_bool":
+        rewrite_review_authority(
+            root,
+            mutate_snapshot=lambda value: value.__setitem__(
+                "artifactCount",
+                True,
+            ),
+        )
+    elif drift == "snapshot_size_decimal":
+        rewrite_review_authority(
+            root,
+            mutate_snapshot=lambda value: value["artifacts"][0].__setitem__(
+                "sizeBytes",
+                float(REAL_V6_INSTALLER_SIZE_BYTES),
+            ),
+        )
+    else:
+        rewrite_review_authority(
+            root,
+            mutate_decision=lambda value: value[
+                "artifactHandoff"
+            ].__setitem__(
+                "sizeBytes",
+                float(REAL_V6_INSTALLER_SIZE_BYTES),
+            ),
+        )
+
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+    with pytest.raises(controller.CutoverError, match=expected_error):
+        controller._validate_scope_bound_review_authority(
+            canonical_raw=canonical_raw,
+            canonical=json.loads(canonical_raw),
+            evidence_bytes=captured,
+            generation_id=authority["generationId"],
+            release_scope_decision_sha256=authority[
+                "releaseScopeDecisionSha256"
+            ],
+            candidate_version=candidate["version"],
+        )
+
+
+def test_scope_bound_startup_smoke_rejects_real_v6_decimal_payload_size(
+    tmp_path: Path,
+) -> None:
+    root, inventory, candidate, canonical_raw, _authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    rewrite_startup_smoke(
+        root,
+        mutate=lambda value: value.__setitem__(
+            "bootstrapPayloadSizeBytes",
+            float(REAL_V6_PAYLOAD_SIZE_BYTES),
+        ),
+    )
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+
+    with pytest.raises(controller.CutoverError, match="startup-smoke"):
+        controller._validate_scope_bound_startup_smoke(
+            captured[controller.SCOPE_BOUND_STARTUP_SMOKE_PATH],
+            artifact=json.loads(canonical_raw)["artifacts"][0],
+            release_version=candidate["version"],
+        )
+
+
+@pytest.mark.parametrize("field", ("fileCount", "totalBytes"))
+def test_scope_bound_candidate_summary_requires_exact_integer_type(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    root, inventory, candidate, _canonical_raw, _authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    candidate[field] = Decimal(candidate[field])
+
+    with pytest.raises(controller.CutoverError, match="summary drifted"):
+        capture_review_candidate(root, inventory, candidate)
+
+
+def test_type_aware_json_equality_preserves_decimal_without_integer_coercion(
+) -> None:
+    assert controller._json_semantically_equal(
+        {"finite": [Decimal("1.5")]},
+        {"finite": [Decimal("1.5")]},
+    )
+    assert not controller._json_semantically_equal(
+        {"sizeBytes": Decimal(REAL_V6_INSTALLER_SIZE_BYTES)},
+        {"sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES},
+    )
+    assert not controller._json_semantically_equal(
+        {"artifactCount": True},
+        {"artifactCount": 1},
+    )
 
 
 @pytest.mark.parametrize("mutation", ("missing", "extra"))

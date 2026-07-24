@@ -170,6 +170,7 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "artifactId": "avalonia-win-x64-installer",
         "channel": "preview",
         "channelId": "preview",
+        "compatibilityState": "compatible",
         "downloadUrl": f"/downloads/g/{GENERATION_ID}/files/{installer_name}",
         "fileName": installer_name,
         "head": "avalonia",
@@ -266,12 +267,20 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "channelId": "preview",
         "desktopSurfaceRefs": [dict(semantic_row)],
         "desktopTupleCoverage": coverage,
+        "generatedAt": "2026-07-24T12:40:00Z",
         "generationId": GENERATION_ID,
         "installAwareArtifactRegistry": install_aware,
+        "knownIssueSummary": (
+            "Fixture review-required release remains bounded."
+        ),
         "platformScope": "windows_only",
+        "publishedAt": "2026-07-24T12:40:00Z",
         "registryCommit": REGISTRY_COMMIT,
         "registry_commit": REGISTRY_COMMIT,
         "releaseVersion": VERSION,
+        "rolloutState": "public_release_review_required",
+        "status": "published",
+        "supportabilityState": "review_required",
         "version": VERSION,
     }
     compatibility_row = {
@@ -399,6 +408,148 @@ def invoke(
     )
 
 
+def add_cutover_review_evidence(item: dict[str, Any]) -> None:
+    canonical_raw = item["canonical"].read_bytes()
+    canonical = json.loads(canonical_raw)
+    artifact = canonical["artifacts"][0]
+    artifact_id = artifact["artifactId"]
+    install_route = f"/downloads/install/{artifact_id}"
+    support_owner = "chummer-release-operations"
+    next_actions = ["Keep the fixture under review."]
+    handoff = {
+        "contractName": "chummer.public-preview-byte-handoff/v1",
+        "status": "approved_public_preview_bytes",
+        "sourcePublicationState": "preview",
+        "releaseScopeDecisionSha256": item["decisionSha"],
+        "releaseVersion": VERSION,
+        "channel": "preview",
+        "artifactId": artifact_id,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "sha256": artifact["sha256"],
+        "sizeBytes": artifact["sizeBytes"],
+        "artifactAccessClass": "open_public",
+        "signingRequirement": "preview_unsigned_allowed",
+        "downloadUrl": artifact["downloadUrl"],
+        "publicInstallRoute": install_route,
+    }
+    decision = {
+        "contractName": "chummer.preview-release-decision/v2",
+        "generatedAt": "2026-07-24T15:25:16Z",
+        "status": "review_required",
+        "releaseDecisionStatus": "review_required",
+        "verdict": "PREVIEW_RELEASE_REVIEW_REQUIRED",
+        "releaseVersion": VERSION,
+        "releaseScopeDecisionSha256": item["decisionSha"],
+        "channel": "preview",
+        "platforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "fallbackHeadsByPlatform": {"windows": []},
+        "artifactAccessClass": "open_public",
+        "supportOwner": support_owner,
+        "nextActions": next_actions,
+        "registryCommit": REGISTRY_COMMIT,
+        "manifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "authoritySnapshotSha256": "",
+        "candidateDecisionStatus": "",
+        "candidateDecisionSha256": "",
+        "manifestGeneratedAt": canonical["publishedAt"],
+        "scorecardSha256": "",
+        "convergenceSha256": "",
+        "blockingFindings": [
+            {
+                "id": "preview_1",
+                "severity": "release_truth",
+                "summary": "Fixture remains review-required.",
+            }
+        ],
+        "artifactHandoff": handoff,
+    }
+    decision_raw = canonical_bytes(decision)
+    snapshot = {
+        "authorityContract": "chummer.release-authority-snapshot/v2",
+        "releaseVersion": VERSION,
+        "channel": "preview",
+        "status": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "availablePlatforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "artifactCount": 1,
+        "downloadAccessPosture": "open_public",
+        "knownIssueSummary": canonical["knownIssueSummary"],
+        "manifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "registryRepository": "ArchonMegalon/chummer6-hub-registry",
+        "registryCommit": REGISTRY_COMMIT,
+        "releaseDecisionStatus": "review_required",
+        "releaseDecisionSha256": hashlib.sha256(
+            decision_raw
+        ).hexdigest(),
+        "supportOwner": support_owner,
+        "nextActions": next_actions,
+        "artifacts": [
+            {
+                "artifactId": artifact_id,
+                "head": "avalonia",
+                "platform": "windows",
+                "rid": "win-x64",
+                "arch": "x64",
+                "kind": "installer",
+                "downloadUrl": artifact["downloadUrl"],
+                "sha256": artifact["sha256"],
+                "sizeBytes": artifact["sizeBytes"],
+                "compatibilityState": "compatible",
+                "promotionState": "promoted",
+                "publicationScope": "signed-in-and-public",
+                "revokeState": "not_revoked",
+                "publicInstallRoute": install_route,
+                "installAccessClass": "open_public",
+            }
+        ],
+        "manifestPath": "RELEASE_CHANNEL.json",
+        "releaseDecisionPath": "RELEASE_DECISION.json",
+    }
+    snapshot_raw = canonical_bytes(snapshot)
+    current = {
+        "releaseVersion": VERSION,
+        "snapshotSha256": hashlib.sha256(snapshot_raw).hexdigest(),
+        "decisionSha256": hashlib.sha256(decision_raw).hexdigest(),
+        "status": "review_required",
+    }
+    smoke = {
+        "status": "pass",
+        "headId": "avalonia",
+        "version": VERSION,
+        "releaseVersion": VERSION,
+        "channelId": "preview",
+        "platform": "windows",
+        "arch": "x64",
+        "rid": "win-x64",
+        "artifactDigest": f"sha256:{artifact['sha256']}",
+        "artifactSha256": artifact["sha256"],
+        "artifactId": artifact_id,
+        "artifactFileName": artifact["fileName"],
+        "fileName": artifact["fileName"],
+        "artifactRelativePath": f"files/{artifact['fileName']}",
+        "bootstrapPayloadSha256": artifact["payloadSha256"],
+        "bootstrapPayloadSizeBytes": artifact["payloadSizeBytes"],
+        "bootstrapPayloadFileName": artifact["payloadFileName"],
+    }
+    evidence = {
+        "release-evidence/CURRENT.json": canonical_bytes(current),
+        "release-evidence/RELEASE_DECISION.json": decision_raw,
+        "release-evidence/SNAPSHOT.json": snapshot_raw,
+        (
+            "startup-smoke/"
+            "startup-smoke-avalonia-win-x64.receipt.json"
+        ): canonical_bytes(smoke),
+    }
+    for relative, raw in evidence.items():
+        write(item["bundle"] / relative, raw, mode=0o400)
+
+
 def test_materializer_roundtrips_through_projection_and_cutover_validator(
     tmp_path: Path,
 ) -> None:
@@ -449,6 +600,7 @@ def test_materializer_roundtrips_through_projection_and_cutover_validator(
         purpose=projection.PROJECTION_PURPOSE_CANDIDATE_IMPORT,
     )
     assert resolved.snapshot_sha256 == projected.snapshot_sha256
+    add_cutover_review_evidence(item)
     cutover = load_module(CUTOVER, "scope_bound_cutover_roundtrip")
     config = SimpleNamespace(
         source_root=REPO_ROOT,
