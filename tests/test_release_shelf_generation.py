@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -8,6 +10,7 @@ import stat
 import subprocess
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,509 @@ SPEC = importlib.util.spec_from_file_location("release_shelf_generation", SCRIPT
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+FRESHNESS_EVALUATED_AT = datetime(
+    2026,
+    7,
+    24,
+    12,
+    40,
+    tzinfo=timezone.utc,
+)
+
+
+def _format_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _proof_age_seconds(later: datetime, earlier: datetime) -> int:
+    return 0 if later <= earlier else int((later - earlier).total_seconds() // 1)
+
+
+def _create_localization_gate(generated_at: datetime) -> dict[str, object]:
+    locales = ["en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn"]
+    domains = [
+        "app_chrome",
+        "install_update_support",
+        "explain_receipts",
+        "data_rules_names",
+        "generated_artifacts",
+    ]
+    return {
+        "status": "pass",
+        "generatedAt": _format_utc(generated_at),
+        "defaultKeyCount": 441,
+        "explicitFallbackRuntime": "pass",
+        "signoffSmokeRunnerStatus": "pass",
+        "shippingLocales": locales,
+        "acceptanceGates": [
+            "pseudo_localization",
+            "missing_key_fail_fast",
+            "top_surface_overflow_checks",
+            "locale_smoke_first_launch",
+            "locale_smoke_settings",
+            "locale_smoke_explain",
+            "locale_smoke_updater",
+            "locale_smoke_support",
+            "non_english_generated_artifact_smoke",
+        ],
+        "domainCoverage": {domain: "pass" for domain in domains},
+        "localeDomainCoverage": {
+            locale: {domain: "pass" for domain in domains}
+            for locale in locales
+        },
+        "blockingFindingsCount": 0,
+        "blockingFindings": [],
+        "translationBacklogFindingsCount": 0,
+        "translationBacklogFindings": [],
+        "localeSummary": [
+            {
+                "locale": locale,
+                "untranslatedKeyCount": 0,
+                "overrideCount": 441,
+                "minimumOverrideCount": 441 if locale == "en-us" else 40,
+                "missingReleaseSeedKeys": [],
+                "legacyXmlPresent": True,
+                "legacyDataXmlPresent": True,
+            }
+            for locale in locales
+        ],
+    }
+
+
+def _create_flagship_readiness(
+    generated_at: datetime,
+) -> dict[str, object]:
+    digest_material: dict[str, object] = {
+        "contractName": "chummer.flagship_product_readiness_gate.v1",
+        "coverageGapKeys": [],
+        "desktopClientReady": True,
+        "generatedAt": _format_utc(generated_at),
+        "launchBlockers": [],
+        "reason": "Flagship product readiness proof is green.",
+        "sourceSha256": (
+            "sha256:"
+            "0123456789abcdef0123456789abcdef"
+            "0123456789abcdef0123456789abcdef"
+        ),
+        "status": "pass",
+    }
+    return {
+        **digest_material,
+        "snapshotSha256": (
+            "sha256:"
+            + hashlib.sha256(
+                MODULE.canonical_json_bytes(digest_material)
+            ).hexdigest()
+        ),
+    }
+
+
+def _create_release_proof(generated_at: datetime) -> dict[str, object]:
+    return {
+        "status": "passed",
+        "generatedAt": _format_utc(generated_at),
+        "baseUrl": "https://chummer.run",
+        "journeysPassed": [
+            "install_claim_restore_continue",
+            "build_explain_publish",
+            "campaign_session_recover_recap",
+            "report_cluster_release_notify",
+            "organize_community_and_close_loop",
+        ],
+        "proofRoutes": [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/home/access",
+            "/home/work",
+            "/account/access",
+            "/account/work",
+            "/account/support",
+            "/contact",
+            "/downloads",
+        ],
+        "uiLocalizationReleaseGate": _create_localization_gate(generated_at),
+        "flagshipReadiness": _create_flagship_readiness(generated_at),
+    }
+
+
+def _create_freshness_facts(
+    release_proof: dict[str, object],
+    published_at: datetime,
+) -> dict[str, object]:
+    release_generated_at = datetime.fromisoformat(
+        str(release_proof["generatedAt"]).replace("Z", "+00:00")
+    )
+    localization = release_proof["uiLocalizationReleaseGate"]
+    readiness = release_proof["flagshipReadiness"]
+    assert isinstance(localization, dict)
+    assert isinstance(readiness, dict)
+    localization_generated_at = datetime.fromisoformat(
+        str(localization["generatedAt"]).replace("Z", "+00:00")
+    )
+    readiness_generated_at = datetime.fromisoformat(
+        str(readiness["generatedAt"]).replace("Z", "+00:00")
+    )
+    return {
+        "status": "fresh",
+        "releaseProofGeneratedAt": _format_utc(release_generated_at),
+        "releaseProofAgeSeconds": _proof_age_seconds(
+            published_at,
+            release_generated_at,
+        ),
+        "releaseProofMaxAgeSeconds": MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS,
+        "uiLocalizationGeneratedAt": _format_utc(localization_generated_at),
+        "uiLocalizationAgeSeconds": _proof_age_seconds(
+            published_at,
+            localization_generated_at,
+        ),
+        "uiLocalizationMaxAgeSeconds": (
+            MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS
+        ),
+        "flagshipReadinessGeneratedAt": _format_utc(
+            readiness_generated_at
+        ),
+        "flagshipReadinessAgeSeconds": _proof_age_seconds(
+            published_at,
+            readiness_generated_at,
+        ),
+        "flagshipReadinessMaxAgeSeconds": (
+            MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS
+        ),
+        "flagshipReadinessStatus": readiness["status"],
+        "flagshipReadinessCoverageGapKeys": copy.deepcopy(
+            readiness["coverageGapKeys"]
+        ),
+        "flagshipDesktopClientReady": readiness["desktopClientReady"],
+        "flagshipReadinessSnapshotSha256": readiness["snapshotSha256"],
+    }
+
+
+def _create_fresh_release_payload(
+    *,
+    generated_at: datetime = FRESHNESS_EVALUATED_AT,
+    published_at: datetime = FRESHNESS_EVALUATED_AT,
+) -> dict[str, object]:
+    release_proof = _create_release_proof(generated_at)
+    return {
+        "version": "run-proof-freshness",
+        "channel": "preview",
+        "publishedAt": _format_utc(published_at),
+        "status": "published",
+        "rolloutState": "public_stable",
+        "supportabilityState": "gold_supported",
+        "releaseProof": release_proof,
+        "publicTrustMetrics": {
+            "proofFreshness": _create_freshness_facts(
+                release_proof,
+                published_at,
+            ),
+        },
+    }
+
+
+def _clear_privacy_contract() -> dict[str, object]:
+    contract = MODULE.load_privacy_launch_gate_contract()
+    contract["status"] = "documented"
+    contract["reviewRequired"] = False
+    contract["blocksLaunch"] = False
+    return contract
+
+
+def _write_fresh_manifest_pair(
+    root: Path,
+    payload: dict[str, object] | None = None,
+) -> tuple[Path, Path]:
+    canonical_path = root / MODULE.CANONICAL_MANIFEST
+    compatibility_path = root / MODULE.COMPATIBILITY_MANIFEST
+    common = copy.deepcopy(payload or _create_fresh_release_payload())
+    canonical = {
+        **copy.deepcopy(common),
+        "artifacts": [
+            {
+                "artifactId": "avalonia-win-x64-installer",
+                "fileName": "chummer.exe",
+                "downloadUrl": "/downloads/files/chummer.exe",
+                "installAccessClass": "open_public",
+            }
+        ],
+    }
+    compatibility = {
+        **copy.deepcopy(common),
+        "downloads": [
+            {
+                "id": "avalonia-win-x64-installer",
+                "fileName": "chummer.exe",
+                "url": "/downloads/files/chummer.exe",
+                "installAccessClass": "open_public",
+            }
+        ],
+    }
+    canonical_path.write_text(json.dumps(canonical), encoding="utf-8")
+    compatibility_path.write_text(
+        json.dumps(compatibility),
+        encoding="utf-8",
+    )
+    return canonical_path, compatibility_path
+
+
+def _materialized_freshness_status(
+    payload: dict[str, object],
+    evaluated_at: datetime = FRESHNESS_EVALUATED_AT,
+) -> str:
+    projected = MODULE.apply_current_release_supportability_floor(
+        payload,
+        _clear_privacy_contract(),
+        evaluated_at,
+    )
+    return projected["publicTrustMetrics"]["proofFreshness"]["status"]
+
+
+def test_fresh_claim_without_release_proof_materializes_missing() -> None:
+    payload = _create_fresh_release_payload()
+    del payload["releaseProof"]
+
+    assert _materialized_freshness_status(payload) == "missing"
+
+
+def test_fresh_claim_missing_required_fact_materializes_missing() -> None:
+    payload = _create_fresh_release_payload()
+    proof_freshness = payload["publicTrustMetrics"]["proofFreshness"]
+    del proof_freshness["flagshipReadinessSnapshotSha256"]
+
+    assert _materialized_freshness_status(payload) == "missing"
+
+
+def test_invalid_digest_bound_readiness_evidence_materializes_missing() -> None:
+    payload = _create_fresh_release_payload()
+    readiness = payload["releaseProof"]["flagshipReadiness"]
+    readiness["snapshotSha256"] = "sha256:" + ("f" * 64)
+
+    assert _materialized_freshness_status(payload) == "missing"
+
+
+def test_freshness_timestamp_mismatch_materializes_stale() -> None:
+    payload = _create_fresh_release_payload()
+    proof_freshness = payload["publicTrustMetrics"]["proofFreshness"]
+    proof_freshness["releaseProofGeneratedAt"] = _format_utc(
+        FRESHNESS_EVALUATED_AT - timedelta(seconds=1)
+    )
+    proof_freshness["releaseProofAgeSeconds"] = 1
+
+    assert _materialized_freshness_status(payload) == "stale"
+
+
+@pytest.mark.parametrize(
+    ("future_seconds", "expected_status"),
+    ((300, "fresh"), (301, "stale")),
+)
+def test_freshness_future_skew_matches_runtime_boundary(
+    future_seconds: int,
+    expected_status: str,
+) -> None:
+    payload = _create_fresh_release_payload(
+        generated_at=FRESHNESS_EVALUATED_AT
+        + timedelta(seconds=future_seconds)
+    )
+
+    assert _materialized_freshness_status(payload) == expected_status
+
+
+@pytest.mark.parametrize(
+    ("elapsed_seconds", "expected_status"),
+    (
+        (MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS, "fresh"),
+        (MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS + 1, "stale"),
+    ),
+)
+def test_freshness_expiry_matches_runtime_boundary(
+    elapsed_seconds: int,
+    expected_status: str,
+) -> None:
+    generated_at = FRESHNESS_EVALUATED_AT - timedelta(
+        seconds=MODULE.RELEASE_PROOF_MAXIMUM_AGE_SECONDS
+    )
+    payload = _create_fresh_release_payload(
+        generated_at=generated_at,
+        published_at=FRESHNESS_EVALUATED_AT,
+    )
+
+    assert (
+        _materialized_freshness_status(
+            payload,
+            generated_at + timedelta(seconds=elapsed_seconds),
+        )
+        == expected_status
+    )
+
+
+def test_malformed_freshness_fact_materializes_stale() -> None:
+    payload = _create_fresh_release_payload()
+    payload["publicTrustMetrics"]["proofFreshness"][
+        "uiLocalizationAgeSeconds"
+    ] = "not-an-integer"
+
+    assert _materialized_freshness_status(payload) == "stale"
+
+
+def test_fresh_evidence_applies_only_the_current_privacy_blocker() -> None:
+    payload = _create_fresh_release_payload()
+
+    blocked = MODULE.apply_current_release_supportability_floor(
+        payload,
+        MODULE.load_privacy_launch_gate_contract(),
+        FRESHNESS_EVALUATED_AT,
+    )
+    clear = MODULE.apply_current_release_supportability_floor(
+        payload,
+        _clear_privacy_contract(),
+        FRESHNESS_EVALUATED_AT,
+    )
+
+    assert blocked["publicTrustMetrics"]["proofFreshness"]["status"] == "fresh"
+    assert "Hosted Build privacy" in blocked["knownIssueSummary"]
+    assert "stale or incomplete proof receipts" not in blocked["knownIssueSummary"]
+    assert clear["publicTrustMetrics"]["proofFreshness"]["status"] == "fresh"
+    assert clear["rolloutState"] == "public_stable"
+    assert clear["supportabilityState"] == "gold_supported"
+    assert "knownIssueSummary" not in clear
+
+
+def test_project_manifest_pair_rejects_release_proof_evidence_disagreement_atomically(
+    tmp_path: Path,
+) -> None:
+    canonical_path, compatibility_path = _write_fresh_manifest_pair(tmp_path)
+    compatibility = json.loads(
+        compatibility_path.read_text(encoding="utf-8")
+    )
+    compatibility["publicTrustMetrics"]["proofFreshness"][
+        "releaseProofAgeSeconds"
+    ] = 1
+    compatibility_path.write_text(
+        json.dumps(compatibility),
+        encoding="utf-8",
+    )
+    before = canonical_path.read_bytes(), compatibility_path.read_bytes()
+
+    with pytest.raises(
+        MODULE.ReleaseShelfError,
+        match="same release-proof freshness evidence",
+    ):
+        MODULE.project_manifest_pair(
+            canonical_path,
+            compatibility_path,
+            "g-release-proof-evidence-disagreement",
+            evaluated_at=FRESHNESS_EVALUATED_AT,
+        )
+
+    assert (canonical_path.read_bytes(), compatibility_path.read_bytes()) == before
+
+
+def test_project_manifest_pair_is_byte_idempotent_at_one_evaluation_instant(
+    tmp_path: Path,
+) -> None:
+    canonical_path, compatibility_path = _write_fresh_manifest_pair(tmp_path)
+
+    first_receipt = MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "g-fresh-byte-idempotence",
+        evaluated_at=FRESHNESS_EVALUATED_AT,
+    )
+    first_bytes = canonical_path.read_bytes(), compatibility_path.read_bytes()
+    second_receipt = MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "g-fresh-byte-idempotence",
+        evaluated_at=FRESHNESS_EVALUATED_AT,
+    )
+
+    assert (canonical_path.read_bytes(), compatibility_path.read_bytes()) == (
+        first_bytes
+    )
+    assert second_receipt == first_receipt
+    assert first_receipt["supportabilityFloorEvaluatedAt"] == _format_utc(
+        FRESHNESS_EVALUATED_AT
+    )
+
+
+def test_privacy_contract_snapshot_binds_projection_and_receipt_without_post_replace_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canonical_path, compatibility_path = _write_fresh_manifest_pair(tmp_path)
+    source_contract_path = MODULE.PRIVACY_LAUNCH_GATE_CONTRACT
+    contract_path = tmp_path / "PRIVACY_LAUNCH_GATE.json"
+    contract_a_bytes = source_contract_path.read_bytes()
+    contract_a = json.loads(contract_a_bytes.decode("utf-8"))
+    contract_path.write_bytes(contract_a_bytes)
+    contract_b = copy.deepcopy(contract_a)
+    contract_b["reason"] = contract_b["reason"] + " Mutation sentinel."
+    contract_b_bytes = (
+        json.dumps(contract_b, indent=2, ensure_ascii=False).encode("utf-8")
+        + b"\n"
+    )
+    monkeypatch.setattr(MODULE, "PRIVACY_LAUNCH_GATE_CONTRACT", contract_path)
+
+    original_read_bytes = Path.read_bytes
+    original_open = Path.open
+    contract_reads = 0
+    contract_mutated = False
+
+    def fail_on_contract_reread(path: Path) -> bytes:
+        nonlocal contract_reads
+        if path == contract_path:
+            contract_reads += 1
+            if contract_reads > 1:
+                raise OSError("privacy contract was read after projection began")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", fail_on_contract_reread)
+
+    def fail_on_post_replace_contract_open(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ):
+        if path == contract_path and contract_mutated:
+            raise OSError("privacy contract was opened after manifest replacement")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_on_post_replace_contract_open)
+    original_replace = MODULE.os.replace
+
+    def mutate_contract_after_first_destination_replace(
+        source: str | os.PathLike[str],
+        destination: str | os.PathLike[str],
+    ) -> None:
+        nonlocal contract_mutated
+        original_replace(source, destination)
+        if Path(destination) == canonical_path and not contract_mutated:
+            contract_path.write_bytes(contract_b_bytes)
+            contract_mutated = True
+
+    monkeypatch.setattr(
+        MODULE.os,
+        "replace",
+        mutate_contract_after_first_destination_replace,
+    )
+
+    receipt = MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "g-privacy-snapshot-binding",
+        evaluated_at=FRESHNESS_EVALUATED_AT,
+    )
+
+    assert contract_mutated
+    assert contract_reads == 1
+    assert receipt["privacyLaunchGateContractSha256"] == hashlib.sha256(
+        contract_a_bytes
+    ).hexdigest()
+    assert receipt["privacyLaunchGateContractSha256"] != hashlib.sha256(
+        contract_b_bytes
+    ).hexdigest()
+    for path in (canonical_path, compatibility_path):
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        assert manifest["publicTrustMetrics"]["privacyReadiness"] == contract_a
 
 
 def test_project_manifest_pair_binds_exact_generation_without_copying_artifacts(
@@ -100,6 +606,294 @@ def test_project_manifest_pair_rejects_release_identity_drift_without_mutation(
             canonical_path,
             compatibility_path,
             "gen-release-identity-drift",
+        )
+
+    assert (canonical_path.read_bytes(), compatibility_path.read_bytes()) == before
+
+
+def _write_supportability_projection_pair(
+    root: Path,
+    *,
+    proof_freshness_status: str = "missing",
+    rollout_state: str = "public_release_review_required",
+    rollout_reason: str = "Proof receipts are stale.",
+    supportability_state: str = "review_required",
+    supportability_summary: str = "Proof receipts require review.",
+    known_issue_summary: str = (
+        "Known issue: stale or incomplete proof receipts still block "
+        "launch-readiness claims."
+    ),
+    fix_availability_summary: str = "Wait for current proof receipts.",
+) -> tuple[Path, Path]:
+    canonical_path = root / MODULE.CANONICAL_MANIFEST
+    compatibility_path = root / MODULE.COMPATIBILITY_MANIFEST
+    common = {
+        "version": "run-supportability-floor",
+        "channel": "preview",
+        "publishedAt": "2026-07-24T12:40:00Z",
+        "status": "published",
+        "rolloutState": rollout_state,
+        "rolloutReason": rollout_reason,
+        "supportabilityState": supportability_state,
+        "supportabilitySummary": supportability_summary,
+        "knownIssueSummary": known_issue_summary,
+        "fixAvailabilitySummary": fix_availability_summary,
+        "publicTrustMetrics": {
+            "proofFreshness": {
+                "status": proof_freshness_status,
+                "stableFact": "unchanged",
+            },
+            "releaseChannel": {
+                "rolloutState": rollout_state,
+                "supportabilityState": supportability_state,
+                "posture": "blocked",
+                "summary": "Proof receipts require review.",
+                "stableCount": 7,
+            },
+            "stableMetric": {"value": "unchanged"},
+        },
+        "registryBoundaryCoverage": {
+            "releaseChannel": {
+                "rolloutState": rollout_state,
+                "supportabilityState": supportability_state,
+                "publicTrustPosture": "blocked",
+                "summary": "Registry proof receipts require review.",
+                "stableCount": 11,
+            },
+            "stableBoundary": True,
+        },
+        "stableUnrelated": {
+            "text": "unchanged",
+            "count": 42,
+            "enabled": True,
+        },
+    }
+    canonical = {
+        **common,
+        "artifacts": [
+            {
+                "artifactId": "avalonia-win-x64-installer",
+                "fileName": "chummer.exe",
+                "downloadUrl": "/downloads/files/chummer.exe",
+                "installAccessClass": "open_public",
+                "stableArtifactFact": "unchanged",
+            }
+        ],
+    }
+    compatibility = {
+        **common,
+        "downloads": [
+            {
+                "id": "avalonia-win-x64-installer",
+                "fileName": "chummer.exe",
+                "url": "/downloads/files/chummer.exe",
+                "installAccessClass": "open_public",
+                "stableArtifactFact": "unchanged",
+            }
+        ],
+    }
+    canonical_path.write_text(json.dumps(canonical), encoding="utf-8")
+    compatibility_path.write_text(json.dumps(compatibility), encoding="utf-8")
+    return canonical_path, compatibility_path
+
+
+def test_project_manifest_pair_materializes_exact_runtime_privacy_floor(
+    tmp_path: Path,
+) -> None:
+    canonical_path, compatibility_path = _write_supportability_projection_pair(
+        tmp_path
+    )
+
+    receipt = MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "g-runtime-privacy-floor",
+    )
+
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    compatibility = json.loads(compatibility_path.read_text(encoding="utf-8"))
+    expected_blocker = (
+        "stale or incomplete proof receipts and Hosted Build privacy, retention, "
+        "recovery, and erasure review still block launch-readiness claims"
+    )
+    expected_known_issue = f"Known issue: {expected_blocker}."
+    expected_privacy = json.loads(
+        MODULE.PRIVACY_LAUNCH_GATE_CONTRACT.read_text(encoding="utf-8")
+    )
+
+    for manifest in (canonical, compatibility):
+        assert manifest["rolloutState"] == "public_release_review_required"
+        assert manifest["supportabilityState"] == "review_required"
+        assert manifest["knownIssueSummary"] == expected_known_issue
+        assert manifest["rolloutReason"] == (
+            "Current shelf is published, but release posture stays review-required "
+            f"because {expected_blocker}."
+        )
+        assert manifest["supportabilitySummary"] == (
+            f"Treat the current release as review-required because {expected_blocker}."
+        )
+        assert manifest["publicTrustMetrics"]["privacyReadiness"] == expected_privacy
+        assert (
+            manifest["publicTrustMetrics"]["releaseChannel"]["summary"]
+            == f"Release channel remains review-required because {expected_blocker}."
+        )
+        assert (
+            manifest["registryBoundaryCoverage"]["releaseChannel"]["summary"]
+            == "Release-channel truth remains review-required because "
+            f"{expected_blocker}."
+        )
+        assert manifest["stableUnrelated"] == {
+            "text": "unchanged",
+            "count": 42,
+            "enabled": True,
+        }
+        assert manifest["publicTrustMetrics"]["stableMetric"] == {
+            "value": "unchanged"
+        }
+        assert manifest["publicTrustMetrics"]["proofFreshness"]["stableFact"] == (
+            "unchanged"
+        )
+
+    assert MODULE._supportability_floor_projection(
+        canonical
+    ) == MODULE._supportability_floor_projection(compatibility)
+    assert (
+        canonical["artifacts"][0]["stableArtifactFact"]
+        == compatibility["downloads"][0]["stableArtifactFact"]
+        == "unchanged"
+    )
+    assert receipt["supportabilityFloorApplied"] is True
+    assert (
+        receipt["privacyLaunchGateContractName"]
+        == expected_privacy["contractName"]
+    )
+    assert receipt["privacyLaunchGateContractVersion"] == 1
+    assert receipt["privacyLaunchGateContractSha256"] == MODULE.sha256_file(
+        MODULE.PRIVACY_LAUNCH_GATE_CONTRACT
+    )
+
+
+def test_current_release_supportability_floor_is_idempotent_without_duplicates() -> None:
+    contract = MODULE.load_privacy_launch_gate_contract()
+    source = {
+        "status": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "publicTrustMetrics": {
+            "proofFreshness": {"status": "missing"},
+        },
+    }
+
+    once = MODULE.apply_current_release_supportability_floor(source, contract)
+    twice = MODULE.apply_current_release_supportability_floor(once, contract)
+
+    assert twice == once
+    for field in (
+        "rolloutReason",
+        "supportabilitySummary",
+        "knownIssueSummary",
+    ):
+        assert once[field].count("Hosted Build privacy") == 1
+        assert once[field].count("stale or incomplete proof receipts") == 1
+    assert (
+        once["publicTrustMetrics"]["releaseChannel"]["summary"].count(
+            "Hosted Build privacy"
+        )
+        == 1
+    )
+    assert (
+        once["registryBoundaryCoverage"]["releaseChannel"]["summary"].count(
+            "Hosted Build privacy"
+        )
+        == 1
+    )
+
+
+def test_project_manifest_pair_preserves_stronger_blocker_narratives(
+    tmp_path: Path,
+) -> None:
+    narratives = {
+        "rollout_reason": "Required desktop coverage is incomplete.",
+        "supportability_summary": "The Windows installer is still missing.",
+        "known_issue_summary": "Windows remains unavailable.",
+        "fix_availability_summary": "Wait for the Windows candidate.",
+    }
+    canonical_path, compatibility_path = _write_supportability_projection_pair(
+        tmp_path,
+        rollout_state="coverage_incomplete",
+        **narratives,
+    )
+    for path, public_summary, registry_summary in (
+        (
+            canonical_path,
+            "Public channel coverage is incomplete.",
+            "Registry coverage is incomplete.",
+        ),
+        (
+            compatibility_path,
+            "Public channel coverage is incomplete.",
+            "Registry coverage is incomplete.",
+        ),
+    ):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["publicTrustMetrics"]["releaseChannel"]["summary"] = public_summary
+        payload["registryBoundaryCoverage"]["releaseChannel"][
+            "summary"
+        ] = registry_summary
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    MODULE.project_manifest_pair(
+        canonical_path,
+        compatibility_path,
+        "g-stronger-supportability-blocker",
+    )
+
+    for path in (canonical_path, compatibility_path):
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        assert manifest["rolloutState"] == "coverage_incomplete"
+        assert manifest["rolloutReason"] == narratives["rollout_reason"]
+        assert (
+            manifest["supportabilitySummary"]
+            == narratives["supportability_summary"]
+        )
+        assert manifest["knownIssueSummary"] == narratives["known_issue_summary"]
+        assert (
+            manifest["fixAvailabilitySummary"]
+            == narratives["fix_availability_summary"]
+        )
+        assert (
+            manifest["publicTrustMetrics"]["releaseChannel"]["summary"]
+            == "Public channel coverage is incomplete."
+        )
+        assert (
+            manifest["registryBoundaryCoverage"]["releaseChannel"]["summary"]
+            == "Registry coverage is incomplete."
+        )
+        assert manifest["publicTrustMetrics"]["privacyReadiness"][
+            "blocksLaunch"
+        ]
+
+
+def test_project_manifest_pair_rejects_supportability_projection_drift_atomically(
+    tmp_path: Path,
+) -> None:
+    canonical_path, compatibility_path = _write_supportability_projection_pair(
+        tmp_path
+    )
+    canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    canonical["rolloutState"] = "security_hold"
+    canonical["knownIssueSummary"] = "Security review remains open."
+    canonical_path.write_text(json.dumps(canonical), encoding="utf-8")
+    before = canonical_path.read_bytes(), compatibility_path.read_bytes()
+
+    with pytest.raises(
+        MODULE.ReleaseShelfError,
+        match="same runtime supportability-floor projection",
+    ):
+        MODULE.project_manifest_pair(
+            canonical_path,
+            compatibility_path,
+            "g-supportability-projection-drift",
         )
 
     assert (canonical_path.read_bytes(), compatibility_path.read_bytes()) == before

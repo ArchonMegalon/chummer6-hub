@@ -1144,11 +1144,18 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal(proofFreshnessStatus, root.GetProperty("publicTrustMetrics").GetProperty("proofFreshness").GetProperty("status").GetString());
         Assert.Equal("public_release_review_required", root.GetProperty("rolloutState").GetString());
         Assert.Equal("review_required", root.GetProperty("supportabilityState").GetString());
-        Assert.Contains("Hosted Build privacy", root.GetProperty("rolloutReason").GetString(), StringComparison.Ordinal);
-        if (proofIsStale)
-        {
-            Assert.Contains("stale or incomplete proof receipts", root.GetProperty("rolloutReason").GetString(), StringComparison.Ordinal);
-        }
+        string expectedBlocker = proofIsStale
+            ? "stale or incomplete proof receipts and Hosted Build privacy, retention, recovery, and erasure review still block launch-readiness claims"
+            : "Hosted Build privacy, retention, recovery, and erasure review still blocks launch-readiness claims";
+        Assert.Equal(
+            $"Current shelf is published, but release posture stays review-required because {expectedBlocker}.",
+            root.GetProperty("rolloutReason").GetString());
+        Assert.Equal(
+            $"Treat the current release as review-required because {expectedBlocker}.",
+            root.GetProperty("supportabilitySummary").GetString());
+        Assert.Equal(
+            $"Known issue: {expectedBlocker}.",
+            root.GetProperty("knownIssueSummary").GetString());
 
         JsonElement privacy = root.GetProperty("publicTrustMetrics").GetProperty("privacyReadiness");
         Assert.Equal(PrivacyLaunchGate.ContractName, privacy.GetProperty("contractName").GetString());
@@ -1157,10 +1164,16 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal("public_release_review_required", publicReleaseChannel.GetProperty("rolloutState").GetString());
         Assert.Equal("review_required", publicReleaseChannel.GetProperty("supportabilityState").GetString());
         Assert.Equal("blocked", publicReleaseChannel.GetProperty("posture").GetString());
+        Assert.Equal(
+            $"Release channel remains review-required because {expectedBlocker}.",
+            publicReleaseChannel.GetProperty("summary").GetString());
         JsonElement registryReleaseChannel = root.GetProperty("registryBoundaryCoverage").GetProperty("releaseChannel");
         Assert.Equal("public_release_review_required", registryReleaseChannel.GetProperty("rolloutState").GetString());
         Assert.Equal("review_required", registryReleaseChannel.GetProperty("supportabilityState").GetString());
         Assert.Equal("blocked", registryReleaseChannel.GetProperty("publicTrustPosture").GetString());
+        Assert.Equal(
+            $"Release-channel truth remains review-required because {expectedBlocker}.",
+            registryReleaseChannel.GetProperty("summary").GetString());
 
         PublicReleaseManifestDto releasesManifest = service.LoadManifest();
         Assert.Equal("review_required", releasesManifest.SupportabilityState);
