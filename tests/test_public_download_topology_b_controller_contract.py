@@ -1108,6 +1108,95 @@ def test_commit_archive_crash_reconstructs_active_authority_without_state_receip
     ).hexdigest()
 
 
+def test_committed_reconciliation_reprobes_with_existing_active_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    shelf = {"generationId": "g-test", "generationRoot": str(tmp_path)}
+    runtime = {"candidateImageId": "sha256:" + "1" * 64}
+    sidecar = {"containerId": "2" * 64}
+    commit = {
+        "phase": "committed",
+        "targetConfigSha256": "3" * 64,
+        "targetVersion": 7,
+    }
+    active = {"status": "active"}
+    (tmp_path / "releases.json").write_text("{}\n", encoding="utf-8")
+
+    class FakeCloudflare:
+        @staticmethod
+        def commit_transaction(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return dict(commit)
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.cloudflare = FakeCloudflare()
+    actions._state = {
+        "receipts": {
+            "shelf": shelf,
+            "runtime": runtime,
+            "sidecar": sidecar,
+            "cloudflareCommit": commit,
+            "activeAuthority": active,
+        }
+    }
+    actions.config = config
+    actions.runner = SimpleNamespace()
+    actions._cloudflare_api = lambda: object()
+
+    events: list[str] = []
+
+    def current_runtime(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        events.append("container")
+        return {
+            "wasRunning": True,
+            "imageId": runtime["candidateImageId"],
+        }
+
+    monkeypatch.setattr(controller, "container_runtime", current_runtime)
+    monkeypatch.setattr(
+        controller,
+        "wait_healthy",
+        lambda *_args, **_kwargs: events.append("healthy"),
+    )
+    monkeypatch.setattr(
+        controller,
+        "probe_sidecar_hosts",
+        lambda *_args, **_kwargs: events.append("local"),
+    )
+
+    def probe_artifacts(*_args: Any, **kwargs: Any) -> None:
+        assert kwargs["scope"] == "public"
+        events.append("public-artifacts")
+
+    monkeypatch.setattr(
+        controller,
+        "probe_download_artifact_hosts",
+        probe_artifacts,
+    )
+    monkeypatch.setattr(
+        controller,
+        "_probe_exact_manifest",
+        lambda *_args, **_kwargs: events.append("public-manifest"),
+    )
+    actions.write_active_receipt = lambda *_args, **_kwargs: pytest.fail(
+        "existing active authority must not be rewritten"
+    )
+
+    result = actions.reconcile_committed(config)
+
+    assert result["active"] is active
+    assert events == [
+        "container",
+        "healthy",
+        "local",
+        "public-artifacts",
+        "public-manifest",
+        "public-manifest",
+    ]
+
+
 def test_incumbent_baseline_and_rollback_cover_both_public_hosts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

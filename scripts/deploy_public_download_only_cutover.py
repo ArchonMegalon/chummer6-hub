@@ -5918,84 +5918,84 @@ class TopologyBActions:
             ),
         )
         active = self._state.get("receipts", {}).get("activeAuthority")
-        if not isinstance(active, dict):
-            shelf = self._state.get("receipts", {}).get("shelf")
-            runtime = self._state.get("receipts", {}).get("runtime")
-            sidecar = self._state.get("receipts", {}).get("sidecar")
-            commit = self._state.get("receipts", {}).get("cloudflareCommit")
-            if not isinstance(commit, dict):
-                commit = {
-                    "phase": receipt["phase"],
-                    "targetConfigSha256": receipt[
-                        "targetConfigSha256"
-                    ],
-                    "targetVersion": receipt["targetVersion"],
-                    "evidencePath": str(
-                        config.cloudflare_committed_evidence
-                    ),
-                    "evidenceSha256": sha256_bytes(
-                        stable_regular_bytes(
-                            config.cloudflare_committed_evidence,
-                            label="committed Cloudflare evidence",
-                            maximum_bytes=16 * 1024 * 1024,
-                            owner_only=True,
-                        )
-                    ),
-                }
-            if not all(
-                isinstance(item, dict)
-                for item in (shelf, runtime, sidecar, commit)
-            ):
-                raise RecoveryUncertain(
-                    "committed route lacks reconstructable active authority"
-                )
-            current_runtime = container_runtime(
-                self.runner,
-                str(sidecar.get("containerId") or ""),
+        shelf = self._state.get("receipts", {}).get("shelf")
+        runtime = self._state.get("receipts", {}).get("runtime")
+        sidecar = self._state.get("receipts", {}).get("sidecar")
+        commit = self._state.get("receipts", {}).get("cloudflareCommit")
+        if not isinstance(commit, dict):
+            commit = {
+                "phase": receipt["phase"],
+                "targetConfigSha256": receipt[
+                    "targetConfigSha256"
+                ],
+                "targetVersion": receipt["targetVersion"],
+                "evidencePath": str(
+                    config.cloudflare_committed_evidence
+                ),
+                "evidenceSha256": sha256_bytes(
+                    stable_regular_bytes(
+                        config.cloudflare_committed_evidence,
+                        label="committed Cloudflare evidence",
+                        maximum_bytes=16 * 1024 * 1024,
+                        owner_only=True,
+                    )
+                ),
+            }
+        if not all(
+            isinstance(item, dict)
+            for item in (shelf, runtime, sidecar, commit)
+        ):
+            raise RecoveryUncertain(
+                "committed route lacks reconstructable active authority"
             )
-            if (
-                not current_runtime["wasRunning"]
-                or current_runtime["imageId"]
-                != runtime.get("candidateImageId")
-            ):
-                raise RecoveryUncertain(
-                    "committed sidecar runtime is not exact and running"
-                )
-            wait_healthy(
-                self.runner,
-                str(sidecar["containerId"]),
-                expected_image=str(runtime["candidateImageId"]),
-                timeout_seconds=self.config.ready_timeout_seconds,
+        current_runtime = container_runtime(
+            self.runner,
+            str(sidecar.get("containerId") or ""),
+        )
+        if (
+            not current_runtime["wasRunning"]
+            or current_runtime["imageId"]
+            != runtime.get("candidateImageId")
+        ):
+            raise RecoveryUncertain(
+                "committed sidecar runtime is not exact and running"
             )
-            probe_sidecar_hosts(
-                self.config,
-                shelf=shelf,
+        wait_healthy(
+            self.runner,
+            str(sidecar["containerId"]),
+            expected_image=str(runtime["candidateImageId"]),
+            timeout_seconds=self.config.ready_timeout_seconds,
+        )
+        probe_sidecar_hosts(
+            self.config,
+            shelf=shelf,
+            generation_id=str(shelf["generationId"]),
+            generation_root=Path(str(shelf["generationRoot"])),
+        )
+        probe_download_artifact_hosts(
+            self.config,
+            shelf=shelf,
+            scope="public",
+        )
+        manifest = stable_regular_bytes(
+            Path(str(shelf["generationRoot"])) / "releases.json",
+            label="recovery generation compatibility manifest",
+            maximum_bytes=8 * 1024 * 1024,
+        )
+        path = (
+            f"/downloads/g/{shelf['generationId']}/releases.json"
+        )
+        for hostname in SIDECAR_HOSTS:
+            _probe_exact_manifest(
+                scheme="https",
+                connect_host=hostname,
+                connect_port=443,
+                request_host=hostname,
+                path=path,
+                expected=manifest,
                 generation_id=str(shelf["generationId"]),
-                generation_root=Path(str(shelf["generationRoot"])),
             )
-            probe_download_artifact_hosts(
-                self.config,
-                shelf=shelf,
-                scope="public",
-            )
-            manifest = stable_regular_bytes(
-                Path(str(shelf["generationRoot"])) / "releases.json",
-                label="recovery generation compatibility manifest",
-                maximum_bytes=8 * 1024 * 1024,
-            )
-            path = (
-                f"/downloads/g/{shelf['generationId']}/releases.json"
-            )
-            for hostname in SIDECAR_HOSTS:
-                _probe_exact_manifest(
-                    scheme="https",
-                    connect_host=hostname,
-                    connect_port=443,
-                    request_host=hostname,
-                    path=path,
-                    expected=manifest,
-                    generation_id=str(shelf["generationId"]),
-                )
+        if not isinstance(active, dict):
             active = self.write_active_receipt(
                 config,
                 shelf,
