@@ -32,7 +32,7 @@ import sys
 import tarfile
 import tempfile
 import time
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol
 from urllib.parse import parse_qs, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
@@ -90,6 +90,66 @@ class CutoverError(RuntimeError):
 
 class RecoveryUncertain(CutoverError):
     pass
+
+
+def _safe_stderr_summary(value: bytes) -> str:
+    """Return a bounded, non-verbatim classification of command stderr."""
+    if not value:
+        return "stderr was empty"
+    lowered = value.lower()
+    if b"required variable" in lowered and b"is missing a value" in lowered:
+        return "Compose required-variable validation failed"
+    if (
+        b"only one connection allowed" in lowered
+        or b"error while dialing" in lowered
+        or b"cannot connect to the docker daemon" in lowered
+    ):
+        return "Docker daemon connection was unavailable"
+    return "stderr content redacted; correlate by SHA-256"
+
+
+class CommandFailure(CutoverError):
+    """A subprocess failure whose durable evidence never contains raw output."""
+
+    def __init__(
+        self,
+        *,
+        label: str,
+        failure_kind: str,
+        status: int | None,
+        stdout: bytes = b"",
+        stderr: bytes = b"",
+    ) -> None:
+        suffix = f" with status {status}" if status is not None else ""
+        super().__init__(f"{label} {failure_kind}{suffix}")
+        self.evidence = {
+            "contractName": "chummer.public-download-command-failure/v1",
+            "stage": label,
+            "failureKind": failure_kind,
+            "exitStatus": status,
+            "stdoutSha256": sha256_bytes(stdout),
+            "stdoutSizeBytes": len(stdout),
+            "stderrSha256": sha256_bytes(stderr),
+            "stderrSizeBytes": len(stderr),
+            "safeStderrSummary": _safe_stderr_summary(stderr),
+        }
+
+
+def _find_command_failure(error: BaseException) -> CommandFailure | None:
+    observed: set[int] = set()
+    pending: list[BaseException] = [error]
+    while pending and len(observed) < 8:
+        current = pending.pop(0)
+        if id(current) in observed:
+            continue
+        if isinstance(current, CommandFailure):
+            return current
+        observed.add(id(current))
+        if current.__cause__ is not None:
+            pending.append(current.__cause__)
+        if current.__context__ is not None:
+            pending.append(current.__context__)
+    return None
 
 
 def utc_now() -> str:
@@ -1418,6 +1478,8 @@ def build_candidate_image(
     *,
     contexts: dict[str, Path] | None = None,
     context_digests: dict[str, str] | None = None,
+    unique_tag: str | None = None,
+    on_built: Callable[[str, str], None] | None = None,
 ) -> tuple[str, str]:
     if contexts is None:
         contexts = {
@@ -1438,10 +1500,14 @@ def build_candidate_image(
     }
     if before_digests != context_digests:
         raise CutoverError("immutable build context changed before image build")
-    unique_tag = (
-        f"chummer-run-api:public-download-{config.source_head[:16]}-"
-        f"{secrets.token_hex(4)}"
-    )
+    if unique_tag is None:
+        unique_tag = (
+            f"chummer-run-api:public-download-{config.source_head[:16]}-"
+            f"{secrets.token_hex(4)}"
+        )
+    tag_match = CANDIDATE_IMAGE_TAG.fullmatch(unique_tag)
+    if tag_match is None or tag_match.group(1) != config.source_head[:16]:
+        raise CutoverError("candidate image tag is invalid")
     runner.docker(
         [
             "buildx",
@@ -1504,6 +1570,8 @@ def build_candidate_image(
         )
     ):
         raise CutoverError("candidate image identity or source labels are invalid")
+    if on_built is not None:
+        on_built(unique_tag, image_id)
     return unique_tag, image_id
 
 
@@ -2615,6 +2683,18 @@ CF_TUNNEL_ID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 SIDECAR_PROJECT = re.compile(r"^chummer-public-download-[a-z0-9-]{8,80}$")
+CANDIDATE_IMAGE_TAG = re.compile(
+    r"^chummer-run-api:public-download-([0-9a-f]{16})-([0-9a-f]{8})$"
+)
+CANDIDATE_BUILD_CONTEXT_NAMES = frozenset(
+    {
+        "default",
+        "run-services",
+        "hub-registry",
+        "fleet-media",
+        "design-product",
+    }
+)
 SIDECAR_LOGICAL_VOLUMES = (
     "public-download-app",
     "public-download-fleet",
@@ -3149,11 +3229,44 @@ class TopologyBRunner:
                 check=False,
                 timeout=timeout,
             )
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout if isinstance(exc.stdout, bytes) else b""
+            stderr = exc.stderr if isinstance(exc.stderr, bytes) else b""
+            raise CommandFailure(
+                label=label,
+                failure_kind="timed out",
+                status=None,
+                stdout=stdout,
+                stderr=stderr,
+            ) from exc
         except (OSError, subprocess.SubprocessError) as exc:
-            raise CutoverError(f"{label} could not execute") from exc
+            raise CommandFailure(
+                label=label,
+                failure_kind="could not execute",
+                status=None,
+            ) from exc
         if completed.returncode != 0:
-            raise CutoverError(
-                f"{label} failed with status {completed.returncode}"
+            stdout = (
+                completed.stdout
+                if isinstance(completed.stdout, bytes)
+                else b""
+            )
+            stderr = (
+                completed.stderr
+                if isinstance(completed.stderr, bytes)
+                else b""
+            )
+            exit_status = (
+                completed.returncode
+                if completed.returncode > 0
+                else 128 + min(abs(completed.returncode), 127)
+            )
+            raise CommandFailure(
+                label=label,
+                failure_kind="failed",
+                status=exit_status,
+                stdout=stdout,
+                stderr=stderr,
             )
         return completed.stdout
 
@@ -4467,6 +4580,7 @@ def probe_public_incumbent(
 
 
 class TopologyBActionsProtocol(Protocol):
+    def record_primary_failure(self, config: Any, error: Exception) -> dict[str, Any]: ...
     def prepare_sidecar_release_shelf(self, config: Any) -> dict[str, Any]: ...
     def generate_sidecar_data_protection(self, config: Any) -> dict[str, Any]: ...
     def materialize_sidecar_compose(self, config: Any, *args: Any) -> dict[str, Any]: ...
@@ -5579,6 +5693,135 @@ class TopologyBActions:
         )
         self._state = state
 
+    def record_primary_failure(
+        self,
+        _config: SidecarConfig,
+        error: Exception,
+    ) -> dict[str, Any]:
+        state = copy.deepcopy(self._state)
+        receipts = state.setdefault("receipts", {})
+        if not isinstance(receipts, dict):
+            raise RecoveryUncertain("topology-B operation receipts are malformed")
+        expected_receipt_fields = {
+            "contractName",
+            "recordedAtUtc",
+            "projectName",
+            "sourceHead",
+            "command",
+        }
+        expected_command_fields = {
+            "contractName",
+            "stage",
+            "failureKind",
+            "exitStatus",
+            "stdoutSha256",
+            "stdoutSizeBytes",
+            "stderrSha256",
+            "stderrSizeBytes",
+            "safeStderrSummary",
+        }
+
+        def validate_receipt(candidate: Any) -> dict[str, Any]:
+            command = (
+                candidate.get("command")
+                if isinstance(candidate, dict)
+                else None
+            )
+            if (
+                not isinstance(candidate, dict)
+                or set(candidate) != expected_receipt_fields
+                or candidate.get("contractName")
+                != "chummer.public-download-primary-failure/v1"
+                or candidate.get("projectName") != self.config.project_name
+                or candidate.get("sourceHead") != self.config.source_head
+                or not isinstance(candidate.get("recordedAtUtc"), str)
+                or not isinstance(command, dict)
+                or set(command) != expected_command_fields
+                or command.get("contractName")
+                != "chummer.public-download-command-failure/v1"
+                or not isinstance(command.get("stage"), str)
+                or not 1 <= len(command["stage"]) <= 160
+                or not command["stage"].isprintable()
+                or command.get("failureKind")
+                not in {
+                    "failed",
+                    "timed out",
+                    "could not execute",
+                    "controller exception",
+                }
+                or (
+                    command.get("exitStatus") is not None
+                    and (
+                        isinstance(command.get("exitStatus"), bool)
+                        or not isinstance(command.get("exitStatus"), int)
+                        or command["exitStatus"] < 0
+                    )
+                )
+                or SHA256.fullmatch(str(command.get("stdoutSha256") or ""))
+                is None
+                or SHA256.fullmatch(str(command.get("stderrSha256") or ""))
+                is None
+                or any(
+                    isinstance(command.get(field), bool)
+                    or not isinstance(command.get(field), int)
+                    or command[field] < 0
+                    for field in ("stdoutSizeBytes", "stderrSizeBytes")
+                )
+                or command.get("safeStderrSummary")
+                not in {
+                    "stderr was empty",
+                    "Compose required-variable validation failed",
+                    "Docker daemon connection was unavailable",
+                    "stderr content redacted; correlate by SHA-256",
+                    (
+                        "exception detail redacted; no subprocess stderr "
+                        "was captured"
+                    ),
+                }
+            ):
+                raise RecoveryUncertain(
+                    "topology-B primary failure evidence is malformed"
+                )
+            return candidate
+
+        existing = receipts.get("primaryFailure")
+        if existing is not None:
+            return validate_receipt(existing)
+        command_failure = _find_command_failure(error)
+        if command_failure is not None:
+            command = copy.deepcopy(command_failure.evidence)
+        else:
+            command = {
+                "contractName": "chummer.public-download-command-failure/v1",
+                "stage": "topology-B controller",
+                "failureKind": "controller exception",
+                "exitStatus": None,
+                "stdoutSha256": sha256_bytes(b""),
+                "stdoutSizeBytes": 0,
+                "stderrSha256": sha256_bytes(b""),
+                "stderrSizeBytes": 0,
+                "safeStderrSummary": (
+                    "exception detail redacted; no subprocess stderr was captured"
+                ),
+            }
+        receipt = {
+            "contractName": "chummer.public-download-primary-failure/v1",
+            "recordedAtUtc": utc_now(),
+            "projectName": self.config.project_name,
+            "sourceHead": self.config.source_head,
+            "command": command,
+        }
+        validate_receipt(receipt)
+        receipts["primaryFailure"] = receipt
+        state["updatedAtUtc"] = utc_now()
+        write_private_json(
+            self.config.operation_journal,
+            state,
+            replace=True,
+        )
+        self._state = state
+        return receipt
+
     def _assert_canonical_shelf_unchanged(self) -> None:
         expected = self._state.get("canonicalShelfTreeSha256")
         observed = tree_sha256_file_stream(
@@ -5719,12 +5962,69 @@ class TopologyBActions:
                 config.operation_root,
             )
         )
+        if (
+            set(context_digests) != CANDIDATE_BUILD_CONTEXT_NAMES
+            or any(
+                not isinstance(digest, str)
+                or SHA256.fullmatch(digest) is None
+                for digest in context_digests.values()
+            )
+        ):
+            raise CutoverError(
+                "immutable candidate build context authority is malformed"
+            )
+        planned_tag = (
+            f"chummer-run-api:public-download-{config.source_head[:16]}-"
+            f"{secrets.token_hex(4)}"
+        )
+        self._record(
+            "candidate-image-planned",
+            "candidateImagePlan",
+            {
+                "contractName": (
+                    "chummer.public-download-candidate-image-plan/v1"
+                ),
+                "candidateTag": planned_tag,
+                "sourceHead": config.source_head,
+                "immutableBuildContextDigests": dict(context_digests),
+                "plannedAtUtc": utc_now(),
+            },
+        )
+
+        def bind_candidate_image(tag: str, image_id: str) -> None:
+            if tag != planned_tag or IMAGE_ID.fullmatch(image_id) is None:
+                raise CutoverError(
+                    "candidate image build did not match its durable plan"
+                )
+            self._record(
+                "candidate-image-built",
+                "candidateImage",
+                {
+                    "contractName": (
+                        "chummer.public-download-candidate-image-binding/v1"
+                    ),
+                    "candidateTag": tag,
+                    "candidateImageId": image_id,
+                    "sourceHead": config.source_head,
+                    "boundAtUtc": utc_now(),
+                },
+            )
+
         unique_tag, image_id = build_candidate_image(
             config,
             self.runner,
             contexts=contexts,
             context_digests=context_digests,
+            unique_tag=planned_tag,
+            on_built=bind_candidate_image,
         )
+        tag_match = CANDIDATE_IMAGE_TAG.fullmatch(unique_tag)
+        if (
+            tag_match is None
+            or tag_match.group(1) != config.source_head[:16]
+            or IMAGE_ID.fullmatch(image_id) is None
+        ):
+            raise CutoverError("candidate image binding is invalid")
         if resolve_image_tag(self.runner, unique_tag) != image_id:
             raise CutoverError("candidate image tag changed before sidecar use")
         compose = materialize_sidecar_compose(
@@ -5835,6 +6135,7 @@ class TopologyBActions:
             if (
                 not isinstance(inspection, list)
                 or len(inspection) != 1
+                or not isinstance(inspection[0], dict)
                 or inspection[0].get("Name") != name
                 or inspection[0].get("Labels") != expected_labels
             ):
@@ -6303,25 +6604,927 @@ class TopologyBActions:
         self._record("cloudflare-rolled-back", "cloudflareRollback", summary)
         return summary
 
+    @staticmethod
+    def _strict_output_lines(value: bytes, *, label: str) -> list[str]:
+        try:
+            decoded = value.decode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise RecoveryUncertain(f"{label} output is malformed") from exc
+        return [line.strip() for line in decoded.splitlines() if line.strip()]
+
+    def _prove_pre_runtime_absence(
+        self,
+        config: SidecarConfig,
+    ) -> dict[str, Any]:
+        checks = (
+            (
+                "containers",
+                [
+                    "container",
+                    "ls",
+                    "--all",
+                    "--quiet",
+                    "--no-trunc",
+                    "--filter",
+                    f"label=com.docker.compose.project={config.project_name}",
+                ],
+            ),
+            (
+                "networks",
+                [
+                    "network",
+                    "ls",
+                    "--quiet",
+                    "--no-trunc",
+                    "--filter",
+                    f"label=com.docker.compose.project={config.project_name}",
+                ],
+            ),
+            (
+                "labeledVolumes",
+                [
+                    "volume",
+                    "ls",
+                    "--quiet",
+                    "--filter",
+                    "label=run.chummer.public-download-operation="
+                    f"{config.project_name}",
+                ],
+            ),
+        )
+        for resource, arguments in checks:
+            try:
+                output = self.runner.docker(
+                    arguments,
+                    label=f"prove no exact topology-B {resource}",
+                )
+            except CutoverError as exc:
+                raise RecoveryUncertain(
+                    f"pre-runtime topology-B {resource} could not be proven absent"
+                ) from exc
+            observed = self._strict_output_lines(
+                output,
+                label=f"topology-B {resource}",
+            )
+            if observed:
+                raise RecoveryUncertain(
+                    f"pre-runtime topology-B {resource} are present"
+                )
+        try:
+            listener_output = self.runner.run(
+                [
+                    "/usr/bin/ss",
+                    "-H",
+                    "-ltn",
+                    f"sport = :{SIDECAR_PORT}",
+                ],
+                label="prove topology-B sidecar port is free",
+            )
+        except CutoverError as exc:
+            raise RecoveryUncertain(
+                "pre-runtime topology-B sidecar port could not be proven free"
+            ) from exc
+        listeners = self._strict_output_lines(
+            listener_output,
+            label="topology-B sidecar port",
+        )
+        if listeners:
+            raise RecoveryUncertain(
+                "pre-runtime topology-B sidecar port is in use"
+            )
+        return {
+            "contractName": (
+                "chummer.public-download-pre-runtime-absence/v1"
+            ),
+            "projectName": config.project_name,
+            "containers": 0,
+            "networks": 0,
+            "labeledVolumes": 0,
+            "publishedAddress": SIDECAR_ADDRESS,
+            "publishedPort": SIDECAR_PORT,
+            "listeners": 0,
+            "status": "pass",
+        }
+
+    def _validated_runtime_environment(
+        self,
+        config: SidecarConfig,
+        runtime: Mapping[str, Any],
+        receipts: Mapping[str, Any],
+    ) -> tuple[dict[str, str], str]:
+        environment = runtime.get("environment")
+        shelf = receipts.get("shelf")
+        data_protection = receipts.get("dataProtection")
+        application = runtime.get("application")
+        binding = receipts.get("candidateImage")
+        if (
+            not isinstance(environment, dict)
+            or not environment
+            or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in environment.items()
+            )
+            or not isinstance(shelf, dict)
+            or not isinstance(data_protection, dict)
+            or not isinstance(application, dict)
+            or not isinstance(binding, dict)
+            or not isinstance(shelf.get("shelfTreeSha256"), str)
+            or SHA256.fullmatch(shelf["shelfTreeSha256"])
+            is None
+            or not isinstance(
+                data_protection.get("certificateSha256"),
+                str,
+            )
+            or SHA256.fullmatch(data_protection["certificateSha256"])
+            is None
+            or not isinstance(data_protection.get("passwordSha256"), str)
+            or SHA256.fullmatch(data_protection["passwordSha256"])
+            is None
+            or not isinstance(application.get("treeSha256"), str)
+            or SHA256.fullmatch(application["treeSha256"])
+            is None
+            or runtime.get("projectName") != config.project_name
+            or runtime.get("publishedAddress") != SIDECAR_ADDRESS
+            or runtime.get("publishedPort") != SIDECAR_PORT
+            or runtime.get("candidateImageId")
+            != binding.get("candidateImageId")
+            or runtime.get("candidateTag") != binding.get("candidateTag")
+            or runtime.get("volumes") != config.volume_names
+            or runtime.get("composePath") != str(config.compose_file)
+            or runtime.get("materializationReceipt")
+            != str(config.materialization_receipt)
+            or runtime.get("runtimeAttestation")
+            != str(config.runtime_attestation)
+        ):
+            raise RecoveryUncertain(
+                "topology-B runtime Compose authority is malformed"
+            )
+        try:
+            expected = _sidecar_compose_environment(
+                config,
+                dp=data_protection,
+                app_overlay_sha256=str(application["treeSha256"]),
+                shelf=shelf,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RecoveryUncertain(
+                "topology-B runtime Compose environment cannot be reconstructed"
+            ) from exc
+        if environment != expected:
+            raise RecoveryUncertain(
+                "topology-B runtime Compose environment drifted"
+            )
+        try:
+            compose_bytes = stable_regular_bytes(
+                config.compose_file,
+                label="topology-B materialized Compose",
+                owner_only=True,
+            )
+            materialization_bytes = stable_regular_bytes(
+                config.materialization_receipt,
+                label="topology-B Compose materialization receipt",
+                owner_only=True,
+            )
+            attestation_bytes = stable_regular_bytes(
+                config.runtime_attestation,
+                label="topology-B Compose runtime attestation",
+                owner_only=True,
+            )
+            materialization = json.loads(materialization_bytes)
+            attestation = json.loads(attestation_bytes)
+            canonical_source_root = config.source_root.resolve(strict=True)
+            base_source = canonical_source_root / "docker-compose.public-edge.yml"
+            profile_source = (
+                canonical_source_root / "docker-compose.public-downloads.yml"
+            )
+            base_sha256 = sha256_bytes(
+                stable_regular_bytes(
+                    base_source,
+                    label="revision-bound public-edge Compose source",
+                )
+            )
+            profile_sha256 = sha256_bytes(
+                stable_regular_bytes(
+                    profile_source,
+                    label="revision-bound public-download Compose profile",
+                )
+            )
+        except (
+            CutoverError,
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise RecoveryUncertain(
+                "topology-B runtime Compose authority is unavailable"
+            ) from exc
+        compose_sha256 = sha256_bytes(compose_bytes)
+        materialization_fields = {
+            "contractName",
+            "status",
+            "operation",
+            "sourceRoot",
+            "sourceHead",
+            "baseComposeSource",
+            "baseComposeSourceSha256",
+            "profileSource",
+            "profileSourceSha256",
+            "candidateImageId",
+            "composeSha256",
+        }
+        attestation_fields = {
+            "contractName",
+            "status",
+            "operation",
+            "runtimeProfile",
+            "projectName",
+            "operationRoot",
+            "portalImageId",
+            "initializerImageId",
+            "initializerConstrained",
+            "portalAppCopiedReadOnly",
+            "portalFleetCopiedReadOnly",
+            "longRunningSourceBindsAbsent",
+            "releaseShelfPreinitialized",
+            "releaseShelfPortalReadOnly",
+            "isolatedVolumes",
+            "runtimeInputs",
+            "postgresServicesAbsent",
+            "postgresEnvironmentAbsent",
+            "postgresMountsAbsent",
+            "postgresHostMappingAbsent",
+            "portalBuildAbsent",
+            "publicDownloadsHealthcheck",
+            "releaseShelfPosture",
+            "portalMountCount",
+            "initializerMountCount",
+            "publishedAddress",
+            "publishedPort",
+            "renderedComposeSha256",
+            "sourceRoot",
+            "sourceHead",
+            "baseComposeSourceSha256",
+            "profileSourceSha256",
+            "materializedComposeSha256",
+        }
+        expected_runtime_inputs = {
+            "appOverlay": {
+                "source": str(config.overlay_staging_root),
+                "sha256": application["treeSha256"],
+            },
+            "fleet": {
+                "source": str(config.fleet_source),
+                "sha256": config.fleet_sha256,
+            },
+            "shelf": {
+                "source": str(config.shelf_source),
+                "sha256": shelf["shelfTreeSha256"],
+            },
+            "projection": {
+                "source": str(config.projection_snapshot_root),
+                "sha256": config.projection_source_tree_sha256,
+            },
+            "runtimeProof": {
+                "source": str(config.runtime_proof_source),
+                "sha256": config.runtime_proof_sha256,
+            },
+            "finalGold": {
+                "source": str(config.final_gold_source),
+                "sha256": config.final_gold_sha256,
+            },
+            "certificateSha256": data_protection["certificateSha256"],
+            "certificatePasswordSha256": data_protection["passwordSha256"],
+            "certificateAuthority": "operation-bound-sidecar-only",
+        }
+        expected_release_shelf_posture = {
+            "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+            "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
+        }
+        if (
+            not isinstance(materialization, dict)
+            or set(materialization) != materialization_fields
+            or materialization.get("contractName")
+            != "chummer.public-download-only-compose-materialization/v1"
+            or materialization.get("status") != "pass"
+            or materialization.get("operation") != config.operation
+            or materialization.get("sourceRoot")
+            != str(canonical_source_root)
+            or materialization.get("sourceHead") != config.source_head
+            or materialization.get("baseComposeSource") != str(base_source)
+            or materialization.get("baseComposeSourceSha256") != base_sha256
+            or materialization.get("profileSource") != str(profile_source)
+            or materialization.get("profileSourceSha256") != profile_sha256
+            or materialization.get("candidateImageId")
+            != binding.get("candidateImageId")
+            or materialization.get("composeSha256") != compose_sha256
+            or not isinstance(attestation, dict)
+            or set(attestation) != attestation_fields
+            or attestation.get("contractName")
+            != "chummer.public-download-only-compose-runtime-attestation/v1"
+            or attestation.get("status") != "pass"
+            or attestation.get("operation") != config.operation
+            or attestation.get("runtimeProfile") != RUNTIME_PROFILE
+            or attestation.get("projectName") != config.project_name
+            or attestation.get("operationRoot") != str(config.operation_root)
+            or attestation.get("portalImageId")
+            != binding.get("candidateImageId")
+            or attestation.get("initializerImageId")
+            != binding.get("candidateImageId")
+            or attestation.get("initializerConstrained") is not True
+            or attestation.get("portalAppCopiedReadOnly") is not True
+            or attestation.get("portalFleetCopiedReadOnly") is not True
+            or attestation.get("longRunningSourceBindsAbsent") is not True
+            or attestation.get("releaseShelfPreinitialized") is not True
+            or attestation.get("releaseShelfPortalReadOnly") is not True
+            or attestation.get("isolatedVolumes") != config.volume_names
+            or attestation.get("runtimeInputs") != expected_runtime_inputs
+            or attestation.get("postgresServicesAbsent") is not True
+            or attestation.get("postgresEnvironmentAbsent") is not True
+            or attestation.get("postgresMountsAbsent") is not True
+            or attestation.get("postgresHostMappingAbsent") is not True
+            or attestation.get("portalBuildAbsent") is not True
+            or attestation.get("publicDownloadsHealthcheck") is not True
+            or attestation.get("releaseShelfPosture")
+            != expected_release_shelf_posture
+            or attestation.get("portalMountCount") != 10
+            or attestation.get("initializerMountCount") != 18
+            or attestation.get("publishedAddress") != SIDECAR_ADDRESS
+            or attestation.get("publishedPort") != SIDECAR_PORT
+            or attestation.get("sourceRoot") != str(canonical_source_root)
+            or attestation.get("sourceHead") != config.source_head
+            or attestation.get("baseComposeSourceSha256") != base_sha256
+            or attestation.get("profileSourceSha256") != profile_sha256
+            or attestation.get("materializedComposeSha256")
+            != compose_sha256
+            or SHA256.fullmatch(
+                str(attestation.get("renderedComposeSha256") or "")
+            )
+            is None
+        ):
+            raise RecoveryUncertain(
+                "topology-B runtime Compose authority drifted"
+            )
+        return expected, str(attestation["renderedComposeSha256"])
+
+    def _prove_rendered_compose_unchanged(
+        self,
+        environment: Mapping[str, str],
+        rendered_compose_sha256: str,
+    ) -> None:
+        rendered = self.runner.compose(
+            ["config", "--format", "json"],
+            environment=environment,
+            label="revalidate topology-B Compose before cleanup",
+        )
+        if sha256_bytes(rendered) != rendered_compose_sha256:
+            raise RecoveryUncertain(
+                "topology-B rendered Compose authority drifted"
+            )
+
+    def _preflight_candidate_image(
+        self,
+        config: SidecarConfig,
+    ) -> dict[str, Any]:
+        receipts = self._state.get("receipts")
+        if not isinstance(receipts, dict):
+            raise RecoveryUncertain("topology-B operation receipts are malformed")
+        binding = receipts.get("candidateImage")
+        plan = receipts.get("candidateImagePlan")
+        recovered_from_plan = False
+        if plan is None:
+            if binding is None:
+                return {"disposition": "not-bound"}
+            raise RecoveryUncertain(
+                "topology-B bound candidate image has no durable plan"
+            )
+        expected_plan_fields = {
+            "contractName",
+            "candidateTag",
+            "sourceHead",
+            "immutableBuildContextDigests",
+            "plannedAtUtc",
+        }
+        digests = (
+            plan.get("immutableBuildContextDigests")
+            if isinstance(plan, dict)
+            else None
+        )
+        planned_tag = (
+            str(plan.get("candidateTag") or "")
+            if isinstance(plan, dict)
+            else ""
+        )
+        tag_match = CANDIDATE_IMAGE_TAG.fullmatch(planned_tag)
+        if (
+            not isinstance(plan, dict)
+            or set(plan) != expected_plan_fields
+            or plan.get("contractName")
+            != "chummer.public-download-candidate-image-plan/v1"
+            or plan.get("sourceHead") != config.source_head
+            or not isinstance(plan.get("plannedAtUtc"), str)
+            or tag_match is None
+            or tag_match.group(1) != config.source_head[:16]
+            or not isinstance(digests, dict)
+            or set(digests) != CANDIDATE_BUILD_CONTEXT_NAMES
+            or any(
+                not isinstance(value, str)
+                or SHA256.fullmatch(value) is None
+                for value in digests.values()
+            )
+        ):
+            raise RecoveryUncertain(
+                "topology-B candidate image plan is malformed"
+            )
+        planned_digests: Mapping[str, str] = digests
+        if binding is None:
+            planned_image_ids = self._strict_output_lines(
+                self.runner.docker(
+                    [
+                        "image",
+                        "ls",
+                        "--quiet",
+                        "--no-trunc",
+                        planned_tag,
+                    ],
+                    label="resolve planned candidate image tag for cleanup",
+                ),
+                label="planned candidate image tag",
+            )
+            if planned_image_ids:
+                if (
+                    len(set(planned_image_ids)) != 1
+                    or any(
+                        IMAGE_ID.fullmatch(item) is None
+                        for item in planned_image_ids
+                    )
+                ):
+                    raise RecoveryUncertain(
+                        "planned candidate image tag is ambiguous"
+                    )
+                image_id = planned_image_ids[0]
+                binding = {
+                    "contractName": (
+                        "chummer.public-download-candidate-image-binding/v1"
+                    ),
+                    "candidateTag": planned_tag,
+                    "candidateImageId": image_id,
+                    "sourceHead": config.source_head,
+                    "boundAtUtc": utc_now(),
+                }
+                recovered_from_plan = True
+            else:
+                return {
+                    "disposition": "planned-image-absent",
+                    "candidateTag": planned_tag,
+                }
+        expected_fields = {
+            "contractName",
+            "candidateTag",
+            "candidateImageId",
+            "sourceHead",
+            "boundAtUtc",
+        }
+        if (
+            not isinstance(binding, dict)
+            or set(binding) != expected_fields
+            or binding.get("contractName")
+            != "chummer.public-download-candidate-image-binding/v1"
+            or binding.get("sourceHead") != config.source_head
+            or not isinstance(binding.get("boundAtUtc"), str)
+            or not isinstance(binding.get("candidateTag"), str)
+            or not isinstance(binding.get("candidateImageId"), str)
+        ):
+            raise RecoveryUncertain(
+                "topology-B candidate image binding is malformed"
+            )
+        tag = binding["candidateTag"]
+        image_id = binding["candidateImageId"]
+        tag_match = CANDIDATE_IMAGE_TAG.fullmatch(tag)
+        if (
+            tag != planned_tag
+            or tag_match is None
+            or tag_match.group(1) != config.source_head[:16]
+            or IMAGE_ID.fullmatch(image_id) is None
+        ):
+            raise RecoveryUncertain(
+                "topology-B candidate image binding is invalid"
+            )
+
+        all_image_ids = self._strict_output_lines(
+            self.runner.docker(
+                ["image", "ls", "--all", "--quiet", "--no-trunc"],
+                label="inventory local images for candidate cleanup",
+            ),
+            label="local image inventory",
+        )
+        if any(IMAGE_ID.fullmatch(item) is None for item in all_image_ids):
+            raise RecoveryUncertain("local image inventory is malformed")
+        tag_image_ids = self._strict_output_lines(
+            self.runner.docker(
+                ["image", "ls", "--quiet", "--no-trunc", tag],
+                label="resolve exact candidate image tag for cleanup",
+            ),
+            label="candidate image tag",
+        )
+        if any(IMAGE_ID.fullmatch(item) is None for item in tag_image_ids):
+            raise RecoveryUncertain("candidate image tag output is malformed")
+        if not tag_image_ids:
+            if image_id not in all_image_ids:
+                return {
+                    "disposition": "already-absent",
+                    "candidateTag": tag,
+                    "candidateImageId": image_id,
+                }
+            tag_present = False
+        else:
+            tag_present = True
+        if (
+            tag_present
+            and (
+                set(tag_image_ids) != {image_id}
+                or image_id not in all_image_ids
+            )
+        ):
+            raise RecoveryUncertain(
+                "candidate image tag no longer resolves to its bound image"
+            )
+        try:
+            inspection = json.loads(
+                self.runner.docker(
+                    ["image", "inspect", tag if tag_present else image_id],
+                    label="inspect exact candidate image for cleanup",
+                )
+            )
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise RecoveryUncertain(
+                "candidate image inspection is malformed"
+            ) from exc
+        if not isinstance(inspection, list) or len(inspection) != 1:
+            raise RecoveryUncertain(
+                "candidate image inspection does not match its binding"
+            )
+        inspected_image = inspection[0]
+        inspected_config = (
+            inspected_image.get("Config")
+            if isinstance(inspected_image, dict)
+            else None
+        )
+        inspected_labels = (
+            inspected_config.get("Labels")
+            if isinstance(inspected_config, dict)
+            else None
+        )
+        context_label_prefix = "run.chummer.build-context."
+        context_label_suffix = ".sha256"
+        observed_context_digests = (
+            {
+                key[
+                    len(context_label_prefix) : -len(context_label_suffix)
+                ]: value
+                for key, value in inspected_labels.items()
+                if isinstance(key, str)
+                and key.startswith(context_label_prefix)
+                and key.endswith(context_label_suffix)
+            }
+            if isinstance(inspected_labels, dict)
+            else {}
+        )
+        if (
+            not isinstance(inspected_image, dict)
+            or inspected_image.get("Id") != image_id
+            or set(inspected_image.get("RepoTags") or [])
+            != ({tag} if tag_present else set())
+            or inspected_image.get("RepoDigests") not in (None, [])
+            or not isinstance(inspected_labels, dict)
+            or inspected_labels.get("org.opencontainers.image.revision")
+            != config.source_head
+            or inspected_labels.get("run.chummer.runtime-profile")
+            != RUNTIME_PROFILE
+            or observed_context_digests != planned_digests
+        ):
+            raise RecoveryUncertain(
+                "candidate image inspection does not match its binding"
+            )
+        if recovered_from_plan:
+            self._record(
+                "candidate-image-recovered",
+                "candidateImage",
+                binding,
+            )
+        return {
+            "disposition": "remove",
+            "candidateTag": tag,
+            "candidateImageId": image_id,
+            "tagPresent": tag_present,
+        }
+
+    def _sidecar_container_references(
+        self,
+        config: SidecarConfig,
+        candidate_image_id: str | None,
+        *,
+        allow_exact_project_containers: bool,
+    ) -> list[str]:
+        container_ids = self._strict_output_lines(
+            self.runner.docker(
+                [
+                    "container",
+                    "ls",
+                    "--all",
+                    "--quiet",
+                    "--no-trunc",
+                ],
+                label="inventory containers for candidate image cleanup",
+            ),
+            label="container inventory",
+        )
+        if any(CONTAINER_ID.fullmatch(item) is None for item in container_ids):
+            raise RecoveryUncertain("container inventory is malformed")
+        project_references: list[str] = []
+        project_services: set[str] = set()
+        operation_volumes = set(config.volume_names.values())
+        for container_id in container_ids:
+            try:
+                container_inspection = json.loads(
+                    self.runner.docker(
+                        ["container", "inspect", container_id],
+                        label="inspect candidate image container reference",
+                    )
+                )
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise RecoveryUncertain(
+                    "container inspection is malformed"
+                ) from exc
+            if (
+                not isinstance(container_inspection, list)
+                or len(container_inspection) != 1
+                or not isinstance(container_inspection[0], dict)
+                or container_inspection[0].get("Id") != container_id
+                or IMAGE_ID.fullmatch(
+                    str(container_inspection[0].get("Image") or "")
+                )
+                is None
+                or not isinstance(
+                    container_inspection[0].get("Mounts"),
+                    list,
+                )
+            ):
+                raise RecoveryUncertain(
+                    "container inspection is ambiguous"
+                )
+            container = container_inspection[0]
+            mounts = container["Mounts"]
+            if any(
+                not isinstance(mount, dict)
+                or not isinstance(mount.get("Type"), str)
+                or (
+                    mount.get("Type") == "volume"
+                    and not isinstance(mount.get("Name"), str)
+                )
+                for mount in mounts
+            ):
+                raise RecoveryUncertain(
+                    "container mount inspection is ambiguous"
+                )
+            referenced_operation_volumes = [
+                mount["Name"]
+                for mount in mounts
+                if mount.get("Type") == "volume"
+                and mount.get("Name") in operation_volumes
+            ]
+            references_candidate = (
+                candidate_image_id is not None
+                and container.get("Image") == candidate_image_id
+            )
+            container_config = container.get("Config")
+            labels = (
+                container_config.get("Labels")
+                if isinstance(container_config, dict)
+                else None
+            )
+            service = (
+                labels.get("com.docker.compose.service")
+                if isinstance(labels, dict)
+                else None
+            )
+            references_project = (
+                isinstance(labels, dict)
+                and labels.get("com.docker.compose.project")
+                == config.project_name
+            )
+            if (
+                not references_candidate
+                and not referenced_operation_volumes
+                and not references_project
+            ):
+                continue
+            if (
+                not allow_exact_project_containers
+                or not isinstance(labels, dict)
+                or labels.get("com.docker.compose.project")
+                != config.project_name
+                or labels.get("com.docker.compose.project.config_files")
+                != str(config.compose_file)
+                or labels.get("com.docker.compose.project.working_dir")
+                != str(config.operation_root)
+                or labels.get("com.docker.compose.oneoff") != "False"
+                or labels.get("com.docker.compose.container-number") != "1"
+                or service
+                not in {"chummer-public-download-init", PORTAL_SERVICE}
+                or service in project_services
+                or not references_candidate
+                or len(referenced_operation_volumes)
+                != len(operation_volumes)
+                or set(referenced_operation_volumes) != operation_volumes
+            ):
+                raise RecoveryUncertain(
+                    "sidecar image or volume has a foreign or ambiguous "
+                    "container reference"
+                )
+            project_services.add(service)
+            project_references.append(container_id)
+        return sorted(project_references)
+
+    def _prove_sidecar_resources_unreferenced(
+        self,
+        config: SidecarConfig,
+        preflight: Mapping[str, Any],
+    ) -> None:
+        candidate_image_id = preflight.get("candidateImageId")
+        if candidate_image_id is not None and (
+            not isinstance(candidate_image_id, str)
+            or IMAGE_ID.fullmatch(candidate_image_id) is None
+        ):
+            raise RecoveryUncertain(
+                "candidate image cleanup identity is malformed"
+            )
+        self._sidecar_container_references(
+            config,
+            candidate_image_id,
+            allow_exact_project_containers=False,
+        )
+
+    def _prove_zero_sidecar_project_networks(
+        self,
+        config: SidecarConfig,
+        *,
+        phase: str,
+    ) -> None:
+        checks = (
+            (
+                "project-labeled",
+                [
+                    "network",
+                    "ls",
+                    "--quiet",
+                    "--no-trunc",
+                    "--filter",
+                    "label=com.docker.compose.project="
+                    f"{config.project_name}",
+                ],
+            ),
+            (
+                "default-name",
+                [
+                    "network",
+                    "ls",
+                    "--quiet",
+                    "--no-trunc",
+                    "--filter",
+                    "name=^"
+                    f"{re.escape(config.project_name + '_default')}$",
+                ],
+            ),
+        )
+        for scope, arguments in checks:
+            network_ids = self._strict_output_lines(
+                self.runner.docker(
+                    arguments,
+                    label=(
+                        f"prove zero {scope} topology-B networks "
+                        f"{phase}"
+                    ),
+                ),
+                label=f"{scope} topology-B network inventory",
+            )
+            if any(
+                CONTAINER_ID.fullmatch(network_id) is None
+                for network_id in network_ids
+            ):
+                raise RecoveryUncertain(
+                    "topology-B network inventory is malformed"
+                )
+            if network_ids:
+                raise RecoveryUncertain(
+                    "topology-B project network deletion scope is not empty"
+                )
+
+    def _remove_candidate_image(
+        self,
+        preflight: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        if preflight.get("disposition") != "remove":
+            return dict(preflight)
+        tag = str(preflight["candidateTag"])
+        image_id = str(preflight["candidateImageId"])
+        tag_image_ids = self._strict_output_lines(
+            self.runner.docker(
+                ["image", "ls", "--quiet", "--no-trunc", tag],
+                label="recheck exact candidate image tag before removal",
+            ),
+            label="candidate image tag recheck",
+        )
+        if preflight.get("tagPresent") is True:
+            if set(tag_image_ids) != {image_id}:
+                raise RecoveryUncertain(
+                    "candidate image tag changed after cleanup preflight"
+                )
+        elif tag_image_ids:
+            raise RecoveryUncertain(
+                "candidate image tag reappeared after cleanup preflight"
+            )
+        self.runner.docker(
+            ["image", "rm", image_id],
+            label="remove exact unused candidate image",
+        )
+        remaining_ids = self._strict_output_lines(
+            self.runner.docker(
+                ["image", "ls", "--all", "--quiet", "--no-trunc"],
+                label="verify candidate image removal",
+            ),
+            label="post-cleanup local image inventory",
+        )
+        remaining_tag_ids = self._strict_output_lines(
+            self.runner.docker(
+                ["image", "ls", "--quiet", "--no-trunc", tag],
+                label="verify candidate image tag removal",
+            ),
+            label="post-cleanup candidate image tag",
+        )
+        if (
+            any(IMAGE_ID.fullmatch(item) is None for item in remaining_ids)
+            or remaining_tag_ids
+            or image_id in remaining_ids
+        ):
+            raise RecoveryUncertain(
+                "candidate image removal could not be verified"
+            )
+        return {
+            "disposition": "removed",
+            "candidateTag": tag,
+            "candidateImageId": image_id,
+        }
+
     def cleanup_sidecar_resources(
         self,
         config: SidecarConfig,
         *_args: Any,
     ) -> dict[str, Any]:
-        runtime = self._state.get("receipts", {}).get("runtime", {})
-        environment = runtime.get("environment", {})
-        if config.compose_file.is_file() and isinstance(environment, dict):
-            self.runner.compose(
-                ["down", "--remove-orphans"],
-                environment={
-                    str(key): str(value)
-                    for key, value in environment.items()
-                },
-                label="remove exact topology-B sidecar project",
-                timeout=600,
+        receipts = self._state.get("receipts")
+        if not isinstance(receipts, dict):
+            raise RecoveryUncertain("topology-B operation receipts are malformed")
+        runtime = receipts.get("runtime")
+        if runtime is not None and not isinstance(runtime, dict):
+            raise RecoveryUncertain("topology-B runtime receipt is malformed")
+        pre_runtime_absence: dict[str, Any] | None = None
+        if runtime is not None:
+            environment, rendered_compose_sha256 = (
+                self._validated_runtime_environment(
+                    config,
+                    runtime,
+                    receipts,
+                )
             )
-        removed: list[str] = []
-        for name in config.volume_names.values():
+        else:
+            environment = None
+            rendered_compose_sha256 = None
+            pre_runtime_absence = self._prove_pre_runtime_absence(config)
+        candidate_preflight = self._preflight_candidate_image(config)
+        candidate_image_id = candidate_preflight.get("candidateImageId")
+        self._sidecar_container_references(
+            config,
+            (
+                str(candidate_image_id)
+                if candidate_image_id is not None
+                else None
+            ),
+            allow_exact_project_containers=runtime is not None,
+        )
+        self._prove_zero_sidecar_project_networks(
+            config,
+            phase="before cleanup",
+        )
+        if runtime is not None:
+            if environment is None or rendered_compose_sha256 is None:
+                raise RecoveryUncertain(
+                    "topology-B runtime Compose authority is unavailable"
+                )
+            compose_disposition = "remove"
+        else:
+            environment = None
+            compose_disposition = "not-created"
+        removable: list[str] = []
+        for logical, name in config.volume_names.items():
             listed = self.runner.docker(
                 [
                     "volume",
@@ -6331,35 +7534,96 @@ class TopologyBActions:
                     f"name=^{name}$",
                 ],
                 label="resolve exact topology-B volume",
-            ).decode("utf-8", errors="strict").splitlines()
-            if name not in listed:
-                continue
-            inspection = json.loads(
-                self.runner.docker(
-                    ["volume", "inspect", name],
-                    label="inspect exact topology-B volume",
-                )
             )
+            listed_names = self._strict_output_lines(
+                listed,
+                label="exact topology-B volume",
+            )
+            if not listed_names:
+                continue
+            if set(listed_names) != {name}:
+                raise RecoveryUncertain(
+                    "topology-B volume resolution is ambiguous"
+                )
+            try:
+                inspection = json.loads(
+                    self.runner.docker(
+                        ["volume", "inspect", name],
+                        label="inspect exact topology-B volume",
+                    )
+                )
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise RecoveryUncertain(
+                    "topology-B volume inspection is malformed"
+                ) from exc
             if (
                 not isinstance(inspection, list)
                 or len(inspection) != 1
+                or not isinstance(inspection[0], dict)
                 or inspection[0].get("Name") != name
-                or (
-                    inspection[0].get("Labels") or {}
-                ).get("run.chummer.public-download-operation")
-                != config.project_name
+                or (inspection[0].get("Labels") or {})
+                != {
+                    "run.chummer.public-download-operation": (
+                        config.project_name
+                    ),
+                    "run.chummer.public-download-logical-volume": logical,
+                }
             ):
                 raise RecoveryUncertain(
                     "topology-B volume identity is ambiguous"
                 )
+            removable.append(name)
+        if runtime is not None:
+            self._prove_rendered_compose_unchanged(
+                environment,
+                rendered_compose_sha256,
+            )
+            self.runner.compose(
+                ["down", "--remove-orphans"],
+                environment=environment,
+                label="remove exact topology-B sidecar project",
+                timeout=600,
+            )
+            compose_disposition = "removed"
+        self._prove_sidecar_resources_unreferenced(
+            config,
+            candidate_preflight,
+        )
+        self._prove_zero_sidecar_project_networks(
+            config,
+            phase="after cleanup",
+        )
+        removed: list[str] = []
+        for name in removable:
             self.runner.docker(
                 ["volume", "rm", name],
                 label="remove exact topology-B volume",
             )
+            remaining = self._strict_output_lines(
+                self.runner.docker(
+                    [
+                        "volume",
+                        "ls",
+                        "--quiet",
+                        "--filter",
+                        f"name=^{name}$",
+                    ],
+                    label="verify exact topology-B volume removal",
+                ),
+                label="post-cleanup topology-B volume",
+            )
+            if remaining:
+                raise RecoveryUncertain(
+                    "topology-B volume removal could not be verified"
+                )
             removed.append(name)
+        candidate_image = self._remove_candidate_image(candidate_preflight)
         receipt = {
             "projectName": config.project_name,
+            "composeDisposition": compose_disposition,
+            "preRuntimeAbsence": pre_runtime_absence,
             "removedVolumes": removed,
+            "candidateImage": candidate_image,
         }
         self._record("cleaned", "cleanup", receipt)
         return receipt
@@ -6624,15 +7888,33 @@ def execute_topology_b(
         }
     except Exception as original:
         if cloudflare_committed:
+            evidence_error: Exception | None = None
+            try:
+                action_boundary.record_primary_failure(config, original)
+            except Exception as error:
+                evidence_error = error
+            suffix = (
+                "; primary failure evidence could not be retained"
+                if evidence_error is not None
+                else ""
+            )
             raise RecoveryUncertain(
-                "Cloudflare committed; active authority requires reconciliation"
-            ) from original
+                "Cloudflare committed; active authority requires "
+                f"reconciliation{suffix}"
+            ) from (evidence_error or original)
         if not cloudflare_transaction_started:
+            try:
+                action_boundary.record_primary_failure(config, original)
+            except Exception as evidence_error:
+                raise RecoveryUncertain(
+                    "topology-B primary failure evidence could not be retained"
+                ) from evidence_error
             try:
                 action_boundary.cleanup_sidecar_resources(config)
             except Exception as cleanup_error:
                 raise RecoveryUncertain(
-                    "pre-Cloudflare sidecar cleanup is uncertain"
+                    "pre-Cloudflare sidecar cleanup is uncertain; "
+                    "primary failure evidence was retained"
                 ) from cleanup_error
             raise CutoverError(
                 "topology-B cutover failed before Cloudflare mutation"
@@ -6644,11 +7926,36 @@ def execute_topology_b(
                 phase="after-rollback",
                 hosts=SIDECAR_HOSTS,
             )
-            action_boundary.cleanup_sidecar_resources(config)
         except Exception as recovery_error:
+            try:
+                action_boundary.record_primary_failure(config, original)
+            except Exception:
+                pass
             raise RecoveryUncertain(
                 "topology-B rollback or incumbent verification is uncertain"
             ) from recovery_error
+        evidence_error = None
+        try:
+            action_boundary.record_primary_failure(config, original)
+        except Exception as error:
+            evidence_error = error
+        try:
+            action_boundary.cleanup_sidecar_resources(config)
+        except Exception as cleanup_error:
+            suffix = (
+                "; primary failure evidence could not be retained"
+                if evidence_error is not None
+                else "; primary failure evidence was retained"
+            )
+            raise RecoveryUncertain(
+                "topology-B failed after exact rollback but sidecar cleanup "
+                f"is uncertain{suffix}"
+            ) from cleanup_error
+        if evidence_error is not None:
+            raise RecoveryUncertain(
+                "topology-B failed after exact rollback and cleanup; "
+                "primary failure evidence could not be retained"
+            ) from evidence_error
         raise CutoverError(
             "topology-B cutover failed after exact rollback"
         ) from original
