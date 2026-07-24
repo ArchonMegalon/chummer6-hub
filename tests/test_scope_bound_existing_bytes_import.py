@@ -10,6 +10,8 @@ import sys
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MATERIALIZER = (
     REPO_ROOT
@@ -177,7 +179,8 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "kind": "installer",
         "payloadAcquisitionMode": "download",
         "payloadDownloadUrl": (
-            f"/downloads/g/{GENERATION_ID}/files/{payload_name}"
+            f"/downloads/g/{GENERATION_ID}/install/"
+            "avalonia-win-x64-installer/payload"
         ),
         "payloadFileName": payload_name,
         "payloadSha256": payload_sha,
@@ -189,16 +192,85 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "sizeBytes": len(installer_raw),
         "version": VERSION,
     }
+    semantic_install_route = (
+        "/downloads/install/avalonia-win-x64-installer"
+    )
+    fallback_install_route = (
+        "/downloads/install/blazor-desktop-win-x64-installer"
+    )
+    semantic_row = {
+        "artifactId": "avalonia-win-x64-installer",
+        "head": "avalonia",
+        "platform": "windows",
+        "publicInstallRoute": semantic_install_route,
+        "rid": "win-x64",
+        "tupleId": "avalonia:windows:win-x64",
+    }
+    coverage = {
+        "complete": True,
+        "desktopRouteTruth": [
+            dict(semantic_row),
+            {
+                "artifactId": "",
+                "head": "blazor-desktop",
+                "platform": "windows",
+                "publicInstallRoute": fallback_install_route,
+                "rid": "win-x64",
+                "tupleId": "blazor-desktop:windows:win-x64",
+            },
+        ],
+        "externalProofRequests": [],
+        "missingRequiredHeads": [],
+        "missingRequiredPlatformHeadPairs": [],
+        "missingRequiredPlatformHeadRidTuples": [],
+        "missingRequiredPlatforms": [],
+        "promotedInstallerTuples": [
+            {
+                "arch": "x64",
+                "artifactId": "avalonia-win-x64-installer",
+                "head": "avalonia",
+                "kind": "installer",
+                "platform": "windows",
+                "rid": "win-x64",
+                "tupleId": "avalonia:windows:win-x64",
+            }
+        ],
+        "promotedPlatformHeadRidTuples": [
+            "avalonia:win-x64:windows"
+        ],
+        "promotedPlatformHeads": {"windows": ["avalonia"]},
+        "requiredDesktopHeads": ["avalonia"],
+        "requiredDesktopPlatformHeadRidTuples": [
+            "avalonia:win-x64:windows"
+        ],
+        "requiredDesktopPlatforms": ["windows"],
+    }
+    install_aware = [
+        {
+            "artifactId": "avalonia-win-x64-installer",
+            "conciergeAssetRefs": {
+                "publicTrustWrapper": semantic_install_route
+            },
+            "head": "avalonia",
+            "platform": "windows",
+            "recoveryProofRefs": [semantic_install_route],
+            "rid": "win-x64",
+            "tupleId": "avalonia:windows:win-x64",
+        }
+    ]
     canonical = {
+        "artifactIdentityRegistry": [dict(semantic_row)],
+        "artifactPublicationBindings": [dict(semantic_row)],
         "artifacts": [artifact],
         "channel": "preview",
         "channelId": "preview",
-        "desktopTupleCoverage": {
-            "requiredDesktopHeads": ["avalonia"],
-            "requiredDesktopPlatforms": ["windows"],
-        },
+        "desktopSurfaceRefs": [dict(semantic_row)],
+        "desktopTupleCoverage": coverage,
         "generationId": GENERATION_ID,
+        "installAwareArtifactRegistry": install_aware,
         "platformScope": "windows_only",
+        "registryCommit": REGISTRY_COMMIT,
+        "registry_commit": REGISTRY_COMMIT,
         "releaseVersion": VERSION,
         "version": VERSION,
     }
@@ -207,15 +279,18 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "url": artifact["downloadUrl"],
     }
     compatibility = {
+        "artifactIdentityRegistry": [dict(semantic_row)],
+        "artifactPublicationBindings": [dict(semantic_row)],
         "channel": "preview",
         "channelId": "preview",
-        "desktopTupleCoverage": {
-            "requiredDesktopHeads": ["avalonia"],
-            "requiredDesktopPlatforms": ["windows"],
-        },
+        "desktopSurfaceRefs": [dict(semantic_row)],
+        "desktopTupleCoverage": coverage,
         "downloads": [compatibility_row],
         "generationId": GENERATION_ID,
+        "installAwareArtifactRegistry": install_aware,
         "platformScope": "windows_only",
+        "registryCommit": REGISTRY_COMMIT,
+        "registry_commit": REGISTRY_COMMIT,
         "releaseVersion": VERSION,
         "version": VERSION,
     }
@@ -348,6 +423,11 @@ def test_materializer_roundtrips_through_projection_and_cutover_validator(
     assert binding["retainedPlatforms"] == []
     assert binding["shelfPlatforms"] == ["windows"]
     assert binding["releaseScopeDecisionSha256"] == item["decisionSha"]
+    assert binding["sourceCommitPosture"] == {
+        "hub": "cutover_source_head_required",
+        "registry": "bound_to_sealed_manifest_aliases",
+        "ui": "caller_asserted_unverified_informational",
+    }
 
     snapshot_root = tmp_path / "projection"
     snapshot_root.mkdir(mode=0o700)
@@ -394,6 +474,11 @@ def test_materializer_roundtrips_through_projection_and_cutover_validator(
         "hub": HUB_COMMIT,
         "registry": REGISTRY_COMMIT,
         "ui": UI_COMMIT,
+    }
+    assert receipt["sourceCommitVerification"] == {
+        "hub": "verified_against_cutover_source_head",
+        "registry": "verified_against_manifest_aliases",
+        "ui": "caller_asserted_unverified_informational",
     }
 
 
@@ -464,6 +549,25 @@ def test_materializer_rejects_group_writable_candidate_mode(
     assert not item["direct"].exists()
 
 
+def test_materializer_rejects_special_candidate_mode(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    payload = (
+        item["bundle"]
+        / "files"
+        / "chummer-avalonia-win-x64-payload.zip"
+    )
+    payload.chmod(0o4600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "unsafe mode" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
 def test_materializer_rejects_manifest_pair_byte_drift(
     tmp_path: Path,
 ) -> None:
@@ -516,3 +620,250 @@ def test_materializer_rejects_protocol_relative_payload_url(
     assert "sidecar differs from the manifest byte graph" in completed.stderr
     assert not item["authority"].exists()
     assert not item["direct"].exists()
+
+
+def test_materializer_rejects_generation_route_drift(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    canonical = json.loads(item["canonical"].read_text())
+    compatibility = json.loads(item["compatibility"].read_text())
+    canonical["artifacts"][0]["payloadDownloadUrl"] = (
+        "https://example.invalid/payload?access_token=credential-value"
+    )
+    compatibility["downloads"][0]["payloadDownloadUrl"] = (
+        "https://example.invalid/payload?access_token=credential-value"
+    )
+    item["canonical"].write_bytes(pretty_bytes(canonical))
+    item["canonical"].chmod(0o600)
+    item["compatibility"].write_bytes(pretty_bytes(compatibility))
+    item["compatibility"].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert (
+        "credential-shaped material" in completed.stderr
+        or "generation-aware manifest routes drifted" in completed.stderr
+        or "URL query or fragment" in completed.stderr
+    )
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_non_windows_required_platforms(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    for key in ("canonical", "compatibility"):
+        manifest = json.loads(item[key].read_text())
+        manifest["desktopTupleCoverage"]["requiredDesktopPlatforms"] = [
+            "linux",
+            "macos",
+            "windows",
+        ]
+        item[key].write_bytes(pretty_bytes(manifest))
+        item[key].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "Windows source posture drifted" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_registry_source_commit_drift(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    for key in ("canonical", "compatibility"):
+        manifest = json.loads(item[key].read_text())
+        manifest["registryCommit"] = "d" * 40
+        manifest["registry_commit"] = "d" * 40
+        item[key].write_bytes(pretty_bytes(manifest))
+        item[key].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "Windows source posture drifted" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_nested_manifest_authority_overclaim(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    for key in ("canonical", "compatibility"):
+        manifest = json.loads(item[key].read_text())
+        manifest["publicationAuthorized"] = True
+        manifest["deployAuthority"] = True
+        item[key].write_bytes(pretty_bytes(manifest))
+        item[key].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert (
+        "must not claim authority" in completed.stderr
+        or "must be exactly false" in completed.stderr
+    )
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_unknown_nested_authority_overclaim(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    canonical = json.loads(item["canonical"].read_text())
+    canonical["servingAuthority"] = True
+    item["canonical"].write_bytes(pretty_bytes(canonical))
+    item["canonical"].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "must not claim authority" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_nested_semantic_route_escape(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    canonical = json.loads(item["canonical"].read_text())
+    canonical["artifactPublicationBindings"][0][
+        "publicInstallRoute"
+    ] = "https://example.invalid/install?access_token=credential-value"
+    item["canonical"].write_bytes(pretty_bytes(canonical))
+    item["canonical"].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert (
+        "credential-shaped material" in completed.stderr
+        or "semantic route graph drifted" in completed.stderr
+        or "URL query or fragment" in completed.stderr
+    )
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+@pytest.mark.parametrize(
+    "support_url",
+    (
+        "/support?accessToken=credential-value",
+        "/support?access-token=credential-value",
+        "/support?access%5Ftoken=credential-value",
+        "/support?token=credential-value",
+        "/support#credential-value",
+    ),
+)
+def test_materializer_rejects_query_or_fragment_in_extension_url(
+    tmp_path: Path,
+    support_url: str,
+) -> None:
+    item = fixture(tmp_path)
+    for key in ("canonical", "compatibility"):
+        manifest = json.loads(item[key].read_text())
+        manifest["extension"] = {"supportUrl": support_url}
+        item[key].write_bytes(pretty_bytes(manifest))
+        item[key].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "URL query or fragment" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_rejects_nested_non_windows_coverage(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    for key in ("canonical", "compatibility"):
+        manifest = json.loads(item[key].read_text())
+        coverage = manifest["desktopTupleCoverage"]
+        coverage["promotedPlatformHeads"]["macos"] = ["avalonia"]
+        coverage["desktopRouteTruth"].append(
+            {
+                "artifactId": "avalonia-osx-arm64-installer",
+                "head": "avalonia",
+                "platform": "macos",
+                "publicInstallRoute": (
+                    "/downloads/install/avalonia-osx-arm64-installer"
+                ),
+                "rid": "osx-arm64",
+                "tupleId": "avalonia:macos:osx-arm64",
+            }
+        )
+        item[key].write_bytes(pretty_bytes(manifest))
+        item[key].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "Windows source posture drifted" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_materializer_requires_both_registry_commit_aliases(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    canonical = json.loads(item["canonical"].read_text())
+    del canonical["registry_commit"]
+    item["canonical"].write_bytes(pretty_bytes(canonical))
+    item["canonical"].chmod(0o600)
+
+    completed = invoke(item)
+
+    assert completed.returncode != 0
+    assert "Windows source posture drifted" in completed.stderr
+    assert not item["authority"].exists()
+    assert not item["direct"].exists()
+
+
+def test_cutover_rejects_nonadjacent_direct_import_receipt(
+    tmp_path: Path,
+) -> None:
+    item = fixture(tmp_path)
+    completed = invoke(item)
+    assert completed.returncode == 0, completed.stderr
+    outside = tmp_path / "outside"
+    outside.mkdir(mode=0o700)
+    copied_direct = (
+        outside / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    )
+    write(copied_direct, item["direct"].read_bytes())
+    projection = load_module(
+        PROJECTION, "scope_bound_projection_nonadjacent_direct"
+    )
+    cutover = load_module(
+        CUTOVER, "scope_bound_cutover_nonadjacent_direct"
+    )
+    config = SimpleNamespace(
+        source_root=REPO_ROOT,
+        source_head=HUB_COMMIT,
+        candidate_import_authority=item["authority"],
+        candidate_import_authority_sha256=sha(item["authority"]),
+        direct_import_receipt=copied_direct,
+        direct_import_receipt_sha256=sha(copied_direct),
+        release_candidate_root=item["bundle"],
+        migration_candidate_root=tmp_path / "unused-migration",
+        release_channel_receipt=item["canonical"],
+        release_channel_receipt_sha256=sha(item["canonical"]),
+    )
+
+    with pytest.raises(cutover.CutoverError, match="candidate-adjacent"):
+        cutover.validate_release_candidate_authority(
+            config,
+            projection_verifier=projection,
+        )

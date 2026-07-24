@@ -2678,6 +2678,19 @@ def _retired_topology_a_parse_args(argv: list[str] | None = None) -> Config:
 TOPOLOGY_B_CONTRACT = "chummer.public-download-only-topology-b/v1"
 TOPOLOGY_B_OPERATION_SCHEMA = "chummer.public-download-only-operation/v1"
 TOPOLOGY_B_ACTIVE_SCHEMA = "chummer.public-download-only-active-runtime/v1"
+SCOPE_BOUND_EXISTING_BYTES_PROFILE = (
+    "v3_scope_bound_existing_windows_bytes"
+)
+SCOPE_BOUND_SOURCE_COMMIT_POSTURE = {
+    "hub": "cutover_source_head_required",
+    "registry": "bound_to_sealed_manifest_aliases",
+    "ui": "caller_asserted_unverified_informational",
+}
+SCOPE_BOUND_SOURCE_COMMIT_VERIFICATION = {
+    "hub": "verified_against_cutover_source_head",
+    "registry": "verified_against_manifest_aliases",
+    "ui": "caller_asserted_unverified_informational",
+}
 SIDECAR_ORIGIN = "http://172.17.0.1:18091"
 SIDECAR_ADDRESS = "172.17.0.1"
 SIDECAR_PORT = 18091
@@ -4904,7 +4917,14 @@ def _validate_scope_bound_existing_bytes_candidate(
 ) -> dict[str, Any]:
     """Validate the zero-retention existing-bytes v3 import profile."""
 
-    profile = projection_verifier.CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    profile = SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    if config.direct_import_receipt != (
+        config.release_candidate_root.parent
+        / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    ):
+        raise CutoverError(
+            "scope-bound direct-import receipt is not candidate-adjacent"
+        )
     direct_keys = {
         "canonicalManifest",
         "compatibilityManifest",
@@ -4920,6 +4940,7 @@ def _validate_scope_bound_existing_bytes_candidate(
         "release",
         "releaseScopeDecision",
         "signature",
+        "sourceCommitPosture",
         "sourceCommits",
         "status",
         "transport",
@@ -4951,6 +4972,8 @@ def _validate_scope_bound_existing_bytes_candidate(
         )
         or direct_import.get("release")
         != {"channel": "preview", "version": candidate.get("version")}
+        or direct_import.get("sourceCommitPosture")
+        != SCOPE_BOUND_SOURCE_COMMIT_POSTURE
         or direct_import.get("hubCandidateImportAuthority")
         != {
             "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
@@ -5011,6 +5034,13 @@ def _validate_scope_bound_existing_bytes_candidate(
             generation_raw,
             label="scope-bound generation inventory",
         )
+        canonical = projection_verifier._strict_json_object(
+            canonical_raw, label="scope-bound canonical manifest"
+        )
+        compatibility = projection_verifier._strict_json_object(
+            compatibility_raw,
+            label="scope-bound compatibility manifest",
+        )
     except CutoverError:
         raise
     except Exception as exc:
@@ -5031,6 +5061,10 @@ def _validate_scope_bound_existing_bytes_candidate(
         not isinstance(binding, dict)
         or not isinstance(source_commits, dict)
         or source_commits != binding.get("sourceCommits")
+        or binding.get("sourceCommitPosture")
+        != SCOPE_BOUND_SOURCE_COMMIT_POSTURE
+        or direct_import.get("sourceCommitPosture")
+        != binding.get("sourceCommitPosture")
         or set(source_commits) != {"hub", "registry", "ui"}
         or any(
             COMMIT.fullmatch(str(source_commits.get(name) or "")) is None
@@ -5063,6 +5097,17 @@ def _validate_scope_bound_existing_bytes_candidate(
         raise CutoverError(
             "scope-bound direct-import receipt byte graph drifted"
         )
+    try:
+        projection_verifier._validate_scope_bound_manifest_source_and_routes(
+            canonical,
+            compatibility,
+            generation_id=str(binding.get("generationId") or ""),
+            registry_commit=str(source_commits["registry"]),
+        )
+    except Exception as exc:
+        raise CutoverError(
+            "scope-bound manifest source or route revalidation failed"
+        ) from exc
 
     release_files = [
         {**row, "mode": release_modes[str(row["path"])]}
@@ -5155,9 +5200,6 @@ def _validate_scope_bound_existing_bytes_candidate(
         sidecar = projection_verifier._strict_json_object(
             sidecar_raw, label="scope-bound Windows payload sidecar"
         )
-        canonical = projection_verifier._strict_json_object(
-            canonical_raw, label="scope-bound canonical manifest"
-        )
         installer = canonical["artifacts"][0]
         payload_name = str(installer.get("payloadFileName") or "")
         sidecar_url = urlsplit(str(sidecar.get("downloadUrl") or ""))
@@ -5218,6 +5260,9 @@ def _validate_scope_bound_existing_bytes_candidate(
             "releaseScopeDecisionSha256"
         ],
         "sourceCommits": dict(source_commits),
+        "sourceCommitVerification": (
+            SCOPE_BOUND_SOURCE_COMMIT_VERIFICATION
+        ),
         "directImportReceipt": {
             "path": str(config.direct_import_receipt),
             "sha256": config.direct_import_receipt_sha256,
@@ -5305,7 +5350,7 @@ def validate_release_candidate_authority(
         raise CutoverError("direct-import receipt is malformed") from exc
     if (
         authority.get("projectionProfile")
-        == projection_verifier.CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+        == SCOPE_BOUND_EXISTING_BYTES_PROFILE
     ):
         return _validate_scope_bound_existing_bytes_candidate(
             config,

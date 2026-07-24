@@ -53,6 +53,11 @@ DIRECT_SIGNATURE = {
     "required": False,
     "status": "unsigned",
 }
+SOURCE_COMMIT_POSTURE = {
+    "hub": "cutover_source_head_required",
+    "registry": "bound_to_sealed_manifest_aliases",
+    "ui": "caller_asserted_unverified_informational",
+}
 
 
 class ImportMaterializationError(ValueError):
@@ -128,16 +133,16 @@ def _safe_tree_modes(
         not stat.S_ISDIR(metadata.st_mode)
         or stat.S_ISLNK(metadata.st_mode)
         or metadata.st_uid != os.geteuid()
-        or root_mode & 0o022
+        or root_mode & 0o7022
         or root_mode & 0o500 != 0o500
     ):
         _fail("candidate root has unsafe ownership or mode")
     for path, mode in file_modes.items():
-        if mode & 0o022 or mode & 0o400 != 0o400:
+        if mode & 0o7022 or mode & 0o400 != 0o400:
             _fail(f"candidate file has unsafe mode: {path}")
     for row in directory_modes:
         mode = int(row["mode"])
-        if mode & 0o022 or mode & 0o500 != 0o500:
+        if mode & 0o7022 or mode & 0o500 != 0o500:
             _fail(f"candidate directory has unsafe mode: {row['path']}")
     return root_mode
 
@@ -145,6 +150,9 @@ def _safe_tree_modes(
 def _strict_json_bytes(raw: bytes, *, label: str) -> dict[str, Any]:
     value = candidate_tools._strict_json_bytes(raw, label=label)
     projection._scope_bound_secret_free(value, label=label)
+    projection._candidate_validate_unsigned_profile_recursive_authority(
+        value, label=label
+    )
     return value
 
 
@@ -448,12 +456,19 @@ def _materialize(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
         label="candidate release version",
     )
     candidate = _candidate_identity(version, canonical_raw, rows)
+    commits = _source_commits(args)
     installer = _validate_manifest_pair(
         canonical,
         compatibility,
         candidate=candidate,
         rows=rows,
         generation_id=args.generation_id.strip(),
+    )
+    projection._validate_scope_bound_manifest_source_and_routes(
+        canonical,
+        compatibility,
+        generation_id=args.generation_id.strip(),
+        registry_commit=commits["registry"],
     )
     _validate_sidecar(
         bundle_root,
@@ -463,7 +478,6 @@ def _materialize(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
     decision_raw, _decision, scope_authority = _validate_scope(
         args, version=version
     )
-    commits = _source_commits(args)
 
     inventory = {
         "contractName": "chummer.release-upload.candidate-inventory/v1",
@@ -554,6 +568,7 @@ def _materialize(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
             generation_inventory_raw
         ).hexdigest(),
         "sourceCommits": commits,
+        "sourceCommitPosture": SOURCE_COMMIT_POSTURE,
         "freshDelta": fresh_delta,
         "retainedFromIncumbent": [],
         "retainedPlatforms": [],
@@ -632,6 +647,7 @@ def _materialize(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, An
         "deployAuthorized": False,
         "release": {"channel": "preview", "version": version},
         "sourceCommits": commits,
+        "sourceCommitPosture": SOURCE_COMMIT_POSTURE,
         "hubCandidateImportAuthority": {
             "path": AUTHORITY_NAME,
             "sha256": authority_sha,
