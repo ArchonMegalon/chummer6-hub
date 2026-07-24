@@ -45,8 +45,20 @@ MANAGED_HOSTS = ("chummer.run", "www.chummer.run")
 # Go/RE2-compatible: capturing groups only; no lookaround or backreferences.
 GENERATION_ID_RE2 = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 PORTABLE_FILE_LEAF_RE2 = r"[A-Za-z0-9][A-Za-z0-9._+-]{0,254}"
+MANAGED_CONTROL_PATHS = (
+    "/api/ready/public-downloads",
+    "/api/ready",
+    "/api/ready/publication",
+    "/api/ready/install-linking-authority",
+    "/api/v1/install-linking/me",
+    "/account/access/install-link",
+    "/downloads/install/public-download-only-probe",
+)
+MANAGED_CONTROL_PATH_RE2 = "|".join(MANAGED_CONTROL_PATHS)
 MANAGED_PATH_RE2 = (
-    r"^(/api/ready/public-downloads|/downloads/"
+    r"^("
+    + MANAGED_CONTROL_PATH_RE2
+    + r"|/downloads/"
     r"(releases\.json|RELEASE_CHANNEL\.generated\.json|g/"
     + GENERATION_ID_RE2
     + r"/(releases\.json|RELEASE_CHANNEL\.generated\.json|files/"

@@ -4983,6 +4983,7 @@ def _probe_exact_manifest(
     expected: bytes,
     shelf: Mapping[str, Any],
     generation_id: str | None,
+    timeout: float = 30,
 ) -> dict[str, Any]:
     status, headers, body = _http_bytes(
         scheme=scheme,
@@ -4990,7 +4991,7 @@ def _probe_exact_manifest(
         connect_port=connect_port,
         request_host=request_host,
         path=path,
-        timeout=30,
+        timeout=timeout,
     )
     if status != 200:
         raise CutoverError("served manifest did not return HTTP 200")
@@ -5523,6 +5524,64 @@ def probe_sidecar_hosts(
         "observations": observations,
         "artifactVerification": artifact_verification,
     }
+
+
+def _local_served_generation_manifest_sha256(
+    local_probe: Mapping[str, Any],
+    *,
+    generation_id: str,
+) -> str:
+    expected_endpoints = {
+        (
+            f"http://{hostname}/downloads/g/{generation_id}/"
+            "releases.json"
+        )
+        for hostname in SIDECAR_HOSTS
+    }
+    if (
+        local_probe.get("status") != "pass"
+        or local_probe.get("origin") != SIDECAR_ORIGIN
+        or local_probe.get("hosts") != list(SIDECAR_HOSTS)
+        or local_probe.get("generationId") != generation_id
+        or not isinstance(local_probe.get("observations"), list)
+    ):
+        raise CutoverError(
+            "recorded local generation probe authority is malformed"
+        )
+    matched: dict[str, str] = {}
+    for candidate in local_probe["observations"]:
+        if not isinstance(candidate, Mapping):
+            raise CutoverError(
+                "recorded local generation probe observation is malformed"
+            )
+        endpoint = candidate.get("endpoint")
+        if endpoint not in expected_endpoints:
+            continue
+        if endpoint in matched:
+            raise CutoverError(
+                "recorded local generation probe endpoint is duplicated"
+            )
+        body_sha256 = str(candidate.get("bodySha256") or "")
+        if (
+            candidate.get("httpStatus") != 200
+            or candidate.get("generationId") != generation_id
+            or candidate.get("anonymous") is not True
+            or SHA256.fullmatch(body_sha256) is None
+        ):
+            raise CutoverError(
+                "recorded local generation probe observation is invalid"
+            )
+        matched[str(endpoint)] = body_sha256
+    if set(matched) != expected_endpoints:
+        raise CutoverError(
+            "recorded local generation probe host closure is incomplete"
+        )
+    unique_sha256 = set(matched.values())
+    if len(unique_sha256) != 1:
+        raise CutoverError(
+            "recorded local generation probe body digest diverged by host"
+        )
+    return unique_sha256.pop()
 
 
 def probe_public_incumbent(
@@ -8449,7 +8508,10 @@ class TopologyBActions:
         self,
         config: SidecarConfig,
         shelf: Mapping[str, Any],
-        *_args: Any,
+        _runtime: Mapping[str, Any],
+        _sidecar: Mapping[str, Any],
+        local_probe: Mapping[str, Any],
+        _incumbent: Mapping[str, Any],
     ) -> dict[str, Any]:
         release_revalidation = validate_release_candidate_authority(
             config,
@@ -8480,10 +8542,20 @@ class TopologyBActions:
             release_revalidation,
         )
         generation_id = str(shelf["generationId"])
-        manifest = stable_regular_bytes(
-            Path(str(shelf["generationRoot"])) / "releases.json",
-            label="Cloudflare probe generation manifest",
-            maximum_bytes=8 * 1024 * 1024,
+        recorded_local_probe = (
+            self._state.get("receipts", {}).get("localProbe")
+            if isinstance(self._state.get("receipts"), dict)
+            else None
+        )
+        if local_probe != recorded_local_probe:
+            raise CutoverError(
+                "local generation probe changed before Cloudflare capture"
+            )
+        served_manifest_sha256 = (
+            _local_served_generation_manifest_sha256(
+                local_probe,
+                generation_id=generation_id,
+            )
         )
         receipt = self.cloudflare.capture_transaction(
             self._cloudflare_api(),
@@ -8494,7 +8566,7 @@ class TopologyBActions:
             probe_endpoint=(
                 f"https://chummer.run/downloads/g/{generation_id}/releases.json"
             ),
-            probe_body_sha256=sha256_bytes(manifest),
+            probe_body_sha256=served_manifest_sha256,
             journal_path=config.cloudflare_journal,
             lock_path=config.cloudflare_lock,
         )
@@ -8527,11 +8599,91 @@ class TopologyBActions:
         self._record("cloudflare-applied", "cloudflareApply", summary)
         return summary
 
+    def _wait_for_public_generation_convergence(
+        self,
+        shelf: Mapping[str, Any],
+        *,
+        sleep_fn: Callable[[float], None] = time.sleep,
+        monotonic_fn: Callable[[], float] = time.monotonic,
+        interval_seconds: float = 2.0,
+    ) -> list[dict[str, Any]]:
+        if interval_seconds <= 0:
+            raise CutoverError(
+                "public generation convergence interval is invalid"
+            )
+        journal = self.cloudflare.load_journal(
+            self.config.cloudflare_journal
+        )
+        generation_id = str(shelf["generationId"])
+        expected_body_sha256 = str(
+            journal.get("probeBodySha256") or ""
+        )
+        if (
+            journal.get("generationId") != generation_id
+            or SHA256.fullmatch(expected_body_sha256) is None
+        ):
+            raise CutoverError(
+                "Cloudflare public generation probe authority drifted"
+            )
+        generation_root = Path(str(shelf["generationRoot"]))
+        manifest = stable_regular_bytes(
+            generation_root / "releases.json",
+            label="prepared generation compatibility manifest",
+            maximum_bytes=8 * 1024 * 1024,
+        )
+        path = f"/downloads/g/{generation_id}/releases.json"
+        deadline = monotonic_fn() + self.config.ready_timeout_seconds
+        last_error: BaseException | None = None
+        while True:
+            observations: list[dict[str, Any]] = []
+            try:
+                for hostname in SIDECAR_HOSTS:
+                    remaining = deadline - monotonic_fn()
+                    if remaining <= 0:
+                        raise CutoverError(
+                            "public generation convergence deadline elapsed"
+                        )
+                    observed = _probe_exact_manifest(
+                        scheme="https",
+                        connect_host=hostname,
+                        connect_port=443,
+                        request_host=hostname,
+                        path=path,
+                        expected=manifest,
+                        shelf=shelf,
+                        generation_id=generation_id,
+                        timeout=min(30.0, remaining),
+                    )
+                    if monotonic_fn() > deadline:
+                        raise CutoverError(
+                            "public generation convergence deadline elapsed"
+                        )
+                    if observed["bodySha256"] != expected_body_sha256:
+                        raise CutoverError(
+                            "public generation body digest differs from "
+                            "the attested local sidecar"
+                        )
+                    observations.append(observed)
+                return observations
+            except (
+                CutoverError,
+                OSError,
+                http.client.HTTPException,
+            ) as exc:
+                last_error = exc
+            remaining = deadline - monotonic_fn()
+            if remaining <= 0:
+                raise CutoverError(
+                    "public generation did not converge before timeout"
+                ) from last_error
+            sleep_fn(min(interval_seconds, remaining))
+
     def _verify_public_downloads(
         self,
         shelf: Mapping[str, Any],
     ) -> dict[str, Any]:
         generation_root = Path(str(shelf["generationRoot"]))
+        convergence = self._wait_for_public_generation_convergence(shelf)
         strict_output = self.config.operation_root / "public-postdeploy.json"
         self.runner.python(
             self.config.source_root
@@ -8641,6 +8793,7 @@ class TopologyBActions:
                 )
             ),
             "artifactVerification": artifact_verification,
+            "convergenceObservations": convergence,
         }
 
     def commit_cloudflare(
