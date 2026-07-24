@@ -183,6 +183,342 @@ def topology_b_config(tmp_path: Path) -> SimpleNamespace:
     )
 
 
+def local_generation_probe(
+    generation_id: str,
+    *,
+    chummer_sha256: str = "b" * 64,
+    www_sha256: str = "b" * 64,
+) -> dict[str, Any]:
+    observations: list[dict[str, Any]] = []
+    for hostname, body_sha256 in (
+        ("chummer.run", chummer_sha256),
+        ("www.chummer.run", www_sha256),
+    ):
+        observations.append(
+            {
+                "endpoint": (
+                    f"http://{hostname}/downloads/g/{generation_id}/"
+                    "releases.json"
+                ),
+                "httpStatus": 200,
+                "bodySha256": body_sha256,
+                "sizeBytes": 1234,
+                "generationId": generation_id,
+                "anonymous": True,
+            }
+        )
+    return {
+        "status": "pass",
+        "origin": controller.SIDECAR_ORIGIN,
+        "hosts": list(controller.SIDECAR_HOSTS),
+        "generationId": generation_id,
+        "observations": observations,
+        "artifactVerification": {"status": "pass"},
+    }
+
+
+def test_local_served_manifest_digest_requires_exact_two_host_closure() -> None:
+    generation_id = "generation-a"
+    local_probe = local_generation_probe(generation_id)
+
+    assert controller._local_served_generation_manifest_sha256(
+        local_probe,
+        generation_id=generation_id,
+    ) == "b" * 64
+
+    divergent = local_generation_probe(
+        generation_id,
+        www_sha256="c" * 64,
+    )
+    with pytest.raises(
+        controller.CutoverError,
+        match="body digest diverged by host",
+    ):
+        controller._local_served_generation_manifest_sha256(
+            divergent,
+            generation_id=generation_id,
+        )
+
+    incomplete = local_generation_probe(generation_id)
+    incomplete["observations"].pop()
+    with pytest.raises(
+        controller.CutoverError,
+        match="host closure is incomplete",
+    ):
+        controller._local_served_generation_manifest_sha256(
+            incomplete,
+            generation_id=generation_id,
+        )
+
+
+def test_capture_cloudflare_binds_recorded_local_served_manifest_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generation_id = "generation-a"
+    local_probe = local_generation_probe(generation_id)
+    release_authority = {
+        "contractName": "candidate-authority",
+        "validatedAtUtc": "2026-07-24T20:00:00Z",
+    }
+    shelf = {
+        "generationId": generation_id,
+        "releaseCandidateAuthority": release_authority,
+    }
+    config = SimpleNamespace(
+        cloudflare_account_id="account-a",
+        cloudflare_tunnel_id="tunnel-a",
+        cloudflare_journal=Path("/tmp/cloudflare-journal"),
+        cloudflare_lock=Path("/tmp/cloudflare-lock"),
+    )
+    captured: dict[str, Any] = {}
+
+    class FakeCloudflare:
+        def capture_transaction(self, _api: Any, **kwargs: Any) -> dict[str, Any]:
+            captured.update(kwargs)
+            return {
+                "phase": "captured",
+                "priorConfigSha256": "1" * 64,
+                "priorVersion": 5,
+                "targetConfigSha256": "2" * 64,
+            }
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.cloudflare = FakeCloudflare()
+    actions.projection_verifier = object()
+    actions.candidate_materializer = object()
+    actions._state = {"receipts": {"localProbe": local_probe}}
+    actions._record = lambda *_args, **_kwargs: None
+    actions._cloudflare_api = lambda: object()
+    monkeypatch.setattr(
+        controller,
+        "validate_release_candidate_authority",
+        lambda *_args, **_kwargs: release_authority,
+    )
+
+    actions.capture_cloudflare(
+        config,
+        shelf,
+        {},
+        {},
+        local_probe,
+        {},
+    )
+
+    assert captured["probe_body_sha256"] == "b" * 64
+    assert captured["probe_body_sha256"] != hashlib.sha256(
+        b"prepared unwrapped manifest"
+    ).hexdigest()
+
+    drifted = local_generation_probe(generation_id)
+    drifted["observations"][0]["bodySha256"] = "c" * 64
+    with pytest.raises(
+        controller.CutoverError,
+        match="local generation probe changed",
+    ):
+        actions.capture_cloudflare(
+            config,
+            shelf,
+            {},
+            {},
+            drifted,
+            {},
+        )
+
+
+def test_public_generation_convergence_retries_only_positive_manifest_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generation_id = "generation-a"
+    expected_body_sha256 = "b" * 64
+    generation_root = tmp_path / generation_id
+    generation_root.mkdir()
+    (generation_root / "releases.json").write_text(
+        '{"generationId":"generation-a"}\n',
+        encoding="utf-8",
+    )
+    config = SimpleNamespace(
+        cloudflare_journal=tmp_path / "cloudflare-journal.json",
+        ready_timeout_seconds=5,
+    )
+
+    class FakeCloudflare:
+        @staticmethod
+        def load_journal(_path: Path) -> dict[str, Any]:
+            return {
+                "generationId": generation_id,
+                "probeBodySha256": expected_body_sha256,
+            }
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.cloudflare = FakeCloudflare()
+    calls: list[str] = []
+
+    def probe(**kwargs: Any) -> dict[str, Any]:
+        calls.append(kwargs["request_host"])
+        if len(calls) == 1:
+            raise controller.CutoverError("incumbent still served")
+        return {
+            "endpoint": (
+                f"https://{kwargs['request_host']}{kwargs['path']}"
+            ),
+            "httpStatus": 200,
+            "bodySha256": expected_body_sha256,
+            "sizeBytes": 1234,
+            "generationId": generation_id,
+            "anonymous": True,
+        }
+
+    monkeypatch.setattr(controller, "_probe_exact_manifest", probe)
+    now = [0.0]
+    sleeps: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    observations = actions._wait_for_public_generation_convergence(
+        {
+            "generationId": generation_id,
+            "generationRoot": str(generation_root),
+        },
+        sleep_fn=sleep,
+        monotonic_fn=lambda: now[0],
+        interval_seconds=2,
+    )
+
+    assert calls == ["chummer.run", "chummer.run", "www.chummer.run"]
+    assert sleeps == [2]
+    assert [row["bodySha256"] for row in observations] == [
+        expected_body_sha256,
+        expected_body_sha256,
+    ]
+
+
+def test_public_generation_convergence_timeout_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generation_id = "generation-a"
+    generation_root = tmp_path / generation_id
+    generation_root.mkdir()
+    (generation_root / "releases.json").write_text(
+        '{"generationId":"generation-a"}\n',
+        encoding="utf-8",
+    )
+    config = SimpleNamespace(
+        cloudflare_journal=tmp_path / "cloudflare-journal.json",
+        ready_timeout_seconds=3,
+    )
+
+    class FakeCloudflare:
+        @staticmethod
+        def load_journal(_path: Path) -> dict[str, Any]:
+            return {
+                "generationId": generation_id,
+                "probeBodySha256": "b" * 64,
+            }
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.cloudflare = FakeCloudflare()
+    attempts = [0]
+
+    def never_converges(**_kwargs: Any) -> dict[str, Any]:
+        attempts[0] += 1
+        raise controller.CutoverError("incumbent still served")
+
+    monkeypatch.setattr(
+        controller,
+        "_probe_exact_manifest",
+        never_converges,
+    )
+    now = [0.0]
+    sleeps: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="did not converge before timeout",
+    ):
+        actions._wait_for_public_generation_convergence(
+            {
+                "generationId": generation_id,
+                "generationRoot": str(generation_root),
+            },
+            sleep_fn=sleep,
+            monotonic_fn=lambda: now[0],
+            interval_seconds=2,
+        )
+
+    assert attempts[0] == 2
+    assert sleeps == [2, 1]
+
+
+def test_public_generation_convergence_rejects_success_after_deadline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generation_id = "generation-a"
+    generation_root = tmp_path / generation_id
+    generation_root.mkdir()
+    (generation_root / "releases.json").write_text(
+        '{"generationId":"generation-a"}\n',
+        encoding="utf-8",
+    )
+    config = SimpleNamespace(
+        cloudflare_journal=tmp_path / "cloudflare-journal.json",
+        ready_timeout_seconds=5,
+    )
+
+    class FakeCloudflare:
+        @staticmethod
+        def load_journal(_path: Path) -> dict[str, Any]:
+            return {
+                "generationId": generation_id,
+                "probeBodySha256": "b" * 64,
+            }
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.cloudflare = FakeCloudflare()
+    now = [0.0]
+
+    def late_success(**kwargs: Any) -> dict[str, Any]:
+        now[0] = 6.0
+        return {
+            "endpoint": (
+                f"https://{kwargs['request_host']}{kwargs['path']}"
+            ),
+            "httpStatus": 200,
+            "bodySha256": "b" * 64,
+            "sizeBytes": 1234,
+            "generationId": generation_id,
+            "anonymous": True,
+        }
+
+    monkeypatch.setattr(controller, "_probe_exact_manifest", late_success)
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="did not converge before timeout",
+    ):
+        actions._wait_for_public_generation_convergence(
+            {
+                "generationId": generation_id,
+                "generationRoot": str(generation_root),
+            },
+            sleep_fn=lambda _seconds: None,
+            monotonic_fn=lambda: now[0],
+            interval_seconds=2,
+        )
+
+
 def test_stage_application_uses_isolated_active_transaction_namespace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -4288,9 +4624,15 @@ def test_local_and_public_controller_phases_both_require_artifact_host_gate() ->
     assert "probe_download_artifact_hosts" in call_leaf_names(
         function_node("probe_sidecar_hosts")
     )
-    assert "probe_download_artifact_hosts" in call_leaf_names(
-        class_method_node("TopologyBActions", "_verify_public_downloads")
+    public_probe = class_method_node(
+        "TopologyBActions",
+        "_verify_public_downloads",
     )
+    public_calls = call_leaf_names_in_source_order(public_probe)
+    assert "probe_download_artifact_hosts" in public_calls
+    assert public_calls.index(
+        "_wait_for_public_generation_convergence"
+    ) < public_calls.index("python")
     assert "probe_download_artifact_hosts" in call_leaf_names(
         class_method_node("TopologyBActions", "reconcile_committed")
     )

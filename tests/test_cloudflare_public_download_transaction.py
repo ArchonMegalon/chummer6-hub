@@ -23,6 +23,18 @@ transaction = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = transaction
 SPEC.loader.exec_module(transaction)
 
+POSTDEPLOY_MODULE_PATH = (
+    ROOT / "scripts" / "verify_public_download_only_postdeploy.py"
+)
+POSTDEPLOY_SPEC = importlib.util.spec_from_file_location(
+    "public_download_only_postdeploy_route_contract_test",
+    POSTDEPLOY_MODULE_PATH,
+)
+assert POSTDEPLOY_SPEC is not None and POSTDEPLOY_SPEC.loader is not None
+postdeploy = importlib.util.module_from_spec(POSTDEPLOY_SPEC)
+sys.modules[POSTDEPLOY_SPEC.name] = postdeploy
+POSTDEPLOY_SPEC.loader.exec_module(postdeploy)
+
 GENERATION_ID = "g-20260724T000000Z-0123456789abcdef"
 PROBE_ENDPOINT = (
     f"https://chummer.run/downloads/g/{GENERATION_ID}/releases.json"
@@ -200,6 +212,12 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
     "path",
     [
         "/api/ready/public-downloads",
+        "/api/ready",
+        "/api/ready/publication",
+        "/api/ready/install-linking-authority",
+        "/api/v1/install-linking/me",
+        "/account/access/install-link",
+        "/downloads/install/public-download-only-probe",
         f"/downloads/g/{GENERATION_ID}/releases.json",
         f"/downloads/g/{GENERATION_ID}/RELEASE_CHANNEL.generated.json",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-installer.msi",
@@ -227,8 +245,14 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         "/downloads/claim/token",
         "/downloads/upload/file",
         "/downloads/personalized/alice",
-        "/api/ready",
+        "/api/ready/extra",
         "/api/ready/public-downloads/extra",
+        "/api/ready/publication/extra",
+        "/api/ready/install-linking-authority/extra",
+        "/api/v1/install-linking",
+        "/api/v1/install-linking/me/extra",
+        "/account/access/install-link/extra",
+        "/downloads/install/public-download-only-probe/extra",
         "/DOWNLOADS/releases.json",
         "/downloads/g",
         "/downloads/files",
@@ -258,6 +282,19 @@ def test_managed_regex_uses_no_known_non_re2_constructs() -> None:
     assert "(?" not in pattern
     assert re.search(r"\\[1-9]", pattern) is None
     transaction.validate_re2_pattern(pattern)
+
+
+def test_managed_control_paths_close_the_strict_postdeploy_contract() -> None:
+    required = {
+        "/api/ready/public-downloads",
+        *postdeploy.UNAVAILABLE_READINESS_PATHS,
+        *postdeploy.PRIVATE_PATHS,
+    }
+
+    assert set(transaction.MANAGED_CONTROL_PATHS) == required
+    for path in required:
+        assert transaction.managed_path_matches(path)
+        assert not transaction.managed_path_matches(f"{path}/extra")
 
 
 @pytest.mark.parametrize(
