@@ -6046,66 +6046,87 @@ class TopologyBActions:
         self._record("runtime-materialized", "runtime", receipt)
         return receipt
 
+    @staticmethod
+    def _validated_sidecar_volume_authority(
+        inspection: object,
+        *,
+        config: SidecarConfig,
+        logical: str,
+        name: str,
+    ) -> dict[str, Any]:
+        expected_labels = {
+            "run.chummer.public-download-operation": config.project_name,
+            "run.chummer.public-download-logical-volume": logical,
+        }
+        volume = (
+            inspection[0]
+            if isinstance(inspection, list)
+            and len(inspection) == 1
+            and isinstance(inspection[0], dict)
+            else None
+        )
+        mountpoint = (
+            volume.get("Mountpoint")
+            if isinstance(volume, dict)
+            else None
+        )
+        mount_path = (
+            Path(mountpoint)
+            if isinstance(mountpoint, str)
+            else None
+        )
+        if (
+            volume is None
+            or volume.get("Name") != name
+            or volume.get("Labels") != expected_labels
+            or volume.get("Driver") != "local"
+            or volume.get("Scope") != "local"
+            or volume.get("Options") not in (None, {})
+            or mount_path is None
+            or not mount_path.is_absolute()
+            or mountpoint.startswith("//")
+            or "|" in mountpoint
+            or any(
+                ord(character) < 0x20 or ord(character) == 0x7F
+                for character in mountpoint
+            )
+            or str(mount_path) != mountpoint
+            or ".." in mount_path.parts
+            or mount_path.name != "_data"
+            or mount_path.parent.name != name
+        ):
+            raise RecoveryUncertain(
+                "topology-B volume authority is ambiguous"
+            )
+        return volume
+
     def create_sidecar_resources(
         self,
         config: SidecarConfig,
         _runtime: Mapping[str, Any],
     ) -> dict[str, Any]:
         created: list[str] = []
-        reused: list[str] = []
         for logical in SIDECAR_LOGICAL_VOLUMES:
             name = config.volume_names[logical]
-            listed = self.runner.docker(
-                [
-                    "volume",
-                    "ls",
-                    "--quiet",
-                    "--filter",
-                    f"name=^{name}$",
-                ],
-                label=f"resolve exact {logical} sidecar volume",
-            ).decode("utf-8", errors="strict").splitlines()
-            if name in listed:
-                inspection = json.loads(
-                    self.runner.docker(
-                        ["volume", "inspect", name],
-                        label=f"inspect exact {logical} sidecar volume",
-                    )
+            listed = self._strict_output_lines(
+                self.runner.docker(
+                    [
+                        "volume",
+                        "ls",
+                        "--quiet",
+                        "--filter",
+                        f"name=^{name}$",
+                    ],
+                    label=f"prove exact {logical} sidecar volume absent",
+                ),
+                label=f"exact {logical} sidecar volume",
+            )
+            if listed:
+                raise RecoveryUncertain(
+                    "preexisting topology-B volume is prohibited"
                 )
-                expected_labels = {
-                    "run.chummer.public-download-operation": (
-                        config.project_name
-                    ),
-                    "run.chummer.public-download-logical-volume": logical,
-                }
-                if (
-                    not isinstance(inspection, list)
-                    or len(inspection) != 1
-                    or inspection[0].get("Name") != name
-                    or inspection[0].get("Labels") != expected_labels
-                ):
-                    raise RecoveryUncertain(
-                        "preexisting topology-B volume authority is ambiguous"
-                    )
-                mountpoint = Path(str(inspection[0].get("Mountpoint") or ""))
-                try:
-                    mount_metadata = mountpoint.lstat()
-                    entries = list(os.scandir(mountpoint))
-                except OSError as exc:
-                    raise RecoveryUncertain(
-                        "preexisting topology-B volume cannot be inspected"
-                    ) from exc
-                if (
-                    not mountpoint.is_absolute()
-                    or not stat.S_ISDIR(mount_metadata.st_mode)
-                    or stat.S_ISLNK(mount_metadata.st_mode)
-                    or entries
-                ):
-                    raise RecoveryUncertain(
-                        "preexisting topology-B volume is not empty"
-                    )
-                reused.append(name)
-                continue
+        for logical in SIDECAR_LOGICAL_VOLUMES:
+            name = config.volume_names[logical]
             raw = self.runner.docker(
                 [
                     "volume",
@@ -6118,52 +6139,38 @@ class TopologyBActions:
                 ],
                 label=f"create exact {logical} sidecar volume",
             )
-            if raw.decode("utf-8", errors="strict").strip() != name:
+            if self._strict_output_lines(
+                raw,
+                label=f"created {logical} sidecar volume",
+            ) != [name]:
                 raise CutoverError("Docker returned an unexpected volume name")
-            inspection = json.loads(
-                self.runner.docker(
-                    ["volume", "inspect", name],
-                    label=f"verify created {logical} sidecar volume",
+            try:
+                inspection = json.loads(
+                    self.runner.docker(
+                        ["volume", "inspect", name],
+                        label=f"verify created {logical} sidecar volume",
+                    )
                 )
-            )
-            expected_labels = {
-                "run.chummer.public-download-operation": (
-                    config.project_name
-                ),
-                "run.chummer.public-download-logical-volume": logical,
-            }
-            if (
-                not isinstance(inspection, list)
-                or len(inspection) != 1
-                or not isinstance(inspection[0], dict)
-                or inspection[0].get("Name") != name
-                or inspection[0].get("Labels") != expected_labels
-            ):
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise RecoveryUncertain(
+                    "created topology-B volume inspection is malformed"
+                ) from exc
+            try:
+                self._validated_sidecar_volume_authority(
+                    inspection,
+                    config=config,
+                    logical=logical,
+                    name=name,
+                )
+            except RecoveryUncertain as exc:
                 raise RecoveryUncertain(
                     "created topology-B volume authority is ambiguous"
-                )
-            mountpoint = Path(str(inspection[0].get("Mountpoint") or ""))
-            try:
-                mount_metadata = mountpoint.lstat()
-                entries = list(os.scandir(mountpoint))
-            except OSError as exc:
-                raise RecoveryUncertain(
-                    "created topology-B volume cannot be inspected"
                 ) from exc
-            if (
-                not mountpoint.is_absolute()
-                or not stat.S_ISDIR(mount_metadata.st_mode)
-                or stat.S_ISLNK(mount_metadata.st_mode)
-                or entries
-            ):
-                raise RecoveryUncertain(
-                    "created topology-B volume is not empty"
-                )
             created.append(name)
         receipt = {
             "projectName": config.project_name,
             "volumes": created,
-            "reusedEmptyVolumes": reused,
+            "reusedEmptyVolumes": [],
         }
         self._record("resources-created", "resources", receipt)
         return receipt
@@ -7556,22 +7563,17 @@ class TopologyBActions:
                 raise RecoveryUncertain(
                     "topology-B volume inspection is malformed"
                 ) from exc
-            if (
-                not isinstance(inspection, list)
-                or len(inspection) != 1
-                or not isinstance(inspection[0], dict)
-                or inspection[0].get("Name") != name
-                or (inspection[0].get("Labels") or {})
-                != {
-                    "run.chummer.public-download-operation": (
-                        config.project_name
-                    ),
-                    "run.chummer.public-download-logical-volume": logical,
-                }
-            ):
+            try:
+                self._validated_sidecar_volume_authority(
+                    inspection,
+                    config=config,
+                    logical=logical,
+                    name=name,
+                )
+            except RecoveryUncertain as exc:
                 raise RecoveryUncertain(
                     "topology-B volume identity is ambiguous"
-                )
+                ) from exc
             removable.append(name)
         if runtime is not None:
             self._prove_rendered_compose_unchanged(

@@ -1022,15 +1022,15 @@ class FakeVolumeRunner:
         self,
         *,
         existing_labels: dict[str, dict[str, str]] | None = None,
-        mount_root: Path | None = None,
+        inspection_overrides: dict[str, dict[str, Any]] | None = None,
+        fail_create_names: set[str] | None = None,
     ) -> None:
         self.labels = dict(existing_labels or {})
         self.inspected: list[str] = []
-        self.mount_root = mount_root
-        if self.mount_root is not None:
-            self.mount_root.mkdir(parents=True, exist_ok=True)
-            for name in self.labels:
-                (self.mount_root / name).mkdir()
+        self.created: list[str] = []
+        self.removed: list[str] = []
+        self.inspection_overrides = dict(inspection_overrides or {})
+        self.fail_create_names = set(fail_create_names or set())
 
     def docker(self, arguments: list[str], **_kwargs: Any) -> bytes:
         if arguments[:2] == ["volume", "ls"]:
@@ -1041,6 +1041,9 @@ class FakeVolumeRunner:
             return f"{name}\n".encode("utf-8") if name in self.labels else b""
         if arguments[:2] == ["volume", "create"]:
             name = arguments[-1]
+            self.created.append(name)
+            if name in self.fail_create_names:
+                raise controller.CutoverError("injected volume create failure")
             if name not in self.labels:
                 labels: dict[str, str] = {}
                 for index, value in enumerate(arguments[:-1]):
@@ -1048,25 +1051,27 @@ class FakeVolumeRunner:
                         key, label_value = arguments[index + 1].split("=", 1)
                         labels[key] = label_value
                 self.labels[name] = labels
-                if self.mount_root is not None:
-                    (self.mount_root / name).mkdir()
             return f"{name}\n".encode("utf-8")
         if arguments[:2] == ["volume", "inspect"]:
             name = arguments[2]
             self.inspected.append(name)
+            inspection = {
+                "Name": name,
+                "Labels": self.labels[name],
+                "Driver": "local",
+                "Scope": "local",
+                "Options": None,
+                "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+            }
+            inspection.update(self.inspection_overrides.get(name, {}))
             return json.dumps(
-                [
-                    {
-                        "Name": name,
-                        "Labels": self.labels[name],
-                        "Mountpoint": (
-                            str(self.mount_root / name)
-                            if self.mount_root is not None
-                            else ""
-                        ),
-                    }
-                ]
+                [inspection]
             ).encode("utf-8")
+        if arguments[:2] == ["volume", "rm"]:
+            name = arguments[2]
+            self.removed.append(name)
+            self.labels.pop(name)
+            return f"{name}\n".encode("utf-8")
         raise AssertionError(arguments)
 
 
@@ -1093,10 +1098,10 @@ def volume_test_config() -> SimpleNamespace:
     )
 
 
-def test_partial_volume_replay_rejects_wrong_adoption_labels() -> None:
+def test_preexisting_later_volume_is_rejected_before_any_create() -> None:
     require_topology_b_surface()
     config = volume_test_config()
-    logical = controller.SIDECAR_LOGICAL_VOLUMES[0]
+    logical = controller.SIDECAR_LOGICAL_VOLUMES[3]
     name = config.volume_names[logical]
     runner = FakeVolumeRunner(
         existing_labels={
@@ -1108,24 +1113,27 @@ def test_partial_volume_replay_rejects_wrong_adoption_labels() -> None:
     )
     actions = concrete_actions_with_volume_runner(runner)
 
-    with pytest.raises((controller.CutoverError, controller.RecoveryUncertain)):
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="preexisting topology-B volume is prohibited",
+    ):
         actions.create_sidecar_resources(config, {})
 
+    assert runner.created == []
+    assert runner.inspected == []
 
-def test_partial_volume_replay_adopts_only_exact_labeled_volumes(
-    tmp_path: Path,
+
+@pytest.mark.parametrize("options", (None, {}))
+def test_exact_new_local_volume_authority_is_accepted(
+    options: dict[str, str] | None,
 ) -> None:
     require_topology_b_surface()
     config = volume_test_config()
-    existing_labels: dict[str, dict[str, str]] = {}
-    for logical in controller.SIDECAR_LOGICAL_VOLUMES[:3]:
-        existing_labels[config.volume_names[logical]] = {
-            "run.chummer.public-download-operation": config.project_name,
-            "run.chummer.public-download-logical-volume": logical,
-        }
     runner = FakeVolumeRunner(
-        existing_labels=existing_labels,
-        mount_root=tmp_path / "volume-mounts",
+        inspection_overrides={
+            name: {"Options": options}
+            for name in config.volume_names.values()
+        }
     )
     actions = concrete_actions_with_volume_runner(runner)
 
@@ -1135,9 +1143,167 @@ def test_partial_volume_replay_adopts_only_exact_labeled_volumes(
         config.volume_names[logical]
         for logical in controller.SIDECAR_LOGICAL_VOLUMES
     ]
-    assert receipt["reusedEmptyVolumes"] == expected[:3]
-    assert receipt["volumes"] == expected[3:]
+    assert receipt["reusedEmptyVolumes"] == []
+    assert receipt["volumes"] == expected
+    assert runner.created == expected
     assert runner.inspected == expected
+
+
+def test_volume_mountpoint_is_never_traversed_on_the_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    config = volume_test_config()
+    runner = FakeVolumeRunner()
+    actions = concrete_actions_with_volume_runner(runner)
+
+    def forbidden_host_traversal(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("Docker Mountpoint must not be traversed on host")
+
+    monkeypatch.setattr(controller.Path, "lstat", forbidden_host_traversal)
+    monkeypatch.setattr(controller.os, "scandir", forbidden_host_traversal)
+
+    assert actions.create_sidecar_resources(config, {})["volumes"]
+
+
+@pytest.mark.parametrize(
+    "ambiguity",
+    (
+        "driver",
+        "scope",
+        "options",
+        "labels",
+        "name",
+        "mountpoint-tab",
+        "mountpoint-del",
+        "mountpoint-parent",
+    ),
+)
+def test_new_volume_authority_rejects_ambiguous_metadata(
+    ambiguity: str,
+) -> None:
+    require_topology_b_surface()
+    config = volume_test_config()
+    logical = controller.SIDECAR_LOGICAL_VOLUMES[0]
+    name = config.volume_names[logical]
+    override: dict[str, Any]
+    if ambiguity == "driver":
+        override = {"Driver": "foreign"}
+    elif ambiguity == "scope":
+        override = {"Scope": "global"}
+    elif ambiguity == "options":
+        override = {"Options": {"type": "nfs"}}
+    elif ambiguity == "labels":
+        override = {"Labels": {"foreign": "label"}}
+    elif ambiguity == "name":
+        override = {"Name": f"{name}-foreign"}
+    elif ambiguity == "mountpoint-tab":
+        override = {
+            "Mountpoint": f"/var/lib/docker/volumes/\t/{name}/_data"
+        }
+    elif ambiguity == "mountpoint-del":
+        override = {
+            "Mountpoint": f"/var/lib/docker/volumes/\x7f/{name}/_data"
+        }
+    else:
+        override = {
+            "Mountpoint": (
+                f"/var/lib/docker/volumes/foreign/../{name}/_data"
+            )
+        }
+    runner = FakeVolumeRunner(
+        inspection_overrides={name: override},
+    )
+    actions = concrete_actions_with_volume_runner(runner)
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="created topology-B volume authority is ambiguous",
+    ):
+        actions.create_sidecar_resources(config, {})
+
+    assert runner.created == [name]
+    assert runner.inspected == [name]
+
+
+def test_inspect_rejected_volume_is_not_deleted_by_cleanup() -> None:
+    require_topology_b_surface()
+    config = volume_test_config()
+    logical = controller.SIDECAR_LOGICAL_VOLUMES[0]
+    name = config.volume_names[logical]
+    runner = FakeVolumeRunner(
+        inspection_overrides={name: {"Driver": "foreign"}},
+    )
+    actions = concrete_actions_with_volume_runner(runner)
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="created topology-B volume authority is ambiguous",
+    ):
+        actions.create_sidecar_resources(config, {})
+
+    actions._state = {"receipts": {}}
+    actions._prove_pre_runtime_absence = lambda _config: {"status": "pass"}
+    actions._preflight_candidate_image = lambda _config: {
+        "disposition": "not-bound"
+    }
+    actions._sidecar_container_references = (
+        lambda *_args, **_kwargs: []
+    )
+    actions._prove_zero_sidecar_project_networks = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._prove_sidecar_resources_unreferenced = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._remove_candidate_image = lambda preflight: dict(preflight)
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="topology-B volume identity is ambiguous",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.removed == []
+    assert set(runner.labels) == {name}
+
+
+def test_partial_new_volume_failure_remains_exactly_cleanupable() -> None:
+    require_topology_b_surface()
+    config = volume_test_config()
+    first = config.volume_names[controller.SIDECAR_LOGICAL_VOLUMES[0]]
+    second = config.volume_names[controller.SIDECAR_LOGICAL_VOLUMES[1]]
+    runner = FakeVolumeRunner(fail_create_names={second})
+    actions = concrete_actions_with_volume_runner(runner)
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="injected volume create failure",
+    ):
+        actions.create_sidecar_resources(config, {})
+
+    assert set(runner.labels) == {first}
+    actions._state = {"receipts": {}}
+    actions._prove_pre_runtime_absence = lambda _config: {"status": "pass"}
+    actions._preflight_candidate_image = lambda _config: {
+        "disposition": "not-bound"
+    }
+    actions._sidecar_container_references = (
+        lambda *_args, **_kwargs: []
+    )
+    actions._prove_zero_sidecar_project_networks = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._prove_sidecar_resources_unreferenced = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._remove_candidate_image = lambda preflight: dict(preflight)
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert receipt["removedVolumes"] == [first]
+    assert runner.removed == [first]
+    assert runner.labels == {}
 
 
 class FakeCleanupRunner:
@@ -1164,6 +1330,9 @@ class FakeCleanupRunner:
         repo_tags: list[str] | None = None,
         repo_digests: list[str] | None = None,
         volume_labels: dict[str, dict[str, str]] | None = None,
+        volume_inspection_overrides: (
+            dict[str, dict[str, Any]] | None
+        ) = None,
     ) -> None:
         self.blocker = blocker
         self.image_id = image_id
@@ -1189,6 +1358,9 @@ class FakeCleanupRunner:
         self.repo_tags = repo_tags
         self.repo_digests = repo_digests
         self.volume_labels = dict(volume_labels or {})
+        self.volume_inspection_overrides = dict(
+            volume_inspection_overrides or {}
+        )
         self.image_present = image_id is not None
         self.tag_present = tag is not None
         self.docker_calls: list[list[str]] = []
@@ -1345,13 +1517,20 @@ class FakeCleanupRunner:
                     return name.encode("utf-8") + b"\n"
                 return b""
         if arguments[:2] == ["volume", "inspect"]:
+            name = arguments[2]
+            inspection = {
+                "Name": name,
+                "Labels": self.volume_labels.get(name, {}),
+                "Driver": "local",
+                "Scope": "local",
+                "Options": None,
+                "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+            }
+            inspection.update(
+                self.volume_inspection_overrides.get(name, {})
+            )
             return json.dumps(
-                [
-                    {
-                        "Name": arguments[2],
-                        "Labels": self.volume_labels.get(arguments[2], {}),
-                    }
-                ]
+                [inspection]
             ).encode("utf-8")
         if arguments[:2] == ["volume", "rm"]:
             self.volume_labels.pop(arguments[2], None)
