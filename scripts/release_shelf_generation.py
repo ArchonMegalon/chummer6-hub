@@ -21,7 +21,7 @@ import shutil
 import stat
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Iterator
 from urllib.parse import quote, unquote, urlsplit
@@ -85,6 +85,156 @@ PUBLIC_GENERATION_METADATA = {
     COMPATIBILITY_MANIFEST,
     PUBLICATION_SCOPE,
 }
+PRIVACY_LAUNCH_GATE_CONTRACT = (
+    Path(__file__).resolve().parents[1]
+    / ".codex-design"
+    / "product"
+    / "PRIVACY_LAUNCH_GATE.json"
+)
+PRIVACY_LAUNCH_GATE_CONTRACT_NAME = "chummer.privacy_launch_gate"
+PRIVACY_LAUNCH_GATE_CONTRACT_VERSION = 1
+PROOF_REVIEW_ROLLOUT_STATE = "public_release_review_required"
+SUPPORTABILITY_FLOOR_FIELDS = (
+    "rolloutState",
+    "rolloutReason",
+    "supportabilityState",
+    "supportabilitySummary",
+    "knownIssueSummary",
+    "fixAvailabilitySummary",
+)
+RELEASE_PROOF_MAXIMUM_FUTURE_CLOCK_SKEW_SECONDS = 5 * 60
+RELEASE_PROOF_MAXIMUM_AGE_SECONDS = 7 * 24 * 60 * 60
+RELEASE_PROOF_REQUIRED_FRESHNESS_FIELDS = (
+    "releaseProofGeneratedAt",
+    "releaseProofAgeSeconds",
+    "releaseProofMaxAgeSeconds",
+    "uiLocalizationGeneratedAt",
+    "uiLocalizationAgeSeconds",
+    "uiLocalizationMaxAgeSeconds",
+    "flagshipReadinessGeneratedAt",
+    "flagshipReadinessAgeSeconds",
+    "flagshipReadinessMaxAgeSeconds",
+    "flagshipReadinessStatus",
+    "flagshipReadinessCoverageGapKeys",
+    "flagshipDesktopClientReady",
+    "flagshipReadinessSnapshotSha256",
+)
+RELEASE_PROOF_KEYS = frozenset(
+    {
+        "status",
+        "generatedAt",
+        "baseUrl",
+        "journeysPassed",
+        "proofRoutes",
+        "uiLocalizationReleaseGate",
+        "flagshipReadiness",
+    }
+)
+RELEASE_PROOF_REQUIRED_JOURNEYS = (
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop",
+)
+RELEASE_PROOF_REQUIRED_ROUTE_PREFIX = (
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/access",
+    "/account/work",
+    "/account/support",
+    "/contact",
+    "/downloads",
+)
+RELEASE_PROOF_INSTALL_ROUTE_PATTERN = re.compile(
+    r"^/downloads/install/[a-z0-9][a-z0-9-]*$"
+)
+LOCALIZATION_GATE_KEYS = frozenset(
+    {
+        "status",
+        "generatedAt",
+        "defaultKeyCount",
+        "explicitFallbackRuntime",
+        "signoffSmokeRunnerStatus",
+        "shippingLocales",
+        "acceptanceGates",
+        "domainCoverage",
+        "localeDomainCoverage",
+        "blockingFindingsCount",
+        "blockingFindings",
+        "translationBacklogFindingsCount",
+        "translationBacklogFindings",
+        "localeSummary",
+    }
+)
+LOCALIZATION_REQUIRED_SHIPPING_LOCALES = (
+    "en-us",
+    "de-de",
+    "fr-fr",
+    "ja-jp",
+    "pt-br",
+    "zh-cn",
+)
+LOCALIZATION_REQUIRED_ACCEPTANCE_GATES = (
+    "pseudo_localization",
+    "missing_key_fail_fast",
+    "top_surface_overflow_checks",
+    "locale_smoke_first_launch",
+    "locale_smoke_settings",
+    "locale_smoke_explain",
+    "locale_smoke_updater",
+    "locale_smoke_support",
+    "non_english_generated_artifact_smoke",
+)
+LOCALIZATION_REQUIRED_DOMAINS = frozenset(
+    {
+        "app_chrome",
+        "install_update_support",
+        "explain_receipts",
+        "data_rules_names",
+        "generated_artifacts",
+    }
+)
+LOCALIZATION_SUMMARY_KEYS = frozenset(
+    {
+        "locale",
+        "untranslatedKeyCount",
+        "overrideCount",
+        "minimumOverrideCount",
+        "missingReleaseSeedKeys",
+        "legacyXmlPresent",
+        "legacyDataXmlPresent",
+    }
+)
+FLAGSHIP_READINESS_KEYS = frozenset(
+    {
+        "contractName",
+        "generatedAt",
+        "status",
+        "coverageGapKeys",
+        "launchBlockers",
+        "desktopClientReady",
+        "reason",
+        "sourceSha256",
+        "snapshotSha256",
+    }
+)
+FLAGSHIP_READINESS_CONTRACT_NAME = "chummer.flagship_product_readiness_gate.v1"
+FLAGSHIP_READINESS_SHA256_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+FLAGSHIP_READINESS_COVERAGE_GAP_PATTERN = re.compile(
+    r"^[a-z0-9][a-z0-9_.:-]*$"
+)
+FLAGSHIP_READINESS_EMAIL_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+    r"(?![A-Za-z0-9_%+-])",
+    re.ASCII,
+)
+FLAGSHIP_READINESS_SENSITIVE_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9:])(?:/(?:docker|users|home|root|tmp|var|etc|opt|workspace)"
+    r"(?:/[^\s,;)]*)?|[A-Za-z]:[\\/][^\s,;)]*)",
+    re.IGNORECASE | re.ASCII,
+)
 
 
 class ReleaseShelfError(RuntimeError):
@@ -213,6 +363,106 @@ def read_json_object(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ReleaseShelfError(f"{label} must be a JSON object: {path}")
     return payload
+
+
+def _validate_privacy_launch_gate_contract(
+    contract: Any,
+) -> dict[str, Any]:
+    if not isinstance(contract, dict):
+        raise ReleaseShelfError(
+            "privacy launch-gate contract must be a JSON object"
+        )
+    required_fields = {
+        "contractName": str,
+        "contractVersion": int,
+        "capabilityContractName": str,
+        "capabilityContractVersion": int,
+        "status": str,
+        "reviewRequired": bool,
+        "blocksLaunch": bool,
+        "scope": str,
+        "facts": list,
+        "prohibitedClaims": list,
+        "blockedClaims": list,
+        "reason": str,
+    }
+    if set(contract) != set(required_fields):
+        raise ReleaseShelfError(
+            "privacy launch-gate contract fields do not match the runtime machine contract"
+        )
+    for field, expected_type in required_fields.items():
+        value = contract[field]
+        if type(value) is not expected_type:  # bool must not satisfy the int contract
+            raise ReleaseShelfError(
+                f"privacy launch-gate contract field {field} has the wrong type"
+            )
+    for field in ("facts", "prohibitedClaims", "blockedClaims"):
+        values = contract[field]
+        if (
+            not values
+            or any(
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                for value in values
+            )
+            or len(set(values)) != len(values)
+        ):
+            raise ReleaseShelfError(
+                f"privacy launch-gate contract field {field} must contain unique canonical tokens"
+            )
+    if (
+        contract["contractName"] != PRIVACY_LAUNCH_GATE_CONTRACT_NAME
+        or contract["contractVersion"] != PRIVACY_LAUNCH_GATE_CONTRACT_VERSION
+        or not contract["status"].strip()
+        or not contract["capabilityContractName"].strip()
+        or not contract["scope"].strip()
+        or not contract["reason"].strip()
+        or contract["blocksLaunch"]
+        != (
+            contract["reviewRequired"]
+            or contract["status"].strip().lower() != "documented"
+        )
+    ):
+        raise ReleaseShelfError(
+            "privacy launch-gate contract does not match the runtime supportability policy"
+        )
+    return contract
+
+
+def load_privacy_launch_gate_contract_snapshot(
+) -> tuple[dict[str, Any], str]:
+    """Bind parsed policy and receipt digest to one immutable byte snapshot."""
+
+    try:
+        raw_contract = PRIVACY_LAUNCH_GATE_CONTRACT.read_bytes()
+    except FileNotFoundError as exc:
+        raise ReleaseShelfError(
+            "privacy launch-gate contract is missing: "
+            f"{PRIVACY_LAUNCH_GATE_CONTRACT}"
+        ) from exc
+    except OSError as exc:
+        raise ReleaseShelfError(
+            "privacy launch-gate contract is unreadable: "
+            f"{PRIVACY_LAUNCH_GATE_CONTRACT} ({exc})"
+        ) from exc
+    try:
+        decoded = raw_contract.decode("utf-8-sig")
+        parsed = json.loads(decoded)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ReleaseShelfError(
+            "privacy launch-gate contract is malformed: "
+            f"{PRIVACY_LAUNCH_GATE_CONTRACT} ({exc})"
+        ) from exc
+    contract = _validate_privacy_launch_gate_contract(parsed)
+    return contract, hashlib.sha256(raw_contract).hexdigest()
+
+
+def load_privacy_launch_gate_contract() -> dict[str, Any]:
+    """Load the machine contract that the Hub runtime projects publicly."""
+
+    contract, _ = load_privacy_launch_gate_contract_snapshot()
+    return contract
 
 
 def write_json(
@@ -615,6 +865,836 @@ def _rewrite_manifest_value(
     return value
 
 
+def _normalize_supportability_token(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _normalize_supportability_state(value: Any) -> str:
+    return _normalize_supportability_token(value).replace("-", "_")
+
+
+def _terminal_publication_state(publication_status: str) -> str:
+    return {
+        "revoked": "revoked",
+        "unpublished": "unpublished",
+        "draft": "unpublished",
+        "manifest_empty": "unpublished",
+        "manifest_error": "unpublished",
+        "disabled": "disabled",
+        "blocked": "blocked",
+        "quarantined": "quarantined",
+        "security_hold": "security_hold",
+    }.get(_normalize_supportability_state(publication_status), "")
+
+
+def _is_optimistic_rollout_state(state: str) -> bool:
+    return state in {
+        "public_stable",
+        "stable",
+        "docker",
+        "promoted_preview",
+        "preview",
+        "published",
+        "live",
+    }
+
+
+def _is_stronger_than_proof_review(rollout_state: str) -> bool:
+    return (
+        bool(rollout_state)
+        and rollout_state
+        not in {
+            "public_release_review_required",
+            "release_review_required",
+            "review_required",
+        }
+        and not _is_optimistic_rollout_state(rollout_state)
+    )
+
+
+def _is_terminal_or_unknown_rollout_state(rollout_state: str) -> bool:
+    return (
+        _is_stronger_than_proof_review(rollout_state)
+        and rollout_state not in {"coverage_incomplete", "desktop_polish_needed"}
+    )
+
+
+def _resolve_non_fresh_rollout_state(
+    publication_status: str,
+    current_rollout_state: str,
+    fallback_review_state: str,
+) -> str:
+    terminal_state = _terminal_publication_state(publication_status)
+    if terminal_state:
+        return (
+            current_rollout_state
+            if _is_terminal_or_unknown_rollout_state(current_rollout_state)
+            else terminal_state
+        )
+    return (
+        current_rollout_state
+        if current_rollout_state
+        and not _is_optimistic_rollout_state(current_rollout_state)
+        else fallback_review_state
+    )
+
+
+def _is_non_optimistic_supportability_state(state: str) -> bool:
+    return bool(state) and state not in {
+        "gold_supported",
+        "preview_supported",
+        "supported",
+    }
+
+
+def _is_terminal_or_unknown_supportability_state(state: str) -> bool:
+    return (
+        _is_non_optimistic_supportability_state(state)
+        and state not in {"review_required", "limited"}
+    )
+
+
+def _resolve_non_fresh_supportability_state(
+    publication_status: str,
+    effective_rollout_state: str,
+    current_supportability_state: str,
+) -> str:
+    terminal_state = _terminal_publication_state(publication_status)
+    if terminal_state:
+        return (
+            current_supportability_state
+            if _is_terminal_or_unknown_supportability_state(
+                current_supportability_state
+            )
+            else terminal_state
+        )
+    if _is_non_optimistic_supportability_state(current_supportability_state):
+        return current_supportability_state
+    return (
+        effective_rollout_state
+        if _is_terminal_or_unknown_rollout_state(effective_rollout_state)
+        else "review_required"
+    )
+
+
+def _narrative_makes_optimistic_support_claim(value: str) -> bool:
+    normalized = value.strip().lower()
+    return any(
+        claim in normalized
+        for claim in (
+            "supported",
+            "passed the local release",
+            "available now",
+            "release status is green",
+            "no blocking release caveat",
+            "ready for launch",
+        )
+    )
+
+
+def _preserve_or_replace_narrative(
+    current: Any,
+    review_narrative: str,
+    preserve_stronger_blocker_narrative: bool,
+) -> str:
+    current_text = str(current or "").strip()
+    if (
+        preserve_stronger_blocker_narrative
+        and current_text
+        and not _narrative_makes_optimistic_support_claim(current_text)
+    ):
+        return current_text
+    return review_narrative
+
+
+def _canonical_utc_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z",
+        value,
+    ):
+        return None
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        return None
+    return parsed if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") == value else None
+
+
+def _date_time_offset(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _projection_evaluated_at(value: datetime | str | None) -> datetime:
+    if value is None:
+        return datetime.now(timezone.utc).replace(microsecond=0)
+    parsed = _canonical_utc_timestamp(value) if isinstance(value, str) else value
+    if (
+        not isinstance(parsed, datetime)
+        or parsed.tzinfo is None
+        or parsed.utcoffset() is None
+    ):
+        raise ReleaseShelfError(
+            "supportability-floor evaluatedAt must be an explicit UTC instant"
+        )
+    normalized = parsed.astimezone(timezone.utc)
+    if normalized.microsecond != 0:
+        raise ReleaseShelfError(
+            "supportability-floor evaluatedAt must use whole-second precision"
+        )
+    return normalized
+
+
+def _format_utc_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _json_int64(value: Any, *, allow_string: bool = False) -> int | None:
+    parsed: int
+    if type(value) is int:
+        parsed = value
+    elif (
+        allow_string
+        and isinstance(value, str)
+        and re.fullmatch(r"\s*[+-]?\d+\s*", value)
+    ):
+        parsed = int(value)
+    else:
+        return None
+    return parsed if -(2**63) <= parsed <= 2**63 - 1 else None
+
+
+def _is_pass_status(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and value.strip().lower() in {"pass", "passed", "ready"}
+    )
+
+
+def _canonical_string_list(value: Any) -> list[str] | None:
+    if not isinstance(value, list):
+        return None
+    if any(
+        not isinstance(item, str)
+        or not item.strip()
+        or item != item.strip()
+        for item in value
+    ):
+        return None
+    return list(value) if len(set(value)) == len(value) else None
+
+
+def _validate_passing_coverage(
+    value: Any,
+    required_keys: frozenset[str],
+) -> bool:
+    return (
+        isinstance(value, dict)
+        and set(value) == required_keys
+        and all(_is_pass_status(value[key]) for key in required_keys)
+    )
+
+
+def _validate_localization_gate(value: Any) -> datetime | None:
+    if not isinstance(value, dict) or set(value) != LOCALIZATION_GATE_KEYS:
+        return None
+    generated_at = _canonical_utc_timestamp(value["generatedAt"])
+    default_key_count = _json_int64(value["defaultKeyCount"])
+    if (
+        generated_at is None
+        or default_key_count is None
+        or default_key_count <= 0
+        or not _is_pass_status(value["status"])
+        or not _is_pass_status(value["explicitFallbackRuntime"])
+        or not _is_pass_status(value["signoffSmokeRunnerStatus"])
+        or _canonical_string_list(value["shippingLocales"])
+        != list(LOCALIZATION_REQUIRED_SHIPPING_LOCALES)
+        or _canonical_string_list(value["acceptanceGates"])
+        != list(LOCALIZATION_REQUIRED_ACCEPTANCE_GATES)
+        or not _validate_passing_coverage(
+            value["domainCoverage"],
+            LOCALIZATION_REQUIRED_DOMAINS,
+        )
+    ):
+        return None
+
+    locale_coverage = value["localeDomainCoverage"]
+    if (
+        not isinstance(locale_coverage, dict)
+        or set(locale_coverage) != set(LOCALIZATION_REQUIRED_SHIPPING_LOCALES)
+        or any(
+            not _validate_passing_coverage(
+                locale_coverage[locale],
+                LOCALIZATION_REQUIRED_DOMAINS,
+            )
+            for locale in LOCALIZATION_REQUIRED_SHIPPING_LOCALES
+        )
+    ):
+        return None
+
+    blocking_count = _json_int64(value["blockingFindingsCount"])
+    backlog_count = _json_int64(value["translationBacklogFindingsCount"])
+    if (
+        blocking_count != 0
+        or value["blockingFindings"] != []
+        or backlog_count != 0
+        or value["translationBacklogFindings"] != []
+    ):
+        return None
+
+    rows = value["localeSummary"]
+    if not isinstance(rows, list) or len(rows) != len(
+        LOCALIZATION_REQUIRED_SHIPPING_LOCALES
+    ):
+        return None
+    for expected_locale, row in zip(
+        LOCALIZATION_REQUIRED_SHIPPING_LOCALES,
+        rows,
+        strict=True,
+    ):
+        if not isinstance(row, dict) or set(row) != LOCALIZATION_SUMMARY_KEYS:
+            return None
+        untranslated_count = _json_int64(row["untranslatedKeyCount"])
+        override_count = _json_int64(row["overrideCount"])
+        minimum_override_count = _json_int64(row["minimumOverrideCount"])
+        if (
+            row["locale"] != expected_locale
+            or untranslated_count != 0
+            or override_count is None
+            or override_count < default_key_count
+            or minimum_override_count is None
+            or minimum_override_count < 0
+            or override_count < minimum_override_count
+            or row["missingReleaseSeedKeys"] != []
+            or row["legacyXmlPresent"] is not True
+            or row["legacyDataXmlPresent"] is not True
+        ):
+            return None
+    return generated_at
+
+
+def _validate_flagship_public_text(value: Any, maximum_length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= maximum_length
+        and value == value.strip()
+        and not FLAGSHIP_READINESS_EMAIL_PATTERN.search(value)
+        and not FLAGSHIP_READINESS_SENSITIVE_PATH_PATTERN.search(value)
+    )
+
+
+def _validate_flagship_readiness(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or set(value) != FLAGSHIP_READINESS_KEYS:
+        return None
+    generated_at = _canonical_utc_timestamp(value["generatedAt"])
+    status = value["status"]
+    coverage_gap_keys = _canonical_string_list(value["coverageGapKeys"])
+    launch_blockers = _canonical_string_list(value["launchBlockers"])
+    desktop_ready = value["desktopClientReady"]
+    if (
+        value["contractName"] != FLAGSHIP_READINESS_CONTRACT_NAME
+        or generated_at is None
+        or status not in {"pass", "fail"}
+        or coverage_gap_keys is None
+        or len(coverage_gap_keys) > 128
+        or any(
+            not FLAGSHIP_READINESS_COVERAGE_GAP_PATTERN.fullmatch(key)
+            for key in coverage_gap_keys
+        )
+        or coverage_gap_keys != sorted(coverage_gap_keys)
+        or launch_blockers is None
+        or len(launch_blockers) > 128
+        or any(
+            not _validate_flagship_public_text(blocker, 1024)
+            for blocker in launch_blockers
+        )
+        or launch_blockers != sorted(launch_blockers)
+        or type(desktop_ready) is not bool
+        or desktop_ready
+        != (
+            status == "pass"
+            and not coverage_gap_keys
+            and not launch_blockers
+        )
+        or not _validate_flagship_public_text(value["reason"], 4096)
+        or not isinstance(value["sourceSha256"], str)
+        or not FLAGSHIP_READINESS_SHA256_PATTERN.fullmatch(value["sourceSha256"])
+        or not isinstance(value["snapshotSha256"], str)
+        or not FLAGSHIP_READINESS_SHA256_PATTERN.fullmatch(
+            value["snapshotSha256"]
+        )
+    ):
+        return None
+
+    digest_material = {
+        "contractName": value["contractName"],
+        "coverageGapKeys": coverage_gap_keys,
+        "desktopClientReady": desktop_ready,
+        "generatedAt": value["generatedAt"],
+        "launchBlockers": launch_blockers,
+        "reason": value["reason"],
+        "sourceSha256": value["sourceSha256"],
+        "status": status,
+    }
+    try:
+        expected_snapshot_sha256 = (
+            "sha256:" + hashlib.sha256(canonical_json_bytes(digest_material)).hexdigest()
+        )
+    except UnicodeEncodeError:
+        return None
+    if value["snapshotSha256"] != expected_snapshot_sha256:
+        return None
+    return {
+        "generatedAt": generated_at,
+        "status": status,
+        "desktopClientReady": desktop_ready,
+        "coverageGapKeys": coverage_gap_keys,
+        "launchBlockers": launch_blockers,
+        "snapshotSha256": value["snapshotSha256"],
+    }
+
+
+def _validate_release_proof_trust(value: Any) -> dict[str, Any] | None:
+    if (
+        not isinstance(value, dict)
+        or set(value) != RELEASE_PROOF_KEYS
+        or not _is_pass_status(value["status"])
+    ):
+        return None
+    generated_at = _canonical_utc_timestamp(value["generatedAt"])
+    base_url = value["baseUrl"]
+    journeys = _canonical_string_list(value["journeysPassed"])
+    proof_routes = _canonical_string_list(value["proofRoutes"])
+    if (
+        generated_at is None
+        or not isinstance(base_url, str)
+        or base_url.strip() != "https://chummer.run"
+        or journeys != list(RELEASE_PROOF_REQUIRED_JOURNEYS)
+        or proof_routes is None
+        or len(proof_routes) < len(RELEASE_PROOF_REQUIRED_ROUTE_PREFIX)
+        or proof_routes[: len(RELEASE_PROOF_REQUIRED_ROUTE_PREFIX)]
+        != list(RELEASE_PROOF_REQUIRED_ROUTE_PREFIX)
+    ):
+        return None
+    route_extensions = proof_routes[len(RELEASE_PROOF_REQUIRED_ROUTE_PREFIX) :]
+    if (
+        any(
+            not RELEASE_PROOF_INSTALL_ROUTE_PATTERN.fullmatch(route)
+            for route in route_extensions
+        )
+        or route_extensions != sorted(route_extensions)
+    ):
+        return None
+
+    localization_generated_at = _validate_localization_gate(
+        value["uiLocalizationReleaseGate"]
+    )
+    readiness = _validate_flagship_readiness(value["flagshipReadiness"])
+    if localization_generated_at is None or readiness is None:
+        return None
+    return {
+        "releaseProofGeneratedAt": generated_at,
+        "uiLocalizationGeneratedAt": localization_generated_at,
+        "flagshipReadinessGeneratedAt": readiness["generatedAt"],
+        "flagshipReadinessStatus": readiness["status"],
+        "flagshipDesktopClientReady": readiness["desktopClientReady"],
+        "flagshipReadinessCoverageGapKeys": readiness["coverageGapKeys"],
+        "flagshipReadinessLaunchBlockers": readiness["launchBlockers"],
+        "flagshipReadinessSnapshotSha256": readiness["snapshotSha256"],
+    }
+
+
+def _freshness_source_status(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip().lower()
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, separators=(",", ":"), ensure_ascii=False).lower()
+    return str(value).strip().lower()
+
+
+def _proof_age_seconds(later: datetime, earlier: datetime) -> int:
+    return 0 if later <= earlier else int((later - earlier).total_seconds() // 1)
+
+
+def _evaluate_release_proof_freshness(
+    payload: dict[str, Any],
+    evaluated_at: datetime,
+) -> str:
+    evidence = _validate_release_proof_trust(payload.get("releaseProof"))
+    if evidence is None:
+        return "missing"
+
+    public_trust_metrics = payload.get("publicTrustMetrics")
+    proof_freshness = (
+        public_trust_metrics.get("proofFreshness")
+        if isinstance(public_trust_metrics, dict)
+        else None
+    )
+    published_at = _date_time_offset(payload.get("publishedAt"))
+    if not isinstance(proof_freshness, dict) or published_at is None:
+        return "missing"
+    if (
+        published_at - evaluated_at
+        > timedelta(seconds=RELEASE_PROOF_MAXIMUM_FUTURE_CLOCK_SKEW_SECONDS)
+    ):
+        return "stale"
+
+    source_status = _freshness_source_status(proof_freshness.get("status"))
+    if source_status != "fresh":
+        return (
+            "missing"
+            if not source_status or source_status == "missing"
+            else "stale"
+        )
+    if any(
+        field not in proof_freshness or proof_freshness[field] is None
+        for field in RELEASE_PROOF_REQUIRED_FRESHNESS_FIELDS
+    ):
+        return "missing"
+
+    facts: dict[str, tuple[datetime, int, int]] = {}
+    for prefix in ("releaseProof", "uiLocalization", "flagshipReadiness"):
+        generated_at = _canonical_utc_timestamp(
+            proof_freshness[f"{prefix}GeneratedAt"]
+        )
+        age_seconds = _json_int64(
+            proof_freshness[f"{prefix}AgeSeconds"],
+            allow_string=True,
+        )
+        max_age_seconds = _json_int64(
+            proof_freshness[f"{prefix}MaxAgeSeconds"],
+            allow_string=True,
+        )
+        if (
+            generated_at is None
+            or age_seconds is None
+            or age_seconds < 0
+            or max_age_seconds is None
+            or max_age_seconds < 0
+        ):
+            return "stale"
+        facts[prefix] = (generated_at, age_seconds, max_age_seconds)
+
+    effective_instant = max(evaluated_at, published_at)
+    for generated_at, age_seconds, max_age_seconds in facts.values():
+        if max_age_seconds != RELEASE_PROOF_MAXIMUM_AGE_SECONDS:
+            return "stale"
+        if (
+            generated_at - published_at
+            > timedelta(
+                seconds=RELEASE_PROOF_MAXIMUM_FUTURE_CLOCK_SKEW_SECONDS
+            )
+            or age_seconds != _proof_age_seconds(published_at, generated_at)
+            or generated_at - effective_instant
+            > timedelta(
+                seconds=RELEASE_PROOF_MAXIMUM_FUTURE_CLOCK_SKEW_SECONDS
+            )
+            or _proof_age_seconds(effective_instant, generated_at)
+            > max_age_seconds
+        ):
+            return "stale"
+
+    for prefix in ("releaseProof", "uiLocalization", "flagshipReadiness"):
+        if facts[prefix][0] != evidence[f"{prefix}GeneratedAt"]:
+            return "stale"
+
+    flagship_status = _freshness_source_status(
+        proof_freshness["flagshipReadinessStatus"]
+    )
+    desktop_ready = proof_freshness["flagshipDesktopClientReady"]
+    coverage_gap_keys = _canonical_string_list(
+        proof_freshness["flagshipReadinessCoverageGapKeys"]
+    )
+    if flagship_status != "pass" or desktop_ready is not True:
+        return "stale"
+    if (
+        flagship_status != evidence["flagshipReadinessStatus"]
+        or desktop_ready != evidence["flagshipDesktopClientReady"]
+        or coverage_gap_keys
+        != evidence["flagshipReadinessCoverageGapKeys"]
+        or proof_freshness["flagshipReadinessSnapshotSha256"]
+        != evidence["flagshipReadinessSnapshotSha256"]
+        or not _is_pass_status(evidence["flagshipReadinessStatus"])
+        or not evidence["flagshipDesktopClientReady"]
+        or evidence["flagshipReadinessCoverageGapKeys"]
+        or evidence["flagshipReadinessLaunchBlockers"]
+    ):
+        return "stale"
+    return "fresh"
+
+
+def _release_proof_evidence_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    public_trust_metrics = payload.get("publicTrustMetrics")
+    proof_freshness = (
+        public_trust_metrics.get("proofFreshness")
+        if isinstance(public_trust_metrics, dict)
+        and isinstance(public_trust_metrics.get("proofFreshness"), dict)
+        else {}
+    )
+    return {
+        "releaseProof": copy.deepcopy(payload.get("releaseProof")),
+        "proofFreshness": {
+            field: copy.deepcopy(proof_freshness.get(field))
+            for field in ("status", *RELEASE_PROOF_REQUIRED_FRESHNESS_FIELDS)
+        },
+    }
+
+
+def _release_readiness_blocker_clause(
+    proof_is_fresh: bool,
+    privacy_blocks_supportability: bool,
+) -> str:
+    if not proof_is_fresh and privacy_blocks_supportability:
+        return (
+            "stale or incomplete proof receipts and Hosted Build privacy, retention, "
+            "recovery, and erasure review still block launch-readiness claims"
+        )
+    if not proof_is_fresh:
+        return "stale or incomplete proof receipts still block launch-readiness claims"
+    if privacy_blocks_supportability:
+        return (
+            "Hosted Build privacy, retention, recovery, and erasure review still "
+            "blocks launch-readiness claims"
+        )
+    return "launch-readiness review remains incomplete"
+
+
+def _manifest_object(payload: dict[str, Any], key: str) -> dict[str, Any]:
+    value = payload.get(key)
+    if isinstance(value, dict):
+        return value
+    projected: dict[str, Any] = {}
+    payload[key] = projected
+    return projected
+
+
+def _apply_release_channel_supportability_floor(
+    release_channel: dict[str, Any],
+    publication_status: str,
+    top_level_rollout_state: str,
+    public_trust_posture_field: str,
+    review_summary: str,
+) -> None:
+    existing_rollout_state = _normalize_supportability_state(
+        release_channel.get("rolloutState")
+    )
+    effective_rollout_state = _resolve_non_fresh_rollout_state(
+        publication_status,
+        existing_rollout_state,
+        top_level_rollout_state,
+    )
+    stronger_rollout_state = _is_stronger_than_proof_review(
+        effective_rollout_state
+    )
+    release_channel["rolloutState"] = effective_rollout_state
+    release_channel["supportabilityState"] = (
+        _resolve_non_fresh_supportability_state(
+            publication_status,
+            effective_rollout_state,
+            _normalize_supportability_state(
+                release_channel.get("supportabilityState")
+            ),
+        )
+    )
+    current_public_trust_posture = _normalize_supportability_state(
+        release_channel.get(public_trust_posture_field)
+    )
+    release_channel[public_trust_posture_field] = (
+        "revoked"
+        if (
+            publication_status == "revoked"
+            or effective_rollout_state == "revoked"
+            or current_public_trust_posture == "revoked"
+        )
+        else "blocked"
+    )
+    release_channel["summary"] = _preserve_or_replace_narrative(
+        release_channel.get("summary"),
+        review_summary,
+        stronger_rollout_state,
+    )
+
+
+def apply_current_release_supportability_floor(
+    payload: dict[str, Any],
+    privacy_launch_gate: dict[str, Any],
+    evaluated_at: datetime | str | None = None,
+) -> dict[str, Any]:
+    """Mirror the runtime proof/privacy floor before authority binds manifest bytes."""
+
+    projected = copy.deepcopy(payload)
+    materialized_freshness_status = _evaluate_release_proof_freshness(
+        projected,
+        _projection_evaluated_at(evaluated_at),
+    )
+    public_trust_metrics = _manifest_object(projected, "publicTrustMetrics")
+    proof_freshness = _manifest_object(public_trust_metrics, "proofFreshness")
+    proof_freshness["status"] = materialized_freshness_status
+    public_trust_metrics["privacyReadiness"] = copy.deepcopy(
+        privacy_launch_gate
+    )
+
+    privacy_blocks_supportability = bool(
+        privacy_launch_gate["reviewRequired"]
+        or _normalize_supportability_token(privacy_launch_gate["status"])
+        != "documented"
+    )
+    proof_is_fresh = materialized_freshness_status == "fresh"
+    if proof_is_fresh and not privacy_blocks_supportability:
+        return projected
+
+    readiness_blocker = _release_readiness_blocker_clause(
+        proof_is_fresh,
+        privacy_blocks_supportability,
+    )
+    review_rollout_reason = (
+        "Current shelf is published, but release posture stays review-required "
+        f"because {readiness_blocker}."
+    )
+    review_supportability_summary = (
+        f"Treat the current release as review-required because {readiness_blocker}."
+    )
+    review_known_issue_summary = f"Known issue: {readiness_blocker}."
+    review_fix_availability_summary = (
+        "Only send fixed notices after current launch-readiness blockers are cleared "
+        "and the affected install can receive the published channel artifact now on "
+        "the release page."
+    )
+
+    publication_status = _normalize_supportability_state(projected.get("status"))
+    existing_rollout_state = _normalize_supportability_state(
+        projected.get("rolloutState")
+    )
+    effective_rollout_state = _resolve_non_fresh_rollout_state(
+        publication_status,
+        existing_rollout_state,
+        PROOF_REVIEW_ROLLOUT_STATE,
+    )
+    stronger_rollout_state = _is_stronger_than_proof_review(
+        effective_rollout_state
+    )
+    projected["rolloutState"] = effective_rollout_state
+    projected["rolloutReason"] = _preserve_or_replace_narrative(
+        projected.get("rolloutReason"),
+        review_rollout_reason,
+        stronger_rollout_state,
+    )
+    projected["supportabilityState"] = _resolve_non_fresh_supportability_state(
+        publication_status,
+        effective_rollout_state,
+        _normalize_supportability_state(projected.get("supportabilityState")),
+    )
+    projected["supportabilitySummary"] = _preserve_or_replace_narrative(
+        projected.get("supportabilitySummary"),
+        review_supportability_summary,
+        stronger_rollout_state,
+    )
+    projected["knownIssueSummary"] = _preserve_or_replace_narrative(
+        projected.get("knownIssueSummary"),
+        review_known_issue_summary,
+        stronger_rollout_state,
+    )
+    projected["fixAvailabilitySummary"] = _preserve_or_replace_narrative(
+        projected.get("fixAvailabilitySummary"),
+        review_fix_availability_summary,
+        stronger_rollout_state,
+    )
+
+    public_release_channel = _manifest_object(
+        public_trust_metrics,
+        "releaseChannel",
+    )
+    _apply_release_channel_supportability_floor(
+        public_release_channel,
+        publication_status,
+        effective_rollout_state,
+        "posture",
+        f"Release channel remains review-required because {readiness_blocker}.",
+    )
+
+    registry_boundary_coverage = _manifest_object(
+        projected,
+        "registryBoundaryCoverage",
+    )
+    registry_release_channel = _manifest_object(
+        registry_boundary_coverage,
+        "releaseChannel",
+    )
+    _apply_release_channel_supportability_floor(
+        registry_release_channel,
+        publication_status,
+        effective_rollout_state,
+        "publicTrustPosture",
+        (
+            "Release-channel truth remains review-required because "
+            f"{readiness_blocker}."
+        ),
+    )
+    return projected
+
+
+def _supportability_floor_projection(payload: dict[str, Any]) -> dict[str, Any]:
+    public_trust_metrics = payload.get("publicTrustMetrics")
+    public_release_channel = (
+        public_trust_metrics.get("releaseChannel")
+        if isinstance(public_trust_metrics, dict)
+        and isinstance(public_trust_metrics.get("releaseChannel"), dict)
+        else {}
+    )
+    registry_boundary_coverage = payload.get("registryBoundaryCoverage")
+    registry_release_channel = (
+        registry_boundary_coverage.get("releaseChannel")
+        if isinstance(registry_boundary_coverage, dict)
+        and isinstance(registry_boundary_coverage.get("releaseChannel"), dict)
+        else {}
+    )
+    return {
+        field: copy.deepcopy(payload.get(field))
+        for field in SUPPORTABILITY_FLOOR_FIELDS
+    } | {
+        "proofFreshnessStatus": (
+            public_trust_metrics.get("proofFreshness", {}).get("status")
+            if isinstance(public_trust_metrics, dict)
+            and isinstance(public_trust_metrics.get("proofFreshness"), dict)
+            else None
+        ),
+        "privacyReadiness": (
+            copy.deepcopy(public_trust_metrics.get("privacyReadiness"))
+            if isinstance(public_trust_metrics, dict)
+            else None
+        ),
+        "publicReleaseChannel": {
+            field: copy.deepcopy(public_release_channel.get(field))
+            for field in (
+                "rolloutState",
+                "supportabilityState",
+                "posture",
+                "summary",
+            )
+        },
+        "registryReleaseChannel": {
+            field: copy.deepcopy(registry_release_channel.get(field))
+            for field in (
+                "rolloutState",
+                "supportabilityState",
+                "publicTrustPosture",
+                "summary",
+            )
+        },
+    }
+
+
 def normalize_manifest(
     path: Path,
     generation_id: str,
@@ -642,6 +1722,8 @@ def project_manifest_pair(
     canonical_path: Path,
     compatibility_path: Path,
     generation_id: str,
+    *,
+    evaluated_at: datetime | str | None = None,
 ) -> dict[str, Any]:
     """Atomically project both incoming manifests to one caller-declared generation.
 
@@ -674,6 +1756,37 @@ def project_manifest_pair(
     ):
         raise ReleaseShelfError(
             "canonical and compatibility manifests must expose the same release identity"
+        )
+
+    if _release_proof_evidence_projection(
+        canonical_source
+    ) != _release_proof_evidence_projection(compatibility_source):
+        raise ReleaseShelfError(
+            "canonical and compatibility manifests must expose the same "
+            "release-proof freshness evidence"
+        )
+
+    projection_evaluated_at = _projection_evaluated_at(evaluated_at)
+    (
+        privacy_launch_gate,
+        privacy_launch_gate_contract_sha256,
+    ) = load_privacy_launch_gate_contract_snapshot()
+    canonical_source = apply_current_release_supportability_floor(
+        canonical_source,
+        privacy_launch_gate,
+        projection_evaluated_at,
+    )
+    compatibility_source = apply_current_release_supportability_floor(
+        compatibility_source,
+        privacy_launch_gate,
+        projection_evaluated_at,
+    )
+    if _supportability_floor_projection(
+        canonical_source
+    ) != _supportability_floor_projection(compatibility_source):
+        raise ReleaseShelfError(
+            "canonical and compatibility manifests must expose the same "
+            "runtime supportability-floor projection"
         )
 
     artifact_routes = _artifact_routes(compatibility_source, generation_id)
@@ -741,6 +1854,17 @@ def project_manifest_pair(
             "publishedAt": projected_canonical_identity[2],
             "canonicalManifestSha256": sha256_file(canonical_path),
             "compatibilityManifestSha256": sha256_file(compatibility_path),
+            "privacyLaunchGateContractName": privacy_launch_gate["contractName"],
+            "privacyLaunchGateContractVersion": privacy_launch_gate[
+                "contractVersion"
+            ],
+            "privacyLaunchGateContractSha256": (
+                privacy_launch_gate_contract_sha256
+            ),
+            "supportabilityFloorEvaluatedAt": _format_utc_timestamp(
+                projection_evaluated_at
+            ),
+            "supportabilityFloorApplied": True,
         }
     finally:
         for temporary in temporary_paths:
@@ -2148,6 +3272,10 @@ def build_parser() -> argparse.ArgumentParser:
     project_manifests.add_argument("--canonical-manifest", type=Path, required=True)
     project_manifests.add_argument("--compatibility-manifest", type=Path, required=True)
     project_manifests.add_argument("--generation-id", required=True)
+    project_manifests.add_argument(
+        "--evaluated-at",
+        help="explicit canonical UTC instant used for proof-freshness projection",
+    )
 
     activate = subparsers.add_parser(
         "activate-filesystem", help="stage, validate, and atomically activate a filesystem shelf"
@@ -2206,6 +3334,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.canonical_manifest,
                 args.compatibility_manifest,
                 args.generation_id,
+                evaluated_at=args.evaluated_at,
             )
             print(json.dumps(result, sort_keys=True))
         elif args.command == "activate-filesystem":
