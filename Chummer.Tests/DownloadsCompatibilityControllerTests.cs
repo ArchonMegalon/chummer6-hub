@@ -6,8 +6,11 @@ using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 using Xunit;
@@ -16,6 +19,26 @@ namespace Chummer.Tests;
 
 public sealed class DownloadsCompatibilityControllerTests
 {
+    [Fact]
+    public void PublicReleaseShelfByteRoutesExposeGetAndHeadWithoutPublishingTheCurrentPointer()
+    {
+        AssertRouteSupportsGetAndHead(
+            nameof(DownloadsCompatibilityController.DownloadFile),
+            "/downloads/files/{**path}");
+        AssertRouteSupportsGetAndHead(
+            nameof(DownloadsCompatibilityController.DownloadGenerationFile),
+            "/downloads/g/{generationId}/files/{**path}");
+
+        string[] controllerRoutes = typeof(DownloadsCompatibilityController)
+            .GetMethods()
+            .Where(method => method.DeclaringType == typeof(DownloadsCompatibilityController))
+            .SelectMany(method => method.GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true))
+            .Cast<HttpMethodAttribute>()
+            .Select(route => route.Template ?? string.Empty)
+            .ToArray();
+        Assert.DoesNotContain("/downloads/current.json", controllerRoutes);
+    }
+
     [Fact]
     public void WindowsProofStoreActionsExposeOnlyCloudflareProtectedRoutes()
     {
@@ -259,6 +282,63 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.True(file.EnableRangeProcessing);
         Assert.Equal(11, file.FileStream.Length);
         await file.FileStream.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task WindowsInstallerFilePathHeadReturnsExactLengthWithoutWritingABody()
+    {
+        using Fixture fixture = new();
+        await using var responseBody = new MemoryStream();
+        DefaultHttpContext context = CreateDownloadHttpContext(HttpMethods.Head, responseBody);
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            "chummer-avalonia-win-x64-installer.exe",
+            CancellationToken.None);
+        await ExecuteResultAsync(result, context);
+
+        Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+        Assert.Equal(11, context.Response.ContentLength);
+        Assert.Equal(0, responseBody.Length);
+    }
+
+    [Fact]
+    public async Task WindowsInstallerFilePathGetPreservesSatisfiableByteRanges()
+    {
+        using Fixture fixture = new();
+        await using var responseBody = new MemoryStream();
+        DefaultHttpContext context = CreateDownloadHttpContext(HttpMethods.Get, responseBody);
+        context.Request.Headers.Range = "bytes=0-0";
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            "chummer-avalonia-win-x64-installer.exe",
+            CancellationToken.None);
+        await ExecuteResultAsync(result, context);
+
+        Assert.Equal(StatusCodes.Status206PartialContent, context.Response.StatusCode);
+        Assert.Equal(1, context.Response.ContentLength);
+        Assert.Equal("bytes 0-0/11", context.Response.Headers.ContentRange.ToString());
+        Assert.Equal("w"u8.ToArray(), responseBody.ToArray());
+    }
+
+    [Fact]
+    public async Task WindowsInstallerFilePathGetPreservesUnsatisfiableByteRanges()
+    {
+        using Fixture fixture = new();
+        await using var responseBody = new MemoryStream();
+        DefaultHttpContext context = CreateDownloadHttpContext(HttpMethods.Get, responseBody);
+        context.Request.Headers.Range = "bytes=11-";
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            "chummer-avalonia-win-x64-installer.exe",
+            CancellationToken.None);
+        await ExecuteResultAsync(result, context);
+
+        Assert.Equal(StatusCodes.Status416RangeNotSatisfiable, context.Response.StatusCode);
+        Assert.Equal("bytes */11", context.Response.Headers.ContentRange.ToString());
+        Assert.Equal(0, responseBody.Length);
     }
 
     [Fact]
@@ -619,6 +699,32 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Contains(routes, route => route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
         Assert.Contains(routes, route => route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
     }
+
+    private static DefaultHttpContext CreateDownloadHttpContext(string method, Stream responseBody)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddControllers();
+
+        return new DefaultHttpContext
+        {
+            RequestServices = services.BuildServiceProvider(),
+            Request =
+            {
+                Method = method
+            },
+            Response =
+            {
+                Body = responseBody
+            }
+        };
+    }
+
+    private static Task ExecuteResultAsync(IActionResult result, HttpContext context)
+        => result.ExecuteResultAsync(new ActionContext(
+            context,
+            new RouteData(),
+            new ActionDescriptor()));
 
     private static void WriteEmbeddedPayloadInstaller(string path, string head)
     {
