@@ -58,6 +58,7 @@ SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 RELEASE_CHANNEL_STABLE_CHANNELS = {"public_stable", "stable", "docker"}
 VERSION_TEXT_PATTERN = re.compile(r"\bVersion\s+\S+", re.IGNORECASE)
 STATUS_DECISION_HEADINGS = {
+    "Downloads under review",
     "Preview downloads",
     "Stable downloads",
     "Downloads paused",
@@ -574,26 +575,6 @@ def release_manifest_copy_safety(manifest: dict[str, Any], prefix: str) -> tuple
 
 
 def public_installer_available(payload: dict[str, Any]) -> bool:
-    trust_metrics = payload.get("publicTrustMetrics")
-    trust_metrics = trust_metrics if isinstance(trust_metrics, dict) else {}
-    adoption_health = trust_metrics.get("adoptionHealth")
-    adoption_health = adoption_health if isinstance(adoption_health, dict) else {}
-    if "publicInstallCount" in adoption_health:
-        try:
-            return int(adoption_health.get("publicInstallCount") or 0) > 0
-        except (TypeError, ValueError):
-            return False
-
-    coverage = payload.get("registryBoundaryCoverage")
-    coverage = coverage if isinstance(coverage, dict) else {}
-    entitlement = coverage.get("entitlement")
-    entitlement = entitlement if isinstance(entitlement, dict) else {}
-    if "openPublicSurfaceCount" in entitlement:
-        try:
-            return int(entitlement.get("openPublicSurfaceCount") or 0) > 0
-        except (TypeError, ValueError):
-            return False
-
     downloads = payload.get("downloads")
     if isinstance(downloads, list):
         return bool(downloads)
@@ -618,6 +599,26 @@ def public_installer_available(payload: dict[str, Any]) -> bool:
                 return True
         return False
 
+    trust_metrics = payload.get("publicTrustMetrics")
+    trust_metrics = trust_metrics if isinstance(trust_metrics, dict) else {}
+    adoption_health = trust_metrics.get("adoptionHealth")
+    adoption_health = adoption_health if isinstance(adoption_health, dict) else {}
+    if "publicInstallCount" in adoption_health:
+        try:
+            return int(adoption_health.get("publicInstallCount") or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
+    coverage = payload.get("registryBoundaryCoverage")
+    coverage = coverage if isinstance(coverage, dict) else {}
+    entitlement = coverage.get("entitlement")
+    entitlement = entitlement if isinstance(entitlement, dict) else {}
+    if "openPublicSurfaceCount" in entitlement:
+        try:
+            return int(entitlement.get("openPublicSurfaceCount") or 0) > 0
+        except (TypeError, ValueError):
+            return False
+
     # Older manifest contracts did not expose availability counters. Preserve their
     # established heading expectations until an explicit availability signal exists.
     return True
@@ -636,6 +637,18 @@ def expected_status_heading(
     normalized_channel = (expected_release_channel or "").strip().lower()
     normalized_supportability_state = (expected_supportability_state or "").strip().lower()
     normalized_rollout_state = (expected_rollout_state or "").strip().lower()
+
+    if (
+        (not normalized_status or normalized_status == "published")
+        and normalized_supportability_state == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
+        and expected_public_installer_available is not False
+        and (
+            normalized_version
+            or normalized_channel
+            or normalized_rollout_state in RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES
+        )
+    ):
+        return "Downloads under review"
 
     if expected_public_installer_available is False:
         return "Downloads paused"

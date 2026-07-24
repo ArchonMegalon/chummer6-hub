@@ -37,34 +37,54 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
     release_supportability_state = "review_required"
     release_rollout_state = "coverage_incomplete"
     public_install_count = 1
+    public_download_profile = False
 
     def do_GET(self):  # noqa: N802
         if self.path == "/downloads/RELEASE_CHANNEL.generated.json":
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
-            self.wfile.write(
-                json.dumps(
-                    {
-                        "status": self.release_status,
-                        "version": self.release_version,
-                        "channel": self.release_channel,
-                        "supportabilityState": self.release_supportability_state,
-                        "rolloutState": self.release_rollout_state,
-                        "publicTrustMetrics": {
-                            "adoptionHealth": {
-                                "publicInstallCount": self.public_install_count,
-                            }
-                        },
+            payload = {
+                "status": self.release_status,
+                "version": self.release_version,
+                "channel": self.release_channel,
+                "supportabilityState": self.release_supportability_state,
+                "rolloutState": self.release_rollout_state,
+                "publicTrustMetrics": {
+                    "adoptionHealth": {
+                        "publicInstallCount": self.public_install_count,
                     }
-                ).encode("utf-8")
-            )
+                },
+            }
+            if self.public_download_profile:
+                payload["artifacts"] = [
+                    {
+                        "id": "avalonia-win-x64-installer",
+                        "kind": "installer",
+                        "installAccessClass": "open_public",
+                        "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    }
+                ]
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
 
         if self.path == "/":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
+            if self.public_download_profile:
+                self.wfile.write(
+                    b"<html><body>"
+                    b"A Shadowrun character manager for clean sheets and faster tables."
+                    b"<a>Download Chummer</a>"
+                    b"<p>Listed for review: Windows. Availability is not asserted.</p>"
+                    b"<p>Current public lane: Preview. Review required.</p>"
+                    b"<a>Help</a>"
+                    b"<a href=\"/build\" data-public-install-handoff=\"true\">Build</a>"
+                    b"<a href=\"/mobile/player\" data-public-install-handoff=\"true\">Play</a>"
+                    b"</body></html>"
+                )
+                return
             play_control = (
                 b"<a class=\"site-account-menu__link site-open-chummer-menu__button\" href=\"/mobile/player\" data-analytics-label=\"Play\">Play</a>"
                 if self.guest_play_public
@@ -94,25 +114,80 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(
-                b"<html><body>"
-                b"Downloads Chummer selects the best installer when it can. Stable release is unchanged. Nightly handoff Stable Build from source Download script"
-                b"</body></html>"
-            )
+            if self.public_download_profile:
+                self.wfile.write(
+                    b"<html><body>"
+                    b"<h1>Downloads</h1>"
+                    b"Chummer selects the best installer when it can. "
+                    b"Nightly Stable Build from source Download script "
+                    b"No Stable build on this shelf. Preview build. Review required."
+                    b"<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
+                    b"</body></html>"
+                )
+                return
+            if self.downloads_mode == "paused":
+                body = (
+                    b"<html><body><h1>Downloads</h1>"
+                    b"Chummer selects the best installer when it can. "
+                    b"<h2>No build is available right now</h2><a>Help</a>"
+                    b"<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
+                    b"</body></html>"
+                )
+            elif self.downloads_mode == "gold":
+                body = (
+                    b"<html><body><h1>Downloads</h1>"
+                    b"Chummer selects the best installer when it can. "
+                    b"Stable release. Nightly Stable Build from source Download script "
+                    b"<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
+                    b"</body></html>"
+                )
+            else:
+                body = (
+                    b"<html><body><h1>Downloads</h1>"
+                    b"Chummer selects the best installer when it can. "
+                    b"Nightly Stable Build from source Download script "
+                    b"No Stable build on this shelf. Preview build. Review required. "
+                    b"<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
+                    b"</body></html>"
+                )
+            self.wfile.write(body)
             return
 
         if self.path == "/status":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
+            if self.public_download_profile:
+                self.wfile.write(
+                    b"<html><head><title>Status \xc2\xb7 Chummer</title></head><body>"
+                    b"<section class=\"minimal-page-hero minimal-status-pill\">"
+                    b"<p>Now</p><h1>Downloads under review</h1>"
+                    b"<p>Windows installers remain listed for review; availability is not asserted.</p>"
+                    b"<a data-analytics-surface=\"status_decision\" href=\"/downloads\">Downloads</a>"
+                    b"<a href=\"/help\">Help</a>"
+                    b"</section></body></html>"
+                )
+                return
+            if self.public_install_count <= 0:
+                heading = b"Downloads paused"
+                summary = b"Downloads are paused."
+            elif (
+                self.release_supportability_state == "gold_supported"
+                and self.release_rollout_state == "public_stable"
+                and self.release_channel in {"public_stable", "stable", "docker"}
+            ):
+                heading = b"Stable downloads"
+                summary = b"Windows download is live."
+            else:
+                heading = b"Preview downloads"
+                summary = b"Windows download is live."
             self.wfile.write(
-                b"<html><body>"
+                b"<html><head><title>Status \xc2\xb7 Chummer</title></head><body>"
                 b"<section class=\"minimal-page-hero minimal-status-pill\">"
-                b"<h1>Updated</h1>"
-                b"<a href=\"/downloads\">Downloads</a>"
+                b"<p>Now</p><h1>" + heading + b"</h1><p>" + summary + b"</p>"
+                b"<a data-analytics-surface=\"status_decision\" href=\"/downloads\">Downloads</a>"
                 b"<a href=\"/help\">Help</a>"
-                b"</section>"
-                b"</body></html>"
+                b"</section></body></html>"
             )
             return
 
@@ -308,6 +383,27 @@ class LiveSurfaceParityTests(unittest.TestCase):
         _SurfaceHandler.release_supportability_state = "review_required"
         _SurfaceHandler.release_rollout_state = "coverage_incomplete"
         _SurfaceHandler.public_install_count = 1
+        _SurfaceHandler.public_download_profile = False
+
+    def test_public_download_profile_requires_anonymous_artifact_and_review_copy(self) -> None:
+        module = load_module()
+        _SurfaceHandler.public_download_profile = True
+        _SurfaceHandler.release_channel = "preview"
+        _SurfaceHandler.public_install_count = 0
+
+        payload = module.verify(
+            self.base_url,
+            surface_profile=module.SURFACE_PROFILE_PUBLIC_DOWNLOAD,
+        )
+
+        self.assertEqual("pass", payload["status"], payload["failures"])
+        self.assertEqual("public-download", payload["surface_profile"])
+        self.assertEqual(["/", "/downloads", "/status"], [item["path"] for item in payload["results"]])
+        self.assertTrue(payload["release_posture"]["public_download_artifact_available"])
+        self.assertTrue(payload["release_posture"]["downloads_under_review"])
+        self.assertFalse(payload["release_posture"]["downloads_paused"])
+        status = next(item for item in payload["results"] if item["path"] == "/status")
+        self.assertIn("Downloads under review", status["required_texts"])
 
     def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()

@@ -30,6 +30,12 @@ RETRYABLE_FETCH_REASONS = (
     ConnectionResetError,
     ConnectionRefusedError,
 )
+SURFACE_PROFILE_FLAGSHIP = "flagship"
+SURFACE_PROFILE_PUBLIC_DOWNLOAD = "public-download"
+SURFACE_PROFILES = {
+    SURFACE_PROFILE_FLAGSHIP,
+    SURFACE_PROFILE_PUBLIC_DOWNLOAD,
+}
 
 def truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
@@ -94,7 +100,6 @@ def build_downloads_surface(
     if downloads_paused:
         required_texts.extend(
             [
-                "Current public installer",
                 "No build is available right now",
                 "Help",
             ]
@@ -131,10 +136,13 @@ def build_status_surface(
     *,
     release_review_required: bool,
     downloads_paused: bool = False,
+    downloads_under_review: bool = False,
 ) -> dict[str, Any]:
     status_heading = (
         "Downloads paused"
         if downloads_paused
+        else "Downloads under review"
+        if downloads_under_review
         else "Preview downloads"
         if release_review_required
         else "Stable downloads"
@@ -153,6 +161,7 @@ def build_status_surface(
             "Linux download is live.",
             "Downloads are paused.",
             "No public installer right now.",
+            "availability is not asserted.",
         ],
         "required_html_texts": [
             "<title>Status · Chummer</title>",
@@ -210,6 +219,77 @@ def build_status_surface(
     }
 
 
+def build_public_download_surfaces(
+    *,
+    release_review_required: bool,
+    downloads_paused: bool,
+    downloads_under_review: bool,
+) -> list[dict[str, Any]]:
+    landing_required_texts = [
+        "A Shadowrun character manager for clean sheets and faster tables.",
+        "Download Chummer",
+        "Help",
+    ]
+    if downloads_paused:
+        landing_required_texts.extend(
+            [
+                "No public installer right now.",
+                "Current public lane: Downloads paused.",
+            ]
+        )
+    elif downloads_under_review:
+        landing_required_texts.extend(
+            [
+                "Listed for review:",
+                "Availability is not asserted.",
+                "Current public lane: Preview. Review required.",
+            ]
+        )
+    else:
+        landing_required_texts.append("Current public installer")
+        landing_required_texts.append(
+            "Current public lane: Preview. Review required."
+            if release_review_required
+            else "Current public lane: Stable."
+        )
+
+    landing = {
+        "path": "/",
+        "required_texts": landing_required_texts,
+        "required_html_texts": [
+            'href="/build"',
+            'href="/mobile/player"',
+            'data-public-install-handoff="true"',
+        ],
+        "forbidden_texts": [
+            "Next move",
+            "Need help?",
+            "One compact rail for downloads, play, and public status.",
+            "Get started",
+            "Flagship routes",
+            "Signals and horizons",
+            "Trust and support",
+            "Account and quick actions",
+        ],
+        "forbidden_html_texts": [
+            'data-disabled-target="/build"',
+            'data-disabled-target="/mobile/player"',
+        ],
+    }
+    return [
+        landing,
+        build_downloads_surface(
+            release_review_required=release_review_required,
+            downloads_paused=downloads_paused,
+        ),
+        build_status_surface(
+            release_review_required=release_review_required,
+            downloads_paused=downloads_paused,
+            downloads_under_review=downloads_under_review,
+        ),
+    ]
+
+
 def build_surfaces(
     require_brilliant_directories_checkout: bool,
     *,
@@ -249,76 +329,8 @@ def build_surfaces(
                 "Trust and support",
                 "Account and quick actions",
             ],
-        },
-        {
-            "path": "/downloads",
-            "required_texts": [
-                "Downloads",
-                "Chummer selects the best installer when it can.",
-                "Stable release",
-                "Nightly",
-                "Stable",
-                "Build from source",
-                "Download script",
-            ],
-            "forbidden_texts": [
-                "Advanced download options",
-                "Release notes",
-                "Build run",
-                "Need account return?",
-                "Current notes.",
-                "Install questions?",
-                "Account return later?",
-                "account-assisted install paths",
-                "Link this copy from the first launch",
-                "guided installer",
-                "Current stable build",
-                "Latest published build",
-                "Use this when you want the newest Windows or Linux release.",
-                "Get started",
-                "Flagship routes",
-                "Signals and horizons",
-                "Trust and support",
-                "Account and quick actions",
-            ],
-        },
-        {
-            "path": "/status",
-            "required_final_url_prefix": "/status",
-            "required_texts": [
-                "Updated",
-                "Downloads",
-                "Help",
-            ],
-            "forbidden_texts": [
-                "Current release",
-                "The build, platforms, and current state in one place.",
-                "Open downloads",
-                "Open help",
-                "Platforms",
-                "Release and next step.",
-                "Release, caution, next click.",
-                "Known issues and install help stay nearby.",
-                "provider",
-                "operator",
-                "fleet",
-                "proof",
-                "receipt",
-                "Released",
-                "Current caution.",
-                "Preview posture on Public release",
-                "Review is still required before this release can be treated as supportable.",
-                "Fallback",
-                "Revoked",
-                "usage snapshot",
-                "At a glance",
-                "Signed-in return",
-                "Status poster",
-                "Get started",
-                "Flagship routes",
-                "Signals and horizons",
-                "Trust and support",
-                "Account and quick actions",
+            "forbidden_html_texts": [
+                'site-open-chummer-menu__button" href="/mobile/player"',
             ],
         },
         build_downloads_surface(
@@ -787,6 +799,59 @@ def public_installer_available(payload: dict[str, Any]) -> bool:
     return True
 
 
+def public_download_artifact_available(payload: dict[str, Any]) -> bool:
+    downloads = payload.get("downloads")
+    if isinstance(downloads, list):
+        return bool(downloads)
+
+    artifacts = payload.get("artifacts")
+    if isinstance(artifacts, list):
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            kind = normalize_token(artifact.get("kind") or artifact.get("artifactKind"))
+            if "installer" not in kind:
+                continue
+            access = normalize_token(
+                artifact.get("installAccessClass")
+                or artifact.get("accessClass")
+                or artifact.get("access")
+            )
+            if access and access not in {"open_public", "public", "guest"}:
+                continue
+            if first_text(artifact, "downloadUrl", "url", "installUrl"):
+                return True
+        return False
+
+    return public_installer_available(payload)
+
+
+def downloads_under_review(payload: dict[str, Any], artifact_available: bool) -> bool:
+    if not artifact_available:
+        return False
+    status = normalize_token(payload.get("status"))
+    supportability_state = normalize_token(
+        payload.get("supportabilityState") or payload.get("supportability_state")
+    )
+    rollout_state = normalize_token(
+        payload.get("rolloutState") or payload.get("rollout_state")
+    )
+    return bool(
+        (not status or status == "published")
+        and (
+            supportability_state == "review_required"
+            or rollout_state
+            in {
+                "blocked",
+                "coverage_incomplete",
+                "desktop_polish_needed",
+                "public_release_review_required",
+                "release_review_required",
+            }
+        )
+    )
+
+
 def release_posture_expected_failures(payload: dict[str, Any], expected: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     if not expected:
         return {}, []
@@ -867,9 +932,13 @@ def load_release_posture(
 
     review_required = True
     installer_available = False
+    artifact_available = False
+    under_review = False
     if payload and parse_error is None:
         review_required = release_review_required(payload)
         installer_available = public_installer_available(payload)
+        artifact_available = public_download_artifact_available(payload)
+        under_review = downloads_under_review(payload, artifact_available)
     expected_fields, expected_failures = release_posture_expected_failures(payload, expected_release_channel or {})
 
     return {
@@ -887,7 +956,9 @@ def load_release_posture(
         "rollout_state": payload.get("rolloutState"),
         "review_required": review_required,
         "public_installer_available": installer_available,
-        "downloads_paused": not installer_available,
+        "public_download_artifact_available": artifact_available,
+        "downloads_paused": not artifact_available,
+        "downloads_under_review": under_review,
         **expected_fields,
         "expected_failures": expected_failures,
     }
@@ -904,7 +975,11 @@ def verify(
     output_path: Path | None = None,
     release_channel_receipt: Path | None = None,
     deadline_monotonic: float | None = None,
+    *,
+    surface_profile: str = SURFACE_PROFILE_FLAGSHIP,
 ) -> dict[str, Any]:
+    if surface_profile not in SURFACE_PROFILES:
+        raise ValueError(f"unsupported live-surface parity profile: {surface_profile}")
     output_path = output_path or OUTPUT_PATH
     base = base_url.rstrip("/")
     base_origin = urllib.parse.urlparse(base)
@@ -918,11 +993,18 @@ def verify(
             expected_release_channel,
             deadline_monotonic,
         )
-    surfaces = build_surfaces(
-        require_brilliant_directories_checkout,
-        release_review_required=bool(release_posture["review_required"]),
-        downloads_paused=bool(release_posture["downloads_paused"]),
-    )
+    if surface_profile == SURFACE_PROFILE_PUBLIC_DOWNLOAD:
+        surfaces = build_public_download_surfaces(
+            release_review_required=bool(release_posture["review_required"]),
+            downloads_paused=bool(release_posture["downloads_paused"]),
+            downloads_under_review=bool(release_posture["downloads_under_review"]),
+        )
+    else:
+        surfaces = build_surfaces(
+            require_brilliant_directories_checkout,
+            release_review_required=bool(release_posture["review_required"]),
+            downloads_paused=bool(release_posture["downloads_paused"]),
+        )
     results: list[dict[str, Any]] = []
     failures: list[str] = list(release_posture.get("expected_failures") or [])
 
@@ -1026,6 +1108,7 @@ def verify(
         "contract_name": "chummer.live_surface_parity",
         "generated_at_utc": now_iso(),
         "base_url": base,
+        "surface_profile": surface_profile,
         "require_brilliant_directories_checkout": require_brilliant_directories_checkout,
         "release_posture": release_posture,
         "status": "pass" if not failures else "fail",
@@ -1044,13 +1127,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=OUTPUT_PATH, help="Path to write the generated live-surface parity receipt.")
     parser.add_argument("--release-channel-receipt", type=Path, default=DEFAULT_RELEASE_CHANNEL_RECEIPT, help="Expected release-channel receipt used to compare the live downloads release manifest.")
     parser.add_argument("--skip-release-channel-match", action="store_true", help="Skip comparing the live downloads release manifest with the local release-channel receipt.")
+    parser.add_argument(
+        "--surface-profile",
+        choices=sorted(SURFACE_PROFILES),
+        default=SURFACE_PROFILE_FLAGSHIP,
+        help="Select the reviewed public-surface contract to verify.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     release_channel_receipt = None if args.skip_release_channel_match else args.release_channel_receipt
-    payload = verify(args.base_url, args.output, release_channel_receipt)
+    payload = verify(
+        args.base_url,
+        args.output,
+        release_channel_receipt,
+        surface_profile=args.surface_profile,
+    )
     if payload["status"] != "pass":
         raise SystemExit("live surface parity failed")
     print("live_surface_parity:ok")

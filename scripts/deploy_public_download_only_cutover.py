@@ -21,6 +21,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
+import pwd
 import re
 import secrets
 import shutil
@@ -2646,6 +2647,27 @@ SIDECAR_VOLUME_ENVIRONMENT = {
     "public-download-proofs": "CHUMMER_PUBLIC_DOWNLOAD_PROOFS_VOLUME",
     "public-download-shelf": "CHUMMER_PUBLIC_DOWNLOAD_SHELF_VOLUME",
 }
+PLAYWRIGHT_PYTHON_DISTRIBUTION_ENTRIES = (
+    "greenlet",
+    "greenlet-3.5.2.dist-info",
+    "playwright",
+    "playwright-1.60.0.dist-info",
+    "pyee",
+    "pyee-13.0.1.dist-info",
+    "typing_extensions.py",
+    "typing_extensions-4.15.0.dist-info",
+)
+PLAYWRIGHT_PYTHON_DISTRIBUTION_VERSIONS = {
+    "greenlet-3.5.2.dist-info": "3.5.2",
+    "playwright-1.60.0.dist-info": "1.60.0",
+    "pyee-13.0.1.dist-info": "13.0.1",
+    "typing_extensions-4.15.0.dist-info": "4.15.0",
+}
+PLAYWRIGHT_BROWSER_EXECUTABLES = (
+    Path("chromium_headless_shell-1223")
+    / "chrome-headless-shell-linux64"
+    / "chrome-headless-shell",
+)
 
 
 @dataclass(frozen=True)
@@ -2731,7 +2753,7 @@ class SidecarConfig:
 
     @property
     def overlay_root(self) -> Path:
-        return self.operation_root / "overlay-active-unused"
+        return self.operation_root / "overlay-active-unused" / "app"
 
     @property
     def overlay_staging_root(self) -> Path:
@@ -2744,6 +2766,14 @@ class SidecarConfig:
     @property
     def overlay_build_root(self) -> Path:
         return self.operation_root / "overlay-build"
+
+    @property
+    def host_build_root(self) -> Path:
+        return self.operation_root / "host-build"
+
+    @property
+    def playwright_python_root(self) -> Path:
+        return self.host_build_root / "playwright-python"
 
     @property
     def compose_file(self) -> Path:
@@ -2800,6 +2830,288 @@ class SidecarConfig:
         }
 
 
+def _validate_playwright_python_closure(root: Path) -> None:
+    try:
+        root_metadata = root.lstat()
+    except OSError as exc:
+        raise CutoverError(
+            "operation-private Playwright Python closure root is unavailable"
+        ) from exc
+    if (
+        not stat.S_ISDIR(root_metadata.st_mode)
+        or stat.S_ISLNK(root_metadata.st_mode)
+        or root_metadata.st_uid != os.getuid()
+        or stat.S_IMODE(root_metadata.st_mode) != 0o700
+        or root.resolve(strict=True) != root
+    ):
+        raise CutoverError(
+            "operation-private Playwright Python closure root is unsafe"
+        )
+    try:
+        entries = {entry.name for entry in os.scandir(root)}
+    except OSError as exc:
+        raise CutoverError(
+            "operation-private Playwright Python closure is unavailable"
+        ) from exc
+    if entries != set(PLAYWRIGHT_PYTHON_DISTRIBUTION_ENTRIES):
+        raise CutoverError(
+            "operation-private Playwright Python closure has an unexpected file set"
+        )
+    for directory, directory_names, file_names in os.walk(
+        root,
+        followlinks=False,
+    ):
+        parent = Path(directory)
+        for name in [*directory_names, *file_names]:
+            candidate = parent / name
+            try:
+                metadata = candidate.lstat()
+            except OSError as exc:
+                raise CutoverError(
+                    "operation-private Playwright Python closure changed"
+                ) from exc
+            if stat.S_ISLNK(metadata.st_mode):
+                raise CutoverError(
+                    "operation-private Playwright Python closure contains a symlink"
+                )
+            if candidate.name.endswith(".pth"):
+                raise CutoverError(
+                    "operation-private Playwright Python closure contains a path hook"
+                )
+            if metadata.st_uid != os.getuid():
+                raise CutoverError(
+                    "operation-private Playwright Python closure has a foreign owner"
+                )
+            if stat.S_ISDIR(metadata.st_mode):
+                if stat.S_IMODE(metadata.st_mode) != 0o700:
+                    raise CutoverError(
+                        "operation-private Playwright Python directory is not private"
+                    )
+            elif stat.S_ISREG(metadata.st_mode):
+                if metadata.st_nlink != 1 or stat.S_IMODE(metadata.st_mode) & 0o077:
+                    raise CutoverError(
+                        "operation-private Playwright Python file is not private"
+                    )
+            else:
+                raise CutoverError(
+                    "operation-private Playwright Python closure contains a special entry"
+                )
+    for distribution, expected_version in (
+        PLAYWRIGHT_PYTHON_DISTRIBUTION_VERSIONS.items()
+    ):
+        metadata = stable_regular_bytes(
+            root / distribution / "METADATA",
+            label=f"{distribution} metadata",
+        ).decode("utf-8")
+        versions = [
+            line.removeprefix("Version: ").strip()
+            for line in metadata.splitlines()
+            if line.startswith("Version: ")
+        ]
+        if versions != [expected_version]:
+            raise CutoverError(
+                "operation-private Playwright Python distribution version drifted"
+            )
+
+
+def prepare_operation_host_build(
+    config: SidecarConfig,
+) -> dict[str, Any]:
+    host_build_root = private_directory(config.host_build_root, create=True)
+    private_paths = {
+        name: private_directory(host_build_root / name, create=True)
+        for name in (
+            "home",
+            "dotnet-cli",
+            "nuget-packages",
+            "nuget-http-cache",
+            "tmp",
+            "sdk",
+        )
+    }
+    account_home = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
+    source_python_root = (
+        account_home
+        / ".local"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+    if not source_python_root.is_dir() or source_python_root.is_symlink():
+        raise CutoverError("host Playwright Python authority is unavailable")
+    browser_root = private_directory(
+        account_home / ".cache" / "ms-playwright",
+        create=False,
+    )
+    for relative_executable in PLAYWRIGHT_BROWSER_EXECUTABLES:
+        executable = browser_root / relative_executable
+        try:
+            metadata = executable.lstat()
+        except OSError as exc:
+            raise CutoverError(
+                "host Playwright browser authority is incomplete"
+            ) from exc
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or not os.access(executable, os.X_OK)
+        ):
+            raise CutoverError("host Playwright browser executable is unsafe")
+
+    closure_root = config.playwright_python_root
+    if not closure_root.exists() and not closure_root.is_symlink():
+        temporary_root = Path(
+            tempfile.mkdtemp(
+                prefix=".playwright-python.",
+                dir=host_build_root,
+            )
+        )
+        try:
+            temporary_root.chmod(0o700)
+            for entry_name in PLAYWRIGHT_PYTHON_DISTRIBUTION_ENTRIES:
+                source = source_python_root / entry_name
+                if not source.exists() or source.is_symlink():
+                    raise CutoverError(
+                        "host Playwright Python authority is incomplete"
+                    )
+                destination = temporary_root / entry_name
+                if source.is_dir():
+                    shutil.copytree(source, destination, symlinks=True)
+                elif source.is_file():
+                    shutil.copy2(source, destination, follow_symlinks=False)
+                else:
+                    raise CutoverError(
+                        "host Playwright Python authority contains a special entry"
+                    )
+            for directory, _directory_names, file_names in os.walk(
+                temporary_root,
+                followlinks=False,
+            ):
+                parent = Path(directory)
+                parent.chmod(0o700)
+                for file_name in file_names:
+                    file_path = parent / file_name
+                    metadata = file_path.lstat()
+                    if stat.S_ISLNK(metadata.st_mode):
+                        raise CutoverError(
+                            "host Playwright Python authority contains a symlink"
+                        )
+                    file_path.chmod(
+                        0o700 if stat.S_IMODE(metadata.st_mode) & 0o100 else 0o600
+                    )
+            os.replace(temporary_root, closure_root)
+        finally:
+            if temporary_root.exists():
+                shutil.rmtree(temporary_root)
+    _validate_playwright_python_closure(closure_root)
+
+    operation_browser_root = private_directory(
+        host_build_root / "playwright-browsers",
+        create=True,
+    )
+    browser_revision_root = operation_browser_root / "chromium_headless_shell-1223"
+    if not browser_revision_root.exists() and not browser_revision_root.is_symlink():
+        temporary_browser_root = Path(
+            tempfile.mkdtemp(
+                prefix=".chromium-headless-shell.",
+                dir=host_build_root,
+            )
+        )
+        try:
+            temporary_browser_root.chmod(0o700)
+            source_revision_root = browser_root / "chromium_headless_shell-1223"
+            shutil.copytree(
+                source_revision_root,
+                temporary_browser_root / "chromium_headless_shell-1223",
+                symlinks=True,
+            )
+            copied_revision_root = (
+                temporary_browser_root / "chromium_headless_shell-1223"
+            )
+            for directory, _directory_names, file_names in os.walk(
+                copied_revision_root,
+                followlinks=False,
+            ):
+                parent = Path(directory)
+                if parent.is_symlink():
+                    raise CutoverError(
+                        "host Playwright browser authority contains a symlink"
+                    )
+                parent.chmod(0o700)
+                for file_name in file_names:
+                    file_path = parent / file_name
+                    metadata = file_path.lstat()
+                    if stat.S_ISLNK(metadata.st_mode):
+                        raise CutoverError(
+                            "host Playwright browser authority contains a symlink"
+                        )
+                    if not stat.S_ISREG(metadata.st_mode):
+                        raise CutoverError(
+                            "host Playwright browser authority contains a special entry"
+                        )
+                    file_path.chmod(
+                        0o700 if stat.S_IMODE(metadata.st_mode) & 0o100 else 0o600
+                    )
+            os.replace(copied_revision_root, browser_revision_root)
+        finally:
+            if temporary_browser_root.exists():
+                shutil.rmtree(temporary_browser_root)
+    operation_browser_executable = (
+        operation_browser_root / PLAYWRIGHT_BROWSER_EXECUTABLES[0]
+    )
+    if not operation_browser_executable.is_file() or not os.access(
+        operation_browser_executable,
+        os.X_OK,
+    ):
+        raise CutoverError(
+            "operation-private Playwright browser authority is incomplete"
+        )
+    python_tree_sha256 = tree_sha256_file_stream(
+        closure_root,
+        label="operation-private Playwright Python closure",
+    )
+    browser_tree_sha256 = tree_sha256_file_stream(
+        browser_revision_root,
+        label="operation-private Playwright browser closure",
+    )
+    authority = {
+        "contractName": "chummer.operation-private-playwright-authority/v1",
+        "pythonAbi": f"cp{sys.version_info.major}{sys.version_info.minor}",
+        "playwrightVersion": "1.60.0",
+        "chromiumRevision": "1223",
+        "pythonRoot": str(closure_root),
+        "pythonTreeSha256": python_tree_sha256,
+        "browsersRoot": str(operation_browser_root),
+        "browserRevisionRoot": str(browser_revision_root),
+        "browserTreeSha256": browser_tree_sha256,
+        "browserExecutableRelativePath": str(
+            PLAYWRIGHT_BROWSER_EXECUTABLES[0]
+        ),
+    }
+    authority_path = host_build_root / "playwright-authority.json"
+    write_private_json(authority_path, authority, replace=True)
+    authority_bytes = stable_regular_bytes(
+        authority_path,
+        label="operation-private Playwright authority",
+    )
+    return {
+        "hostBuildRoot": str(host_build_root),
+        "home": str(private_paths["home"]),
+        "dotnetCliHome": str(private_paths["dotnet-cli"]),
+        "nugetPackages": str(private_paths["nuget-packages"]),
+        "nugetHttpCache": str(private_paths["nuget-http-cache"]),
+        "tmp": str(private_paths["tmp"]),
+        "sdk": str(private_paths["sdk"]),
+        "playwrightPythonRoot": str(closure_root),
+        "playwrightPythonTreeSha256": python_tree_sha256,
+        "playwrightBrowsersRoot": str(operation_browser_root),
+        "playwrightBrowserTreeSha256": browser_tree_sha256,
+        "playwrightAuthority": str(authority_path),
+        "playwrightAuthoritySha256": sha256_bytes(authority_bytes),
+    }
+
+
 class TopologyBRunner:
     def __init__(self, config: SidecarConfig) -> None:
         self.config = config
@@ -2853,12 +3165,14 @@ class TopologyBRunner:
         label: str,
         timeout: int = 300,
         input_bytes: bytes | None = None,
+        environment: Mapping[str, str] | None = None,
     ) -> bytes:
         return self.run(
             ["/usr/bin/python3", "-I", str(script), *arguments],
             label=label,
             timeout=timeout,
             input_bytes=input_bytes,
+            environment=environment,
         )
 
     def docker(
@@ -5335,6 +5649,7 @@ class TopologyBActions:
 
     def _stage_application(self) -> dict[str, Any]:
         output = self.config.operation_root / "overlay-stage.json"
+        host_build = prepare_operation_host_build(self.config)
         self.runner.python(
             self.config.source_root
             / "scripts/publish_public_edge_portal_overlay.py",
@@ -5349,6 +5664,18 @@ class TopologyBActions:
                 str(self.config.overlay_backup_root),
                 "--build-root",
                 str(self.config.overlay_build_root),
+                "--host-build-root",
+                str(self.config.host_build_root),
+                "--downloads-source-root",
+                str(self.config.shelf_source),
+                "--playwright-authority",
+                str(host_build["playwrightAuthority"]),
+                "--playwright-authority-sha256",
+                str(host_build["playwrightAuthoritySha256"]),
+                "--delivery-phase",
+                self.config.delivery_phase,
+                "--surface-profile",
+                "public-download",
                 "--release-channel-receipt",
                 str(self.config.release_channel_receipt),
                 "--release-channel-receipt-sha256",
@@ -5358,6 +5685,15 @@ class TopologyBActions:
             ],
             label="stage operation-only portal application",
             timeout=3600,
+            environment={
+                "HOME": str(host_build["home"]),
+                "DOTNET_ROOT": str(host_build["sdk"]),
+                "DOTNET_CLI_HOME": str(host_build["dotnetCliHome"]),
+                "NUGET_PACKAGES": str(host_build["nugetPackages"]),
+                "NUGET_HTTP_CACHE_PATH": str(host_build["nugetHttpCache"]),
+                "TMPDIR": str(host_build["tmp"]),
+                "PATH": f"{host_build['sdk']}:/usr/bin:/bin",
+            },
         )
         overlay_digest = tree_sha256_file_stream(
             self.config.overlay_staging_root,
@@ -5367,6 +5703,7 @@ class TopologyBActions:
             "receipt": str(output),
             "root": str(self.config.overlay_staging_root),
             "treeSha256": overlay_digest,
+            "hostBuild": host_build,
         }
 
     def materialize_sidecar_compose(

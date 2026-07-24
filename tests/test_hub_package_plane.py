@@ -226,6 +226,7 @@ def test_isolated_environment_overrides_ambient_cache_and_sibling_inputs(
     assert result["NUGET_PACKAGES"] == str(tmp_path / "packages")
     assert result["DOTNET_CLI_HOME"] == str(tmp_path / "cli")
     assert result["NUGET_HTTP_CACHE_PATH"] == str(tmp_path / "http")
+    assert result["HOME"] == str(tmp_path / "home")
     assert not any(value.startswith("/ambient") for value in result.values())
     assert "CHUMMER_WORKSPACE_ROOT" not in result
     assert "CHUMMER_PACKAGE_FEED" not in result
@@ -239,6 +240,15 @@ def test_isolated_environment_overrides_ambient_cache_and_sibling_inputs(
     assert result["DOTNET_MULTILEVEL_LOOKUP"] == "0"
     assert result["TZ"] == "UTC"
     assert result["TMPDIR"] == str(tmp_path / "tmp")
+    for directory in (
+        tmp_path / "home",
+        tmp_path / "packages",
+        tmp_path / "cli",
+        tmp_path / "http",
+        tmp_path / "tmp",
+    ):
+        assert directory.is_dir()
+        assert directory.stat().st_mode & 0o777 == 0o700
 
 
 def test_exact_head_checkout_validator_rejects_dirty_tree(tmp_path: Path) -> None:
