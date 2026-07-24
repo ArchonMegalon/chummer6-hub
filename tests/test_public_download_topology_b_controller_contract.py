@@ -3766,13 +3766,21 @@ def test_local_and_public_controller_phases_both_require_artifact_host_gate() ->
 
 
 class FakeDataProtectionRunner:
-    def __init__(self, *, fail_first_request: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_first_request: bool = False,
+        fail_lifetime_check: bool = False,
+    ) -> None:
         self.fail_first_request = fail_first_request
+        self.fail_lifetime_check = fail_lifetime_check
         self.calls: list[str] = []
+        self.commands: list[list[str]] = []
 
-    def run(self, command: list[str], **_kwargs: Any) -> bytes:
+    def run(self, command: list[str], **kwargs: Any) -> bytes:
         operation = command[1]
         self.calls.append(operation)
+        self.commands.append(list(command))
         if operation == "req":
             if self.fail_first_request:
                 self.fail_first_request = False
@@ -3794,12 +3802,28 @@ class FakeDataProtectionRunner:
                 if certificate.read_bytes() != b"fake-pkcs12:" + password:
                     raise controller.CutoverError("invalid fake PKCS#12")
                 return b""
+            if "-clcerts" in command and "-nokeys" in command:
+                certificate = Path(command[command.index("-in") + 1])
+                password_argument = command[command.index("-passin") + 1]
+                password = Path(
+                    password_argument.removeprefix("file:")
+                ).read_bytes()
+                if certificate.read_bytes() != b"fake-pkcs12:" + password:
+                    raise controller.CutoverError("invalid fake PKCS#12")
+                return b"fake-public-certificate"
             password_argument = command[command.index("-passout") + 1]
             assert password_argument.startswith("file:")
             password = Path(password_argument.removeprefix("file:")).read_bytes()
             Path(command[command.index("-out") + 1]).write_bytes(
                 b"fake-pkcs12:" + password
             )
+            return b""
+        if operation == "x509":
+            assert kwargs["input_bytes"] == b"fake-public-certificate"
+            if self.fail_lifetime_check:
+                raise controller.CutoverError(
+                    "simulated certificate lifetime failure"
+                )
             return b""
         raise AssertionError(f"unexpected fake OpenSSL operation: {operation}")
 
@@ -3826,6 +3850,26 @@ def test_fresh_data_protection_generation_recovers_and_replays_exactly(
     assert not config.sidecar_certificate.exists()
 
     first = controller.generate_sidecar_data_protection(config, runner)
+    certificate_request = next(
+        command for command in runner.commands if command[1] == "req"
+    )
+    assert certificate_request[
+        certificate_request.index("-days") + 1
+    ] == str(controller.SIDECAR_CERTIFICATE_VALIDITY_DAYS)
+    assert controller.SIDECAR_CERTIFICATE_VALIDITY_DAYS == 30
+    certificate_lifetime_check = next(
+        command for command in runner.commands if command[1] == "x509"
+    )
+    assert certificate_lifetime_check[
+        certificate_lifetime_check.index("-checkend") + 1
+    ] == str(controller.SIDECAR_CERTIFICATE_MINIMUM_REMAINING_SECONDS)
+    assert (
+        controller.SIDECAR_CERTIFICATE_MINIMUM_REMAINING_SECONDS
+        == 7 * 24 * 60 * 60
+    )
+    assert "fake-public-certificate" not in " ".join(
+        certificate_lifetime_check
+    )
     certificate = config.sidecar_certificate.read_bytes()
     password = config.sidecar_certificate_password.read_bytes()
     replay = controller.generate_sidecar_data_protection(config, runner)
@@ -3858,6 +3902,31 @@ def test_data_protection_replay_rejects_partial_final_pkcs12(
         controller.generate_sidecar_data_protection(
             config,
             FakeDataProtectionRunner(),
+        )
+
+
+def test_data_protection_replay_rejects_near_expiry_certificate(
+    tmp_path: Path,
+) -> None:
+    operation_root = tmp_path / "chummer-public-download-dp-near-expiry"
+    operation_root.mkdir(mode=0o700)
+    certificate = operation_root / "sidecar-data-protection.pfx"
+    password = operation_root / "sidecar-data-protection.password"
+    password_bytes = b"known-password\n"
+    certificate.write_bytes(b"fake-pkcs12:" + password_bytes)
+    password.write_bytes(password_bytes)
+    certificate.chmod(0o600)
+    password.chmod(0o600)
+    config = SimpleNamespace(
+        operation_root=operation_root,
+        sidecar_certificate=certificate,
+        sidecar_certificate_password=password,
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        controller.generate_sidecar_data_protection(
+            config,
+            FakeDataProtectionRunner(fail_lifetime_check=True),
         )
 
 
