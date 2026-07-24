@@ -61,6 +61,8 @@ def test_project_manifest_pair_binds_exact_generation_without_copying_artifacts(
     assert receipt["compatibilityManifestSha256"] == MODULE.sha256_file(
         compatibility_path
     )
+    assert stat.S_IMODE(canonical_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(compatibility_path.stat().st_mode) == 0o600
     assert not list(tmp_path.glob(".*.generation-*"))
 
 
@@ -426,6 +428,265 @@ def write_candidate(root: Path, version: str = "release-1", artifact: bytes = b"
     (smoke / "test.json").write_text('{"status":"passed"}\n', encoding="utf-8")
     (evidence / "test.json").write_text('{"status":"passed"}\n', encoding="utf-8")
     return root
+
+
+def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_without_source_mutation(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    files = candidate / "files"
+    files.mkdir(parents=True)
+    installer_name = "chummer-avalonia-win-x64-installer.exe"
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    metadata_name = f"{payload_name}.json"
+    installer = files / installer_name
+    payload = files / payload_name
+    metadata = files / metadata_name
+    installer.write_bytes(b"fixture installer")
+    payload.write_bytes(b"fixture payload")
+    metadata.write_bytes(b'{"payload":"fixture"}\n')
+
+    artifact = {
+        "artifactId": "avalonia-win-x64-installer",
+        "fileName": installer_name,
+        "downloadUrl": f"/downloads/files/{installer_name}",
+        "sha256": MODULE.sha256_file(installer),
+        "sizeBytes": installer.stat().st_size,
+        "installAccessClass": "open_public",
+        "payloadFileName": payload_name,
+        "payloadDownloadUrl": f"/downloads/files/{payload_name}",
+        "payloadSha256": MODULE.sha256_file(payload),
+        "payloadSizeBytes": payload.stat().st_size,
+        "payloadMetadataFileName": metadata_name,
+        "payloadMetadataUrl": f"/downloads/files/{metadata_name}",
+    }
+    canonical = {
+        "version": "run-read-only-five-file",
+        "releaseVersion": "run-read-only-five-file",
+        "channel": "preview",
+        "publishedAt": "2026-07-24T08:00:00Z",
+        "artifacts": [artifact],
+    }
+    compatibility_artifact = dict(artifact)
+    compatibility_artifact["id"] = compatibility_artifact.pop("artifactId")
+    compatibility_artifact["url"] = compatibility_artifact.pop("downloadUrl")
+    compatibility = {
+        "version": "run-read-only-five-file",
+        "channel": "preview",
+        "publishedAt": "2026-07-24T08:00:00Z",
+        "downloads": [compatibility_artifact],
+    }
+    (candidate / MODULE.CANONICAL_MANIFEST).write_text(
+        json.dumps(canonical, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (candidate / MODULE.COMPATIBILITY_MANIFEST).write_text(
+        json.dumps(compatibility, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    source_files = sorted(path for path in candidate.rglob("*") if path.is_file())
+    assert {
+        path.relative_to(candidate).as_posix() for path in source_files
+    } == {
+        MODULE.CANONICAL_MANIFEST,
+        MODULE.COMPATIBILITY_MANIFEST,
+        f"files/{installer_name}",
+        f"files/{payload_name}",
+        f"files/{metadata_name}",
+    }
+    for path in source_files:
+        path.chmod(0o400)
+    files.chmod(0o700)
+    candidate.chmod(0o700)
+    source_entries = [candidate, *sorted(candidate.rglob("*"))]
+    source_snapshot = {
+        path.relative_to(candidate).as_posix(): (
+            path.is_dir(),
+            path.read_bytes() if path.is_file() else None,
+            MODULE.sha256_file(path) if path.is_file() else None,
+            stat.S_IMODE(path.stat().st_mode),
+            path.stat().st_mtime_ns,
+            path.stat().st_ino,
+        )
+        for path in source_entries
+    }
+
+    prepared = tmp_path / "prepared"
+    receipt = MODULE.prepare_sidecar_active_layout(
+        candidate,
+        prepared,
+        generation_id="generation-read-only-five-file",
+        activated_at="2026-07-24T08:30:00Z",
+        activation_receipt_id="receipt-read-only-five-file",
+    )
+
+    pointer = receipt["pointer"]
+    generation = (
+        prepared
+        / MODULE.GENERATIONS_DIRECTORY
+        / "generation-read-only-five-file"
+    )
+    MODULE.verify_generation(generation, pointer)
+    state, resolved, resolved_pointer = MODULE.resolve_shelf_root(prepared)
+    assert state == "generation"
+    assert resolved == generation
+    assert resolved_pointer == pointer
+    assert pointer["manifests"]["canonical"]["sha256"] == MODULE.sha256_file(
+        generation / MODULE.CANONICAL_MANIFEST
+    )
+    assert pointer["manifests"]["compatibility"]["sha256"] == MODULE.sha256_file(
+        generation / MODULE.COMPATIBILITY_MANIFEST
+    )
+    assert MODULE.sha256_file(generation / "files" / installer_name) == MODULE.sha256_file(
+        installer
+    )
+    assert MODULE.sha256_file(generation / "files" / payload_name) == MODULE.sha256_file(
+        payload
+    )
+    assert MODULE.sha256_file(generation / "files" / metadata_name) == MODULE.sha256_file(
+        metadata
+    )
+
+    assert stat.S_IMODE(candidate.stat().st_mode) == 0o700
+    assert stat.S_IMODE(files.stat().st_mode) == 0o700
+    assert {
+        path.relative_to(candidate).as_posix(): (
+            path.is_dir(),
+            path.read_bytes() if path.is_file() else None,
+            MODULE.sha256_file(path) if path.is_file() else None,
+            stat.S_IMODE(path.stat().st_mode),
+            path.stat().st_mtime_ns,
+            path.stat().st_ino,
+        )
+        for path in source_entries
+    } == source_snapshot
+    assert all(
+        stat.S_IMODE(path.stat().st_mode) == MODULE.SEALED_DIRECTORY_MODE
+        for path in (generation, generation / "files")
+    )
+    assert all(
+        stat.S_IMODE((generation / name).stat().st_mode)
+        == MODULE.PUBLIC_METADATA_FILE_MODE
+        for name in (
+            MODULE.ACTIVATION_CANDIDATE,
+            MODULE.CANONICAL_MANIFEST,
+            MODULE.COMPATIBILITY_MANIFEST,
+        )
+    )
+    assert all(
+        stat.S_IMODE((generation / "files" / name).stat().st_mode)
+        == MODULE.SEALED_FILE_MODE
+        for name in (installer_name, payload_name, metadata_name)
+    )
+    assert receipt["canonicalMirrorSha256"] == MODULE.sha256_file(
+        candidate / MODULE.CANONICAL_MANIFEST
+    )
+    assert receipt["compatibilityMirrorSha256"] == MODULE.sha256_file(
+        candidate / MODULE.COMPATIBILITY_MANIFEST
+    )
+
+
+def test_manifest_normalization_replace_failure_preserves_original_and_cleans_temp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = tmp_path / MODULE.CANONICAL_MANIFEST
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": "release-replace-failure",
+                "channel": "preview",
+                "publishedAt": "2026-07-24T08:00:00Z",
+                "artifacts": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest.chmod(0o400)
+    before = (
+        manifest.read_bytes(),
+        stat.S_IMODE(manifest.stat().st_mode),
+        manifest.stat().st_mtime_ns,
+        manifest.stat().st_ino,
+    )
+
+    def fail_replace(source: Path, destination: Path) -> None:
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(MODULE.os, "replace", fail_replace)
+    with pytest.raises(MODULE.ReleaseShelfError, match="failed to atomically replace"):
+        MODULE.normalize_manifest(manifest, "generation-replace-failure")
+
+    assert (
+        manifest.read_bytes(),
+        stat.S_IMODE(manifest.stat().st_mode),
+        manifest.stat().st_mtime_ns,
+        manifest.stat().st_ino,
+    ) == before
+    assert not list(tmp_path.glob(f".{manifest.name}.normalize-*"))
+
+
+@pytest.mark.parametrize("mode", (0o400, 0o600))
+def test_manifest_normalization_preserves_existing_permission_bits(
+    tmp_path: Path,
+    mode: int,
+) -> None:
+    manifest = tmp_path / MODULE.CANONICAL_MANIFEST
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": "release-mode-preservation",
+                "channel": "preview",
+                "publishedAt": "2026-07-24T08:00:00Z",
+                "artifacts": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest.chmod(mode)
+    original_inode = manifest.stat().st_ino
+
+    normalized = MODULE.normalize_manifest(
+        manifest,
+        "generation-mode-preservation",
+    )
+
+    assert normalized["generationId"] == "generation-mode-preservation"
+    assert manifest.stat().st_ino != original_inode
+    assert stat.S_IMODE(manifest.stat().st_mode) == mode
+    assert not list(tmp_path.glob(f".{manifest.name}.normalize-*"))
+
+
+def test_prepare_rejects_manifest_and_nested_file_symlinks(tmp_path: Path) -> None:
+    manifest_candidate = write_candidate(tmp_path / "manifest-candidate")
+    canonical = manifest_candidate / MODULE.CANONICAL_MANIFEST
+    external_manifest = tmp_path / "external-manifest.json"
+    external_manifest.write_bytes(canonical.read_bytes())
+    canonical.unlink()
+    canonical.symlink_to(external_manifest)
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="candidate file is invalid"):
+        MODULE.prepare_layout(
+            manifest_candidate,
+            tmp_path / "manifest-prepared",
+            generation_id="generation-manifest-symlink",
+        )
+
+    nested_candidate = write_candidate(tmp_path / "nested-candidate")
+    nested_link = nested_candidate / "files" / "nested-installer-link.exe"
+    nested_link.symlink_to(
+        nested_candidate / "files" / "chummer-test-installer.exe"
+    )
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="symbolic links"):
+        MODULE.prepare_layout(
+            nested_candidate,
+            tmp_path / "nested-prepared",
+            generation_id="generation-nested-symlink",
+        )
 
 
 def test_prepare_binds_every_shelf_url_and_records_complete_inventory(tmp_path: Path) -> None:
