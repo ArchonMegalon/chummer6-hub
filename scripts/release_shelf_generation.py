@@ -231,6 +231,73 @@ def write_json(
         os.fsync(handle.fileno())
 
 
+def _atomic_replace_bytes(path: Path, payload: bytes) -> None:
+    """Replace one existing regular file while preserving its permission bits."""
+    try:
+        original = path.lstat()
+        parent = path.parent
+        parent_metadata = parent.lstat()
+    except OSError as exc:
+        raise ReleaseShelfError(
+            f"atomic destination is unavailable: {path} ({exc})"
+        ) from exc
+    if stat.S_ISLNK(original.st_mode) or not stat.S_ISREG(original.st_mode):
+        raise ReleaseShelfError(
+            f"atomic destination must be a regular non-symlink file: {path}"
+        )
+    if stat.S_ISLNK(parent_metadata.st_mode) or not stat.S_ISDIR(
+        parent_metadata.st_mode
+    ):
+        raise ReleaseShelfError(
+            f"atomic destination parent must be a regular directory: {parent}"
+        )
+    replacement_mode = stat.S_IMODE(original.st_mode)
+
+    descriptor = -1
+    temporary: Path | None = None
+    try:
+        descriptor, raw_temporary = tempfile.mkstemp(
+            prefix=f".{path.name}.normalize-",
+            dir=parent,
+        )
+        temporary = Path(raw_temporary)
+        os.fchmod(descriptor, replacement_mode)
+        handle = os.fdopen(descriptor, "wb")
+        descriptor = -1
+        with handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        current = path.lstat()
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or (current.st_dev, current.st_ino)
+            != (original.st_dev, original.st_ino)
+        ):
+            raise ReleaseShelfError(
+                f"atomic destination changed during normalization: {path}"
+            )
+
+        os.replace(temporary, path)
+        temporary = None
+        parent_descriptor = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(parent_descriptor)
+        finally:
+            os.close(parent_descriptor)
+    except OSError as exc:
+        raise ReleaseShelfError(
+            f"failed to atomically replace {path}: {exc}"
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def _normalize_timestamp(value: Any) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -564,7 +631,10 @@ def normalize_manifest(
     )
     assert isinstance(normalized, dict)
     normalized["generationId"] = generation_id
-    path.write_bytes(canonical_json_bytes(normalized) + b"\n")
+    _atomic_replace_bytes(
+        path,
+        canonical_json_bytes(normalized) + b"\n",
+    )
     return normalized
 
 
