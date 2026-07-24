@@ -2570,7 +2570,10 @@ public sealed class ReleaseBundlePromotionService
         JsonNode? canonicalProofRoutes = manifest["releaseProof"]?["proofRoutes"] is JsonArray routes
             ? routes
             : null;
-        foreach (string value in EnumerateGenerationBoundStrings(manifest, canonicalProofRoutes))
+        foreach ((_, string value) in EnumerateGenerationBoundStrings(
+                     manifest,
+                     canonicalProofRoutes,
+                     Array.Empty<string>()))
         {
             _ = RewriteReleaseUrl(value, generationId, artifactRoutes);
         }
@@ -2713,11 +2716,17 @@ public sealed class ReleaseBundlePromotionService
         JsonNode? canonicalProofRoutes = proofRoutesCandidate is JsonArray
             ? proofRoutesCandidate
             : null;
+        IReadOnlyDictionary<string, bool> artifactAccess = artifactRoutes.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.IsOpenPublic,
+            StringComparer.OrdinalIgnoreCase);
         NormalizeManifestNode(
             manifest,
             generationId,
             artifactRoutes,
-            canonicalProofRoutes);
+            artifactAccess,
+            canonicalProofRoutes,
+            Array.Empty<string>());
         ValidateGenerationBoundManifestRoutes(manifest, generationId);
     }
 
@@ -2725,13 +2734,16 @@ public sealed class ReleaseBundlePromotionService
         JsonNode node,
         string generationId,
         IReadOnlyDictionary<string, GenerationArtifactRoute> artifactRoutes,
-        JsonNode? canonicalProofRoutes)
+        IReadOnlyDictionary<string, bool> artifactAccess,
+        JsonNode? canonicalProofRoutes,
+        IReadOnlyList<string> path)
     {
         if (node is JsonObject jsonObject)
         {
             foreach (string key in jsonObject.Select(static property => property.Key).ToArray())
             {
                 JsonNode? child = jsonObject[key];
+                IReadOnlyList<string> childPath = path.Append(key).ToArray();
                 // Only the exact top-level releaseProof.proofRoutes node is immutable
                 // Registry evidence describing the canonical route contract that was
                 // exercised. Node identity deliberately prevents a nested object named
@@ -2743,6 +2755,14 @@ public sealed class ReleaseBundlePromotionService
 
                 if (child is JsonValue value && value.TryGetValue(out string? text))
                 {
+                    if (PreservesSemanticPublicNavigationRoute(
+                            text,
+                            childPath,
+                            artifactAccess))
+                    {
+                        continue;
+                    }
+
                     string? rewritten = RewriteReleaseUrl(text, generationId, artifactRoutes);
                     if (rewritten is null)
                     {
@@ -2759,7 +2779,9 @@ public sealed class ReleaseBundlePromotionService
                         child,
                         generationId,
                         artifactRoutes,
-                        canonicalProofRoutes);
+                        artifactAccess,
+                        canonicalProofRoutes,
+                        childPath);
                 }
             }
 
@@ -2771,8 +2793,17 @@ public sealed class ReleaseBundlePromotionService
             for (int index = jsonArray.Count - 1; index >= 0; index--)
             {
                 JsonNode? child = jsonArray[index];
+                IReadOnlyList<string> childPath = path.Append("[]").ToArray();
                 if (child is JsonValue value && value.TryGetValue(out string? text))
                 {
+                    if (PreservesSemanticPublicNavigationRoute(
+                            text,
+                            childPath,
+                            artifactAccess))
+                    {
+                        continue;
+                    }
+
                     string? rewritten = RewriteReleaseUrl(text, generationId, artifactRoutes);
                     if (rewritten is null)
                     {
@@ -2789,10 +2820,87 @@ public sealed class ReleaseBundlePromotionService
                         child,
                         generationId,
                         artifactRoutes,
-                        canonicalProofRoutes);
+                        artifactAccess,
+                        canonicalProofRoutes,
+                        childPath);
                 }
             }
         }
+    }
+
+    private static bool PreservesSemanticPublicNavigationRoute(
+        string value,
+        IReadOnlyList<string> path,
+        IReadOnlyDictionary<string, bool> artifactAccess)
+    {
+        if (!IsSemanticPublicNavigationRoutePath(path)
+            || !TryGetStablePublicInstallArtifactId(value, out string artifactId))
+        {
+            return false;
+        }
+
+        // Missing and revoked desktop tuples can retain a stable route identity
+        // even when this generation carries no corresponding artifact bytes.
+        return !artifactAccess.TryGetValue(artifactId, out bool isOpenPublic)
+               || isOpenPublic;
+    }
+
+    private static bool IsSemanticPublicNavigationRoutePath(
+        IReadOnlyList<string> path)
+        => path.Count switch
+        {
+            3 => path[1] == "[]"
+                 && path[2] == "publicInstallRoute"
+                 && path[0] is "artifactIdentityRegistry"
+                     or "artifactPublicationBindings"
+                     or "desktopSurfaceRefs",
+            4 => (path[0] == "desktopTupleCoverage"
+                  && path[1] == "desktopRouteTruth"
+                  && path[2] == "[]"
+                  && path[3] == "publicInstallRoute")
+                 || (path[0] == "installAwareArtifactRegistry"
+                     && path[1] == "[]"
+                     && path[2] == "recoveryProofRefs"
+                     && path[3] == "[]")
+                 || (path[0] == "installAwareArtifactRegistry"
+                     && path[1] == "[]"
+                     && path[2] == "conciergeAssetRefs"
+                     && path[3] == "publicTrustWrapper"),
+            5 => path[0] == "publicTrustMetrics"
+                 && path[1] == "revocationFacts"
+                 && path[2] == "activeRevocations"
+                 && path[3] == "[]"
+                 && path[4] == "publicInstallRoute",
+            _ => false
+        };
+
+    private static bool TryGetStablePublicInstallArtifactId(
+        string value,
+        out string artifactId)
+    {
+        artifactId = string.Empty;
+        if (!TryGetReleasePath(value, out string path))
+        {
+            return false;
+        }
+
+        const string prefix = "/downloads/install/";
+        if (!path.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string candidate = path[prefix.Length..];
+        if (candidate.Length == 0
+            || candidate.Contains('/')
+            || candidate.Contains('\\')
+            || candidate.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        artifactId = candidate;
+        return true;
     }
 
     private static string? RewriteReleaseUrl(
@@ -3021,19 +3129,33 @@ public sealed class ReleaseBundlePromotionService
         JsonNode? canonicalProofRoutes = proofRoutesCandidate is JsonArray
             ? proofRoutesCandidate
             : null;
-        foreach (string value in EnumerateGenerationBoundStrings(node, canonicalProofRoutes))
+        IReadOnlyDictionary<string, bool> artifactAccess =
+            BuildManifestArtifactAccess(node);
+        foreach ((IReadOnlyList<string> path, string value) in
+                 EnumerateGenerationBoundStrings(
+                     node,
+                     canonicalProofRoutes,
+                     Array.Empty<string>()))
         {
-            if (!TryGetReleasePath(value, out string path))
+            if (PreservesSemanticPublicNavigationRoute(
+                    value,
+                    path,
+                    artifactAccess))
             {
                 continue;
             }
 
-            if (!path.StartsWith(expectedPrefix, StringComparison.Ordinal))
+            if (!TryGetReleasePath(value, out string releasePath))
+            {
+                continue;
+            }
+
+            if (!releasePath.StartsWith(expectedPrefix, StringComparison.Ordinal))
             {
                 throw new InvalidDataException($"manifest retains a non-generation-bound release URL: {value}");
             }
 
-            string relative = path[expectedPrefix.Length..];
+            string relative = releasePath[expectedPrefix.Length..];
             string[] parts = relative.Split('/', StringSplitOptions.None);
             if (parts.Length == 0
                 || parts.Any(static part => string.IsNullOrEmpty(part) || part is "." or "..")
@@ -3066,19 +3188,63 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
-    private static IEnumerable<string> EnumerateGenerationBoundStrings(
+    private static IReadOnlyDictionary<string, bool> BuildManifestArtifactAccess(
+        JsonObject manifest)
+    {
+        var artifactAccess = new Dictionary<string, bool>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (string collectionName in new[] { "artifacts", "downloads" })
+        {
+            if (manifest[collectionName] is not JsonArray rows)
+            {
+                continue;
+            }
+
+            foreach (JsonObject row in rows.OfType<JsonObject>())
+            {
+                string? artifactId = GetJsonString(row["artifactId"])
+                                     ?? GetJsonString(row["id"]);
+                if (string.IsNullOrWhiteSpace(artifactId))
+                {
+                    continue;
+                }
+
+                bool isOpenPublic = string.Equals(
+                    GetJsonString(row["installAccessClass"])?.Trim(),
+                    "open_public",
+                    StringComparison.OrdinalIgnoreCase);
+                string normalizedArtifactId = artifactId.Trim();
+                if (artifactAccess.TryGetValue(
+                        normalizedArtifactId,
+                        out bool priorAccess)
+                    && priorAccess != isOpenPublic)
+                {
+                    throw new InvalidDataException(
+                        $"manifest artifactId '{normalizedArtifactId}' has conflicting install access.");
+                }
+
+                artifactAccess[normalizedArtifactId] = isOpenPublic;
+            }
+        }
+
+        return artifactAccess;
+    }
+
+    private static IEnumerable<(IReadOnlyList<string> Path, string Value)>
+        EnumerateGenerationBoundStrings(
         JsonNode node,
-        JsonNode? canonicalProofRoutes)
+        JsonNode? canonicalProofRoutes,
+        IReadOnlyList<string> path)
     {
         if (node is JsonValue value && value.TryGetValue(out string? text))
         {
-            yield return text;
+            yield return (path, text);
             yield break;
         }
 
         if (node is JsonObject jsonObject)
         {
-            foreach ((_, JsonNode? child) in jsonObject)
+            foreach ((string key, JsonNode? child) in jsonObject)
             {
                 if (child is null
                     || ReferenceEquals(child, canonicalProofRoutes))
@@ -3086,9 +3252,11 @@ public sealed class ReleaseBundlePromotionService
                     continue;
                 }
 
-                foreach (string nested in EnumerateGenerationBoundStrings(
+                foreach ((IReadOnlyList<string> Path, string Value) nested
+                         in EnumerateGenerationBoundStrings(
                              child,
-                             canonicalProofRoutes))
+                             canonicalProofRoutes,
+                             path.Append(key).ToArray()))
                 {
                     yield return nested;
                 }
@@ -3106,9 +3274,11 @@ public sealed class ReleaseBundlePromotionService
                     continue;
                 }
 
-                foreach (string nested in EnumerateGenerationBoundStrings(
+                foreach ((IReadOnlyList<string> Path, string Value) nested
+                         in EnumerateGenerationBoundStrings(
                              child,
-                             canonicalProofRoutes))
+                             canonicalProofRoutes,
+                             path.Append("[]").ToArray()))
                 {
                     yield return nested;
                 }

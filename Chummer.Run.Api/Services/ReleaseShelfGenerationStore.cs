@@ -1652,8 +1652,12 @@ public sealed class ReleaseShelfGenerationStore
         JsonElement element,
         string generationId,
         string label,
-        GenerationRouteTraversalContext context = GenerationRouteTraversalContext.ManifestRoot)
+        GenerationRouteTraversalContext context = GenerationRouteTraversalContext.ManifestRoot,
+        IReadOnlyList<string>? path = null,
+        IReadOnlyDictionary<string, bool>? artifactAccess = null)
     {
+        path ??= Array.Empty<string>();
+        artifactAccess ??= BuildManifestArtifactAccess(element);
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
@@ -1688,7 +1692,13 @@ public sealed class ReleaseShelfGenerationStore
                                 ? GenerationRouteTraversalContext.TopLevelReleaseProof
                                 : GenerationRouteTraversalContext.NestedReleaseProof
                             : GenerationRouteTraversalContext.Other;
-                    ValidateGenerationRoutes(property.Value, generationId, label, childContext);
+                    ValidateGenerationRoutes(
+                        property.Value,
+                        generationId,
+                        label,
+                        childContext,
+                        path.Append(property.Name).ToArray(),
+                        artifactAccess);
                 }
                 return;
             case JsonValueKind.Array:
@@ -1698,12 +1708,22 @@ public sealed class ReleaseShelfGenerationStore
                         child,
                         generationId,
                         label,
-                        GenerationRouteTraversalContext.Other);
+                        GenerationRouteTraversalContext.Other,
+                        path.Append("[]").ToArray(),
+                        artifactAccess);
                 }
                 return;
             case JsonValueKind.String:
                 string? value = element.GetString();
                 if (value is null)
+                {
+                    return;
+                }
+
+                if (PreservesSemanticPublicNavigationRoute(
+                        value,
+                        path,
+                        artifactAccess))
                 {
                     return;
                 }
@@ -1766,6 +1786,134 @@ public sealed class ReleaseShelfGenerationStore
                 return;
         }
     }
+
+    private static IReadOnlyDictionary<string, bool> BuildManifestArtifactAccess(
+        JsonElement manifest)
+    {
+        var artifactAccess = new Dictionary<string, bool>(
+            StringComparer.OrdinalIgnoreCase);
+        if (manifest.ValueKind != JsonValueKind.Object)
+        {
+            return artifactAccess;
+        }
+
+        foreach (string collectionName in new[] { "artifacts", "downloads" })
+        {
+            if (!manifest.TryGetProperty(collectionName, out JsonElement rows)
+                || rows.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (JsonElement row in rows.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                string artifactId = string.Empty;
+                foreach (string propertyName in new[] { "artifactId", "id" })
+                {
+                    if (row.TryGetProperty(propertyName, out JsonElement id)
+                        && id.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(id.GetString()))
+                    {
+                        artifactId = id.GetString()!;
+                        break;
+                    }
+                }
+                if (string.IsNullOrWhiteSpace(artifactId))
+                {
+                    continue;
+                }
+
+                bool isOpenPublic = row.TryGetProperty(
+                                        "installAccessClass",
+                                        out JsonElement access)
+                                    && access.ValueKind == JsonValueKind.String
+                                    && string.Equals(
+                                        access.GetString()?.Trim(),
+                                        "open_public",
+                                        StringComparison.OrdinalIgnoreCase);
+                string normalizedArtifactId = artifactId.Trim();
+                if (artifactAccess.TryGetValue(
+                        normalizedArtifactId,
+                        out bool priorAccess)
+                    && priorAccess != isOpenPublic)
+                {
+                    throw new InvalidDataException(
+                        $"Release shelf manifest artifactId '{normalizedArtifactId}' has conflicting install access.");
+                }
+
+                artifactAccess[normalizedArtifactId] = isOpenPublic;
+            }
+        }
+
+        return artifactAccess;
+    }
+
+    private static bool PreservesSemanticPublicNavigationRoute(
+        string value,
+        IReadOnlyList<string> path,
+        IReadOnlyDictionary<string, bool> artifactAccess)
+    {
+        if (!IsSemanticPublicNavigationRoutePath(path))
+        {
+            return false;
+        }
+
+        const string prefix = "/downloads/install/";
+        if (!value.StartsWith(prefix, StringComparison.Ordinal)
+            || value.Contains('?')
+            || value.Contains('#')
+            || value.Contains('\\')
+            || value.Contains('%'))
+        {
+            return false;
+        }
+
+        string artifactId = value[prefix.Length..];
+        if (!PortableInventorySegmentPattern.IsMatch(artifactId)
+            || artifactId.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // Missing and revoked desktop tuples can retain a stable route identity
+        // even when this generation carries no corresponding artifact bytes.
+        return !artifactAccess.TryGetValue(artifactId, out bool isOpenPublic)
+               || isOpenPublic;
+    }
+
+    private static bool IsSemanticPublicNavigationRoutePath(
+        IReadOnlyList<string> path)
+        => path.Count switch
+        {
+            3 => path[1] == "[]"
+                 && path[2] == "publicInstallRoute"
+                 && path[0] is "artifactIdentityRegistry"
+                     or "artifactPublicationBindings"
+                     or "desktopSurfaceRefs",
+            4 => (path[0] == "desktopTupleCoverage"
+                  && path[1] == "desktopRouteTruth"
+                  && path[2] == "[]"
+                  && path[3] == "publicInstallRoute")
+                 || (path[0] == "installAwareArtifactRegistry"
+                     && path[1] == "[]"
+                     && path[2] == "recoveryProofRefs"
+                     && path[3] == "[]")
+                 || (path[0] == "installAwareArtifactRegistry"
+                     && path[1] == "[]"
+                     && path[2] == "conciergeAssetRefs"
+                     && path[3] == "publicTrustWrapper"),
+            5 => path[0] == "publicTrustMetrics"
+                 && path[1] == "revocationFacts"
+                 && path[2] == "activeRevocations"
+                 && path[3] == "[]"
+                 && path[4] == "publicInstallRoute",
+            _ => false
+        };
 
     private enum GenerationRouteTraversalContext
     {

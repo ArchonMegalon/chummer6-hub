@@ -251,6 +251,57 @@ public sealed class ReleaseShelfGenerationStoreTests
     }
 
     [Fact]
+    public void CaptureAllowsStableOpenPublicNavigationRoutesAtExactRegistryPaths()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            includeSemanticNavigationRoutes: true);
+        fixture.Activate("generation-a", "run-a");
+
+        ReleaseShelfSnapshot snapshot = fixture.CreateStore().Capture();
+
+        Assert.Equal("generation-a", snapshot.GenerationId);
+    }
+
+    [Fact]
+    public void CaptureRejectsStableNavigationRouteForProtectedArtifact()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            installAccessClass: "account_required",
+            includeSemanticNavigationRoutes: true);
+        fixture.Activate("generation-a", "run-a");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => fixture.CreateStore().Capture());
+
+        Assert.Contains("non-generation-bound", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CaptureRejectsStablePublicInstallRouteOutsideExactRegistryPaths()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            semanticNavigationLookalikeRoute: "/downloads/install/test-installer");
+        fixture.Activate("generation-a", "run-a");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => fixture.CreateStore().Capture());
+
+        Assert.Contains("non-generation-bound", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CaptureRejectsNestedReleaseProofLookalikeEvenWithGenerationBoundRoute()
     {
         using var fixture = new ReleaseShelfFixture();
@@ -1446,7 +1497,9 @@ public sealed class ReleaseShelfGenerationStoreTests
             bool omitCompatibilityGenerationId = false,
             string? canonicalGenerationIdOverride = null,
             string? compatibilityGenerationIdOverride = null,
-            Func<ReadOnlyMemory<byte>, IReadOnlyDictionary<string, byte[]>>? generationBoundFilesFactory = null)
+            Func<ReadOnlyMemory<byte>, IReadOnlyDictionary<string, byte[]>>? generationBoundFilesFactory = null,
+            bool includeSemanticNavigationRoutes = false,
+            string? semanticNavigationLookalikeRoute = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1559,6 +1612,78 @@ public sealed class ReleaseShelfGenerationStoreTests
                     {
                         ["proofRoutes"] = nestedProofRoutes
                     }
+                };
+            }
+
+            if (includeSemanticNavigationRoutes)
+            {
+                const string stableRoute = "/downloads/install/test-installer";
+                static void AddSemanticNavigationRoutes(
+                    Dictionary<string, object?> manifest,
+                    string route)
+                {
+                    manifest["artifactIdentityRegistry"] = new object[]
+                    {
+                        new Dictionary<string, object?> { ["publicInstallRoute"] = route }
+                    };
+                    manifest["artifactPublicationBindings"] = new object[]
+                    {
+                        new Dictionary<string, object?> { ["publicInstallRoute"] = route }
+                    };
+                    manifest["desktopSurfaceRefs"] = new object[]
+                    {
+                        new Dictionary<string, object?> { ["publicInstallRoute"] = route }
+                    };
+                    manifest["desktopTupleCoverage"] = new Dictionary<string, object?>
+                    {
+                        ["desktopRouteTruth"] = new object[]
+                        {
+                            new Dictionary<string, object?> { ["publicInstallRoute"] = route },
+                            new Dictionary<string, object?>
+                            {
+                                ["publicInstallRoute"] = "/downloads/install/missing-installer"
+                            }
+                        }
+                    };
+                    manifest["installAwareArtifactRegistry"] = new object[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["conciergeAssetRefs"] = new Dictionary<string, object?>
+                            {
+                                ["publicTrustWrapper"] = route
+                            },
+                            ["recoveryProofRefs"] = new object[]
+                            {
+                                route,
+                                "startup-smoke/startup-smoke-test.receipt.json"
+                            }
+                        }
+                    };
+                    manifest["publicTrustMetrics"] = new Dictionary<string, object?>
+                    {
+                        ["revocationFacts"] = new Dictionary<string, object?>
+                        {
+                            ["activeRevocations"] = new object[]
+                            {
+                                new Dictionary<string, object?>
+                                {
+                                    ["publicInstallRoute"] = route
+                                }
+                            }
+                        }
+                    };
+                }
+
+                AddSemanticNavigationRoutes(canonical, stableRoute);
+                AddSemanticNavigationRoutes(compatibility, stableRoute);
+            }
+
+            if (!string.IsNullOrWhiteSpace(semanticNavigationLookalikeRoute))
+            {
+                canonical["extension"] = new Dictionary<string, object?>
+                {
+                    ["publicInstallRoute"] = semanticNavigationLookalikeRoute
                 };
             }
 
