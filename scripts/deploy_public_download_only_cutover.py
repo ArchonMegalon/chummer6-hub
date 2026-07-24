@@ -4891,6 +4891,359 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
         private_directory(config.operation_root, create=False)
 
 
+def _validate_scope_bound_existing_bytes_candidate(
+    config: SidecarConfig,
+    *,
+    projection_verifier: Any,
+    candidate_materializer: Any,
+    authority: dict[str, Any],
+    authority_raw: bytes,
+    candidate: dict[str, Any],
+    custody: dict[str, Any],
+    direct_import: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate the zero-retention existing-bytes v3 import profile."""
+
+    profile = projection_verifier.CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    direct_keys = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "deployAuthorized",
+        "generationInventory",
+        "hubCandidateImportAuthority",
+        "platformScope",
+        "projectionProfile",
+        "publicationAuthorized",
+        "release",
+        "releaseScopeDecision",
+        "signature",
+        "sourceCommits",
+        "status",
+        "transport",
+        "uploadAuthorized",
+    }
+    authority_sha256 = sha256_bytes(authority_raw)
+    if (
+        set(direct_import) != direct_keys
+        or direct_import.get("contractName")
+        != "chummer6-ui.preview-nightly-unsigned-direct-import"
+        or direct_import.get("contractVersion") != 1
+        or direct_import.get("projectionProfile") != profile
+        or direct_import.get("status") != "sealed_review_required"
+        or direct_import.get("platformScope") != "windows_only"
+        or direct_import.get("crossRunBitReproducible") is not False
+        or direct_import.get("signature")
+        != {
+            "policy": "preview_policy",
+            "required": False,
+            "status": "unsigned",
+        }
+        or any(
+            direct_import.get(name) is not False
+            for name in (
+                "publicationAuthorized",
+                "uploadAuthorized",
+                "deployAuthorized",
+            )
+        )
+        or direct_import.get("release")
+        != {"channel": "preview", "version": candidate.get("version")}
+        or direct_import.get("hubCandidateImportAuthority")
+        != {
+            "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+            "sha256": authority_sha256,
+            "sizeBytes": len(authority_raw),
+        }
+    ):
+        raise CutoverError(
+            "scope-bound direct-import receipt authority posture drifted"
+        )
+    try:
+        projection_verifier._scope_bound_secret_free(
+            direct_import, label="scope-bound direct-import receipt"
+        )
+        inventory_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("inventory"),
+            label="scope-bound candidate upload inventory",
+            expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+        )
+        inventory = projection_verifier._strict_json_object(
+            inventory_raw,
+            label="scope-bound candidate upload inventory",
+        )
+        (
+            release_rows,
+            release_modes,
+            release_directories,
+            _release_captured,
+        ) = candidate_materializer._validate_bundle_inventory(
+            config.release_candidate_root,
+            inventory,
+            candidate,
+            allow_root_ancillary_files=True,
+        )
+        canonical_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("canonicalManifest"),
+            label="scope-bound candidate canonical manifest",
+            expected_path="RELEASE_CHANNEL.generated.json",
+        )
+        compatibility_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("compatibilityManifest"),
+            label="scope-bound candidate compatibility manifest",
+            expected_path="releases.json",
+        )
+        decision_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("releaseScopeDecision"),
+            label="scope-bound approved release decision",
+            expected_path=projection_verifier.CANDIDATE_SCOPE_DECISION_FILE,
+        )
+        generation_raw = projection_verifier._candidate_embedded_bytes(
+            custody.get("generationInventory"),
+            label="scope-bound generation inventory",
+            expected_path=(
+                projection_verifier.CANDIDATE_GENERATION_INVENTORY_FILE
+            ),
+        )
+        generation = projection_verifier._strict_json_object(
+            generation_raw,
+            label="scope-bound generation inventory",
+        )
+    except CutoverError:
+        raise
+    except Exception as exc:
+        raise CutoverError(
+            "scope-bound release bundle custody validation failed"
+        ) from exc
+
+    def reference(raw: bytes, path: str) -> dict[str, Any]:
+        return {
+            "path": path,
+            "sha256": sha256_bytes(raw),
+            "sizeBytes": len(raw),
+        }
+
+    source_commits = direct_import.get("sourceCommits")
+    binding = custody.get("scopeBoundExistingBytes")
+    if (
+        not isinstance(binding, dict)
+        or not isinstance(source_commits, dict)
+        or source_commits != binding.get("sourceCommits")
+        or set(source_commits) != {"hub", "registry", "ui"}
+        or any(
+            COMMIT.fullmatch(str(source_commits.get(name) or "")) is None
+            for name in ("hub", "registry", "ui")
+        )
+        or source_commits.get("hub") != config.source_head
+        or direct_import.get("releaseScopeDecision")
+        != reference(
+            decision_raw,
+            projection_verifier.CANDIDATE_SCOPE_DECISION_FILE,
+        )
+        or direct_import.get("generationInventory")
+        != reference(
+            generation_raw,
+            projection_verifier.CANDIDATE_GENERATION_INVENTORY_FILE,
+        )
+        or direct_import.get("canonicalManifest")
+        != reference(canonical_raw, "RELEASE_CHANNEL.generated.json")
+        or direct_import.get("compatibilityManifest")
+        != reference(compatibility_raw, "releases.json")
+        or direct_import.get("transport")
+        != {
+            "bundleIdentitySha256": candidate.get(
+                "bundleIdentitySha256"
+            ),
+            "generationId": binding.get("generationId"),
+            "mode": "existing_bytes",
+        }
+    ):
+        raise CutoverError(
+            "scope-bound direct-import receipt byte graph drifted"
+        )
+
+    release_files = [
+        {**row, "mode": release_modes[str(row["path"])]}
+        for row in release_rows
+    ]
+    root_mode = stat.S_IMODE(config.release_candidate_root.lstat().st_mode)
+    if (
+        generation.get("rootMode") != root_mode
+        or generation.get("files") != release_files
+        or generation.get("directories") != release_directories
+        or binding.get("retainedFromIncumbent") != []
+        or binding.get("retainedPlatforms") != []
+        or binding.get("shelfPlatforms") != ["windows"]
+    ):
+        raise CutoverError(
+            "scope-bound generation inventory or zero-retention posture drifted"
+        )
+    expected_fresh_paths = (
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        "files/chummer-avalonia-win-x64-payload.zip.json",
+    )
+    fresh = binding.get("freshDelta")
+    if (
+        not isinstance(fresh, list)
+        or tuple(
+            str(item.get("path") or "")
+            for item in fresh
+            if isinstance(item, dict)
+        )
+        != expected_fresh_paths
+    ):
+        raise CutoverError(
+            "scope-bound fresh delta is not installer/payload/sidecar"
+        )
+    release_by_path = {
+        str(item["path"]): item for item in release_files
+    }
+    fresh_by_path = {
+        str(item["path"]): item
+        for item in fresh
+        if isinstance(item, dict)
+    }
+    for path in expected_fresh_paths:
+        release_row = release_by_path.get(path)
+        fresh_row = fresh_by_path.get(path)
+        if release_row is None or fresh_row is None or any(
+            release_row.get(key) != fresh_row.get(key)
+            for key in ("mode", "sha256", "sizeBytes")
+        ):
+            raise CutoverError(
+                "scope-bound fresh delta differs from exact candidate bytes"
+            )
+
+    canonical_bundle_raw = stable_regular_bytes(
+        config.release_candidate_root
+        / "RELEASE_CHANNEL.generated.json",
+        label="scope-bound candidate canonical manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    compatibility_bundle_raw = stable_regular_bytes(
+        config.release_candidate_root / "releases.json",
+        label="scope-bound candidate compatibility manifest",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    release_receipt_raw = stable_regular_bytes(
+        config.release_channel_receipt,
+        label="scope-bound authenticated release-channel receipt",
+        maximum_bytes=8 * 1024 * 1024,
+    )
+    if (
+        canonical_bundle_raw != canonical_raw
+        or canonical_bundle_raw != release_receipt_raw
+        or compatibility_bundle_raw != compatibility_raw
+        or sha256_bytes(release_receipt_raw)
+        != config.release_channel_receipt_sha256
+    ):
+        raise CutoverError(
+            "scope-bound release manifest bytes do not share one authority"
+        )
+
+    sidecar_raw = stable_regular_bytes(
+        config.release_candidate_root
+        / "files"
+        / "chummer-avalonia-win-x64-payload.zip.json",
+        label="scope-bound Windows payload sidecar",
+        maximum_bytes=1024 * 1024,
+    )
+    try:
+        sidecar = projection_verifier._strict_json_object(
+            sidecar_raw, label="scope-bound Windows payload sidecar"
+        )
+        canonical = projection_verifier._strict_json_object(
+            canonical_raw, label="scope-bound canonical manifest"
+        )
+        installer = canonical["artifacts"][0]
+        payload_name = str(installer.get("payloadFileName") or "")
+        sidecar_url = urlsplit(str(sidecar.get("downloadUrl") or ""))
+    except Exception as exc:
+        raise CutoverError(
+            "scope-bound Windows payload sidecar is malformed"
+        ) from exc
+    if (
+        set(sidecar)
+        != {
+            "contractName",
+            "downloadUrl",
+            "fileName",
+            "installerFileName",
+            "payloadAcquisitionMode",
+            "releaseVersion",
+            "sha256",
+            "sizeBytes",
+        }
+        or sidecar.get("contractName")
+        != "chummer6-ui.windows_bootstrap_payload"
+        or sidecar.get("fileName") != installer.get("payloadFileName")
+        or sidecar.get("installerFileName") != installer.get("fileName")
+        or sidecar.get("payloadAcquisitionMode") != "download"
+        or sidecar.get("releaseVersion") != candidate.get("version")
+        or sidecar.get("sha256") != installer.get("payloadSha256")
+        or sidecar.get("sizeBytes") != installer.get("payloadSizeBytes")
+        or sidecar_url.query
+        or sidecar_url.fragment
+        or sidecar_url.path != f"/downloads/files/{payload_name}"
+        or sidecar_url.scheme not in {"", "https"}
+        or sidecar_url.scheme == ""
+        and bool(sidecar_url.netloc)
+        or sidecar_url.scheme == "https"
+        and (
+            sidecar_url.netloc != "chummer.run"
+            or sidecar_url.hostname != "chummer.run"
+            or sidecar_url.username is not None
+            or sidecar_url.password is not None
+        )
+    ):
+        raise CutoverError(
+            "scope-bound Windows payload sidecar byte graph drifted"
+        )
+
+    empty_inventory_sha256 = (
+        projection_verifier._candidate_ui_compact_sha256([])
+    )
+    return {
+        "path": str(config.candidate_import_authority),
+        "sha256": config.candidate_import_authority_sha256,
+        "contractName": authority["contractName"],
+        "contractVersion": authority["contractVersion"],
+        "projectionProfile": profile,
+        "candidateVersion": candidate["version"],
+        "generationId": binding["generationId"],
+        "releaseScopeDecisionSha256": binding[
+            "releaseScopeDecisionSha256"
+        ],
+        "sourceCommits": dict(source_commits),
+        "directImportReceipt": {
+            "path": str(config.direct_import_receipt),
+            "sha256": config.direct_import_receipt_sha256,
+        },
+        "bundleIdentitySha256": candidate["bundleIdentitySha256"],
+        "inventorySha256": candidate["inventorySha256"],
+        "fileCount": candidate["fileCount"],
+        "totalBytes": candidate["totalBytes"],
+        "canonicalManifestSha256": candidate[
+            "canonicalManifestSha256"
+        ],
+        "freshDelta": [
+            {
+                "path": path,
+                "sha256": str(fresh_by_path[path]["sha256"]),
+                "sizeBytes": int(fresh_by_path[path]["sizeBytes"]),
+            }
+            for path in expected_fresh_paths
+        ],
+        "retainedInventorySha256": empty_inventory_sha256,
+        "incumbentInventorySha256": empty_inventory_sha256,
+        "servingAuthority": True,
+        "validatedAtUtc": utc_now(),
+    }
+
+
 def validate_release_candidate_authority(
     config: SidecarConfig,
     *,
@@ -4950,6 +5303,20 @@ def validate_release_candidate_authority(
         )
     except Exception as exc:
         raise CutoverError("direct-import receipt is malformed") from exc
+    if (
+        authority.get("projectionProfile")
+        == projection_verifier.CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    ):
+        return _validate_scope_bound_existing_bytes_candidate(
+            config,
+            projection_verifier=projection_verifier,
+            candidate_materializer=candidate_materializer,
+            authority=authority,
+            authority_raw=authority_raw,
+            candidate=candidate,
+            custody=custody,
+            direct_import=direct_import,
+        )
     direct_import_keys = {
         "compositionRequest",
         "contractName",
