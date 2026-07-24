@@ -32,7 +32,7 @@ import tarfile
 import tempfile
 import time
 from typing import Any, Mapping, Protocol
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -3560,12 +3560,12 @@ def _fresh_delta_rows(shelf: Mapping[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def _retained_account_required_artifact(
+def _retained_account_required_bindings(
     *,
     config: SidecarConfig,
     generation_root: Path,
     fresh_rows: list[dict[str, Any]],
-) -> dict[str, Any]:
+) -> list[dict[str, Any]]:
     raw = stable_regular_bytes(
         generation_root / "RELEASE_CHANNEL.generated.json",
         label="prepared generation canonical manifest",
@@ -3580,67 +3580,126 @@ def _retained_account_required_artifact(
         raise CutoverError("prepared canonical manifest artifacts are unavailable")
     fresh_paths = {str(row["path"]) for row in fresh_rows}
     candidates: list[dict[str, Any]] = []
+    mac_artifact_ids: set[str] = set()
     for row in artifacts:
         if not isinstance(row, dict):
             continue
         platform = str(row.get("platform") or "").strip().lower()
         rid = str(row.get("rid") or "").strip().lower()
-        if (
-            str(row.get("installAccessClass") or "").strip().lower()
-            != "account_required"
-            or (
-                platform not in {"mac", "macos", "osx"}
-                and not rid.startswith("osx-")
-            )
-        ):
+        if str(
+            row.get("installAccessClass") or ""
+        ).strip().lower() != "account_required":
             continue
         artifact_id = str(
             row.get("artifactId") or row.get("id") or ""
         ).strip()
-        file_name = str(row.get("fileName") or "").strip()
-        sha256 = str(row.get("sha256") or "").strip().lower()
-        size = row.get("sizeBytes")
-        raw_url = str(
-            row.get("downloadUrl") or row.get("url") or ""
-        ).strip()
-        resolved = urlsplit(
-            urljoin(config.base_url.rstrip("/") + "/", raw_url)
-        )
-        path = f"/downloads/files/{file_name}"
-        if (
-            not artifact_id
-            or not file_name
-            or Path(file_name).name != file_name
-            or "/" in file_name
-            or "\\" in file_name
-            or SHA256.fullmatch(sha256) is None
-            or isinstance(size, bool)
-            or not isinstance(size, int)
-            or size <= 0
-            or resolved.scheme != "https"
-            or resolved.hostname != SIDECAR_HOSTS[0]
-            or resolved.path != path
-            or resolved.query
-            or resolved.fragment
-            or path in fresh_paths
-        ):
+        if not artifact_id:
             raise CutoverError(
-                "retained account-required artifact contract is invalid"
+                "retained account-required artifact identity is invalid"
             )
-        candidates.append(
-            {
-                "artifactId": artifact_id,
-                "path": path,
-                "sha256": sha256,
-                "sizeBytes": size,
-                "installAccessClass": "account_required",
-            }
-        )
-    if not candidates:
+        if (
+            platform in {"mac", "macos", "osx"}
+            or rid.startswith("osx-")
+        ):
+            mac_artifact_ids.add(artifact_id)
+
+        role_rows: list[tuple[str, str, str, Any, str]] = [
+            (
+                "primary",
+                str(row.get("fileName") or "").strip(),
+                str(row.get("sha256") or "").strip().lower(),
+                row.get("sizeBytes"),
+                str(
+                    row.get("downloadUrl") or row.get("url") or ""
+                ).strip(),
+            )
+        ]
+        payload_file_name = str(
+            row.get("payloadFileName") or ""
+        ).strip()
+        if payload_file_name:
+            payload_url = str(
+                row.get("payloadDownloadUrl") or ""
+            ).strip()
+            role_rows.append(
+                (
+                    "payload",
+                    payload_file_name,
+                    str(row.get("payloadSha256") or "").strip().lower(),
+                    row.get("payloadSizeBytes"),
+                    payload_url,
+                )
+            )
+            sidecar_name = payload_file_name + ".json"
+            sidecar_bytes = stable_regular_bytes(
+                generation_root / "files" / sidecar_name,
+                label=(
+                    "retained account-required payload metadata "
+                    f"{artifact_id}"
+                ),
+                maximum_bytes=8 * 1024 * 1024,
+            )
+            role_rows.append(
+                (
+                    "sidecar",
+                    sidecar_name,
+                    sha256_bytes(sidecar_bytes),
+                    len(sidecar_bytes),
+                    payload_url + ".json",
+                )
+            )
+
+        for role, file_name, sha256, size, raw_url in role_rows:
+            resolved = urlsplit(
+                urljoin(config.base_url.rstrip("/") + "/", raw_url)
+            )
+            path = f"/downloads/files/{file_name}"
+            if (
+                not file_name
+                or Path(file_name).name != file_name
+                or "/" in file_name
+                or "\\" in file_name
+                or SHA256.fullmatch(sha256) is None
+                or isinstance(size, bool)
+                or not isinstance(size, int)
+                or size <= 0
+                or resolved.scheme != "https"
+                or resolved.hostname != SIDECAR_HOSTS[0]
+                or resolved.path != path
+                or resolved.query
+                or resolved.fragment
+                or path in fresh_paths
+            ):
+                raise CutoverError(
+                    "retained account-required artifact contract is invalid"
+                )
+            candidates.append(
+                {
+                    "artifactId": artifact_id,
+                    "role": role,
+                    "path": path,
+                    "sha256": sha256,
+                    "sizeBytes": size,
+                    "installAccessClass": "account_required",
+                }
+            )
+    if not candidates or not mac_artifact_ids:
         raise CutoverError(
             "no retained account-required Mac artifact is available for denial proof"
         )
-    return sorted(candidates, key=lambda row: str(row["artifactId"]))[0]
+    paths = [str(row["path"]) for row in candidates]
+    if len(paths) != len(set(paths)):
+        raise CutoverError(
+            "retained account-required artifact path closure is ambiguous"
+        )
+    return sorted(
+        candidates,
+        key=lambda row: (
+            str(row["artifactId"]),
+            str(row["role"]),
+            str(row["path"]),
+        ),
+    )
 
 
 def _probe_denied_download(
@@ -3651,9 +3710,35 @@ def _probe_denied_download(
     request_host: str,
     path: str,
     generation_id: str,
+    artifact_id: str,
+    route_kind: str,
+    expected_sha256: str,
+    expected_size_bytes: int,
     timeout: float = 30,
 ) -> dict[str, Any]:
     _validate_download_probe_target(request_host=request_host, path=path)
+    if (
+        route_kind not in {"stable", "generation"}
+        or not artifact_id
+        or SHA256.fullmatch(expected_sha256) is None
+        or isinstance(expected_size_bytes, bool)
+        or expected_size_bytes <= 0
+    ):
+        raise CutoverError(
+            "account-required denial expectation is invalid"
+        )
+    if (
+        route_kind == "stable"
+        and not path.startswith("/downloads/files/")
+    ) or (
+        route_kind == "generation"
+        and not path.startswith(
+            f"/downloads/g/{generation_id}/files/"
+        )
+    ):
+        raise CutoverError(
+            "account-required denial route shape drifted"
+        )
     connection = _open_probe_connection(
         scheme=scheme,
         connect_host=connect_host,
@@ -3665,21 +3750,14 @@ def _probe_denied_download(
         connection.request("GET", path, headers=request_headers)
         response = connection.getresponse()
         headers = _response_header_values(response)
-        _reject_download_response_state(headers, allow_location=True)
-        if response.status not in {
-            302,
-            303,
-            307,
-            308,
-            401,
-            403,
-            404,
-            409,
-            410,
-            503,
-        }:
+        _reject_download_response_state(
+            headers,
+            allow_location=route_kind == "stable",
+        )
+        expected_status = 302 if route_kind == "stable" else 409
+        if response.status != expected_status:
             raise CutoverError(
-                "account-required artifact did not fail closed anonymously"
+                "account-required artifact denial status drifted"
             )
         generations = headers.get(
             "x-chummer-release-generation",
@@ -3690,26 +3768,53 @@ def _probe_denied_download(
                 "account-required denial generation header drifted"
             )
         locations = headers.get("location", [])
-        if 300 <= response.status < 400:
+        if route_kind == "stable":
             if len(locations) != 1:
                 raise CutoverError(
                     "account-required redirect has ambiguous Location"
                 )
             parsed_location = urlsplit(locations[0])
+            try:
+                redirect_port = parsed_location.port
+            except ValueError as exc:
+                raise CutoverError(
+                    "account-required redirect port is invalid"
+                ) from exc
             if (
                 parsed_location.username is not None
                 or parsed_location.password is not None
                 or (
                     parsed_location.hostname is not None
-                    and parsed_location.hostname not in SIDECAR_HOSTS
+                    and parsed_location.hostname != request_host
                 )
                 or (
-                    parsed_location.path != "/login"
-                    and not parsed_location.path.startswith("/account/")
+                    parsed_location.scheme
+                    and parsed_location.scheme != "https"
                 )
+                or redirect_port not in {None, 443}
+                or parsed_location.path != "/login"
+                or parsed_location.fragment
             ):
                 raise CutoverError(
                     "account-required redirect escaped the account boundary"
+                )
+            try:
+                redirect_query = parse_qs(
+                    parsed_location.query,
+                    strict_parsing=True,
+                )
+            except ValueError as exc:
+                raise CutoverError(
+                    "account-required redirect query is malformed"
+                ) from exc
+            if (
+                set(redirect_query) != {"next"}
+                or redirect_query["next"] != [
+                    f"/downloads/install/{artifact_id}"
+                ]
+            ):
+                raise CutoverError(
+                    "account-required redirect target drifted"
                 )
         elif locations:
             raise CutoverError(
@@ -3717,25 +3822,64 @@ def _probe_denied_download(
             )
         digest = hashlib.sha256()
         size = 0
+        body_parts: list[bytes] = []
         while True:
             chunk = response.read(64 * 1024)
             if not chunk:
                 break
             digest.update(chunk)
+            body_parts.append(chunk)
             size += len(chunk)
             if size > 64 * 1024:
                 raise CutoverError(
                     "account-required denial returned an artifact-sized body"
+                )
+        observed_sha256 = digest.hexdigest()
+        if (
+            size == expected_size_bytes
+            and observed_sha256 == expected_sha256
+        ):
+            raise CutoverError(
+                "account-required denial returned the protected artifact bytes"
+            )
+        if route_kind == "generation":
+            content_types = headers.get("content-type", [])
+            if (
+                len(content_types) != 1
+                or not content_types[0].lower().startswith(
+                    "application/json"
+                )
+            ):
+                raise CutoverError(
+                    "generation-bound denial is not JSON"
+                )
+            try:
+                denial = json.loads(b"".join(body_parts))
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise CutoverError(
+                    "generation-bound denial body is malformed"
+                ) from exc
+            if (
+                not isinstance(denial, dict)
+                or denial.get("error")
+                != "generation_bound_credential_required"
+            ):
+                raise CutoverError(
+                    "generation-bound denial contract drifted"
                 )
         return {
             "method": "GET",
             "endpoint": f"{scheme}://{request_host}{path}",
             "httpStatus": int(response.status),
             "bodySizeBytes": size,
-            "bodySha256": digest.hexdigest(),
+            "bodySha256": observed_sha256,
+            "protectedSizeBytes": expected_size_bytes,
+            "protectedSha256": expected_sha256,
             "generationId": generation_id,
             "anonymous": True,
             "artifactBytesServed": False,
+            "bodyDiffersFromProtectedBytes": True,
+            "routeKind": route_kind,
             "redirectsFollowed": 0,
         }
     except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
@@ -3763,7 +3907,7 @@ def probe_download_artifact_hosts(
     if not generation_id or not generation_root.is_absolute():
         raise CutoverError("artifact probe generation authority is invalid")
     fresh_rows = _fresh_delta_rows(shelf)
-    retained = _retained_account_required_artifact(
+    retained_bindings = _retained_account_required_bindings(
         config=config,
         generation_root=generation_root,
         fresh_rows=fresh_rows,
@@ -3773,43 +3917,65 @@ def probe_download_artifact_hosts(
     for hostname in SIDECAR_HOSTS:
         connect_host = SIDECAR_ADDRESS if scope == "local" else hostname
         for row in fresh_rows:
-            observation = _stream_exact_download(
-                scheme=scheme,
-                connect_host=connect_host,
-                connect_port=connect_port,
-                request_host=hostname,
-                path=str(row["path"]),
-                expected_sha256=str(row["sha256"]),
-                expected_size_bytes=int(row["sizeBytes"]),
-                generation_id=generation_id,
-            )
-            observations.append(
-                {
-                    **observation,
-                    "kind": row["kind"],
-                }
-            )
-        for path in (
-            str(retained["path"]),
-            (
-                f"/downloads/g/{generation_id}/files/"
-                f"{Path(str(retained['path'])).name}"
-            ),
-        ):
-            denial_observations.append(
-                {
-                    **_probe_denied_download(
-                        scheme=scheme,
-                        connect_host=connect_host,
-                        connect_port=connect_port,
-                        request_host=hostname,
-                        path=path,
-                        generation_id=generation_id,
+            for route_kind, path in (
+                ("stable", str(row["path"])),
+                (
+                    "generation",
+                    (
+                        f"/downloads/g/{generation_id}/files/"
+                        f"{Path(str(row['path'])).name}"
                     ),
-                    "artifactId": retained["artifactId"],
-                    "installAccessClass": "account_required",
-                }
-            )
+                ),
+            ):
+                observation = _stream_exact_download(
+                    scheme=scheme,
+                    connect_host=connect_host,
+                    connect_port=connect_port,
+                    request_host=hostname,
+                    path=path,
+                    expected_sha256=str(row["sha256"]),
+                    expected_size_bytes=int(row["sizeBytes"]),
+                    generation_id=generation_id,
+                )
+                observations.append(
+                    {
+                        **observation,
+                        "kind": row["kind"],
+                        "routeKind": route_kind,
+                    }
+                )
+        for retained in retained_bindings:
+            for route_kind, path in (
+                ("stable", str(retained["path"])),
+                (
+                    "generation",
+                    (
+                        f"/downloads/g/{generation_id}/files/"
+                        f"{Path(str(retained['path'])).name}"
+                    ),
+                ),
+            ):
+                denial_observations.append(
+                    {
+                        **_probe_denied_download(
+                            scheme=scheme,
+                            connect_host=connect_host,
+                            connect_port=connect_port,
+                            request_host=hostname,
+                            path=path,
+                            generation_id=generation_id,
+                            artifact_id=str(retained["artifactId"]),
+                            route_kind=route_kind,
+                            expected_sha256=str(retained["sha256"]),
+                            expected_size_bytes=int(
+                                retained["sizeBytes"]
+                            ),
+                        ),
+                        "artifactId": retained["artifactId"],
+                        "role": retained["role"],
+                        "installAccessClass": "account_required",
+                    }
+                )
     return {
         "status": "pass",
         "scope": scope,

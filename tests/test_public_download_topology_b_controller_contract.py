@@ -1402,10 +1402,18 @@ def test_account_required_denial_probe_does_not_follow_login_redirect(
         request_host="chummer.run",
         path="/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
         generation_id="generation-a",
+        artifact_id="mac",
+        route_kind="stable",
+        expected_sha256=hashlib.sha256(
+            b"protected-mac-installer"
+        ).hexdigest(),
+        expected_size_bytes=len(b"protected-mac-installer"),
     )
 
     assert receipt["httpStatus"] == 302
     assert receipt["artifactBytesServed"] is False
+    assert receipt["bodyDiffersFromProtectedBytes"] is True
+    assert receipt["routeKind"] == "stable"
     assert receipt["redirectsFollowed"] == 0
     assert len(connection.requests) == 1
     assert {
@@ -1417,22 +1425,106 @@ def test_account_required_denial_probe_does_not_follow_login_redirect(
     )
 
 
+def test_account_required_generation_denial_requires_exact_409_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    response = FakeProbeResponse(
+        json.dumps(
+            {
+                "error": "generation_bound_credential_required",
+                "message": "Use a generation-bound credential.",
+            }
+        ).encode(),
+        status=409,
+        headers=[("Content-Type", "application/json; charset=utf-8")],
+    )
+    connection = FakeProbeConnection(response)
+    monkeypatch.setattr(
+        controller,
+        "_open_probe_connection",
+        lambda **_kwargs: connection,
+    )
+
+    receipt = controller._probe_denied_download(
+        scheme="http",
+        connect_host=controller.SIDECAR_ADDRESS,
+        connect_port=controller.SIDECAR_PORT,
+        request_host="www.chummer.run",
+        path=(
+            "/downloads/g/generation-a/files/"
+            "chummer-avalonia-osx-x64-installer.dmg"
+        ),
+        generation_id="generation-a",
+        artifact_id="mac",
+        route_kind="generation",
+        expected_sha256=hashlib.sha256(
+            b"protected-mac-installer"
+        ).hexdigest(),
+        expected_size_bytes=len(b"protected-mac-installer"),
+    )
+
+    assert receipt["httpStatus"] == 409
+    assert receipt["routeKind"] == "generation"
+    assert receipt["artifactBytesServed"] is False
+    assert receipt["bodyDiffersFromProtectedBytes"] is True
+
+
 @pytest.mark.parametrize(
-    "status,headers",
+    "route_kind,status,body,headers",
     [
-        (200, []),
-        (302, [("Location", "/login"), ("Set-Cookie", "session=secret")]),
-        (401, [("WWW-Authenticate", 'Bearer realm="private"')]),
+        ("stable", 404, b"", []),
+        (
+            "stable",
+            302,
+            b"",
+            [
+                ("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac"),
+                ("Set-Cookie", "session=secret"),
+            ],
+        ),
+        (
+            "stable",
+            302,
+            b"",
+            [
+                (
+                    "Location",
+                    "https://www.chummer.run/login"
+                    "?next=%2Fdownloads%2Finstall%2Fmac",
+                )
+            ],
+        ),
+        (
+            "stable",
+            302,
+            b"protected-mac-installer",
+            [("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac")],
+        ),
+        (
+            "generation",
+            302,
+            b"",
+            [("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac")],
+        ),
+        (
+            "generation",
+            409,
+            b'{"error":"wrong"}',
+            [("Content-Type", "application/json")],
+        ),
     ],
 )
-def test_account_required_denial_probe_rejects_exposure_or_auth_state(
+def test_account_required_denial_probe_rejects_contract_drift_or_exact_bytes(
     monkeypatch: pytest.MonkeyPatch,
+    route_kind: str,
     status: int,
+    body: bytes,
     headers: list[tuple[str, str]],
 ) -> None:
     require_topology_b_surface()
     response = FakeProbeResponse(
-        b"mac-installer-bytes" if status == 200 else b"",
+        body,
         status=status,
         headers=headers,
     )
@@ -1449,8 +1541,22 @@ def test_account_required_denial_probe_rejects_exposure_or_auth_state(
             connect_host="chummer.run",
             connect_port=443,
             request_host="chummer.run",
-            path="/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
+            path=(
+                "/downloads/files/"
+                "chummer-avalonia-osx-x64-installer.dmg"
+                if route_kind == "stable"
+                else (
+                    "/downloads/g/generation-a/files/"
+                    "chummer-avalonia-osx-x64-installer.dmg"
+                )
+            ),
             generation_id="generation-a",
+            artifact_id="mac",
+            route_kind=route_kind,
+            expected_sha256=hashlib.sha256(
+                b"protected-mac-installer"
+            ).hexdigest(),
+            expected_size_bytes=len(b"protected-mac-installer"),
         )
 
 
@@ -1480,21 +1586,59 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
     generation_id = "generation-a"
     generation_root = tmp_path / "generation"
     generation_root.mkdir()
-    mac_file = "chummer-avalonia-osx-x64-installer.dmg"
+    generation_files = generation_root / "files"
+    generation_files.mkdir()
+    private_payload_name = "chummer-avalonia-osx-x64-payload.zip"
+    private_sidecar = b'{"contractName":"private-mac-payload"}\n'
+    (generation_files / f"{private_payload_name}.json").write_bytes(
+        private_sidecar
+    )
+    mac_files = {
+        "avalonia-osx-x64-installer": (
+            "chummer-avalonia-osx-x64-installer.dmg",
+            "d",
+        ),
+        "blazor-desktop-osx-arm64-installer": (
+            "chummer-blazor-desktop-osx-arm64-installer.dmg",
+            "e",
+        ),
+    }
     (generation_root / "RELEASE_CHANNEL.generated.json").write_text(
         json.dumps(
             {
                 "artifacts": [
                     {
-                        "artifactId": "avalonia-osx-x64-installer",
+                        "artifactId": artifact_id,
                         "platform": "macos",
-                        "rid": "osx-x64",
+                        "rid": (
+                            "osx-arm64"
+                            if "arm64" in artifact_id
+                            else "osx-x64"
+                        ),
                         "fileName": mac_file,
                         "downloadUrl": f"/downloads/files/{mac_file}",
-                        "sha256": "d" * 64,
-                        "sizeBytes": 101,
+                        "sha256": character * 64,
+                        "sizeBytes": index + 101,
                         "installAccessClass": "account_required",
+                        **(
+                            {
+                                "payloadFileName": private_payload_name,
+                                "payloadDownloadUrl": (
+                                    "/downloads/files/"
+                                    f"{private_payload_name}"
+                                ),
+                                "payloadSha256": "f" * 64,
+                                "payloadSizeBytes": 303,
+                            }
+                            if artifact_id
+                            == "avalonia-osx-x64-installer"
+                            else {}
+                        ),
                     }
+                    for index, (
+                        artifact_id,
+                        (mac_file, character),
+                    ) in enumerate(mac_files.items())
                 ]
             }
         ),
@@ -1546,9 +1690,13 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
                 f"{kwargs['scheme']}://{kwargs['request_host']}"
                 f"{kwargs['path']}"
             ),
-            "httpStatus": 302,
+            "httpStatus": (
+                302 if kwargs["route_kind"] == "stable" else 409
+            ),
             "anonymous": True,
             "artifactBytesServed": False,
+            "bodyDiffersFromProtectedBytes": True,
+            "routeKind": kwargs["route_kind"],
             "redirectsFollowed": 0,
         }
 
@@ -1563,18 +1711,60 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
 
     assert receipt["status"] == "pass"
     assert receipt["hosts"] == list(HOSTS)
-    assert len(receipt["freshArtifacts"]) == 6
-    assert len(receipt["accountRequiredDenials"]) == 4
+    assert len(receipt["freshArtifacts"]) == 12
+    assert len(receipt["accountRequiredDenials"]) == 16
     assert {call["request_host"] for call in streamed} == set(HOSTS)
     assert {call["connect_host"] for call in streamed} == connect_hosts
     assert {call["scheme"] for call in streamed} == {scheme}
     assert {call["path"] for call in streamed} == {
-        f"/downloads/{path}" for path in fresh_paths
+        candidate
+        for path in fresh_paths
+        for candidate in (
+            f"/downloads/{path}",
+            (
+                f"/downloads/g/{generation_id}/files/"
+                f"{Path(path).name}"
+            ),
+        )
+    }
+    private_file_names = {
+        *(mac_file for mac_file, _character in mac_files.values()),
+        private_payload_name,
+        f"{private_payload_name}.json",
     }
     assert {call["path"] for call in denied} == {
-        f"/downloads/files/{mac_file}",
-        f"/downloads/g/{generation_id}/files/{mac_file}",
+        candidate
+        for file_name in private_file_names
+        for candidate in (
+            f"/downloads/files/{file_name}",
+            f"/downloads/g/{generation_id}/files/{file_name}",
+        )
     }
+    assert {
+        call["artifact_id"] for call in denied
+    } == set(mac_files)
+    assert {
+        call["route_kind"] for call in denied
+    } == {"stable", "generation"}
+    assert {
+        (
+            call["expected_sha256"],
+            call["expected_size_bytes"],
+        )
+        for call in denied
+        if call["path"].endswith(
+            f"{private_payload_name}.json"
+        )
+    } == {
+        (
+            hashlib.sha256(private_sidecar).hexdigest(),
+            len(private_sidecar),
+        )
+    }
+    assert {
+        observation["role"]
+        for observation in receipt["accountRequiredDenials"]
+    } == {"primary", "payload", "sidecar"}
     assert all(
         observation["installAccessClass"] == "account_required"
         and observation["artifactBytesServed"] is False
