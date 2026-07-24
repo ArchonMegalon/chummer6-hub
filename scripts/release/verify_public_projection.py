@@ -104,6 +104,18 @@ CANDIDATE_UNSIGNED_COMPOSITION_FILE = (
     "PREVIEW_NIGHTLY_UNSIGNED_COMPOSITION.proposed.json"
 )
 CANDIDATE_UNSIGNED_V3_PROJECTION_PROFILE = "v3_unsigned_windows_fresh_delta"
+CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE = (
+    "v3_scope_bound_existing_windows_bytes"
+)
+CANDIDATE_SCOPE_BOUND_SOURCE_COMMIT_POSTURE = {
+    "hub": "cutover_source_head_required",
+    "registry": "bound_to_sealed_manifest_aliases",
+    "ui": "caller_asserted_unverified_informational",
+}
+CANDIDATE_SCOPE_DECISION_FILE = "RELEASE_SCOPE_DECISION.approved.json"
+CANDIDATE_GENERATION_INVENTORY_FILE = (
+    "EXISTING_BYTES_GENERATION_INVENTORY.generated.json"
+)
 CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME = (
     "chummer-avalonia-win-x64-payload.zip.json"
 )
@@ -128,6 +140,9 @@ CANDIDATE_GITHUB_LOGIN_RE = re.compile(
 )
 CANDIDATE_POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
 CANDIDATE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,159}$")
+CANDIDATE_GENERATION_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+)
 CANDIDATE_GITHUB_TIMESTAMP_RE = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
 )
@@ -4424,9 +4439,941 @@ def _candidate_validate_unsigned_profile_manifest_pair(
     }
 
 
+def _scope_bound_secret_free(value: object, *, label: str) -> None:
+    forbidden_key_fragments = {
+        "accesstoken",
+        "apikey",
+        "authorization",
+        "cookie",
+        "credential",
+        "password",
+        "privatekey",
+        "probetoken",
+        "refreshtoken",
+        "secret",
+    }
+    pending: list[tuple[object, str]] = [(value, label)]
+    while pending:
+        current, current_label = pending.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+                if any(fragment in normalized for fragment in forbidden_key_fragments):
+                    raise ProjectionBlocked(
+                        f"{current_label} contains credential-shaped field {key!r}"
+                    )
+                if child is True and normalized.endswith(
+                    ("authority", "authorized", "authoritative")
+                ):
+                    raise ProjectionBlocked(
+                        f"{current_label}.{key} must not claim authority"
+                    )
+                if (
+                    isinstance(child, str)
+                    and (
+                        normalized.endswith(("route", "uri", "url"))
+                        or child.casefold().startswith(
+                            ("/", "http://", "https://")
+                        )
+                    )
+                    and ("?" in child or "#" in child)
+                ):
+                    raise ProjectionBlocked(
+                        f"{current_label}.{key} contains a URL query or fragment"
+                    )
+                pending.append((child, f"{current_label}.{key}"))
+        elif isinstance(current, list):
+            pending.extend(
+                (child, f"{current_label}[{index}]")
+                for index, child in enumerate(current)
+            )
+        elif isinstance(current, str):
+            folded = current.casefold()
+            if (
+                folded.startswith(("/", "http://", "https://"))
+                and ("?" in current or "#" in current)
+            ) or folded.startswith(("bearer ", "basic ")) or any(
+                marker in folded
+                for marker in (
+                    "access_token=",
+                    "api_key=",
+                    "apikey=",
+                    "authorization=",
+                    "password=",
+                    "probe_token=",
+                    "refresh_token=",
+                    "secret=",
+                )
+            ):
+                raise ProjectionBlocked(
+                    f"{current_label} contains credential-shaped material"
+                )
+
+
+def _scope_bound_mode_rows(
+    value: object,
+    *,
+    label: str,
+    directory: bool,
+) -> list[dict[str, object]]:
+    if not isinstance(value, list) or len(value) > 100_000:
+        raise ProjectionBlocked(f"{label} must be a bounded array")
+    rows: list[dict[str, object]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict) or set(item) != {"mode", "path"}:
+            raise ProjectionBlocked(f"{label} row {index} drifted")
+        path = _candidate_relative_path(
+            item.get("path"), label=f"{label} row {index} path"
+        )
+        mode = item.get("mode")
+        if (
+            isinstance(mode, bool)
+            or not isinstance(mode, int)
+            or not 0 <= mode <= 0o7777
+            or mode & 0o7022
+            or directory
+            and mode & 0o500 != 0o500
+            or not directory
+            and mode & 0o400 != 0o400
+        ):
+            raise ProjectionBlocked(f"{label} row {index} has an unsafe mode")
+        rows.append({"mode": mode, "path": path})
+    if rows != sorted(rows, key=lambda row: str(row["path"])) or len(
+        {str(row["path"]) for row in rows}
+    ) != len(rows):
+        raise ProjectionBlocked(f"{label} rows are not uniquely sorted")
+    return rows
+
+
+def _scope_bound_file_rows(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list) or not value or len(value) > 100_000:
+        raise ProjectionBlocked(
+            "scope-bound generation files must be a bounded non-empty array"
+        )
+    rows: list[dict[str, object]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict) or set(item) != {
+            "mode",
+            "path",
+            "sha256",
+            "sizeBytes",
+        }:
+            raise ProjectionBlocked(
+                f"scope-bound generation file row {index} drifted"
+            )
+        path = _candidate_relative_path(
+            item.get("path"),
+            label=f"scope-bound generation file row {index} path",
+        )
+        digest = str(item.get("sha256") or "")
+        size = item.get("sizeBytes")
+        mode = item.get("mode")
+        if (
+            SHA256_RE.fullmatch(digest) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size < 0
+            or isinstance(mode, bool)
+            or not isinstance(mode, int)
+            or not 0 <= mode <= 0o7777
+            or mode & 0o7022
+            or mode & 0o400 != 0o400
+        ):
+            raise ProjectionBlocked(
+                f"scope-bound generation file row {index} is unsafe"
+            )
+        rows.append(
+            {
+                "mode": mode,
+                "path": path,
+                "sha256": digest,
+                "sizeBytes": size,
+            }
+        )
+    if rows != sorted(rows, key=lambda row: str(row["path"])) or len(
+        {str(row["path"]) for row in rows}
+    ) != len(rows):
+        raise ProjectionBlocked(
+            "scope-bound generation file rows are not uniquely sorted"
+        )
+    return rows
+
+
+def _scope_bound_inventory_digest(rows: Sequence[Mapping[str, object]]) -> str:
+    digest = hashlib.sha256()
+    for row in rows:
+        encoded = str(row["path"]).encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(int(row["sizeBytes"]).to_bytes(8, "big"))
+        digest.update(bytes.fromhex(str(row["sha256"])))
+    return digest.hexdigest()
+
+
+def _validate_scope_bound_manifest_source_and_routes(
+    canonical: dict[str, object],
+    compatibility: dict[str, object],
+    *,
+    generation_id: str,
+    registry_commit: str,
+) -> None:
+    if (
+        CANDIDATE_GENERATION_RE.fullmatch(generation_id) is None
+        or ".." in generation_id
+        or CANDIDATE_COMMIT_RE.fullmatch(registry_commit) is None
+    ):
+        raise ProjectionBlocked(
+            "scope-bound manifest source or generation identity is invalid"
+        )
+    for manifest, label in (
+        (canonical, "canonical"),
+        (compatibility, "compatibility"),
+    ):
+        coverage = manifest.get("desktopTupleCoverage")
+        route_rows = (
+            coverage.get("desktopRouteTruth")
+            if isinstance(coverage, dict)
+            else None
+        )
+        expected_route_rows = [
+            {
+                "artifactId": "avalonia-win-x64-installer",
+                "head": "avalonia",
+                "platform": "windows",
+                "publicInstallRoute": (
+                    "/downloads/install/avalonia-win-x64-installer"
+                ),
+                "rid": "win-x64",
+                "tupleId": "avalonia:windows:win-x64",
+            },
+            {
+                "artifactId": "",
+                "head": "blazor-desktop",
+                "platform": "windows",
+                "publicInstallRoute": (
+                    "/downloads/install/blazor-desktop-win-x64-installer"
+                ),
+                "rid": "win-x64",
+                "tupleId": "blazor-desktop:windows:win-x64",
+            },
+        ]
+        observed_route_rows = (
+            [
+                {
+                    key: row.get(key)
+                    for key in expected_route_rows[index]
+                }
+                for index, row in enumerate(route_rows)
+                if isinstance(row, dict)
+                and index < len(expected_route_rows)
+            ]
+            if isinstance(route_rows, list)
+            else None
+        )
+        if (
+            manifest.get("registryCommit") != registry_commit
+            or manifest.get("registry_commit") != registry_commit
+            or not isinstance(coverage, dict)
+            or coverage.get("complete") is not True
+            or coverage.get("requiredDesktopPlatforms") != ["windows"]
+            or coverage.get("requiredDesktopHeads") != ["avalonia"]
+            or coverage.get("requiredDesktopPlatformHeadRidTuples")
+            != ["avalonia:win-x64:windows"]
+            or coverage.get("promotedPlatformHeads")
+            != {"windows": ["avalonia"]}
+            or coverage.get("promotedPlatformHeadRidTuples")
+            != ["avalonia:win-x64:windows"]
+            or coverage.get("promotedInstallerTuples")
+            != [
+                {
+                    "arch": "x64",
+                    "artifactId": "avalonia-win-x64-installer",
+                    "head": "avalonia",
+                    "kind": "installer",
+                    "platform": "windows",
+                    "rid": "win-x64",
+                    "tupleId": "avalonia:windows:win-x64",
+                }
+            ]
+            or coverage.get("externalProofRequests") != []
+            or coverage.get("missingRequiredHeads") != []
+            or coverage.get("missingRequiredPlatforms") != []
+            or coverage.get("missingRequiredPlatformHeadPairs") != []
+            or coverage.get("missingRequiredPlatformHeadRidTuples") != []
+            or not isinstance(route_rows, list)
+            or len(route_rows) != len(expected_route_rows)
+            or observed_route_rows != expected_route_rows
+        ):
+            raise ProjectionBlocked(
+                f"scope-bound {label} Windows source posture drifted"
+            )
+
+    canonical_artifacts = canonical.get("artifacts")
+    compatibility_downloads = compatibility.get("downloads")
+    if (
+        not isinstance(canonical_artifacts, list)
+        or len(canonical_artifacts) != 1
+        or not isinstance(canonical_artifacts[0], dict)
+        or not isinstance(compatibility_downloads, list)
+        or len(compatibility_downloads) != 1
+        or not isinstance(compatibility_downloads[0], dict)
+    ):
+        raise ProjectionBlocked(
+            "scope-bound manifest route cardinality drifted"
+        )
+    canonical_row = canonical_artifacts[0]
+    compatibility_row = compatibility_downloads[0]
+    artifact_id = "avalonia-win-x64-installer"
+    installer_name = "chummer-avalonia-win-x64-installer.exe"
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    installer_url = (
+        f"/downloads/g/{generation_id}/files/{installer_name}"
+    )
+    payload_url = (
+        f"/downloads/g/{generation_id}/install/{artifact_id}/payload"
+    )
+    semantic_install_url = (
+        "/downloads/install/avalonia-win-x64-installer"
+    )
+    if (
+        canonical_row.get("artifactId") != artifact_id
+        or canonical_row.get("id") != artifact_id
+        or canonical_row.get("fileName") != installer_name
+        or canonical_row.get("payloadFileName") != payload_name
+        or canonical_row.get("downloadUrl") != installer_url
+        or canonical_row.get("payloadDownloadUrl") != payload_url
+        or compatibility_row.get("artifactId") != artifact_id
+        or compatibility_row.get("id") != artifact_id
+        or compatibility_row.get("fileName") != installer_name
+        or compatibility_row.get("payloadFileName") != payload_name
+        or compatibility_row.get("url") != installer_url
+        or compatibility_row.get("downloadUrl") != installer_url
+        or compatibility_row.get("payloadDownloadUrl") != payload_url
+    ):
+        raise ProjectionBlocked(
+            "scope-bound generation-aware manifest routes drifted"
+        )
+    for manifest, label in (
+        (canonical, "canonical"),
+        (compatibility, "compatibility"),
+    ):
+        for collection in (
+            "artifactIdentityRegistry",
+            "artifactPublicationBindings",
+            "desktopSurfaceRefs",
+        ):
+            rows = manifest.get(collection)
+            if (
+                not isinstance(rows, list)
+                or len(rows) != 1
+                or not isinstance(rows[0], dict)
+                or rows[0].get("artifactId") != artifact_id
+                or rows[0].get("head") != "avalonia"
+                or rows[0].get("platform") != "windows"
+                or rows[0].get("rid") != "win-x64"
+                or rows[0].get("tupleId")
+                != "avalonia:windows:win-x64"
+                or rows[0].get("publicInstallRoute")
+                != semantic_install_url
+            ):
+                raise ProjectionBlocked(
+                    f"scope-bound {label} semantic route graph drifted"
+                )
+        install_aware = manifest.get("installAwareArtifactRegistry")
+        if (
+            not isinstance(install_aware, list)
+            or len(install_aware) != 1
+            or not isinstance(install_aware[0], dict)
+            or install_aware[0].get("artifactId") != artifact_id
+            or install_aware[0].get("head") != "avalonia"
+            or install_aware[0].get("platform") != "windows"
+            or install_aware[0].get("rid") != "win-x64"
+            or install_aware[0].get("tupleId")
+            != "avalonia:windows:win-x64"
+            or not isinstance(
+                install_aware[0].get("conciergeAssetRefs"), dict
+            )
+            or install_aware[0]["conciergeAssetRefs"].get(
+                "publicTrustWrapper"
+            )
+            != semantic_install_url
+            or not isinstance(
+                install_aware[0].get("recoveryProofRefs"), list
+            )
+            or semantic_install_url
+            not in install_aware[0]["recoveryProofRefs"]
+        ):
+            raise ProjectionBlocked(
+                f"scope-bound {label} install-aware route graph drifted"
+            )
+
+        pending: list[object] = [manifest]
+        while pending:
+            current = pending.pop()
+            if isinstance(current, dict):
+                for key, child in current.items():
+                    if key == "publicInstallRoute" and (
+                        not isinstance(child, str)
+                        or child
+                        not in (
+                            semantic_install_url,
+                            (
+                                "/downloads/install/"
+                                "blazor-desktop-win-x64-installer"
+                            ),
+                        )
+                    ):
+                        raise ProjectionBlocked(
+                            f"scope-bound {label} semantic route escaped"
+                        )
+                    if isinstance(child, str) and child.casefold().startswith(
+                        ("http://", "https://")
+                    ) and child != "https://chummer.run":
+                        raise ProjectionBlocked(
+                            f"scope-bound {label} external URL escaped"
+                        )
+                    if isinstance(child, (dict, list)):
+                        pending.append(child)
+            elif isinstance(current, list):
+                pending.extend(current)
+            elif isinstance(current, str) and current.casefold().startswith(
+                ("//", "http://", "https://")
+            ) and current != "https://chummer.run":
+                raise ProjectionBlocked(
+                    f"scope-bound {label} external URL escaped"
+                )
+
+
+def _validate_scope_bound_existing_bytes_authority(
+    authority: dict[str, object],
+) -> dict[str, object]:
+    expected_root_keys = {
+        "candidate",
+        "candidateImportAuthority",
+        "candidateReviewAuthority",
+        "codeDeploymentAuthority",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "custody",
+        "deployAuthority",
+        "exactIncomingDesktopScope",
+        "expiresAtUtc",
+        "generatedAtUtc",
+        "platformScope",
+        "projectionProfile",
+        "publicationAuthorized",
+        "publicationEligible",
+        "releaseUploadAuthority",
+        "routeAuthority",
+        "signaturePolicy",
+        "status",
+    }
+    signature_policy = {
+        "signatureStatus": "unsigned",
+        "signingRequired": False,
+        "unsignedReason": "preview_policy",
+    }
+    if (
+        set(authority) != expected_root_keys
+        or authority.get("contractName") != CANDIDATE_AUTHORITY_CONTRACT_V3
+        or type(authority.get("contractVersion")) is not int
+        or authority.get("contractVersion") != 3
+        or authority.get("projectionProfile")
+        != CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+        or authority.get("status") != PROJECTION_STATUS_CANDIDATE_IMPORT_READY
+        or authority.get("candidateImportAuthority") is not True
+        or authority.get("candidateReviewAuthority") is not True
+        or authority.get("exactIncomingDesktopScope") != CANDIDATE_EXACT_SCOPE
+        or authority.get("platformScope") != "windows_only"
+        or authority.get("crossRunBitReproducible") is not False
+        or authority.get("signaturePolicy") != signature_policy
+        or any(
+            authority.get(key) is not False
+            for key in (
+                "publicationAuthorized",
+                "publicationEligible",
+                "releaseUploadAuthority",
+                "deployAuthority",
+                "routeAuthority",
+                "codeDeploymentAuthority",
+            )
+        )
+    ):
+        raise ProjectionBlocked(
+            "scope-bound candidate import authority contract drifted"
+        )
+    try:
+        generated_at = datetime.fromisoformat(
+            str(authority.get("generatedAtUtc") or "").replace("Z", "+00:00")
+        )
+        expires_at = datetime.fromisoformat(
+            str(authority.get("expiresAtUtc") or "").replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise ProjectionBlocked(
+            "scope-bound candidate authority timestamps are invalid"
+        ) from exc
+    now = datetime.now(timezone.utc)
+    if (
+        generated_at.utcoffset() != timezone.utc.utcoffset(generated_at)
+        or expires_at.utcoffset() != timezone.utc.utcoffset(expires_at)
+        or generated_at > now + timedelta(minutes=5)
+        or generated_at < now - timedelta(hours=6, minutes=5)
+        or expires_at <= now
+        or expires_at > generated_at + timedelta(hours=6)
+    ):
+        raise ProjectionBlocked("scope-bound candidate authority lifetime drifted")
+
+    candidate = authority.get("candidate")
+    candidate_keys = {
+        "bundleIdentitySha256",
+        "canonicalManifestSha256",
+        "fileCount",
+        "inventorySha256",
+        "totalBytes",
+        "version",
+    }
+    if not isinstance(candidate, dict) or set(candidate) != candidate_keys:
+        raise ProjectionBlocked("scope-bound candidate identity drifted")
+    _candidate_version(
+        candidate.get("version"), label="scope-bound candidate version"
+    )
+    if any(
+        SHA256_RE.fullmatch(str(candidate.get(name) or "")) is None
+        for name in (
+            "bundleIdentitySha256",
+            "canonicalManifestSha256",
+            "inventorySha256",
+        )
+    ) or any(
+        isinstance(candidate.get(name), bool)
+        or not isinstance(candidate.get(name), int)
+        or int(candidate[name]) < minimum
+        for name, minimum in (("fileCount", 1), ("totalBytes", 0))
+    ):
+        raise ProjectionBlocked("scope-bound candidate summary drifted")
+    identity = {
+        key: candidate[key]
+        for key in (
+            "version",
+            "canonicalManifestSha256",
+            "inventorySha256",
+            "fileCount",
+            "totalBytes",
+        )
+    }
+    if candidate.get("bundleIdentitySha256") != hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest():
+        raise ProjectionBlocked("scope-bound candidate bundle identity drifted")
+
+    custody = authority.get("custody")
+    custody_keys = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "generationInventory",
+        "inventory",
+        "releaseScopeDecision",
+        "scopeBoundExistingBytes",
+    }
+    if not isinstance(custody, dict) or set(custody) != custody_keys:
+        raise ProjectionBlocked("scope-bound candidate custody drifted")
+    canonical_raw = _candidate_embedded_bytes(
+        custody.get("canonicalManifest"),
+        label="scope-bound canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    compatibility_raw = _candidate_embedded_bytes(
+        custody.get("compatibilityManifest"),
+        label="scope-bound compatibility manifest",
+        expected_path="releases.json",
+    )
+    inventory_raw = _candidate_embedded_bytes(
+        custody.get("inventory"),
+        label="scope-bound candidate inventory",
+        expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+    )
+    decision_raw = _candidate_embedded_bytes(
+        custody.get("releaseScopeDecision"),
+        label="scope-bound release decision",
+        expected_path=CANDIDATE_SCOPE_DECISION_FILE,
+    )
+    generation_raw = _candidate_embedded_bytes(
+        custody.get("generationInventory"),
+        label="scope-bound generation inventory",
+        expected_path=CANDIDATE_GENERATION_INVENTORY_FILE,
+    )
+    canonical = _strict_json_object(
+        canonical_raw, label="scope-bound canonical manifest"
+    )
+    compatibility = _strict_json_object(
+        compatibility_raw, label="scope-bound compatibility manifest"
+    )
+    inventory = _strict_json_object(
+        inventory_raw, label="scope-bound candidate inventory"
+    )
+    decision = _strict_json_object(
+        decision_raw, label="scope-bound release decision"
+    )
+    generation = _strict_json_object(
+        generation_raw, label="scope-bound generation inventory"
+    )
+    binding = custody.get("scopeBoundExistingBytes")
+    if not isinstance(binding, dict):
+        raise ProjectionBlocked("scope-bound existing-byte binding is missing")
+    for document, label in (
+        (canonical, "scope-bound canonical manifest"),
+        (compatibility, "scope-bound compatibility manifest"),
+        (decision, "scope-bound release decision"),
+        (generation, "scope-bound generation inventory"),
+        (binding, "scope-bound existing-byte binding"),
+    ):
+        _scope_bound_secret_free(document, label=label)
+        _candidate_validate_unsigned_profile_recursive_authority(
+            document, label=label
+        )
+
+    if (
+        set(inventory) != {"contractName", "contractVersion", "files"}
+        or inventory.get("contractName")
+        != "chummer.release-upload.candidate-inventory/v1"
+        or type(inventory.get("contractVersion")) is not int
+        or inventory.get("contractVersion") != 1
+    ):
+        raise ProjectionBlocked("scope-bound candidate inventory contract drifted")
+    candidate_rows = _candidate_inventory_rows(
+        inventory.get("files"), label="scope-bound candidate inventory"
+    )
+    if (
+        len(candidate_rows) != candidate["fileCount"]
+        or sum(int(row["sizeBytes"]) for row in candidate_rows)
+        != candidate["totalBytes"]
+        or _scope_bound_inventory_digest(candidate_rows)
+        != candidate["inventorySha256"]
+    ):
+        raise ProjectionBlocked("scope-bound candidate inventory summary drifted")
+    canonical_scope = _candidate_windows_scope(
+        canonical,
+        candidate_rows,
+        candidate,
+        allow_ancillary_files=True,
+        expected_channel="preview",
+    )
+    if (
+        canonical.get("platformScope") != "windows_only"
+        or compatibility.get("platformScope") != "windows_only"
+        or hashlib.sha256(canonical_raw).hexdigest()
+        != candidate["canonicalManifestSha256"]
+    ):
+        raise ProjectionBlocked("scope-bound Windows-only manifest posture drifted")
+    canonical_artifacts = canonical.get("artifacts")
+    compatibility_downloads = compatibility.get("downloads")
+    if (
+        not isinstance(canonical_artifacts, list)
+        or len(canonical_artifacts) != 1
+        or not isinstance(compatibility_downloads, list)
+        or len(compatibility_downloads) != 1
+        or any(
+            not isinstance(row, dict)
+            for row in (*canonical_artifacts, *compatibility_downloads)
+        )
+    ):
+        raise ProjectionBlocked(
+            "scope-bound manifests must contain exactly one Windows artifact"
+        )
+    canonical_row = canonical_artifacts[0]
+    compatibility_row = compatibility_downloads[0]
+    if (
+        canonical_row.get("platform") != "windows"
+        or canonical_row.get("head") != "avalonia"
+        or canonical_row.get("rid") != CANDIDATE_RID
+        or canonical_row.get("installAccessClass") != "open_public"
+        or compatibility_row.get("platform") != "windows"
+        or compatibility_row.get("head") != "avalonia"
+        or compatibility_row.get("rid") != CANDIDATE_RID
+        or compatibility_row.get("installAccessClass") != "open_public"
+        or any(
+            compatibility_row.get(key) != canonical_row.get(key)
+            for key in (
+                "artifactId",
+                "fileName",
+                "installerMode",
+                "payloadAcquisitionMode",
+                "payloadFileName",
+                "payloadSha256",
+                "payloadSizeBytes",
+                "sha256",
+                "sizeBytes",
+            )
+        )
+    ):
+        raise ProjectionBlocked("scope-bound manifest pair drifted")
+    compatibility_version = _candidate_version(
+        _candidate_manifest_alias(
+            compatibility,
+            "version",
+            "releaseVersion",
+            label="scope-bound compatibility release version",
+        ),
+        label="scope-bound compatibility release version",
+    )
+    compatibility_channel = _candidate_manifest_alias(
+        compatibility,
+        "channelId",
+        "channel",
+        label="scope-bound compatibility release channel",
+    )
+    generation_id = canonical.get("generationId")
+    if (
+        compatibility_version != candidate["version"]
+        or compatibility_channel != "preview"
+        or not isinstance(generation_id, str)
+        or CANDIDATE_GENERATION_RE.fullmatch(generation_id) is None
+        or ".." in generation_id
+        or compatibility.get("generationId") != generation_id
+    ):
+        raise ProjectionBlocked("scope-bound generation identity drifted")
+
+    generation_keys = {
+        "bundleIdentitySha256",
+        "canonicalManifestSha256",
+        "channel",
+        "compatibilityManifestSha256",
+        "contractName",
+        "contractVersion",
+        "directories",
+        "fileCount",
+        "files",
+        "generationId",
+        "inventorySha256",
+        "projectionProfile",
+        "releaseVersion",
+        "rootMode",
+        "status",
+        "totalBytes",
+    }
+    file_rows = _scope_bound_file_rows(generation.get("files"))
+    directory_rows = _scope_bound_mode_rows(
+        generation.get("directories"),
+        label="scope-bound generation directories",
+        directory=True,
+    )
+    root_mode = generation.get("rootMode")
+    if (
+        set(generation) != generation_keys
+        or generation_raw != _canonical_json_bytes(generation)
+        or generation.get("contractName")
+        != "chummer.release-shelf.existing-bytes-generation-inventory/v1"
+        or type(generation.get("contractVersion")) is not int
+        or generation.get("contractVersion") != 1
+        or generation.get("status") != "pass"
+        or generation.get("projectionProfile")
+        != CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+        or generation.get("releaseVersion") != candidate["version"]
+        or generation.get("channel") != "preview"
+        or generation.get("generationId") != generation_id
+        or generation.get("canonicalManifestSha256")
+        != hashlib.sha256(canonical_raw).hexdigest()
+        or generation.get("compatibilityManifestSha256")
+        != hashlib.sha256(compatibility_raw).hexdigest()
+        or generation.get("inventorySha256") != candidate["inventorySha256"]
+        or generation.get("bundleIdentitySha256")
+        != candidate["bundleIdentitySha256"]
+        or generation.get("fileCount") != candidate["fileCount"]
+        or generation.get("totalBytes") != candidate["totalBytes"]
+        or isinstance(root_mode, bool)
+        or not isinstance(root_mode, int)
+        or not 0 <= root_mode <= 0o7777
+        or root_mode & 0o7022
+        or root_mode & 0o500 != 0o500
+        or [
+            {
+                "path": row["path"],
+                "sha256": row["sha256"],
+                "sizeBytes": row["sizeBytes"],
+            }
+            for row in file_rows
+        ]
+        != candidate_rows
+    ):
+        raise ProjectionBlocked("scope-bound generation inventory drifted")
+    expected_paths = {
+        "RELEASE_CHANNEL.generated.json",
+        "releases.json",
+        "files/chummer-avalonia-win-x64-installer.exe",
+        "files/chummer-avalonia-win-x64-payload.zip",
+        f"files/{CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME}",
+    }
+    if {str(row["path"]) for row in file_rows} != expected_paths or {
+        str(row["path"]) for row in directory_rows
+    } != {"files"}:
+        raise ProjectionBlocked(
+            "scope-bound generation contains bytes outside the exact Windows shelf"
+        )
+
+    decision_fields = {
+        "approvedAtUtc",
+        "approvedBy",
+        "channel",
+        "contractName",
+        "contractVersion",
+        "decisionId",
+        "platforms",
+        "releaseTarget",
+        "releaseVersion",
+        "status",
+        "supportOwner",
+    }
+    decision_sha = hashlib.sha256(decision_raw).hexdigest()
+    if (
+        set(decision) != decision_fields
+        or decision_raw != _canonical_json_bytes(decision)
+        or decision.get("contractName") != "chummer.release-scope-decision/v1"
+        or type(decision.get("contractVersion")) is not int
+        or decision.get("contractVersion") != 1
+        or decision.get("status") != "approved"
+        or decision.get("channel") != "preview"
+        or decision.get("releaseTarget") != "preview"
+        or decision.get("releaseVersion") != candidate["version"]
+        or not isinstance(decision.get("decisionId"), str)
+        or not isinstance(decision.get("approvedBy"), str)
+        or not str(decision["approvedBy"]).strip()
+        or not isinstance(decision.get("supportOwner"), str)
+        or not str(decision["supportOwner"]).strip()
+    ):
+        raise ProjectionBlocked("scope-bound approved release decision drifted")
+    platforms = decision.get("platforms")
+    expected_platform = {
+        "artifactAccessClass": "open_public",
+        "fallbackHeads": [],
+        "platform": "windows",
+        "primaryHead": "avalonia",
+        "rid": CANDIDATE_RID,
+        "signingRequirement": "preview_unsigned_allowed",
+    }
+    if platforms != [expected_platform]:
+        raise ProjectionBlocked(
+            "scope-bound release decision is not one open-public Windows preview"
+        )
+
+    binding_keys = {
+        "canonicalManifestSha256",
+        "channel",
+        "compatibilityManifestSha256",
+        "contractName",
+        "contractVersion",
+        "exactIncomingDesktopScope",
+        "freshDelta",
+        "generationId",
+        "generationInventorySha256",
+        "inventorySha256",
+        "platformScope",
+        "projectionProfile",
+        "releaseScopeAuthority",
+        "releaseScopeDecisionSha256",
+        "releaseVersion",
+        "retainedFromIncumbent",
+        "retainedPlatforms",
+        "shelfPlatforms",
+        "signaturePolicy",
+        "sourceCommitPosture",
+        "sourceCommits",
+        "status",
+    }
+    source_commits = binding.get("sourceCommits")
+    expected_authority = (
+        f"design://release-scope/{decision['decisionId']}/sha256/{decision_sha}"
+    )
+    if (
+        set(binding) != binding_keys
+        or binding.get("contractName")
+        != "chummer.release-upload.scope-bound-existing-bytes/v1"
+        or type(binding.get("contractVersion")) is not int
+        or binding.get("contractVersion") != 1
+        or binding.get("status") != "sealed_review_required"
+        or binding.get("projectionProfile")
+        != CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+        or binding.get("releaseVersion") != candidate["version"]
+        or binding.get("channel") != "preview"
+        or binding.get("generationId") != generation_id
+        or binding.get("platformScope") != "windows_only"
+        or binding.get("exactIncomingDesktopScope") != CANDIDATE_EXACT_SCOPE
+        or binding.get("signaturePolicy") != signature_policy
+        or binding.get("releaseScopeDecisionSha256") != decision_sha
+        or binding.get("releaseScopeAuthority") != expected_authority
+        or binding.get("canonicalManifestSha256")
+        != hashlib.sha256(canonical_raw).hexdigest()
+        or binding.get("compatibilityManifestSha256")
+        != hashlib.sha256(compatibility_raw).hexdigest()
+        or binding.get("inventorySha256") != candidate["inventorySha256"]
+        or binding.get("generationInventorySha256")
+        != hashlib.sha256(generation_raw).hexdigest()
+        or binding.get("retainedFromIncumbent") != []
+        or binding.get("retainedPlatforms") != []
+        or binding.get("shelfPlatforms") != ["windows"]
+        or binding.get("sourceCommitPosture")
+        != CANDIDATE_SCOPE_BOUND_SOURCE_COMMIT_POSTURE
+        or not isinstance(source_commits, dict)
+        or set(source_commits) != {"hub", "registry", "ui"}
+        or any(
+            CANDIDATE_COMMIT_RE.fullmatch(
+                str(source_commits.get(name) or "")
+            )
+            is None
+            for name in ("hub", "registry", "ui")
+        )
+    ):
+        raise ProjectionBlocked("scope-bound existing-byte graph drifted")
+    _validate_scope_bound_manifest_source_and_routes(
+        canonical,
+        compatibility,
+        generation_id=generation_id,
+        registry_commit=str(source_commits["registry"]),
+    )
+    fresh = binding.get("freshDelta")
+    expected_fresh = (
+        (
+            "installer",
+            "files/chummer-avalonia-win-x64-installer.exe",
+        ),
+        (
+            "bootstrap_payload",
+            "files/chummer-avalonia-win-x64-payload.zip",
+        ),
+        (
+            "bootstrap_payload_sidecar",
+            f"files/{CANDIDATE_UNSIGNED_PAYLOAD_SIDECAR_NAME}",
+        ),
+    )
+    file_by_path = {str(row["path"]): row for row in file_rows}
+    if not isinstance(fresh, list) or len(fresh) != len(expected_fresh):
+        raise ProjectionBlocked("scope-bound fresh Windows delta drifted")
+    for item, (role, path) in zip(fresh, expected_fresh, strict=True):
+        source = file_by_path[path]
+        if item != {
+            "artifactRole": role,
+            "mode": source["mode"],
+            "path": path,
+            "sha256": source["sha256"],
+            "sizeBytes": source["sizeBytes"],
+        }:
+            raise ProjectionBlocked(
+                "scope-bound fresh Windows delta byte drifted"
+            )
+    return authority
+
+
 def _validate_candidate_import_authority_v3(
     authority: dict[str, object],
 ) -> dict[str, object]:
+    if (
+        authority.get("projectionProfile")
+        == CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    ):
+        return _validate_scope_bound_existing_bytes_authority(authority)
     expected_root_keys = {
         "candidate",
         "candidateImportAuthority",
@@ -6068,7 +7015,24 @@ def _publish_candidate_import_snapshot_locked(
         raise ProjectionBlocked(
             "candidate import authority SHA256 does not match its immutable handoff"
         )
-    _validate_candidate_import_authority(authority_payload)
+    candidate_authority = _validate_candidate_import_authority(
+        authority_payload
+    )
+    candidate_release_channel: bytes | None = None
+    if (
+        candidate_authority.get("projectionProfile")
+        == CANDIDATE_SCOPE_BOUND_EXISTING_BYTES_PROFILE
+    ):
+        custody = candidate_authority.get("custody")
+        if not isinstance(custody, dict):
+            raise ProjectionBlocked(
+                "scope-bound candidate publication custody is missing"
+            )
+        candidate_release_channel = _candidate_embedded_bytes(
+            custody.get("canonicalManifest"),
+            label="scope-bound candidate release channel",
+            expected_path="RELEASE_CHANNEL.generated.json",
+        )
 
     snapshot_stage = Path(
         tempfile.mkdtemp(prefix=".public-projection-candidate.", dir=snapshot_root)
@@ -6078,11 +7042,20 @@ def _publish_candidate_import_snapshot_locked(
         output_payloads: dict[str, bytes] = {}
         output_digests: dict[str, str] = {}
         for name in SNAPSHOT_OUTPUT_NAMES:
-            payload = _stable_read(source.outputs[name], label=f"source current {name}")
+            source_payload = _stable_read(
+                source.outputs[name], label=f"source current {name}"
+            )
             if not hmac.compare_digest(
-                hashlib.sha256(payload).hexdigest(), source.output_sha256[name]
+                hashlib.sha256(source_payload).hexdigest(),
+                source.output_sha256[name],
             ):
                 raise ProjectionBlocked("source current output changed during candidate staging")
+            payload = (
+                candidate_release_channel
+                if name == "RELEASE_CHANNEL.generated.json"
+                and candidate_release_channel is not None
+                else source_payload
+            )
             _write_fsynced_file(
                 snapshot_stage / name,
                 payload,
@@ -6090,7 +7063,7 @@ def _publish_candidate_import_snapshot_locked(
                 label=f"candidate snapshot {name}",
             )
             output_payloads[name] = payload
-            output_digests[name] = source.output_sha256[name]
+            output_digests[name] = hashlib.sha256(payload).hexdigest()
         _write_fsynced_file(
             snapshot_stage / CANDIDATE_IMPORT_AUTHORITY_NAME,
             authority_payload,
