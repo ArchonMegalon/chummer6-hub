@@ -111,6 +111,10 @@ filtered_files_dir="$(mktemp -d)"
 generation_candidate_dir="$(mktemp -d)"
 prepared_layout_dir="$(mktemp -d)"
 cleanup() {
+  chmod -R u+rwX -- \
+    "$filtered_files_dir" \
+    "$generation_candidate_dir" \
+    "$prepared_layout_dir" 2>/dev/null || true
   rm -rf "$filtered_files_dir" "$generation_candidate_dir" "$prepared_layout_dir"
 }
 report_publish_error() {

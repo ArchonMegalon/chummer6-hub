@@ -70,6 +70,20 @@ ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
     "portal",
     "status",
 }
+PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE = "public-download-only"
+FULL_RUNTIME_PROFILE = "full"
+PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
+    "contractName",
+    "deploymentOperation",
+    "generatedAtUtc",
+    "portal",
+    "publicProjectionManifestSha256",
+    "publicProjectionSnapshotId",
+    "publicProjectionSnapshotSha256",
+    "runtimeProfile",
+    "sourceHead",
+    "status",
+}
 ACTIVE_RUNTIME_PORTAL_FIELDS = {
     "containerId",
     "containerName",
@@ -121,6 +135,36 @@ DEPLOY_OVERLAY_AUTHORITY_FIELDS = {
     "priorPortalProofPublicSnapshot",
     "proofBindSourcePath",
     "stagingRoot",
+}
+PUBLIC_DOWNLOAD_DEPLOY_OVERLAY_AUTHORITY_FIELDS = (
+    DEPLOY_OVERLAY_AUTHORITY_FIELDS
+    | {
+        "priorActiveRuntimeAuthorityExisted",
+        "priorActiveRuntimeAuthoritySnapshotPath",
+        "priorActiveRuntimeAuthoritySnapshotSha256",
+    }
+)
+SOURCE_HEAD_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+DEPLOYMENT_OPERATION_PATTERN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+)
+FULL_SNAPSHOT_FIELDS = {
+    "activeExisted",
+    "activeRoot",
+    "contractName",
+    "deployOverlayAuthority",
+    "operation",
+    "phase",
+    "priorActiveFingerprint",
+    "priorActiveIdentity",
+    "runtimePriorState",
+    "sourceRoot",
+    "status",
+}
+PUBLIC_DOWNLOAD_SNAPSHOT_FIELDS = FULL_SNAPSHOT_FIELDS | {
+    "deploymentOperation",
+    "runtimeProfile",
+    "sourceHead",
 }
 
 APPARENT_SECRET_PATTERNS = (
@@ -548,6 +592,12 @@ def snapshot(
     candidate_proof_bind_source_snapshot: Path | None = None,
     prior_portal_proof_authority_snapshot: Path | None = None,
     prior_portal_proof_public_snapshot: Path | None = None,
+    runtime_profile: str = FULL_RUNTIME_PROFILE,
+    deployment_operation: str = "deploy",
+    source_head: str = "",
+    prior_active_runtime_authority_existed: bool | None = None,
+    prior_active_runtime_authority_snapshot: Path | None = None,
+    prior_active_runtime_authority_snapshot_sha256: str | None = None,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
@@ -560,7 +610,39 @@ def snapshot(
             overlay.assert_no_incomplete_activation_transaction(active_root)
             existed, fingerprint, identity = _current_state(active_root)
             prior_runtime = dict(runtime_prior_state or {})
-            deploy_authority: dict[str, str] = {}
+            deploy_authority: dict[str, Any] = {}
+            if runtime_profile not in {
+                FULL_RUNTIME_PROFILE,
+                PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+            }:
+                raise RuntimeError("overlay transaction runtime profile is invalid")
+            if (
+                runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+                and DEPLOYMENT_OPERATION_PATTERN.fullmatch(
+                    deployment_operation
+                )
+                is None
+            ):
+                raise RuntimeError(
+                    "public-download transaction deployment operation is invalid"
+                )
+            if (
+                runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+                and prior_runtime
+                and SOURCE_HEAD_PATTERN.fullmatch(source_head) is None
+            ):
+                raise RuntimeError(
+                    "public-download deploy transaction requires an exact source HEAD"
+                )
+            if (
+                runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+                and source_head
+                and SOURCE_HEAD_PATTERN.fullmatch(
+                source_head
+                )
+                is None
+            ):
+                raise RuntimeError("overlay transaction source HEAD is invalid")
             if prior_runtime:
                 prior_runtime = validate_runtime_prior_state(prior_runtime)
                 if (
@@ -667,6 +749,74 @@ def snapshot(
                         normalized_prior_public_snapshot or ""
                     ),
                 }
+                if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+                    if not isinstance(
+                        prior_active_runtime_authority_existed,
+                        bool,
+                    ):
+                        raise RuntimeError(
+                            "public-download transaction requires prior active "
+                            "runtime authority existence"
+                        )
+                    normalized_prior_runtime_snapshot: Path | None = None
+                    if prior_active_runtime_authority_existed:
+                        if (
+                            prior_active_runtime_authority_snapshot is None
+                            or prior_active_runtime_authority_snapshot_sha256 is None
+                            or re.fullmatch(
+                                r"[0-9a-f]{64}",
+                                prior_active_runtime_authority_snapshot_sha256,
+                            )
+                            is None
+                        ):
+                            raise RuntimeError(
+                                "public-download transaction prior runtime "
+                                "authority snapshot is invalid"
+                            )
+                        normalized_prior_runtime_snapshot = (
+                            overlay.normalized_absolute_path(
+                                prior_active_runtime_authority_snapshot
+                            )
+                        )
+                        if _stable_file_sha256(
+                            normalized_prior_runtime_snapshot,
+                            label="prior active runtime authority snapshot",
+                        ) != prior_active_runtime_authority_snapshot_sha256:
+                            raise RuntimeError(
+                                "prior active runtime authority snapshot changed"
+                            )
+                    elif (
+                        prior_active_runtime_authority_snapshot is not None
+                        or prior_active_runtime_authority_snapshot_sha256
+                        not in (None, "")
+                    ):
+                        raise RuntimeError(
+                            "absent prior runtime authority cannot claim a snapshot"
+                        )
+                    deploy_authority.update(
+                        {
+                            "priorActiveRuntimeAuthorityExisted": (
+                                prior_active_runtime_authority_existed
+                            ),
+                            "priorActiveRuntimeAuthoritySnapshotPath": str(
+                                normalized_prior_runtime_snapshot or ""
+                            ),
+                            "priorActiveRuntimeAuthoritySnapshotSha256": (
+                                prior_active_runtime_authority_snapshot_sha256 or ""
+                            ),
+                        }
+                    )
+                elif any(
+                    value is not None
+                    for value in (
+                        prior_active_runtime_authority_existed,
+                        prior_active_runtime_authority_snapshot,
+                        prior_active_runtime_authority_snapshot_sha256,
+                    )
+                ):
+                    raise RuntimeError(
+                        "full runtime transaction refuses public-only authority fields"
+                    )
             elif any(
                 value is not None
                 for value in (
@@ -682,7 +832,7 @@ def snapshot(
                 raise RuntimeError(
                     "deploy overlay authority paths require runtime prior state"
                 )
-            payload = {
+            payload: dict[str, Any] = {
                 "contractName": CONTRACT_NAME,
                 "operation": "snapshot",
                 "status": "pass",
@@ -695,6 +845,14 @@ def snapshot(
                 "runtimePriorState": prior_runtime,
                 "deployOverlayAuthority": deploy_authority,
             }
+            if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+                payload.update(
+                    {
+                        "runtimeProfile": runtime_profile,
+                        "deploymentOperation": deployment_operation,
+                        "sourceHead": source_head,
+                    }
+                )
             overlay.atomic_write_json(output, payload)
             return payload
 
@@ -704,12 +862,42 @@ def _validated_snapshot(
     *,
     source_root: Path,
     active_root: Path,
+    expected_runtime_profile: str | None = None,
+    expected_source_head: str | None = None,
+    expected_deployment_operation: str | None = None,
 ) -> dict[str, Any]:
     payload = _load_object(path, label="overlay transaction snapshot")
+    fields = set(payload)
+    if fields == FULL_SNAPSHOT_FIELDS:
+        runtime_profile = FULL_RUNTIME_PROFILE
+        deployment_operation = "deploy"
+        source_head = ""
+    elif fields == PUBLIC_DOWNLOAD_SNAPSHOT_FIELDS:
+        runtime_profile = payload.get("runtimeProfile")
+        deployment_operation = payload.get("deploymentOperation")
+        source_head = payload.get("sourceHead")
+    else:
+        raise RuntimeError("overlay transaction snapshot contract is invalid")
     if (
         payload.get("contractName") != CONTRACT_NAME
         or payload.get("operation") != "snapshot"
         or payload.get("status") != "pass"
+        or runtime_profile not in {
+            FULL_RUNTIME_PROFILE,
+            PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+        }
+        or not isinstance(deployment_operation, str)
+        or DEPLOYMENT_OPERATION_PATTERN.fullmatch(deployment_operation) is None
+        or not isinstance(source_head, str)
+        or (
+            runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            and bool(payload.get("runtimePriorState"))
+            and SOURCE_HEAD_PATTERN.fullmatch(source_head) is None
+        )
+        or (
+            source_head
+            and SOURCE_HEAD_PATTERN.fullmatch(source_head) is None
+        )
         or not _same_path(payload.get("sourceRoot"), source_root)
         or not _same_path(payload.get("activeRoot"), active_root)
         or not isinstance(payload.get("activeExisted"), bool)
@@ -720,6 +908,20 @@ def _validated_snapshot(
         or not isinstance(payload.get("deployOverlayAuthority", {}), dict)
     ):
         raise RuntimeError("overlay transaction snapshot contract is invalid")
+    if (
+        expected_runtime_profile is not None
+        and runtime_profile != expected_runtime_profile
+    ):
+        raise RuntimeError("overlay transaction runtime profile conflicts with caller")
+    if expected_source_head is not None and source_head != expected_source_head:
+        raise RuntimeError("overlay transaction source HEAD conflicts with caller")
+    if (
+        expected_deployment_operation is not None
+        and deployment_operation != expected_deployment_operation
+    ):
+        raise RuntimeError(
+            "overlay transaction deployment operation conflicts with caller"
+        )
     if payload["activeExisted"]:
         fingerprint = payload["priorActiveFingerprint"]
         identity = payload["priorActiveIdentity"]
@@ -741,19 +943,31 @@ def validated_deploy_snapshot(
     *,
     source_root: Path,
     active_root: Path,
+    expected_runtime_profile: str | None = None,
+    expected_source_head: str | None = None,
+    expected_deployment_operation: str | None = None,
 ) -> dict[str, Any]:
     payload = _validated_snapshot(
         path,
         source_root=source_root.resolve(),
         active_root=overlay.normalized_absolute_path(active_root),
+        expected_runtime_profile=expected_runtime_profile,
+        expected_source_head=expected_source_head,
+        expected_deployment_operation=expected_deployment_operation,
     )
     payload["runtimePriorState"] = validate_runtime_prior_state(
         payload["runtimePriorState"]
     )
     authority = payload.get("deployOverlayAuthority")
-    if not isinstance(authority, dict) or set(authority) != DEPLOY_OVERLAY_AUTHORITY_FIELDS:
+    runtime_profile = payload.get("runtimeProfile", FULL_RUNTIME_PROFILE)
+    authority_fields = (
+        PUBLIC_DOWNLOAD_DEPLOY_OVERLAY_AUTHORITY_FIELDS
+        if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+        else DEPLOY_OVERLAY_AUTHORITY_FIELDS
+    )
+    if not isinstance(authority, dict) or set(authority) != authority_fields:
         raise RuntimeError("deploy overlay authority contract is invalid")
-    normalized_authority: dict[str, str] = {}
+    normalized_authority: dict[str, Any] = {}
     optional_prior_snapshot_fields = {
         "priorPortalProofAuthoritySnapshot",
         "priorPortalProofPublicSnapshot",
@@ -772,6 +986,55 @@ def validated_deploy_snapshot(
         if str(normalized) != value:
             raise RuntimeError(f"deploy overlay authority {field} is not canonical")
         normalized_authority[field] = value
+    if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+        prior_authority_existed = authority["priorActiveRuntimeAuthorityExisted"]
+        prior_authority_snapshot = authority[
+            "priorActiveRuntimeAuthoritySnapshotPath"
+        ]
+        prior_authority_sha256 = authority[
+            "priorActiveRuntimeAuthoritySnapshotSha256"
+        ]
+        if not isinstance(prior_authority_existed, bool):
+            raise RuntimeError(
+                "public-download prior runtime authority existence is invalid"
+            )
+        if prior_authority_existed:
+            if (
+                not isinstance(prior_authority_snapshot, str)
+                or not prior_authority_snapshot
+                or not Path(prior_authority_snapshot).is_absolute()
+                or not isinstance(prior_authority_sha256, str)
+                or LOWERCASE_SHA256_PATTERN.fullmatch(prior_authority_sha256)
+                is None
+            ):
+                raise RuntimeError(
+                    "public-download prior runtime authority snapshot is invalid"
+                )
+            normalized_snapshot = overlay.normalized_absolute_path(
+                Path(prior_authority_snapshot)
+            )
+            if str(normalized_snapshot) != prior_authority_snapshot:
+                raise RuntimeError(
+                    "public-download prior runtime authority snapshot is not canonical"
+                )
+            if _stable_file_sha256(
+                normalized_snapshot,
+                label="prior active runtime authority snapshot",
+            ) != prior_authority_sha256:
+                raise RuntimeError(
+                    "prior active runtime authority snapshot changed after snapshot"
+                )
+        elif prior_authority_snapshot != "" or prior_authority_sha256 != "":
+            raise RuntimeError(
+                "absent prior runtime authority claims snapshot authority"
+            )
+        normalized_authority.update(
+            {
+                "priorActiveRuntimeAuthorityExisted": prior_authority_existed,
+                "priorActiveRuntimeAuthoritySnapshotPath": prior_authority_snapshot,
+                "priorActiveRuntimeAuthoritySnapshotSha256": prior_authority_sha256,
+            }
+        )
     if normalized_authority["stagingRoot"] == str(
         overlay.normalized_absolute_path(active_root)
     ):
@@ -881,18 +1144,45 @@ def _validate_candidate_active_runtime_authority(
     candidate_portal_container_name: str,
     candidate_portal_image_id: str,
     proof_mount_sha256: str,
-    readiness_path: Path,
-    readiness_sha256: str,
+    readiness_path: Path | None,
+    readiness_sha256: str | None,
+    runtime_profile: str,
+    source_head: str = "",
+    deployment_operation: str = "",
+    public_projection_snapshot_id: str = "",
+    public_projection_snapshot_sha256: str = "",
+    public_projection_manifest_sha256: str = "",
 ) -> None:
     portal = payload.get("portal")
+    if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+        authority_fields = PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        readiness_binding_valid = (
+            payload.get("runtimeProfile")
+            == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            and payload.get("sourceHead") == source_head
+            and payload.get("deploymentOperation") == deployment_operation
+            and payload.get("publicProjectionSnapshotId")
+            == public_projection_snapshot_id
+            and payload.get("publicProjectionSnapshotSha256")
+            == public_projection_snapshot_sha256
+            and payload.get("publicProjectionManifestSha256")
+            == public_projection_manifest_sha256
+        )
+    else:
+        authority_fields = ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        readiness_binding_valid = (
+            readiness_path is not None
+            and readiness_sha256 is not None
+            and payload.get("installLinkingAuthorityReadinessPath")
+            == str(readiness_path)
+            and payload.get("installLinkingAuthorityReadinessSha256")
+            == readiness_sha256
+        )
     if (
-        set(payload) != ACTIVE_RUNTIME_AUTHORITY_FIELDS
+        set(payload) != authority_fields
         or payload.get("contractName") != ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME
         or payload.get("status") != "pass"
-        or payload.get("installLinkingAuthorityReadinessPath")
-        != str(readiness_path)
-        or payload.get("installLinkingAuthorityReadinessSha256")
-        != readiness_sha256
+        or not readiness_binding_valid
         or not isinstance(portal, dict)
         or set(portal) != ACTIVE_RUNTIME_PORTAL_FIELDS
         or portal.get("existed") is not True
@@ -921,9 +1211,10 @@ def complete_transaction(
     candidate_portal_container_id: str,
     candidate_portal_container_name: str,
     candidate_portal_image_id: str,
-    install_linking_authority_readiness: Path,
-    install_linking_authority_readiness_sha256: str,
+    install_linking_authority_readiness: Path | None,
+    install_linking_authority_readiness_sha256: str | None,
     shared_mutation_lock_token: str,
+    runtime_profile: str = FULL_RUNTIME_PROFILE,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
@@ -949,6 +1240,7 @@ def complete_transaction(
                 journal_path,
                 source_root=source_root,
                 active_root=active_root,
+                expected_runtime_profile=runtime_profile,
             )
             if payload.get("phase") != "tunnel_started":
                 raise RuntimeError(
@@ -966,27 +1258,62 @@ def complete_transaction(
                 raise RuntimeError(
                     "candidate portal authority conflicts with deployment journal"
                 )
-            readiness_evidence_root = _validate_owner_only_evidence_root(
-                install_linking_authority_readiness.parent,
-                label="private cutover evidence root",
-            )
-            readiness_path, readiness_sha256, _readiness = (
-                validate_install_linking_authority_readiness(
-                    install_linking_authority_readiness,
-                    expected_sha256=(
-                        install_linking_authority_readiness_sha256
-                    ),
-                    evidence_root=readiness_evidence_root,
+            if runtime_profile == FULL_RUNTIME_PROFILE:
+                if (
+                    install_linking_authority_readiness is None
+                    or install_linking_authority_readiness_sha256 is None
+                ):
+                    raise RuntimeError(
+                        "full runtime completion requires InstallLinking "
+                        "authority readiness"
+                    )
+                readiness_evidence_root = _validate_owner_only_evidence_root(
+                    install_linking_authority_readiness.parent,
+                    label="private cutover evidence root",
                 )
-            )
-            if readiness_path in {journal_path, runtime_authority_output}:
-                raise RuntimeError(
-                    "InstallLinking authority readiness path conflicts with "
-                    "transaction authority paths"
+                readiness_path, readiness_sha256, _readiness = (
+                    validate_install_linking_authority_readiness(
+                        install_linking_authority_readiness,
+                        expected_sha256=(
+                            install_linking_authority_readiness_sha256
+                        ),
+                        evidence_root=readiness_evidence_root,
+                    )
                 )
+                if readiness_path in {journal_path, runtime_authority_output}:
+                    raise RuntimeError(
+                        "InstallLinking authority readiness path conflicts with "
+                        "transaction authority paths"
+                    )
+            elif runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+                if (
+                    install_linking_authority_readiness is not None
+                    or install_linking_authority_readiness_sha256 is not None
+                ):
+                    raise RuntimeError(
+                        "public-download-only completion refuses an "
+                        "InstallLinking authority readiness binding"
+                    )
+                readiness_path = None
+                readiness_sha256 = None
+            else:
+                raise RuntimeError("active runtime profile is unsupported")
             proof_mount_sha256 = prior[
                 "expectedRuntimeProofBindSourceSha256"
             ]
+            source_head = str(payload.get("sourceHead") or "")
+            deployment_operation = str(
+                payload.get("deploymentOperation") or "deploy"
+            )
+            public_projection_snapshot_id = str(
+                prior["publicProjectionSnapshotId"]
+            )
+            public_projection_snapshot_sha256 = str(
+                prior["publicProjectionSnapshotSha256"]
+            )
+            public_projection_manifest_sha256 = str(
+                prior["publicProjectionManifestSha256"]
+            )
             existing_authority: dict[str, Any] | None = None
             if (
                 runtime_authority_output.exists()
@@ -1014,6 +1341,16 @@ def complete_transaction(
                     proof_mount_sha256=proof_mount_sha256,
                     readiness_path=readiness_path,
                     readiness_sha256=readiness_sha256,
+                    runtime_profile=runtime_profile,
+                    source_head=source_head,
+                    deployment_operation=deployment_operation,
+                    public_projection_snapshot_id=public_projection_snapshot_id,
+                    public_projection_snapshot_sha256=(
+                        public_projection_snapshot_sha256
+                    ),
+                    public_projection_manifest_sha256=(
+                        public_projection_manifest_sha256
+                    ),
                 )
             else:
                 active_authority = active_runtime_authority_payload(
@@ -1025,14 +1362,32 @@ def complete_transaction(
                     proof_authority_mount_sha256=proof_mount_sha256,
                     proof_public_mount_sha256=proof_mount_sha256,
                 )
-                active_authority.update(
-                    {
-                        "installLinkingAuthorityReadinessPath": str(
-                            readiness_path
-                        ),
-                        "installLinkingAuthorityReadinessSha256": readiness_sha256,
-                    }
-                )
+                if runtime_profile == FULL_RUNTIME_PROFILE:
+                    active_authority.update(
+                        {
+                            "installLinkingAuthorityReadinessPath": str(
+                                readiness_path
+                            ),
+                            "installLinkingAuthorityReadinessSha256": readiness_sha256,
+                        }
+                    )
+                else:
+                    active_authority.update(
+                        {
+                            "deploymentOperation": deployment_operation,
+                            "publicProjectionManifestSha256": (
+                                public_projection_manifest_sha256
+                            ),
+                            "publicProjectionSnapshotId": (
+                                public_projection_snapshot_id
+                            ),
+                            "publicProjectionSnapshotSha256": (
+                                public_projection_snapshot_sha256
+                            ),
+                            "runtimeProfile": PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+                            "sourceHead": source_head,
+                        }
+                    )
                 overlay.atomic_write_json(
                     runtime_authority_output,
                     active_authority,
@@ -1053,16 +1408,29 @@ def complete_transaction(
                 proof_mount_sha256=proof_mount_sha256,
                 readiness_path=readiness_path,
                 readiness_sha256=readiness_sha256,
+                runtime_profile=runtime_profile,
+                source_head=source_head,
+                deployment_operation=deployment_operation,
+                public_projection_snapshot_id=public_projection_snapshot_id,
+                public_projection_snapshot_sha256=(
+                    public_projection_snapshot_sha256
+                ),
+                public_projection_manifest_sha256=(
+                    public_projection_manifest_sha256
+                ),
             )
             journal_path.unlink()
             overlay.fsync_directory(journal_path.parent)
-    return {
+    result = {
         "contractName": CONTRACT_NAME,
         "operation": "complete",
         "status": "pass",
         "journalRetired": True,
         "activeRuntimeAuthority": str(runtime_authority_output),
     }
+    if runtime_profile == PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE:
+        result["runtimeProfile"] = PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+    return result
 
 
 def _activation_receipt_backup_hint(
@@ -1535,6 +1903,25 @@ def parse_args() -> argparse.Namespace:
     )
     snapshot_parser.add_argument("--prior-portal-proof-authority-snapshot", default="")
     snapshot_parser.add_argument("--prior-portal-proof-public-snapshot", default="")
+    snapshot_parser.add_argument(
+        "--runtime-profile",
+        choices=(FULL_RUNTIME_PROFILE, PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE),
+        default=FULL_RUNTIME_PROFILE,
+    )
+    snapshot_parser.add_argument("--deployment-operation", default="deploy")
+    snapshot_parser.add_argument("--source-head", default="")
+    snapshot_parser.add_argument(
+        "--prior-active-runtime-authority-existed",
+        choices=("0", "1"),
+    )
+    snapshot_parser.add_argument(
+        "--prior-active-runtime-authority-snapshot",
+        default="",
+    )
+    snapshot_parser.add_argument(
+        "--prior-active-runtime-authority-snapshot-sha256",
+        default="",
+    )
     complete_parser.add_argument(
         "--runtime-authority-output",
         type=Path,
@@ -1546,11 +1933,14 @@ def parse_args() -> argparse.Namespace:
     complete_parser.add_argument(
         "--install-linking-authority-readiness",
         type=Path,
-        required=True,
     )
     complete_parser.add_argument(
         "--install-linking-authority-readiness-sha256",
-        required=True,
+    )
+    complete_parser.add_argument(
+        "--runtime-profile",
+        choices=(FULL_RUNTIME_PROFILE, PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE),
+        default=FULL_RUNTIME_PROFILE,
     )
     phase_parser.add_argument("--phase", choices=TRANSACTION_PHASES, required=True)
     return parser.parse_args()
@@ -1616,6 +2006,22 @@ def main() -> int:
                     if args.prior_portal_proof_public_snapshot
                     else None
                 ),
+                runtime_profile=args.runtime_profile,
+                deployment_operation=args.deployment_operation,
+                source_head=args.source_head,
+                prior_active_runtime_authority_existed=(
+                    args.prior_active_runtime_authority_existed == "1"
+                    if args.prior_active_runtime_authority_existed is not None
+                    else None
+                ),
+                prior_active_runtime_authority_snapshot=(
+                    Path(args.prior_active_runtime_authority_snapshot)
+                    if args.prior_active_runtime_authority_snapshot
+                    else None
+                ),
+                prior_active_runtime_authority_snapshot_sha256=(
+                    args.prior_active_runtime_authority_snapshot_sha256 or None
+                ),
             )
         elif args.operation == "mark-phase":
             payload = mark_phase(
@@ -1640,6 +2046,7 @@ def main() -> int:
                 install_linking_authority_readiness_sha256=(
                     args.install_linking_authority_readiness_sha256
                 ),
+                runtime_profile=args.runtime_profile,
                 shared_mutation_lock_token=args.shared_mutation_lock_token,
             )
         else:

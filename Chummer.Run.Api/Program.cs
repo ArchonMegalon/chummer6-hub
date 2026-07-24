@@ -395,6 +395,14 @@ app.MapMethods("/api/ready", new[] { HttpMethods.Get, HttpMethods.Head }, (
             ? StatusCodes.Status200OK
             : StatusCodes.Status503ServiceUnavailable);
 });
+app.MapMethods("/api/ready/public-downloads", new[] { HttpMethods.Get, HttpMethods.Head }, (
+    HubDeepReadinessService readiness,
+    HttpContext context) =>
+{
+    PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    return PublicDownloadsReadinessEndpoint.CreateResult(readiness.Evaluate());
+});
 app.MapMethods("/api/ready/play-projection", new[] { HttpMethods.Get, HttpMethods.Head }, (
     PublicPlayProxyGateway playGateway) =>
 {

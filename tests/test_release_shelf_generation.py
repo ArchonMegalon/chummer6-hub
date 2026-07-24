@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
+import stat
 import subprocess
 import threading
 import time
@@ -482,6 +484,49 @@ def test_prepare_binds_every_shelf_url_and_records_complete_inventory(tmp_path: 
     MODULE.verify_generation(generation, pointer)
 
 
+def test_prepare_sidecar_active_layout_binds_current_generation_without_fabricated_journal(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    prepared = tmp_path / "prepared"
+
+    receipt = MODULE.prepare_sidecar_active_layout(
+        candidate,
+        prepared,
+        generation_id="generation-sidecar",
+        activated_at="2026-07-24T01:00:00Z",
+        activation_receipt_id="activation-sidecar",
+    )
+
+    pointer_bytes = (prepared / MODULE.CURRENT_POINTER).read_bytes()
+    pointer = json.loads(pointer_bytes)
+    assert (prepared / MODULE.LAYOUT_MARKER).read_bytes() == b"v1\n"
+    assert json.loads((prepared / MODULE.WRITER_POLICY).read_bytes()) == {
+        "schemaVersion": MODULE.SERVER_WRITER_POLICY_SCHEMA,
+        "mode": MODULE.SIDECAR_WRITER_POLICY_MODE,
+    }
+    assert not (prepared / ".release-shelf-activation-journal").exists()
+    assert not (prepared / MODULE.PROMOTION_LOCK).exists()
+    assert receipt["pointer"] == pointer
+    assert receipt["pointerSha256"] == MODULE.sha256_file(
+        prepared / MODULE.CURRENT_POINTER
+    )
+    assert (
+        (prepared / MODULE.CANONICAL_MANIFEST).read_bytes()
+        == (candidate / MODULE.CANONICAL_MANIFEST).read_bytes()
+    )
+    assert (
+        (prepared / MODULE.COMPATIBILITY_MANIFEST).read_bytes()
+        == (candidate / MODULE.COMPATIBILITY_MANIFEST).read_bytes()
+    )
+    assert receipt["canonicalMirrorSha256"] == MODULE.sha256_file(
+        prepared / MODULE.CANONICAL_MANIFEST
+    )
+    assert receipt["compatibilityMirrorSha256"] == MODULE.sha256_file(
+        prepared / MODULE.COMPATIBILITY_MANIFEST
+    )
+
+
 def test_filesystem_writer_refuses_server_journal_policy_before_staging(tmp_path: Path) -> None:
     candidate = write_candidate(tmp_path / "candidate")
     shelf = tmp_path / "downloads"
@@ -498,6 +543,31 @@ def test_filesystem_writer_refuses_server_journal_policy_before_staging(tmp_path
     )
 
     with pytest.raises(MODULE.ReleaseShelfError, match="staged HTTP server journal"):
+        MODULE.activate_filesystem(candidate, shelf, initialize_layout=True)
+
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+    assert not (shelf / MODULE.GENERATIONS_DIRECTORY).exists()
+    assert not list(shelf.glob(".release-shelf-stage-*"))
+
+
+def test_filesystem_writer_refuses_read_only_sidecar_policy_before_staging(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    shelf = tmp_path / "downloads"
+    shelf.mkdir()
+    (shelf / MODULE.WRITER_POLICY).write_text(
+        json.dumps(
+            {
+                "schemaVersion": MODULE.SERVER_WRITER_POLICY_SCHEMA,
+                "mode": MODULE.SIDECAR_WRITER_POLICY_MODE,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="unsupported"):
         MODULE.activate_filesystem(candidate, shelf, initialize_layout=True)
 
     assert not (shelf / MODULE.CURRENT_POINTER).exists()
@@ -729,8 +799,20 @@ def test_manifest_validator_rejects_non_exact_generation_install_routes(url: str
         )
 
 
-def test_shared_helper_accepts_cross_language_contract_fixture() -> None:
-    fixture = ROOT / "tests" / "fixtures" / "atomic_release_shelf_v1"
+def test_shared_helper_accepts_cross_language_contract_fixture(
+    tmp_path: Path,
+) -> None:
+    source = ROOT / "tests" / "fixtures" / "atomic_release_shelf_v1"
+    fixture = tmp_path / "atomic-release-shelf-v1"
+    shutil.copytree(source, fixture)
+    (fixture / MODULE.CURRENT_POINTER).chmod(MODULE.PUBLIC_METADATA_FILE_MODE)
+    (fixture / MODULE.LAYOUT_MARKER).chmod(MODULE.PUBLIC_METADATA_FILE_MODE)
+    pointer = MODULE.load_pointer(fixture / MODULE.CURRENT_POINTER)
+    MODULE._normalize_public_generation_modes(
+        fixture
+        / MODULE.GENERATIONS_DIRECTORY
+        / str(pointer["generationId"])
+    )
 
     state, generation_root, pointer = MODULE.resolve_shelf_root(fixture)
 
@@ -793,6 +875,155 @@ def test_filesystem_activation_requires_explicit_initialization_and_preserves_ge
     state, resolved, _ = MODULE.resolve_shelf_root(shelf)
     assert state == "generation"
     assert resolved == shelf / "generations" / "generation-b"
+
+
+def test_activation_publishes_runtime_bytes_for_a_distinct_uid_without_widening_source_candidate(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    candidate_entries = [candidate, *candidate.rglob("*")]
+    for path in reversed(candidate_entries):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    shelf = tmp_path / "shelf"
+
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-public-modes",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-public-modes",
+    )
+
+    generation = (
+        shelf / MODULE.GENERATIONS_DIRECTORY / pointer["generationId"]
+    )
+    shared_directories = [
+        shelf,
+        shelf / MODULE.GENERATIONS_DIRECTORY,
+    ]
+    sealed_directories = [
+        generation,
+        *[path for path in generation.rglob("*") if path.is_dir()],
+    ]
+    public_metadata = [
+        shelf / MODULE.CURRENT_POINTER,
+        shelf / MODULE.LAYOUT_MARKER,
+        *[
+            generation / name
+            for name in (
+                MODULE.ACTIVATION_CANDIDATE,
+                MODULE.CANONICAL_MANIFEST,
+                MODULE.COMPATIBILITY_MANIFEST,
+            )
+        ],
+    ]
+    sealed_files = [
+        path
+        for path in generation.rglob("*")
+        if path.is_file() and path not in public_metadata
+    ]
+    for directory in shared_directories:
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o2770
+    for directory in sealed_directories:
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o555
+    for path in public_metadata:
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+    for path in sealed_files:
+        assert stat.S_IMODE(path.stat().st_mode) == 0o444
+    assert stat.S_IMODE((shelf / MODULE.PROMOTION_LOCK).stat().st_mode) == 0o660
+    assert stat.S_IMODE(candidate.stat().st_mode) == 0o700
+    assert all(
+        stat.S_IMODE(path.stat().st_mode) == (0o700 if path.is_dir() else 0o600)
+        for path in candidate.rglob("*")
+    )
+
+    runtime_uid = shelf.stat().st_uid + 100_000
+    runtime_gid = shelf.stat().st_gid
+
+    def permission_bits(path: Path) -> int:
+        metadata = path.stat()
+        mode = stat.S_IMODE(metadata.st_mode)
+        if metadata.st_uid == runtime_uid:
+            return (mode >> 6) & 0o7
+        if metadata.st_gid == runtime_gid:
+            return (mode >> 3) & 0o7
+        return mode & 0o7
+
+    assert all(permission_bits(path) & 0o3 == 0o3 for path in shared_directories)
+    assert all(permission_bits(path) & 0o1 for path in sealed_directories)
+    assert all(permission_bits(path) & 0o4 for path in public_metadata)
+    assert all(permission_bits(path) & 0o4 for path in sealed_files)
+
+    sealed_files[-1].chmod(0o600)
+    with pytest.raises(MODULE.ReleaseShelfError, match="non-public mode"):
+        MODULE.verify_generation(generation, pointer)
+
+
+def test_same_intent_recovery_repairs_authenticated_prepatch_private_modes(
+    tmp_path: Path,
+) -> None:
+    candidate = write_candidate(tmp_path / "candidate")
+    shelf = tmp_path / "shelf"
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-private-mode-recovery",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-private-mode-recovery",
+        allow_orphan_generation_recovery=True,
+    )
+    generation = (
+        shelf / MODULE.GENERATIONS_DIRECTORY / pointer["generationId"]
+    )
+    generation_entries = [generation, *generation.rglob("*")]
+    for path in reversed(generation_entries):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    (shelf / MODULE.GENERATIONS_DIRECTORY).chmod(0o700)
+    (shelf / MODULE.CURRENT_POINTER).chmod(0o600)
+    (shelf / MODULE.LAYOUT_MARKER).chmod(0o600)
+    shelf.chmod(0o700)
+
+    recovered = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-private-mode-recovery",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-private-mode-recovery",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert recovered == pointer
+    assert stat.S_IMODE(shelf.stat().st_mode) == 0o2770
+    assert stat.S_IMODE(
+        (shelf / MODULE.GENERATIONS_DIRECTORY).stat().st_mode
+    ) == 0o2770
+    assert stat.S_IMODE(generation.stat().st_mode) == 0o555
+    assert all(
+        stat.S_IMODE(path.stat().st_mode) == 0o555
+        for path in generation.rglob("*")
+        if path.is_dir()
+    )
+    assert all(
+        stat.S_IMODE(path.stat().st_mode)
+        == (
+            0o644
+            if path.relative_to(generation).as_posix()
+            in {
+                MODULE.ACTIVATION_CANDIDATE,
+                MODULE.CANONICAL_MANIFEST,
+                MODULE.COMPATIBILITY_MANIFEST,
+            }
+            else 0o444
+        )
+        for path in generation.rglob("*")
+        if path.is_file()
+    )
+    assert stat.S_IMODE((shelf / MODULE.CURRENT_POINTER).stat().st_mode) == 0o644
+    assert stat.S_IMODE((shelf / MODULE.LAYOUT_MARKER).stat().st_mode) == 0o644
+    assert stat.S_IMODE((shelf / MODULE.PROMOTION_LOCK).stat().st_mode) == 0o660
 
 
 def test_marker_or_pointer_inconsistency_fails_closed_without_legacy_fallback(tmp_path: Path) -> None:
@@ -869,7 +1100,9 @@ def test_missing_or_corrupt_generation_fails_closed(tmp_path: Path) -> None:
         generation_id="generation-a",
     )
     artifact = shelf / "generations" / "generation-a" / "files" / "chummer-test-installer.exe"
+    artifact.chmod(0o644)
     artifact.write_bytes(b"tampered")
+    artifact.chmod(MODULE.SEALED_FILE_MODE)
 
     with pytest.raises(MODULE.ReleaseShelfError, match="mismatch"):
         MODULE.resolve_shelf_root(shelf)
@@ -892,6 +1125,268 @@ def test_generation_id_cannot_be_reused_even_with_identical_bytes(tmp_path: Path
             initialize_layout=False,
             generation_id="generation-a",
         )
+
+
+def test_same_intent_retry_recovers_generation_rename_before_pointer_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_write = MODULE._atomic_write_json
+    failed = False
+
+    def crash_before_pointer(path: Path, payload: dict[str, object]) -> None:
+        nonlocal failed
+        if path.name == MODULE.CURRENT_POINTER and not failed:
+            failed = True
+            raise RuntimeError("simulated pointer-write crash")
+        original_write(path, payload)
+
+    monkeypatch.setattr(MODULE, "_atomic_write_json", crash_before_pointer)
+    with pytest.raises(RuntimeError, match="pointer-write crash"):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-retry",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-retry",
+            allow_orphan_generation_recovery=True,
+        )
+
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+    assert (shelf / MODULE.LAYOUT_MARKER).read_bytes() == b"v1\n"
+    assert (
+        shelf / MODULE.GENERATIONS_DIRECTORY / "generation-retry"
+    ).is_dir()
+    assert len(
+        [
+            path
+            for path in shelf.iterdir()
+            if path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        ]
+    ) == 1
+
+    monkeypatch.setattr(MODULE, "_atomic_write_json", original_write)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retry",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-retry",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert pointer["generationId"] == "generation-retry"
+    assert MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER) == pointer
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+
+
+def test_same_intent_retry_recovers_marker_commit_before_pointer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_marker = MODULE._create_layout_marker
+    failed = False
+
+    def crash_after_marker(root: Path) -> None:
+        nonlocal failed
+        original_marker(root)
+        if not failed:
+            failed = True
+            raise RuntimeError("simulated marker crash")
+
+    monkeypatch.setattr(MODULE, "_create_layout_marker", crash_after_marker)
+    with pytest.raises(RuntimeError, match="marker crash"):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-marker-retry",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-marker-retry",
+            allow_orphan_generation_recovery=True,
+        )
+    assert (shelf / MODULE.LAYOUT_MARKER).read_bytes() == b"v1\n"
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+
+    monkeypatch.setattr(MODULE, "_create_layout_marker", original_marker)
+    MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-marker-retry",
+        activated_at="2026-07-23T12:00:00Z",
+        activation_receipt_id="receipt-marker-retry",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert (
+        MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER)["generationId"]
+        == "generation-marker-retry"
+    )
+
+
+def test_unknown_or_partial_activation_stage_residue_fails_closed(
+    tmp_path: Path,
+) -> None:
+    shelf = tmp_path / "shelf"
+    shelf.mkdir()
+    candidate = write_candidate(tmp_path / "candidate")
+    residue = shelf / f"{MODULE.ACTIVATION_STAGE_PREFIX}unknown"
+    residue.mkdir()
+    (residue / "partial").write_text("not a transaction\n", encoding="utf-8")
+
+    with pytest.raises(
+        MODULE.ReleaseShelfError,
+        match="unknown release shelf activation stage residue",
+    ):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-stage-reject",
+            activation_receipt_id="receipt-stage-reject",
+            allow_orphan_generation_recovery=True,
+        )
+
+    assert not (shelf / MODULE.CURRENT_POINTER).exists()
+    assert residue.is_dir()
+
+
+def test_committed_stage_is_atomically_retired_before_best_effort_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_rmtree = MODULE.shutil.rmtree
+
+    def fail_retired_cleanup(path: Path, *args, **kwargs) -> None:
+        if "-retired-activation-stage-" in Path(path).name:
+            raise OSError("simulated retired cleanup failure")
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", fail_retired_cleanup)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retired-cleanup",
+        activation_receipt_id="receipt-retired-cleanup",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert MODULE.load_pointer(shelf / MODULE.CURRENT_POINTER) == pointer
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+    retired = [
+        path
+        for path in shelf.parent.iterdir()
+        if "-retired-activation-stage-" in path.name
+    ]
+    assert len(retired) == 1
+    original_rmtree(retired[0])
+
+
+def test_internal_promotion_lock_remains_held_through_stage_retirement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_retire = MODULE._retire_activation_stage
+    observed_lock = False
+
+    def assert_lock_then_retire(stage_root: Path, shelf_root: Path) -> Path:
+        nonlocal observed_lock
+        descriptor = os.open(
+            shelf_root / MODULE.PROMOTION_LOCK,
+            os.O_RDWR,
+        )
+        try:
+            with pytest.raises(BlockingIOError):
+                MODULE.fcntl.flock(
+                    descriptor,
+                    MODULE.fcntl.LOCK_EX | MODULE.fcntl.LOCK_NB,
+                )
+            observed_lock = True
+        finally:
+            os.close(descriptor)
+        return original_retire(stage_root, shelf_root)
+
+    monkeypatch.setattr(
+        MODULE,
+        "_retire_activation_stage",
+        assert_lock_then_retire,
+    )
+    MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-lock-retirement",
+        activation_receipt_id="receipt-lock-retirement",
+    )
+
+    assert observed_lock is True
+
+
+def test_retry_after_process_death_during_retired_stage_cleanup_is_idempotent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "shelf"
+    candidate = write_candidate(tmp_path / "candidate")
+    original_rmtree = MODULE.shutil.rmtree
+
+    class SimulatedProcessDeath(BaseException):
+        pass
+
+    def die_during_retired_cleanup(path: Path, *args, **kwargs) -> None:
+        if "-retired-activation-stage-" in Path(path).name:
+            raise SimulatedProcessDeath()
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", die_during_retired_cleanup)
+    with pytest.raises(SimulatedProcessDeath):
+        MODULE.activate_filesystem(
+            candidate,
+            shelf,
+            initialize_layout=True,
+            generation_id="generation-retired-crash",
+            activated_at="2026-07-23T12:00:00Z",
+            activation_receipt_id="receipt-retired-crash",
+            allow_orphan_generation_recovery=True,
+        )
+    assert (shelf / MODULE.CURRENT_POINTER).is_file()
+    assert not any(
+        path.name.startswith(MODULE.ACTIVATION_STAGE_PREFIX)
+        for path in shelf.iterdir()
+    )
+
+    monkeypatch.setattr(MODULE.shutil, "rmtree", original_rmtree)
+    pointer = MODULE.activate_filesystem(
+        candidate,
+        shelf,
+        initialize_layout=True,
+        generation_id="generation-retired-crash",
+        activation_receipt_id="receipt-retired-crash",
+        allow_orphan_generation_recovery=True,
+    )
+
+    assert pointer["generationId"] == "generation-retired-crash"
+    for path in shelf.parent.iterdir():
+        if "-retired-activation-stage-" in path.name:
+            original_rmtree(path)
 
 
 def test_concurrent_pointer_readers_observe_only_complete_generation_a_or_b(

@@ -15,19 +15,23 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover]" >&2; exit 2 ;;
+  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
+PUBLIC_DOWNLOAD_ONLY_OPERATION=0
 if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=1
+elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover \
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover ]]; then
+  PUBLIC_DOWNLOAD_ONLY_OPERATION=1
 fi
 
 readonly TRUSTED_GIT="/usr/bin/git"
@@ -153,6 +157,8 @@ CANONICAL_DOCKER_CONFIG_ROOT="/docker/chummercomplete/.state/public-edge-docker-
 CANONICAL_FLEET_MEDIA_CONTRACTS="/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
 CANONICAL_DESIGN_PRODUCT_ROOT="/docker/chummercomplete/chummer-design"
 CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="/docker/chummercomplete/chummer.run-services/.codex-studio/published"
+CANONICAL_PUBLIC_DOWNLOAD_FLEET_SOURCE="/docker/fleet/.codex-studio/published"
+CANONICAL_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE="/docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json"
 BUILD_CONTEXT="${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-$CANONICAL_BUILD_CONTEXT}"
 COMPOSE_FILE_INPUT="${CHUMMER_PUBLIC_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
 COMPOSE_PROJECT="${CHUMMER_PUBLIC_EDGE_PROJECT_NAME:-$CANONICAL_COMPOSE_PROJECT}"
@@ -163,6 +169,7 @@ BASE_URL="${CHUMMER_PUBLIC_EDGE_BASE_URL:-$CANONICAL_BASE_URL}"
 RELEASE_CHANNEL_RECEIPT_INPUT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT-}"
 RELEASE_CHANNEL_RECEIPT_SHA256="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256-}"
 PROJECTION_SNAPSHOT_ROOT_INPUT="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT-}"
+PROJECTION_SNAPSHOT_TREE_SHA256="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_TREE_SHA256-}"
 RUNTIME_PROOF_BIND_SOURCE_SHA256="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
 INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY-}"
 INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256-}"
@@ -184,14 +191,20 @@ DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"
 CANONICAL_DEPLOY_LOCK_AUTH_ROOT="$DEPLOY_LOCK_ROOT/public-edge-lock-recovery-receipts"
 CANONICAL_DEPLOY_RECEIPT_ROOT="$DEPLOY_LOCK_ROOT/public-edge-deploy-receipts"
 CANONICAL_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-runtime-authority.json"
+PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/public-download-active-runtime-authority.json"
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
 CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-cutover"
+PUBLIC_DOWNLOAD_CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-public-download-cutover"
+PUBLIC_DOWNLOAD_CANDIDATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-public-download-candidate"
+PUBLIC_DOWNLOAD_OPERATION_ID="${CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID-}"
+PUBLIC_DOWNLOAD_OPERATION_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID"
 CANONICAL_RELEASE_SHELF_ROOT="/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 CUTOVER_RECOVERY_REEXEC=0
 CUTOVER_STEADY_HANDOFF=0
 CUTOVER_STATE_CLASSIFICATION=""
 RECOVERY_ROUTE_REQUESTED=0
 if [[ "$DEPLOY_OPERATION" == recover \
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
   || -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
 fi
@@ -299,13 +312,23 @@ if [[ ! -f "$TRUSTED_PROJECTION_VERIFIER" || -L "$TRUSTED_PROJECTION_VERIFIER" ]
   echo "audited public projection verifier is missing or symlinked" >&2
   exit 2
 fi
+projection_purpose="code-deploy"
+projection_output_args=(
+  --output-name HUB_LOCAL_RELEASE_PROOF.generated.json
+  --output-name RELEASE_CHANNEL.generated.json
+)
+if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+  projection_purpose="candidate-import"
+  projection_output_args+=(
+    --output-name RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json
+  )
+fi
 if ! projection_resolution_json="$(
   "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
     "$TRUSTED_PYTHON" -I "$TRUSTED_PROJECTION_VERIFIER" \
       --resolve-current "$PROJECTION_SNAPSHOT_ROOT" \
-      --purpose code-deploy \
-      --output-name HUB_LOCAL_RELEASE_PROOF.generated.json \
-      --output-name RELEASE_CHANNEL.generated.json
+      --purpose "$projection_purpose" \
+      "${projection_output_args[@]}"
 )"; then
   echo "authenticated CURRENT public projection is unavailable" >&2
   exit 2
@@ -316,9 +339,11 @@ if ! projection_binding="$(
       "$TRUSTED_PYTHON" -I -c '
 import json, re, sys
 payload = json.load(sys.stdin)
+purpose = sys.argv[1]
 outputs = payload.get("outputs") or {}
 proof_output = outputs.get("HUB_LOCAL_RELEASE_PROOF.generated.json") or {}
 release_output = outputs.get("RELEASE_CHANNEL.generated.json") or {}
+candidate_output = outputs.get("RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json") or {}
 snapshot_id = str(payload.get("snapshotId") or "")
 snapshot_sha = str(payload.get("snapshotSha256") or "")
 manifest_sha = str(payload.get("manifestSha256") or "")
@@ -328,19 +353,28 @@ proof_path = str(proof_output.get("path") or "")
 proof_digest = str(proof_output.get("sha256") or "")
 release_path = str(release_output.get("path") or "")
 release_digest = str(release_output.get("sha256") or "")
+candidate_path = str(candidate_output.get("path") or "")
+candidate_digest = str(candidate_output.get("sha256") or "")
 valid_authority = (
-    payload.get("codeDeploymentAuthority") is True
-    and (
-        (
-            status == "pass"
-            and stage == "release_upload_ready"
-            and payload.get("releaseUploadAuthority") is True
-        )
-        or (
-            status == "review_required"
-            and stage == "code_deploy_review_required"
-            and payload.get("releaseUploadAuthority") is False
-        )
+    (
+        purpose == "code-deploy"
+        and payload.get("codeDeploymentAuthority") is True
+        and status == "review_required"
+        and stage == "code_deploy_review_required"
+        and payload.get("releaseUploadAuthority") is False
+        and payload.get("candidateImportAuthority") is False
+    )
+    or (
+        purpose == "candidate-import"
+        and payload.get("candidateImportAuthority") is True
+        and payload.get("codeDeploymentAuthority") is False
+        and payload.get("releaseUploadAuthority") is False
+        and status == "candidate_import_ready"
+        and stage == "candidate_import_ready"
+        and candidate_output.get("name")
+            == "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+        and re.fullmatch(r"[0-9a-f]{64}", candidate_digest) is not None
+        and "|" not in candidate_path
     )
 )
 if (
@@ -369,11 +403,13 @@ print(
             proof_digest,
             release_path,
             release_digest,
+            candidate_path,
+            candidate_digest,
         )
     ),
     end="",
 )
-'
+' "$projection_purpose"
 )"; then
   echo "authenticated CURRENT public projection resolution is malformed" >&2
   exit 2
@@ -383,6 +419,8 @@ IFS='|' read -r PUBLIC_PROJECTION_SNAPSHOT_ID PUBLIC_PROJECTION_SNAPSHOT_SHA256 
   PUBLIC_PROJECTION_STAGE \
   RUNTIME_PROOF_BIND_SOURCE AUTHENTICATED_RUNTIME_PROOF_SHA256 \
   RELEASE_CHANNEL_RECEIPT AUTHENTICATED_RELEASE_CHANNEL_SHA256 \
+  PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY \
+  AUTHENTICATED_CANDIDATE_IMPORT_AUTHORITY_SHA256 \
   <<<"$projection_binding"
 if [[ "$RUNTIME_PROOF_BIND_SOURCE" \
     != "$PROJECTION_SNAPSHOT_ROOT/$PUBLIC_PROJECTION_SNAPSHOT_ID/HUB_LOCAL_RELEASE_PROOF.generated.json" \
@@ -400,7 +438,15 @@ if [[ "$RELEASE_CHANNEL_RECEIPT" \
   echo "authenticated CURRENT release channel is unavailable" >&2
   exit 2
 fi
-  if [[ "$PUBLIC_PROJECTION_STATUS" != review_required \
+  if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+    if [[ "$PUBLIC_PROJECTION_STATUS" != candidate_import_ready \
+      || "$PUBLIC_PROJECTION_STAGE" != candidate_import_ready \
+      || "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY" \
+        != "$PROJECTION_SNAPSHOT_ROOT/$PUBLIC_PROJECTION_SNAPSHOT_ID/RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json" ]]; then
+      echo "public-download cutover requires the bounded candidate-import snapshot" >&2
+      exit 2
+    fi
+  elif [[ "$PUBLIC_PROJECTION_STATUS" != review_required \
     || "$PUBLIC_PROJECTION_STAGE" != code_deploy_review_required ]]; then
     echo "new public edge deploy requires the bounded review-required code-deploy snapshot" >&2
     exit 2
@@ -795,6 +841,281 @@ if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_RECEIPT_ROOT")" \
 fi
 if [[ -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
+fi
+if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+  PUBLIC_DOWNLOAD_CONTROLLER="$SOURCE_ROOT/scripts/deploy_public_download_only_cutover.py"
+  PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY-}"
+  PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256-}"
+  PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT-}"
+  PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY-}"
+  PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256-}"
+  PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT-}"
+  PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID-}"
+  PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID-}"
+  PUBLIC_DOWNLOAD_RESTORATION_SPEC_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_MANIFEST_CLOSURE_RESTORATION_SPEC-}"
+  PUBLIC_DOWNLOAD_RESTORATION_SPEC_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_MANIFEST_CLOSURE_RESTORATION_SPEC_SHA256-}"
+  PUBLIC_DOWNLOAD_FINAL_GOLD_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE:-$CANONICAL_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE}"
+  PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256-}"
+  PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE:-$CANONICAL_PUBLIC_DOWNLOAD_FLEET_SOURCE}"
+  PUBLIC_DOWNLOAD_FLEET_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256-}"
+  PUBLIC_DOWNLOAD_DELIVERY_PHASE="${CHUMMER_PUBLIC_DOWNLOAD_DELIVERY_PHASE-}"
+  if [[ ! "$PUBLIC_DOWNLOAD_OPERATION_ID" \
+    =~ ^[a-z0-9][a-z0-9-]{7,63}$ ]]; then
+    echo "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID must be a caller-generated retry-unique identifier" >&2
+    exit 2
+  fi
+  if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || ! -O "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || "$("$TRUSTED_STAT" -c '%h' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" != 1 ]]; then
+    echo "audited public-download cutover controller is unsafe" >&2
+    exit 2
+  fi
+  if ! public_download_controller_mode="$("$TRUSTED_STAT" -c '%a' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" \
+    || [[ ! "$public_download_controller_mode" =~ ^[0-7]{3,4}$ ]] \
+    || (( (8#$public_download_controller_mode & 8#022) != 0 )); then
+    echo "audited public-download cutover controller is group- or world-writable" >&2
+    exit 2
+  fi
+  if [[ ! "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ \
+    || ! "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID" \
+      =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    echo "public-download Cloudflare account and tunnel identifiers are invalid" >&2
+    exit 2
+  fi
+  if [[ "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" != /* \
+    || "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" == *$'\n'* \
+    || "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" == *'|'* ]]; then
+    echo "public-download Cloudflare credentials file path is required" >&2
+    exit 2
+  fi
+  if ! PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS="$(
+    "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT"
+  )" \
+    || [[ "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+      != "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT" ]]; then
+    echo "public-download Cloudflare credentials file must use an exact canonical path" >&2
+    exit 2
+  fi
+  if [[ ! -f "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || -L "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || ! -O "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || ! -r "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS" \
+    || "$("$TRUSTED_STAT" -c '%h' -- \
+      "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS")" != 1 ]]; then
+    echo "public-download Cloudflare credentials file metadata is unsafe" >&2
+    exit 2
+  fi
+  if ! public_download_cloudflare_credentials_mode="$(
+    "$TRUSTED_STAT" -c '%a' -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+  )" \
+    || [[ ! "$public_download_cloudflare_credentials_mode" \
+      =~ ^[0-7]{3,4}$ ]] \
+    || (( (8#$public_download_cloudflare_credentials_mode & 8#077) != 0 )); then
+    echo "public-download Cloudflare credentials file must be owner-only" >&2
+    exit 2
+  fi
+  if ! public_download_cloudflare_credentials_size="$(
+    "$TRUSTED_STAT" -c '%s' -- "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+  )" \
+    || [[ ! "$public_download_cloudflare_credentials_size" =~ ^[0-9]+$ ]] \
+    || ((public_download_cloudflare_credentials_size < 1 \
+      || public_download_cloudflare_credentials_size > 65536)); then
+    echo "public-download Cloudflare credentials file size is invalid" >&2
+    exit 2
+  fi
+  if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+    if [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" != /* \
+      || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *$'\n'* \
+      || "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" == *'|'* \
+      || ! "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "public-download migration authority path and independent SHA-256 are required" >&2
+      exit 2
+    fi
+    if [[ "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" != /* \
+      || "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" == *$'\n'* \
+      || "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" == *'|'* \
+      || ! -d "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" \
+      || -L "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" \
+      || "$("$TRUSTED_REALPATH" -e -- \
+        "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT")" \
+        != "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT" ]]; then
+      echo "public-download sealed release candidate root is unsafe" >&2
+      exit 2
+    fi
+    PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT="$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT"
+    if [[ "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_INPUT" \
+        != "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY" \
+      || "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256" \
+        != "$AUTHENTICATED_CANDIDATE_IMPORT_AUTHORITY_SHA256" ]]; then
+      echo "candidate-import authority does not match the authenticated projection snapshot" >&2
+      exit 2
+    fi
+    if [[ "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT" \
+        != "${PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT%/*}/UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json" \
+      || ! "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256" \
+        =~ ^[0-9a-f]{64}$ \
+      || ! -f "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT" \
+      || -L "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT" \
+      || ! -O "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT" \
+      || "$("$TRUSTED_REALPATH" -e -- \
+        "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT")" \
+        != "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT" ]]; then
+      echo "public-download direct-import receipt is unsafe or not adjacent to the bundle" >&2
+      exit 2
+    fi
+    PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT="$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT"
+    if [[ ! "$PROJECTION_SNAPSHOT_TREE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_TREE_SHA256 is required" >&2
+      exit 2
+    fi
+    PUBLIC_DOWNLOAD_PROJECTION_SOURCE="$PROJECTION_SNAPSHOT_ROOT/$PUBLIC_PROJECTION_SNAPSHOT_ID"
+    if ! PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$(
+      "$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
+    )" \
+      || [[ "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY" \
+        != "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT" ]]; then
+      echo "public-download migration authority must be an exact canonical path" >&2
+      exit 2
+    fi
+    for public_download_file_input in \
+      "$PUBLIC_DOWNLOAD_RESTORATION_SPEC_INPUT" \
+      "$PUBLIC_DOWNLOAD_FINAL_GOLD_INPUT"; do
+      if [[ "$public_download_file_input" != /* \
+        || "$public_download_file_input" == *$'\n'* \
+        || "$public_download_file_input" == *'|'* \
+        || ! -f "$public_download_file_input" \
+        || -L "$public_download_file_input" \
+        || ! -O "$public_download_file_input" \
+        || "$("$TRUSTED_STAT" -c '%h' -- "$public_download_file_input")" != 1 \
+        || "$("$TRUSTED_REALPATH" -e -- "$public_download_file_input")" \
+          != "$public_download_file_input" ]]; then
+        echo "public-download file input is unsafe" >&2
+        exit 2
+      fi
+    done
+    if [[ ! "$PUBLIC_DOWNLOAD_RESTORATION_SPEC_SHA256" =~ ^[0-9a-f]{64}$ \
+      || ! "$PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256" =~ ^[0-9a-f]{64}$ \
+      || ! "$PUBLIC_DOWNLOAD_FLEET_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "public-download restoration/final-gold/fleet SHA-256 inputs are required" >&2
+      exit 2
+    fi
+    if [[ "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" != /* \
+      || "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" == *$'\n'* \
+      || "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" == *'|'* \
+      || ! -d "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" \
+      || -L "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" \
+      || "$("$TRUSTED_REALPATH" -e -- "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT")" \
+        != "$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT" ]]; then
+      echo "public-download fleet source is unsafe" >&2
+      exit 2
+    fi
+    if [[ "$PUBLIC_DOWNLOAD_DELIVERY_PHASE" != "bootstrap" \
+      && "$PUBLIC_DOWNLOAD_DELIVERY_PHASE" != "windows-preview" ]]; then
+      echo "public-download delivery phase must be bootstrap or windows-preview" >&2
+      exit 2
+    fi
+    PUBLIC_DOWNLOAD_RESTORATION_SPEC="$PUBLIC_DOWNLOAD_RESTORATION_SPEC_INPUT"
+    PUBLIC_DOWNLOAD_FINAL_GOLD="$PUBLIC_DOWNLOAD_FINAL_GOLD_INPUT"
+    PUBLIC_DOWNLOAD_FLEET_SOURCE="$PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT"
+  else
+    PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY="$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_INPUT"
+    PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT="${PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT:-/nonexistent/topology-b-release-candidate}"
+    PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY="${PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_INPUT:-/nonexistent/topology-b-candidate-import-authority}"
+    PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256="${PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT="${PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT:-/nonexistent/topology-b-direct-import-receipt}"
+    PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256="${PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_PROJECTION_SOURCE="${PROJECTION_SNAPSHOT_ROOT}/${PUBLIC_PROJECTION_SNAPSHOT_ID:-nonexistent-topology-b-projection}"
+    PROJECTION_SNAPSHOT_TREE_SHA256="${PROJECTION_SNAPSHOT_TREE_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_RESTORATION_SPEC="${PUBLIC_DOWNLOAD_RESTORATION_SPEC_INPUT:-/nonexistent/topology-b-restoration-spec}"
+    PUBLIC_DOWNLOAD_RESTORATION_SPEC_SHA256="${PUBLIC_DOWNLOAD_RESTORATION_SPEC_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_FINAL_GOLD="${PUBLIC_DOWNLOAD_FINAL_GOLD_INPUT:-/nonexistent/topology-b-final-gold}"
+    PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256="${PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_FLEET_SOURCE="${PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT:-/nonexistent/topology-b-fleet}"
+    PUBLIC_DOWNLOAD_FLEET_SHA256="${PUBLIC_DOWNLOAD_FLEET_SHA256:-0000000000000000000000000000000000000000000000000000000000000000}"
+    PUBLIC_DOWNLOAD_DELIVERY_PHASE="${PUBLIC_DOWNLOAD_DELIVERY_PHASE:-windows-preview}"
+  fi
+  if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    || (-e "$CANONICAL_DOCKER_CONFIG_ROOT" \
+      && (! -d "$CANONICAL_DOCKER_CONFIG_ROOT" || ! -O "$CANONICAL_DOCKER_CONFIG_ROOT")) ]]; then
+    echo "canonical public edge Docker configuration root is unsafe" >&2
+    exit 2
+  fi
+  "$TRUSTED_INSTALL" -d -m 0700 -- \
+    "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/home" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/config"
+  "$TRUSTED_CHMOD" 0700 -- \
+    "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/home" \
+    "$CANONICAL_DOCKER_CONFIG_ROOT/config"
+  public_download_controller_args=(
+    --operation "$DEPLOY_OPERATION"
+    --source-root "$SOURCE_ROOT"
+    --source-head "${EXPECTED_HEAD,,}"
+    --shared-mutation-lock-token "$deploy_lock_owner_token"
+    --shelf-root "$CANONICAL_RELEASE_SHELF_ROOT"
+    --migration-candidate-root "$PUBLIC_DOWNLOAD_CANDIDATE_ROOT"
+    --migration-authority "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY"
+    --migration-authority-sha256 "$PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256"
+    --release-candidate-root "$PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT"
+    --candidate-import-authority "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY"
+    --candidate-import-authority-sha256 "$PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256"
+    --direct-import-receipt "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT"
+    --direct-import-receipt-sha256 "$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256"
+    --manifest-closure-restoration-spec "$PUBLIC_DOWNLOAD_RESTORATION_SPEC"
+    --manifest-closure-restoration-spec-sha256 "$PUBLIC_DOWNLOAD_RESTORATION_SPEC_SHA256"
+    --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
+    --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+    --projection-snapshot-root "$PUBLIC_DOWNLOAD_PROJECTION_SOURCE"
+    --projection-snapshot-id "$PUBLIC_PROJECTION_SNAPSHOT_ID"
+    --projection-snapshot-sha256 "$PUBLIC_PROJECTION_SNAPSHOT_SHA256"
+    --projection-snapshot-tree-sha256 "$PROJECTION_SNAPSHOT_TREE_SHA256"
+    --projection-manifest-sha256 "$PUBLIC_PROJECTION_MANIFEST_SHA256"
+    --runtime-proof-source "$RUNTIME_PROOF_BIND_SOURCE"
+    --runtime-proof-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
+    --final-gold-source "$PUBLIC_DOWNLOAD_FINAL_GOLD"
+    --final-gold-sha256 "$PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256"
+    --fleet-source "$PUBLIC_DOWNLOAD_FLEET_SOURCE"
+    --fleet-sha256 "$PUBLIC_DOWNLOAD_FLEET_SHA256"
+    --operation-root "$PUBLIC_DOWNLOAD_OPERATION_ROOT"
+    --active-runtime-authority "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY"
+    --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT"
+    --cloudflare-credentials-file "$PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS"
+    --cloudflare-account-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID"
+    --cloudflare-tunnel-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID"
+    --receipt-root "$CANONICAL_DEPLOY_RECEIPT_ROOT"
+    --base-url "$BASE_URL"
+    --build-context "$BUILD_CONTEXT"
+    --fleet-media-contracts "$FLEET_MEDIA_CONTRACTS"
+    --design-product-root "$DESIGN_PRODUCT_ROOT"
+    --delivery-phase "$PUBLIC_DOWNLOAD_DELIVERY_PHASE"
+    --ready-timeout-seconds "$PORTAL_READY_TIMEOUT_SECONDS"
+  )
+  public_download_controller_status=0
+  "$TRUSTED_ENV" -i \
+    PATH=/usr/bin:/bin LANG=C LC_ALL=C \
+    "$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    "${public_download_controller_args[@]}" \
+    || public_download_controller_status=$?
+  if ((public_download_controller_status == 76)); then
+    deploy_lock_active=0
+    echo "public-download recovery is uncertain; authenticated mutation lock retained" >&2
+    exit 76
+  fi
+  if ((public_download_controller_status != 0)); then
+    echo "public-download cutover failed after exact recovery or before live mutation" >&2
+    exit "$public_download_controller_status"
+  fi
+  if ! release_deploy_lock; then
+    deploy_lock_active=0
+    trap - EXIT
+    echo "public-download cutover completed but deployment lock release failed" >&2
+    exit 70
+  fi
+  trap - EXIT
+  exit 0
 fi
 INSTALL_LINKING_CUTOVER_BOUNDARY=""
 if ((RECOVERY_ROUTE_REQUESTED == 0)); then

@@ -133,6 +133,8 @@ class SimulatedHardCrash(BaseException):
 def prepare_deploy_activation(
     module,
     tmp_path: Path,
+    *,
+    runtime_profile: str | None = None,
 ) -> tuple[Path, Path, Path, Path, Path, dict[str, int]]:
     source_root = tmp_path / "source"
     active_root = tmp_path / "overlay" / "app"
@@ -149,6 +151,16 @@ def prepare_deploy_activation(
         active_root,
         label="active root",
     )
+    profile_arguments: dict[str, object] = {}
+    if runtime_profile is not None:
+        profile_arguments = {
+            "runtime_profile": runtime_profile,
+            "deployment_operation": (
+                "initial-release-shelf-public-download-cutover"
+            ),
+            "source_head": "d" * 40,
+            "prior_active_runtime_authority_existed": False,
+        }
     module.snapshot(
         source_root=source_root,
         active_root=active_root,
@@ -158,6 +170,7 @@ def prepare_deploy_activation(
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
+        **profile_arguments,
         **deploy_proof_authority(tmp_path),
     )
     return (
@@ -706,6 +719,34 @@ def test_transaction_phase_journal_is_monotonic(tmp_path: Path, monkeypatch) -> 
     assert json.loads(journal.read_text(encoding="utf-8"))["phase"] == "tunnel_drained"
 
 
+def test_default_full_snapshot_preserves_legacy_exact_field_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        _source_root,
+        _active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(module, tmp_path)
+    payload = json.loads(journal.read_text(encoding="utf-8"))
+
+    assert set(payload) == module.FULL_SNAPSHOT_FIELDS
+    assert set(payload["deployOverlayAuthority"]) == (
+        module.DEPLOY_OVERLAY_AUTHORITY_FIELDS
+    )
+    assert "runtimeProfile" not in payload
+    assert "deploymentOperation" not in payload
+    assert "sourceHead" not in payload
+    assert "priorActiveRuntimeAuthorityExisted" not in (
+        payload["deployOverlayAuthority"]
+    )
+
+
 def test_deploy_snapshot_rejects_inconsistent_runtime_prior_state(
     tmp_path: Path,
     monkeypatch,
@@ -1244,6 +1285,109 @@ module.complete_transaction(
     )
 
 
+def test_public_download_only_completion_neither_requires_nor_claims_install_linking_authority(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        source_root,
+        active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(
+        module,
+        tmp_path,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
+    for phase in module.TRANSACTION_PHASES[1:]:
+        module.mark_phase(
+            source_root=source_root,
+            active_root=active_root,
+            journal_path=journal,
+            phase=phase,
+            shared_mutation_lock_token="9" * 64,
+        )
+    evidence_root = tmp_path / "runtime-evidence"
+    evidence_root.mkdir(mode=0o700)
+    evidence_root.chmod(0o700)
+    authority_path = evidence_root / "active-runtime-authority.json"
+
+    receipt = module.complete_transaction(
+        source_root=source_root,
+        active_root=active_root,
+        journal_path=journal,
+        runtime_authority_output=authority_path,
+        candidate_portal_container_id=CANDIDATE_PORTAL_ID,
+        candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
+        candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
+        install_linking_authority_readiness=None,
+        install_linking_authority_readiness_sha256=None,
+        shared_mutation_lock_token="9" * 64,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
+
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    assert receipt["runtimeProfile"] == "public-download-only"
+    assert set(authority) == (
+        module.PUBLIC_DOWNLOAD_ONLY_ACTIVE_RUNTIME_AUTHORITY_FIELDS
+    )
+    assert authority["runtimeProfile"] == "public-download-only"
+    assert authority["sourceHead"] == "d" * 40
+    assert (
+        authority["deploymentOperation"]
+        == "initial-release-shelf-public-download-cutover"
+    )
+    assert authority["publicProjectionSnapshotId"] == (
+        runtime_prior_state()["publicProjectionSnapshotId"]
+    )
+    assert "installLinkingAuthorityReadinessPath" not in authority
+    assert "installLinkingAuthorityReadinessSha256" not in authority
+    assert not journal.exists()
+
+
+def test_runtime_profile_and_source_binding_reject_cross_profile_recovery(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    disable_host_locks(module, monkeypatch)
+    (
+        source_root,
+        active_root,
+        _staging_root,
+        _backup_root,
+        journal,
+        _prior_identity,
+    ) = prepare_deploy_activation(
+        module,
+        tmp_path,
+        runtime_profile=module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE,
+    )
+
+    with pytest.raises(RuntimeError, match="runtime profile conflicts"):
+        module.validated_deploy_snapshot(
+            journal,
+            source_root=source_root,
+            active_root=active_root,
+            expected_runtime_profile=module.FULL_RUNTIME_PROFILE,
+        )
+    with pytest.raises(RuntimeError, match="source HEAD conflicts"):
+        module.validated_deploy_snapshot(
+            journal,
+            source_root=source_root,
+            active_root=active_root,
+            expected_runtime_profile=(
+                module.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
+            ),
+            expected_source_head="e" * 40,
+        )
+    assert journal.is_file()
+
+
 def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
     script_path = ROOT / "scripts" / "deploy_public_edge_portal.sh"
     script = script_path.read_text(encoding="utf-8")
@@ -1318,8 +1462,8 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
         "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied"
         not in script
     )
-    assert script.count('--release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"') == 7
-    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 7
+    assert script.count('--release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"') == 8
+    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 8
     assert "public_edge_deploy_recovery.py" in script
     assert "run_deploy_recovery" in script
     assert 'DEPLOY_OPERATION="${1:-deploy}"' in script

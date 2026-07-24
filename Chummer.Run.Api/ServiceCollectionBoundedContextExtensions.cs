@@ -236,7 +236,9 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
-        if (environment.IsProduction())
+        bool publicDownloadOnly = environment.IsProduction()
+            && configuration.GetValue<bool>("CHUMMER_PUBLIC_DOWNLOAD_ONLY");
+        if (environment.IsProduction() && !publicDownloadOnly)
         {
             services.AddSingleton(_ => new InstallLinkingPostgresRuntime(
                 InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(

@@ -18,11 +18,12 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator
+from typing import Any, BinaryIO, Iterator
 from urllib.parse import quote, unquote, urlsplit
 from urllib.request import Request, urlopen
 
@@ -33,11 +34,14 @@ LAYOUT_MARKER = ".release-shelf-layout-v1"
 CURRENT_POINTER = "current.json"
 GENERATIONS_DIRECTORY = "generations"
 PROMOTION_LOCK = ".release-shelf-promotion.lock"
+ACTIVATION_STAGE_PREFIX = ".release-shelf-stage-"
 WRITER_POLICY = ".release-shelf-writer-policy.json"
 SERVER_WRITER_POLICY_SCHEMA = "chummer.release-shelf.writer-policy/v1"
 SERVER_WRITER_POLICY_MODE = "server-journal-v1"
+SIDECAR_WRITER_POLICY_MODE = "sidecar-readonly-v1"
 CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
 COMPATIBILITY_MANIFEST = "releases.json"
+PUBLICATION_SCOPE = "PUBLICATION_SCOPE.generated.json"
 ACTIVATION_CANDIDATE = "activation-candidate.json"
 SAFE_GENERATION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -45,6 +49,7 @@ PORTABLE_INVENTORY_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,254}$")
 COPYABLE_FILES = {
     CANONICAL_MANIFEST,
     COMPATIBILITY_MANIFEST,
+    PUBLICATION_SCOPE,
     "aur-packages.json",
 }
 COPYABLE_DIRECTORIES = {
@@ -69,10 +74,69 @@ ALLOWED_GENERATION_ROUTE_ROOTS = {
     "release-evidence",
 }
 PROOF_ROUTE_KEYS = frozenset({"proofRoutes", "proof_routes"})
+SEALED_DIRECTORY_MODE = 0o555
+SEALED_FILE_MODE = 0o444
+PUBLIC_METADATA_FILE_MODE = 0o644
+SHARED_DIRECTORY_MODE = 0o2770
+SHARED_CONTROL_FILE_MODE = 0o660
+PUBLIC_GENERATION_METADATA = {
+    ACTIVATION_CANDIDATE,
+    CANONICAL_MANIFEST,
+    COMPATIBILITY_MANIFEST,
+    PUBLICATION_SCOPE,
+}
 
 
 class ReleaseShelfError(RuntimeError):
     """Raised when a shelf or candidate fails closed."""
+
+
+def _stage_intent_name(generation_id: str, activation_receipt_id: str) -> str:
+    generation_id = validate_generation_id(generation_id)
+    activation_receipt_id = validate_generation_id(activation_receipt_id)
+    digest = hashlib.sha256(
+        canonical_json_bytes(
+            {
+                "activationReceiptId": activation_receipt_id,
+                "generationId": generation_id,
+            }
+        )
+    ).hexdigest()
+    return f"{ACTIVATION_STAGE_PREFIX}{digest[:32]}"
+
+
+class _PromotionLockLease:
+    """Opaque proof that this process still owns the canonical shelf lock."""
+
+    __slots__ = ("_handle", "_lock_path", "_identity")
+
+    def __init__(self, handle: BinaryIO, lock_path: Path) -> None:
+        self._handle = handle
+        self._lock_path = lock_path
+        metadata = os.fstat(handle.fileno())
+        self._identity = (metadata.st_dev, metadata.st_ino)
+
+    def validate_for(self, shelf_root: Path) -> None:
+        expected = (shelf_root.resolve(strict=True) / PROMOTION_LOCK)
+        if expected != self._lock_path:
+            raise ReleaseShelfError(
+                "promotion lock lease is bound to a different release shelf"
+            )
+        try:
+            opened = os.fstat(self._handle.fileno())
+            linked = self._lock_path.lstat()
+        except (OSError, ValueError) as exc:
+            raise ReleaseShelfError("promotion lock lease is no longer active") from exc
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(linked.st_mode)
+            or (opened.st_dev, opened.st_ino) != self._identity
+            or (linked.st_dev, linked.st_ino) != self._identity
+            or opened.st_nlink != 1
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != SHARED_CONTROL_FILE_MODE
+        ):
+            raise ReleaseShelfError("promotion lock lease identity changed")
 
 
 def refuse_server_managed_filesystem_shelf(shelf_root: Path) -> None:
@@ -151,9 +215,16 @@ def read_json_object(path: Path, label: str) -> dict[str, Any]:
     return payload
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> None:
+def write_json(
+    path: Path,
+    payload: dict[str, Any],
+    *,
+    mode: int | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as handle:
+        if mode is not None:
+            os.fchmod(handle.fileno(), mode)
         json.dump(payload, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
         handle.flush()
@@ -631,6 +702,79 @@ def copy_candidate(source_root: Path, generation_root: Path) -> None:
         raise ReleaseShelfError("candidate is missing required files directory")
 
 
+def _normalize_public_generation_modes(generation_root: Path) -> None:
+    """Seal one unpublished generation with the public runtime mode contract."""
+    try:
+        root_metadata = generation_root.lstat()
+    except OSError as exc:
+        raise ReleaseShelfError(
+            f"generation root is unavailable: {generation_root}"
+        ) from exc
+    if (
+        stat.S_ISLNK(root_metadata.st_mode)
+        or not stat.S_ISDIR(root_metadata.st_mode)
+    ):
+        raise ReleaseShelfError(f"generation root is unsafe: {generation_root}")
+    generation_root.chmod(SEALED_DIRECTORY_MODE)
+    for path in sorted(generation_root.rglob("*"), key=lambda item: item.as_posix()):
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ReleaseShelfError(
+                f"generation entries must not be symbolic links: {path}"
+            )
+        if stat.S_ISDIR(metadata.st_mode):
+            path.chmod(SEALED_DIRECTORY_MODE)
+        elif stat.S_ISREG(metadata.st_mode):
+            relative = path.relative_to(generation_root).as_posix()
+            path.chmod(
+                PUBLIC_METADATA_FILE_MODE
+                if relative in PUBLIC_GENERATION_METADATA
+                else SEALED_FILE_MODE
+            )
+        else:
+            raise ReleaseShelfError(f"generation contains a special entry: {path}")
+
+
+def _verify_public_generation_modes(generation_root: Path) -> None:
+    try:
+        root_metadata = generation_root.lstat()
+    except OSError as exc:
+        raise ReleaseShelfError(
+            f"generation root is unavailable: {generation_root}"
+        ) from exc
+    if (
+        stat.S_ISLNK(root_metadata.st_mode)
+        or not stat.S_ISDIR(root_metadata.st_mode)
+        or stat.S_IMODE(root_metadata.st_mode) != SEALED_DIRECTORY_MODE
+    ):
+        raise ReleaseShelfError(
+            "generation root does not satisfy the public directory mode contract"
+        )
+    for path in sorted(generation_root.rglob("*"), key=lambda item: item.as_posix()):
+        metadata = path.lstat()
+        relative = path.relative_to(generation_root).as_posix()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ReleaseShelfError(
+                f"generation entries must not be symbolic links: {relative}"
+            )
+        if stat.S_ISDIR(metadata.st_mode):
+            expected_mode = SEALED_DIRECTORY_MODE
+        elif stat.S_ISREG(metadata.st_mode):
+            expected_mode = (
+                PUBLIC_METADATA_FILE_MODE
+                if relative in PUBLIC_GENERATION_METADATA
+                else SEALED_FILE_MODE
+            )
+        else:
+            raise ReleaseShelfError(
+                f"generation contains a special entry: {relative}"
+            )
+        if stat.S_IMODE(metadata.st_mode) != expected_mode:
+            raise ReleaseShelfError(
+                f"generation entry has non-public mode: {relative}"
+            )
+
+
 def _verify_artifact_row(row: dict[str, Any], files_root: Path, label: str) -> None:
     file_name = str(row.get("fileName") or "").strip()
     if not file_name:
@@ -880,13 +1024,23 @@ def materialize_generation(
         "inventoryDigest": pointer["inventoryDigest"],
         "inventory": inventory,
     }
-    write_json(generation_root / ACTIVATION_CANDIDATE, candidate_record)
+    write_json(
+        generation_root / ACTIVATION_CANDIDATE,
+        candidate_record,
+        mode=PUBLIC_METADATA_FILE_MODE,
+    )
+    _normalize_public_generation_modes(generation_root)
     verify_generation(generation_root, pointer)
     fsync_tree(generation_root)
     return pointer
 
 
-def verify_generation(generation_root: Path, pointer: dict[str, Any]) -> None:
+def verify_generation(
+    generation_root: Path,
+    pointer: dict[str, Any],
+    *,
+    require_sealed_modes: bool = True,
+) -> None:
     generation_id = validate_generation_id(str(pointer.get("generationId") or ""))
     if generation_root.name != generation_id:
         raise ReleaseShelfError(
@@ -894,6 +1048,8 @@ def verify_generation(generation_root: Path, pointer: dict[str, Any]) -> None:
         )
     if pointer.get("schemaVersion") != POINTER_SCHEMA:
         raise ReleaseShelfError("unsupported release shelf pointer schemaVersion")
+    if require_sealed_modes:
+        _verify_public_generation_modes(generation_root)
     candidate = read_json_object(
         generation_root / ACTIVATION_CANDIDATE, "activation candidate"
     )
@@ -1006,12 +1162,29 @@ def load_pointer(path: Path) -> dict[str, Any]:
     return validate_pointer_payload(read_json_object(path, "release shelf pointer"))
 
 
+def _load_public_pointer(path: Path) -> dict[str, Any]:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise ReleaseShelfError("release shelf pointer is unavailable") from exc
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or stat.S_IMODE(metadata.st_mode) != PUBLIC_METADATA_FILE_MODE
+    ):
+        raise ReleaseShelfError(
+            "release shelf pointer does not satisfy the public file mode contract"
+        )
+    return load_pointer(path)
+
+
 def resolve_shelf_root(shelf_root: Path) -> tuple[str, Path, dict[str, Any] | None]:
     marker_exists = (shelf_root / LAYOUT_MARKER).is_file()
     pointer_path = shelf_root / CURRENT_POINTER
     pointer_exists = pointer_path.is_file()
     if pointer_exists:
-        pointer = load_pointer(pointer_path)
+        pointer = _load_public_pointer(pointer_path)
         generation_id = str(pointer["generationId"])
         generation_root = shelf_root / GENERATIONS_DIRECTORY / generation_id
         if not generation_root.is_dir():
@@ -1026,13 +1199,38 @@ def resolve_shelf_root(shelf_root: Path) -> tuple[str, Path, dict[str, Any] | No
 
 
 @contextlib.contextmanager
-def promotion_lock(shelf_root: Path) -> Iterator[None]:
+def promotion_lock(shelf_root: Path) -> Iterator[_PromotionLockLease]:
     shelf_root.mkdir(parents=True, exist_ok=True)
+    shelf_root = shelf_root.resolve(strict=True)
     lock_path = shelf_root / PROMOTION_LOCK
-    with lock_path.open("a+b") as handle:
+    flags = (
+        os.O_RDWR
+        | os.O_APPEND
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(lock_path, flags, SHARED_CONTROL_FILE_MODE)
+    with os.fdopen(descriptor, "a+b") as handle:
+        os.fchmod(handle.fileno(), SHARED_CONTROL_FILE_MODE)
+        opened = os.fstat(handle.fileno())
+        linked = lock_path.lstat()
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_ISLNK(linked.st_mode)
+            or (opened.st_dev, opened.st_ino) != (linked.st_dev, linked.st_ino)
+            or opened.st_nlink != 1
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != SHARED_CONTROL_FILE_MODE
+        ):
+            raise ReleaseShelfError("release shelf promotion lock is unsafe")
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        lease = _PromotionLockLease(
+            handle,
+            lock_path,
+        )
         try:
-            yield
+            yield lease
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
@@ -1042,6 +1240,7 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     descriptor, raw_temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temp_path = Path(raw_temp)
     try:
+        os.fchmod(descriptor, PUBLIC_METADATA_FILE_MODE)
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             json.dump(payload, handle, indent=2, ensure_ascii=False)
             handle.write("\n")
@@ -1052,17 +1251,318 @@ def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
         temp_path.unlink(missing_ok=True)
 
 
-def _create_layout_marker(shelf_root: Path) -> None:
-    descriptor, raw_temp = tempfile.mkstemp(prefix=f".{LAYOUT_MARKER}.", dir=shelf_root)
+def _atomic_write_layout_marker(marker: Path) -> None:
+    descriptor, raw_temp = tempfile.mkstemp(prefix=f".{marker.name}.", dir=marker.parent)
     temp_path = Path(raw_temp)
     try:
+        os.fchmod(descriptor, PUBLIC_METADATA_FILE_MODE)
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write("v1\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp_path, shelf_root / LAYOUT_MARKER)
+        os.replace(temp_path, marker)
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+def _create_layout_marker(shelf_root: Path) -> None:
+    _atomic_write_layout_marker(shelf_root / LAYOUT_MARKER)
+
+
+def _require_layout_marker(
+    shelf_root: Path,
+    *,
+    require_public_mode: bool = True,
+) -> None:
+    marker = shelf_root / LAYOUT_MARKER
+    try:
+        metadata = marker.lstat()
+        body = marker.read_bytes()
+    except OSError as exc:
+        raise ReleaseShelfError("release shelf layout marker is unavailable") from exc
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or (
+            require_public_mode
+            and stat.S_IMODE(metadata.st_mode) != PUBLIC_METADATA_FILE_MODE
+        )
+        or body != b"v1\n"
+    ):
+        raise ReleaseShelfError("release shelf layout marker is invalid")
+
+
+def _repair_authenticated_layout_modes(
+    shelf_root: Path,
+    pointer: dict[str, Any],
+    *,
+    publish_pointer: bool,
+) -> None:
+    """Repair only a byte-authenticated layout produced by the pre-mode writer."""
+    generation_id = validate_generation_id(str(pointer.get("generationId") or ""))
+    generation_root = shelf_root / GENERATIONS_DIRECTORY / generation_id
+    verify_generation(
+        generation_root,
+        pointer,
+        require_sealed_modes=False,
+    )
+    marker = shelf_root / LAYOUT_MARKER
+    if marker.exists() or marker.is_symlink():
+        _require_layout_marker(shelf_root, require_public_mode=False)
+    _normalize_public_generation_modes(generation_root)
+    shelf_root.chmod(SHARED_DIRECTORY_MODE)
+    generations_root = shelf_root / GENERATIONS_DIRECTORY
+    generations_root.chmod(SHARED_DIRECTORY_MODE)
+    if marker.exists():
+        _atomic_write_layout_marker(marker)
+    if publish_pointer:
+        _atomic_write_json(shelf_root / CURRENT_POINTER, pointer)
+    verify_generation(generation_root, pointer)
+    if marker.exists():
+        _require_layout_marker(shelf_root)
+    if publish_pointer:
+        _load_public_pointer(shelf_root / CURRENT_POINTER)
+
+
+def _tree_fingerprint(root: Path) -> list[dict[str, Any]]:
+    if not root.is_dir() or root.is_symlink():
+        raise ReleaseShelfError(f"activation tree is unsafe: {root}")
+    rows: list[dict[str, Any]] = []
+    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+        relative = path.relative_to(root).as_posix()
+        metadata = path.lstat()
+        if stat.S_ISLNK(metadata.st_mode):
+            raise ReleaseShelfError(
+                f"activation tree contains a symbolic link: {relative}"
+            )
+        if stat.S_ISDIR(metadata.st_mode):
+            rows.append({"path": relative, "type": "directory"})
+        elif stat.S_ISREG(metadata.st_mode):
+            rows.append(
+                {
+                    "path": relative,
+                    "type": "file",
+                    "sha256": sha256_file(path),
+                    "sizeBytes": metadata.st_size,
+                }
+            )
+        else:
+            raise ReleaseShelfError(
+                f"activation tree contains a special entry: {relative}"
+            )
+    return rows
+
+
+def _validate_prepared_stage_for_intent(
+    stage_root: Path,
+    *,
+    candidate_root: Path,
+    shelf_root: Path,
+    generation_id: str,
+    activation_receipt_id: str,
+) -> dict[str, Any]:
+    if stage_root.is_symlink() or not stage_root.is_dir():
+        raise ReleaseShelfError("release shelf activation stage is unsafe")
+    pointer = _load_public_pointer(stage_root / CURRENT_POINTER)
+    if (
+        pointer.get("generationId") != generation_id
+        or pointer.get("activationReceiptId") != activation_receipt_id
+    ):
+        raise ReleaseShelfError(
+            "release shelf activation stage belongs to a different intent"
+        )
+    entries = {item.name for item in stage_root.iterdir()}
+    if entries != {CURRENT_POINTER, GENERATIONS_DIRECTORY, LAYOUT_MARKER}:
+        raise ReleaseShelfError(
+            "release shelf activation stage closure is invalid"
+        )
+    _require_layout_marker(stage_root)
+    expected_parent = Path(
+        tempfile.mkdtemp(
+            prefix=f".{shelf_root.name}-release-shelf-verify-",
+            dir=shelf_root.parent,
+        )
+    )
+    try:
+        expected = expected_parent / "prepared"
+        prepare_layout(
+            candidate_root,
+            expected,
+            generation_id=generation_id,
+            activated_at=str(pointer["activatedAt"]),
+            activation_receipt_id=activation_receipt_id,
+        )
+        expected_pointer = _load_public_pointer(expected / CURRENT_POINTER)
+        if pointer != expected_pointer:
+            raise ReleaseShelfError(
+                "release shelf activation stage pointer differs from pinned candidate"
+            )
+        staged_generation = (
+            stage_root / GENERATIONS_DIRECTORY / generation_id
+        )
+        final_generation = (
+            shelf_root / GENERATIONS_DIRECTORY / generation_id
+        )
+        staged_exists = staged_generation.is_dir() and not staged_generation.is_symlink()
+        final_exists = final_generation.is_dir() and not final_generation.is_symlink()
+        if staged_exists and final_exists:
+            raise ReleaseShelfError(
+                "release shelf activation stage has duplicate generation closure"
+            )
+        if staged_exists:
+            observed_generation = staged_generation
+        elif final_exists:
+            if any((stage_root / GENERATIONS_DIRECTORY).iterdir()):
+                raise ReleaseShelfError(
+                    "release shelf activation stage has an ambiguous generation"
+                )
+            observed_generation = final_generation
+        else:
+            raise ReleaseShelfError(
+                "release shelf activation stage lost its pinned generation"
+            )
+        expected_generation = expected / GENERATIONS_DIRECTORY / generation_id
+        if _tree_fingerprint(observed_generation) != _tree_fingerprint(
+            expected_generation
+        ):
+            raise ReleaseShelfError(
+                "release shelf activation generation differs from pinned candidate"
+            )
+        verify_generation(
+            observed_generation,
+            pointer,
+            require_sealed_modes=False,
+        )
+        _normalize_public_generation_modes(observed_generation)
+        verify_generation(observed_generation, pointer)
+        return pointer
+    finally:
+        shutil.rmtree(expected_parent, ignore_errors=True)
+
+
+def reconcile_activation_stage_residue(
+    candidate_root: Path,
+    shelf_root: Path,
+    *,
+    generation_id: str,
+    activation_receipt_id: str,
+) -> Path | None:
+    """Return the one exact same-intent stage; reject every unknown residue."""
+    generation_id = validate_generation_id(generation_id)
+    activation_receipt_id = validate_generation_id(activation_receipt_id)
+    matching: list[Path] = []
+    for path in sorted(shelf_root.iterdir(), key=lambda item: item.name):
+        if not path.name.startswith(ACTIVATION_STAGE_PREFIX):
+            continue
+        try:
+            _validate_prepared_stage_for_intent(
+                path,
+                candidate_root=candidate_root,
+                shelf_root=shelf_root,
+                generation_id=generation_id,
+                activation_receipt_id=activation_receipt_id,
+            )
+        except (OSError, ReleaseShelfError) as exc:
+            raise ReleaseShelfError(
+                f"unknown release shelf activation stage residue: {path.name}"
+            ) from exc
+        matching.append(path)
+    if len(matching) > 1:
+        raise ReleaseShelfError(
+            "multiple same-intent release shelf activation stages are ambiguous"
+        )
+    return matching[0] if matching else None
+
+
+def _validate_committed_activation_for_intent(
+    candidate_root: Path,
+    shelf_root: Path,
+    *,
+    generation_id: str,
+    activation_receipt_id: str,
+) -> dict[str, Any]:
+    pointer = load_pointer(shelf_root / CURRENT_POINTER)
+    if (
+        pointer.get("generationId") != generation_id
+        or pointer.get("activationReceiptId") != activation_receipt_id
+    ):
+        raise ReleaseShelfError(
+            "committed release shelf activation belongs to a different intent"
+        )
+    _require_layout_marker(shelf_root, require_public_mode=False)
+    final_generation = (
+        shelf_root / GENERATIONS_DIRECTORY / generation_id
+    )
+    verify_generation(
+        final_generation,
+        pointer,
+        require_sealed_modes=False,
+    )
+    expected_parent = Path(
+        tempfile.mkdtemp(
+            prefix=f".{shelf_root.name}-release-shelf-committed-verify-",
+            dir=shelf_root.parent,
+        )
+    )
+    try:
+        expected = expected_parent / "prepared"
+        prepare_layout(
+            candidate_root,
+            expected,
+            generation_id=generation_id,
+            activated_at=str(pointer["activatedAt"]),
+            activation_receipt_id=activation_receipt_id,
+        )
+        expected_pointer = _load_public_pointer(expected / CURRENT_POINTER)
+        if pointer != expected_pointer or _tree_fingerprint(
+            final_generation
+        ) != _tree_fingerprint(
+            expected / GENERATIONS_DIRECTORY / generation_id
+        ):
+            raise ReleaseShelfError(
+                "committed activation differs from the pinned candidate intent"
+            )
+        _repair_authenticated_layout_modes(
+            shelf_root,
+            pointer,
+            publish_pointer=True,
+        )
+        return pointer
+    finally:
+        shutil.rmtree(expected_parent, ignore_errors=True)
+
+
+def _retire_activation_stage(stage_root: Path, shelf_root: Path) -> Path:
+    retired = shelf_root.parent / (
+        f".{shelf_root.name}-retired-activation-stage-"
+        f"{uuid.uuid4().hex}"
+    )
+    os.rename(stage_root, retired)
+    for directory in (shelf_root, shelf_root.parent):
+        descriptor = os.open(
+            directory,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    try:
+        shutil.rmtree(retired)
+        descriptor = os.open(
+            shelf_root.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError:
+        # The authoritative shelf no longer contains the stage. A sibling
+        # retirement residue is safe for later operator cleanup.
+        pass
+    return retired
 
 
 def activate_filesystem(
@@ -1073,26 +1573,120 @@ def activate_filesystem(
     generation_id: str | None = None,
     activated_at: str | None = None,
     activation_receipt_id: str | None = None,
+    promotion_lease: _PromotionLockLease | None = None,
+    allow_orphan_generation_recovery: bool = False,
 ) -> dict[str, Any]:
-    shelf_root.mkdir(parents=True, exist_ok=True)
-    refuse_server_managed_filesystem_shelf(shelf_root)
     generation_id = validate_generation_id(generation_id or new_generation_id())
-    stage_parent = Path(tempfile.mkdtemp(prefix=".release-shelf-stage-", dir=shelf_root))
+    activation_receipt_id = validate_generation_id(
+        activation_receipt_id or new_activation_receipt_id()
+    )
+    shelf_root.mkdir(parents=True, exist_ok=True)
+    if shelf_root.is_symlink():
+        raise ReleaseShelfError("release shelf root must not be a symbolic link")
+    shelf_root = shelf_root.resolve(strict=True)
+    if promotion_lease is not None:
+        promotion_lease.validate_for(shelf_root)
+        lock_scope: contextlib.AbstractContextManager[object] = contextlib.nullcontext(
+            promotion_lease
+        )
+    else:
+        lock_scope = promotion_lock(shelf_root)
+    stage_parent: Path | None = None
+    activation_succeeded = False
     try:
-        prepare_layout(
-            candidate_root,
-            stage_parent,
-            generation_id=generation_id,
-            activated_at=activated_at,
-            activation_receipt_id=activation_receipt_id,
-        )
-        return activate_prepared_filesystem(
-            stage_parent,
-            shelf_root,
-            initialize_layout=initialize_layout,
-        )
+        with lock_scope as active_lease:
+            lease = promotion_lease or active_lease
+            refuse_server_managed_filesystem_shelf(shelf_root)
+            if (
+                not initialize_layout
+                and not (shelf_root / CURRENT_POINTER).is_file()
+            ):
+                raise ReleaseShelfError(
+                    f"{shelf_root} has no {LAYOUT_MARKER}; explicit layout "
+                    "initialization is required"
+                )
+            stage_parent = reconcile_activation_stage_residue(
+                candidate_root,
+                shelf_root,
+                generation_id=generation_id,
+                activation_receipt_id=activation_receipt_id,
+            )
+            final_generation = (
+                shelf_root / GENERATIONS_DIRECTORY / generation_id
+            )
+            if (
+                stage_parent is None
+                and final_generation.exists()
+                and not allow_orphan_generation_recovery
+            ):
+                raise ReleaseShelfError(
+                    f"generation ID has already been used: {generation_id}"
+                )
+            if (
+                stage_parent is None
+                and allow_orphan_generation_recovery
+                and (shelf_root / CURRENT_POINTER).is_file()
+            ):
+                return _validate_committed_activation_for_intent(
+                    candidate_root,
+                    shelf_root,
+                    generation_id=generation_id,
+                    activation_receipt_id=activation_receipt_id,
+                )
+            if stage_parent is None:
+                preparing_parent = Path(
+                    tempfile.mkdtemp(
+                        prefix=f".{shelf_root.name}-release-shelf-preparing-",
+                        dir=shelf_root.parent,
+                    )
+                )
+                try:
+                    prepared = preparing_parent / "prepared"
+                    prepare_layout(
+                        candidate_root,
+                        prepared,
+                        generation_id=generation_id,
+                        activated_at=activated_at,
+                        activation_receipt_id=activation_receipt_id,
+                    )
+                    stage_parent = (
+                        shelf_root
+                        / _stage_intent_name(
+                            generation_id,
+                            activation_receipt_id,
+                        )
+                    )
+                    os.rename(prepared, stage_parent)
+                    root_descriptor = os.open(shelf_root, os.O_RDONLY)
+                    try:
+                        os.fsync(root_descriptor)
+                    finally:
+                        os.close(root_descriptor)
+                finally:
+                    shutil.rmtree(preparing_parent, ignore_errors=True)
+            _validate_prepared_stage_for_intent(
+                stage_parent,
+                candidate_root=candidate_root,
+                shelf_root=shelf_root,
+                generation_id=generation_id,
+                activation_receipt_id=activation_receipt_id,
+            )
+            result = activate_prepared_filesystem(
+                stage_parent,
+                shelf_root,
+                initialize_layout=initialize_layout,
+                promotion_lease=lease,
+                allow_orphan_generation_recovery=(
+                    allow_orphan_generation_recovery
+                ),
+            )
+            _retire_activation_stage(stage_parent, shelf_root)
+            stage_parent = None
+            activation_succeeded = True
+            return result
     finally:
-        shutil.rmtree(stage_parent, ignore_errors=True)
+        if activation_succeeded and stage_parent is not None:
+            _retire_activation_stage(stage_parent, shelf_root)
 
 
 def activate_prepared_filesystem(
@@ -1100,55 +1694,145 @@ def activate_prepared_filesystem(
     shelf_root: Path,
     *,
     initialize_layout: bool,
+    promotion_lease: _PromotionLockLease | None = None,
+    allow_orphan_generation_recovery: bool = False,
 ) -> dict[str, Any]:
     shelf_root.mkdir(parents=True, exist_ok=True)
-    pointer = load_pointer(prepared_root / CURRENT_POINTER)
+    pointer = _load_public_pointer(prepared_root / CURRENT_POINTER)
     generation_id = validate_generation_id(str(pointer.get("generationId") or ""))
     prepared_generation = prepared_root / GENERATIONS_DIRECTORY / generation_id
-    verify_generation(prepared_generation, pointer)
+    final_generation = shelf_root / GENERATIONS_DIRECTORY / generation_id
+    if prepared_generation.is_dir() and not prepared_generation.is_symlink():
+        verify_generation(prepared_generation, pointer)
+    elif (
+        allow_orphan_generation_recovery
+        and final_generation.is_dir()
+        and not final_generation.is_symlink()
+    ):
+        verify_generation(
+            final_generation,
+            pointer,
+            require_sealed_modes=False,
+        )
+    else:
+        raise ReleaseShelfError(
+            "prepared activation generation is unavailable"
+        )
     if prepared_root.stat().st_dev != shelf_root.stat().st_dev:
         raise ReleaseShelfError("prepared generation and current.json must share one filesystem")
-    with promotion_lock(shelf_root):
+    if promotion_lease is not None:
+        promotion_lease.validate_for(shelf_root)
+        lock_scope: contextlib.AbstractContextManager[object] = contextlib.nullcontext(
+            promotion_lease
+        )
+    else:
+        lock_scope = promotion_lock(shelf_root)
+    with lock_scope:
+        if promotion_lease is not None:
+            promotion_lease.validate_for(shelf_root)
         refuse_server_managed_filesystem_shelf(shelf_root)
-        state, _, _ = resolve_shelf_root(shelf_root)
-        if state == "legacy" and not initialize_layout:
+        pointer_path = shelf_root / CURRENT_POINTER
+        marker_path = shelf_root / LAYOUT_MARKER
+        existing_pointer: dict[str, Any] | None = None
+        if pointer_path.is_file():
+            try:
+                existing_pointer = _load_public_pointer(pointer_path)
+            except ReleaseShelfError:
+                if not allow_orphan_generation_recovery:
+                    raise
+                existing_pointer = load_pointer(pointer_path)
+                existing_generation = (
+                    shelf_root
+                    / GENERATIONS_DIRECTORY
+                    / str(existing_pointer["generationId"])
+                )
+                verify_generation(
+                    existing_generation,
+                    existing_pointer,
+                    require_sealed_modes=False,
+                )
+                _repair_authenticated_layout_modes(
+                    shelf_root,
+                    existing_pointer,
+                    publish_pointer=True,
+                )
+        marker_exists = marker_path.exists() or marker_path.is_symlink()
+        if marker_exists:
+            try:
+                _require_layout_marker(shelf_root)
+            except ReleaseShelfError:
+                if not allow_orphan_generation_recovery:
+                    raise
+                _require_layout_marker(
+                    shelf_root,
+                    require_public_mode=False,
+                )
+                _atomic_write_layout_marker(marker_path)
+                _require_layout_marker(shelf_root)
+        if existing_pointer is None and not initialize_layout:
             raise ReleaseShelfError(
                 f"{shelf_root} has no {LAYOUT_MARKER}; explicit layout initialization is required"
             )
+        if existing_pointer is not None:
+            existing_generation = (
+                shelf_root
+                / GENERATIONS_DIRECTORY
+                / str(existing_pointer["generationId"])
+            )
+            verify_generation(existing_generation, existing_pointer)
         generations_root = shelf_root / GENERATIONS_DIRECTORY
-        generations_root.mkdir(exist_ok=True)
+        shelf_root.chmod(SHARED_DIRECTORY_MODE)
+        generations_root.mkdir(mode=SHARED_DIRECTORY_MODE, exist_ok=True)
+        generations_root.chmod(SHARED_DIRECTORY_MODE)
         final_generation = generations_root / generation_id
         if final_generation.exists():
-            raise ReleaseShelfError(f"generation ID has already been used: {generation_id}")
-        try:
-            os.rename(prepared_generation, final_generation)
-            parent_descriptor = os.open(generations_root, os.O_RDONLY)
-            try:
-                os.fsync(parent_descriptor)
-            finally:
-                os.close(parent_descriptor)
+            if not allow_orphan_generation_recovery:
+                raise ReleaseShelfError(
+                    f"generation ID has already been used: {generation_id}"
+                )
+            if allow_orphan_generation_recovery:
+                verify_generation(
+                    final_generation,
+                    pointer,
+                    require_sealed_modes=False,
+                )
+                _normalize_public_generation_modes(final_generation)
             verify_generation(final_generation, pointer)
-            _atomic_write_json(shelf_root / CURRENT_POINTER, pointer)
-            if state == "legacy":
+            if prepared_generation.exists() and existing_pointer != pointer:
+                # Only the governed recovery lane may explicitly opt into this
+                # same-intent reuse after independently validating its prestate.
+                pass
+        try:
+            if not final_generation.exists():
+                # Some deployment filesystems require the moved directory
+                # itself to retain owner-write permission for rename(2).
+                # The private stage is owner-only and every child remains
+                # sealed; restore the public 0555 root before publishing any
+                # authority pointer.
+                prepared_generation.chmod(0o755)
                 try:
-                    _create_layout_marker(shelf_root)
-                except OSError:
-                    # current.json is the commit point and is already independently
-                    # sufficient for v1 readers. Marker creation is a post-commit,
-                    # non-retryable downgrade-sentinel warning.
-                    pointer["durabilityWarning"] = (
-                        "layout marker creation failed after current.json activation"
-                    )
-            # The rename above is the commit point. Directory fsync is best-effort so
-            # a post-commit durability warning cannot turn success into a retry signal.
-            try:
-                root_descriptor = os.open(shelf_root, os.O_RDONLY)
-                try:
-                    os.fsync(root_descriptor)
+                    os.rename(prepared_generation, final_generation)
                 finally:
-                    os.close(root_descriptor)
-            except OSError:
-                pointer["durabilityWarning"] = "shelf root directory fsync failed after activation"
+                    if final_generation.exists():
+                        final_generation.chmod(SEALED_DIRECTORY_MODE)
+                    elif prepared_generation.exists():
+                        prepared_generation.chmod(SEALED_DIRECTORY_MODE)
+                parent_descriptor = os.open(generations_root, os.O_RDONLY)
+                try:
+                    os.fsync(parent_descriptor)
+                finally:
+                    os.close(parent_descriptor)
+            verify_generation(final_generation, pointer)
+            if not marker_exists:
+                _create_layout_marker(shelf_root)
+            _require_layout_marker(shelf_root)
+            _atomic_write_json(shelf_root / CURRENT_POINTER, pointer)
+            _require_layout_marker(shelf_root)
+            root_descriptor = os.open(shelf_root, os.O_RDONLY)
+            try:
+                os.fsync(root_descriptor)
+            finally:
+                os.close(root_descriptor)
             return pointer
         except Exception:
             raise
@@ -1174,9 +1858,85 @@ def prepare_layout(
         activated_at=activated_at,
         activation_receipt_id=activation_receipt_id,
     )
-    write_json(output_root / CURRENT_POINTER, pointer)
-    (output_root / LAYOUT_MARKER).write_text("v1\n", encoding="utf-8")
+    write_json(
+        output_root / CURRENT_POINTER,
+        pointer,
+        mode=PUBLIC_METADATA_FILE_MODE,
+    )
+    _atomic_write_layout_marker(output_root / LAYOUT_MARKER)
     return pointer
+
+
+def prepare_sidecar_active_layout(
+    candidate_root: Path,
+    output_root: Path,
+    *,
+    generation_id: str,
+    activated_at: str,
+    activation_receipt_id: str,
+) -> dict[str, Any]:
+    """Materialize one complete current generation for a read-only sidecar.
+
+    No server activation is claimed. The current generation is assembled and
+    verified offline, while the controller retains the external authority
+    receipt that pins every digest before routing can change.
+    """
+
+    pointer = prepare_layout(
+        candidate_root,
+        output_root,
+        generation_id=generation_id,
+        activated_at=activated_at,
+        activation_receipt_id=activation_receipt_id,
+    )
+    output_root = output_root.resolve(strict=True)
+    generation_root = (
+        output_root / GENERATIONS_DIRECTORY / str(pointer["generationId"])
+    )
+
+    for name in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
+        source = candidate_root / name
+        destination = output_root / name
+        shutil.copyfile(source, destination)
+        destination.chmod(PUBLIC_METADATA_FILE_MODE)
+
+    write_json(
+        output_root / WRITER_POLICY,
+        {
+            "schemaVersion": SERVER_WRITER_POLICY_SCHEMA,
+            "mode": SIDECAR_WRITER_POLICY_MODE,
+        },
+        mode=0o600,
+    )
+
+    pointer_path = output_root / CURRENT_POINTER
+    pointer_bytes = pointer_path.read_bytes()
+    pointer_sha256 = hashlib.sha256(pointer_bytes).hexdigest()
+
+    verify_generation(generation_root, pointer)
+    for path in (
+        output_root / CANONICAL_MANIFEST,
+        output_root / COMPATIBILITY_MANIFEST,
+    ):
+        if sha256_file(path) != sha256_file(candidate_root / path.name):
+            raise ReleaseShelfError(
+                "server active shelf compatibility mirror changed during preparation"
+            )
+    fsync_tree(output_root)
+    return {
+        "pointer": pointer,
+        "pointerSha256": pointer_sha256,
+        "activationCandidateSha256": sha256_file(
+            generation_root / ACTIVATION_CANDIDATE
+        ),
+        "canonicalMirrorSha256": sha256_file(
+            output_root / CANONICAL_MANIFEST
+        ),
+        "compatibilityMirrorSha256": sha256_file(
+            output_root / COMPATIBILITY_MANIFEST
+        ),
+        "writerPolicy": SIDECAR_WRITER_POLICY_MODE,
+    }
 
 
 def verify_http_projection(

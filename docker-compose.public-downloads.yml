@@ -1,0 +1,13 @@
+# Source-controlled selector for the generated public-download runtime. The
+# materializer validates this closure before it constructs the two-service runtime;
+# no inherited environment, dependency, host mapping, or mount survives implicitly.
+services:
+  chummer-portal:
+    profiles: ["public-downloads"]
+    env_file: !reset []
+    depends_on: !reset {}
+    extra_hosts: !reset []
+    environment: !override {}
+    volumes: !override []
+    healthcheck:
+      test: ["CMD", "dotnet", "/app/loopback-probe/Chummer.Run.LoopbackProbe.dll", "/api/ready/public-downloads"]
