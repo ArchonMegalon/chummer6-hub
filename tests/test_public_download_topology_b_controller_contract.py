@@ -3540,6 +3540,462 @@ def test_account_required_denial_probe_rejects_contract_drift_or_exact_bytes(
         )
 
 
+def windows_only_artifact_binding_fixture(
+    tmp_path: Path,
+) -> dict[str, Any]:
+    generation_id = "generation-windows-fixture"
+    generation_root = tmp_path / generation_id
+    generation_files = generation_root / "files"
+    generation_files.mkdir(parents=True)
+    file_bytes = {
+        "chummer-avalonia-win-x64-installer.exe": b"MZwindows-fixture",
+        "chummer-avalonia-win-x64-payload.zip": b"PK\x03\x04windows-fixture",
+        "chummer-avalonia-win-x64-payload.zip.json": (
+            b'{"contractName":"windows-fixture"}\n'
+        ),
+    }
+    for name, raw in file_bytes.items():
+        (generation_files / name).write_bytes(raw)
+    installer_name, payload_name, _sidecar_name = file_bytes
+    artifact = {
+        "artifactId": "avalonia-win-x64-installer",
+        "id": "avalonia-win-x64-installer",
+        "platform": "windows",
+        "rid": "win-x64",
+        "fileName": installer_name,
+        "downloadUrl": (
+            f"/downloads/g/{generation_id}/files/{installer_name}"
+        ),
+        "sha256": hashlib.sha256(file_bytes[installer_name]).hexdigest(),
+        "sizeBytes": len(file_bytes[installer_name]),
+        "installAccessClass": "open_public",
+        "payloadFileName": payload_name,
+        "payloadDownloadUrl": (
+            f"/downloads/g/{generation_id}/install/"
+            "avalonia-win-x64-installer/payload"
+        ),
+        "payloadSha256": hashlib.sha256(
+            file_bytes[payload_name]
+        ).hexdigest(),
+        "payloadSizeBytes": len(file_bytes[payload_name]),
+    }
+    canonical = {
+        "generationId": generation_id,
+        "artifacts": [dict(artifact)],
+    }
+    compatibility = {
+        "generationId": generation_id,
+        "downloads": [
+            {
+                **artifact,
+                "url": artifact["downloadUrl"],
+            }
+        ],
+    }
+    fresh_rows = [
+        {
+            "kind": (
+                "installer"
+                if name.endswith("-installer.exe")
+                else "sidecar"
+                if name.endswith(".json")
+                else "payload"
+            ),
+            "path": f"/downloads/files/{name}",
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sizeBytes": len(raw),
+        }
+        for name, raw in file_bytes.items()
+    ]
+    result = {
+        "generationId": generation_id,
+        "generationRoot": generation_root,
+        "fileBytes": file_bytes,
+        "canonical": canonical,
+        "compatibility": compatibility,
+        "freshRows": fresh_rows,
+    }
+    write_artifact_binding_manifests(result)
+    return result
+
+
+def write_artifact_binding_manifests(fixture: dict[str, Any]) -> None:
+    generation_root = fixture["generationRoot"]
+    (generation_root / "RELEASE_CHANNEL.generated.json").write_text(
+        json.dumps(fixture["canonical"]),
+        encoding="utf-8",
+    )
+    (generation_root / "releases.json").write_text(
+        json.dumps(fixture["compatibility"]),
+        encoding="utf-8",
+    )
+
+
+def test_artifact_host_gate_accepts_exact_windows_only_open_public_zero_denials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    generation_id = "generation-windows-only"
+    generation_root = tmp_path / generation_id
+    generation_files = generation_root / "files"
+    generation_files.mkdir(parents=True)
+    file_bytes = {
+        "chummer-avalonia-win-x64-installer.exe": b"MZwindows-installer",
+        "chummer-avalonia-win-x64-payload.zip": b"PK\x03\x04windows-payload",
+        "chummer-avalonia-win-x64-payload.zip.json": (
+            b'{"contractName":"windows-payload"}\n'
+        ),
+    }
+    for name, raw in file_bytes.items():
+        (generation_files / name).write_bytes(raw)
+    installer_name, payload_name, _sidecar_name = file_bytes
+    artifact = {
+        "artifactId": "avalonia-win-x64-installer",
+        "id": "avalonia-win-x64-installer",
+        "platform": "windows",
+        "rid": "win-x64",
+        "fileName": installer_name,
+        "downloadUrl": (
+            f"/downloads/g/{generation_id}/files/{installer_name}"
+        ),
+        "sha256": hashlib.sha256(file_bytes[installer_name]).hexdigest(),
+        "sizeBytes": len(file_bytes[installer_name]),
+        "installAccessClass": "open_public",
+        "payloadFileName": payload_name,
+        "payloadDownloadUrl": (
+            f"/downloads/g/{generation_id}/install/"
+            "avalonia-win-x64-installer/payload"
+        ),
+        "payloadSha256": hashlib.sha256(
+            file_bytes[payload_name]
+        ).hexdigest(),
+        "payloadSizeBytes": len(file_bytes[payload_name]),
+    }
+    (generation_root / "RELEASE_CHANNEL.generated.json").write_text(
+        json.dumps(
+            {
+                "generationId": generation_id,
+                "artifacts": [artifact],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (generation_root / "releases.json").write_text(
+        json.dumps(
+            {
+                "generationId": generation_id,
+                "downloads": [
+                    {
+                        **artifact,
+                        "url": artifact["downloadUrl"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    fresh_paths = tuple(f"files/{name}" for name in file_bytes)
+    shelf = {
+        "generationId": generation_id,
+        "generationRoot": str(generation_root),
+        "releaseCandidateAuthority": {
+            "freshDelta": [
+                {
+                    "path": path,
+                    "sha256": hashlib.sha256(
+                        file_bytes[Path(path).name]
+                    ).hexdigest(),
+                    "sizeBytes": len(file_bytes[Path(path).name]),
+                }
+                for path in fresh_paths
+            ]
+        },
+    }
+    streamed: list[dict[str, Any]] = []
+
+    def fake_stream(**kwargs: Any) -> dict[str, Any]:
+        streamed.append(kwargs)
+        return {
+            "endpoint": (
+                f"{kwargs['scheme']}://{kwargs['request_host']}"
+                f"{kwargs['path']}"
+            ),
+            "httpStatus": 200,
+            "sha256": kwargs["expected_sha256"],
+            "sizeBytes": kwargs["expected_size_bytes"],
+            "anonymous": True,
+            "redirectsFollowed": 0,
+        }
+
+    monkeypatch.setattr(controller, "_stream_exact_download", fake_stream)
+    monkeypatch.setattr(
+        controller,
+        "_probe_denied_download",
+        lambda **_kwargs: pytest.fail(
+            "Windows-only open-public shelf must not invent a denial probe"
+        ),
+    )
+
+    receipt = controller.probe_download_artifact_hosts(
+        SimpleNamespace(base_url="https://chummer.run"),
+        shelf=shelf,
+        scope="local",
+    )
+
+    assert receipt["status"] == "pass"
+    assert len(streamed) == len(HOSTS) * len(file_bytes) * 2
+    assert receipt["accountRequiredDenials"] == []
+    assert receipt["accountRequiredDenialClosure"] == {
+        "status": "pass",
+        "accountRequiredArtifactCount": 0,
+        "bindingCount": 0,
+        "expectedObservationCount": 0,
+        "observedObservationCount": 0,
+        "sealedGenerationFileCount": 3,
+        "freshFileCount": 3,
+        "zeroCountProved": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "missing_access",
+        "padded_access",
+        "unknown_access",
+        "conflicting_access_alias",
+        "non_object_row",
+        "duplicate_id",
+        "duplicate_path",
+        "alias_conflict",
+        "unexpected_canonical_collection",
+        "unexpected_compatibility_collection",
+        "generation_drift",
+        "compatibility_access_drift",
+        "compatibility_identity_drift",
+        "compatibility_sha_drift",
+        "compatibility_size_drift",
+        "compatibility_payload_omission",
+        "absolute_url",
+        "bad_port_url",
+        "encoded_url",
+        "query_url",
+        "control_url",
+        "raw_files_metadata_url",
+        "duplicate_json_key",
+        "extra_file",
+        "missing_file",
+        "symlink_file",
+        "fresh_sha_drift",
+        "fresh_size_drift",
+    ),
+)
+def test_retained_binding_closure_rejects_manifest_and_file_bypasses(
+    tmp_path: Path,
+    case: str,
+) -> None:
+    fixture = windows_only_artifact_binding_fixture(tmp_path)
+    canonical_row = fixture["canonical"]["artifacts"][0]
+    compatibility_row = fixture["compatibility"]["downloads"][0]
+    if case == "missing_access":
+        canonical_row.pop("installAccessClass")
+        compatibility_row.pop("installAccessClass")
+    elif case == "padded_access":
+        canonical_row["installAccessClass"] = " open_public"
+        compatibility_row["installAccessClass"] = " open_public"
+    elif case == "unknown_access":
+        canonical_row["installAccessClass"] = "public"
+        compatibility_row["installAccessClass"] = "public"
+    elif case == "conflicting_access_alias":
+        canonical_row["install_access_class"] = "account_required"
+        compatibility_row["install_access_class"] = "account_required"
+    elif case == "non_object_row":
+        fixture["canonical"]["artifacts"] = ["not-an-object"]
+    elif case == "duplicate_id":
+        fixture["canonical"]["artifacts"].append(dict(canonical_row))
+    elif case == "duplicate_path":
+        duplicate = {
+            **canonical_row,
+            "artifactId": "duplicate-win-x64-installer",
+            "id": "duplicate-win-x64-installer",
+            "payloadDownloadUrl": (
+                f"/downloads/g/{fixture['generationId']}/install/"
+                "duplicate-win-x64-installer/payload"
+            ),
+        }
+        fixture["canonical"]["artifacts"].append(duplicate)
+    elif case == "alias_conflict":
+        canonical_row["id"] = "conflicting-artifact-id"
+    elif case == "unexpected_canonical_collection":
+        fixture["canonical"]["downloads"] = [
+            {
+                **canonical_row,
+                "installAccessClass": "account_required",
+            }
+        ]
+    elif case == "unexpected_compatibility_collection":
+        fixture["compatibility"]["artifacts"] = [
+            {
+                **compatibility_row,
+                "installAccessClass": "account_required",
+            }
+        ]
+    elif case == "generation_drift":
+        fixture["canonical"]["generationId"] = "other-generation"
+        fixture["compatibility"]["generationId"] = "other-generation"
+    elif case == "compatibility_access_drift":
+        compatibility_row["installAccessClass"] = "account_required"
+    elif case == "compatibility_identity_drift":
+        compatibility_row["artifactId"] = "other-win-installer"
+        compatibility_row["id"] = "other-win-installer"
+    elif case == "compatibility_sha_drift":
+        compatibility_row["sha256"] = "f" * 64
+    elif case == "compatibility_size_drift":
+        compatibility_row["sizeBytes"] += 1
+    elif case == "compatibility_payload_omission":
+        for key in (
+            "payloadFileName",
+            "payloadDownloadUrl",
+            "payloadSha256",
+            "payloadSizeBytes",
+        ):
+            compatibility_row.pop(key)
+    elif case in {
+        "absolute_url",
+        "bad_port_url",
+        "encoded_url",
+        "query_url",
+        "control_url",
+    }:
+        original = str(canonical_row["downloadUrl"])
+        mutated = {
+            "absolute_url": f"https://chummer.run{original}",
+            "bad_port_url": f"https://chummer.run:bad{original}",
+            "encoded_url": original.replace(
+                "/downloads/",
+                "/downloads%2f",
+            ),
+            "query_url": f"{original}?ticket=secret",
+            "control_url": f"{original}\n",
+        }[case]
+        canonical_row["downloadUrl"] = mutated
+        compatibility_row["downloadUrl"] = mutated
+        compatibility_row["url"] = mutated
+    elif case == "raw_files_metadata_url":
+        sidecar_name = (
+            "chummer-avalonia-win-x64-payload.zip.json"
+        )
+        for row in (canonical_row, compatibility_row):
+            row["payloadMetadataFileName"] = sidecar_name
+            row["payloadMetadataUrl"] = (
+                f"/downloads/g/{fixture['generationId']}/files/"
+                f"{sidecar_name}"
+            )
+    elif case == "extra_file":
+        (
+            fixture["generationRoot"]
+            / "files"
+            / "unbound-secret.bin"
+        ).write_bytes(b"unbound")
+    elif case == "missing_file":
+        (
+            fixture["generationRoot"]
+            / "files"
+            / "chummer-avalonia-win-x64-payload.zip.json"
+        ).unlink()
+    elif case == "symlink_file":
+        sidecar = (
+            fixture["generationRoot"]
+            / "files"
+            / "chummer-avalonia-win-x64-payload.zip.json"
+        )
+        sidecar.unlink()
+        sidecar.symlink_to(
+            fixture["generationRoot"]
+            / "files"
+            / "chummer-avalonia-win-x64-payload.zip"
+        )
+    elif case == "fresh_sha_drift":
+        fixture["freshRows"][0]["sha256"] = "f" * 64
+    elif case == "fresh_size_drift":
+        fixture["freshRows"][0]["sizeBytes"] += 1
+
+    write_artifact_binding_manifests(fixture)
+    if case == "duplicate_json_key":
+        (
+            fixture["generationRoot"]
+            / "RELEASE_CHANNEL.generated.json"
+        ).write_text(
+            (
+                '{"generationId":"'
+                f'{fixture["generationId"]}",'
+                '"generationId":"duplicate","artifacts":[]}'
+            ),
+            encoding="utf-8",
+        )
+
+    with pytest.raises(controller.CutoverError):
+        controller._retained_account_required_bindings(
+            config=SimpleNamespace(base_url="https://chummer.run"),
+            generation_root=fixture["generationRoot"],
+            fresh_rows=fixture["freshRows"],
+        )
+
+
+def test_retained_binding_closure_accepts_unambiguous_snake_case_access_alias(
+    tmp_path: Path,
+) -> None:
+    fixture = windows_only_artifact_binding_fixture(tmp_path)
+    for row in (
+        fixture["canonical"]["artifacts"][0],
+        fixture["compatibility"]["downloads"][0],
+    ):
+        row["install_access_class"] = row.pop("installAccessClass")
+    write_artifact_binding_manifests(fixture)
+
+    bindings, closure = controller._retained_account_required_bindings(
+        config=SimpleNamespace(base_url="https://chummer.run"),
+        generation_root=fixture["generationRoot"],
+        fresh_rows=fixture["freshRows"],
+    )
+
+    assert bindings == []
+    assert closure["accountRequiredArtifactCount"] == 0
+    assert closure["zeroCountProved"] is True
+
+
+def test_artifact_host_gate_rejects_shelf_and_generation_root_identity_drift(
+    tmp_path: Path,
+) -> None:
+    fixture = windows_only_artifact_binding_fixture(tmp_path)
+    shelf = {
+        "generationId": "different-generation",
+        "generationRoot": str(fixture["generationRoot"]),
+        "releaseCandidateAuthority": {
+            "freshDelta": [
+                {
+                    **row,
+                    "path": str(row["path"]).removeprefix(
+                        "/downloads/"
+                    ),
+                }
+                for row in fixture["freshRows"]
+            ]
+        },
+    }
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="generation authority",
+    ):
+        controller.probe_download_artifact_hosts(
+            SimpleNamespace(base_url="https://chummer.run"),
+            shelf=shelf,
+            scope="local",
+        )
+
+
 @pytest.mark.parametrize(
     "scope,scheme,connect_hosts",
     [
@@ -3564,70 +4020,133 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
 ) -> None:
     require_topology_b_surface()
     generation_id = "generation-a"
-    generation_root = tmp_path / "generation"
+    generation_root = tmp_path / generation_id
     generation_root.mkdir()
     generation_files = generation_root / "files"
     generation_files.mkdir()
-    private_payload_name = "chummer-avalonia-osx-x64-payload.zip"
-    private_sidecar = b'{"contractName":"private-mac-payload"}\n'
-    (generation_files / f"{private_payload_name}.json").write_bytes(
-        private_sidecar
+    fresh_file_bytes = {
+        "chummer-avalonia-win-x64-installer.exe": b"MZfresh-windows",
+        "chummer-avalonia-win-x64-payload.zip": b"PK\x03\x04fresh-windows",
+        "chummer-avalonia-win-x64-payload.zip.json": (
+            b'{"contractName":"fresh-windows"}\n'
+        ),
+    }
+    for file_name, raw in fresh_file_bytes.items():
+        (generation_files / file_name).write_bytes(raw)
+    fresh_installer_name, fresh_payload_name, _fresh_sidecar = (
+        fresh_file_bytes
     )
+    open_artifact = {
+        "artifactId": "avalonia-win-x64-installer",
+        "id": "avalonia-win-x64-installer",
+        "platform": "windows",
+        "rid": "win-x64",
+        "fileName": fresh_installer_name,
+        "downloadUrl": f"/downloads/files/{fresh_installer_name}",
+        "sha256": hashlib.sha256(
+            fresh_file_bytes[fresh_installer_name]
+        ).hexdigest(),
+        "sizeBytes": len(fresh_file_bytes[fresh_installer_name]),
+        "installAccessClass": "open_public",
+        "payloadFileName": fresh_payload_name,
+        "payloadDownloadUrl": f"/downloads/files/{fresh_payload_name}",
+        "payloadSha256": hashlib.sha256(
+            fresh_file_bytes[fresh_payload_name]
+        ).hexdigest(),
+        "payloadSizeBytes": len(
+            fresh_file_bytes[fresh_payload_name]
+        ),
+    }
+    private_payload_name = "chummer-avalonia-osx-x64-payload.zip"
+    private_payload = b"PK\x03\x04private-mac-payload"
+    private_sidecar = b'{"contractName":"private-mac-payload"}\n'
+    (generation_files / private_payload_name).write_bytes(private_payload)
+    (generation_files / f"{private_payload_name}.json").write_bytes(private_sidecar)
     mac_files = {
         "avalonia-osx-x64-installer": (
             "chummer-avalonia-osx-x64-installer.dmg",
-            "d",
+            b"protected-avalonia-mac-installer",
         ),
         "blazor-desktop-osx-arm64-installer": (
             "chummer-blazor-desktop-osx-arm64-installer.dmg",
-            "e",
+            b"protected-blazor-mac-installer",
         ),
     }
+    for mac_file, raw in mac_files.values():
+        (generation_files / mac_file).write_bytes(raw)
+    protected_artifacts = [
+        {
+            "artifactId": artifact_id,
+            "platform": "macos",
+            "rid": (
+                "osx-arm64"
+                if "arm64" in artifact_id
+                else "osx-x64"
+            ),
+            "fileName": mac_file,
+            "downloadUrl": f"/downloads/files/{mac_file}",
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sizeBytes": len(raw),
+            "installAccessClass": "account_required",
+            **(
+                {
+                    "payloadFileName": private_payload_name,
+                    "payloadDownloadUrl": (
+                        f"/downloads/files/{private_payload_name}"
+                    ),
+                    "payloadSha256": hashlib.sha256(
+                        private_payload
+                    ).hexdigest(),
+                    "payloadSizeBytes": len(private_payload),
+                    "payloadMetadataFileName": (
+                        f"{private_payload_name}.json"
+                    ),
+                    "payloadMetadataUrl": (
+                        "/downloads/files/"
+                        f"{private_payload_name}.json"
+                    ),
+                }
+                if artifact_id == "avalonia-osx-x64-installer"
+                else {}
+            ),
+        }
+        for artifact_id, (mac_file, raw) in mac_files.items()
+    ]
+    all_artifacts = [open_artifact, *protected_artifacts]
     (generation_root / "RELEASE_CHANNEL.generated.json").write_text(
         json.dumps(
             {
-                "artifacts": [
-                    {
-                        "artifactId": artifact_id,
-                        "platform": "macos",
-                        "rid": (
-                            "osx-arm64"
-                            if "arm64" in artifact_id
-                            else "osx-x64"
-                        ),
-                        "fileName": mac_file,
-                        "downloadUrl": f"/downloads/files/{mac_file}",
-                        "sha256": character * 64,
-                        "sizeBytes": index + 101,
-                        "installAccessClass": "account_required",
-                        **(
-                            {
-                                "payloadFileName": private_payload_name,
-                                "payloadDownloadUrl": (
-                                    "/downloads/files/"
-                                    f"{private_payload_name}"
-                                ),
-                                "payloadSha256": "f" * 64,
-                                "payloadSizeBytes": 303,
-                            }
-                            if artifact_id
-                            == "avalonia-osx-x64-installer"
-                            else {}
-                        ),
-                    }
-                    for index, (
-                        artifact_id,
-                        (mac_file, character),
-                    ) in enumerate(mac_files.items())
-                ]
+                "generationId": generation_id,
+                "artifacts": all_artifacts,
             }
         ),
         encoding="utf-8",
     )
-    fresh_paths = (
-        "files/chummer-avalonia-win-x64-installer.exe",
-        "files/chummer-avalonia-win-x64-payload.zip",
-        "files/chummer-avalonia-win-x64-payload.zip.json",
+    (generation_root / "releases.json").write_text(
+        json.dumps(
+            {
+                "generationId": generation_id,
+                "downloads": [
+                    {
+                        **artifact,
+                        "url": artifact["downloadUrl"],
+                    }
+                    for artifact in all_artifacts
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    generation.normalize_manifest(
+        generation_root / generation.CANONICAL_MANIFEST,
+        generation_id,
+    )
+    generation.normalize_manifest(
+        generation_root / generation.COMPATIBILITY_MANIFEST,
+        generation_id,
+    )
+    fresh_paths = tuple(
+        f"files/{file_name}" for file_name in fresh_file_bytes
     )
     shelf = {
         "generationId": generation_id,
@@ -3636,12 +4155,14 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
             "freshDelta": [
                 {
                     "path": path,
-                    "sha256": character * 64,
-                    "sizeBytes": index + 10,
+                    "sha256": hashlib.sha256(
+                        fresh_file_bytes[Path(path).name]
+                    ).hexdigest(),
+                    "sizeBytes": len(
+                        fresh_file_bytes[Path(path).name]
+                    ),
                 }
-                for index, (path, character) in enumerate(
-                    zip(fresh_paths, ("a", "b", "c"), strict=True)
-                )
+                for path in fresh_paths
             ]
         },
     }
@@ -3693,6 +4214,16 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
     assert receipt["hosts"] == list(HOSTS)
     assert len(receipt["freshArtifacts"]) == 12
     assert len(receipt["accountRequiredDenials"]) == 16
+    assert receipt["accountRequiredDenialClosure"] == {
+        "status": "pass",
+        "accountRequiredArtifactCount": 2,
+        "bindingCount": 4,
+        "expectedObservationCount": 16,
+        "observedObservationCount": 16,
+        "sealedGenerationFileCount": 7,
+        "freshFileCount": 3,
+        "zeroCountProved": False,
+    }
     assert {call["request_host"] for call in streamed} == set(HOSTS)
     assert {call["connect_host"] for call in streamed} == connect_hosts
     assert {call["scheme"] for call in streamed} == {scheme}

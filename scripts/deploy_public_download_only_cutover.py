@@ -4028,139 +4028,495 @@ def _fresh_delta_rows(shelf: Mapping[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _strict_prepared_manifest(
+    generation_root: Path,
+    name: str,
+    label: str,
+) -> dict[str, Any]:
+    raw = stable_regular_bytes(
+        generation_root / name,
+        label=label,
+        maximum_bytes=8 * 1024 * 1024,
+    )
+
+    def unique_object(
+        pairs: list[tuple[str, Any]],
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-finite JSON number: {value}")
+
+    try:
+        manifest = json.loads(
+            raw,
+            object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise CutoverError(f"{label} is malformed") from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("generationId") != generation_root.name
+    ):
+        raise CutoverError(
+            f"{label} does not bind the prepared generation"
+        )
+    return manifest
+
+
+def _prepared_download_path(
+    raw: Any,
+    *,
+    label: str,
+) -> str:
+    if (
+        not isinstance(raw, str)
+        or not raw
+        or raw != raw.strip()
+        or "\\" in raw
+        or "%" in raw
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in raw
+        )
+    ):
+        raise CutoverError(f"{label} is not a canonical download URL")
+    try:
+        parsed = urlsplit(raw)
+    except ValueError as exc:
+        raise CutoverError(f"{label} is not a canonical download URL") from exc
+    if parsed.query or parsed.fragment:
+        raise CutoverError(f"{label} is not a canonical download URL")
+    if parsed.scheme or parsed.netloc:
+        raise CutoverError(f"{label} has an unauthorized origin")
+    if not parsed.path.startswith("/downloads/"):
+        raise CutoverError(f"{label} is not a download URL")
+    return parsed.path
+
+
+def _prepared_artifact_id(
+    row: Mapping[str, Any],
+    *,
+    label: str,
+) -> str:
+    aliases = [
+        row[key]
+        for key in ("artifactId", "id")
+        if key in row
+    ]
+    if not aliases:
+        raise CutoverError(f"{label} artifact identity is unavailable")
+    if any(
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        for value in aliases
+    ):
+        raise CutoverError(f"{label} artifact identity is malformed")
+    artifact_id = str(aliases[0])
+    if (
+        any(value != artifact_id for value in aliases[1:])
+        or re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}",
+            artifact_id,
+        )
+        is None
+        or ".." in artifact_id
+    ):
+        raise CutoverError(f"{label} artifact identity is ambiguous")
+    return artifact_id
+
+
+def _prepared_role(
+    row: Mapping[str, Any],
+    *,
+    artifact_id: str,
+    generation_id: str,
+    access_class: str,
+    role: str,
+    file_key: str,
+    sha256_key: str,
+    size_key: str,
+    url_keys: tuple[str, ...],
+) -> dict[str, Any]:
+    label = f"prepared artifact {artifact_id} {role}"
+    file_name = row.get(file_key)
+    sha256 = row.get(sha256_key)
+    size = row.get(size_key)
+    if (
+        not isinstance(file_name, str)
+        or not file_name
+        or file_name != file_name.strip()
+        or Path(file_name).name != file_name
+        or re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9._+-]{0,254}",
+            file_name,
+        )
+        is None
+        or not isinstance(sha256, str)
+        or sha256 != sha256.strip().lower()
+        or SHA256.fullmatch(sha256) is None
+        or isinstance(size, bool)
+        or not isinstance(size, int)
+        or size <= 0
+    ):
+        raise CutoverError(f"{label} byte contract is malformed")
+    raw_urls = [row[key] for key in url_keys if key in row]
+    if not raw_urls:
+        raise CutoverError(f"{label} URL is unavailable")
+    paths = {
+        _prepared_download_path(
+            raw_url,
+            label=f"{label} URL",
+        )
+        for raw_url in raw_urls
+    }
+    if len(paths) != 1:
+        raise CutoverError(f"{label} URL aliases disagree")
+    manifest_path = paths.pop()
+    if role == "primary":
+        generation_path = (
+            f"/downloads/g/{generation_id}/files/{file_name}"
+            if access_class == "open_public"
+            else (
+                f"/downloads/g/{generation_id}/install/"
+                f"{artifact_id}"
+            )
+        )
+    else:
+        generation_path = (
+            f"/downloads/g/{generation_id}/install/"
+            f"{artifact_id}/payload"
+        )
+    if manifest_path != generation_path:
+        raise CutoverError(f"{label} URL shape drifted")
+    return {
+        "role": role,
+        "fileName": file_name,
+        "sha256": sha256,
+        "sizeBytes": size,
+        "manifestPath": manifest_path,
+    }
+
+
+def _normalized_prepared_artifacts(
+    manifest: Mapping[str, Any],
+    *,
+    collection_name: str,
+    label: str,
+    generation_id: str,
+) -> dict[str, dict[str, Any]]:
+    unexpected_collection = (
+        "downloads"
+        if collection_name == "artifacts"
+        else "artifacts"
+    )
+    if unexpected_collection in manifest:
+        raise CutoverError(
+            f"{label} contains unexpected {unexpected_collection}"
+        )
+    rows = manifest.get(collection_name)
+    if not isinstance(rows, list):
+        raise CutoverError(f"{label} {collection_name} are unavailable")
+    artifacts: dict[str, dict[str, Any]] = {}
+    paths: set[str] = set()
+    for index, raw_row in enumerate(rows):
+        if not isinstance(raw_row, dict):
+            raise CutoverError(f"{label} artifact row {index} is malformed")
+        artifact_id = _prepared_artifact_id(
+            raw_row,
+            label=f"{label} row {index}",
+        )
+        if artifact_id in artifacts:
+            raise CutoverError(f"{label} contains duplicate artifact identity")
+        access_aliases = [
+            raw_row[key]
+            for key in (
+                "installAccessClass",
+                "install_access_class",
+            )
+            if key in raw_row
+        ]
+        if (
+            not access_aliases
+            or any(
+                not isinstance(value, str)
+                or value not in {
+                    "open_public",
+                    "account_required",
+                }
+                for value in access_aliases
+            )
+            or len(set(access_aliases)) != 1
+        ):
+            raise CutoverError(
+                f"{label} artifact access class is missing or malformed"
+            )
+        access_class = str(access_aliases[0])
+        primary = _prepared_role(
+            raw_row,
+            artifact_id=artifact_id,
+            generation_id=generation_id,
+            access_class=access_class,
+            role="primary",
+            file_key="fileName",
+            sha256_key="sha256",
+            size_key="sizeBytes",
+            url_keys=("downloadUrl", "url"),
+        )
+        payload_fields = {
+            "payloadFileName",
+            "payloadSha256",
+            "payloadSizeBytes",
+            "payloadDownloadUrl",
+            "payloadMetadataFileName",
+            "payloadMetadataUrl",
+        }
+        roles = [primary]
+        if any(key in raw_row for key in payload_fields):
+            payload = _prepared_role(
+                raw_row,
+                artifact_id=artifact_id,
+                generation_id=generation_id,
+                access_class=access_class,
+                role="payload",
+                file_key="payloadFileName",
+                sha256_key="payloadSha256",
+                size_key="payloadSizeBytes",
+                url_keys=("payloadDownloadUrl",),
+            )
+            sidecar_name = f"{payload['fileName']}.json"
+            if (
+                "payloadMetadataFileName" in raw_row
+                and raw_row.get("payloadMetadataFileName")
+                != sidecar_name
+            ):
+                raise CutoverError(
+                    f"prepared artifact {artifact_id} sidecar name drifted"
+                )
+            metadata_path = ""
+            if "payloadMetadataUrl" in raw_row:
+                metadata_path = _prepared_download_path(
+                    raw_row.get("payloadMetadataUrl"),
+                    label=(
+                        f"prepared artifact {artifact_id} sidecar URL"
+                    ),
+                )
+                if metadata_path != (
+                    f"/downloads/g/{generation_id}/install/"
+                    f"{artifact_id}/metadata"
+                ):
+                    raise CutoverError(
+                        f"prepared artifact {artifact_id} sidecar URL shape drifted"
+                    )
+            roles.extend(
+                (
+                    payload,
+                    {
+                        "role": "sidecar",
+                        "fileName": sidecar_name,
+                        "manifestPath": metadata_path,
+                    },
+                )
+            )
+        for role in roles:
+            file_name = str(role["fileName"])
+            if file_name in paths:
+                raise CutoverError(
+                    f"{label} artifact file path closure is ambiguous"
+                )
+            paths.add(file_name)
+        artifacts[artifact_id] = {
+            "artifactId": artifact_id,
+            "installAccessClass": access_class,
+            "platform": raw_row.get("platform"),
+            "rid": raw_row.get("rid"),
+            "roles": roles,
+        }
+    return artifacts
+
+
 def _retained_account_required_bindings(
     *,
     config: SidecarConfig,
     generation_root: Path,
     fresh_rows: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    raw = stable_regular_bytes(
-        generation_root / "RELEASE_CHANNEL.generated.json",
-        label="prepared generation canonical manifest",
-        maximum_bytes=8 * 1024 * 1024,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    del config
+    canonical = _strict_prepared_manifest(
+        generation_root,
+        "RELEASE_CHANNEL.generated.json",
+        "prepared generation canonical manifest",
     )
-    try:
-        manifest = json.loads(raw)
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise CutoverError("prepared canonical manifest is malformed") from exc
-    artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
-    if not isinstance(artifacts, list):
-        raise CutoverError("prepared canonical manifest artifacts are unavailable")
-    fresh_paths = {str(row["path"]) for row in fresh_rows}
-    candidates: list[dict[str, Any]] = []
-    mac_artifact_ids: set[str] = set()
-    for row in artifacts:
-        if not isinstance(row, dict):
-            continue
-        platform = str(row.get("platform") or "").strip().lower()
-        rid = str(row.get("rid") or "").strip().lower()
-        if str(
-            row.get("installAccessClass") or ""
-        ).strip().lower() != "account_required":
-            continue
-        artifact_id = str(
-            row.get("artifactId") or row.get("id") or ""
-        ).strip()
-        if not artifact_id:
-            raise CutoverError(
-                "retained account-required artifact identity is invalid"
-            )
-        if (
-            platform in {"mac", "macos", "osx"}
-            or rid.startswith("osx-")
-        ):
-            mac_artifact_ids.add(artifact_id)
-
-        role_rows: list[tuple[str, str, str, Any, str]] = [
-            (
-                "primary",
-                str(row.get("fileName") or "").strip(),
-                str(row.get("sha256") or "").strip().lower(),
-                row.get("sizeBytes"),
-                str(
-                    row.get("downloadUrl") or row.get("url") or ""
-                ).strip(),
-            )
-        ]
-        payload_file_name = str(
-            row.get("payloadFileName") or ""
-        ).strip()
-        if payload_file_name:
-            payload_url = str(
-                row.get("payloadDownloadUrl") or ""
-            ).strip()
-            role_rows.append(
-                (
-                    "payload",
-                    payload_file_name,
-                    str(row.get("payloadSha256") or "").strip().lower(),
-                    row.get("payloadSizeBytes"),
-                    payload_url,
-                )
-            )
-            sidecar_name = payload_file_name + ".json"
-            sidecar_bytes = stable_regular_bytes(
-                generation_root / "files" / sidecar_name,
-                label=(
-                    "retained account-required payload metadata "
-                    f"{artifact_id}"
-                ),
-                maximum_bytes=8 * 1024 * 1024,
-            )
-            role_rows.append(
-                (
-                    "sidecar",
-                    sidecar_name,
-                    sha256_bytes(sidecar_bytes),
-                    len(sidecar_bytes),
-                    payload_url + ".json",
-                )
-            )
-
-        for role, file_name, sha256, size, raw_url in role_rows:
-            resolved = urlsplit(
-                urljoin(config.base_url.rstrip("/") + "/", raw_url)
-            )
-            path = f"/downloads/files/{file_name}"
-            if (
-                not file_name
-                or Path(file_name).name != file_name
-                or "/" in file_name
-                or "\\" in file_name
-                or SHA256.fullmatch(sha256) is None
-                or isinstance(size, bool)
-                or not isinstance(size, int)
-                or size <= 0
-                or resolved.scheme != "https"
-                or resolved.hostname != SIDECAR_HOSTS[0]
-                or resolved.path != path
-                or resolved.query
-                or resolved.fragment
-                or path in fresh_paths
-            ):
-                raise CutoverError(
-                    "retained account-required artifact contract is invalid"
-                )
-            candidates.append(
-                {
-                    "artifactId": artifact_id,
-                    "role": role,
-                    "path": path,
-                    "sha256": sha256,
-                    "sizeBytes": size,
-                    "installAccessClass": "account_required",
-                }
-            )
-    if not candidates or not mac_artifact_ids:
+    compatibility = _strict_prepared_manifest(
+        generation_root,
+        "releases.json",
+        "prepared generation compatibility manifest",
+    )
+    canonical_artifacts = _normalized_prepared_artifacts(
+        canonical,
+        collection_name="artifacts",
+        label="prepared canonical manifest",
+        generation_id=generation_root.name,
+    )
+    compatibility_artifacts = _normalized_prepared_artifacts(
+        compatibility,
+        collection_name="downloads",
+        label="prepared compatibility manifest",
+        generation_id=generation_root.name,
+    )
+    if canonical_artifacts != compatibility_artifacts:
         raise CutoverError(
-            "no retained account-required Mac artifact is available for denial proof"
+            "prepared canonical and compatibility artifact contracts disagree"
+        )
+
+    fresh_by_name: dict[str, dict[str, Any]] = {}
+    for row in fresh_rows:
+        path = str(row["path"])
+        file_name = Path(path).name
+        if (
+            path != f"/downloads/files/{file_name}"
+            or file_name in fresh_by_name
+        ):
+            raise CutoverError("fresh download authority is ambiguous")
+        fresh_by_name[file_name] = row
+
+    account_required_ids = {
+        artifact_id
+        for artifact_id, artifact in canonical_artifacts.items()
+        if artifact["installAccessClass"] == "account_required"
+    }
+    open_roles: dict[str, dict[str, Any]] = {}
+    protected_roles: list[tuple[str, dict[str, Any]]] = []
+    for artifact_id, artifact in canonical_artifacts.items():
+        for role in artifact["roles"]:
+            file_name = str(role["fileName"])
+            if artifact["installAccessClass"] == "open_public":
+                if file_name in open_roles:
+                    raise CutoverError(
+                        "prepared open-public file path closure is ambiguous"
+                    )
+                open_roles[file_name] = role
+            else:
+                protected_roles.append((artifact_id, role))
+    if set(open_roles) != set(fresh_by_name):
+        raise CutoverError(
+            "prepared open-public roles differ from fresh authority"
+        )
+    if any(
+        str(role["fileName"]) in fresh_by_name
+        for _artifact_id, role in protected_roles
+    ):
+        raise CutoverError(
+            "account-required and fresh file path closures overlap"
+        )
+
+    expected_names = {
+        *fresh_by_name,
+        *(
+            str(role["fileName"])
+            for _artifact_id, role in protected_roles
+        ),
+    }
+    files_root = generation_root / "files"
+    try:
+        files_metadata = files_root.lstat()
+    except OSError as exc:
+        raise CutoverError(
+            "prepared generation files closure is unavailable"
+        ) from exc
+    if (
+        stat.S_ISLNK(files_metadata.st_mode)
+        or not stat.S_ISDIR(files_metadata.st_mode)
+    ):
+        raise CutoverError(
+            "prepared generation file closure differs from authenticated roles"
+        )
+    try:
+        entries = [
+            (entry, entry.lstat())
+            for entry in files_root.iterdir()
+        ]
+    except OSError as exc:
+        raise CutoverError(
+            "prepared generation file closure changed while inspected"
+        ) from exc
+    if (
+        any(
+            entry.name not in expected_names
+            or stat.S_ISLNK(metadata.st_mode)
+            or not stat.S_ISREG(metadata.st_mode)
+            for entry, metadata in entries
+        )
+        or {entry.name for entry, _metadata in entries}
+        != expected_names
+    ):
+        raise CutoverError(
+            "prepared generation file closure differs from authenticated roles"
+        )
+
+    actual: dict[str, dict[str, Any]] = {}
+    for file_name in sorted(expected_names):
+        raw = stable_regular_bytes(
+            files_root / file_name,
+            label=f"prepared generation file {file_name}",
+            maximum_bytes=None,
+        )
+        actual[file_name] = {
+            "sha256": sha256_bytes(raw),
+            "sizeBytes": len(raw),
+        }
+    for file_name, fresh in fresh_by_name.items():
+        role = open_roles[file_name]
+        expected = actual[file_name]
+        if any(
+            fresh.get(key) != expected[key]
+            for key in ("sha256", "sizeBytes")
+        ):
+            raise CutoverError(
+                "fresh authority differs from sealed generation bytes"
+            )
+        if role["role"] != "sidecar" and any(
+            role.get(key) != expected[key]
+            for key in ("sha256", "sizeBytes")
+        ):
+            raise CutoverError(
+                "open-public manifest differs from sealed generation bytes"
+            )
+
+    candidates: list[dict[str, Any]] = []
+    for artifact_id, role in protected_roles:
+        file_name = str(role["fileName"])
+        expected = actual[file_name]
+        if role["role"] != "sidecar" and any(
+            role.get(key) != expected[key]
+            for key in ("sha256", "sizeBytes")
+        ):
+            raise CutoverError(
+                "account-required manifest differs from sealed generation bytes"
+            )
+        candidates.append(
+            {
+                "artifactId": artifact_id,
+                "role": role["role"],
+                "path": f"/downloads/files/{file_name}",
+                "sha256": expected["sha256"],
+                "sizeBytes": expected["sizeBytes"],
+                "installAccessClass": "account_required",
+            }
         )
     paths = [str(row["path"]) for row in candidates]
     if len(paths) != len(set(paths)):
         raise CutoverError(
             "retained account-required artifact path closure is ambiguous"
         )
-    return sorted(
+    bindings = sorted(
         candidates,
         key=lambda row: (
             str(row["artifactId"]),
@@ -4168,6 +4524,19 @@ def _retained_account_required_bindings(
             str(row["path"]),
         ),
     )
+    if bool(account_required_ids) != bool(bindings):
+        raise CutoverError(
+            "account-required artifact and denial binding closure disagree"
+        )
+    return bindings, {
+        "accountRequiredArtifactCount": len(account_required_ids),
+        "bindingCount": len(bindings),
+        "sealedGenerationFileCount": len(actual),
+        "freshFileCount": len(fresh_by_name),
+        "zeroCountProved": (
+            not account_required_ids and not bindings
+        ),
+    }
 
 
 def _probe_denied_download(
@@ -4381,10 +4750,17 @@ def probe_download_artifact_hosts(
         raise CutoverError("artifact probe scope is invalid")
     generation_id = str(shelf.get("generationId") or "").strip()
     generation_root = Path(str(shelf.get("generationRoot") or ""))
-    if not generation_id or not generation_root.is_absolute():
+    if (
+        not generation_id
+        or not generation_root.is_absolute()
+        or generation_root.name != generation_id
+    ):
         raise CutoverError("artifact probe generation authority is invalid")
     fresh_rows = _fresh_delta_rows(shelf)
-    retained_bindings = _retained_account_required_bindings(
+    (
+        retained_bindings,
+        denial_closure,
+    ) = _retained_account_required_bindings(
         config=config,
         generation_root=generation_root,
         fresh_rows=fresh_rows,
@@ -4453,6 +4829,13 @@ def probe_download_artifact_hosts(
                         "installAccessClass": "account_required",
                     }
                 )
+    expected_denial_observations = (
+        len(SIDECAR_HOSTS) * len(retained_bindings) * 2
+    )
+    if len(denial_observations) != expected_denial_observations:
+        raise CutoverError(
+            "account-required denial observation closure is incomplete"
+        )
     return {
         "status": "pass",
         "scope": scope,
@@ -4460,6 +4843,12 @@ def probe_download_artifact_hosts(
         "generationId": generation_id,
         "freshArtifacts": observations,
         "accountRequiredDenials": denial_observations,
+        "accountRequiredDenialClosure": {
+            "status": "pass",
+            **denial_closure,
+            "expectedObservationCount": expected_denial_observations,
+            "observedObservationCount": len(denial_observations),
+        },
     }
 
 
