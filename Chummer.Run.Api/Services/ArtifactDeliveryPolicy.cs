@@ -388,7 +388,13 @@ public sealed class ArtifactDeliveryPolicy
         else
         {
             if (string.IsNullOrWhiteSpace(artifact.PayloadFileName)
-                || !TryValidatePayloadSidecar(snapshot, manifest, artifact, out string? metadataSha, out long metadataSize))
+                || !TryValidatePayloadSidecar(
+                    snapshot,
+                    manifest,
+                    artifact,
+                    accessClass!,
+                    out string? metadataSha,
+                    out long metadataSize))
             {
                 return false;
             }
@@ -420,6 +426,7 @@ public sealed class ArtifactDeliveryPolicy
         ReleaseShelfSnapshot snapshot,
         PublicReleaseManifestDto manifest,
         PublicReleaseArtifactDto artifact,
+        string accessClass,
         out string? metadataSha256,
         out long metadataSize)
     {
@@ -442,7 +449,9 @@ public sealed class ArtifactDeliveryPolicy
                 artifact.PayloadSizeBytes,
                 manifest.Version,
                 allowMutableIncomingUrl: snapshot.IsLegacy,
-                out _))
+                out _,
+                installAccessClass: accessClass,
+                artifactId: artifact.Id))
         {
             return false;
         }
@@ -728,6 +737,8 @@ public sealed class ArtifactDeliveryPolicy
 
 internal static class PayloadSidecarContractValidator
 {
+    private const string CanonicalPublicOrigin = "https://chummer.run";
+
     private static readonly string[] RequiredProperties =
     [
         "contractName",
@@ -748,7 +759,9 @@ internal static class PayloadSidecarContractValidator
         long? payloadSizeBytes,
         string? releaseVersion,
         bool allowMutableIncomingUrl,
-        out string? failure)
+        out string? failure,
+        string? installAccessClass = null,
+        string? artifactId = null)
         => TryValidate(
             bytes,
             installerFileName,
@@ -759,7 +772,9 @@ internal static class PayloadSidecarContractValidator
             releaseVersion,
             allowMutableIncomingUrl,
             requirePayloadAcquisitionMode: false,
-            out failure);
+            out failure,
+            installAccessClass,
+            artifactId);
 
     public static bool TryValidate(
         byte[] bytes,
@@ -771,7 +786,9 @@ internal static class PayloadSidecarContractValidator
         string? releaseVersion,
         bool allowMutableIncomingUrl,
         bool requirePayloadAcquisitionMode,
-        out string? failure)
+        out string? failure,
+        string? installAccessClass = null,
+        string? artifactId = null)
     {
         failure = null;
         try
@@ -834,12 +851,18 @@ internal static class PayloadSidecarContractValidator
                 return Fail("payload sidecar identity does not match its manifests", out failure);
             }
 
-            if (!TryString(root, "downloadUrl", out string? actualUrl)
+            string? actualUrl;
+            bool hasActualUrl = allowMutableIncomingUrl
+                ? TryString(root, "downloadUrl", out actualUrl)
+                : TryCanonicalUrlString(root, "downloadUrl", out actualUrl);
+            if (!hasActualUrl
                 || !IsMatchingGovernedUrl(
                     actualUrl!,
                     payloadDownloadUrl,
                     expectedPayloadName,
-                    allowMutableIncomingUrl))
+                    allowMutableIncomingUrl,
+                    installAccessClass,
+                    artifactId))
             {
                 return Fail("payload sidecar URL does not match its governed payload route", out failure);
             }
@@ -856,7 +879,58 @@ internal static class PayloadSidecarContractValidator
         string actual,
         string? manifestUrl,
         string payloadFileName,
-        bool allowMutableIncomingUrl)
+        bool allowMutableIncomingUrl,
+        string? installAccessClass,
+        string? artifactId)
+    {
+        if (allowMutableIncomingUrl)
+        {
+            return IsMatchingMutableIncomingUrl(actual, manifestUrl, payloadFileName);
+        }
+
+        string rawManifestUrl = manifestUrl ?? string.Empty;
+        if (actual.Contains('?', StringComparison.Ordinal)
+            || actual.Contains('#', StringComparison.Ordinal)
+            || actual.Contains('\\', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!IsPortableRouteSegment(payloadFileName))
+        {
+            return false;
+        }
+
+        string stableUrl =
+            $"{CanonicalPublicOrigin}/downloads/files/{payloadFileName}";
+        if (string.Equals(
+                installAccessClass,
+                InstallAccessClasses.OpenPublic,
+                StringComparison.Ordinal)
+            && IsImmutableSemanticPayloadRoute(rawManifestUrl, artifactId)
+            && string.Equals(actual, stableUrl, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (string.Equals(actual, rawManifestUrl, StringComparison.Ordinal)
+            && IsImmutablePayloadRoute(rawManifestUrl, payloadFileName))
+        {
+            return true;
+        }
+
+        return rawManifestUrl.StartsWith("/", StringComparison.Ordinal)
+               && IsImmutablePayloadRoute(rawManifestUrl, payloadFileName)
+               && string.Equals(
+                   actual,
+                   CanonicalPublicOrigin + rawManifestUrl,
+                   StringComparison.Ordinal);
+    }
+
+    private static bool IsMatchingMutableIncomingUrl(
+        string actual,
+        string? manifestUrl,
+        string payloadFileName)
     {
         string expectedManifestUrl = (manifestUrl ?? string.Empty).Trim();
         if (actual.Contains('?', StringComparison.Ordinal)
@@ -866,8 +940,7 @@ internal static class PayloadSidecarContractValidator
             return false;
         }
 
-        if (string.Equals(actual, expectedManifestUrl, StringComparison.Ordinal)
-            && (allowMutableIncomingUrl || IsImmutablePayloadRoute(actual, payloadFileName)))
+        if (string.Equals(actual, expectedManifestUrl, StringComparison.Ordinal))
         {
             return true;
         }
@@ -882,13 +955,95 @@ internal static class PayloadSidecarContractValidator
         }
 
         string incomingPath = $"/downloads/files/{payloadFileName}";
-        return (allowMutableIncomingUrl
-               && string.Equals(absolute.AbsolutePath, incomingPath, StringComparison.Ordinal))
-               || (string.Equals(absolute.AbsolutePath, expectedManifestUrl, StringComparison.Ordinal)
-                   && IsImmutablePayloadRoute(absolute.AbsolutePath, payloadFileName));
+        return string.Equals(absolute.AbsolutePath, incomingPath, StringComparison.Ordinal)
+               || (string.Equals(
+                       absolute.AbsolutePath,
+                       expectedManifestUrl,
+                       StringComparison.Ordinal)
+                   && IsLegacyImmutablePayloadRoute(
+                       absolute.AbsolutePath,
+                       payloadFileName));
+    }
+
+    private static bool IsImmutableSemanticPayloadRoute(
+        string value,
+        string? artifactId)
+    {
+        string expectedArtifactId = artifactId ?? string.Empty;
+        if (!IsPortableRouteSegment(expectedArtifactId)
+            || !value.StartsWith("/", StringComparison.Ordinal)
+            || value.Contains('?', StringComparison.Ordinal)
+            || value.Contains('#', StringComparison.Ordinal)
+            || value.Contains('\\', StringComparison.Ordinal)
+            || value.Contains('%', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string[] parts = value.Split('/');
+        return parts.Length == 7
+               && parts[0].Length == 0
+               && parts[1] == "downloads"
+               && parts[2] == "g"
+               && IsPortableRouteSegment(parts[3])
+               && parts[4] == "install"
+               && string.Equals(parts[5], expectedArtifactId, StringComparison.Ordinal)
+               && parts[6] == "payload";
     }
 
     private static bool IsImmutablePayloadRoute(string value, string payloadFileName)
+    {
+        string path;
+        if (value.StartsWith("/", StringComparison.Ordinal))
+        {
+            path = value;
+        }
+        else if (value.StartsWith(
+                     CanonicalPublicOrigin + "/",
+                     StringComparison.Ordinal))
+        {
+            path = value[CanonicalPublicOrigin.Length..];
+        }
+        else
+        {
+            return false;
+        }
+
+        if (!IsPortableRouteSegment(payloadFileName)
+            || path.Contains('?', StringComparison.Ordinal)
+            || path.Contains('#', StringComparison.Ordinal)
+            || path.Contains('\\', StringComparison.Ordinal)
+            || path.Contains('%', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string[] parts = path.Split('/');
+        if (parts.Length < 6
+            || parts[0].Length != 0
+            || parts[1] != "downloads"
+            || parts[2] != "g"
+            || !IsPortableRouteSegment(parts[3]))
+        {
+            return false;
+        }
+
+        if (parts.Length == 6
+            && parts[4] == "files"
+            && string.Equals(parts[5], payloadFileName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return parts.Length == 7
+               && parts[4] == "install"
+               && IsPortableRouteSegment(parts[5])
+               && parts[6] == "payload";
+    }
+
+    private static bool IsLegacyImmutablePayloadRoute(
+        string value,
+        string payloadFileName)
     {
         string path = value;
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute))
@@ -938,6 +1093,23 @@ internal static class PayloadSidecarContractValidator
 
         value = child.GetString()?.Trim();
         return value is not null;
+    }
+
+    private static bool TryCanonicalUrlString(
+        JsonElement root,
+        string property,
+        out string? value)
+    {
+        value = null;
+        if (!root.TryGetProperty(property, out JsonElement child)
+            || child.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = child.GetString();
+        return !string.IsNullOrEmpty(value)
+               && string.Equals(value, value.Trim(), StringComparison.Ordinal);
     }
 
     private static bool Fail(string message, out string? failure)
