@@ -937,6 +937,59 @@ def test_topology_b_runner_hashes_but_does_not_expose_failed_command_stderr(
     assert evidence["stderrSizeBytes"] == len(stderr)
 
 
+def test_topology_b_runner_round_trips_real_subprocess_stdin(
+    tmp_path: Path,
+) -> None:
+    config = SimpleNamespace(
+        docker_config_root=tmp_path / "docker",
+        project_name="chummer-public-download-runner-test",
+        compose_file=tmp_path / "compose.json",
+        operation_root=tmp_path,
+    )
+    runner = controller.TopologyBRunner(config)
+    payload = b"governed topology-B stdin"
+
+    output = runner.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                "value = sys.stdin.buffer.read(); "
+                "sys.stdout.buffer.write(value[::-1])"
+            ),
+        ],
+        label="test governed stdin round trip",
+        input_bytes=payload,
+    )
+
+    assert output == payload[::-1]
+
+
+def test_topology_b_runner_uses_devnull_without_input(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = SimpleNamespace(
+        docker_config_root=tmp_path / "docker",
+        project_name="chummer-public-download-runner-test",
+        compose_file=tmp_path / "compose.json",
+        operation_root=tmp_path,
+    )
+    runner = controller.TopologyBRunner(config)
+    observed: dict[str, Any] = {}
+
+    def completed(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        observed.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr(controller.subprocess, "run", completed)
+
+    assert runner.run(["/usr/bin/true"], label="test no-input command") == b""
+    assert observed["input"] is None
+    assert observed["stdin"] is controller.subprocess.DEVNULL
+
+
 def test_topology_b_runner_normalizes_signal_exit_for_replayable_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -3220,7 +3220,7 @@ class TopologyBRunner:
                 env=process_environment,
                 input=input_bytes,
                 stdin=(
-                    subprocess.PIPE
+                    None
                     if input_bytes is not None
                     else subprocess.DEVNULL
                 ),
