@@ -14,11 +14,13 @@ import argparse
 import copy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 import hashlib
 import http.client
 import io
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath
 import pwd
@@ -2691,6 +2693,116 @@ SCOPE_BOUND_SOURCE_COMMIT_VERIFICATION = {
     "registry": "verified_against_manifest_aliases",
     "ui": "caller_asserted_unverified_informational",
 }
+SCOPE_BOUND_REVIEW_EVIDENCE_PATHS = (
+    "release-evidence/CURRENT.json",
+    "release-evidence/RELEASE_DECISION.json",
+    "release-evidence/SNAPSHOT.json",
+)
+SCOPE_BOUND_STARTUP_SMOKE_PATH = (
+    "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+)
+SCOPE_BOUND_CANDIDATE_ADJUNCT_PATHS = frozenset(
+    {
+        *SCOPE_BOUND_REVIEW_EVIDENCE_PATHS,
+        SCOPE_BOUND_STARTUP_SMOKE_PATH,
+    }
+)
+REVIEW_AUTHORITY_CURRENT_FIELDS = frozenset(
+    {"releaseVersion", "snapshotSha256", "decisionSha256", "status"}
+)
+REVIEW_AUTHORITY_SNAPSHOT_FIELDS = frozenset(
+    {
+        "authorityContract",
+        "releaseVersion",
+        "channel",
+        "status",
+        "rolloutState",
+        "supportabilityState",
+        "availablePlatforms",
+        "primaryHeadByPlatform",
+        "artifactCount",
+        "downloadAccessPosture",
+        "knownIssueSummary",
+        "manifestSha256",
+        "registryRepository",
+        "registryCommit",
+        "releaseDecisionStatus",
+        "releaseDecisionSha256",
+        "supportOwner",
+        "nextActions",
+        "artifacts",
+        "manifestPath",
+        "releaseDecisionPath",
+    }
+)
+REVIEW_AUTHORITY_ARTIFACT_FIELDS = frozenset(
+    {
+        "artifactId",
+        "head",
+        "platform",
+        "rid",
+        "arch",
+        "kind",
+        "downloadUrl",
+        "sha256",
+        "sizeBytes",
+        "compatibilityState",
+        "promotionState",
+        "publicationScope",
+        "revokeState",
+        "publicInstallRoute",
+        "installAccessClass",
+    }
+)
+REVIEW_AUTHORITY_DECISION_FIELDS = frozenset(
+    {
+        "contractName",
+        "generatedAt",
+        "status",
+        "releaseDecisionStatus",
+        "verdict",
+        "releaseVersion",
+        "releaseScopeDecisionSha256",
+        "channel",
+        "platforms",
+        "primaryHeadByPlatform",
+        "fallbackHeadsByPlatform",
+        "artifactAccessClass",
+        "supportOwner",
+        "nextActions",
+        "registryCommit",
+        "manifestSha256",
+        "authoritySnapshotSha256",
+        "candidateDecisionStatus",
+        "candidateDecisionSha256",
+        "manifestGeneratedAt",
+        "scorecardSha256",
+        "convergenceSha256",
+        "blockingFindings",
+        "artifactHandoff",
+    }
+)
+REVIEW_AUTHORITY_HANDOFF_FIELDS = frozenset(
+    {
+        "contractName",
+        "status",
+        "sourcePublicationState",
+        "releaseScopeDecisionSha256",
+        "releaseVersion",
+        "channel",
+        "artifactId",
+        "head",
+        "platform",
+        "rid",
+        "arch",
+        "sha256",
+        "sizeBytes",
+        "artifactAccessClass",
+        "signingRequirement",
+        "downloadUrl",
+        "publicInstallRoute",
+    }
+)
 SIDECAR_ORIGIN = "http://172.17.0.1:18091"
 SIDECAR_ADDRESS = "172.17.0.1"
 SIDECAR_PORT = 18091
@@ -4476,14 +4588,20 @@ def _retained_account_required_bindings(
         role = open_roles[file_name]
         expected = actual[file_name]
         if any(
-            fresh.get(key) != expected[key]
+            not _json_semantically_equal(
+                fresh.get(key),
+                expected[key],
+            )
             for key in ("sha256", "sizeBytes")
         ):
             raise CutoverError(
                 "fresh authority differs from sealed generation bytes"
             )
         if role["role"] != "sidecar" and any(
-            role.get(key) != expected[key]
+            not _json_semantically_equal(
+                role.get(key),
+                expected[key],
+            )
             for key in ("sha256", "sizeBytes")
         ):
             raise CutoverError(
@@ -4495,7 +4613,10 @@ def _retained_account_required_bindings(
         file_name = str(role["fileName"])
         expected = actual[file_name]
         if role["role"] != "sidecar" and any(
-            role.get(key) != expected[key]
+            not _json_semantically_equal(
+                role.get(key),
+                expected[key],
+            )
             for key in ("sha256", "sizeBytes")
         ):
             raise CutoverError(
@@ -4860,6 +4981,7 @@ def _probe_exact_manifest(
     request_host: str,
     path: str,
     expected: bytes,
+    shelf: Mapping[str, Any],
     generation_id: str | None,
 ) -> dict[str, Any]:
     status, headers, body = _http_bytes(
@@ -4870,11 +4992,52 @@ def _probe_exact_manifest(
         path=path,
         timeout=30,
     )
-    if status != 200 or body != expected:
-        raise CutoverError("served manifest does not match exact prepared bytes")
+    if status != 200:
+        raise CutoverError("served manifest did not return HTTP 200")
     observed_generation = headers.get("x-chummer-release-generation", "")
-    if generation_id is not None and observed_generation != generation_id:
+    if (
+        not isinstance(generation_id, str)
+        or not generation_id
+        or observed_generation != generation_id
+    ):
         raise CutoverError("served manifest generation header drifted")
+    prepared_payload = _strict_json_object_bytes(
+        expected,
+        label="prepared manifest",
+    )
+    served_payload = _strict_json_object_bytes(
+        body,
+        label="served manifest",
+    )
+    if "releaseTruth" in prepared_payload:
+        raise CutoverError(
+            "prepared manifest unexpectedly contains a releaseTruth envelope"
+        )
+    _verify_prepared_manifest_authority(
+        shelf=shelf,
+        prepared=prepared_payload,
+        prepared_sha256=sha256_bytes(expected),
+        path=path,
+        generation_id=generation_id,
+    )
+    (
+        expected_release_truth,
+        release_scope_decision_sha256,
+    ) = _review_required_release_truth_authority(shelf)
+    release_truth = served_payload.get("releaseTruth")
+    _verify_review_required_release_truth(
+        release_truth,
+        expected=expected_release_truth,
+        prepared=prepared_payload,
+        generation_id=generation_id,
+        release_scope_decision_sha256=release_scope_decision_sha256,
+    )
+    unwrapped_payload = dict(served_payload)
+    del unwrapped_payload["releaseTruth"]
+    if not _json_semantically_equal(unwrapped_payload, prepared_payload):
+        raise CutoverError(
+            "served manifest payload differs from the prepared manifest"
+        )
     return {
         "endpoint": f"{scheme}://{request_host}{path}",
         "httpStatus": status,
@@ -4883,6 +5046,400 @@ def _probe_exact_manifest(
         "generationId": observed_generation,
         "anonymous": True,
     }
+
+
+_RELEASE_TRUTH_FIELDS = frozenset(
+    {
+        "contractName",
+        "releaseVersion",
+        "channel",
+        "releaseStatus",
+        "rolloutState",
+        "supportabilityState",
+        "availablePlatforms",
+        "primaryHeadByPlatform",
+        "artifactCount",
+        "downloadAccessPosture",
+        "knownIssueSummary",
+        "manifestSha256",
+        "registryCommit",
+        "releaseDecisionStatus",
+        "releaseDecisionSha256",
+        "releaseScopeDecisionSha256",
+        "artifactHandoff",
+    }
+)
+_PUBLIC_PREVIEW_BYTE_HANDOFF_FIELDS = frozenset(
+    {
+        "contractName",
+        "status",
+        "sourcePublicationState",
+        "releaseScopeDecisionSha256",
+        "releaseVersion",
+        "channel",
+        "artifactId",
+        "head",
+        "platform",
+        "rid",
+        "arch",
+        "sha256",
+        "sizeBytes",
+        "artifactAccessClass",
+        "signingRequirement",
+        "downloadUrl",
+        "publicInstallRoute",
+    }
+)
+
+
+def _json_semantically_equal(left: Any, right: Any) -> bool:
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return (
+            left.keys() == right.keys()
+            and all(
+                _json_semantically_equal(left[key], right[key])
+                for key in left
+            )
+        )
+    if isinstance(left, list):
+        return (
+            len(left) == len(right)
+            and all(
+                _json_semantically_equal(left_item, right_item)
+                for left_item, right_item in zip(left, right, strict=True)
+            )
+        )
+    return bool(left == right)
+
+
+def _exact_manifest_alias(
+    payload: Mapping[str, Any],
+    names: tuple[str, ...],
+    *,
+    label: str,
+    nullable_aliases: frozenset[str] = frozenset(),
+) -> str:
+    values: list[str] = []
+    for name in names:
+        if name not in payload:
+            continue
+        value = payload[name]
+        if value is None and name in nullable_aliases:
+            continue
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+        ):
+            raise CutoverError(
+                f"prepared manifest {label} aliases drifted"
+            )
+        values.append(value)
+    if (
+        not values
+        or any(value != values[0] for value in values[1:])
+    ):
+        raise CutoverError(f"prepared manifest {label} aliases drifted")
+    return values[0]
+
+
+def _verify_prepared_manifest_authority(
+    *,
+    shelf: Mapping[str, Any],
+    prepared: Mapping[str, Any],
+    prepared_sha256: str,
+    path: str,
+    generation_id: str,
+) -> None:
+    authority = shelf.get("releaseCandidateAuthority")
+    review_authority = (
+        authority.get("reviewAuthority")
+        if isinstance(authority, dict)
+        else None
+    )
+    release_truth = (
+        authority.get("reviewRequiredReleaseTruth")
+        if isinstance(authority, dict)
+        else None
+    )
+    canonical_hashes = (
+        shelf.get("canonicalMirrorSha256"),
+        shelf.get("generationCanonicalSha256"),
+        (
+            authority.get("canonicalManifestSha256")
+            if isinstance(authority, dict)
+            else None
+        ),
+        (
+            review_authority.get("manifestSha256")
+            if isinstance(review_authority, dict)
+            else None
+        ),
+        (
+            release_truth.get("manifestSha256")
+            if isinstance(release_truth, dict)
+            else None
+        ),
+    )
+    compatibility_hashes = (
+        shelf.get("compatibilityMirrorSha256"),
+        shelf.get("generationCompatibilitySha256"),
+    )
+    if (
+        shelf.get("generationId") != generation_id
+        or prepared.get("generationId") != generation_id
+        or not isinstance(authority, dict)
+        or authority.get("generationId") != generation_id
+        or not isinstance(review_authority, dict)
+        or review_authority.get("generationId") != generation_id
+        or any(
+            not isinstance(value, str)
+            or SHA256.fullmatch(value) is None
+            for value in (*canonical_hashes, *compatibility_hashes)
+        )
+        or any(
+            value != canonical_hashes[0]
+            for value in canonical_hashes[1:]
+        )
+        or compatibility_hashes[1] != compatibility_hashes[0]
+    ):
+        raise CutoverError(
+            "prepared manifest generation or authority hashes drifted"
+        )
+    manifest_name = PurePosixPath(path).name
+    if manifest_name == "RELEASE_CHANNEL.generated.json":
+        expected_sha256 = canonical_hashes[0]
+    elif manifest_name == "releases.json":
+        expected_sha256 = compatibility_hashes[0]
+    else:
+        raise CutoverError("served manifest path is not canonical")
+    if prepared_sha256 != expected_sha256:
+        raise CutoverError(
+            "prepared manifest SHA-256 differs from its shelf authority"
+        )
+
+
+def _prepared_public_preview_artifact(
+    prepared: Mapping[str, Any],
+    *,
+    generation_id: str,
+) -> dict[str, Any]:
+    collections = [
+        prepared[name]
+        for name in ("artifacts", "downloads")
+        if name in prepared
+    ]
+    if (
+        len(collections) != 1
+        or not isinstance(collections[0], list)
+        or len(collections[0]) != 1
+        or not isinstance(collections[0][0], dict)
+    ):
+        raise CutoverError(
+            "prepared manifest public-preview artifact closure drifted"
+        )
+    artifact = collections[0][0]
+    artifact_id = _exact_manifest_alias(
+        artifact,
+        ("artifactId", "id"),
+        label="artifact identity",
+    )
+    download_url = _exact_manifest_alias(
+        artifact,
+        ("downloadUrl", "url"),
+        label="artifact download URL",
+    )
+    file_name = _exact_manifest_alias(
+        artifact,
+        ("fileName",),
+        label="artifact file name",
+    )
+    expected_url = f"/downloads/g/{generation_id}/files/{file_name}"
+    size_bytes = artifact.get("sizeBytes")
+    sha256 = artifact.get("sha256")
+    if (
+        SAFE_NAME.fullmatch(artifact_id) is None
+        or download_url != expected_url
+        or artifact.get("head") != "avalonia"
+        or artifact.get("platform") != "windows"
+        or artifact.get("rid") != "win-x64"
+        or artifact.get("arch") != "x64"
+        or artifact.get("installAccessClass") != "open_public"
+        or not isinstance(sha256, str)
+        or SHA256.fullmatch(sha256) is None
+        or isinstance(size_bytes, bool)
+        or not isinstance(size_bytes, int)
+        or size_bytes <= 0
+    ):
+        raise CutoverError(
+            "prepared manifest public-preview artifact binding drifted"
+        )
+    return {
+        "artifactId": artifact_id,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "sha256": sha256,
+        "sizeBytes": size_bytes,
+        "artifactAccessClass": "open_public",
+        "downloadUrl": download_url,
+        "publicInstallRoute": f"/downloads/install/{artifact_id}",
+    }
+
+
+def _verify_review_required_release_truth(
+    value: Any,
+    *,
+    expected: Mapping[str, Any],
+    prepared: Mapping[str, Any],
+    generation_id: str | None,
+    release_scope_decision_sha256: str,
+) -> None:
+    if generation_id is None:
+        raise CutoverError(
+            "review-required releaseTruth requires a generation binding"
+        )
+    if (
+        not isinstance(value, dict)
+        or not isinstance(expected, dict)
+        or set(value) != _RELEASE_TRUTH_FIELDS
+        or set(expected) != _RELEASE_TRUTH_FIELDS
+        or not _json_semantically_equal(value, expected)
+    ):
+        raise CutoverError(
+            "served releaseTruth does not match its exact authority envelope"
+        )
+    release_version = _exact_manifest_alias(
+        prepared,
+        ("releaseVersion", "version", "publicVersion"),
+        label="release version",
+        nullable_aliases=frozenset({"publicVersion"}),
+    )
+    artifact = _prepared_public_preview_artifact(
+        prepared,
+        generation_id=generation_id,
+    )
+    handoff = value.get("artifactHandoff")
+    if (
+        set(value) != _RELEASE_TRUTH_FIELDS
+        or value.get("contractName")
+        != "chummer.release-truth-projection/v1"
+        or value.get("releaseVersion") != release_version
+        or value.get("channel")
+        != _exact_manifest_alias(
+            prepared,
+            ("channel", "channelId"),
+            label="channel",
+            nullable_aliases=frozenset({"channelId"}),
+        )
+        or value.get("channel") != "preview"
+        or value.get("releaseStatus") != "published"
+        or value.get("releaseStatus") != prepared.get("status")
+        or value.get("rolloutState")
+        != "public_release_review_required"
+        or value.get("rolloutState") != prepared.get("rolloutState")
+        or value.get("supportabilityState") != "review_required"
+        or value.get("supportabilityState")
+        != prepared.get("supportabilityState")
+        or value.get("knownIssueSummary")
+        != prepared.get("knownIssueSummary")
+        or value.get("availablePlatforms") != ["windows"]
+        or value.get("primaryHeadByPlatform") != {"windows": "avalonia"}
+        or value.get("artifactCount") != 1
+        or value.get("downloadAccessPosture") != "open_public"
+        or value.get("releaseDecisionStatus") != "review_required"
+        or COMMIT.fullmatch(str(value.get("registryCommit") or "")) is None
+        or SHA256.fullmatch(str(value.get("manifestSha256") or "")) is None
+        or SHA256.fullmatch(
+            str(value.get("releaseDecisionSha256") or "")
+        )
+        is None
+        or SHA256.fullmatch(release_scope_decision_sha256) is None
+        or value.get("releaseScopeDecisionSha256")
+        != release_scope_decision_sha256
+        or not isinstance(handoff, dict)
+        or set(handoff) != _PUBLIC_PREVIEW_BYTE_HANDOFF_FIELDS
+        or not _json_semantically_equal(
+            handoff,
+            {
+                "contractName": "chummer.public-preview-byte-handoff/v1",
+                "status": "approved_public_preview_bytes",
+                "sourcePublicationState": "preview",
+                "releaseScopeDecisionSha256": (
+                    release_scope_decision_sha256
+                ),
+                "releaseVersion": release_version,
+                "channel": "preview",
+                **artifact,
+                "signingRequirement": "preview_unsigned_allowed",
+            },
+        )
+    ):
+        raise CutoverError(
+            "served releaseTruth is not the review-required public-byte posture"
+        )
+
+
+def _review_required_release_truth_authority(
+    shelf: Mapping[str, Any],
+) -> tuple[dict[str, Any], str]:
+    authority = shelf.get("releaseCandidateAuthority")
+    release_truth = (
+        authority.get("reviewRequiredReleaseTruth")
+        if isinstance(authority, dict)
+        else None
+    )
+    release_scope_decision_sha256 = (
+        authority.get("releaseScopeDecisionSha256")
+        if isinstance(authority, dict)
+        else None
+    )
+    canonical_manifest_sha256 = (
+        authority.get("canonicalManifestSha256")
+        if isinstance(authority, dict)
+        else None
+    )
+    review_authority = (
+        authority.get("reviewAuthority")
+        if isinstance(authority, dict)
+        else None
+    )
+    if (
+        not isinstance(release_truth, dict)
+        or not isinstance(release_scope_decision_sha256, str)
+        or SHA256.fullmatch(release_scope_decision_sha256) is None
+        or not isinstance(canonical_manifest_sha256, str)
+        or SHA256.fullmatch(canonical_manifest_sha256) is None
+        or release_truth.get("manifestSha256")
+        != canonical_manifest_sha256
+        or release_truth.get("releaseScopeDecisionSha256")
+        != release_scope_decision_sha256
+        or release_truth.get("releaseVersion")
+        != authority.get("candidateVersion")
+        or not isinstance(review_authority, dict)
+        or review_authority.get("contractName")
+        != "chummer.review-required-public-byte-authority/v1"
+        or review_authority.get("status") != "pass"
+        or review_authority.get("generationId")
+        != authority.get("generationId")
+        or review_authority.get("manifestSha256")
+        != release_truth.get("manifestSha256")
+        or review_authority.get("releaseScopeDecisionSha256")
+        != release_truth.get("releaseScopeDecisionSha256")
+        or review_authority.get("releaseDecisionSha256")
+        != release_truth.get("releaseDecisionSha256")
+        or SHA256.fullmatch(
+            str(review_authority.get("authoritySnapshotSha256") or "")
+        )
+        is None
+    ):
+        raise CutoverError(
+            "review-required releaseTruth authority is unavailable"
+        )
+    return release_truth, release_scope_decision_sha256
 
 
 def probe_sidecar_hosts(
@@ -4949,6 +5506,7 @@ def probe_sidecar_hosts(
                     request_host=hostname,
                     path=path,
                     expected=expected,
+                    shelf=shelf,
                     generation_id=generation_id,
                 )
             )
@@ -5293,6 +5851,612 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
         private_directory(config.operation_root, create=False)
 
 
+def _strict_json_object_bytes(
+    raw: bytes,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    def unique_object(
+        pairs: list[tuple[str, Any]],
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        normalized: set[str] = set()
+        for key, value in pairs:
+            folded = key.casefold()
+            if folded in normalized:
+                raise ValueError(f"duplicate JSON key: {key}")
+            normalized.add(folded)
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-finite JSON number: {value}")
+
+    def finite_decimal(value: str) -> Decimal:
+        try:
+            binary_value = float(value)
+            exact_value = Decimal(value)
+        except (InvalidOperation, OverflowError, ValueError) as exc:
+            raise ValueError(
+                f"invalid finite JSON number: {value}"
+            ) from exc
+        if not math.isfinite(binary_value) or not exact_value.is_finite():
+            raise ValueError(f"non-finite JSON number: {value}")
+        return exact_value
+
+    try:
+        parsed = json.loads(
+            raw,
+            object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+            parse_float=finite_decimal,
+        )
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise CutoverError(f"{label} is not strict JSON") from exc
+    if not isinstance(parsed, dict):
+        raise CutoverError(f"{label} must be a JSON object")
+    return parsed
+
+
+def _json_semantically_equal(actual: Any, expected: Any) -> bool:
+    """Compare JSON values without Python's bool/int/Decimal coercions."""
+
+    if isinstance(expected, dict):
+        return (
+            isinstance(actual, dict)
+            and set(actual) == set(expected)
+            and all(
+                _json_semantically_equal(actual[key], expected[key])
+                for key in expected
+            )
+        )
+    if isinstance(expected, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(expected)
+            and all(
+                _json_semantically_equal(actual_item, expected_item)
+                for actual_item, expected_item in zip(
+                    actual,
+                    expected,
+                    strict=True,
+                )
+            )
+        )
+    return type(actual) is type(expected) and actual == expected
+
+
+def _candidate_inventory_sha256(
+    rows: list[dict[str, Any]],
+) -> str:
+    digest = hashlib.sha256()
+    for row in rows:
+        encoded = str(row["path"]).encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(int(row["sizeBytes"]).to_bytes(8, "big"))
+        digest.update(bytes.fromhex(str(row["sha256"])))
+    return digest.hexdigest()
+
+
+def _scope_bound_full_candidate_inventory(
+    config: SidecarConfig,
+    *,
+    candidate_materializer: Any,
+    inventory: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, int],
+    list[dict[str, Any]],
+    dict[str, bytes],
+]:
+    if (
+        set(inventory) != {"contractName", "contractVersion", "files"}
+        or inventory.get("contractName")
+        != "chummer.release-upload.candidate-inventory/v1"
+        or type(inventory.get("contractVersion")) is not int
+        or inventory["contractVersion"] != 1
+        or not isinstance(inventory.get("files"), list)
+    ):
+        raise CutoverError("scope-bound candidate inventory contract drifted")
+    authority_rows = inventory["files"]
+    if (
+        not authority_rows
+        or any(
+            not isinstance(row, dict)
+            or set(row) != {"path", "sha256", "sizeBytes"}
+            or not isinstance(row.get("path"), str)
+            or not row["path"]
+            or row["path"].startswith("/")
+            or "\\" in row["path"]
+            or any(
+                part in {"", ".", ".."} or ":" in part
+                for part in row["path"].split("/")
+            )
+            or not isinstance(row.get("sha256"), str)
+            or SHA256.fullmatch(row["sha256"]) is None
+            or type(row.get("sizeBytes")) is not int
+            or row["sizeBytes"] < 0
+            for row in authority_rows
+        )
+        or authority_rows
+        != sorted(authority_rows, key=lambda row: str(row["path"]))
+        or len({str(row["path"]) for row in authority_rows})
+        != len(authority_rows)
+    ):
+        raise CutoverError("scope-bound candidate inventory rows drifted")
+
+    try:
+        (
+            actual_rows,
+            actual_modes,
+            actual_directories,
+            captured,
+        ) = candidate_materializer._scan_bundle_tree(
+            config.release_candidate_root
+        )
+    except CutoverError:
+        raise
+    except Exception as exc:
+        raise CutoverError(
+            "scope-bound full candidate tree validation failed"
+        ) from exc
+
+    authority_paths = {
+        str(row["path"]) for row in authority_rows
+    }
+    actual_by_path = {
+        str(row["path"]): row for row in actual_rows
+    }
+    if (
+        len(actual_by_path) != len(actual_rows)
+        or set(actual_by_path) - authority_paths
+        != SCOPE_BOUND_CANDIDATE_ADJUNCT_PATHS
+        or authority_paths - set(actual_by_path)
+    ):
+        raise CutoverError(
+            "scope-bound candidate adjunct path closure drifted"
+        )
+    authenticated_rows = [
+        actual_by_path[str(row["path"])]
+        for row in authority_rows
+    ]
+    if authenticated_rows != authority_rows:
+        raise CutoverError(
+            "scope-bound authenticated candidate subset drifted"
+        )
+    if (
+        type(candidate.get("fileCount")) is not int
+        or candidate["fileCount"] != len(authenticated_rows)
+        or type(candidate.get("totalBytes")) is not int
+        or candidate["totalBytes"]
+        != sum(row["sizeBytes"] for row in authenticated_rows)
+        or candidate.get("inventorySha256")
+        != _candidate_inventory_sha256(authenticated_rows)
+    ):
+        raise CutoverError(
+            "scope-bound authenticated candidate summary drifted"
+        )
+
+    authenticated_directories = {
+        prefix
+        for path in authority_paths
+        for prefix in (
+            "/".join(path.split("/")[:index])
+            for index in range(1, len(path.split("/")))
+        )
+    }
+    actual_directory_by_path = {
+        str(row.get("path") or ""): row
+        for row in actual_directories
+        if isinstance(row, dict)
+    }
+    expected_directories = authenticated_directories | {
+        "release-evidence",
+        "startup-smoke",
+    }
+    if (
+        len(actual_directory_by_path) != len(actual_directories)
+        or set(actual_directory_by_path) != expected_directories
+        or any(
+            actual_directory_by_path[path].get("mode") != 0o700
+            for path in ("release-evidence", "startup-smoke")
+        )
+        or any(
+            actual_modes.get(path) != 0o400
+            for path in SCOPE_BOUND_CANDIDATE_ADJUNCT_PATHS
+        )
+    ):
+        raise CutoverError(
+            "scope-bound candidate adjunct metadata drifted"
+        )
+
+    adjunct_bytes: dict[str, bytes] = {}
+    for path in sorted(SCOPE_BOUND_CANDIDATE_ADJUNCT_PATHS):
+        raw = stable_regular_bytes(
+            config.release_candidate_root / path,
+            label=f"scope-bound candidate adjunct {path}",
+            maximum_bytes=4 * 1024 * 1024,
+            owner_only=True,
+        )
+        row = actual_by_path[path]
+        if (
+            sha256_bytes(raw) != row["sha256"]
+            or len(raw) != row["sizeBytes"]
+        ):
+            raise CutoverError(
+                "scope-bound candidate adjunct changed after inventory scan"
+            )
+        adjunct_bytes[path] = raw
+
+    return (
+        authenticated_rows,
+        {
+            path: int(actual_modes[path])
+            for path in authority_paths
+        },
+        [
+            actual_directory_by_path[path]
+            for path in sorted(authenticated_directories)
+        ],
+        {
+            **captured,
+            **adjunct_bytes,
+        },
+    )
+
+
+def _validate_scope_bound_startup_smoke(
+    raw: bytes,
+    *,
+    artifact: Mapping[str, Any],
+    release_version: str,
+) -> dict[str, Any]:
+    receipt = _strict_json_object_bytes(
+        raw,
+        label="scope-bound Windows startup-smoke receipt",
+    )
+    file_name = str(artifact.get("fileName") or "")
+    payload_name = str(artifact.get("payloadFileName") or "")
+    sha256 = str(artifact.get("sha256") or "")
+    payload_sha256 = str(artifact.get("payloadSha256") or "")
+    payload_size = artifact.get("payloadSizeBytes")
+    expected = {
+        "status": "pass",
+        "headId": "avalonia",
+        "version": release_version,
+        "releaseVersion": release_version,
+        "channelId": "preview",
+        "platform": "windows",
+        "arch": "x64",
+        "rid": "win-x64",
+        "artifactDigest": f"sha256:{sha256}",
+        "artifactSha256": sha256,
+        "artifactId": artifact.get("artifactId"),
+        "artifactFileName": file_name,
+        "fileName": file_name,
+        "artifactRelativePath": f"files/{file_name}",
+        "bootstrapPayloadSha256": payload_sha256,
+        "bootstrapPayloadSizeBytes": payload_size,
+        "bootstrapPayloadFileName": payload_name,
+    }
+    if not _json_semantically_equal(
+        {key: receipt.get(key) for key in expected},
+        expected,
+    ):
+        raise CutoverError(
+            "scope-bound Windows startup-smoke receipt contradicts "
+            "the authenticated artifact bytes"
+        )
+    return {
+        "path": SCOPE_BOUND_STARTUP_SMOKE_PATH,
+        "sha256": sha256_bytes(raw),
+        "sizeBytes": len(raw),
+        "status": "pass",
+    }
+
+
+def _validate_scope_bound_review_authority(
+    *,
+    canonical_raw: bytes,
+    canonical: Mapping[str, Any],
+    evidence_bytes: Mapping[str, bytes],
+    generation_id: str,
+    release_scope_decision_sha256: str,
+    candidate_version: str,
+) -> dict[str, Any]:
+    evidence = {
+        path: _strict_json_object_bytes(
+            evidence_bytes[path],
+            label=f"scope-bound review authority {path}",
+        )
+        for path in SCOPE_BOUND_REVIEW_EVIDENCE_PATHS
+    }
+    current = evidence["release-evidence/CURRENT.json"]
+    decision = evidence["release-evidence/RELEASE_DECISION.json"]
+    snapshot = evidence["release-evidence/SNAPSHOT.json"]
+    decision_raw = evidence_bytes[
+        "release-evidence/RELEASE_DECISION.json"
+    ]
+    snapshot_raw = evidence_bytes["release-evidence/SNAPSHOT.json"]
+    manifest_sha256 = sha256_bytes(canonical_raw)
+    snapshot_sha256 = sha256_bytes(snapshot_raw)
+    decision_sha256 = sha256_bytes(decision_raw)
+
+    if (
+        set(current) != REVIEW_AUTHORITY_CURRENT_FIELDS
+        or not _json_semantically_equal(
+            current,
+            {
+                "releaseVersion": candidate_version,
+                "snapshotSha256": snapshot_sha256,
+                "decisionSha256": decision_sha256,
+                "status": "review_required",
+            },
+        )
+        or set(snapshot) != REVIEW_AUTHORITY_SNAPSHOT_FIELDS
+        or set(decision) != REVIEW_AUTHORITY_DECISION_FIELDS
+    ):
+        raise CutoverError(
+            "scope-bound review authority envelope or digest chain drifted"
+        )
+
+    artifacts = canonical.get("artifacts")
+    if (
+        not isinstance(artifacts, list)
+        or len(artifacts) != 1
+        or not isinstance(artifacts[0], dict)
+    ):
+        raise CutoverError(
+            "scope-bound canonical manifest must contain one artifact"
+        )
+    artifact = artifacts[0]
+    artifact_id = str(artifact.get("artifactId") or "")
+    file_name = str(artifact.get("fileName") or "")
+    expected_download_url = (
+        f"/downloads/g/{generation_id}/files/{file_name}"
+    )
+    expected_install_route = f"/downloads/install/{artifact_id}"
+    release_version = str(
+        canonical.get("releaseVersion")
+        or canonical.get("version")
+        or ""
+    )
+    channel = str(
+        canonical.get("channelId")
+        or canonical.get("channel")
+        or ""
+    )
+    manifest_generated_at = str(
+        canonical.get("publishedAt")
+        or canonical.get("generatedAt")
+        or ""
+    )
+    if (
+        not generation_id
+        or canonical.get("generationId") != generation_id
+        or release_version != candidate_version
+        or channel != "preview"
+        or canonical.get("status") != "published"
+        or canonical.get("rolloutState")
+        != "public_release_review_required"
+        or canonical.get("supportabilityState") != "review_required"
+        or artifact_id != "avalonia-win-x64-installer"
+        or artifact.get("head") != "avalonia"
+        or artifact.get("platform") != "windows"
+        or artifact.get("rid") != "win-x64"
+        or artifact.get("arch") != "x64"
+        or artifact.get("kind") != "installer"
+        or artifact.get("compatibilityState") != "compatible"
+        or artifact.get("installAccessClass") != "open_public"
+        or artifact.get("downloadUrl") != expected_download_url
+        or not file_name
+        or Path(file_name).name != file_name
+        or SHA256.fullmatch(str(artifact.get("sha256") or "")) is None
+        or type(artifact.get("sizeBytes")) is not int
+        or artifact["sizeBytes"] <= 0
+        or type(artifact.get("payloadSizeBytes")) is not int
+        or artifact["payloadSizeBytes"] <= 0
+    ):
+        raise CutoverError(
+            "scope-bound manifest is not the exact review-required "
+            "Windows public-byte handoff"
+        )
+
+    snapshot_artifacts = snapshot.get("artifacts")
+    if (
+        snapshot.get("authorityContract")
+        != "chummer.release-authority-snapshot/v2"
+        or snapshot.get("releaseVersion") != release_version
+        or snapshot.get("channel") != "preview"
+        or snapshot.get("status") != "published"
+        or snapshot.get("rolloutState")
+        != "public_release_review_required"
+        or snapshot.get("supportabilityState") != "review_required"
+        or snapshot.get("availablePlatforms") != ["windows"]
+        or snapshot.get("primaryHeadByPlatform")
+        != {"windows": "avalonia"}
+        or type(snapshot.get("artifactCount")) is not int
+        or snapshot["artifactCount"] != 1
+        or snapshot.get("downloadAccessPosture") != "open_public"
+        or snapshot.get("knownIssueSummary")
+        != canonical.get("knownIssueSummary")
+        or snapshot.get("manifestSha256") != manifest_sha256
+        or snapshot.get("registryRepository")
+        != "ArchonMegalon/chummer6-hub-registry"
+        or COMMIT.fullmatch(
+            str(snapshot.get("registryCommit") or "")
+        )
+        is None
+        or snapshot.get("releaseDecisionStatus") != "review_required"
+        or snapshot.get("releaseDecisionSha256") != decision_sha256
+        or not isinstance(snapshot.get("supportOwner"), str)
+        or not snapshot["supportOwner"]
+        or not isinstance(snapshot.get("nextActions"), list)
+        or not snapshot["nextActions"]
+        or any(
+            not isinstance(item, str) or not item.strip()
+            for item in snapshot["nextActions"]
+        )
+        or snapshot.get("manifestPath") != "RELEASE_CHANNEL.json"
+        or snapshot.get("releaseDecisionPath")
+        != "RELEASE_DECISION.json"
+        or not isinstance(snapshot_artifacts, list)
+        or len(snapshot_artifacts) != 1
+        or not isinstance(snapshot_artifacts[0], dict)
+        or set(snapshot_artifacts[0])
+        != REVIEW_AUTHORITY_ARTIFACT_FIELDS
+    ):
+        raise CutoverError(
+            "scope-bound review authority snapshot contradicts "
+            "the authenticated manifest"
+        )
+    snapshot_artifact = snapshot_artifacts[0]
+    expected_snapshot_artifact = {
+        "artifactId": artifact_id,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "kind": "installer",
+        "downloadUrl": expected_download_url,
+        "sha256": artifact["sha256"],
+        "sizeBytes": artifact["sizeBytes"],
+        "compatibilityState": artifact.get("compatibilityState"),
+        "promotionState": "promoted",
+        "publicationScope": "signed-in-and-public",
+        "revokeState": "not_revoked",
+        "publicInstallRoute": expected_install_route,
+        "installAccessClass": "open_public",
+    }
+    if not _json_semantically_equal(
+        snapshot_artifact,
+        expected_snapshot_artifact,
+    ):
+        raise CutoverError(
+            "scope-bound review authority artifact binding drifted"
+        )
+
+    handoff = decision.get("artifactHandoff")
+    blocking = decision.get("blockingFindings")
+    if (
+        decision.get("contractName")
+        != "chummer.preview-release-decision/v2"
+        or decision.get("status") != "review_required"
+        or decision.get("releaseDecisionStatus") != "review_required"
+        or decision.get("verdict")
+        != "PREVIEW_RELEASE_REVIEW_REQUIRED"
+        or decision.get("releaseVersion") != release_version
+        or decision.get("releaseScopeDecisionSha256")
+        != release_scope_decision_sha256
+        or decision.get("channel") != "preview"
+        or decision.get("platforms") != ["windows"]
+        or decision.get("primaryHeadByPlatform")
+        != {"windows": "avalonia"}
+        or decision.get("fallbackHeadsByPlatform")
+        != {"windows": []}
+        or decision.get("artifactAccessClass") != "open_public"
+        or decision.get("supportOwner") != snapshot["supportOwner"]
+        or decision.get("nextActions") != snapshot["nextActions"]
+        or decision.get("registryCommit")
+        != snapshot["registryCommit"]
+        or decision.get("manifestSha256") != manifest_sha256
+        or decision.get("authoritySnapshotSha256") != ""
+        or decision.get("candidateDecisionStatus") != ""
+        or decision.get("candidateDecisionSha256") != ""
+        or decision.get("manifestGeneratedAt") != manifest_generated_at
+        or decision.get("scorecardSha256") != ""
+        or decision.get("convergenceSha256") != ""
+        or not isinstance(decision.get("generatedAt"), str)
+        or not decision["generatedAt"]
+        or not isinstance(blocking, list)
+        or not blocking
+        or any(
+            not isinstance(item, dict)
+            or set(item) != {"id", "severity", "summary"}
+            or item.get("severity") != "release_truth"
+            or not isinstance(item.get("id"), str)
+            or not item["id"]
+            or not isinstance(item.get("summary"), str)
+            or not item["summary"]
+            for item in blocking
+        )
+        or not isinstance(handoff, dict)
+        or set(handoff) != REVIEW_AUTHORITY_HANDOFF_FIELDS
+    ):
+        raise CutoverError(
+            "scope-bound review decision posture or closure drifted"
+        )
+    expected_handoff = {
+        "contractName": "chummer.public-preview-byte-handoff/v1",
+        "status": "approved_public_preview_bytes",
+        "sourcePublicationState": "preview",
+        "releaseScopeDecisionSha256": (
+            release_scope_decision_sha256
+        ),
+        "releaseVersion": release_version,
+        "channel": "preview",
+        "artifactId": artifact_id,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "sha256": artifact["sha256"],
+        "sizeBytes": artifact["sizeBytes"],
+        "artifactAccessClass": "open_public",
+        "signingRequirement": "preview_unsigned_allowed",
+        "downloadUrl": expected_download_url,
+        "publicInstallRoute": expected_install_route,
+    }
+    if not _json_semantically_equal(handoff, expected_handoff):
+        raise CutoverError(
+            "scope-bound review decision artifact handoff drifted"
+        )
+
+    release_truth = {
+        "contractName": "chummer.release-truth-projection/v1",
+        "releaseVersion": release_version,
+        "channel": "preview",
+        "releaseStatus": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "availablePlatforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "artifactCount": 1,
+        "downloadAccessPosture": "open_public",
+        "knownIssueSummary": snapshot["knownIssueSummary"],
+        "manifestSha256": manifest_sha256,
+        "registryCommit": snapshot["registryCommit"],
+        "releaseDecisionStatus": "review_required",
+        "releaseDecisionSha256": decision_sha256,
+        "releaseScopeDecisionSha256": (
+            release_scope_decision_sha256
+        ),
+        "artifactHandoff": expected_handoff,
+    }
+    return {
+        "contractName": "chummer.review-required-public-byte-authority/v1",
+        "status": "pass",
+        "generationId": generation_id,
+        "manifestSha256": manifest_sha256,
+        "releaseScopeDecisionSha256": (
+            release_scope_decision_sha256
+        ),
+        "authoritySnapshotSha256": snapshot_sha256,
+        "releaseDecisionSha256": decision_sha256,
+        "files": [
+            {
+                "path": path,
+                "sha256": sha256_bytes(evidence_bytes[path]),
+                "sizeBytes": len(evidence_bytes[path]),
+            }
+            for path in SCOPE_BOUND_REVIEW_EVIDENCE_PATHS
+        ],
+        "releaseTruth": release_truth,
+    }
+
+
 def _validate_scope_bound_existing_bytes_candidate(
     config: SidecarConfig,
     *,
@@ -5340,17 +6504,20 @@ def _validate_scope_bound_existing_bytes_candidate(
         set(direct_import) != direct_keys
         or direct_import.get("contractName")
         != "chummer6-ui.preview-nightly-unsigned-direct-import"
+        or type(direct_import.get("contractVersion")) is not int
         or direct_import.get("contractVersion") != 1
         or direct_import.get("projectionProfile") != profile
         or direct_import.get("status") != "sealed_review_required"
         or direct_import.get("platformScope") != "windows_only"
         or direct_import.get("crossRunBitReproducible") is not False
-        or direct_import.get("signature")
-        != {
-            "policy": "preview_policy",
-            "required": False,
-            "status": "unsigned",
-        }
+        or not _json_semantically_equal(
+            direct_import.get("signature"),
+            {
+                "policy": "preview_policy",
+                "required": False,
+                "status": "unsigned",
+            },
+        )
         or any(
             direct_import.get(name) is not False
             for name in (
@@ -5359,16 +6526,27 @@ def _validate_scope_bound_existing_bytes_candidate(
                 "deployAuthorized",
             )
         )
-        or direct_import.get("release")
-        != {"channel": "preview", "version": candidate.get("version")}
-        or direct_import.get("sourceCommitPosture")
-        != SCOPE_BOUND_SOURCE_COMMIT_POSTURE
-        or direct_import.get("hubCandidateImportAuthority")
-        != {
-            "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
-            "sha256": authority_sha256,
-            "sizeBytes": len(authority_raw),
-        }
+        or not _json_semantically_equal(
+            direct_import.get("release"),
+            {
+                "channel": "preview",
+                "version": candidate.get("version"),
+            },
+        )
+        or not _json_semantically_equal(
+            direct_import.get("sourceCommitPosture"),
+            SCOPE_BOUND_SOURCE_COMMIT_POSTURE,
+        )
+        or not _json_semantically_equal(
+            direct_import.get("hubCandidateImportAuthority"),
+            {
+                "path": (
+                    "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+                ),
+                "sha256": authority_sha256,
+                "sizeBytes": len(authority_raw),
+            },
+        )
     ):
         raise CutoverError(
             "scope-bound direct-import receipt authority posture drifted"
@@ -5390,12 +6568,12 @@ def _validate_scope_bound_existing_bytes_candidate(
             release_rows,
             release_modes,
             release_directories,
-            _release_captured,
-        ) = candidate_materializer._validate_bundle_inventory(
-            config.release_candidate_root,
-            inventory,
-            candidate,
-            allow_root_ancillary_files=True,
+            release_captured,
+        ) = _scope_bound_full_candidate_inventory(
+            config,
+            candidate_materializer=candidate_materializer,
+            inventory=inventory,
+            candidate=candidate,
         )
         canonical_raw = projection_verifier._candidate_embedded_bytes(
             custody.get("canonicalManifest"),
@@ -5449,39 +6627,56 @@ def _validate_scope_bound_existing_bytes_candidate(
     if (
         not isinstance(binding, dict)
         or not isinstance(source_commits, dict)
-        or source_commits != binding.get("sourceCommits")
-        or binding.get("sourceCommitPosture")
-        != SCOPE_BOUND_SOURCE_COMMIT_POSTURE
-        or direct_import.get("sourceCommitPosture")
-        != binding.get("sourceCommitPosture")
+        or not _json_semantically_equal(
+            source_commits,
+            binding.get("sourceCommits"),
+        )
+        or not _json_semantically_equal(
+            binding.get("sourceCommitPosture"),
+            SCOPE_BOUND_SOURCE_COMMIT_POSTURE,
+        )
+        or not _json_semantically_equal(
+            direct_import.get("sourceCommitPosture"),
+            binding.get("sourceCommitPosture"),
+        )
         or set(source_commits) != {"hub", "registry", "ui"}
         or any(
             COMMIT.fullmatch(str(source_commits.get(name) or "")) is None
             for name in ("hub", "registry", "ui")
         )
         or source_commits.get("hub") != config.source_head
-        or direct_import.get("releaseScopeDecision")
-        != reference(
-            decision_raw,
-            projection_verifier.CANDIDATE_SCOPE_DECISION_FILE,
-        )
-        or direct_import.get("generationInventory")
-        != reference(
-            generation_raw,
-            projection_verifier.CANDIDATE_GENERATION_INVENTORY_FILE,
-        )
-        or direct_import.get("canonicalManifest")
-        != reference(canonical_raw, "RELEASE_CHANNEL.generated.json")
-        or direct_import.get("compatibilityManifest")
-        != reference(compatibility_raw, "releases.json")
-        or direct_import.get("transport")
-        != {
-            "bundleIdentitySha256": candidate.get(
-                "bundleIdentitySha256"
+        or not _json_semantically_equal(
+            direct_import.get("releaseScopeDecision"),
+            reference(
+                decision_raw,
+                projection_verifier.CANDIDATE_SCOPE_DECISION_FILE,
             ),
-            "generationId": binding.get("generationId"),
-            "mode": "existing_bytes",
-        }
+        )
+        or not _json_semantically_equal(
+            direct_import.get("generationInventory"),
+            reference(
+                generation_raw,
+                projection_verifier.CANDIDATE_GENERATION_INVENTORY_FILE,
+            ),
+        )
+        or not _json_semantically_equal(
+            direct_import.get("canonicalManifest"),
+            reference(canonical_raw, "RELEASE_CHANNEL.generated.json"),
+        )
+        or not _json_semantically_equal(
+            direct_import.get("compatibilityManifest"),
+            reference(compatibility_raw, "releases.json"),
+        )
+        or not _json_semantically_equal(
+            direct_import.get("transport"),
+            {
+                "bundleIdentitySha256": candidate.get(
+                    "bundleIdentitySha256"
+                ),
+                "generationId": binding.get("generationId"),
+                "mode": "existing_bytes",
+            },
+        )
     ):
         raise CutoverError(
             "scope-bound direct-import receipt byte graph drifted"
@@ -5504,12 +6699,28 @@ def _validate_scope_bound_existing_bytes_candidate(
     ]
     root_mode = stat.S_IMODE(config.release_candidate_root.lstat().st_mode)
     if (
-        generation.get("rootMode") != root_mode
-        or generation.get("files") != release_files
-        or generation.get("directories") != release_directories
-        or binding.get("retainedFromIncumbent") != []
-        or binding.get("retainedPlatforms") != []
-        or binding.get("shelfPlatforms") != ["windows"]
+        type(generation.get("rootMode")) is not int
+        or generation["rootMode"] != root_mode
+        or not _json_semantically_equal(
+            generation.get("files"),
+            release_files,
+        )
+        or not _json_semantically_equal(
+            generation.get("directories"),
+            release_directories,
+        )
+        or not _json_semantically_equal(
+            binding.get("retainedFromIncumbent"),
+            [],
+        )
+        or not _json_semantically_equal(
+            binding.get("retainedPlatforms"),
+            [],
+        )
+        or not _json_semantically_equal(
+            binding.get("shelfPlatforms"),
+            ["windows"],
+        )
     ):
         raise CutoverError(
             "scope-bound generation inventory or zero-retention posture drifted"
@@ -5544,7 +6755,10 @@ def _validate_scope_bound_existing_bytes_candidate(
         release_row = release_by_path.get(path)
         fresh_row = fresh_by_path.get(path)
         if release_row is None or fresh_row is None or any(
-            release_row.get(key) != fresh_row.get(key)
+            not _json_semantically_equal(
+                release_row.get(key),
+                fresh_row.get(key),
+            )
             for key in ("mode", "sha256", "sizeBytes")
         ):
             raise CutoverError(
@@ -5577,6 +6791,22 @@ def _validate_scope_bound_existing_bytes_candidate(
         raise CutoverError(
             "scope-bound release manifest bytes do not share one authority"
         )
+
+    review_authority = _validate_scope_bound_review_authority(
+        canonical_raw=canonical_bundle_raw,
+        canonical=canonical,
+        evidence_bytes=release_captured,
+        generation_id=str(binding.get("generationId") or ""),
+        release_scope_decision_sha256=str(
+            binding.get("releaseScopeDecisionSha256") or ""
+        ),
+        candidate_version=str(candidate.get("version") or ""),
+    )
+    startup_smoke = _validate_scope_bound_startup_smoke(
+        release_captured[SCOPE_BOUND_STARTUP_SMOKE_PATH],
+        artifact=canonical["artifacts"][0],
+        release_version=str(candidate.get("version") or ""),
+    )
 
     sidecar_raw = stable_regular_bytes(
         config.release_candidate_root
@@ -5615,7 +6845,12 @@ def _validate_scope_bound_existing_bytes_candidate(
         or sidecar.get("payloadAcquisitionMode") != "download"
         or sidecar.get("releaseVersion") != candidate.get("version")
         or sidecar.get("sha256") != installer.get("payloadSha256")
-        or sidecar.get("sizeBytes") != installer.get("payloadSizeBytes")
+        or type(sidecar.get("sizeBytes")) is not int
+        or sidecar["sizeBytes"] <= 0
+        or not _json_semantically_equal(
+            sidecar.get("sizeBytes"),
+            installer.get("payloadSizeBytes"),
+        )
         or sidecar_url.query
         or sidecar_url.fragment
         or sidecar_url.path != f"/downloads/files/{payload_name}"
@@ -5648,6 +6883,15 @@ def _validate_scope_bound_existing_bytes_candidate(
         "releaseScopeDecisionSha256": binding[
             "releaseScopeDecisionSha256"
         ],
+        "reviewRequiredReleaseTruth": review_authority[
+            "releaseTruth"
+        ],
+        "reviewAuthority": {
+            key: value
+            for key, value in review_authority.items()
+            if key != "releaseTruth"
+        },
+        "startupSmoke": startup_smoke,
         "sourceCommits": dict(source_commits),
         "sourceCommitVerification": (
             SCOPE_BOUND_SOURCE_COMMIT_VERIFICATION
@@ -5716,6 +6960,7 @@ def validate_release_candidate_authority(
     if (
         authority.get("contractName")
         != "chummer.release-upload.candidate-import-authority/v3"
+        or type(authority.get("contractVersion")) is not int
         or authority.get("contractVersion") != 3
     ):
         raise CutoverError("candidate import authority is not the required v3 contract")
@@ -5723,6 +6968,15 @@ def validate_release_candidate_authority(
     custody = authority.get("custody")
     if not isinstance(candidate, dict) or not isinstance(custody, dict):
         raise CutoverError("candidate import authority identity is unavailable")
+    if (
+        type(candidate.get("fileCount")) is not int
+        or candidate["fileCount"] <= 0
+        or type(candidate.get("totalBytes")) is not int
+        or candidate["totalBytes"] <= 0
+    ):
+        raise CutoverError(
+            "candidate import authority count or size is malformed"
+        )
     direct_import_raw = stable_regular_bytes(
         config.direct_import_receipt,
         label="sealed direct-import receipt",
@@ -5775,16 +7029,19 @@ def validate_release_candidate_authority(
         set(direct_import) != direct_import_keys
         or direct_import.get("contractName")
         != "chummer6-ui.preview-nightly-unsigned-direct-import"
+        or type(direct_import.get("contractVersion")) is not int
         or direct_import.get("contractVersion") != 1
         or direct_import.get("status") != "sealed_review_required"
         or direct_import.get("platformScope") != "windows_only"
         or direct_import.get("crossRunBitReproducible") is not False
-        or direct_import.get("signature")
-        != {
-            "policy": "preview_policy",
-            "required": False,
-            "status": "unsigned",
-        }
+        or not _json_semantically_equal(
+            direct_import.get("signature"),
+            {
+                "policy": "preview_policy",
+                "required": False,
+                "status": "unsigned",
+            },
+        )
         or any(
             direct_import.get(name) is not False
             for name in (
@@ -5793,14 +7050,23 @@ def validate_release_candidate_authority(
                 "deployAuthorized",
             )
         )
-        or direct_import.get("release")
-        != {"channel": "preview", "version": candidate.get("version")}
-        or direct_import.get("hubCandidateImportAuthority")
-        != {
-            "path": "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
-            "sha256": config.candidate_import_authority_sha256,
-            "sizeBytes": len(authority_raw),
-        }
+        or not _json_semantically_equal(
+            direct_import.get("release"),
+            {
+                "channel": "preview",
+                "version": candidate.get("version"),
+            },
+        )
+        or not _json_semantically_equal(
+            direct_import.get("hubCandidateImportAuthority"),
+            {
+                "path": (
+                    "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+                ),
+                "sha256": config.candidate_import_authority_sha256,
+                "sizeBytes": len(authority_raw),
+            },
+        )
     ):
         raise CutoverError("direct-import receipt authority posture drifted")
 
@@ -5916,28 +7182,38 @@ def validate_release_candidate_authority(
         json.dumps(composition, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
     if (
-        direct_import.get("registryCandidateReceipt")
-        != reference(
-            registry_candidate_raw,
-            projection_verifier.CANDIDATE_REGISTRY_RECEIPT_FILE,
+        not _json_semantically_equal(
+            direct_import.get("registryCandidateReceipt"),
+            reference(
+                registry_candidate_raw,
+                projection_verifier.CANDIDATE_REGISTRY_RECEIPT_FILE,
+            ),
         )
-        or direct_import.get("registryFinalizeAuthority")
-        != reference(
-            registry_authority_raw,
-            projection_verifier.CANDIDATE_REGISTRY_AUTHORITY_FILE,
+        or not _json_semantically_equal(
+            direct_import.get("registryFinalizeAuthority"),
+            reference(
+                registry_authority_raw,
+                projection_verifier.CANDIDATE_REGISTRY_AUTHORITY_FILE,
+            ),
         )
-        or direct_import.get("registryFinalizeReceipt")
-        != reference(
-            registry_finalize_raw,
-            projection_verifier.CANDIDATE_REGISTRY_FINALIZE_FILE,
+        or not _json_semantically_equal(
+            direct_import.get("registryFinalizeReceipt"),
+            reference(
+                registry_finalize_raw,
+                projection_verifier.CANDIDATE_REGISTRY_FINALIZE_FILE,
+            ),
         )
-        or direct_import.get("compositionRequest")
-        != reference(
-            composition_raw,
-            projection_verifier.CANDIDATE_UNSIGNED_COMPOSITION_FILE,
+        or not _json_semantically_equal(
+            direct_import.get("compositionRequest"),
+            reference(
+                composition_raw,
+                projection_verifier.CANDIDATE_UNSIGNED_COMPOSITION_FILE,
+            ),
         )
-        or direct_import.get("uiScope")
-        != reference(scope_raw, scope_path)
+        or not _json_semantically_equal(
+            direct_import.get("uiScope"),
+            reference(scope_raw, scope_path),
+        )
     ):
         raise CutoverError(
             "direct-import receipt does not bind embedded Registry/UI custody"
@@ -5947,7 +7223,10 @@ def validate_release_candidate_authority(
         {**row, "mode": release_modes[str(row["path"])]}
         for row in release_rows
     ]
-    if release_with_modes != scope.get("fullShelfInventory"):
+    if not _json_semantically_equal(
+        release_with_modes,
+        scope.get("fullShelfInventory"),
+    ):
         raise CutoverError(
             "sealed release bundle modes differ from the v3 authority"
         )
@@ -5956,9 +7235,14 @@ def validate_release_candidate_authority(
         for row in incumbent_rows
     ]
     if (
-        incumbent_with_modes != incumbent_snapshot.get("fullShelfInventory")
-        or incumbent_directory_modes
-        != incumbent_snapshot.get("directoryModes")
+        not _json_semantically_equal(
+            incumbent_with_modes,
+            incumbent_snapshot.get("fullShelfInventory"),
+        )
+        or not _json_semantically_equal(
+            incumbent_directory_modes,
+            incumbent_snapshot.get("directoryModes"),
+        )
     ):
         raise CutoverError(
             "v3 authority incumbent snapshot differs from the attested candidate"
@@ -5995,7 +7279,10 @@ def validate_release_candidate_authority(
     for path, fresh_row in fresh_by_path.items():
         release_row = release_by_path.get(path)
         if release_row is None or any(
-            fresh_row.get(key) != release_row.get(key)
+            not _json_semantically_equal(
+                fresh_row.get(key),
+                release_row.get(key),
+            )
             for key in ("mode", "sha256", "sizeBytes")
         ):
             raise CutoverError(
@@ -6032,7 +7319,10 @@ def validate_release_candidate_authority(
     for path, retained_row in retained_by_path.items():
         incumbent_row = incumbent_by_path[path]
         if any(
-            retained_row.get(key) != incumbent_row.get(key)
+            not _json_semantically_equal(
+                retained_row.get(key),
+                incumbent_row.get(key),
+            )
             for key in ("mode", "sha256", "sizeBytes")
         ):
             raise CutoverError("v3 authority retained incumbent bytes drifted")
@@ -6149,7 +7439,21 @@ def prepare_sidecar_release_shelf(
         candidate_root=config.migration_candidate_root,
         manifest_closure_restorations=restorations,
     )
-    generation_id = generation.new_generation_id()
+    release_validation: dict[str, Any] | None = None
+    if getattr(config, "delivery_phase", None) == "windows-preview":
+        release_validation = validate_release_candidate_authority(
+            config,
+            projection_verifier=projection_verifier,
+            candidate_materializer=candidate_materializer,
+        )
+    candidate_generation_id = str(
+        (release_validation or {}).get("generationId") or ""
+    )
+    generation_id = (
+        generation.validate_generation_id(candidate_generation_id)
+        if candidate_generation_id
+        else generation.new_generation_id()
+    )
     activation_receipt_id = generation.new_activation_receipt_id()
     authority_validation_root = (
         config.operation_root / "candidate-authority-validation"
@@ -6164,11 +7468,12 @@ def prepare_sidecar_release_shelf(
         generation_id,
         activation_receipt_id,
     )
-    release_validation = validate_release_candidate_authority(
-        config,
-        projection_verifier=projection_verifier,
-        candidate_materializer=candidate_materializer,
-    )
+    if release_validation is None:
+        release_validation = validate_release_candidate_authority(
+            config,
+            projection_verifier=projection_verifier,
+            candidate_materializer=candidate_materializer,
+        )
     prepared = generation.prepare_sidecar_active_layout(
         config.release_candidate_root,
         config.shelf_source,
@@ -7284,6 +8589,7 @@ class TopologyBActions:
                 request_host=hostname,
                 path=path,
                 expected=manifest,
+                shelf=shelf,
                 generation_id=generation_id,
             )
             observations.append(
@@ -7581,11 +8887,15 @@ class TopologyBActions:
             is None
             or runtime.get("projectName") != config.project_name
             or runtime.get("publishedAddress") != SIDECAR_ADDRESS
-            or runtime.get("publishedPort") != SIDECAR_PORT
+            or type(runtime.get("publishedPort")) is not int
+            or runtime["publishedPort"] != SIDECAR_PORT
             or runtime.get("candidateImageId")
             != binding.get("candidateImageId")
             or runtime.get("candidateTag") != binding.get("candidateTag")
-            or runtime.get("volumes") != config.volume_names
+            or not _json_semantically_equal(
+                runtime.get("volumes"),
+                config.volume_names,
+            )
             or runtime.get("composePath") != str(config.compose_file)
             or runtime.get("materializationReceipt")
             != str(config.materialization_receipt)
@@ -7772,20 +9082,31 @@ class TopologyBActions:
             or attestation.get("longRunningSourceBindsAbsent") is not True
             or attestation.get("releaseShelfPreinitialized") is not True
             or attestation.get("releaseShelfPortalReadOnly") is not True
-            or attestation.get("isolatedVolumes") != config.volume_names
-            or attestation.get("runtimeInputs") != expected_runtime_inputs
+            or not _json_semantically_equal(
+                attestation.get("isolatedVolumes"),
+                config.volume_names,
+            )
+            or not _json_semantically_equal(
+                attestation.get("runtimeInputs"),
+                expected_runtime_inputs,
+            )
             or attestation.get("postgresServicesAbsent") is not True
             or attestation.get("postgresEnvironmentAbsent") is not True
             or attestation.get("postgresMountsAbsent") is not True
             or attestation.get("postgresHostMappingAbsent") is not True
             or attestation.get("portalBuildAbsent") is not True
             or attestation.get("publicDownloadsHealthcheck") is not True
-            or attestation.get("releaseShelfPosture")
-            != expected_release_shelf_posture
-            or attestation.get("portalMountCount") != 10
-            or attestation.get("initializerMountCount") != 18
+            or not _json_semantically_equal(
+                attestation.get("releaseShelfPosture"),
+                expected_release_shelf_posture,
+            )
+            or type(attestation.get("portalMountCount")) is not int
+            or attestation["portalMountCount"] != 10
+            or type(attestation.get("initializerMountCount")) is not int
+            or attestation["initializerMountCount"] != 18
             or attestation.get("publishedAddress") != SIDECAR_ADDRESS
-            or attestation.get("publishedPort") != SIDECAR_PORT
+            or type(attestation.get("publishedPort")) is not int
+            or attestation["publishedPort"] != SIDECAR_PORT
             or attestation.get("sourceRoot") != str(canonical_source_root)
             or attestation.get("sourceHead") != config.source_head
             or attestation.get("baseComposeSourceSha256") != base_sha256
@@ -8600,6 +9921,7 @@ class TopologyBActions:
                 request_host=hostname,
                 path=path,
                 expected=manifest,
+                shelf=shelf,
                 generation_id=str(shelf["generationId"]),
             )
         if not isinstance(active, dict):

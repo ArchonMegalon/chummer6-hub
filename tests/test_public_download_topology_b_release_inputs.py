@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import importlib.util
 import hashlib
 import json
@@ -29,6 +30,10 @@ def load_controller() -> Any:
 
 
 controller = load_controller()
+candidate_scanner = controller.load_module(
+    ROOT / "scripts" / "release" / "materialize_candidate_import_authority.py",
+    "topology_b_release_input_candidate_scanner",
+)
 
 
 def projection_fixture(tmp_path: Path) -> tuple[Path, str, str]:
@@ -199,6 +204,832 @@ FRESH_WINDOWS_PATHS = (
     "files/chummer-avalonia-win-x64-payload.zip",
     "files/chummer-avalonia-win-x64-payload.zip.json",
 )
+REAL_V6_INSTALLER_SHA256 = (
+    "8b2f2c4a37f72f202ff7af1b3eed5af0cc32138496f25ad9ae5512a2048d0f4a"
+)
+REAL_V6_INSTALLER_SIZE_BYTES = 2_734_880
+REAL_V6_PAYLOAD_SHA256 = (
+    "22464a462bf72e0b24efd686ddb2a66114bccde0f98b82273e15f7335a35582e"
+)
+REAL_V6_PAYLOAD_SIZE_BYTES = 51_231_862
+
+
+def write_review_bound_candidate(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, Any], dict[str, Any], bytes, dict[str, Any]]:
+    candidate_root = tmp_path / "candidate"
+    files_root = candidate_root / "files"
+    evidence_root = candidate_root / "release-evidence"
+    smoke_root = candidate_root / "startup-smoke"
+    for path in (candidate_root, files_root, evidence_root, smoke_root):
+        path.mkdir(exist_ok=True, mode=0o700)
+        path.chmod(0o700)
+
+    generation_id = "g-20260724T152516Z-6907464d-c779a59"
+    release_version = "run-20260723-230227"
+    scope_sha256 = (
+        "d24e0033b9e6aadb82c754202be8fd514303ed0a7bdb83a1ee7c22d6978718ee"
+    )
+    registry_commit = "c779a59afca81858e62d727499e2daeab89b4f0d"
+    installer = b"fixture installer bytes\n"
+    payload = b"fixture payload bytes\n"
+    sidecar = b'{"fixture":"payload-sidecar"}\n'
+    installer_sha256 = REAL_V6_INSTALLER_SHA256
+    payload_sha256 = REAL_V6_PAYLOAD_SHA256
+    installer_name = "chummer-avalonia-win-x64-installer.exe"
+    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    artifact_id = "avalonia-win-x64-installer"
+    download_url = (
+        f"/downloads/g/{generation_id}/files/{installer_name}"
+    )
+    install_route = f"/downloads/install/{artifact_id}"
+    known_issue = "Fixture review-required release remains bounded."
+    artifact = {
+        "artifactId": artifact_id,
+        "id": artifact_id,
+        "fileName": installer_name,
+        "downloadUrl": download_url,
+        "sha256": installer_sha256,
+        "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "kind": "installer",
+        "compatibilityState": "compatible",
+        "installAccessClass": "open_public",
+        "payloadFileName": payload_name,
+        "payloadSha256": payload_sha256,
+        "payloadSizeBytes": REAL_V6_PAYLOAD_SIZE_BYTES,
+    }
+    canonical = {
+        "version": release_version,
+        "releaseVersion": release_version,
+        "generationId": generation_id,
+        "channel": "preview",
+        "channelId": "preview",
+        "status": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "knownIssueSummary": known_issue,
+        "publishedAt": "2026-07-24T12:40:00Z",
+        "generatedAt": "2026-07-24T12:40:00Z",
+        "artifacts": [artifact],
+    }
+    compatibility = {
+        "version": release_version,
+        "generationId": generation_id,
+        "channel": "preview",
+        "status": "published",
+        "downloads": [
+            {
+                **artifact,
+                "url": download_url,
+            }
+        ],
+    }
+    canonical_raw = (
+        json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    compatibility_raw = (
+        json.dumps(
+            compatibility,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode()
+    base_payloads = {
+        "RELEASE_CHANNEL.generated.json": canonical_raw,
+        "releases.json": compatibility_raw,
+        f"files/{installer_name}": installer,
+        f"files/{payload_name}": payload,
+        f"files/{payload_name}.json": sidecar,
+    }
+    for relative, raw in base_payloads.items():
+        path = candidate_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+        path.chmod(0o600)
+
+    handoff = {
+        "contractName": "chummer.public-preview-byte-handoff/v1",
+        "status": "approved_public_preview_bytes",
+        "sourcePublicationState": "preview",
+        "releaseScopeDecisionSha256": scope_sha256,
+        "releaseVersion": release_version,
+        "channel": "preview",
+        "artifactId": artifact_id,
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "sha256": installer_sha256,
+        "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
+        "artifactAccessClass": "open_public",
+        "signingRequirement": "preview_unsigned_allowed",
+        "downloadUrl": download_url,
+        "publicInstallRoute": install_route,
+    }
+    next_actions = ["Keep the fixture under review."]
+    decision = {
+        "contractName": "chummer.preview-release-decision/v2",
+        "generatedAt": "2026-07-24T15:25:16Z",
+        "status": "review_required",
+        "releaseDecisionStatus": "review_required",
+        "verdict": "PREVIEW_RELEASE_REVIEW_REQUIRED",
+        "releaseVersion": release_version,
+        "releaseScopeDecisionSha256": scope_sha256,
+        "channel": "preview",
+        "platforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "fallbackHeadsByPlatform": {"windows": []},
+        "artifactAccessClass": "open_public",
+        "supportOwner": "chummer-release-operations",
+        "nextActions": next_actions,
+        "registryCommit": registry_commit,
+        "manifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "authoritySnapshotSha256": "",
+        "candidateDecisionStatus": "",
+        "candidateDecisionSha256": "",
+        "manifestGeneratedAt": "2026-07-24T12:40:00Z",
+        "scorecardSha256": "",
+        "convergenceSha256": "",
+        "blockingFindings": [
+            {
+                "id": "preview_1",
+                "severity": "release_truth",
+                "summary": "Fixture remains review-required.",
+            }
+        ],
+        "artifactHandoff": handoff,
+    }
+
+    def encoded(value: dict[str, Any]) -> bytes:
+        return (
+            json.dumps(value, sort_keys=True, separators=(",", ":"))
+            + "\n"
+        ).encode()
+
+    decision_raw = encoded(decision)
+    snapshot = {
+        "artifactCount": 1,
+        "artifacts": [
+            {
+                "artifactId": artifact_id,
+                "head": "avalonia",
+                "platform": "windows",
+                "rid": "win-x64",
+                "arch": "x64",
+                "kind": "installer",
+                "downloadUrl": download_url,
+                "sha256": installer_sha256,
+                "sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES,
+                "compatibilityState": "compatible",
+                "promotionState": "promoted",
+                "publicationScope": "signed-in-and-public",
+                "revokeState": "not_revoked",
+                "publicInstallRoute": install_route,
+                "installAccessClass": "open_public",
+            }
+        ],
+        "authorityContract": "chummer.release-authority-snapshot/v2",
+        "availablePlatforms": ["windows"],
+        "channel": "preview",
+        "downloadAccessPosture": "open_public",
+        "knownIssueSummary": known_issue,
+        "manifestPath": "RELEASE_CHANNEL.json",
+        "manifestSha256": hashlib.sha256(canonical_raw).hexdigest(),
+        "nextActions": next_actions,
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "registryCommit": registry_commit,
+        "registryRepository": "ArchonMegalon/chummer6-hub-registry",
+        "releaseDecisionPath": "RELEASE_DECISION.json",
+        "releaseDecisionSha256": hashlib.sha256(decision_raw).hexdigest(),
+        "releaseDecisionStatus": "review_required",
+        "releaseVersion": release_version,
+        "rolloutState": "public_release_review_required",
+        "status": "published",
+        "supportOwner": "chummer-release-operations",
+        "supportabilityState": "review_required",
+    }
+    snapshot_raw = encoded(snapshot)
+    current = {
+        "decisionSha256": hashlib.sha256(decision_raw).hexdigest(),
+        "releaseVersion": release_version,
+        "snapshotSha256": hashlib.sha256(snapshot_raw).hexdigest(),
+        "status": "review_required",
+    }
+    evidence_payloads = {
+        "release-evidence/CURRENT.json": encoded(current),
+        "release-evidence/RELEASE_DECISION.json": decision_raw,
+        "release-evidence/SNAPSHOT.json": snapshot_raw,
+    }
+    smoke = {
+        "status": "pass",
+        "headId": "avalonia",
+        "version": release_version,
+        "releaseVersion": release_version,
+        "channelId": "preview",
+        "platform": "windows",
+        "arch": "x64",
+        "rid": "win-x64",
+        "artifactDigest": f"sha256:{installer_sha256}",
+        "artifactSha256": installer_sha256,
+        "artifactId": artifact_id,
+        "artifactFileName": installer_name,
+        "fileName": installer_name,
+        "artifactRelativePath": f"files/{installer_name}",
+        "bootstrapPayloadSha256": payload_sha256,
+        "bootstrapPayloadSizeBytes": REAL_V6_PAYLOAD_SIZE_BYTES,
+        "bootstrapPayloadFileName": payload_name,
+    }
+    evidence_payloads[
+        controller.SCOPE_BOUND_STARTUP_SMOKE_PATH
+    ] = encoded(smoke)
+    for relative, raw in evidence_payloads.items():
+        path = candidate_root / relative
+        path.write_bytes(raw)
+        path.chmod(0o400)
+
+    base_rows = sorted(
+        (
+            {
+                "path": path,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "sizeBytes": len(raw),
+            }
+            for path, raw in base_payloads.items()
+        ),
+        key=lambda row: row["path"],
+    )
+    inventory = {
+        "contractName": "chummer.release-upload.candidate-inventory/v1",
+        "contractVersion": 1,
+        "files": base_rows,
+    }
+    candidate = {
+        "version": release_version,
+        "canonicalManifestSha256": hashlib.sha256(
+            canonical_raw
+        ).hexdigest(),
+        "inventorySha256": controller._candidate_inventory_sha256(
+            base_rows
+        ),
+        "fileCount": len(base_rows),
+        "totalBytes": sum(row["sizeBytes"] for row in base_rows),
+        "bundleIdentitySha256": "0" * 64,
+    }
+    authority = {
+        "generationId": generation_id,
+        "releaseScopeDecisionSha256": scope_sha256,
+    }
+    return (
+        candidate_root,
+        inventory,
+        candidate,
+        canonical_raw,
+        authority,
+    )
+
+
+def capture_review_candidate(
+    candidate_root: Path,
+    inventory: dict[str, Any],
+    candidate: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, bytes]]:
+    rows, _modes, _directories, captured = (
+        controller._scope_bound_full_candidate_inventory(
+            SimpleNamespace(release_candidate_root=candidate_root),
+            candidate_materializer=candidate_scanner,
+            inventory=inventory,
+            candidate=candidate,
+        )
+    )
+    return rows, captured
+
+
+def rewrite_review_authority(
+    candidate_root: Path,
+    *,
+    mutate_decision: Any = None,
+    mutate_snapshot: Any = None,
+) -> None:
+    evidence_root = candidate_root / "release-evidence"
+    decision_path = evidence_root / "RELEASE_DECISION.json"
+    snapshot_path = evidence_root / "SNAPSHOT.json"
+    current_path = evidence_root / "CURRENT.json"
+    decision = json.loads(decision_path.read_bytes())
+    snapshot = json.loads(snapshot_path.read_bytes())
+    if mutate_decision is not None:
+        mutate_decision(decision)
+    decision_raw = (
+        json.dumps(decision, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    decision_path.chmod(0o600)
+    decision_path.write_bytes(decision_raw)
+    decision_path.chmod(0o400)
+    snapshot["releaseDecisionSha256"] = hashlib.sha256(
+        decision_raw
+    ).hexdigest()
+    if mutate_snapshot is not None:
+        mutate_snapshot(snapshot)
+    snapshot_raw = (
+        json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    snapshot_path.chmod(0o600)
+    snapshot_path.write_bytes(snapshot_raw)
+    snapshot_path.chmod(0o400)
+    current = json.loads(current_path.read_bytes())
+    current["decisionSha256"] = hashlib.sha256(decision_raw).hexdigest()
+    current["snapshotSha256"] = hashlib.sha256(
+        snapshot_raw
+    ).hexdigest()
+    current_raw = (
+        json.dumps(current, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    current_path.chmod(0o600)
+    current_path.write_bytes(current_raw)
+    current_path.chmod(0o400)
+
+
+def rewrite_startup_smoke(
+    candidate_root: Path,
+    *,
+    mutate: Any,
+) -> None:
+    smoke_path = (
+        candidate_root
+        / controller.SCOPE_BOUND_STARTUP_SMOKE_PATH
+    )
+    receipt = json.loads(smoke_path.read_bytes())
+    mutate(receipt)
+    raw = (
+        json.dumps(receipt, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode()
+    smoke_path.chmod(0o600)
+    smoke_path.write_bytes(raw)
+    smoke_path.chmod(0o400)
+
+
+def test_scope_bound_full_candidate_accepts_only_authenticated_adjuncts(
+    tmp_path: Path,
+) -> None:
+    root, inventory, candidate, canonical_raw, authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+
+    review = controller._validate_scope_bound_review_authority(
+        canonical_raw=canonical_raw,
+        canonical=json.loads(canonical_raw),
+        evidence_bytes=captured,
+        generation_id=authority["generationId"],
+        release_scope_decision_sha256=authority[
+            "releaseScopeDecisionSha256"
+        ],
+        candidate_version=candidate["version"],
+    )
+    smoke = controller._validate_scope_bound_startup_smoke(
+        captured[controller.SCOPE_BOUND_STARTUP_SMOKE_PATH],
+        artifact=json.loads(canonical_raw)["artifacts"][0],
+        release_version=candidate["version"],
+    )
+
+    assert len(rows) == 5
+    assert set(captured).issuperset(
+        controller.SCOPE_BOUND_CANDIDATE_ADJUNCT_PATHS
+    )
+    assert len(review["releaseTruth"]) == 17
+    assert review["generationId"] == authority["generationId"]
+    assert review["releaseTruth"]["artifactHandoff"][
+        "downloadUrl"
+    ].startswith(f"/downloads/g/{authority['generationId']}/")
+    assert smoke["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    ("drift", "expected_error"),
+    (
+        ("artifact_count_bool", "snapshot contradicts"),
+        ("snapshot_size_decimal", "artifact binding drifted"),
+        ("handoff_size_decimal", "artifact handoff drifted"),
+    ),
+)
+def test_scope_bound_review_authority_rejects_real_v6_numeric_type_drift(
+    tmp_path: Path,
+    drift: str,
+    expected_error: str,
+) -> None:
+    root, inventory, candidate, canonical_raw, authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    if drift == "artifact_count_bool":
+        rewrite_review_authority(
+            root,
+            mutate_snapshot=lambda value: value.__setitem__(
+                "artifactCount",
+                True,
+            ),
+        )
+    elif drift == "snapshot_size_decimal":
+        rewrite_review_authority(
+            root,
+            mutate_snapshot=lambda value: value["artifacts"][0].__setitem__(
+                "sizeBytes",
+                float(REAL_V6_INSTALLER_SIZE_BYTES),
+            ),
+        )
+    else:
+        rewrite_review_authority(
+            root,
+            mutate_decision=lambda value: value[
+                "artifactHandoff"
+            ].__setitem__(
+                "sizeBytes",
+                float(REAL_V6_INSTALLER_SIZE_BYTES),
+            ),
+        )
+
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+    with pytest.raises(controller.CutoverError, match=expected_error):
+        controller._validate_scope_bound_review_authority(
+            canonical_raw=canonical_raw,
+            canonical=json.loads(canonical_raw),
+            evidence_bytes=captured,
+            generation_id=authority["generationId"],
+            release_scope_decision_sha256=authority[
+                "releaseScopeDecisionSha256"
+            ],
+            candidate_version=candidate["version"],
+        )
+
+
+def test_scope_bound_startup_smoke_rejects_real_v6_decimal_payload_size(
+    tmp_path: Path,
+) -> None:
+    root, inventory, candidate, canonical_raw, _authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    rewrite_startup_smoke(
+        root,
+        mutate=lambda value: value.__setitem__(
+            "bootstrapPayloadSizeBytes",
+            float(REAL_V6_PAYLOAD_SIZE_BYTES),
+        ),
+    )
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+
+    with pytest.raises(controller.CutoverError, match="startup-smoke"):
+        controller._validate_scope_bound_startup_smoke(
+            captured[controller.SCOPE_BOUND_STARTUP_SMOKE_PATH],
+            artifact=json.loads(canonical_raw)["artifacts"][0],
+            release_version=candidate["version"],
+        )
+
+
+@pytest.mark.parametrize("field", ("fileCount", "totalBytes"))
+def test_scope_bound_candidate_summary_requires_exact_integer_type(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    root, inventory, candidate, _canonical_raw, _authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    candidate[field] = Decimal(candidate[field])
+
+    with pytest.raises(controller.CutoverError, match="summary drifted"):
+        capture_review_candidate(root, inventory, candidate)
+
+
+def test_type_aware_json_equality_preserves_decimal_without_integer_coercion(
+) -> None:
+    assert controller._json_semantically_equal(
+        {"finite": [Decimal("1.5")]},
+        {"finite": [Decimal("1.5")]},
+    )
+    assert not controller._json_semantically_equal(
+        {"sizeBytes": Decimal(REAL_V6_INSTALLER_SIZE_BYTES)},
+        {"sizeBytes": REAL_V6_INSTALLER_SIZE_BYTES},
+    )
+    assert not controller._json_semantically_equal(
+        {"artifactCount": True},
+        {"artifactCount": 1},
+    )
+
+
+@pytest.mark.parametrize("mutation", ("missing", "extra"))
+def test_scope_bound_full_candidate_rejects_adjunct_path_drift(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    root, inventory, candidate, _canonical_raw, _authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    if mutation == "missing":
+        (
+            root
+            / "release-evidence"
+            / "CURRENT.json"
+        ).unlink()
+    else:
+        extra = root / "release-evidence" / "EXTRA.json"
+        extra.write_text("{}\n", encoding="utf-8")
+        extra.chmod(0o400)
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="adjunct path closure",
+    ):
+        capture_review_candidate(root, inventory, candidate)
+
+
+@pytest.mark.parametrize(
+    "drift",
+    ("generation", "handoff_url", "scope", "manifest_sha256"),
+)
+def test_scope_bound_review_authority_rejects_binding_drift(
+    tmp_path: Path,
+    drift: str,
+) -> None:
+    root, inventory, candidate, canonical_raw, authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    generation_id = authority["generationId"]
+    scope_sha256 = authority["releaseScopeDecisionSha256"]
+    if drift == "handoff_url":
+        rewrite_review_authority(
+            root,
+            mutate_decision=lambda value: value[
+                "artifactHandoff"
+            ].__setitem__(
+                "downloadUrl",
+                "/downloads/g/wrong/files/"
+                "chummer-avalonia-win-x64-installer.exe",
+            ),
+        )
+    elif drift == "scope":
+        rewrite_review_authority(
+            root,
+            mutate_decision=lambda value: value.__setitem__(
+                "releaseScopeDecisionSha256",
+                "f" * 64,
+            ),
+        )
+    elif drift == "manifest_sha256":
+        rewrite_review_authority(
+            root,
+            mutate_snapshot=lambda value: value.__setitem__(
+                "manifestSha256",
+                "e" * 64,
+            ),
+        )
+    else:
+        generation_id = "g-wrong-generation"
+
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+    with pytest.raises(controller.CutoverError):
+        controller._validate_scope_bound_review_authority(
+            canonical_raw=canonical_raw,
+            canonical=json.loads(canonical_raw),
+            evidence_bytes=captured,
+            generation_id=generation_id,
+            release_scope_decision_sha256=scope_sha256,
+            candidate_version=candidate["version"],
+        )
+
+
+def test_scope_bound_review_authority_rejects_duplicate_json_keys(
+    tmp_path: Path,
+) -> None:
+    root, inventory, candidate, canonical_raw, authority = (
+        write_review_bound_candidate(tmp_path)
+    )
+    current_path = root / "release-evidence" / "CURRENT.json"
+    current_path.chmod(0o600)
+    current_path.write_bytes(
+        b'{"releaseVersion":"one","releaseVersion":"two"}\n'
+    )
+    current_path.chmod(0o400)
+    _rows, captured = capture_review_candidate(
+        root,
+        inventory,
+        candidate,
+    )
+
+    with pytest.raises(controller.CutoverError, match="strict JSON"):
+        controller._validate_scope_bound_review_authority(
+            canonical_raw=canonical_raw,
+            canonical=json.loads(canonical_raw),
+            evidence_bytes=captured,
+            generation_id=authority["generationId"],
+            release_scope_decision_sha256=authority[
+                "releaseScopeDecisionSha256"
+            ],
+            candidate_version=candidate["version"],
+        )
+
+
+def test_strict_json_accepts_exact_finite_decimal_and_exponent_numbers() -> None:
+    parsed = controller._strict_json_object_bytes(
+        (
+            b'{"decimal":1.5,"exponent":1e3,"negative":-2.5E-3,'
+            b'"zero":0.0,"integer":1,"boolean":true}\n'
+        ),
+        label="finite-number fixture",
+    )
+
+    assert parsed == {
+        "decimal": Decimal("1.5"),
+        "exponent": Decimal("1e3"),
+        "negative": Decimal("-2.5E-3"),
+        "zero": Decimal("0.0"),
+        "integer": 1,
+        "boolean": True,
+    }
+    assert type(parsed["decimal"]) is Decimal
+    assert type(parsed["integer"]) is int
+    assert type(parsed["boolean"]) is bool
+
+
+@pytest.mark.parametrize(
+    "number",
+    (
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "1e309",
+        "-1e309",
+    ),
+)
+def test_strict_json_rejects_nonfinite_and_overflow_numbers(
+    number: str,
+) -> None:
+    with pytest.raises(controller.CutoverError, match="strict JSON"):
+        controller._strict_json_object_bytes(
+            f'{{"value":{number}}}\n'.encode(),
+            label="nonfinite-number fixture",
+        )
+
+
+def test_windows_preview_sidecar_preserves_authenticated_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_root = tmp_path / "operation"
+    operation_root.mkdir(mode=0o700)
+    shelf_source = operation_root / "release-shelf"
+    sealed_generation = "g-sealed-review-authority"
+    observed: dict[str, str] = {}
+    migration_authority = tmp_path / "migration-authority.json"
+    migration_authority.write_bytes(b"fixture migration authority\n")
+    config = SimpleNamespace(
+        delivery_phase="windows-preview",
+        source_root=ROOT,
+        source_head="a" * 40,
+        shelf_root=tmp_path / "canonical-shelf",
+        migration_candidate_root=tmp_path / "migration-candidate",
+        migration_authority=migration_authority,
+        migration_authority_sha256=hashlib.sha256(
+            migration_authority.read_bytes()
+        ).hexdigest(),
+        release_candidate_root=tmp_path / "release-candidate",
+        operation_root=operation_root,
+        shelf_source=shelf_source,
+    )
+
+    monkeypatch.setattr(
+        controller,
+        "_load_restoration_spec",
+        lambda _config: [],
+    )
+    monkeypatch.setattr(
+        controller,
+        "materialize_incumbent_candidate",
+        lambda **_kwargs: {
+            "candidateInventoryDigest": "sha256:" + "c" * 64
+        },
+    )
+    monkeypatch.setattr(
+        controller,
+        "validate_release_candidate_authority",
+        lambda *_args, **_kwargs: {
+            "generationId": sealed_generation,
+            "reviewRequiredReleaseTruth": {"contractName": "fixture"},
+        },
+    )
+    monkeypatch.setattr(
+        controller,
+        "tree_sha256_file_stream",
+        lambda *_args, **_kwargs: "d" * 64,
+    )
+
+    class Generation:
+        GENERATIONS_DIRECTORY = "generations"
+        CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
+        COMPATIBILITY_MANIFEST = "releases.json"
+
+        @staticmethod
+        def validate_generation_id(value: str) -> str:
+            observed["validatedGenerationId"] = value
+            return value
+
+        @staticmethod
+        def new_generation_id() -> str:
+            raise AssertionError(
+                "a new generation must not replace sealed authority"
+            )
+
+        @staticmethod
+        def new_activation_receipt_id() -> str:
+            return "activation-fixture"
+
+        @staticmethod
+        def prepare_sidecar_active_layout(
+            _candidate_root: Path,
+            output_root: Path,
+            *,
+            generation_id: str,
+            **_kwargs: Any,
+        ) -> dict[str, Any]:
+            observed["materializedGenerationId"] = generation_id
+            generation_root = (
+                output_root / "generations" / generation_id
+            )
+            generation_root.mkdir(parents=True)
+            (
+                generation_root
+                / "RELEASE_CHANNEL.generated.json"
+            ).write_bytes(b"canonical\n")
+            (generation_root / "releases.json").write_bytes(
+                b"compatibility\n"
+            )
+            return {
+                "pointer": {"inventoryDigest": "sha256:" + "e" * 64},
+                "pointerSha256": "f" * 64,
+                "activationCandidateSha256": "1" * 64,
+                "canonicalMirrorSha256": "2" * 64,
+                "compatibilityMirrorSha256": "3" * 64,
+                "writerPolicy": "sidecar-readonly-v1",
+            }
+
+        @staticmethod
+        def sha256_file(path: Path) -> str:
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    class Attestor:
+        @staticmethod
+        def prepare_public_download_migration(
+            _shelf_root: Path,
+            _validation_root: Path,
+            _candidate_root: Path,
+            _authority: Path,
+            _authority_sha256: str,
+            _source_head: str,
+            generation_id: str,
+            _activation_receipt_id: str,
+        ) -> dict[str, Any]:
+            observed["attestedGenerationId"] = generation_id
+            return {"generationId": generation_id}
+
+    receipt = controller.prepare_sidecar_release_shelf(
+        config,
+        generation=Generation,
+        attestor=Attestor,
+        projection_verifier=object(),
+        candidate_materializer=object(),
+    )
+
+    assert receipt["generationId"] == sealed_generation
+    assert observed == {
+        "validatedGenerationId": sealed_generation,
+        "attestedGenerationId": sealed_generation,
+        "materializedGenerationId": sealed_generation,
+    }
+    assert receipt["releaseCandidateAuthority"][
+        "reviewRequiredReleaseTruth"
+    ] == {"contractName": "fixture"}
 
 
 def release_candidate_authority_fixture(
