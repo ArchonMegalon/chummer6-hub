@@ -884,6 +884,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     [HttpGet("/downloads/files/{**path}")]
+    [HttpHead("/downloads/files/{**path}")]
     public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
         TryApplyCredentialResponseNoStoreHeaders();
@@ -1050,6 +1051,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     [HttpGet("/downloads/g/{generationId}/files/{**path}")]
+    [HttpHead("/downloads/g/{generationId}/files/{**path}")]
     public async Task<IActionResult> DownloadGenerationFile(
         [FromRoute] string generationId,
         [FromRoute] string? path,
