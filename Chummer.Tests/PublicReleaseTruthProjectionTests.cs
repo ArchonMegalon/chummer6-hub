@@ -14,6 +14,8 @@ namespace Chummer.Tests;
 public sealed class PublicReleaseTruthProjectionTests
 {
     private const string RegistryCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const string ReleaseScopeDecisionSha256 =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     [Fact]
     public void ProjectionPublishesTheCompleteDeterministicConvergenceContract()
@@ -59,7 +61,7 @@ public sealed class PublicReleaseTruthProjectionTests
                      "supportabilityState", "availablePlatforms", "primaryHeadByPlatform",
                      "artifactCount", "downloadAccessPosture", "knownIssueSummary",
                      "manifestSha256", "registryCommit", "releaseDecisionStatus",
-                     "releaseDecisionSha256"
+                     "releaseDecisionSha256", "releaseScopeDecisionSha256"
                  })
         {
             Assert.True(serialized.RootElement.TryGetProperty(requiredField, out _), requiredField);
@@ -94,7 +96,7 @@ public sealed class PublicReleaseTruthProjectionTests
     [Fact]
     public void UnknownDecisionAuthorityIsRejected()
     {
-        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
         AuthorityEnvelope authority = BuildAuthorityEnvelope(manifest, "approved");
 
         Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, authority));
@@ -103,7 +105,7 @@ public sealed class PublicReleaseTruthProjectionTests
     [Fact]
     public void ReviewRequiredKeepsArtifactProjectionButWithholdsOptimisticClaims()
     {
-        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
         PublicReleaseTruthProjectionDto projection = ProjectAuthority(
             manifest,
             BuildAuthorityEnvelope(manifest, "review_required"));
@@ -115,12 +117,252 @@ public sealed class PublicReleaseTruthProjectionTests
         Assert.False(projection.AvailabilityClaimsAllowed);
         Assert.False(projection.StableClaimsAllowed);
         Assert.True(projection.ReviewBannerRequired);
+        Assert.False(projection.ReviewRequiredPublicByteHandoffsAllowed);
+    }
+
+    [Fact]
+    public void ScopeBoundPublishedOpenPublicReviewAllowsOnlyByteHandoffClaims()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true));
+
+        Assert.Equal(ReleaseScopeDecisionSha256, projection.ReleaseScopeDecisionSha256);
+        Assert.True(projection.AuthorityBound);
+        Assert.True(projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(projection.AvailabilityClaimsAllowed);
+        Assert.False(projection.StableClaimsAllowed);
+        Assert.True(projection.ReviewBannerRequired);
+    }
+
+    [Theory]
+    [InlineData("account_recommended")]
+    [InlineData("account_required")]
+    public void ProtectedReviewShelfNeverAllowsPublicByteHandoffs(string accessClass)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(
+            BuildArtifact("windows", "windows", "avalonia", 'd', accessClass));
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(manifest, "review_required"));
+
+        Assert.False(projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(projection.AvailabilityClaimsAllowed);
+    }
+
+    [Fact]
+    public void MixedReviewShelfNeverAllowsPublicByteHandoffs()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(
+            BuildPublicArtifact(),
+            BuildArtifact("linux", "linux", "avalonia", 'f', "account_required"));
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(manifest, "review_required"));
+
+        Assert.Equal("mixed", projection.DownloadAccessPosture);
+        Assert.False(projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(projection.AvailabilityClaimsAllowed);
+    }
+
+    [Theory]
+    [InlineData("status", "revoked")]
+    [InlineData("rollout", "revoked")]
+    [InlineData("rollout", "release_review_required")]
+    [InlineData("supportability", "unsupported")]
+    [InlineData("channel", "public_stable")]
+    public void NonCanonicalOrRevokedReviewPostureNeverAllowsPublicByteHandoffs(
+        string field,
+        string value)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact()) with
+        {
+            Channel = field == "channel" ? value : "preview",
+            Status = field == "status" ? value : "published",
+            RolloutState = field == "rollout" ? value : "public_release_review_required",
+            SupportabilityState = field == "supportability" ? value : "review_required"
+        };
+        Assert.Throws<InvalidDataException>(() =>
+            ProjectAuthority(
+                manifest,
+                BuildAuthorityEnvelope(
+                    manifest,
+                    "review_required",
+                    publicByteHandoff: true)));
+    }
+
+    [Fact]
+    public void PreviewDecisionRequiresAnAuthorityBoundReleaseScopeDigest()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest,
+            "review_required",
+            publicByteHandoff: true);
+        JsonObject missing = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        missing.Remove("releaseScopeDecisionSha256");
+        AuthorityEnvelope missingAuthority = RebindDecision(
+            authority,
+            Encoding.UTF8.GetBytes(missing.ToJsonString()));
+        JsonObject invalid = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        invalid["releaseScopeDecisionSha256"] = new string('E', 64);
+        AuthorityEnvelope invalidAuthority = RebindDecision(
+            authority,
+            Encoding.UTF8.GetBytes(invalid.ToJsonString()));
+
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, missingAuthority));
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, invalidAuthority));
+    }
+
+    [Fact]
+    public void ScopeDigestMutationWithoutEnvelopeRebindingIsRejected()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest,
+            "review_required",
+            publicByteHandoff: true);
+        JsonObject decision = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        decision["releaseScopeDecisionSha256"] = new string('f', 64);
+
+        Assert.Throws<InvalidDataException>(() =>
+            PublicReleaseAuthorityEnvelopeProjection.Project(
+                authority.CurrentBytes,
+                authority.SnapshotBytes,
+                Encoding.UTF8.GetBytes(decision.ToJsonString()),
+                manifest,
+                Digest(authority.ManifestBytes),
+                authority.ManifestBytes));
+    }
+
+    [Theory]
+    [InlineData("contractName", "chummer.public-preview-byte-handoff/v2")]
+    [InlineData("status", "review_required")]
+    [InlineData("sourcePublicationState", "published")]
+    [InlineData("releaseScopeDecisionSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    [InlineData("artifactId", "other-installer")]
+    [InlineData("head", "blazor-desktop")]
+    [InlineData("platform", "linux")]
+    [InlineData("rid", "win-arm64")]
+    [InlineData("arch", "arm64")]
+    [InlineData("sha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")]
+    [InlineData("artifactAccessClass", "account_required")]
+    [InlineData("signingRequirement", "signed")]
+    [InlineData("downloadUrl", "/downloads/files/other-installer.exe")]
+    [InlineData("publicInstallRoute", "/downloads/get/other-installer")]
+    public void V2ArtifactHandoffMustExactlyMatchScopeAndSnapshotArtifact(
+        string field,
+        string value)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest,
+            "review_required",
+            publicByteHandoff: true);
+        JsonObject decision = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        decision["artifactHandoff"]!.AsObject()[field] = value;
+        AuthorityEnvelope rebound = RebindDecision(
+            authority,
+            Encoding.UTF8.GetBytes(decision.ToJsonString()));
+
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, rebound));
+    }
+
+    [Theory]
+    [InlineData("/downloads/g/../files/installer.exe")]
+    [InlineData("/downloads/g/%2e%2e/files/installer.exe")]
+    [InlineData("/downloads/g/generation%2fescape/files/installer.exe")]
+    [InlineData("/downloads/g/generation/files/%2e%2e")]
+    [InlineData("/downloads/g/generation/files/installer%5cexe")]
+    [InlineData("/downloads/g/generation/files/installer.exe?ticket=secret")]
+    [InlineData("/downloads/g/generation/files/installer.exe#fragment")]
+    [InlineData("/downloads/g/generation/files/nested/installer.exe")]
+    [InlineData("https://user@chummer.run/downloads/g/generation/files/installer.exe")]
+    [InlineData("//chummer.run/downloads/g/generation/files/installer.exe")]
+    public void V2ArtifactHandoffRejectsUnsafeDownloadUrlsEvenWhenAuthorityMatches(
+        string downloadUrl)
+    {
+        PublicReleaseArtifactDto artifact = BuildPublicArtifact() with
+        {
+            Url = downloadUrl
+        };
+        PublicReleaseManifestDto manifest = BuildReviewManifest(artifact);
+
+        Assert.Throws<InvalidDataException>(() =>
+            ProjectAuthority(
+                manifest,
+                BuildAuthorityEnvelope(
+                    manifest,
+                    "review_required",
+                    publicByteHandoff: true)));
+    }
+
+    [Theory]
+    [InlineData("/downloads/install/../windows")]
+    [InlineData("/downloads/install/%2e%2e")]
+    [InlineData("/downloads/install/windows?ticket=secret")]
+    [InlineData("/downloads/install/windows#fragment")]
+    [InlineData("https://user@chummer.run/downloads/install/windows")]
+    public void V2ArtifactHandoffRejectsUnsafeInstallRoutesEvenWhenSnapshotMatches(
+        string publicInstallRoute)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        AuthorityEnvelope authority = MutateSnapshot(
+            BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true),
+            snapshot => snapshot["artifacts"]!.AsArray()[0]!.AsObject()[
+                "publicInstallRoute"] = publicInstallRoute);
+        JsonObject decision = JsonNode.Parse(
+            Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+        decision["artifactHandoff"]!.AsObject()["publicInstallRoute"] = publicInstallRoute;
+        AuthorityEnvelope rebound = RebindDecision(
+            authority,
+            Encoding.UTF8.GetBytes(decision.ToJsonString()));
+
+        Assert.Throws<InvalidDataException>(() => ProjectAuthority(manifest, rebound));
+    }
+
+    [Fact]
+    public void V2ArtifactHandoffRejectsMissingUnknownAndWrongSizedBindings()
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        AuthorityEnvelope authority = BuildAuthorityEnvelope(
+            manifest,
+            "review_required",
+            publicByteHandoff: true);
+
+        AuthorityEnvelope Mutate(Action<JsonObject> mutation)
+        {
+            JsonObject decision = JsonNode.Parse(
+                Encoding.UTF8.GetString(authority.DecisionBytes.Span))!.AsObject();
+            mutation(decision["artifactHandoff"]!.AsObject());
+            return RebindDecision(
+                authority,
+                Encoding.UTF8.GetBytes(decision.ToJsonString()));
+        }
+
+        Assert.Throws<InvalidDataException>(() =>
+            ProjectAuthority(manifest, Mutate(handoff => handoff.Remove("artifactId"))));
+        Assert.Throws<InvalidDataException>(() =>
+            ProjectAuthority(manifest, Mutate(handoff => handoff["unexpected"] = "value")));
+        Assert.Throws<InvalidDataException>(() =>
+            ProjectAuthority(manifest, Mutate(handoff => handoff["sizeBytes"] = 1025)));
     }
 
     [Fact]
     public void AuthorityManifestDigestMismatchIsRejected()
     {
-        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
         AuthorityEnvelope authority = BuildAuthorityEnvelope(manifest, "stable_ready");
 
         Assert.Throws<InvalidDataException>(() =>
@@ -538,7 +780,7 @@ public sealed class PublicReleaseTruthProjectionTests
     [InlineData("/downloads/proof/windows/candidates/6.2.0/metadata")]
     public async Task ReviewRequiredShortCircuitsEveryInstallerAndUpdaterOutput(string route)
     {
-        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
         PublicReleaseTruthProjectionDto projection = ProjectAuthority(
             manifest,
             BuildAuthorityEnvelope(manifest, "review_required"));
@@ -571,7 +813,7 @@ public sealed class PublicReleaseTruthProjectionTests
     [Fact]
     public async Task ReviewRequiredAllowsWindowsProofUploadTicketCreationToReachController()
     {
-        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
         PublicReleaseTruthProjectionDto projection = ProjectAuthority(
             manifest,
             BuildAuthorityEnvelope(manifest, "review_required"));
@@ -595,6 +837,116 @@ public sealed class PublicReleaseTruthProjectionTests
     }
 
     [Theory]
+    [InlineData("/downloads/files/example-installer.exe")]
+    [InlineData("/downloads/files/example-payload.zip")]
+    [InlineData("/downloads/files/example-payload.zip.json")]
+    [InlineData("/downloads/g/candidate-42/files/example-installer.exe")]
+    [InlineData("/downloads/g/candidate-42/files/example-payload.zip")]
+    [InlineData("/downloads/g/candidate-42/files/example-payload.zip.json")]
+    public async Task ScopeBoundReviewAllowsOnlyRawImmutableByteRoutes(string route)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true));
+        var context = new DefaultHttpContext();
+        context.Request.Path = route;
+        context.Request.Method = HttpMethods.Get;
+        bool downstreamInvoked = false;
+        var middleware = new PublicReleaseTruthProjectionMiddleware(responseContext =>
+        {
+            downstreamInvoked = true;
+            responseContext.Response.StatusCode = StatusCodes.Status204NoContent;
+            return Task.CompletedTask;
+        });
+
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
+
+        Assert.True(downstreamInvoked);
+        Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+        Assert.False(projection.AvailabilityClaimsAllowed);
+        Assert.False(projection.StableClaimsAllowed);
+        Assert.True(projection.ReviewBannerRequired);
+    }
+
+    [Theory]
+    [InlineData("/downloads/get/example-installer")]
+    [InlineData("/downloads/file/example-installer")]
+    [InlineData("/downloads/install/example-installer/payload")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer/payload")]
+    [InlineData("/downloads/proof/windows/current/installers/example-installer")]
+    [InlineData("/downloads/current.json")]
+    [InlineData("/downloads/files/folder/example-installer.exe")]
+    [InlineData("/downloads/g/candidate-42/files/folder/example-installer.exe")]
+    public async Task ScopeBoundReviewDoesNotOpenCurrentProtectedOrOffScopeRoutes(string route)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true));
+        var context = new DefaultHttpContext();
+        context.Request.Path = route;
+        context.Request.Method = HttpMethods.Get;
+        bool downstreamInvoked = false;
+        var middleware = new PublicReleaseTruthProjectionMiddleware(_ =>
+        {
+            downstreamInvoked = true;
+            return Task.CompletedTask;
+        });
+
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
+
+        if (route == "/downloads/current.json")
+        {
+            Assert.True(downstreamInvoked);
+            return;
+        }
+
+        Assert.False(downstreamInvoked);
+        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("POST", "")]
+    [InlineData("GET", "?ticket=credential")]
+    public async Task ScopeBoundReviewRawRouteDoesNotBroadenMethodOrCredentialSemantics(
+        string method,
+        string query)
+    {
+        PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(
+                manifest,
+                "review_required",
+                publicByteHandoff: true));
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/downloads/files/example-installer.exe";
+        context.Request.Method = method;
+        context.Request.QueryString = new QueryString(query);
+        bool downstreamInvoked = false;
+        var middleware = new PublicReleaseTruthProjectionMiddleware(_ =>
+        {
+            downstreamInvoked = true;
+            return Task.CompletedTask;
+        });
+
+        await InvokeMiddlewareAsync(middleware, context, new StubProjection(projection));
+
+        Assert.False(downstreamInvoked);
+        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/downloads/files/example-installer.exe")]
+    [InlineData("/downloads/g/candidate-42/files/example-installer.exe")]
     [InlineData("/downloads/get/example-installer")]
     [InlineData("/downloads/g/candidate-42/install/example-installer")]
     [InlineData("/install-personalized-script.sh")]
@@ -755,7 +1107,8 @@ public sealed class PublicReleaseTruthProjectionTests
         string releaseDecisionStatus,
         IReadOnlyDictionary<string, string>? primaryHeads = null,
         string releaseDecisionPath = PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath,
-        ReadOnlyMemory<byte>? manifestBytesOverride = null)
+        ReadOnlyMemory<byte>? manifestBytesOverride = null,
+        bool publicByteHandoff = false)
     {
         ReadOnlyMemory<byte> manifestBytes = manifestBytesOverride ?? Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
@@ -781,7 +1134,12 @@ public sealed class PublicReleaseTruthProjectionTests
                 promotionState = "promoted",
                 publicationScope = "signed-in-and-public",
                 revokeState = "not_revoked",
-                publicInstallRoute = $"/downloads/get/{artifact.Id}",
+                publicInstallRoute = string.Equals(
+                    PublicReleaseTruthProjectionService.NormalizeToken(artifact.InstallAccessClass),
+                    "open_public",
+                    StringComparison.Ordinal)
+                    ? $"/downloads/install/{artifact.Id}"
+                    : artifact.Url,
                 installAccessClass = PublicReleaseTruthProjectionService.NormalizeToken(artifact.InstallAccessClass)
             })
             .ToArray();
@@ -847,7 +1205,8 @@ public sealed class PublicReleaseTruthProjectionTests
                 primaryHeadByPlatform,
                 fallbackHeadsByPlatform,
                 artifacts.Length,
-                downloadAccessPosture);
+                downloadAccessPosture,
+                publicByteHandoff);
         ReadOnlyMemory<byte> decisionBytes = Encoding.UTF8.GetBytes(decision.ToJsonString());
         string decisionSha256 = Digest(decisionBytes);
         byte[] snapshotBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -892,17 +1251,21 @@ public sealed class PublicReleaseTruthProjectionTests
         IReadOnlyDictionary<string, string> primaryHeadByPlatform,
         IReadOnlyDictionary<string, string[]> fallbackHeadsByPlatform,
         int artifactCount,
-        string downloadAccessPosture)
+        string downloadAccessPosture,
+        bool publicByteHandoff)
     {
         bool ready = releaseDecisionStatus == "preview_ready";
-        return new JsonObject
+        var decision = new JsonObject
         {
-            ["contractName"] = PublicReleaseAuthorityEnvelopeProjection.PreviewDecisionContract,
+            ["contractName"] = publicByteHandoff
+                ? PublicReleaseAuthorityEnvelopeProjection.PreviewDecisionContractV2
+                : PublicReleaseAuthorityEnvelopeProjection.PreviewDecisionContract,
             ["generatedAt"] = "2026-07-18T12:00:00Z",
             ["status"] = releaseDecisionStatus,
             ["releaseDecisionStatus"] = releaseDecisionStatus,
             ["verdict"] = ready ? "PREVIEW_READY" : "PREVIEW_RELEASE_REVIEW_REQUIRED",
             ["releaseVersion"] = manifest.Version,
+            ["releaseScopeDecisionSha256"] = ReleaseScopeDecisionSha256,
             ["channel"] = PublicReleaseTruthProjectionService.NormalizeToken(manifest.Channel),
             ["platforms"] = JsonSerializer.SerializeToNode(availablePlatforms),
             ["primaryHeadByPlatform"] = JsonSerializer.SerializeToNode(primaryHeadByPlatform),
@@ -929,6 +1292,33 @@ public sealed class PublicReleaseTruthProjectionTests
                     ["summary"] = "Immutable release authority still requires review."
                 })
         };
+        if (publicByteHandoff)
+        {
+            PublicReleaseArtifactDto artifact = Assert.Single(manifest.Downloads);
+            decision["artifactHandoff"] = JsonSerializer.SerializeToNode(new
+            {
+                contractName = PublicReleaseAuthorityEnvelopeProjection.PublicPreviewByteHandoffContract,
+                status = "approved_public_preview_bytes",
+                sourcePublicationState = "preview",
+                releaseScopeDecisionSha256 = ReleaseScopeDecisionSha256,
+                releaseVersion = manifest.Version,
+                channel = "preview",
+                artifactId = artifact.Id,
+                head = PublicReleaseTruthProjectionService.NormalizeToken(artifact.Head),
+                platform = PublicReleaseTruthProjectionService.ResolvePlatformId(artifact),
+                rid = (artifact.Rid ?? string.Empty).Trim().ToLowerInvariant(),
+                arch = PublicReleaseTruthProjectionService.NormalizeToken(artifact.Arch),
+                sha256 = artifact.Sha256.Trim().ToLowerInvariant(),
+                sizeBytes = artifact.SizeBytes,
+                artifactAccessClass = PublicReleaseTruthProjectionService.NormalizeToken(
+                    artifact.InstallAccessClass),
+                signingRequirement = "preview_unsigned_allowed",
+                downloadUrl = artifact.Url,
+                publicInstallRoute = $"/downloads/install/{artifact.Id}"
+            });
+        }
+
+        return decision;
     }
 
     private static JsonObject BuildStableDecisionFixture(
@@ -1142,6 +1532,16 @@ public sealed class PublicReleaseTruthProjectionTests
             SupportabilityState: "gold_supported",
             KnownIssueSummary: "Known caution.");
 
+    private static PublicReleaseManifestDto BuildReviewManifest(
+        params PublicReleaseArtifactDto[] artifacts)
+        => BuildManifest(artifacts) with
+        {
+            Channel = "preview",
+            Status = "published",
+            RolloutState = "public_release_review_required",
+            SupportabilityState = "review_required"
+        };
+
     private static PublicReleaseArtifactDto BuildPublicArtifact()
         => BuildArtifact("windows", "windows", "avalonia", 'd', "open_public");
 
@@ -1155,7 +1555,7 @@ public sealed class PublicReleaseTruthProjectionTests
             Id: id,
             Platform: platform,
             Url: installAccessClass == "open_public"
-                ? $"/downloads/{id}"
+                ? $"/downloads/g/candidate-42/files/{id}.exe"
                 : $"/downloads/get/{id}",
             Sha256: new string(shaCharacter, 64),
             Head: head,

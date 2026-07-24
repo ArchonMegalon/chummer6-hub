@@ -98,7 +98,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
             "Link",
             "</api/v1/public/release-truth>; rel=\"release-truth\"; type=\"application/json\"");
         if (!projection.AvailabilityClaimsAllowed
-            && IsReleaseArtifactHandoffRoute(context.Request.Path))
+            && IsReleaseArtifactHandoffRoute(context.Request.Path)
+            && !IsReviewRequiredPublicByteHandoffRequest(context.Request, projection))
         {
             context.Response.StatusCode = StatusCodes.Status409Conflict;
             context.Response.ContentType = "application/json; charset=utf-8";
@@ -218,6 +219,60 @@ public sealed class PublicReleaseTruthProjectionMiddleware
             || value.Equals("/api/v1/install-linking/continuation", StringComparison.OrdinalIgnoreCase)
             || value.StartsWith("/api/v1/install-linking/continuation/", StringComparison.OrdinalIgnoreCase);
     }
+
+    internal static bool IsReviewRequiredPublicByteHandoffRequest(
+        HttpRequest request,
+        PublicReleaseTruthProjectionDto projection)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(projection);
+        return projection.ReviewRequiredPublicByteHandoffsAllowed
+            && (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            && !request.QueryString.HasValue
+            && IsRawImmutableArtifactRoute(request.Path);
+    }
+
+    internal static bool IsRawImmutableArtifactRoute(PathString path)
+    {
+        string value = path.Value ?? string.Empty;
+        if (value.Length == 0 || value.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        const string currentPrefix = "/downloads/files/";
+        if (value.StartsWith(currentPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return IsSafeRouteToken(value[currentPrefix.Length..], maximumLength: 255);
+        }
+
+        const string generationPrefix = "/downloads/g/";
+        if (!value.StartsWith(generationPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string remainder = value[generationPrefix.Length..];
+        int separator = remainder.IndexOf('/');
+        if (separator <= 0
+            || !IsSafeRouteToken(remainder[..separator], maximumLength: 128))
+        {
+            return false;
+        }
+
+        const string filesPrefix = "/files/";
+        string generationRoute = remainder[separator..];
+        return generationRoute.StartsWith(filesPrefix, StringComparison.OrdinalIgnoreCase)
+            && IsSafeRouteToken(generationRoute[filesPrefix.Length..], maximumLength: 255);
+    }
+
+    private static bool IsSafeRouteToken(string value, int maximumLength)
+        => value.Length is > 0
+           && value.Length <= maximumLength
+           && !value.Contains("..", StringComparison.Ordinal)
+           && value.All(static character =>
+               char.IsAsciiLetterOrDigit(character)
+               || character is '-' or '_' or '.');
 
     private static bool IsPersonalizedInstallScript(string value)
         => value.StartsWith("/install-", StringComparison.OrdinalIgnoreCase)
