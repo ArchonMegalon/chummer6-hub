@@ -6,6 +6,7 @@ import base64
 import binascii
 import datetime as dt
 import hashlib
+import hmac
 import json
 from pathlib import Path
 import re
@@ -24,6 +25,8 @@ REQUEST_FIELDS = {
     "generationId",
     "expectedShelfPointerSha256",
     "expectedShelfInventoryDigest",
+    "expectedReleaseScopeDecisionSha256",
+    "releaseScopeDecisionBytes",
     "predecessorCurrentBytes",
     "predecessorSnapshotBytes",
     "predecessorDecisionBytes",
@@ -69,6 +72,8 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--successor-decision", type=Path, required=True)
     parser.add_argument("--scorecard", type=Path, required=True)
     parser.add_argument("--convergence", type=Path, required=True)
+    parser.add_argument("--release-scope-decision", type=Path, required=True)
+    parser.add_argument("--expected-release-scope-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -139,6 +144,17 @@ def _expected_revision(request: dict[str, Any], decoded: dict[str, bytes]) -> st
     _append_hash_part(digest, "generation", str(request["generationId"]).encode("utf-8"))
     _append_hash_part(digest, "shelf-pointer", pointer.encode("ascii"))
     _append_hash_part(digest, "shelf-inventory", inventory[7:].encode("ascii"))
+    scope_sha256 = request.get("expectedReleaseScopeDecisionSha256")
+    if not isinstance(scope_sha256, str) or SHA256.fullmatch(scope_sha256) is None:
+        raise VerificationError(
+            "request expectedReleaseScopeDecisionSha256 is invalid"
+        )
+    _append_hash_part(
+        digest, "release-scope-digest", scope_sha256.encode("ascii")
+    )
+    _append_hash_part(
+        digest, "release-scope", decoded["releaseScopeDecisionBytes"]
+    )
     for label, field in (
         ("predecessor-current", "predecessorCurrentBytes"),
         ("predecessor-snapshot", "predecessorSnapshotBytes"),
@@ -196,6 +212,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         expected_files: dict[str, tuple[bytes, dict[str, Any]]] = {}
         for name, path in (
+            ("releaseScopeDecisionBytes", args.release_scope_decision),
             ("predecessorCurrentBytes", args.predecessor_current),
             ("predecessorSnapshotBytes", args.predecessor_snapshot),
             ("predecessorDecisionBytes", args.predecessor_decision),
@@ -213,6 +230,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         generation_id = args.generation_id.strip()
         release_version = args.release_version.strip()
+        expected_release_scope_sha256 = args.expected_release_scope_sha256.strip()
+        if SHA256.fullmatch(expected_release_scope_sha256) is None:
+            raise VerificationError(
+                "expected release-scope SHA-256 must be canonical lowercase hexadecimal"
+            )
+        if (
+            request.get("expectedReleaseScopeDecisionSha256")
+            != expected_release_scope_sha256
+            or not hmac.compare_digest(
+                _sha(decoded["releaseScopeDecisionBytes"]),
+                expected_release_scope_sha256,
+            )
+        ):
+            raise VerificationError(
+                "authority advance request release-scope digest differs from exact input bytes"
+            )
         predecessor_decision = expected_files["predecessorDecisionBytes"][1]
         successor_current = expected_files["successorCurrentBytes"][1]
         successor_snapshot = expected_files["successorSnapshotBytes"][1]
@@ -262,7 +295,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         _write_new(
             args.output,
             {
-                "contractName": "chummer.release-authority-advance-response/v1",
+                "contractName": "chummer.release-authority-advance-response/v2",
                 "status": "pass",
                 "generationId": generation_id,
                 "releaseVersion": release_version,
@@ -271,6 +304,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "decisionSha256": expected_decision_sha256,
                 "scorecardSha256": expected_scorecard_sha256,
                 "convergenceSha256": expected_convergence_sha256,
+                "releaseScopeDecisionSha256": expected_release_scope_sha256,
                 "journalReceiptId": response["journalReceiptId"],
                 "committedAtUtc": response["committedAtUtc"],
                 "recovered": response["recovered"],

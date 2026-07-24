@@ -86,6 +86,8 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
     ).encode() + b"\n"
     scorecard = b'{"preview_status":"pass"}\n'
     convergence = b'{"status":"pass"}\n'
+    release_scope = b'{"contractName":"chummer.release-scope-decision/v1","status":"approved"}\n'
+    release_scope_sha256 = digest(release_scope)
     raw_files = {
         "predecessor-current": predecessor_current,
         "predecessor-snapshot": predecessor_snapshot,
@@ -95,6 +97,7 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
         "successor-decision": successor_decision,
         "scorecard": scorecard,
         "convergence": convergence,
+        "release-scope-decision": release_scope,
     }
     paths: dict[str, Path] = {}
     for name, raw in raw_files.items():
@@ -110,8 +113,10 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
         "generationId": generation_id,
         "expectedShelfPointerSha256": "a" * 64,
         "expectedShelfInventoryDigest": "sha256:" + "b" * 64,
+        "expectedReleaseScopeDecisionSha256": release_scope_sha256,
     }
     for request_field, source_name in {
+        "releaseScopeDecisionBytes": "release-scope-decision",
         "predecessorCurrentBytes": "predecessor-current",
         "predecessorSnapshotBytes": "predecessor-snapshot",
         "predecessorDecisionBytes": "predecessor-decision",
@@ -136,47 +141,84 @@ def prepare_workspace(tmp_path: Path) -> dict[str, object]:
         "generation_id": generation_id,
         "release_version": release_version,
         "manifest_sha256": manifest_sha256,
+        "release_scope_sha256": release_scope_sha256,
     }
+
+
+def create_arguments(
+    setup: dict[str, object],
+    checkpoint: Path,
+) -> list[str]:
+    workspace = setup["workspace"]
+    paths = setup["paths"]
+    assert isinstance(workspace, Path)
+    assert isinstance(paths, dict)
+    return [
+        "create",
+        "--workspace",
+        str(workspace),
+        "--executed-bootstrap",
+        str(setup["executed_bootstrap"]),
+        "--generation-id",
+        str(setup["generation_id"]),
+        "--release-version",
+        str(setup["release_version"]),
+        "--registry-current-url",
+        "https://registry.example/api/v1/registry/release-authority/current",
+        "--hub-authority-advance-url",
+        f"https://chummer.example/api/internal/releases/generations/{setup['generation_id']}/authority-advances",
+        "--live-convergence-base-url",
+        "https://chummer.example",
+        "--expected-manifest-sha256",
+        str(setup["manifest_sha256"]),
+        "--release-scope-decision",
+        str(paths["release-scope-decision"]),
+        "--expected-release-scope-sha256",
+        str(setup["release_scope_sha256"]),
+        "--request",
+        str(paths["request"]),
+        "--predecessor-current",
+        str(paths["predecessor-current"]),
+        "--predecessor-snapshot",
+        str(paths["predecessor-snapshot"]),
+        "--predecessor-decision",
+        str(paths["predecessor-decision"]),
+        "--successor-current",
+        str(paths["successor-current"]),
+        "--successor-snapshot",
+        str(paths["successor-snapshot"]),
+        "--successor-decision",
+        str(paths["successor-decision"]),
+        "--scorecard",
+        str(paths["scorecard"]),
+        "--convergence",
+        str(paths["convergence"]),
+        "--response-verifier",
+        str(paths["response-verifier"]),
+        "--registry-inspector",
+        str(paths["registry-inspector"]),
+        "--live-convergence-verifier",
+        str(paths["live-convergence-verifier"]),
+        "--evidence-directory",
+        str(workspace / "evidence"),
+        "--convergence-timeout-seconds",
+        "30",
+        "--convergence-attempts",
+        "3",
+        "--convergence-retry-seconds",
+        "1",
+        "--output",
+        str(checkpoint),
+    ]
 
 
 def create_checkpoint(setup: dict[str, object]) -> tuple[Path, str]:
     workspace = setup["workspace"]
     tool = setup["tool"]
-    paths = setup["paths"]
     assert isinstance(workspace, Path)
     assert isinstance(tool, Path)
-    assert isinstance(paths, dict)
     checkpoint = workspace / "evidence" / ".authority-checkpoint.json"
-    result = invoke(
-        tool,
-        "create",
-        "--workspace", str(workspace),
-        "--executed-bootstrap", str(setup["executed_bootstrap"]),
-        "--generation-id", str(setup["generation_id"]),
-        "--release-version", str(setup["release_version"]),
-        "--registry-current-url", "https://registry.example/api/v1/registry/release-authority/current",
-        "--hub-authority-advance-url",
-        f"https://chummer.example/api/internal/releases/generations/{setup['generation_id']}/authority-advances",
-        "--live-convergence-base-url", "https://chummer.example",
-        "--expected-manifest-sha256", str(setup["manifest_sha256"]),
-        "--request", str(paths["request"]),
-        "--predecessor-current", str(paths["predecessor-current"]),
-        "--predecessor-snapshot", str(paths["predecessor-snapshot"]),
-        "--predecessor-decision", str(paths["predecessor-decision"]),
-        "--successor-current", str(paths["successor-current"]),
-        "--successor-snapshot", str(paths["successor-snapshot"]),
-        "--successor-decision", str(paths["successor-decision"]),
-        "--scorecard", str(paths["scorecard"]),
-        "--convergence", str(paths["convergence"]),
-        "--response-verifier", str(paths["response-verifier"]),
-        "--registry-inspector", str(paths["registry-inspector"]),
-        "--live-convergence-verifier", str(paths["live-convergence-verifier"]),
-        "--evidence-directory", str(workspace / "evidence"),
-        "--convergence-timeout-seconds", "30",
-        "--convergence-attempts", "3",
-        "--convergence-retry-seconds", "1",
-        "--output", str(checkpoint),
-    )
+    result = invoke(tool, *create_arguments(setup, checkpoint))
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)
     return checkpoint, receipt["checkpointSha256"]
@@ -188,6 +230,16 @@ def test_checkpoint_round_trip_is_private_digest_pinned_and_secret_free(tmp_path
     assert stat.S_IMODE(checkpoint.stat().st_mode) == 0o600
     assert digest(checkpoint.read_bytes()) == checkpoint_sha256
     assert b"ticket-must-never-persist" not in checkpoint.read_bytes()
+    checkpoint_payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert checkpoint_payload["contractName"].endswith("/v3")
+    assert (
+        checkpoint_payload["expectedReleaseScopeDecisionSha256"]
+        == setup["release_scope_sha256"]
+    )
+    assert (
+        checkpoint_payload["files"]["releaseScopeDecision"]["sha256"]
+        == setup["release_scope_sha256"]
+    )
 
     resolution = setup["workspace"] / ".resolution.json"
     result = invoke(
@@ -203,6 +255,12 @@ def test_checkpoint_round_trip_is_private_digest_pinned_and_secret_free(tmp_path
     assert result.stdout.strip() == "release_authority_transaction_resolution:pass"
     assert stat.S_IMODE(resolution.stat().st_mode) == 0o600
     assert b"ticket-must-never-persist" not in resolution.read_bytes()
+    resolution_payload = json.loads(resolution.read_text(encoding="utf-8"))
+    assert resolution_payload["contractName"].endswith("/v3")
+    assert (
+        resolution_payload["expectedReleaseScopeDecisionSha256"]
+        == setup["release_scope_sha256"]
+    )
 
 
 def test_resolve_fails_closed_after_exact_request_tamper(tmp_path: Path) -> None:
@@ -225,6 +283,64 @@ def test_resolve_fails_closed_after_exact_request_tamper(tmp_path: Path) -> None
     assert result.returncode == 1
     assert "request SHA-256 changed" in result.stderr
     assert not resolution.exists()
+
+
+def test_resolve_fails_closed_after_release_scope_tamper(tmp_path: Path) -> None:
+    setup = prepare_workspace(tmp_path)
+    checkpoint, checkpoint_sha256 = create_checkpoint(setup)
+    release_scope = setup["paths"]["release-scope-decision"]
+    release_scope.write_bytes(release_scope.read_bytes() + b" ")
+    resolution = setup["workspace"] / ".resolution.json"
+
+    result = invoke(
+        setup["tool"],
+        "resolve",
+        "--workspace",
+        str(setup["workspace"]),
+        "--executed-bootstrap",
+        str(setup["executed_bootstrap"]),
+        "--checkpoint",
+        str(checkpoint),
+        "--expected-checkpoint-sha256",
+        checkpoint_sha256,
+        "--output",
+        str(resolution),
+    )
+
+    assert result.returncode == 1
+    assert "releaseScopeDecision SHA-256 changed" in result.stderr
+    assert not resolution.exists()
+
+
+@pytest.mark.parametrize("failure", ["request-digest", "scope-bytes"])
+def test_create_rejects_release_scope_binding_drift(
+    tmp_path: Path,
+    failure: str,
+) -> None:
+    setup = prepare_workspace(tmp_path)
+    request = setup["paths"]["request"]
+    if failure == "request-digest":
+        payload = json.loads(request.read_text(encoding="utf-8"))
+        payload["expectedReleaseScopeDecisionSha256"] = "f" * 64
+        write_bytes(
+            request,
+            (
+                json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
+            ).encode(),
+        )
+    else:
+        scope = setup["paths"]["release-scope-decision"]
+        scope.write_bytes(scope.read_bytes() + b" ")
+    checkpoint = setup["workspace"] / "evidence" / ".authority-checkpoint.json"
+
+    result = invoke(
+        setup["tool"],
+        *create_arguments(setup, checkpoint),
+    )
+
+    assert result.returncode == 1
+    assert "release-scope digest differs from exact source bytes" in result.stderr
+    assert not checkpoint.exists()
 
 
 @pytest.mark.parametrize("failure", ["wrong-digest", "public-mode", "tool-tamper"])
