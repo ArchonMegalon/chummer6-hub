@@ -3,10 +3,52 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const stableChannels = new Set(['public_stable', 'stable']);
-const recognizedStatusHeadings = new Set(['Preview downloads', 'Stable downloads', 'Downloads paused']);
+const recognizedStatusHeadings = new Set([
+  'Downloads under review',
+  'Preview downloads',
+  'Stable downloads',
+  'Downloads paused',
+]);
+const blockingRolloutStates = new Set([
+  'blocked',
+  'coverage_incomplete',
+  'desktop_polish_needed',
+  'disabled',
+  'public_release_review_required',
+  'release_review_required',
+  'revoked',
+  'unpublished',
+]);
 
 function normalizedText(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function publicInstallerAvailable(manifest: Record<string, unknown>): boolean {
+  if (Array.isArray(manifest.downloads)) {
+    return manifest.downloads.length > 0;
+  }
+  if (Array.isArray(manifest.artifacts)) {
+    return manifest.artifacts.some((value) => {
+      if (!value || typeof value !== 'object') return false;
+      const artifact = value as Record<string, unknown>;
+      const kind = normalizedText(artifact.kind ?? artifact.artifactKind);
+      const access = normalizedText(
+        artifact.installAccessClass ?? artifact.accessClass ?? artifact.access,
+      );
+      const url = normalizedText(artifact.downloadUrl ?? artifact.url ?? artifact.installUrl);
+      return kind.includes('installer')
+        && (!access || ['open_public', 'public', 'guest'].includes(access))
+        && !!url;
+    });
+  }
+  const publicInstallCount = (
+    manifest.publicTrustMetrics as Record<string, unknown> | undefined
+  )?.adoptionHealth as Record<string, unknown> | undefined;
+  if (publicInstallCount && 'publicInstallCount' in publicInstallCount) {
+    return Number(publicInstallCount.publicInstallCount || 0) > 0;
+  }
+  return true;
 }
 
 function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): string {
@@ -21,6 +63,15 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
     && supportabilityState === 'gold_supported'
     && (stableChannels.has(channel) || rolloutState === 'public_stable')
   );
+
+  if (
+    statusAllowsStableRelease
+    && supportabilityState === 'review_required'
+    && publicInstallerAvailable(manifest)
+    && (version || channel || blockingRolloutStates.has(rolloutState))
+  ) {
+    return 'Downloads under review';
+  }
 
   if (status && status !== 'published') {
     return 'Downloads paused';
@@ -114,7 +165,14 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const statusHero = statusPage.locator('.minimal-page-hero.minimal-status-pill');
   await expect(statusHero).toBeVisible();
   await expect(statusHero).toContainText(/Now|Updated/);
-  await expect(statusHero).toContainText(/Preview downloads|Stable downloads|Downloads/);
+  await expect(statusHero).toContainText(/Downloads under review|Preview downloads|Stable downloads|Downloads paused/);
+  const statusHeadingText = (await statusHero.locator('h1').textContent())?.trim() || '';
+  const statusHeadingRecognized = recognizedStatusHeadings.has(statusHeadingText);
+  const statusHeadingMatchesReleaseChannel = statusHeadingText === expectedStatusHeading;
+  const statusHeadingUsesGenericUpdatedCopy = statusHeadingText === 'Updated';
+  expect(statusHeadingRecognized).toBe(true);
+  expect(statusHeadingMatchesReleaseChannel).toBe(true);
+  expect(statusHeadingUsesGenericUpdatedCopy).toBe(false);
   const statusVersionMarker = statusPage.locator('[data-downloads-release-version]');
   await expect(statusVersionMarker).toContainText(/^Version \S+/);
   const statusVersionText = (await statusVersionMarker.textContent())?.trim() || '';
@@ -137,5 +195,10 @@ test('downloads and status stay concise and point to the right next steps', asyn
     status_redirect_version_marker: true,
     downloads_version_text: downloadsVersionText,
     status_redirect_version_text: statusVersionText,
+    status_redirect_heading: statusHeadingText,
+    status_redirect_heading_recognized: statusHeadingRecognized,
+    status_redirect_heading_expected: expectedStatusHeading,
+    status_redirect_heading_matches_release_channel: statusHeadingMatchesReleaseChannel,
+    status_redirect_heading_uses_generic_updated_copy: statusHeadingUsesGenericUpdatedCopy,
   });
 });

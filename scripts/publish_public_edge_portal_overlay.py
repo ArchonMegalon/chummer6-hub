@@ -74,6 +74,7 @@ DEFAULT_STAGING_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overla
 DEFAULT_ACTIVE_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overlay" / "app"
 DEFAULT_BACKUP_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overlay-backups"
 DEFAULT_BUILD_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overlay-build"
+DEFAULT_HOST_BUILD_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-host-build"
 DEFAULT_OUTPUT = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "PUBLIC_EDGE_PORTAL_OVERLAY_PUBLISH.generated.json"
 DEFAULT_CONFIGURATION = "Release"
 DEFAULT_VERIFY_TIMEOUT_SECONDS = 30.0
@@ -91,6 +92,36 @@ DEFAULT_PUBLISH_LOCK_FILE = "public-edge-portal-overlay.publish.lock"
 PUBLIC_EDGE_MUTATION_LOCK = Path("/docker/chummercomplete/.state/public-edge-mutation.lock")
 PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE = "owner-token"
 CONTRACT_NAME = "chummer.public_edge_portal_overlay_publish.v1"
+PLAYWRIGHT_AUTHORITY_CONTRACT_NAME = (
+    "chummer.operation-private-playwright-authority/v1"
+)
+PLAYWRIGHT_AUTHORITY_EXPECTED_FIELDS = {
+    "contractName",
+    "pythonAbi",
+    "playwrightVersion",
+    "chromiumRevision",
+    "pythonRoot",
+    "pythonTreeSha256",
+    "browsersRoot",
+    "browserRevisionRoot",
+    "browserTreeSha256",
+    "browserExecutableRelativePath",
+}
+PLAYWRIGHT_PYTHON_AUTHORITY_ENTRIES = {
+    "greenlet",
+    "greenlet-3.5.2.dist-info",
+    "playwright",
+    "playwright-1.60.0.dist-info",
+    "pyee",
+    "pyee-13.0.1.dist-info",
+    "typing_extensions.py",
+    "typing_extensions-4.15.0.dist-info",
+}
+PLAYWRIGHT_BROWSER_EXECUTABLE_RELATIVE_PATH = (
+    Path("chromium_headless_shell-1223")
+    / "chrome-headless-shell-linux64"
+    / "chrome-headless-shell"
+)
 SOURCE_FINGERPRINT_ALGORITHM = "sha256-canonical-path-content-size-v1"
 STAGED_PAYLOAD_FINGERPRINT_ALGORITHM = (
     "sha256-canonical-path-content-size-posix-mode-runtime-mount-exclusions-v3"
@@ -177,6 +208,7 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("Directory.Build.props"),
         Path("Directory.Build.targets"),
         Path("global.json"),
+        Path("eng") / "package-plane.lock.json",
         Path(".dockerignore"),
         Path("docker-compose.public-edge.yml"),
         Path("package.json"),
@@ -188,6 +220,7 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("scripts") / "verify_public_edge_postdeploy_gate.py",
         Path("scripts") / "generate_public_play_worker_projection.py",
         Path("scripts") / "public_edge_payload_modes.py",
+        Path("scripts") / "ai" / "bootstrap-hub-package-feed.py",
         Path("scripts") / "strict_json_contract.py",
         Path("scripts") / "validate_public_pwa_proof_authority.py",
         Path("scripts") / "verify_public_pwa_static_assets.py",
@@ -2921,6 +2954,7 @@ def build_isolated_overlay_process_env(
     base_url: str,
     temp_root: Path,
     source_root: Path,
+    downloads_source_root: Path | None = None,
 ) -> dict[str, str]:
     """Build the verification child environment without retired Play transport state."""
     env = dict(inherited_env)
@@ -2933,6 +2967,12 @@ def build_isolated_overlay_process_env(
         env.pop(name, None)
     env["TMPDIR"] = str(temp_root)
     env["CHUMMER_PUBLIC_CANON_ROOT"] = str(source_root)
+    data_protection_root = temp_root / "data-protection-keys"
+    data_protection_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    data_protection_root.chmod(0o700)
+    env["CHUMMER_DATA_PROTECTION_KEYS_PATH"] = str(data_protection_root)
+    if downloads_source_root is not None:
+        env["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = str(downloads_source_root)
     return env
 
 
@@ -3010,14 +3050,18 @@ def verify_local_live_surface_parity(
     program_binding: dict[str, Any],
     *,
     deadline_monotonic: float | None = None,
+    surface_profile: str = "flagship",
+    delivery_phase: str = "",
+    release_channel_receipt: Path | None = None,
 ) -> dict[str, Any]:
     try:
         module = load_live_surface_parity_module(program_binding)
         payload = module.verify(
             base_url,
             output_path,
-            None,
+            release_channel_receipt,
             deadline_monotonic,
+            surface_profile=surface_profile,
         )
         refreshed_binding = refresh_verification_program_binding(program_binding)
         binding_matches = _verification_program_binding_status(refreshed_binding)
@@ -3035,6 +3079,17 @@ def verify_local_live_surface_parity(
             "programBinding": refreshed_binding,
             "programBindingMatches": binding_matches,
             "programSnapshotImported": str(refreshed_binding.get("snapshotPath") or ""),
+            "surfaceProfile": surface_profile,
+            "deliveryPhase": delivery_phase,
+            "releaseChannelReceipt": str(release_channel_receipt or ""),
+            "releaseChannelReceiptSha256": (
+                stable_sha256(
+                    release_channel_receipt,
+                    label="live-surface parity release-channel receipt",
+                )
+                if release_channel_receipt is not None
+                else ""
+            ),
         }
     except Exception as exc:
         return {
@@ -3046,10 +3101,440 @@ def verify_local_live_surface_parity(
             "programBinding": refresh_verification_program_binding(program_binding),
             "programBindingMatches": False,
             "programSnapshotImported": "",
+            "surfaceProfile": surface_profile,
+            "deliveryPhase": delivery_phase,
+            "releaseChannelReceipt": str(release_channel_receipt or ""),
+            "releaseChannelReceiptSha256": "",
         }
 
 
 DEFAULT_VERIFY_LOCAL_LIVE_SURFACE_PARITY_FN = verify_local_live_surface_parity
+
+
+def load_package_plane_module(source_root: Path) -> Any:
+    recipe_path = (
+        source_root / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
+    )
+    if not recipe_path.is_file() or recipe_path.is_symlink():
+        raise RuntimeError("package-plane build recipe is unavailable")
+    recipe_bytes, _metadata = read_stable_regular_bytes(
+        recipe_path,
+        label="package-plane build recipe",
+    )
+    module_name = (
+        "chummer_overlay_package_plane_"
+        + sha256_bytes(recipe_bytes)[:16]
+    )
+    module = types.ModuleType(module_name)
+    module.__file__ = str(recipe_path)
+    module.__package__ = ""
+    sys.modules[module_name] = module
+    exec(
+        compile(recipe_bytes, str(recipe_path), "exec"),
+        module.__dict__,
+    )
+    return module
+
+
+def require_private_host_build_directory(path: Path, *, label: str) -> Path:
+    assert_no_symlink_components(path, label=label)
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise RuntimeError(f"{label} is unavailable before publisher invocation") from exc
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise RuntimeError(f"{label} is not an owner-private directory")
+    return path
+
+
+def operation_host_build_environment(
+    host_build_root: Path,
+    sdk_root: Path,
+) -> dict[str, str]:
+    directories = {
+        "HOME": host_build_root / "home",
+        "DOTNET_CLI_HOME": host_build_root / "dotnet-cli",
+        "NUGET_PACKAGES": host_build_root / "nuget-packages",
+        "NUGET_HTTP_CACHE_PATH": host_build_root / "nuget-http-cache",
+        "TMPDIR": host_build_root / "tmp",
+    }
+    require_private_host_build_directory(
+        host_build_root,
+        label="operation-private host-build root",
+    )
+    for name, directory in directories.items():
+        require_private_host_build_directory(
+            directory,
+            label=f"operation-private {name}",
+        )
+    inherited = {
+        name: value
+        for name, value in os.environ.items()
+        if name
+        in {
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "no_proxy",
+        }
+    }
+    return {
+        **inherited,
+        **{name: str(path) for name, path in directories.items()},
+        "PATH": f"{sdk_root}:/usr/bin:/bin",
+        "DOTNET_ROOT": str(sdk_root),
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+        "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+        "DOTNET_NOLOGO": "1",
+        "DOTNET_MULTILEVEL_LOOKUP": "0",
+        "DOTNET_ROLL_FORWARD": "Disable",
+        "DOTNET_ROLL_FORWARD_TO_PRERELEASE": "0",
+        "CI": "true",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "SOURCE_DATE_EPOCH": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+
+
+def stable_sha256(path: Path, *, label: str) -> str:
+    payload, _metadata = read_stable_regular_bytes(path, label=label)
+    return sha256_bytes(payload)
+
+
+def download_pinned_dotnet_installer(
+    *,
+    url: str,
+    expected_sha256: str,
+    destination: Path,
+) -> dict[str, Any]:
+    if destination.exists() or destination.is_symlink():
+        observed_sha256 = stable_sha256(
+            destination,
+            label="pinned dotnet installer",
+        )
+        if observed_sha256 != expected_sha256:
+            raise RuntimeError("cached dotnet installer bytes do not match the lock")
+        return {
+            "url": url,
+            "path": str(destination),
+            "sha256": observed_sha256,
+            "reused": True,
+        }
+    request = Request(
+        url,
+        headers={"User-Agent": "chummer-public-edge-hermetic-build/1"},
+    )
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = response.read(2 * 1024 * 1024)
+            if response.read(1):
+                raise RuntimeError("dotnet installer exceeds its bounded size")
+    except (OSError, HTTPError, URLError) as exc:
+        raise RuntimeError("pinned dotnet installer download failed") from exc
+    observed_sha256 = sha256_bytes(payload)
+    if observed_sha256 != expected_sha256:
+        raise RuntimeError("downloaded dotnet installer bytes do not match the lock")
+    atomic_write_bytes(destination, payload)
+    os.chmod(destination, 0o500, follow_symlinks=False)
+    return {
+        "url": url,
+        "path": str(destination),
+        "sha256": observed_sha256,
+        "reused": False,
+    }
+
+
+def immutable_nuget_config_bytes(
+    *,
+    feed_root: Path,
+    approved_remote_source: str,
+    package_ids: list[str],
+) -> bytes:
+    def xml_attribute(value: str) -> str:
+        return (
+            value.replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+
+    internal_patterns = "".join(
+        f'<package pattern="{xml_attribute(package_id)}" />'
+        for package_id in sorted(package_ids)
+    )
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        "<configuration><packageSources><clear />"
+        f'<add key="locked-chummer" value="{xml_attribute(str(feed_root))}" />'
+        f'<add key="nuget.org" value="{xml_attribute(approved_remote_source)}" '
+        'protocolVersion="3" />'
+        "</packageSources><packageSourceMapping>"
+        f'<packageSource key="locked-chummer">{internal_patterns}</packageSource>'
+        '<packageSource key="nuget.org"><package pattern="*" /></packageSource>'
+        "</packageSourceMapping></configuration>\n"
+    ).encode("utf-8")
+
+
+def materialize_immutable_file(
+    path: Path,
+    expected_bytes: bytes,
+    *,
+    label: str,
+) -> str:
+    if path.exists() or path.is_symlink():
+        observed, metadata = read_stable_regular_bytes(path, label=label)
+        if metadata.st_nlink != 1 or observed != expected_bytes:
+            raise RuntimeError(f"existing {label} drifted from immutable authority")
+    else:
+        atomic_write_bytes(path, expected_bytes)
+        os.chmod(path, 0o600, follow_symlinks=False)
+    return sha256_bytes(expected_bytes)
+
+
+def prepare_operation_host_build(
+    source_root: Path,
+    host_build_root: Path,
+    *,
+    publish_timeout_seconds: float,
+    run_command_fn: Callable[..., subprocess.CompletedProcess[str]] = run_command,
+) -> dict[str, Any]:
+    host_build_root = normalized_absolute_path(host_build_root)
+    sdk_root = host_build_root / "sdk"
+    feed_root = host_build_root / "package-feed"
+    config_path = host_build_root / "NuGet.Config"
+    require_private_host_build_directory(
+        sdk_root,
+        label="operation-private SDK root",
+    )
+    environment = operation_host_build_environment(host_build_root, sdk_root)
+    package_plane = load_package_plane_module(source_root)
+    lock_path = source_root / "eng" / "package-plane.lock.json"
+    lock = package_plane.load_lock(lock_path)
+    package_plane.validate_build_recipe(source_root, lock)
+    lock_sha256 = stable_sha256(
+        lock_path,
+        label="package-plane authority lock",
+    )
+    dotnet = sdk_root / "dotnet"
+    installer_receipt: dict[str, Any] = {
+        "url": lock.dotnet_install_url,
+        "path": "",
+        "sha256": lock.dotnet_install_sha256,
+        "reused": True,
+    }
+    sdk_reused = dotnet.is_file() and not dotnet.is_symlink()
+    if not sdk_reused:
+        installer_path = (
+            host_build_root
+            / f"dotnet-install.{lock.dotnet_install_sha256}.sh"
+        )
+        installer_receipt = download_pinned_dotnet_installer(
+            url=lock.dotnet_install_url,
+            expected_sha256=lock.dotnet_install_sha256,
+            destination=installer_path,
+        )
+        command = [
+            "/bin/bash",
+            str(installer_path),
+            "--version",
+            lock.dotnet_sdk,
+            "--install-dir",
+            str(sdk_root),
+            "--no-path",
+        ]
+        if run_command_fn is run_command:
+            installed = run_command_fn(
+                command,
+                cwd=host_build_root,
+                env=environment,
+                timeout_seconds=publish_timeout_seconds,
+            )
+        else:
+            installed = run_command_fn(
+                command,
+                cwd=host_build_root,
+                env=environment,
+            )
+        if installed.returncode != 0:
+            raise RuntimeError(
+                "exact operation-private dotnet SDK installation failed: "
+                + installed.stderr[-2000:]
+            )
+    observed_sdk = package_plane._run(
+        (str(dotnet), "--version"),
+        env=environment,
+    ).strip()
+    if observed_sdk != lock.dotnet_sdk:
+        raise RuntimeError(
+            f"operation-private SDK mismatch: expected {lock.dotnet_sdk}, "
+            f"observed {observed_sdk}"
+        )
+    toolchain_sha256 = package_plane.validate_dotnet_toolchain(
+        lock,
+        str(dotnet),
+        env=environment,
+    )
+    feed_reused = feed_root.exists() or feed_root.is_symlink()
+    if feed_reused:
+        inventory_sha256 = package_plane.validate_feed_inventory(
+            feed_root,
+            lock,
+            lock_sha256,
+        )
+    else:
+        inventory_sha256 = package_plane.build_feed(
+            lock,
+            lock_sha256=lock_sha256,
+            feed=feed_root,
+            dotnet=str(dotnet),
+        )
+    config_bytes = immutable_nuget_config_bytes(
+        feed_root=feed_root,
+        approved_remote_source=lock.approved_remote_source,
+        package_ids=[spec.package_id for spec in lock.packages],
+    )
+    config_sha256 = materialize_immutable_file(
+        config_path,
+        config_bytes,
+        label="operation-private NuGet config",
+    )
+    post_toolchain_sha256 = package_plane.validate_dotnet_toolchain(
+        lock,
+        str(dotnet),
+        env=environment,
+    )
+    post_inventory_sha256 = package_plane.validate_feed_inventory(
+        feed_root,
+        lock,
+        lock_sha256,
+    )
+    post_config_sha256 = stable_sha256(
+        config_path,
+        label="operation-private NuGet config",
+    )
+    if (
+        post_toolchain_sha256 != toolchain_sha256
+        or post_inventory_sha256 != inventory_sha256
+        or post_config_sha256 != config_sha256
+    ):
+        raise RuntimeError("operation-private build authority drifted during preparation")
+    return {
+        "status": "pass",
+        "hostBuildRoot": str(host_build_root),
+        "sdkRoot": str(sdk_root),
+        "sdkVersion": lock.dotnet_sdk,
+        "sdkReused": sdk_reused,
+        "dotnet": str(dotnet),
+        "dotnetInstaller": installer_receipt,
+        "toolchainSha256": dict(toolchain_sha256),
+        "packagePlaneLock": str(lock_path),
+        "packagePlaneLockSha256": lock_sha256,
+        "feedRoot": str(feed_root),
+        "feedReused": feed_reused,
+        "feedInventorySha256": inventory_sha256,
+        "nugetConfig": str(config_path),
+        "nugetConfigSha256": config_sha256,
+        "environment": environment,
+    }
+
+
+def validate_operation_host_build(
+    authority: dict[str, Any],
+    source_root: Path,
+) -> dict[str, Any]:
+    package_plane = load_package_plane_module(source_root)
+    lock_path = Path(str(authority["packagePlaneLock"]))
+    lock = package_plane.load_lock(lock_path)
+    lock_sha256 = stable_sha256(
+        lock_path,
+        label="package-plane authority lock",
+    )
+    if lock_sha256 != authority.get("packagePlaneLockSha256"):
+        raise RuntimeError("package-plane authority lock drifted")
+    environment = dict(authority["environment"])
+    toolchain_sha256 = package_plane.validate_dotnet_toolchain(
+        lock,
+        str(authority["dotnet"]),
+        env=environment,
+    )
+    inventory_sha256 = package_plane.validate_feed_inventory(
+        Path(str(authority["feedRoot"])),
+        lock,
+        lock_sha256,
+    )
+    config_sha256 = stable_sha256(
+        Path(str(authority["nugetConfig"])),
+        label="operation-private NuGet config",
+    )
+    status = bool(
+        toolchain_sha256 == authority.get("toolchainSha256")
+        and inventory_sha256 == authority.get("feedInventorySha256")
+        and config_sha256 == authority.get("nugetConfigSha256")
+    )
+    return {
+        "status": "pass" if status else "fail",
+        "toolchainSha256": dict(toolchain_sha256),
+        "feedInventorySha256": inventory_sha256,
+        "nugetConfigSha256": config_sha256,
+    }
+
+
+def operation_restore_publish_commands(
+    *,
+    dotnet: str,
+    project: Path,
+    configuration: str,
+    nuget_config: Path,
+    packages_root: Path,
+    output_root: Path,
+) -> tuple[list[str], list[str]]:
+    common_build_properties = [
+        "-p:BuildInParallel=false",
+        "-p:UseSharedCompilation=false",
+        "-p:ChummerDesktopRuntimeIdentifiers=",
+        "-p:PublishPublicEdgeLoopbackProbe=true",
+    ]
+    restore = [
+        dotnet,
+        "restore",
+        str(project),
+        "--locked-mode",
+        "--no-cache",
+        "--configfile",
+        str(nuget_config),
+        "--packages",
+        str(packages_root),
+        "--nologo",
+        "-m:1",
+        *common_build_properties,
+    ]
+    publish = [
+        dotnet,
+        "publish",
+        str(project),
+        "-c",
+        configuration,
+        "-o",
+        str(output_root),
+        "--nologo",
+        "--no-restore",
+        "-m:1",
+        *common_build_properties,
+    ]
+    return restore, publish
 
 
 def ensure_empty_directory(path: Path) -> None:
@@ -3926,7 +4411,217 @@ def bind_verification_programs_into_child_receipt(
     return rebound_payload, producer_sha256
 
 
-def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+def sha256_file_tree_v1(root: Path, *, label: str) -> str:
+    assert_regular_overlay_tree(root, label=label)
+    files: list[tuple[bytes, str, Path]] = []
+    for directory, directory_names, file_names in os.walk(
+        root,
+        followlinks=False,
+    ):
+        directory_path = Path(directory)
+        directory_names.sort()
+        relative_directory = directory_path.relative_to(root)
+        for file_name in sorted(file_names):
+            if "\n" in file_name or "\r" in file_name:
+                raise RuntimeError(f"{label} contains an unsafe path name")
+            path = directory_path / file_name
+            metadata = path.lstat()
+            if metadata.st_nlink != 1:
+                raise RuntimeError(f"{label} contains a hardlinked file")
+            relative_path = relative_directory / file_name
+            display = "./" + str(relative_path).replace(os.sep, "/")
+            files.append((os.fsencode(display), display, path))
+    stream = hashlib.sha256()
+    for _sort_key, display, path in sorted(files, key=lambda row: row[0]):
+        before = path.lstat()
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        after = path.lstat()
+        identity = lambda item: (
+            item.st_dev,
+            item.st_ino,
+            item.st_mode,
+            item.st_nlink,
+            item.st_size,
+            item.st_mtime_ns,
+            item.st_ctime_ns,
+        )
+        if identity(before) != identity(after):
+            raise RuntimeError(f"{label} changed while hashed")
+        stream.update(f"{digest.hexdigest()}  {display}\n".encode("utf-8"))
+    return stream.hexdigest()
+
+
+def validate_playwright_authority(
+    authority_path: Path,
+    authority_sha256: str,
+    *,
+    host_build_root: Path,
+) -> dict[str, Any]:
+    authority_path = normalized_absolute_path(authority_path)
+    host_build_root = normalized_absolute_path(host_build_root)
+    if (
+        not path_is_within(authority_path, host_build_root)
+        or authority_path == host_build_root
+    ):
+        raise RuntimeError(
+            "Playwright authority manifest must be contained by host-build root"
+        )
+    raw, metadata = read_stable_regular_bytes(
+        authority_path,
+        label="operation-private Playwright authority manifest",
+    )
+    normalized_sha256 = str(authority_sha256 or "").strip().lower()
+    if (
+        metadata.st_nlink != 1
+        or stat.S_IMODE(metadata.st_mode) & 0o077
+        or sha256_bytes(raw) != normalized_sha256
+    ):
+        raise RuntimeError("Playwright authority manifest binding failed")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Playwright authority manifest is invalid") from exc
+    if (
+        not isinstance(payload, dict)
+        or set(payload) != PLAYWRIGHT_AUTHORITY_EXPECTED_FIELDS
+        or payload.get("contractName") != PLAYWRIGHT_AUTHORITY_CONTRACT_NAME
+        or payload.get("pythonAbi")
+        != f"cp{sys.version_info.major}{sys.version_info.minor}"
+        or payload.get("playwrightVersion") != "1.60.0"
+        or payload.get("chromiumRevision") != "1223"
+        or payload.get("browserExecutableRelativePath")
+        != str(PLAYWRIGHT_BROWSER_EXECUTABLE_RELATIVE_PATH)
+    ):
+        raise RuntimeError("Playwright authority manifest contract is invalid")
+    python_root = normalized_absolute_path(Path(str(payload["pythonRoot"])))
+    browsers_root = normalized_absolute_path(Path(str(payload["browsersRoot"])))
+    browser_revision_root = normalized_absolute_path(
+        Path(str(payload["browserRevisionRoot"]))
+    )
+    expected_revision_root = browsers_root / "chromium_headless_shell-1223"
+    for root, label in (
+        (python_root, "Playwright Python authority root"),
+        (browsers_root, "Playwright browser authority root"),
+        (browser_revision_root, "Playwright browser revision root"),
+    ):
+        if not path_is_within(root, host_build_root) or root == host_build_root:
+            raise RuntimeError(f"{label} escapes the operation-private host-build root")
+        assert_no_symlink_components(root, label=label)
+    if browser_revision_root != expected_revision_root:
+        raise RuntimeError("Playwright browser revision root is not exact")
+    require_private_host_build_directory(
+        python_root,
+        label="Playwright Python authority root",
+    )
+    require_private_host_build_directory(
+        browsers_root,
+        label="Playwright browser authority root",
+    )
+    require_private_host_build_directory(
+        browser_revision_root,
+        label="Playwright browser revision root",
+    )
+    try:
+        python_entries = {entry.name for entry in os.scandir(python_root)}
+    except OSError as exc:
+        raise RuntimeError("Playwright Python authority could not be enumerated") from exc
+    if python_entries != PLAYWRIGHT_PYTHON_AUTHORITY_ENTRIES:
+        raise RuntimeError("Playwright Python authority exact file set drifted")
+    executable = browsers_root / PLAYWRIGHT_BROWSER_EXECUTABLE_RELATIVE_PATH
+    executable_metadata = executable.lstat()
+    if (
+        not stat.S_ISREG(executable_metadata.st_mode)
+        or stat.S_ISLNK(executable_metadata.st_mode)
+        or not os.access(executable, os.X_OK)
+    ):
+        raise RuntimeError("Playwright browser executable is unavailable")
+    observed_python_sha256 = sha256_file_tree_v1(
+        python_root,
+        label="Playwright Python authority",
+    )
+    observed_browser_sha256 = sha256_file_tree_v1(
+        browser_revision_root,
+        label="Playwright browser authority",
+    )
+    if (
+        observed_python_sha256 != payload.get("pythonTreeSha256")
+        or observed_browser_sha256 != payload.get("browserTreeSha256")
+    ):
+        raise RuntimeError("Playwright authority tree digest binding failed")
+    return {
+        **payload,
+        "manifestPath": str(authority_path),
+        "manifestSha256": normalized_sha256,
+        "pythonRoot": str(python_root),
+        "browsersRoot": str(browsers_root),
+        "browserRevisionRoot": str(browser_revision_root),
+        "pythonTreeSha256Observed": observed_python_sha256,
+        "browserTreeSha256Observed": observed_browser_sha256,
+        "status": "pass",
+    }
+
+
+@contextmanager
+def activated_playwright_authority(authority: dict[str, Any]):
+    python_root = normalized_absolute_path(Path(str(authority["pythonRoot"])))
+    browsers_root = normalized_absolute_path(Path(str(authority["browsersRoot"])))
+    previous_path = list(sys.path)
+    previous_browsers_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    authority_module_roots = (
+        "playwright",
+        "greenlet",
+        "pyee",
+        "typing_extensions",
+    )
+    if any(
+        name == root or name.startswith(root + ".")
+        for name in sys.modules
+        for root in authority_module_roots
+    ):
+        raise RuntimeError(
+            "Playwright authority module was imported before private authority activation"
+        )
+    sys.path.insert(0, str(python_root))
+    sys.dont_write_bytecode = True
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_root)
+    try:
+        yield
+        for root in authority_module_roots:
+            for name, imported_module in sys.modules.items():
+                if name != root and not name.startswith(root + "."):
+                    continue
+                imported_path = Path(
+                    str(getattr(imported_module, "__file__", "") or "")
+                ).resolve(strict=False)
+                if not path_is_within(imported_path, python_root):
+                    raise RuntimeError(
+                        f"{root} import did not resolve from operation-private authority"
+                    )
+        if "playwright" not in sys.modules:
+            raise RuntimeError(
+                "Playwright was not imported from operation-private authority"
+            )
+    finally:
+        sys.path[:] = previous_path
+        sys.dont_write_bytecode = previous_dont_write_bytecode
+        if previous_browsers_path is None:
+            os.environ.pop("PLAYWRIGHT_BROWSERS_PATH", None)
+        else:
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = previous_browsers_path
+        for name, module in list(sys.modules.items()):
+            module_path = str(getattr(module, "__file__", "") or "")
+            if module_path and path_is_within(
+                Path(module_path).resolve(strict=False),
+                python_root,
+            ):
+                sys.modules.pop(name, None)
+
+
+def _probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     entry_url = (
         f"{base_url.rstrip('/')}/?sessionId=synthetic-probe&grant=synthetic-probe"
         "&tracking=synthetic-probe#turn-runsite-card?grant=synthetic-fragment"
@@ -4073,6 +4768,98 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
     }
 
 
+def probe_landing_anchor_browser_redirect(
+    base_url: str,
+    timeout_seconds: float,
+    *,
+    playwright_authority: dict[str, Any] | None = None,
+    host_build_root: Path | None = None,
+) -> dict[str, Any]:
+    if playwright_authority is None:
+        return _probe_landing_anchor_browser_redirect(base_url, timeout_seconds)
+    if host_build_root is None:
+        raise RuntimeError(
+            "operation-private Playwright authority requires host-build root"
+        )
+    authority_path = Path(str(playwright_authority["manifestPath"]))
+    authority_sha256 = str(playwright_authority["manifestSha256"])
+    before = validate_playwright_authority(
+        authority_path,
+        authority_sha256,
+        host_build_root=host_build_root,
+    )
+    with activated_playwright_authority(before):
+        result = _probe_landing_anchor_browser_redirect(
+            base_url,
+            timeout_seconds,
+        )
+    after = validate_playwright_authority(
+        authority_path,
+        authority_sha256,
+        host_build_root=host_build_root,
+    )
+    authority_unchanged = bool(
+        before["pythonTreeSha256Observed"]
+        == after["pythonTreeSha256Observed"]
+        and before["browserTreeSha256Observed"]
+        == after["browserTreeSha256Observed"]
+    )
+    result["playwrightAuthority"] = {
+        "status": "pass" if authority_unchanged else "fail",
+        "manifestPath": str(authority_path),
+        "manifestSha256": authority_sha256,
+        "playwrightVersion": before["playwrightVersion"],
+        "chromiumRevision": before["chromiumRevision"],
+        "pythonRoot": before["pythonRoot"],
+        "browsersRoot": before["browsersRoot"],
+        "pythonTreeSha256Before": before["pythonTreeSha256Observed"],
+        "pythonTreeSha256After": after["pythonTreeSha256Observed"],
+        "browserTreeSha256Before": before["browserTreeSha256Observed"],
+        "browserTreeSha256After": after["browserTreeSha256Observed"],
+        "unchanged": authority_unchanged,
+    }
+    if not authority_unchanged:
+        result.update(
+            {
+                "status": "fail",
+                "reason": "playwright_authority_drifted",
+                "error": "operation-private Playwright authority changed during probe",
+            }
+        )
+    return result
+
+
+def downloads_verifier_phase_arguments(
+    *,
+    delivery_phase: str,
+    surface_profile: str,
+    downloads_source_root: Path | None,
+) -> list[str]:
+    if (
+        delivery_phase == "windows-preview"
+        and surface_profile == "public-download"
+    ):
+        if downloads_source_root is None:
+            raise RuntimeError(
+                "windows-preview public-download verification requires downloads source root"
+            )
+        manifest = downloads_source_root / "RELEASE_CHANNEL.generated.json"
+        assert_no_symlink_components(
+            manifest,
+            label="public-release manifest",
+        )
+        if not manifest.is_file() or manifest.is_symlink():
+            raise RuntimeError(
+                "windows-preview public-release manifest is unavailable"
+            )
+        return [
+            "--public-release-manifest",
+            str(manifest),
+            "--allow-non-launch-supported-release-channel",
+        ]
+    return []
+
+
 def finite_nonnegative_seconds(value: object) -> float:
     try:
         rendered = float(value)
@@ -4208,6 +4995,11 @@ def verify_published_overlay(
     release_channel_receipt_sha256: str,
     verification_programs: dict[str, Any] | None = None,
     verification_deadline_seconds: float = DEFAULT_VERIFICATION_DEADLINE_SECONDS,
+    downloads_source_root: Path | None = None,
+    playwright_authority: dict[str, Any] | None = None,
+    host_build_root: Path | None = None,
+    surface_profile: str = "flagship",
+    delivery_phase: str = "",
 ) -> dict[str, Any]:
     budget = VerificationBudget(verification_deadline_seconds)
     try:
@@ -4221,6 +5013,11 @@ def verify_published_overlay(
                 release_channel_receipt_sha256=release_channel_receipt_sha256,
                 verification_programs=verification_programs,
                 verification_budget=budget,
+                downloads_source_root=downloads_source_root,
+                playwright_authority=playwright_authority,
+                host_build_root=host_build_root,
+                surface_profile=surface_profile,
+                delivery_phase=delivery_phase,
             )
     except VerificationDeadlineExceeded as exc:
         return verification_deadline_receipt(
@@ -4256,6 +5053,11 @@ def _verify_published_overlay_with_budget(
     release_channel_receipt_sha256: str,
     verification_programs: dict[str, Any] | None = None,
     verification_budget: VerificationBudget,
+    downloads_source_root: Path | None = None,
+    playwright_authority: dict[str, Any] | None = None,
+    host_build_root: Path | None = None,
+    surface_profile: str = "flagship",
+    delivery_phase: str = "",
 ) -> dict[str, Any]:
     verification_budget.remaining_seconds("verification_program_binding")
     verification_receipt_path = normalized_absolute_path(verification_receipt_path)
@@ -4356,6 +5158,7 @@ def _verify_published_overlay_with_budget(
         base_url=base_url,
         temp_root=temp_root,
         source_root=source_root,
+        downloads_source_root=downloads_source_root,
     )
     try:
         with LocalPublicRuntimeDependencyStub() as dependency_stub:
@@ -4421,12 +5224,29 @@ def _verify_published_overlay_with_budget(
                         for name, marker in FORBIDDEN_LANDING_MARKERS.items()
                         if not landing_forbidden_marker_checks.get(name, False)
                     ]
-                    landing_browser_redirect = probe_landing_anchor_browser_redirect(
+                    browser_probe = probe_landing_anchor_browser_redirect
+                    browser_probe_kwargs: dict[str, Any] = {}
+                    if callable_accepts_keyword(
+                        browser_probe,
+                        "playwright_authority",
+                    ):
+                        browser_probe_kwargs["playwright_authority"] = (
+                            playwright_authority
+                        )
+                    if callable_accepts_keyword(
+                        browser_probe,
+                        "host_build_root",
+                    ):
+                        browser_probe_kwargs["host_build_root"] = (
+                            host_build_root
+                        )
+                    landing_browser_redirect = browser_probe(
                         base_url,
                         verification_budget.remaining_seconds(
                             "landing_browser_redirect",
                             verify_timeout_seconds,
                         ),
+                        **browser_probe_kwargs,
                     )
                     verification_budget.remaining_seconds(
                         "downloads_version_verifier_setup"
@@ -4449,34 +5269,40 @@ def _verify_published_overlay_with_budget(
                         }
                         if callable_accepts_keyword(subprocess.run, "timeout"):
                             child_run_kwargs["timeout"] = child_timeout_seconds
+                        verifier_command = [
+                            sys.executable,
+                            "-c",
+                            SEALED_PYTHON_PROGRAM_WRAPPER,
+                            str(verifier_execution["descriptor"]),
+                            str(verifier_execution["sha256Expected"]),
+                            str(
+                                verification_programs_before["programs"][
+                                    "downloadsVersionMarker"
+                                ]["sourcePath"]
+                            ),
+                            "--source-root",
+                            str(source_root),
+                            "--base-url",
+                            base_url,
+                            "--output",
+                            str(verification_receipt_path),
+                            "--timeout-seconds",
+                            str(child_timeout_seconds),
+                            "--release-channel-receipt",
+                            str(release_channel_receipt),
+                            "--release-channel-receipt-sha256",
+                            release_channel_receipt_sha256,
+                            "--invocation-id",
+                            verification_invocation_id,
+                            *downloads_verifier_phase_arguments(
+                                delivery_phase=delivery_phase,
+                                surface_profile=surface_profile,
+                                downloads_source_root=downloads_source_root,
+                            ),
+                        ]
                         try:
                             completed = subprocess.run(
-                                [
-                                    sys.executable,
-                                    "-c",
-                                    SEALED_PYTHON_PROGRAM_WRAPPER,
-                                    str(verifier_execution["descriptor"]),
-                                    str(verifier_execution["sha256Expected"]),
-                                    str(
-                                        verification_programs_before["programs"][
-                                            "downloadsVersionMarker"
-                                        ]["sourcePath"]
-                                    ),
-                                    "--source-root",
-                                    str(source_root),
-                                    "--base-url",
-                                    base_url,
-                                    "--output",
-                                    str(verification_receipt_path),
-                                    "--timeout-seconds",
-                                    str(child_timeout_seconds),
-                                    "--release-channel-receipt",
-                                    str(release_channel_receipt),
-                                    "--release-channel-receipt-sha256",
-                                    release_channel_receipt_sha256,
-                                    "--invocation-id",
-                                    verification_invocation_id,
-                                ],
+                                verifier_command,
                                 **child_run_kwargs,
                             )
                         except subprocess.TimeoutExpired as exc:
@@ -4497,6 +5323,9 @@ def _verify_published_overlay_with_budget(
                             local_live_surface_parity_path,
                             verification_programs_before["programs"]["liveSurfaceParity"],
                             deadline_monotonic=verification_budget.deadline_at_monotonic,
+                            surface_profile=surface_profile,
+                            delivery_phase=delivery_phase,
+                            release_channel_receipt=release_channel_receipt,
                         )
                     else:
                         local_live_surface_parity = parity_verifier(
@@ -4710,6 +5539,9 @@ def _verify_published_overlay_with_budget(
                         "landingForbiddenMarkerChecks": landing_forbidden_marker_checks,
                         "landingForbiddenMarkers": landing_forbidden_markers,
                         "landingBrowserRedirect": landing_browser_redirect,
+                        "downloadsVerifierCommand": verifier_command,
+                        "surfaceProfile": surface_profile,
+                        "deliveryPhase": delivery_phase,
                         "combinedReadiness": overlay_readiness,
                         "localRuntimeDependencyBaseUrl": dependency_stub.base_url,
                         "localLiveSurfaceParity": local_live_surface_parity,
@@ -4834,6 +5666,12 @@ def materialize(
     active_root: Path = DEFAULT_ACTIVE_ROOT,
     backup_root: Path = DEFAULT_BACKUP_ROOT,
     build_root: Path = DEFAULT_BUILD_ROOT,
+    host_build_root: Path = DEFAULT_HOST_BUILD_ROOT,
+    downloads_source_root: Path | None = None,
+    playwright_authority_path: Path | None = None,
+    playwright_authority_sha256: str = "",
+    surface_profile: str = "flagship",
+    delivery_phase: str = "",
     configuration: str = DEFAULT_CONFIGURATION,
     activate: bool = False,
     reuse_staging: bool = False,
@@ -4871,6 +5709,9 @@ def materialize(
         label="publish timeout",
         maximum=MAX_PUBLISH_TIMEOUT_SECONDS,
     )
+    minimum_free_disk_bytes = validated_minimum_free_disk_bytes(
+        minimum_free_disk_bytes
+    )
     path_plan = validate_publisher_path_plan(
         output=output,
         release_channel_receipt=release_channel_receipt,
@@ -4889,8 +5730,10 @@ def materialize(
     active_root = path_plan["activeRoot"]
     backup_root = path_plan["backupRoot"]
     build_root = path_plan["buildRoot"]
-    minimum_free_disk_bytes = validated_minimum_free_disk_bytes(
-        minimum_free_disk_bytes
+    assert_no_incomplete_activation_transaction(active_root)
+    host_build_root = normalized_absolute_path(host_build_root)
+    host_build_required = bool(
+        not test_hooks_injected or playwright_authority_path is not None
     )
     if _preflight_disk_capacity_check is None:
         capacity_check = require_disk_capacity(
@@ -4911,6 +5754,51 @@ def materialize(
                 "preflight disk-capacity evidence does not match publisher inputs"
             )
         capacity_check = _preflight_disk_capacity_check
+    if host_build_required:
+        if any(
+            paths_alias_or_overlap(host_build_root, mutable_root)
+            for mutable_root in (
+                staging_root,
+                active_root,
+                backup_root,
+                build_root,
+                source_root,
+            )
+        ):
+            raise RuntimeError(
+                "operation-private host-build root overlaps source or mutable overlay roots"
+            )
+        require_private_host_build_directory(
+            host_build_root,
+            label="operation-private host-build root",
+        )
+    if downloads_source_root is not None:
+        downloads_source_root = normalized_absolute_path(downloads_source_root)
+        assert_no_symlink_components(
+            downloads_source_root,
+            label="downloads source root",
+        )
+        if not downloads_source_root.is_dir():
+            raise RuntimeError("downloads source root is unavailable")
+    elif not test_hooks_injected:
+        raise RuntimeError(
+            "production publisher requires explicit downloads source root"
+        )
+    if surface_profile not in {"flagship", "public-download"}:
+        raise RuntimeError("live-surface parity profile is invalid")
+    if not str(delivery_phase).strip() and not test_hooks_injected:
+        raise RuntimeError("delivery phase must be explicit")
+    playwright_authority: dict[str, Any] | None = None
+    if playwright_authority_path is not None:
+        playwright_authority = validate_playwright_authority(
+            playwright_authority_path,
+            playwright_authority_sha256,
+            host_build_root=host_build_root,
+        )
+    elif not test_hooks_injected:
+        raise RuntimeError(
+            "production publisher requires operation-private Playwright authority"
+        )
     release_channel_raw_bytes, release_channel_binding = read_bound_release_channel_receipt(
         release_channel_receipt,
         release_channel_receipt_sha256,
@@ -4918,7 +5806,6 @@ def materialize(
     normalized_release_channel_sha256 = str(
         release_channel_binding["sha256Actual"]
     )
-    assert_no_incomplete_activation_transaction(active_root)
     release_channel_snapshot_path = snapshot_bound_release_channel_receipt(
         path_plan["releaseAuthorityRoot"],
         release_channel_raw_bytes,
@@ -4940,7 +5827,23 @@ def materialize(
     overlay_payload_source_root = source_root
     build_project_path = project_path
     copied_build_workspace_roots: list[str] = []
+    restore_command: list[str] = []
     publish_command: list[str] = []
+    restore_result = subprocess.CompletedProcess(
+        args=restore_command,
+        returncode=0,
+        stdout="",
+        stderr="",
+    )
+    host_build_authority: dict[str, Any] = {
+        "status": "test_only_bypass" if test_hooks_injected else "not_prepared",
+    }
+    if not test_hooks_injected:
+        host_build_authority = prepare_operation_host_build(
+            source_root,
+            host_build_root,
+            publish_timeout_seconds=publish_timeout_seconds,
+        )
     built_source_fingerprint: dict[str, Any] = {}
     staging_source_fingerprint_check: dict[str, Any] = {
         "status": "not_checked",
@@ -5019,29 +5922,70 @@ def materialize(
         overlay_payload_source_root = build_source_root
         built_source_fingerprint = source_fingerprint(build_source_root)
         build_project_path = build_source_root / "Chummer.Run.Api" / "Chummer.Run.Api.csproj"
-        publish_command = [
-            "dotnet",
-            "publish",
-            str(build_project_path),
-            "-c",
-            configuration,
-            "-o",
-            str(staging_root),
-            "--nologo",
-            "-m:1",
-            "-p:BuildInParallel=false",
-            "-p:UseSharedCompilation=false",
-            "-p:ChummerDesktopRuntimeIdentifiers=",
-            "-p:PublishPublicEdgeLoopbackProbe=true",
-        ]
-        if run_command_fn is run_command:
+        dotnet_executable = (
+            str(host_build_authority["dotnet"])
+            if not test_hooks_injected
+            else "dotnet"
+        )
+        planned_restore_command, publish_command = (
+            operation_restore_publish_commands(
+                dotnet=dotnet_executable,
+                project=build_project_path,
+                configuration=configuration,
+                nuget_config=Path(
+                    str(
+                        host_build_authority.get(
+                            "nugetConfig",
+                            host_build_root / "NuGet.Config",
+                        )
+                    )
+                ),
+                packages_root=Path(
+                    str(
+                        (
+                            host_build_authority.get("environment") or {}
+                        ).get(
+                            "NUGET_PACKAGES",
+                            host_build_root / "nuget-packages",
+                        )
+                    )
+                ),
+                output_root=staging_root,
+            )
+        )
+        if not test_hooks_injected:
+            restore_command = planned_restore_command
+            restore_result = run_command(
+                restore_command,
+                cwd=build_source_root,
+                env=dict(host_build_authority["environment"]),
+                timeout_seconds=publish_timeout_seconds,
+            )
+        if not test_hooks_injected and restore_result.returncode != 0:
+            publish = restore_result
+        elif run_command_fn is run_command:
             publish = run_command_fn(
                 publish_command,
                 cwd=build_source_root,
+                env=(
+                    dict(host_build_authority["environment"])
+                    if not test_hooks_injected
+                    else None
+                ),
                 timeout_seconds=publish_timeout_seconds,
             )
         else:
             publish = run_command_fn(publish_command, cwd=build_source_root)
+        if not test_hooks_injected:
+            post_build_authority = validate_operation_host_build(
+                host_build_authority,
+                source_root,
+            )
+            host_build_authority["postBuildValidation"] = post_build_authority
+            if post_build_authority.get("status") != "pass":
+                raise RuntimeError(
+                    "operation-private build authority drifted during restore/publish"
+                )
 
     if publish.returncode == 0 and not staging_overlay_ready(staging_root):
         publish_skip_reason = "staging_overlay_missing_runtime_payload"
@@ -5183,6 +6127,18 @@ def materialize(
                 "release_channel_receipt_sha256": normalized_release_channel_sha256,
                 "verification_programs": verification_programs,
             }
+            optional_verification_arguments = {
+                "downloads_source_root": downloads_source_root,
+                "playwright_authority": playwright_authority,
+                "host_build_root": (
+                    host_build_root if playwright_authority is not None else None
+                ),
+                "surface_profile": surface_profile,
+                "delivery_phase": delivery_phase,
+            }
+            for keyword, value in optional_verification_arguments.items():
+                if callable_accepts_keyword(verify_overlay_fn, keyword):
+                    verification_kwargs[keyword] = value
             if callable_accepts_keyword(
                 verify_overlay_fn,
                 "verification_deadline_seconds",
@@ -5479,6 +6435,16 @@ def materialize(
         "activeRoot": str(active_root),
         "backupRoot": str(backup_root),
         "buildRoot": str(build_root),
+        "hostBuildRoot": str(host_build_root),
+        "hostBuildAuthority": {
+            key: value
+            for key, value in host_build_authority.items()
+            if key != "environment"
+        },
+        "downloadsSourceRoot": str(downloads_source_root or ""),
+        "playwrightAuthority": playwright_authority or {},
+        "surfaceProfile": surface_profile,
+        "deliveryPhase": delivery_phase,
         "releaseChannelReceipt": release_channel_binding,
         "verificationPrograms": verification.get("verificationPrograms") or {},
         "verificationProgramsMatch": bool(
@@ -5502,6 +6468,12 @@ def materialize(
         "activationMode": activation_mode,
         "cleanedPaths": [str(path) for path in cleaned_paths],
         "publishCommand": publish_command,
+        "restoreCommand": restore_command,
+        "restore": {
+            "exitCode": restore_result.returncode,
+            "stdoutTail": restore_result.stdout[-4000:],
+            "stderrTail": restore_result.stderr[-4000:],
+        },
         "publish": {
             "exitCode": publish.returncode,
             "stdoutTail": publish.stdout[-4000:],
@@ -5587,6 +6559,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--active-root", type=Path, default=DEFAULT_ACTIVE_ROOT)
     parser.add_argument("--backup-root", type=Path, default=DEFAULT_BACKUP_ROOT)
     parser.add_argument("--build-root", type=Path, default=DEFAULT_BUILD_ROOT)
+    parser.add_argument(
+        "--host-build-root",
+        type=Path,
+        default=DEFAULT_HOST_BUILD_ROOT,
+    )
+    parser.add_argument("--downloads-source-root", type=Path)
+    parser.add_argument("--playwright-authority", type=Path)
+    parser.add_argument("--playwright-authority-sha256", default="")
+    parser.add_argument(
+        "--surface-profile",
+        choices=("flagship", "public-download"),
+        default="flagship",
+    )
+    parser.add_argument("--delivery-phase", default="")
     parser.add_argument("--configuration", default=DEFAULT_CONFIGURATION)
     parser.add_argument(
         "--verify-timeout-seconds",
@@ -5747,6 +6733,30 @@ def main() -> int:
                     active_root=path_plan["activeRoot"],
                     backup_root=path_plan["backupRoot"],
                     build_root=path_plan["buildRoot"],
+                    host_build_root=getattr(
+                        args,
+                        "host_build_root",
+                        DEFAULT_HOST_BUILD_ROOT,
+                    ),
+                    downloads_source_root=getattr(
+                        args,
+                        "downloads_source_root",
+                        None,
+                    ),
+                    playwright_authority_path=getattr(
+                        args,
+                        "playwright_authority",
+                        None,
+                    ),
+                    playwright_authority_sha256=(
+                        getattr(args, "playwright_authority_sha256", "")
+                    ),
+                    surface_profile=getattr(
+                        args,
+                        "surface_profile",
+                        "flagship",
+                    ),
+                    delivery_phase=getattr(args, "delivery_phase", ""),
                     configuration=args.configuration,
                     activate=args.activate,
                     reuse_staging=args.reuse_staging,

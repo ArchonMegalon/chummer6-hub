@@ -3,11 +3,13 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
 import types
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -3790,6 +3792,137 @@ def test_probe_landing_anchor_browser_redirect_falls_back_to_firefox(monkeypatch
     assert launches == ["chromium", "firefox"]
 
 
+def test_playwright_probe_uses_only_receipt_bound_operation_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    host_build_root = tmp_path / "host-build"
+    python_root = host_build_root / "playwright-python"
+    browsers_root = host_build_root / "playwright-browsers"
+    browser_revision_root = browsers_root / "chromium_headless_shell-1223"
+    for directory in (
+        host_build_root,
+        python_root,
+        browsers_root,
+        browser_revision_root,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+        directory.chmod(0o700)
+    for entry in sorted(module.PLAYWRIGHT_PYTHON_AUTHORITY_ENTRIES):
+        path = python_root / entry
+        if entry == "typing_extensions.py":
+            path.write_text("__version__ = '4.15.0'\n", encoding="utf-8")
+            path.chmod(0o600)
+        else:
+            path.mkdir()
+            path.chmod(0o700)
+            if not entry.endswith(".dist-info"):
+                (path / "__init__.py").write_text("", encoding="utf-8")
+                (path / "__init__.py").chmod(0o600)
+    (python_root / "playwright" / "__init__.py").write_text(
+        "AUTHORITY = 'operation-private'\n",
+        encoding="utf-8",
+    )
+    (python_root / "playwright" / "__init__.py").chmod(0o600)
+    executable = browsers_root / module.PLAYWRIGHT_BROWSER_EXECUTABLE_RELATIVE_PATH
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    executable.parent.chmod(0o700)
+    executable.write_bytes(b"#!/bin/sh\nexit 0\n")
+    executable.chmod(0o700)
+    authority = {
+        "contractName": module.PLAYWRIGHT_AUTHORITY_CONTRACT_NAME,
+        "pythonAbi": f"cp{sys.version_info.major}{sys.version_info.minor}",
+        "playwrightVersion": "1.60.0",
+        "chromiumRevision": "1223",
+        "pythonRoot": str(python_root),
+        "pythonTreeSha256": module.sha256_file_tree_v1(
+            python_root,
+            label="test Python authority",
+        ),
+        "browsersRoot": str(browsers_root),
+        "browserRevisionRoot": str(browser_revision_root),
+        "browserTreeSha256": module.sha256_file_tree_v1(
+            browser_revision_root,
+            label="test browser authority",
+        ),
+        "browserExecutableRelativePath": str(
+            module.PLAYWRIGHT_BROWSER_EXECUTABLE_RELATIVE_PATH
+        ),
+    }
+    authority_path = host_build_root / "playwright-authority.json"
+    authority_path.write_text(
+        json.dumps(authority, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    authority_path.chmod(0o600)
+    authority_sha256 = hashlib.sha256(authority_path.read_bytes()).hexdigest()
+    validated = module.validate_playwright_authority(
+        authority_path,
+        authority_sha256,
+        host_build_root=host_build_root,
+    )
+    authority_module_roots = (
+        "playwright",
+        "greenlet",
+        "pyee",
+        "typing_extensions",
+    )
+    for name in list(sys.modules):
+        if any(
+            name == root or name.startswith(root + ".")
+            for root in authority_module_roots
+        ):
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    prior_sys_path = list(sys.path)
+    prior_browser_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+
+    def fake_probe(_base_url: str, _timeout_seconds: float) -> dict[str, Any]:
+        import playwright
+
+        assert playwright.AUTHORITY == "operation-private"
+        assert Path(playwright.__file__).resolve().is_relative_to(python_root)
+        assert os.environ["PLAYWRIGHT_BROWSERS_PATH"] == str(browsers_root)
+        return {"status": "pass"}
+
+    monkeypatch.setattr(
+        module,
+        "_probe_landing_anchor_browser_redirect",
+        fake_probe,
+    )
+    receipt = module.probe_landing_anchor_browser_redirect(
+        "http://127.0.0.1:5010",
+        5.0,
+        playwright_authority=validated,
+        host_build_root=host_build_root,
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["playwrightAuthority"]["status"] == "pass"
+    assert receipt["playwrightAuthority"]["unchanged"] is True
+    assert sys.path == prior_sys_path
+    assert os.environ.get("PLAYWRIGHT_BROWSERS_PATH") == prior_browser_path
+    assert "playwright" not in sys.modules
+
+
+def test_playwright_authority_rejects_manifest_digest_mismatch(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    host_build_root = tmp_path / "host-build"
+    host_build_root.mkdir(mode=0o700)
+    authority_path = host_build_root / "playwright-authority.json"
+    authority_path.write_text("{}\n", encoding="utf-8")
+    authority_path.chmod(0o600)
+
+    with pytest.raises(RuntimeError, match="manifest binding failed"):
+        module.validate_playwright_authority(
+            authority_path,
+            "0" * 64,
+            host_build_root=host_build_root,
+        )
+
+
 def test_build_overlay_verification_env_keeps_play_projection_absent() -> None:
     module = load_module()
 
@@ -3815,17 +3948,179 @@ def test_isolated_overlay_process_env_scrubs_every_inherited_retired_play_transp
     }
     inherited["CHUMMER_PUBLIC_PLAY_PROXY_ENABLED"] = "true"
     inherited["UNRELATED_SETTING"] = "preserved"
+    downloads_root = tmp_path / "release-shelf"
 
     env = module.build_isolated_overlay_process_env(
         inherited,
         base_url="http://127.0.0.1:5010",
         temp_root=tmp_path / "tmp",
         source_root=tmp_path / "source",
+        downloads_source_root=downloads_root,
     )
 
     assert module.RETIRED_PUBLIC_PLAY_PROXY_ENV_NAMES.isdisjoint(env)
     assert env["UNRELATED_SETTING"] == "preserved"
     assert env["ASPNETCORE_URLS"] == "http://127.0.0.1:5010"
+    assert env["CHUMMER_DOWNLOADS_SOURCE_ROOT"] == str(downloads_root)
+    assert env["CHUMMER_DATA_PROTECTION_KEYS_PATH"] == str(
+        tmp_path / "tmp" / "data-protection-keys"
+    )
+    assert (tmp_path / "tmp" / "data-protection-keys").stat().st_mode & 0o777 == 0o700
+
+
+def test_operation_restore_publish_commands_bind_locked_restore_and_no_restore_publish(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    dotnet = str(tmp_path / "host-build" / "sdk" / "dotnet")
+    project = tmp_path / "workspace" / "Chummer.Run.Api.csproj"
+    config = tmp_path / "host-build" / "NuGet.Config"
+    packages = tmp_path / "host-build" / "nuget-packages"
+    output = tmp_path / "app-overlay"
+
+    restore, publish = module.operation_restore_publish_commands(
+        dotnet=dotnet,
+        project=project,
+        configuration="Release",
+        nuget_config=config,
+        packages_root=packages,
+        output_root=output,
+    )
+
+    assert restore[:3] == [dotnet, "restore", str(project)]
+    assert "--locked-mode" in restore
+    assert "--no-cache" in restore
+    assert restore[restore.index("--configfile") + 1] == str(config)
+    assert restore[restore.index("--packages") + 1] == str(packages)
+    assert publish[:3] == [dotnet, "publish", str(project)]
+    assert "--no-restore" in publish
+    assert "--configfile" not in publish
+    assert publish[publish.index("-o") + 1] == str(output)
+
+
+def test_downloads_verifier_relaxation_is_windows_preview_public_download_only(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    downloads_root = tmp_path / "release-shelf"
+    downloads_root.mkdir()
+    manifest = downloads_root / "RELEASE_CHANNEL.generated.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+
+    assert module.downloads_verifier_phase_arguments(
+        delivery_phase="windows-preview",
+        surface_profile="public-download",
+        downloads_source_root=downloads_root,
+    ) == [
+        "--public-release-manifest",
+        str(manifest),
+        "--allow-non-launch-supported-release-channel",
+    ]
+    assert module.downloads_verifier_phase_arguments(
+        delivery_phase="flagship",
+        surface_profile="flagship",
+        downloads_source_root=downloads_root,
+    ) == []
+    assert module.downloads_verifier_phase_arguments(
+        delivery_phase="",
+        surface_profile="flagship",
+        downloads_source_root=None,
+    ) == []
+
+
+def test_prepare_operation_host_build_reuses_exact_sdk_and_builds_locked_feed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    lock_path = source_root / "eng" / "package-plane.lock.json"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text('{"authority":"test"}\n', encoding="utf-8")
+    host_build_root = tmp_path / "operation" / "host-build"
+    for name in (
+        "",
+        "home",
+        "dotnet-cli",
+        "nuget-packages",
+        "nuget-http-cache",
+        "tmp",
+        "sdk",
+    ):
+        directory = host_build_root / name
+        directory.mkdir(parents=True, exist_ok=True)
+        directory.chmod(0o700)
+    dotnet = host_build_root / "sdk" / "dotnet"
+    dotnet.write_bytes(b"exact dotnet host\n")
+    dotnet.chmod(0o700)
+    lock = types.SimpleNamespace(
+        dotnet_install_url="https://dot.net/v1/dotnet-install.sh",
+        dotnet_install_sha256="1" * 64,
+        dotnet_sdk="10.0.103",
+        approved_remote_source="https://api.nuget.org/v3/index.json",
+        packages=(
+            types.SimpleNamespace(package_id="Chummer.Engine.Contracts"),
+            types.SimpleNamespace(package_id="Chummer.Run.Contracts"),
+        ),
+    )
+    inventory_sha256 = "2" * 64
+    toolchain_sha256 = {
+        "dotnet_host": "3" * 64,
+        "csc": "4" * 64,
+        "msbuild": "5" * 64,
+        "nuget_packaging": "6" * 64,
+    }
+
+    def build_feed(
+        _lock,
+        *,
+        lock_sha256,
+        feed,
+        dotnet,
+    ):
+        assert lock_sha256 == hashlib.sha256(lock_path.read_bytes()).hexdigest()
+        assert dotnet == str(host_build_root / "sdk" / "dotnet")
+        feed.mkdir()
+        return inventory_sha256
+
+    package_plane = types.SimpleNamespace(
+        load_lock=lambda _path: lock,
+        validate_build_recipe=lambda _root, _lock: None,
+        _run=lambda _command, env: "10.0.103\n",
+        validate_dotnet_toolchain=(
+            lambda _lock, _dotnet, env: dict(toolchain_sha256)
+        ),
+        build_feed=build_feed,
+        validate_feed_inventory=(
+            lambda _feed, _lock, _lock_sha256: inventory_sha256
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "load_package_plane_module",
+        lambda _source_root: package_plane,
+    )
+
+    receipt = module.prepare_operation_host_build(
+        source_root,
+        host_build_root,
+        publish_timeout_seconds=30.0,
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["sdkVersion"] == "10.0.103"
+    assert receipt["sdkReused"] is True
+    assert receipt["feedReused"] is False
+    assert receipt["feedInventorySha256"] == inventory_sha256
+    assert receipt["toolchainSha256"] == toolchain_sha256
+    assert receipt["environment"]["HOME"] == str(host_build_root / "home")
+    assert receipt["environment"]["DOTNET_ROOT"] == str(
+        host_build_root / "sdk"
+    )
+    config_bytes = Path(receipt["nugetConfig"]).read_bytes()
+    assert b"Chummer.Engine.Contracts" in config_bytes
+    assert b"Chummer.Run.Contracts" in config_bytes
+    assert b'<package pattern="*" />' in config_bytes
 
 
 class _ReadinessResponse:

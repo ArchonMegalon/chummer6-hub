@@ -432,10 +432,20 @@ def isolated_environment(
         "no_proxy",
     }
     result = {key: value for key, value in base.items() if key in inherited}
+    private_home = cli_home.parent / "home"
     temporary_root = cli_home.parent / "tmp"
-    temporary_root.mkdir(parents=True, exist_ok=True)
+    for directory in (
+        private_home,
+        cli_home,
+        package_root,
+        http_cache,
+        temporary_root,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+        directory.chmod(0o700)
     result.update(
         {
+            "HOME": str(private_home),
             "DOTNET_CLI_HOME": str(cli_home),
             "NUGET_PACKAGES": str(package_root),
             "NUGET_HTTP_CACHE_PATH": str(http_cache),

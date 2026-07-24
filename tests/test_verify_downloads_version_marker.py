@@ -413,7 +413,7 @@ def test_expected_status_heading_requires_full_stable_public_tuple() -> None:
         "stable",
         "review_required",
         "public_stable",
-    ) == "Preview downloads"
+    ) == "Downloads under review"
     assert module.expected_status_heading(
         "",
         "run-20260630",
@@ -472,6 +472,35 @@ def test_release_channel_heading_uses_explicit_public_installer_availability() -
     assert legacy_failures == []
     assert legacy_expected["public_installer_available"] is True
     assert legacy_expected["status_heading_expected"] == "Preview downloads"
+
+
+def test_public_installer_artifact_overrides_zero_historical_install_count() -> None:
+    module = load_module()
+    payload = {
+        "status": "published",
+        "version": "run-20260723-230227",
+        "channel": "preview",
+        "supportabilityState": "review_required",
+        "rolloutState": "coverage_incomplete",
+        "publicTrustMetrics": {"adoptionHealth": {"publicInstallCount": 0}},
+        "artifacts": [
+            {
+                "kind": "installer",
+                "installAccessClass": "open_public",
+                "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            }
+        ],
+    }
+
+    assert module.public_installer_available(payload) is True
+    assert module.expected_status_heading(
+        payload["status"],
+        payload["version"],
+        payload["channel"],
+        payload["supportabilityState"],
+        payload["rolloutState"],
+        module.public_installer_available(payload),
+    ) == "Downloads under review"
 
 
 def test_release_channel_expectations_rejects_unknown_channel_even_with_nonempty_posture() -> None:
@@ -1066,7 +1095,7 @@ def test_main_allows_review_required_coverage_incomplete_when_launch_support_not
     output = tmp_path / "DOWNLOADS_VERSION_MARKER.generated.json"
     server, thread, base_url = with_server(
         include_marker=True,
-        status_heading="Preview downloads",
+        status_heading="Downloads under review",
         release_supportability_state="review_required",
         release_rollout_state="coverage_incomplete",
         release_known_issue_summary="Known issue: required desktop tuple coverage is incomplete.",
@@ -1245,7 +1274,7 @@ def test_main_allows_review_required_public_stable_channel_when_flag_enabled(tmp
     output = tmp_path / "DOWNLOADS_VERSION_MARKER.generated.json"
     server, thread, base_url = with_server(
         include_marker=True,
-        status_heading="Preview downloads",
+        status_heading="Downloads under review",
         release_version="run-20260704-170602",
         release_channel="public_stable",
         release_supportability_state="review_required",
@@ -1640,7 +1669,7 @@ def test_main_accepts_consistent_conservative_served_review_floor_for_stale_or_m
         output = case_root / "DOWNLOADS_VERSION_MARKER.generated.json"
         server, thread, base_url = with_server(
             include_marker=True,
-            status_heading="Preview downloads",
+            status_heading="Downloads under review",
             release_version="run-20260713-123603",
             release_channel="preview",
             release_supportability_state="review_required",
@@ -1709,7 +1738,7 @@ def test_main_rejects_review_floor_for_fresh_proof_or_mixed_nested_supportabilit
         output = case_root / "DOWNLOADS_VERSION_MARKER.generated.json"
         server, thread, base_url = with_server(
             include_marker=True,
-            status_heading="Preview downloads",
+            status_heading="Downloads under review",
             release_version="run-20260713-123603",
             release_channel="preview",
             release_supportability_state="review_required",
@@ -1762,7 +1791,7 @@ def test_main_rejects_live_published_at_drift_even_when_review_floor_is_conserva
     output = tmp_path / "DOWNLOADS_VERSION_MARKER.generated.json"
     server, thread, base_url = with_server(
         include_marker=True,
-        status_heading="Preview downloads",
+        status_heading="Downloads under review",
         release_version="run-20260713-123603",
         release_channel="preview",
         release_supportability_state="review_required",
@@ -1812,7 +1841,7 @@ def test_main_keeps_legacy_no_sha_served_posture_comparison_strict(tmp_path) -> 
     output = tmp_path / "DOWNLOADS_VERSION_MARKER.generated.json"
     server, thread, base_url = with_server(
         include_marker=True,
-        status_heading="Preview downloads",
+        status_heading="Downloads under review",
         release_version="run-20260713-123603",
         release_channel="preview",
         release_supportability_state="review_required",
@@ -2067,7 +2096,7 @@ def test_sha_bound_live_manifest_requires_authority_identity_and_consistent_alia
         output = tmp_path / f"{case_name}.generated.json"
         server, thread, base_url = with_server(
             include_marker=True,
-            status_heading="Preview downloads",
+            status_heading="Downloads under review",
             release_version="run-20260713-123603",
             release_channel="preview",
             release_supportability_state="review_required",

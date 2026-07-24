@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER_PATH = ROOT / "scripts" / "deploy_public_download_only_cutover.py"
 GENERATION_PATH = ROOT / "scripts" / "release_shelf_generation.py"
 ATTESTOR_PATH = ROOT / "scripts" / "attest_initial_release_shelf_cutover.py"
+OVERLAY_PUBLISHER_PATH = (
+    ROOT / "scripts" / "publish_public_edge_portal_overlay.py"
+)
 
 
 def load_module(path: Path, name: str) -> Any:
@@ -30,6 +33,10 @@ def load_module(path: Path, name: str) -> Any:
 controller = load_module(CONTROLLER_PATH, "topology_b_controller_contract")
 generation = load_module(GENERATION_PATH, "topology_b_generation_contract")
 attestor = load_module(ATTESTOR_PATH, "topology_b_attestor_contract")
+overlay_publisher = load_module(
+    OVERLAY_PUBLISHER_PATH,
+    "topology_b_overlay_publisher_contract",
+)
 
 HOSTS = ("chummer.run", "www.chummer.run")
 VOLUME_ROLES = (
@@ -173,6 +180,145 @@ def topology_b_config(tmp_path: Path) -> SimpleNamespace:
         ),
         base_url="https://chummer.run",
         ready_timeout_seconds=30,
+    )
+
+
+def test_stage_application_uses_isolated_active_transaction_namespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    operation_root = (
+        tmp_path / "chummer-public-download-overlay-geometry-test"
+    )
+    release_channel_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel_receipt.write_text("{}\n", encoding="utf-8")
+    config = object.__new__(controller.SidecarConfig)
+    for field, value in {
+        "source_root": ROOT,
+        "operation_root": operation_root,
+        "release_channel_receipt": release_channel_receipt,
+        "release_channel_receipt_sha256": "a" * 64,
+        "delivery_phase": "windows-preview",
+    }.items():
+        object.__setattr__(config, field, value)
+
+    captured: dict[str, Any] = {}
+
+    class CapturingRunner:
+        def python(
+            self,
+            script: Path,
+            arguments: list[str],
+            **kwargs: Any,
+        ) -> bytes:
+            captured["script"] = script
+            captured["arguments"] = list(arguments)
+            captured["kwargs"] = dict(kwargs)
+            return b""
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.runner = CapturingRunner()
+    host_build = {
+        "hostBuildRoot": str(config.host_build_root),
+        "home": str(config.host_build_root / "home"),
+        "dotnetCliHome": str(config.host_build_root / "dotnet-cli"),
+        "nugetPackages": str(config.host_build_root / "nuget-packages"),
+        "nugetHttpCache": str(config.host_build_root / "nuget-http-cache"),
+        "tmp": str(config.host_build_root / "tmp"),
+        "sdk": str(config.host_build_root / "sdk"),
+        "playwrightPythonRoot": str(
+            config.host_build_root / "playwright-python"
+        ),
+        "playwrightPythonTreeSha256": "c" * 64,
+        "playwrightBrowsersRoot": str(
+            config.host_build_root / "playwright-browsers"
+        ),
+        "playwrightBrowserTreeSha256": "d" * 64,
+        "playwrightAuthority": str(
+            config.host_build_root / "playwright-authority.json"
+        ),
+        "playwrightAuthoritySha256": "e" * 64,
+    }
+    monkeypatch.setattr(
+        controller,
+        "prepare_operation_host_build",
+        lambda _config: host_build,
+    )
+    monkeypatch.setattr(
+        controller,
+        "tree_sha256_file_stream",
+        lambda root, *, label: "b" * 64,
+    )
+
+    staged = actions._stage_application()
+
+    arguments = captured["arguments"]
+
+    def argument_path(flag: str) -> Path:
+        return Path(arguments[arguments.index(flag) + 1])
+
+    assert captured["script"] == OVERLAY_PUBLISHER_PATH
+    assert config.overlay_root == (
+        operation_root / "overlay-active-unused" / "app"
+    )
+    assert config.overlay_root.parent != operation_root
+    assert argument_path("--active-root") == config.overlay_root
+    assert argument_path("--staging-root") == config.overlay_staging_root
+    assert argument_path("--backup-root") == config.overlay_backup_root
+    assert argument_path("--build-root") == config.overlay_build_root
+    assert argument_path("--host-build-root") == config.host_build_root
+    assert argument_path("--downloads-source-root") == config.shelf_source
+    assert argument_path("--playwright-authority") == Path(
+        host_build["playwrightAuthority"]
+    )
+    assert (
+        arguments[arguments.index("--playwright-authority-sha256") + 1]
+        == "e" * 64
+    )
+    assert arguments[arguments.index("--surface-profile") + 1] == "public-download"
+    assert arguments[arguments.index("--delivery-phase") + 1] == "windows-preview"
+    assert argument_path("--output") == operation_root / "overlay-stage.json"
+    assert staged == {
+        "receipt": str(operation_root / "overlay-stage.json"),
+        "root": str(config.overlay_staging_root),
+        "treeSha256": "b" * 64,
+        "hostBuild": host_build,
+    }
+    environment = captured["kwargs"]["environment"]
+    assert environment == {
+        "HOME": str(config.host_build_root / "home"),
+        "DOTNET_ROOT": str(config.host_build_root / "sdk"),
+        "DOTNET_CLI_HOME": str(config.host_build_root / "dotnet-cli"),
+        "NUGET_PACKAGES": str(config.host_build_root / "nuget-packages"),
+        "NUGET_HTTP_CACHE_PATH": str(
+            config.host_build_root / "nuget-http-cache"
+        ),
+        "TMPDIR": str(config.host_build_root / "tmp"),
+        "PATH": f"{config.host_build_root / 'sdk'}:/usr/bin:/bin",
+    }
+
+    path_plan = overlay_publisher.validate_publisher_path_plan(
+        output=argument_path("--output"),
+        release_channel_receipt=argument_path(
+            "--release-channel-receipt"
+        ),
+        release_channel_receipt_sha256=arguments[
+            arguments.index("--release-channel-receipt-sha256") + 1
+        ],
+        source_root=argument_path("--source-root"),
+        staging_root=argument_path("--staging-root"),
+        active_root=argument_path("--active-root"),
+        backup_root=argument_path("--backup-root"),
+        build_root=argument_path("--build-root"),
+        activation_mode="copy",
+    )
+
+    assert path_plan["activeRoot"] == config.overlay_root
+    assert not overlay_publisher.path_is_within(
+        path_plan["output"],
+        path_plan["activeRoot"].parent,
     )
 
 
