@@ -260,6 +260,29 @@ def _manifest_identity(
 
 _OMIT_MANIFEST_VALUE = object()
 
+SEMANTIC_PUBLIC_NAVIGATION_ROUTE_PATHS = frozenset(
+    {
+        ("desktopTupleCoverage", "desktopRouteTruth", "[]", "publicInstallRoute"),
+        ("artifactIdentityRegistry", "[]", "publicInstallRoute"),
+        ("artifactPublicationBindings", "[]", "publicInstallRoute"),
+        ("desktopSurfaceRefs", "[]", "publicInstallRoute"),
+        (
+            "installAwareArtifactRegistry",
+            "[]",
+            "conciergeAssetRefs",
+            "publicTrustWrapper",
+        ),
+        ("installAwareArtifactRegistry", "[]", "recoveryProofRefs", "[]"),
+        (
+            "publicTrustMetrics",
+            "revocationFacts",
+            "activeRevocations",
+            "[]",
+            "publicInstallRoute",
+        ),
+    }
+)
+
 
 def _artifact_routes(
     payload: dict[str, Any], generation_id: str
@@ -449,6 +472,44 @@ def _rewrite_release_url(
     raise ReleaseShelfError(f"manifest retains an unsupported release URL: {value}")
 
 
+def _stable_public_install_artifact_id(value: str) -> str | None:
+    path = _release_path(value)
+    prefix = "/downloads/install/"
+    if path is None or not path.startswith(prefix):
+        return None
+    artifact_id = path[len(prefix) :]
+    if (
+        not artifact_id
+        or "/" in artifact_id
+        or "\\" in artifact_id
+        or not SAFE_GENERATION_ID.fullmatch(artifact_id)
+        or ".." in artifact_id
+    ):
+        return None
+    return artifact_id
+
+
+def _preserves_semantic_public_navigation_route(
+    value: str,
+    path: tuple[str, ...],
+    artifact_routes: dict[str, dict[str, str | None]],
+) -> bool:
+    if path not in SEMANTIC_PUBLIC_NAVIGATION_ROUTE_PATHS:
+        return False
+    artifact_id = _stable_public_install_artifact_id(value)
+    if artifact_id is None:
+        return False
+    route = artifact_routes.get(artifact_id)
+    if route is None:
+        # Missing desktop tuples and revoked historical tuples intentionally retain
+        # their stable public navigation identity even though no bytes are present
+        # in this generation.
+        return True
+    return str(route["primary"]).startswith("/downloads/g/") and "/files/" in str(
+        route["primary"]
+    )
+
+
 def _rewrite_manifest_value(
     value: Any,
     generation_id: str,
@@ -479,6 +540,10 @@ def _rewrite_manifest_value(
         ]
         return [item for item in rewritten_items if item is not _OMIT_MANIFEST_VALUE]
     if isinstance(value, str):
+        if _preserves_semantic_public_navigation_route(
+            value, path, artifact_routes
+        ):
+            return value
         return _rewrite_release_url(value, generation_id, artifact_routes)
     return value
 
@@ -490,7 +555,7 @@ def normalize_manifest(
 ) -> dict[str, Any]:
     payload = read_json_object(path, path.name)
     artifact_routes = artifact_routes or _artifact_routes(payload, generation_id)
-    for source_value in _walk_strings(payload):
+    for _, source_value in _walk_strings(payload):
         _rewrite_release_url(source_value, generation_id, artifact_routes)
     source = copy.deepcopy(payload)
     _project_artifact_download_urls(source, artifact_routes)
@@ -612,7 +677,9 @@ def project_manifest_pair(
             temporary.unlink(missing_ok=True)
 
 
-def _walk_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[str]:
+def _walk_strings(
+    value: Any, path: tuple[str, ...] = ()
+) -> Iterator[tuple[tuple[str, ...], str]]:
     if isinstance(value, dict):
         for key, item in value.items():
             if key in PROOF_ROUTE_KEYS:
@@ -627,14 +694,19 @@ def _walk_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[str]:
         for item in value:
             yield from _walk_strings(item, path + ("[]",))
     elif isinstance(value, str):
-        yield value
+        yield path, value
 
 
 def validate_manifest_routes(payload: dict[str, Any], generation_id: str, label: str) -> None:
     if payload.get("generationId") != generation_id:
         raise ReleaseShelfError(f"{label} generationId mismatch")
     expected_prefix = f"/downloads/g/{generation_id}/"
-    for value in _walk_strings(payload):
+    artifact_routes = _artifact_routes(payload, generation_id)
+    for value_path, value in _walk_strings(payload):
+        if _preserves_semantic_public_navigation_route(
+            value, value_path, artifact_routes
+        ):
+            continue
         path = _release_path(value)
         if path is None:
             continue

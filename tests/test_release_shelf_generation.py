@@ -692,6 +692,44 @@ def test_registry_generation_projection_matches_cross_language_golden_bytes(
                 "payloadDownloadUrl": "/downloads/files/protected.zip",
             },
         ],
+        "artifactIdentityRegistry": [
+            {"publicInstallRoute": "/downloads/install/open"},
+            {"publicInstallRoute": "/downloads/install/protected"},
+        ],
+        "artifactPublicationBindings": [
+            {"publicInstallRoute": "/downloads/install/open"}
+        ],
+        "desktopSurfaceRefs": [
+            {"publicInstallRoute": "/downloads/install/open"}
+        ],
+        "desktopTupleCoverage": {
+            "desktopRouteTruth": [
+                {"publicInstallRoute": "/downloads/install/open"},
+                {"publicInstallRoute": "/downloads/install/missing"},
+            ]
+        },
+        "installAwareArtifactRegistry": [
+            {
+                "conciergeAssetRefs": {
+                    "publicTrustWrapper": "/downloads/install/open"
+                },
+                "recoveryProofRefs": [
+                    "/downloads/install/open",
+                    "startup-smoke/startup-smoke-open.receipt.json",
+                ],
+            }
+        ],
+        "publicTrustMetrics": {
+            "revocationFacts": {
+                "activeRevocations": [
+                    {"publicInstallRoute": "/downloads/install/open"}
+                ]
+            }
+        },
+        "extension": {
+            "publicInstallRoute": "/downloads/install/open",
+            "unknownPublicInstallRoute": "/downloads/install/missing",
+        },
         "releaseProof": {"proofRoutes": ["/downloads/install/protected"]},
     }
     manifest_path = tmp_path / MODULE.COMPATIBILITY_MANIFEST
@@ -700,12 +738,24 @@ def test_registry_generation_projection_matches_cross_language_golden_bytes(
     MODULE.normalize_manifest(manifest_path, "generation-parity")
 
     expected = (
-        b'{"channel":"preview","downloads":[{"fileName":"open.bin","id":"open",'
+        b'{"artifactIdentityRegistry":[{"publicInstallRoute":"/downloads/install/open"},'
+        b'{"publicInstallRoute":"/downloads/g/generation-parity/install/protected"}],'
+        b'"artifactPublicationBindings":[{"publicInstallRoute":"/downloads/install/open"}],'
+        b'"channel":"preview","desktopSurfaceRefs":[{"publicInstallRoute":"/downloads/install/open"}],'
+        b'"desktopTupleCoverage":{"desktopRouteTruth":[{"publicInstallRoute":"/downloads/install/open"},'
+        b'{"publicInstallRoute":"/downloads/install/missing"}]},'
+        b'"downloads":[{"fileName":"open.bin","id":"open",'
         b'"installAccessClass":"open_public","url":"/downloads/g/generation-parity/files/open.bin"},'
         b'{"fileName":"protected.bin","id":"protected","installAccessClass":"account_required",'
         b'"payloadDownloadUrl":"/downloads/g/generation-parity/install/protected/payload",'
         b'"payloadFileName":"protected.zip","url":"/downloads/g/generation-parity/install/protected"}],'
-        b'"generationId":"generation-parity","publishedAt":"2026-07-17T20:00:00Z",'
+        b'"extension":{"publicInstallRoute":"/downloads/g/generation-parity/files/open.bin"},'
+        b'"generationId":"generation-parity","installAwareArtifactRegistry":[{"conciergeAssetRefs":'
+        b'{"publicTrustWrapper":"/downloads/install/open"},"recoveryProofRefs":'
+        b'["/downloads/install/open","startup-smoke/startup-smoke-open.receipt.json"]}],'
+        b'"publicTrustMetrics":{"revocationFacts":{"activeRevocations":'
+        b'[{"publicInstallRoute":"/downloads/install/open"}]}},'
+        b'"publishedAt":"2026-07-17T20:00:00Z",'
         b'"releaseProof":{"proofRoutes":["/downloads/install/protected"]},'
         b'"version":"release-parity"}\n'
     )

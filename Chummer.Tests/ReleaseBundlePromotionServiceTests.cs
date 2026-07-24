@@ -727,6 +727,42 @@ public sealed class ReleaseBundlePromotionServiceTests
                   "payloadDownloadUrl": "/downloads/files/protected.zip"
                 }
               ],
+              "artifactIdentityRegistry": [
+                { "publicInstallRoute": "/downloads/install/open" },
+                { "publicInstallRoute": "/downloads/install/protected" }
+              ],
+              "artifactPublicationBindings": [
+                { "publicInstallRoute": "/downloads/install/open" }
+              ],
+              "desktopSurfaceRefs": [
+                { "publicInstallRoute": "/downloads/install/open" }
+              ],
+              "desktopTupleCoverage": {
+                "desktopRouteTruth": [
+                  { "publicInstallRoute": "/downloads/install/open" },
+                  { "publicInstallRoute": "/downloads/install/missing" }
+                ]
+              },
+              "installAwareArtifactRegistry": [{
+                "conciergeAssetRefs": {
+                  "publicTrustWrapper": "/downloads/install/open"
+                },
+                "recoveryProofRefs": [
+                  "/downloads/install/open",
+                  "startup-smoke/startup-smoke-open.receipt.json"
+                ]
+              }],
+              "publicTrustMetrics": {
+                "revocationFacts": {
+                  "activeRevocations": [
+                    { "publicInstallRoute": "/downloads/install/open" }
+                  ]
+                }
+              },
+              "extension": {
+                "publicInstallRoute": "/downloads/install/open",
+                "unknownPublicInstallRoute": "/downloads/install/missing"
+              },
               "releaseProof": {
                 "proofRoutes": ["/downloads/install/protected"]
               }
@@ -742,7 +778,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             "generation-parity",
             compatibility);
 
-        const string expected = "{\"channel\":\"preview\",\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"generationId\":\"generation-parity\",\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
+        const string expected = "{\"artifactIdentityRegistry\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/g/generation-parity/install/protected\"}],\"artifactPublicationBindings\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"channel\":\"preview\",\"desktopSurfaceRefs\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"desktopTupleCoverage\":{\"desktopRouteTruth\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/install/missing\"}]},\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"extension\":{\"publicInstallRoute\":\"/downloads/g/generation-parity/files/open.bin\"},\"generationId\":\"generation-parity\",\"installAwareArtifactRegistry\":[{\"conciergeAssetRefs\":{\"publicTrustWrapper\":\"/downloads/install/open\"},\"recoveryProofRefs\":[\"/downloads/install/open\",\"startup-smoke/startup-smoke-open.receipt.json\"]}],\"publicTrustMetrics\":{\"revocationFacts\":{\"activeRevocations\":[{\"publicInstallRoute\":\"/downloads/install/open\"}]}},\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
         Assert.Equal(expected, Encoding.UTF8.GetString(projected));
     }
 
