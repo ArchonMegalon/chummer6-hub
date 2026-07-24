@@ -809,14 +809,11 @@ internal static class PayloadSidecarContractValidator
                 }
             }
 
-            var expectedProperties = new HashSet<string>(
-                RequiredProperties,
-                StringComparer.Ordinal);
-            if (requirePayloadAcquisitionMode)
-            {
-                expectedProperties.Add("payloadAcquisitionMode");
-            }
-            if (!properties.SetEquals(expectedProperties))
+            bool hasPayloadAcquisitionMode =
+                properties.Remove("payloadAcquisitionMode");
+            if (!properties.SetEquals(RequiredProperties)
+                || (requirePayloadAcquisitionMode
+                    && !hasPayloadAcquisitionMode))
             {
                 return Fail("payload sidecar property set is noncanonical", out failure);
             }
@@ -838,13 +835,13 @@ internal static class PayloadSidecarContractValidator
                 || !root.TryGetProperty("sizeBytes", out JsonElement size)
                 || !size.TryGetInt64(out long actualSize)
                 || actualSize != payloadSizeBytes
-                || requirePayloadAcquisitionMode
-                && (!TryString(
-                        root,
+                || hasPayloadAcquisitionMode
+                && (!root.TryGetProperty(
                         "payloadAcquisitionMode",
-                        out string? acquisitionMode)
+                        out JsonElement acquisitionMode)
+                    || acquisitionMode.ValueKind != JsonValueKind.String
                     || !string.Equals(
-                        acquisitionMode,
+                        acquisitionMode.GetString(),
                         "download",
                         StringComparison.Ordinal)))
             {
