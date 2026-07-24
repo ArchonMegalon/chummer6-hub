@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,56 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_PATH = ROOT / "docker-compose.public-edge.yml"
 SCRIPT_PATH = ROOT / "scripts" / "initialize-public-edge-volumes.sh"
 DOCKERFILE_PATH = ROOT / "Chummer.Run.Api" / "Dockerfile"
+
+
+def run_sha256_validator(value: str) -> subprocess.CompletedProcess[str]:
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    start = script.index("validate_sha256() {")
+    end = script.index("\n\nrequire_regular_input()", start)
+    function = script[start:end]
+    harness = (
+        "set -eu\n"
+        "fail() { printf '%s\\n' \"public-edge volume initialization failed: $*\" >&2; exit 1; }\n"
+        f"{function}\n"
+        'validate_sha256 TEST_SHA256 "$1"\n'
+    )
+    return subprocess.run(
+        ["/bin/sh", "-eu", "-c", harness, "sha256-validator", value],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def test_sha256_validator_accepts_exact_lowercase_digest() -> None:
+    result = run_sha256_validator("0123456789abcdef" * 4)
+
+    assert result.returncode == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "a" * 63,
+        "a" * 65,
+        ("a" * 63) + "A",
+        ("a" * 31) + "g" + ("a" * 32),
+    ],
+    ids=["empty", "63-chars", "65-chars", "uppercase", "nonhex"],
+)
+def test_sha256_validator_rejects_invalid_digest(value: str) -> None:
+    result = run_sha256_validator(value)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        "public-edge volume initialization failed: "
+        "TEST_SHA256 must be a lowercase SHA-256\n"
+    )
 
 
 def test_initializer_is_fail_closed_and_never_chowns_downloads_bind() -> None:

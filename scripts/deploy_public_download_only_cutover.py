@@ -52,6 +52,10 @@ CANONICAL_PORTAL_TAG = "chummer-run-api:local"
 CANONICAL_TOOL_TAG = "chummer-install-linking-postgres-tool:local"
 PORTAL_SERVICE = "chummer-portal"
 TUNNEL_SERVICE = "chummer-run-cloudflared"
+# Run.Api requires more than seven full days of validity at load time. Keep the
+# operation-bound certificate short-lived while leaving margin for the cutover.
+SIDECAR_CERTIFICATE_VALIDITY_DAYS = 30
+SIDECAR_CERTIFICATE_MINIMUM_REMAINING_SECONDS = 7 * 24 * 60 * 60
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -3493,6 +3497,30 @@ def generate_sidecar_data_protection(
             ],
             label="validate operation-bound data-protection PKCS#12",
         )
+        public_certificate = runner.run(
+            [
+                "/usr/bin/openssl",
+                "pkcs12",
+                "-in",
+                str(certificate_path),
+                "-passin",
+                f"file:{password_path}",
+                "-clcerts",
+                "-nokeys",
+            ],
+            label="extract operation-bound data-protection public certificate",
+        )
+        runner.run(
+            [
+                "/usr/bin/openssl",
+                "x509",
+                "-checkend",
+                str(SIDECAR_CERTIFICATE_MINIMUM_REMAINING_SECONDS),
+                "-noout",
+            ],
+            label="validate operation-bound data-protection certificate lifetime",
+            input_bytes=public_certificate,
+        )
         return {
             "authority": "operation-bound-sidecar-only",
             "certificatePath": str(config.sidecar_certificate),
@@ -3556,7 +3584,7 @@ def generate_sidecar_data_protection(
                 "-subj",
                 "/CN=chummer-public-download-sidecar",
                 "-days",
-                "7",
+                str(SIDECAR_CERTIFICATE_VALIDITY_DAYS),
                 "-keyout",
                 str(key),
                 "-out",

@@ -142,9 +142,9 @@ ensure_private_directory_as_portal_identity() {
 validate_sha256() {
   label="$1"
   value="$2"
+  [ "${#value}" -eq 64 ] || fail "$label must be a lowercase SHA-256"
   case "$value" in
-    [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-    *) fail "$label must be a lowercase SHA-256" ;;
+    *[!0123456789abcdef]*) fail "$label must be a lowercase SHA-256" ;;
   esac
 }
 
@@ -290,7 +290,7 @@ copy_immutable_tree() {
   label="$4"
   verify_tree_sha256 "$source" "$expected" "$label source"
   reset_runtime_input_root "$destination"
-  cp -a -- "$source/." "$destination/" \
+  cp -R --no-preserve=mode,ownership,timestamps -- "$source/." "$destination/" \
     || fail "cannot copy $label into its isolated volume"
   unsafe_entry="$(find -P "$destination" -xdev ! -type d ! -type f -print -quit)" \
     || fail "cannot inspect copied $label"
@@ -310,7 +310,7 @@ copy_isolated_release_shelf() {
   require_active_release_shelf "$source"
   verify_tree_sha256 "$source" "$expected" "active release shelf source"
   reset_runtime_input_root "$destination"
-  cp -a -- "$source/." "$destination/" \
+  cp -R --no-preserve=mode,ownership,timestamps -- "$source/." "$destination/" \
     || fail "cannot copy the active release shelf"
   unsafe_entry="$(find -P "$destination" -xdev ! -type d ! -type f -print -quit)" \
     || fail "cannot inspect the copied release shelf"
@@ -377,14 +377,6 @@ copy_runtime_secrets() {
     || fail "cannot protect runtime-secret files"
   chown -R -- "${portal_uid}:${portal_gid}" "$destination" \
     || fail "cannot assign runtime-secret ownership"
-  verify_file_sha256 \
-    "$destination/data-protection-key-encryption.pfx" \
-    "$certificate_expected" \
-    "copied certificate"
-  verify_file_sha256 \
-    "$destination/data-protection-key-encryption.password" \
-    "$password_expected" \
-    "copied certificate password"
 }
 
 verify_tree_as_runtime_identity() {
@@ -413,6 +405,8 @@ verify_tree_as_runtime_identity() {
 
 verify_secret_identity_boundary() {
   secret_root="$1"
+  certificate_expected="$2"
+  password_expected="$3"
   setpriv \
     --reuid="$portal_uid" \
     --regid="$portal_gid" \
@@ -421,15 +415,36 @@ verify_secret_identity_boundary() {
       expected_uid="$1"
       expected_gid="$2"
       root="$3"
+      certificate_expected="$4"
+      password_expected="$5"
+      certificate="$root/data-protection-key-encryption.pfx"
+      password="$root/data-protection-key-encryption.password"
       [ "$(id -u)" = "$expected_uid" ]
       [ "$(id -g)" = "$expected_gid" ]
       [ "$(id -G)" = "$expected_gid" ]
-      test -r "$root/data-protection-key-encryption.pfx"
-      test -r "$root/data-protection-key-encryption.password"
+      test -f "$certificate"
+      test ! -L "$certificate"
+      test "$(stat -c %h -- "$certificate")" = 1
+      test -r "$certificate"
+      test -f "$password"
+      test ! -L "$password"
+      test "$(stat -c %h -- "$password")" = 1
+      test -r "$password"
       test "$(stat -c %u:%g:%a -- "$root")" = "$expected_uid:$expected_gid:700"
-      test "$(stat -c %u:%g:%a -- "$root/data-protection-key-encryption.pfx")" = "$expected_uid:$expected_gid:400"
-      test "$(stat -c %u:%g:%a -- "$root/data-protection-key-encryption.password")" = "$expected_uid:$expected_gid:400"
-    ' runtime-secret-reader "$portal_uid" "$portal_gid" "$secret_root" \
+      test "$(stat -c %u:%g:%a -- "$certificate")" = "$expected_uid:$expected_gid:400"
+      test "$(stat -c %u:%g:%a -- "$password")" = "$expected_uid:$expected_gid:400"
+      certificate_observed="$(sha256sum -- "$certificate")"
+      certificate_observed="${certificate_observed%% *}"
+      test "$certificate_observed" = "$certificate_expected"
+      password_observed="$(sha256sum -- "$password")"
+      password_observed="${password_observed%% *}"
+      test "$password_observed" = "$password_expected"
+    ' runtime-secret-reader \
+      "$portal_uid" \
+      "$portal_gid" \
+      "$secret_root" \
+      "$certificate_expected" \
+      "$password_expected" \
     || fail "runtime secrets are not exact-owner readable by the portal"
 
   unrelated_uid=65534
@@ -524,7 +539,10 @@ run_public_download_initializer() {
   verify_tree_as_runtime_identity /downloads-source "isolated release shelf"
   verify_tree_as_runtime_identity /public-projection-staging "copied projection"
   verify_tree_as_runtime_identity /proofs-staging "copied runtime proofs"
-  verify_secret_identity_boundary /run/chummer-secrets
+  verify_secret_identity_boundary \
+    /run/chummer-secrets \
+    "$certificate_sha" \
+    "$password_sha"
   printf '%s\n' \
     "public-download runtime inputs verified for ${portal_uid}:${portal_gid}"
 }
