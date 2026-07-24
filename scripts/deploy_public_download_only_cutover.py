@@ -4983,6 +4983,13 @@ def _probe_exact_manifest(
     )
     if status != 200:
         raise CutoverError("served manifest did not return HTTP 200")
+    observed_generation = headers.get("x-chummer-release-generation", "")
+    if (
+        not isinstance(generation_id, str)
+        or not generation_id
+        or observed_generation != generation_id
+    ):
+        raise CutoverError("served manifest generation header drifted")
     prepared_payload = _strict_json_object_bytes(
         expected,
         label="prepared manifest",
@@ -4995,6 +5002,13 @@ def _probe_exact_manifest(
         raise CutoverError(
             "prepared manifest unexpectedly contains a releaseTruth envelope"
         )
+    _verify_prepared_manifest_authority(
+        shelf=shelf,
+        prepared=prepared_payload,
+        prepared_sha256=sha256_bytes(expected),
+        path=path,
+        generation_id=generation_id,
+    )
     (
         expected_release_truth,
         release_scope_decision_sha256,
@@ -5013,9 +5027,6 @@ def _probe_exact_manifest(
         raise CutoverError(
             "served manifest payload differs from the prepared manifest"
         )
-    observed_generation = headers.get("x-chummer-release-generation", "")
-    if generation_id is not None and observed_generation != generation_id:
-        raise CutoverError("served manifest generation header drifted")
     return {
         "endpoint": f"{scheme}://{request_host}{path}",
         "httpStatus": status,
@@ -5097,24 +5108,106 @@ def _exact_manifest_alias(
     names: tuple[str, ...],
     *,
     label: str,
+    nullable_aliases: frozenset[str] = frozenset(),
 ) -> str:
-    values = [
-        payload[name]
-        for name in names
-        if name in payload
-    ]
-    if (
-        not values
-        or any(
+    values: list[str] = []
+    for name in names:
+        if name not in payload:
+            continue
+        value = payload[name]
+        if value is None and name in nullable_aliases:
+            continue
+        if (
             not isinstance(value, str)
             or not value
             or value != value.strip()
-            for value in values
-        )
+        ):
+            raise CutoverError(
+                f"prepared manifest {label} aliases drifted"
+            )
+        values.append(value)
+    if (
+        not values
         or any(value != values[0] for value in values[1:])
     ):
         raise CutoverError(f"prepared manifest {label} aliases drifted")
-    return str(values[0])
+    return values[0]
+
+
+def _verify_prepared_manifest_authority(
+    *,
+    shelf: Mapping[str, Any],
+    prepared: Mapping[str, Any],
+    prepared_sha256: str,
+    path: str,
+    generation_id: str,
+) -> None:
+    authority = shelf.get("releaseCandidateAuthority")
+    review_authority = (
+        authority.get("reviewAuthority")
+        if isinstance(authority, dict)
+        else None
+    )
+    release_truth = (
+        authority.get("reviewRequiredReleaseTruth")
+        if isinstance(authority, dict)
+        else None
+    )
+    canonical_hashes = (
+        shelf.get("canonicalMirrorSha256"),
+        shelf.get("generationCanonicalSha256"),
+        (
+            authority.get("canonicalManifestSha256")
+            if isinstance(authority, dict)
+            else None
+        ),
+        (
+            review_authority.get("manifestSha256")
+            if isinstance(review_authority, dict)
+            else None
+        ),
+        (
+            release_truth.get("manifestSha256")
+            if isinstance(release_truth, dict)
+            else None
+        ),
+    )
+    compatibility_hashes = (
+        shelf.get("compatibilityMirrorSha256"),
+        shelf.get("generationCompatibilitySha256"),
+    )
+    if (
+        shelf.get("generationId") != generation_id
+        or prepared.get("generationId") != generation_id
+        or not isinstance(authority, dict)
+        or authority.get("generationId") != generation_id
+        or not isinstance(review_authority, dict)
+        or review_authority.get("generationId") != generation_id
+        or any(
+            not isinstance(value, str)
+            or SHA256.fullmatch(value) is None
+            for value in (*canonical_hashes, *compatibility_hashes)
+        )
+        or any(
+            value != canonical_hashes[0]
+            for value in canonical_hashes[1:]
+        )
+        or compatibility_hashes[1] != compatibility_hashes[0]
+    ):
+        raise CutoverError(
+            "prepared manifest generation or authority hashes drifted"
+        )
+    manifest_name = PurePosixPath(path).name
+    if manifest_name == "RELEASE_CHANNEL.generated.json":
+        expected_sha256 = canonical_hashes[0]
+    elif manifest_name == "releases.json":
+        expected_sha256 = compatibility_hashes[0]
+    else:
+        raise CutoverError("served manifest path is not canonical")
+    if prepared_sha256 != expected_sha256:
+        raise CutoverError(
+            "prepared manifest SHA-256 differs from its shelf authority"
+        )
 
 
 def _prepared_public_preview_artifact(
@@ -5212,6 +5305,7 @@ def _verify_review_required_release_truth(
         prepared,
         ("releaseVersion", "version", "publicVersion"),
         label="release version",
+        nullable_aliases=frozenset({"publicVersion"}),
     )
     artifact = _prepared_public_preview_artifact(
         prepared,
@@ -5228,6 +5322,7 @@ def _verify_review_required_release_truth(
             prepared,
             ("channel", "channelId"),
             label="channel",
+            nullable_aliases=frozenset({"channelId"}),
         )
         or value.get("channel") != "preview"
         or value.get("releaseStatus") != "published"
