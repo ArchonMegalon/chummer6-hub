@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import importlib.util
 import hashlib
 import json
@@ -699,6 +700,48 @@ def test_scope_bound_review_authority_rejects_duplicate_json_keys(
                 "releaseScopeDecisionSha256"
             ],
             candidate_version=candidate["version"],
+        )
+
+
+def test_strict_json_accepts_exact_finite_decimal_and_exponent_numbers() -> None:
+    parsed = controller._strict_json_object_bytes(
+        (
+            b'{"decimal":1.5,"exponent":1e3,"negative":-2.5E-3,'
+            b'"zero":0.0,"integer":1,"boolean":true}\n'
+        ),
+        label="finite-number fixture",
+    )
+
+    assert parsed == {
+        "decimal": Decimal("1.5"),
+        "exponent": Decimal("1e3"),
+        "negative": Decimal("-2.5E-3"),
+        "zero": Decimal("0.0"),
+        "integer": 1,
+        "boolean": True,
+    }
+    assert type(parsed["decimal"]) is Decimal
+    assert type(parsed["integer"]) is int
+    assert type(parsed["boolean"]) is bool
+
+
+@pytest.mark.parametrize(
+    "number",
+    (
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "1e309",
+        "-1e309",
+    ),
+)
+def test_strict_json_rejects_nonfinite_and_overflow_numbers(
+    number: str,
+) -> None:
+    with pytest.raises(controller.CutoverError, match="strict JSON"):
+        controller._strict_json_object_bytes(
+            f'{{"value":{number}}}\n'.encode(),
+            label="nonfinite-number fixture",
         )
 
 

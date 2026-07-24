@@ -14,11 +14,13 @@ import argparse
 import copy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 import hashlib
 import http.client
 import io
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath
 import pwd
@@ -5861,15 +5863,24 @@ def _strict_json_object_bytes(
     def reject_constant(value: str) -> None:
         raise ValueError(f"non-finite JSON number: {value}")
 
-    def reject_float(value: str) -> None:
-        raise ValueError(f"non-integer JSON number: {value}")
+    def finite_decimal(value: str) -> Decimal:
+        try:
+            binary_value = float(value)
+            exact_value = Decimal(value)
+        except (InvalidOperation, OverflowError, ValueError) as exc:
+            raise ValueError(
+                f"invalid finite JSON number: {value}"
+            ) from exc
+        if not math.isfinite(binary_value) or not exact_value.is_finite():
+            raise ValueError(f"non-finite JSON number: {value}")
+        return exact_value
 
     try:
         parsed = json.loads(
             raw,
             object_pairs_hook=unique_object,
             parse_constant=reject_constant,
-            parse_float=reject_float,
+            parse_float=finite_decimal,
         )
     except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise CutoverError(f"{label} is not strict JSON") from exc
