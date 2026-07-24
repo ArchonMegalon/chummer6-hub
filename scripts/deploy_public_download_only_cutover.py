@@ -3842,7 +3842,12 @@ def _probe_denied_download(
             raise CutoverError(
                 "account-required denial returned the protected artifact bytes"
             )
-        if route_kind == "generation":
+        if route_kind == "stable":
+            if size != 0:
+                raise CutoverError(
+                    "account-required redirect returned a non-empty body"
+                )
+        else:
             content_types = headers.get("content-type", [])
             if (
                 len(content_types) != 1
@@ -3859,11 +3864,15 @@ def _probe_denied_download(
                 raise CutoverError(
                     "generation-bound denial body is malformed"
                 ) from exc
-            if (
-                not isinstance(denial, dict)
-                or denial.get("error")
-                != "generation_bound_credential_required"
-            ):
+            expected_denial = {
+                "error": "generation_bound_credential_required",
+                "message": (
+                    "This retained release generation requires its "
+                    "generation-bound install ticket or claim code. "
+                    "Use the install command issued for this exact release."
+                ),
+            }
+            if denial != expected_denial:
                 raise CutoverError(
                     "generation-bound denial contract drifted"
                 )

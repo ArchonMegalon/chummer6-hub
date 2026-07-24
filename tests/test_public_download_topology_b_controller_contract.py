@@ -1433,7 +1433,11 @@ def test_account_required_generation_denial_requires_exact_409_json(
         json.dumps(
             {
                 "error": "generation_bound_credential_required",
-                "message": "Use a generation-bound credential.",
+                "message": (
+                    "This retained release generation requires its "
+                    "generation-bound install ticket or claim code. "
+                    "Use the install command issued for this exact release."
+                ),
             }
         ).encode(),
         status=409,
@@ -1502,6 +1506,12 @@ def test_account_required_generation_denial_requires_exact_409_json(
             [("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac")],
         ),
         (
+            "stable",
+            302,
+            b"protected-prefix",
+            [("Location", "/login?next=%2Fdownloads%2Finstall%2Fmac")],
+        ),
+        (
             "generation",
             302,
             b"",
@@ -1511,6 +1521,22 @@ def test_account_required_generation_denial_requires_exact_409_json(
             "generation",
             409,
             b'{"error":"wrong"}',
+            [("Content-Type", "application/json")],
+        ),
+        (
+            "generation",
+            409,
+            json.dumps(
+                {
+                    "error": "generation_bound_credential_required",
+                    "message": (
+                        "This retained release generation requires its "
+                        "generation-bound install ticket or claim code. "
+                        "Use the install command issued for this exact release."
+                    ),
+                    "leakedPrefix": "protected-prefix",
+                }
+            ).encode(),
             [("Content-Type", "application/json")],
         ),
     ],
