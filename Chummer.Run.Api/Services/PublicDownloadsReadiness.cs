@@ -41,6 +41,15 @@ public sealed record PublicDownloadsReadinessResponse(
 
 public static class PublicDownloadsReadinessEndpoint
 {
+    public static int ResolveGlobalStatusCode(
+        bool ready,
+        bool publicDownloadOnlyRuntime)
+    {
+        return ready && !publicDownloadOnlyRuntime
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable;
+    }
+
     public static IResult CreateResult(HubDeepReadinessReport report)
     {
         PublicDownloadsReadinessResponse response =
