@@ -29,7 +29,7 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public void ProfilePayloadSidecarRequiresExactDownloadAcquisitionMode()
+    public void ProfilePayloadSidecarAcceptsExactDownloadModeWhenOptionalOrRequired()
     {
         const string installer = "chummer-avalonia-win-x64-installer.exe";
         const string payload = "chummer-avalonia-win-x64-payload.zip";
@@ -62,7 +62,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             allowMutableIncomingUrl: true,
             requirePayloadAcquisitionMode: true,
             out string? failure), failure);
-        Assert.False(PayloadSidecarContractValidator.TryValidate(
+        Assert.True(PayloadSidecarContractValidator.TryValidate(
             exact,
             installer,
             payload,
@@ -71,7 +71,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             size,
             version,
             allowMutableIncomingUrl: true,
-            out _));
+            out failure), failure);
     }
 
     [Fact]

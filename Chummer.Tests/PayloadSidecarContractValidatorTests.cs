@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Xunit;
@@ -19,18 +21,152 @@ public sealed class PayloadSidecarContractValidatorTests
         "22464a462bf72e0b24efd686ddb2a66114bccde0f98b82273e15f7335a35582e";
     private const long PayloadSizeBytes = 51231862;
     private const string ReleaseVersion = "run-20260723-230227";
+    private const string ProductionSidecarSha256 =
+        "0c247a39d71c5e8cad719187efbd726d2788e33f460a2f1c61521c2d377e6a11";
+    private const string ProductionSidecarJson = """
+        {
+          "contractName": "chummer6-ui.windows_bootstrap_payload",
+          "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+          "fileName": "chummer-avalonia-win-x64-payload.zip",
+          "installerFileName": "chummer-avalonia-win-x64-installer.exe",
+          "payloadAcquisitionMode": "download",
+          "releaseVersion": "run-20260723-230227",
+          "sha256": "22464a462bf72e0b24efd686ddb2a66114bccde0f98b82273e15f7335a35582e",
+          "sizeBytes": 51231862
+        }
+        """;
 
     [Fact]
     public void ExactFailedProductionSidecarMatchesProjectedOpenPublicManifest()
     {
+        byte[] sidecar = ProductionSidecar();
+        Assert.Equal(462, sidecar.Length);
+        Assert.Equal(
+            ProductionSidecarSha256,
+            Convert.ToHexStringLower(SHA256.HashData(sidecar)));
+
         bool valid = ValidateSealed(
-            Sidecar(),
+            sidecar,
             ProjectedPayloadUrl,
             "open_public",
             ArtifactId,
             out string? failure);
 
         Assert.True(valid, failure);
+    }
+
+    [Fact]
+    public void OptionalAcquisitionModeAcceptsBasePropertySet()
+    {
+        bool valid = ValidateModeRequirement(
+            Sidecar(),
+            requirePayloadAcquisitionMode: false,
+            out string? failure);
+
+        Assert.True(valid, failure);
+    }
+
+    [Fact]
+    public void RequiredAcquisitionModeAcceptsExactProductionSidecar()
+    {
+        bool valid = ValidateModeRequirement(
+            ProductionSidecar(),
+            requirePayloadAcquisitionMode: true,
+            out string? failure);
+
+        Assert.True(valid, failure);
+    }
+
+    [Fact]
+    public void RequiredAcquisitionModeRejectsMissingField()
+    {
+        bool valid = ValidateModeRequirement(
+            Sidecar(),
+            requirePayloadAcquisitionMode: true,
+            out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar property set is noncanonical", failure);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Download")]
+    [InlineData("stream")]
+    [InlineData(" download")]
+    [InlineData("download ")]
+    [InlineData(" download ")]
+    public void PresentAcquisitionModeRequiresExactDownloadString(
+        string acquisitionMode)
+    {
+        foreach (bool required in new[] { false, true })
+        {
+            bool valid = ValidateModeRequirement(
+                SidecarWithAcquisitionMode(acquisitionMode),
+                required,
+                out string? failure);
+
+            Assert.False(valid);
+            Assert.Equal(
+                "payload sidecar identity does not match its manifests",
+                failure);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(1)]
+    public void PresentAcquisitionModeRejectsNonStringValues(object? value)
+    {
+        bool valid = ValidateModeRequirement(
+            SidecarWithAcquisitionMode(value),
+            requirePayloadAcquisitionMode: false,
+            out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal(
+            "payload sidecar identity does not match its manifests",
+            failure);
+    }
+
+    [Fact]
+    public void AcquisitionModeDoesNotPermitUnknownProperties()
+    {
+        bool valid = ValidateModeRequirement(
+            SidecarWithAcquisitionMode("download", includeUnknown: true),
+            requirePayloadAcquisitionMode: false,
+            out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar property set is noncanonical", failure);
+    }
+
+    [Fact]
+    public void DuplicateAcquisitionModePropertyFailsClosed()
+    {
+        byte[] duplicate = Encoding.UTF8.GetBytes(
+            """{"payloadAcquisitionMode":"download","payloadAcquisitionMode":"download"}""");
+
+        bool valid = ValidateModeRequirement(
+            duplicate,
+            requirePayloadAcquisitionMode: false,
+            out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar contains duplicate properties", failure);
+    }
+
+    [Fact]
+    public void MalformedAcquisitionModeSidecarFailsClosed()
+    {
+        bool valid = ValidateModeRequirement(
+            "{"u8.ToArray(),
+            requirePayloadAcquisitionMode: false,
+            out string? failure);
+
+        Assert.False(valid);
+        Assert.Equal("payload sidecar JSON is malformed", failure);
     }
 
     [Theory]
@@ -288,6 +424,32 @@ public sealed class PayloadSidecarContractValidatorTests
             releaseVersion = ReleaseVersion
         });
 
+    private static byte[] ProductionSidecar()
+        => Encoding.UTF8.GetBytes(ProductionSidecarJson + "\n");
+
+    private static byte[] SidecarWithAcquisitionMode(
+        object? acquisitionMode,
+        bool includeUnknown = false)
+    {
+        var sidecar = new Dictionary<string, object?>
+        {
+            ["contractName"] = "chummer6-ui.windows_bootstrap_payload",
+            ["fileName"] = PayloadFileName,
+            ["downloadUrl"] = StablePayloadUrl,
+            ["sha256"] = PayloadSha256,
+            ["sizeBytes"] = PayloadSizeBytes,
+            ["installerFileName"] = InstallerFileName,
+            ["releaseVersion"] = ReleaseVersion,
+            ["payloadAcquisitionMode"] = acquisitionMode
+        };
+        if (includeUnknown)
+        {
+            sidecar["unexpected"] = true;
+        }
+
+        return JsonSerializer.SerializeToUtf8Bytes(sidecar);
+    }
+
     private static bool ValidateSealed(
         byte[] sidecar,
         string manifestUrl,
@@ -321,4 +483,22 @@ public sealed class PayloadSidecarContractValidatorTests
             out failure,
             installAccessClass,
             artifactId);
+
+    private static bool ValidateModeRequirement(
+        byte[] sidecar,
+        bool requirePayloadAcquisitionMode,
+        out string? failure)
+        => PayloadSidecarContractValidator.TryValidate(
+            sidecar,
+            InstallerFileName,
+            PayloadFileName,
+            ProjectedPayloadUrl,
+            PayloadSha256,
+            PayloadSizeBytes,
+            ReleaseVersion,
+            allowMutableIncomingUrl: false,
+            requirePayloadAcquisitionMode,
+            out failure,
+            installAccessClass: "open_public",
+            artifactId: ArtifactId);
 }

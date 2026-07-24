@@ -724,18 +724,24 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string sidecarPayloadUrl = stableSidecarWithSemanticManifest
                 ? $"https://chummer.run/downloads/files/{PayloadFileName}"
                 : payloadUrl;
+            var payloadSidecar = new Dictionary<string, object?>
+            {
+                ["contractName"] = "chummer6-ui.windows_bootstrap_payload",
+                ["fileName"] = PayloadFileName,
+                ["downloadUrl"] = sidecarPayloadUrl,
+                ["sha256"] = payloadSha256,
+                ["sizeBytes"] = payloadBytes.Length,
+                ["installerFileName"] = FileName,
+                ["releaseVersion"] = version
+            };
+            if (stableSidecarWithSemanticManifest)
+            {
+                payloadSidecar["payloadAcquisitionMode"] = "download";
+            }
+
             File.WriteAllText(
                 Path.Combine(filesRoot, PayloadFileName + ".json"),
-                JsonSerializer.Serialize(new Dictionary<string, object?>
-                {
-                    ["contractName"] = "chummer6-ui.windows_bootstrap_payload",
-                    ["fileName"] = PayloadFileName,
-                    ["downloadUrl"] = sidecarPayloadUrl,
-                    ["sha256"] = payloadSha256,
-                    ["sizeBytes"] = payloadBytes.Length,
-                    ["installerFileName"] = FileName,
-                    ["releaseVersion"] = version
-                }));
+                JsonSerializer.Serialize(payloadSidecar));
             WriteWindowsProofInstaller(generationRoot, version);
             WriteAurCatalog(
                 generationRoot,
