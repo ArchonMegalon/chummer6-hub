@@ -322,6 +322,85 @@ def test_stage_application_uses_isolated_active_transaction_namespace(
     )
 
 
+def test_candidate_image_is_journal_bound_before_compose_render(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    require_topology_b_surface()
+    source_head = "a" * 40
+    image_id = "sha256:" + "b" * 64
+    tag = f"chummer-run-api:public-download-{source_head[:16]}-c0ffee12"
+    config = SimpleNamespace(
+        source_head=source_head,
+        operation_root=tmp_path / "operation",
+    )
+    records: list[tuple[str, str, dict[str, Any]]] = []
+    actions = object.__new__(controller.TopologyBActions)
+    actions.runner = object()
+    actions._stage_application = lambda: {"treeSha256": "c" * 64}
+    actions._record = (
+        lambda phase, name, receipt: records.append(
+            (phase, name, dict(receipt))
+        )
+    )
+    monkeypatch.setattr(
+        controller,
+        "prepare_immutable_build_contexts",
+        lambda *_args, **_kwargs: (
+            {},
+            {
+                name: character * 64
+                for name, character in (
+                    ("default", "1"),
+                    ("run-services", "2"),
+                    ("hub-registry", "3"),
+                    ("fleet-media", "4"),
+                    ("design-product", "5"),
+                )
+            },
+            tmp_path / "contexts.json",
+        ),
+    )
+    monkeypatch.setattr(controller.secrets, "token_hex", lambda _count: "c0ffee12")
+
+    def fake_build(*_args: Any, **kwargs: Any) -> tuple[str, str]:
+        assert kwargs["unique_tag"] == tag
+        kwargs["on_built"](tag, image_id)
+        return tag, image_id
+
+    monkeypatch.setattr(controller, "build_candidate_image", fake_build)
+    monkeypatch.setattr(
+        controller,
+        "resolve_image_tag",
+        lambda *_args, **_kwargs: image_id,
+    )
+
+    def fail_compose(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise controller.CommandFailure(
+            label="render topology-B Compose",
+            failure_kind="failed",
+            status=1,
+            stderr=b"daemon unavailable",
+        )
+
+    monkeypatch.setattr(controller, "materialize_sidecar_compose", fail_compose)
+
+    with pytest.raises(controller.CommandFailure):
+        actions.materialize_sidecar_compose(config, {}, {})
+
+    assert len(records) == 2
+    plan_phase, plan_name, plan = records[0]
+    assert plan_phase == "candidate-image-planned"
+    assert plan_name == "candidateImagePlan"
+    assert plan["candidateTag"] == tag
+    phase, name, binding = records[1]
+    assert phase == "candidate-image-built"
+    assert name == "candidateImage"
+    assert binding["candidateTag"] == tag
+    assert binding["candidateImageId"] == image_id
+    assert binding["sourceHead"] == source_head
+
+
 def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -507,6 +586,7 @@ class RecordingActions:
         self.fail_at = fail_at
         self.recovery_disposition = recovery_disposition
         self.incumbent_baseline_captured = baseline_captured
+        self.primary_failures: list[Exception] = []
 
     def record(self, event: str, result: Any = None) -> Any:
         self.events.append(event)
@@ -528,6 +608,14 @@ class RecordingActions:
         )
         assert config.canonical_shelf_sentinel.read_bytes() == before
         return result
+
+    def record_primary_failure(
+        self,
+        _config: Any,
+        error: Exception,
+    ) -> dict[str, Any]:
+        self.primary_failures.append(error)
+        return {"status": "retained"}
 
     def generate_sidecar_data_protection(self, config: Any) -> dict[str, Any]:
         assert config.sidecar_dp_certificate.is_relative_to(
@@ -764,6 +852,118 @@ def test_planned_journal_is_not_published_before_operation_root_exists(
     assert not operation_root.exists()
 
 
+def test_primary_failure_receipt_preserves_stage_without_raw_secret(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    receipt_root = tmp_path / "receipts"
+    receipt_root.mkdir(mode=0o700)
+    receipt_root.chmod(0o700)
+    journal = receipt_root / "operation.json"
+    state = {
+        "schema": controller.TOPOLOGY_B_OPERATION_SCHEMA,
+        "phase": "data-protection-prepared",
+        "updatedAtUtc": controller.utc_now(),
+        "receipts": {"dataProtection": {"status": "pass"}},
+    }
+    controller.write_private_json(journal, state)
+    source_head = "a" * 40
+    config = SimpleNamespace(
+        operation_journal=journal,
+        project_name="chummer-public-download-failure-test",
+        source_head=source_head,
+    )
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions._state = state
+    secret = b"TOP_SECRET_VALUE_MUST_NOT_REACH_THE_JOURNAL"
+    error = controller.CommandFailure(
+        label="render topology-B Compose",
+        failure_kind="failed",
+        status=1,
+        stdout=b"",
+        stderr=b"compose failure: " + secret,
+    )
+    wrapped = controller.RecoveryUncertain("wrapped cleanup failure")
+    wrapped.__cause__ = error
+
+    receipt = actions.record_primary_failure(config, wrapped)
+
+    raw = journal.read_bytes()
+    payload = json.loads(raw)
+    assert secret not in raw
+    assert payload["phase"] == "data-protection-prepared"
+    assert payload["receipts"]["primaryFailure"] == receipt
+    command = receipt["command"]
+    assert command["stage"] == "render topology-B Compose"
+    assert command["exitStatus"] == 1
+    assert command["stderrSha256"] == hashlib.sha256(
+        b"compose failure: " + secret
+    ).hexdigest()
+    assert command["safeStderrSummary"].startswith("stderr content redacted")
+
+
+def test_topology_b_runner_hashes_but_does_not_expose_failed_command_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = b"RUNNER_SECRET_VALUE_MUST_STAY_PRIVATE"
+    stderr = b"\xfffailure: " + secret + (b"x" * 8192)
+    config = SimpleNamespace(
+        docker_config_root=tmp_path / "docker",
+        project_name="chummer-public-download-runner-test",
+        compose_file=tmp_path / "compose.json",
+        operation_root=tmp_path,
+    )
+    runner = controller.TopologyBRunner(config)
+    monkeypatch.setattr(
+        controller.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=17,
+            stdout=b"bounded output",
+            stderr=stderr,
+        ),
+    )
+
+    with pytest.raises(controller.CommandFailure) as raised:
+        runner.run(["/usr/bin/false"], label="test governed command")
+
+    evidence = raised.value.evidence
+    assert secret.decode("ascii") not in str(raised.value)
+    assert secret.decode("ascii") not in json.dumps(evidence, sort_keys=True)
+    assert evidence["exitStatus"] == 17
+    assert evidence["stderrSha256"] == hashlib.sha256(stderr).hexdigest()
+    assert evidence["stderrSizeBytes"] == len(stderr)
+
+
+def test_topology_b_runner_normalizes_signal_exit_for_replayable_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = SimpleNamespace(
+        docker_config_root=tmp_path / "docker",
+        project_name="chummer-public-download-runner-test",
+        compose_file=tmp_path / "compose.json",
+        operation_root=tmp_path,
+    )
+    runner = controller.TopologyBRunner(config)
+    monkeypatch.setattr(
+        controller.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=-9,
+            stdout=b"",
+            stderr=b"",
+        ),
+    )
+
+    with pytest.raises(controller.CommandFailure) as raised:
+        runner.run(["/usr/bin/false"], label="test signaled command")
+
+    assert raised.value.evidence["exitStatus"] == 137
+
+
 class FakeVolumeRunner:
     def __init__(
         self,
@@ -887,6 +1087,1273 @@ def test_partial_volume_replay_adopts_only_exact_labeled_volumes(
     assert runner.inspected == expected
 
 
+class FakeCleanupRunner:
+    def __init__(
+        self,
+        *,
+        blocker: str | None = None,
+        image_id: str | None = None,
+        tag: str | None = None,
+        tag_image_id: str | None = None,
+        referencing_container: bool = False,
+        project_candidate_containers: bool = False,
+        retain_project_containers_after_down: bool = False,
+        project_compose_file: str = "",
+        project_working_dir: str = "",
+        project_volume_names: list[str] | None = None,
+        project_oneoff: str = "False",
+        project_container_number: str = "1",
+        foreign_image_id: str | None = None,
+        foreign_volume_name: str | None = None,
+        foreign_same_project: bool = False,
+        post_down_foreign_volume_name: str | None = None,
+        post_down_project_network: bool = False,
+        repo_tags: list[str] | None = None,
+        repo_digests: list[str] | None = None,
+        volume_labels: dict[str, dict[str, str]] | None = None,
+    ) -> None:
+        self.blocker = blocker
+        self.image_id = image_id
+        self.tag = tag
+        self.tag_image_id = tag_image_id or image_id
+        self.referencing_container = referencing_container
+        self.project_candidate_containers = project_candidate_containers
+        self.retain_project_containers_after_down = (
+            retain_project_containers_after_down
+        )
+        self.project_compose_file = project_compose_file
+        self.project_working_dir = project_working_dir
+        self.project_volume_names = list(project_volume_names or [])
+        self.project_oneoff = project_oneoff
+        self.project_container_number = project_container_number
+        self.foreign_image_id = foreign_image_id
+        self.foreign_volume_name = foreign_volume_name
+        self.foreign_same_project = foreign_same_project
+        self.post_down_foreign_volume_name = (
+            post_down_foreign_volume_name
+        )
+        self.post_down_project_network = post_down_project_network
+        self.repo_tags = repo_tags
+        self.repo_digests = repo_digests
+        self.volume_labels = dict(volume_labels or {})
+        self.image_present = image_id is not None
+        self.tag_present = tag is not None
+        self.docker_calls: list[list[str]] = []
+        self.compose_calls: list[list[str]] = []
+        self.run_calls: list[list[str]] = []
+        self.events: list[tuple[str, list[str]]] = []
+
+    def run(self, arguments: list[str], **_kwargs: Any) -> bytes:
+        self.run_calls.append(list(arguments))
+        self.events.append(("run", list(arguments)))
+        assert arguments[:4] == ["/usr/bin/ss", "-H", "-ltn", "sport = :18091"]
+        return (
+            b"LISTEN 0 128 172.17.0.1:18091 0.0.0.0:*\n"
+            if self.blocker == "listener"
+            else b""
+        )
+
+    def compose(self, arguments: list[str], **_kwargs: Any) -> bytes:
+        self.compose_calls.append(list(arguments))
+        self.events.append(("compose", list(arguments)))
+        if (
+            arguments == ["down", "--remove-orphans"]
+            and not self.retain_project_containers_after_down
+        ):
+            self.project_candidate_containers = False
+        if (
+            arguments == ["down", "--remove-orphans"]
+            and self.post_down_foreign_volume_name is not None
+        ):
+            self.referencing_container = True
+            self.foreign_volume_name = self.post_down_foreign_volume_name
+            if self.foreign_image_id is None:
+                self.foreign_image_id = "sha256:" + "c" * 64
+        if (
+            arguments == ["down", "--remove-orphans"]
+            and self.post_down_project_network
+        ):
+            self.blocker = "networks"
+        return b""
+
+    def docker(self, arguments: list[str], **_kwargs: Any) -> bytes:
+        self.docker_calls.append(list(arguments))
+        self.events.append(("docker", list(arguments)))
+        if self.blocker == "probeFailure":
+            raise controller.CommandFailure(
+                label="test cleanup probe",
+                failure_kind="failed",
+                status=1,
+                stderr=b"daemon unavailable",
+            )
+        if arguments[:2] == ["container", "ls"]:
+            if self.blocker == "malformed":
+                return b"\xff"
+            filter_value = arguments[-1]
+            if filter_value.startswith("label=com.docker.compose.project="):
+                return b"c" * 64 + b"\n" if self.blocker == "containers" else b""
+            if arguments == [
+                "container",
+                "ls",
+                "--all",
+                "--quiet",
+                "--no-trunc",
+            ]:
+                container_ids: list[str] = []
+                if self.referencing_container:
+                    container_ids.append("d" * 64)
+                if self.project_candidate_containers:
+                    container_ids.extend(("1" * 64, "2" * 64))
+                if not container_ids:
+                    return b""
+                return ("\n".join(container_ids) + "\n").encode("utf-8")
+        if arguments[:2] == ["container", "inspect"]:
+            container_id = arguments[2]
+            service = {
+                "1" * 64: "chummer-public-download-init",
+                "2" * 64: controller.PORTAL_SERVICE,
+            }.get(container_id)
+            labels = (
+                {
+                    "com.docker.compose.project": (
+                        "chummer-public-download-cleanup-test"
+                    ),
+                    "com.docker.compose.project.config_files": (
+                        self.project_compose_file
+                    ),
+                    "com.docker.compose.project.working_dir": (
+                        self.project_working_dir
+                    ),
+                    "com.docker.compose.service": service,
+                    "com.docker.compose.oneoff": self.project_oneoff,
+                    "com.docker.compose.container-number": (
+                        self.project_container_number
+                    ),
+                }
+                if service is not None
+                else (
+                    {
+                        "com.docker.compose.project": (
+                            "chummer-public-download-cleanup-test"
+                        ),
+                        "com.docker.compose.service": "foreign-service",
+                    }
+                    if self.foreign_same_project
+                    else {}
+                )
+            )
+            if service is not None:
+                mounts = [
+                    {"Type": "volume", "Name": name}
+                    for name in self.project_volume_names
+                ]
+                inspected_image_id = self.image_id
+            else:
+                mounts = (
+                    [
+                        {
+                            "Type": "volume",
+                            "Name": self.foreign_volume_name,
+                        }
+                    ]
+                    if self.foreign_volume_name is not None
+                    else []
+                )
+                inspected_image_id = (
+                    self.foreign_image_id or self.image_id
+                )
+            return json.dumps(
+                [
+                    {
+                        "Id": container_id,
+                        "Image": inspected_image_id,
+                        "Config": {"Labels": labels},
+                        "Mounts": mounts,
+                    }
+                ]
+            ).encode("utf-8")
+        if arguments[:2] == ["network", "ls"]:
+            return b"e" * 64 + b"\n" if self.blocker == "networks" else b""
+        if arguments[:2] == ["volume", "ls"]:
+            filter_value = arguments[-1]
+            if filter_value.startswith(
+                "label=run.chummer.public-download-operation="
+            ):
+                return (
+                    b"operation-volume\n"
+                    if self.blocker == "labeledVolumes"
+                    else b""
+                )
+            if filter_value.startswith("name=^"):
+                name = filter_value.removeprefix("name=^").removesuffix("$")
+                if self.blocker == "exactVolume":
+                    return name.encode("utf-8") + b"\n"
+                if name in self.volume_labels:
+                    return name.encode("utf-8") + b"\n"
+                return b""
+        if arguments[:2] == ["volume", "inspect"]:
+            return json.dumps(
+                [
+                    {
+                        "Name": arguments[2],
+                        "Labels": self.volume_labels.get(arguments[2], {}),
+                    }
+                ]
+            ).encode("utf-8")
+        if arguments[:2] == ["volume", "rm"]:
+            self.volume_labels.pop(arguments[2], None)
+            return f"{arguments[2]}\n".encode("utf-8")
+        if arguments == ["image", "ls", "--all", "--quiet", "--no-trunc"]:
+            if not self.image_present:
+                return b""
+            identifiers = {self.image_id}
+            if self.tag_present:
+                identifiers.add(self.tag_image_id)
+            return (
+                "\n".join(
+                    sorted(item for item in identifiers if item is not None)
+                )
+                + "\n"
+            ).encode("utf-8")
+        if arguments[:4] == ["image", "ls", "--quiet", "--no-trunc"]:
+            requested_tag = arguments[4]
+            if self.tag is not None:
+                assert requested_tag == self.tag
+            if not self.tag_present or self.tag_image_id is None:
+                return b""
+            return f"{self.tag_image_id}\n".encode("utf-8")
+        if arguments[:2] == ["image", "inspect"]:
+            assert arguments[2] in {self.tag, self.image_id}
+            return json.dumps(
+                [
+                    {
+                        "Id": self.image_id,
+                        "RepoTags": (
+                            self.repo_tags
+                            if self.repo_tags is not None
+                            else ([self.tag] if self.tag_present else [])
+                        ),
+                        "RepoDigests": self.repo_digests,
+                        "Config": {
+                            "Labels": {
+                                "org.opencontainers.image.revision": "a" * 40,
+                                "run.chummer.runtime-profile": (
+                                    controller.RUNTIME_PROFILE
+                                ),
+                                **{
+                                    "run.chummer.build-context."
+                                    f"{name}.sha256": character * 64
+                                    for name, character in (
+                                        ("default", "1"),
+                                        ("run-services", "2"),
+                                        ("hub-registry", "3"),
+                                        ("fleet-media", "4"),
+                                        ("design-product", "5"),
+                                    )
+                                },
+                            }
+                        },
+                    }
+                ]
+            ).encode("utf-8")
+        if arguments[:2] == ["image", "rm"]:
+            assert arguments[2] == self.image_id
+            self.image_present = False
+            self.tag_present = False
+            return f"Deleted: {self.image_id}\n".encode("utf-8")
+        raise AssertionError(arguments)
+
+
+def cleanup_test_config(tmp_path: Path) -> SimpleNamespace:
+    operation_root = tmp_path / "chummer-public-download-cleanup-test"
+    operation_root.mkdir()
+    compose_file = operation_root / "public-download-runtime.json"
+    materialization_receipt = operation_root / "compose-materialization.json"
+    runtime_attestation = operation_root / "compose-runtime-attestation.json"
+    compose_file.write_text(
+        '{"mustNotBeInterpolated":"${SECRET_REQUIRED_VARIABLE:?missing}"}\n',
+        encoding="utf-8",
+    )
+    materialization_receipt.write_text("{}\n", encoding="utf-8")
+    runtime_attestation.write_text("{}\n", encoding="utf-8")
+    for path in (compose_file, materialization_receipt, runtime_attestation):
+        path.chmod(0o600)
+    volume_names = {
+        logical: (
+            f"{operation_root.name}-"
+            f"{logical.removeprefix('public-download-')}"
+        )
+        for logical in controller.SIDECAR_LOGICAL_VOLUMES
+    }
+    return SimpleNamespace(
+        operation=controller.CUTOVER_OPERATION,
+        operation_root=operation_root,
+        project_name=operation_root.name,
+        source_root=ROOT,
+        source_head="a" * 40,
+        compose_file=compose_file,
+        materialization_receipt=materialization_receipt,
+        runtime_attestation=runtime_attestation,
+        volume_names=volume_names,
+        sidecar_certificate=operation_root / "sidecar.pfx",
+        sidecar_certificate_password=operation_root / "sidecar.password",
+        overlay_staging_root=operation_root / "app-overlay",
+        fleet_source=operation_root / "fleet-source",
+        fleet_sha256="1" * 64,
+        shelf_source=operation_root / "release-shelf",
+        projection_snapshot_root=operation_root / "projection",
+        projection_source_tree_sha256="2" * 64,
+        runtime_proof_source=operation_root / "runtime-proof.json",
+        runtime_proof_sha256="3" * 64,
+        final_gold_source=operation_root / "final-gold.json",
+        final_gold_sha256="4" * 64,
+    )
+
+
+def concrete_cleanup_actions(
+    config: SimpleNamespace,
+    runner: FakeCleanupRunner,
+    receipts: dict[str, Any],
+) -> tuple[Any, list[tuple[str, str, dict[str, Any]]]]:
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.runner = runner
+    actions._state = {
+        "phase": "data-protection-prepared",
+        "receipts": receipts,
+    }
+    recorded: list[tuple[str, str, dict[str, Any]]] = []
+    actions._record = (
+        lambda phase, name, receipt: recorded.append(
+            (phase, name, dict(receipt))
+        )
+    )
+    return actions, recorded
+
+
+def candidate_binding(config: SimpleNamespace) -> tuple[str, str, dict[str, Any]]:
+    image_id = "sha256:" + "b" * 64
+    tag = (
+        "chummer-run-api:public-download-"
+        f"{config.source_head[:16]}-c0ffee12"
+    )
+    return (
+        image_id,
+        tag,
+        {
+            "contractName": (
+                "chummer.public-download-candidate-image-binding/v1"
+            ),
+            "candidateTag": tag,
+            "candidateImageId": image_id,
+            "sourceHead": config.source_head,
+            "boundAtUtc": "2026-07-24T00:00:00Z",
+        },
+    )
+
+
+def candidate_plan(config: SimpleNamespace, tag: str) -> dict[str, Any]:
+    return {
+        "contractName": "chummer.public-download-candidate-image-plan/v1",
+        "candidateTag": tag,
+        "sourceHead": config.source_head,
+        "immutableBuildContextDigests": {
+            name: character * 64
+            for name, character in (
+                ("default", "1"),
+                ("run-services", "2"),
+                ("hub-registry", "3"),
+                ("fleet-media", "4"),
+                ("design-product", "5"),
+            )
+        },
+        "plannedAtUtc": "2026-07-24T00:00:00Z",
+    }
+
+
+def complete_runtime_receipts(
+    config: SimpleNamespace,
+    *,
+    environment_update: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    _image_id, _tag, binding = candidate_binding(config)
+    shelf = {"shelfTreeSha256": "5" * 64}
+    data_protection = {
+        "certificateSha256": "6" * 64,
+        "passwordSha256": "7" * 64,
+    }
+    application = {"treeSha256": "8" * 64}
+    environment = controller._sidecar_compose_environment(
+        config,
+        dp=data_protection,
+        app_overlay_sha256=application["treeSha256"],
+        shelf=shelf,
+    )
+    if environment_update:
+        environment.update(environment_update)
+    canonical_source_root = config.source_root.resolve(strict=True)
+    base_source = canonical_source_root / "docker-compose.public-edge.yml"
+    profile_source = (
+        canonical_source_root / "docker-compose.public-downloads.yml"
+    )
+    base_sha256 = hashlib.sha256(base_source.read_bytes()).hexdigest()
+    profile_sha256 = hashlib.sha256(profile_source.read_bytes()).hexdigest()
+    compose_sha256 = hashlib.sha256(config.compose_file.read_bytes()).hexdigest()
+    config.materialization_receipt.write_text(
+        json.dumps(
+            {
+                "contractName": (
+                    "chummer.public-download-only-compose-materialization/v1"
+                ),
+                "status": "pass",
+                "operation": config.operation,
+                "sourceRoot": str(canonical_source_root),
+                "sourceHead": config.source_head,
+                "baseComposeSource": str(base_source),
+                "baseComposeSourceSha256": base_sha256,
+                "profileSource": str(profile_source),
+                "profileSourceSha256": profile_sha256,
+                "candidateImageId": binding["candidateImageId"],
+                "composeSha256": compose_sha256,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    config.runtime_attestation.write_text(
+        json.dumps(
+            {
+                "contractName": (
+                    "chummer.public-download-only-compose-runtime-attestation/v1"
+                ),
+                "status": "pass",
+                "operation": config.operation,
+                "runtimeProfile": controller.RUNTIME_PROFILE,
+                "projectName": config.project_name,
+                "operationRoot": str(config.operation_root),
+                "portalImageId": binding["candidateImageId"],
+                "initializerImageId": binding["candidateImageId"],
+                "initializerConstrained": True,
+                "portalAppCopiedReadOnly": True,
+                "portalFleetCopiedReadOnly": True,
+                "longRunningSourceBindsAbsent": True,
+                "releaseShelfPreinitialized": True,
+                "releaseShelfPortalReadOnly": True,
+                "isolatedVolumes": dict(config.volume_names),
+                "runtimeInputs": {
+                    "appOverlay": {
+                        "source": str(config.overlay_staging_root),
+                        "sha256": application["treeSha256"],
+                    },
+                    "fleet": {
+                        "source": str(config.fleet_source),
+                        "sha256": config.fleet_sha256,
+                    },
+                    "shelf": {
+                        "source": str(config.shelf_source),
+                        "sha256": shelf["shelfTreeSha256"],
+                    },
+                    "projection": {
+                        "source": str(config.projection_snapshot_root),
+                        "sha256": config.projection_source_tree_sha256,
+                    },
+                    "runtimeProof": {
+                        "source": str(config.runtime_proof_source),
+                        "sha256": config.runtime_proof_sha256,
+                    },
+                    "finalGold": {
+                        "source": str(config.final_gold_source),
+                        "sha256": config.final_gold_sha256,
+                    },
+                    "certificateSha256": (
+                        data_protection["certificateSha256"]
+                    ),
+                    "certificatePasswordSha256": (
+                        data_protection["passwordSha256"]
+                    ),
+                    "certificateAuthority": (
+                        "operation-bound-sidecar-only"
+                    ),
+                },
+                "postgresServicesAbsent": True,
+                "postgresEnvironmentAbsent": True,
+                "postgresMountsAbsent": True,
+                "postgresHostMappingAbsent": True,
+                "portalBuildAbsent": True,
+                "publicDownloadsHealthcheck": True,
+                "releaseShelfPosture": {
+                    "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
+                    "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": (
+                        "false"
+                    ),
+                },
+                "portalMountCount": 10,
+                "initializerMountCount": 18,
+                "publishedAddress": controller.SIDECAR_ADDRESS,
+                "publishedPort": controller.SIDECAR_PORT,
+                "sourceRoot": str(canonical_source_root),
+                "sourceHead": config.source_head,
+                "baseComposeSourceSha256": base_sha256,
+                "profileSourceSha256": profile_sha256,
+                "materializedComposeSha256": compose_sha256,
+                "renderedComposeSha256": hashlib.sha256(b"").hexdigest(),
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    config.materialization_receipt.chmod(0o600)
+    config.runtime_attestation.chmod(0o600)
+    return {
+        "shelf": shelf,
+        "dataProtection": data_protection,
+        "candidateImagePlan": candidate_plan(
+            config,
+            binding["candidateTag"],
+        ),
+        "candidateImage": binding,
+        "runtime": {
+            "projectName": config.project_name,
+            "publishedAddress": controller.SIDECAR_ADDRESS,
+            "publishedPort": controller.SIDECAR_PORT,
+            "candidateImageId": binding["candidateImageId"],
+            "candidateTag": binding["candidateTag"],
+            "composePath": str(config.compose_file),
+            "materializationReceipt": str(config.materialization_receipt),
+            "runtimeAttestation": str(config.runtime_attestation),
+            "environment": environment,
+            "volumes": dict(config.volume_names),
+            "application": application,
+        },
+    }
+
+
+def test_no_runtime_receipt_skips_compose_only_after_exact_absence_proof(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    runner = FakeCleanupRunner()
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {
+            "shelf": {"status": "pass"},
+            "dataProtection": {"status": "pass"},
+        },
+    )
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert receipt["composeDisposition"] == "not-created"
+    assert receipt["preRuntimeAbsence"]["status"] == "pass"
+    assert receipt["preRuntimeAbsence"]["containers"] == 0
+    assert receipt["preRuntimeAbsence"]["networks"] == 0
+    assert receipt["preRuntimeAbsence"]["labeledVolumes"] == 0
+    assert receipt["preRuntimeAbsence"]["listeners"] == 0
+    assert receipt["candidateImage"] == {"disposition": "not-bound"}
+    assert recorded == [("cleaned", "cleanup", receipt)]
+    assert not any(
+        call[:2] in (["volume", "rm"], ["image", "rm"])
+        for call in runner.docker_calls
+    )
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "empty-receipt",
+        "missing-environment",
+        "empty-environment",
+        "bad-value",
+        "wrong-project",
+        "missing-compose",
+        "symlink-compose",
+    ),
+)
+def test_present_but_corrupt_runtime_receipt_is_not_treated_as_absent(
+    tmp_path: Path,
+    case: str,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    runtime: Any
+    if case == "empty-receipt":
+        runtime = {}
+    elif case == "missing-environment":
+        runtime = {"projectName": config.project_name}
+    elif case == "empty-environment":
+        runtime = {
+            "projectName": config.project_name,
+            "environment": {},
+        }
+    elif case == "bad-value":
+        runtime = {
+            "projectName": config.project_name,
+            "environment": {"REQUIRED": 7},
+        }
+    elif case == "wrong-project":
+        runtime = {
+            "projectName": "chummer-public-download-wrong-project",
+            "environment": {"REQUIRED": "present"},
+        }
+    else:
+        runtime = {
+            "projectName": config.project_name,
+            "environment": {"REQUIRED": "present"},
+        }
+        config.compose_file.unlink()
+        if case == "symlink-compose":
+            target = tmp_path / "other-compose.json"
+            target.write_text("{}\n", encoding="utf-8")
+            config.compose_file.symlink_to(target)
+    runner = FakeCleanupRunner()
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {"runtime": runtime},
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert runner.docker_calls == []
+    assert runner.run_calls == []
+    assert recorded == []
+
+
+def test_runtime_environment_injection_is_rejected_before_compose_or_delete(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    receipts = complete_runtime_receipts(
+        config,
+        environment_update={"DOCKER_HOST": "tcp://attacker.invalid:2375"},
+    )
+    runner = FakeCleanupRunner()
+    actions, recorded = concrete_cleanup_actions(config, runner, receipts)
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="environment drifted",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert runner.docker_calls == []
+    assert runner.run_calls == []
+    assert recorded == []
+
+
+def test_runtime_compose_byte_tamper_is_rejected_before_mutation(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    receipts = complete_runtime_receipts(config)
+    config.compose_file.write_text('{"tampered":true}\n', encoding="utf-8")
+    config.compose_file.chmod(0o600)
+    runner = FakeCleanupRunner()
+    actions, recorded = concrete_cleanup_actions(config, runner, receipts)
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="authority drifted",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert runner.docker_calls == []
+    assert runner.run_calls == []
+    assert recorded == []
+
+
+def test_exact_runtime_authority_is_preflighted_before_compose_cleanup(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == [
+        ["config", "--format", "json"],
+        ["down", "--remove-orphans"],
+    ]
+    assert ["image", "rm", image_id] in runner.docker_calls
+    assert receipt["composeDisposition"] == "removed"
+    assert receipt["candidateImage"]["disposition"] == "removed"
+    assert recorded[-1][0:2] == ("cleaned", "cleanup")
+    down_index = runner.events.index(
+        ("compose", ["down", "--remove-orphans"])
+    )
+    container_inventory_indices = [
+        index
+        for index, event in enumerate(runner.events)
+        if event
+        == (
+            "docker",
+            ["container", "ls", "--all", "--quiet", "--no-trunc"],
+        )
+    ]
+    image_removal_index = runner.events.index(
+        ("docker", ["image", "rm", image_id])
+    )
+    assert len(container_inventory_indices) == 2
+    assert (
+        container_inventory_indices[0]
+        < down_index
+        < container_inventory_indices[1]
+        < image_removal_index
+    )
+
+
+def test_foreign_candidate_reference_blocks_runtime_cleanup_before_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        referencing_container=True,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert recorded == []
+
+
+@pytest.mark.parametrize(
+    ("project_oneoff", "project_container_number"),
+    (("True", "1"), ("False", "2")),
+)
+def test_noncanonical_project_container_blocks_cleanup_before_down(
+    tmp_path: Path,
+    project_oneoff: str,
+    project_container_number: str,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+        project_oneoff=project_oneoff,
+        project_container_number=project_container_number,
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_foreign_volume_reference_blocks_cleanup_before_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        referencing_container=True,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+        foreign_image_id="sha256:" + "c" * 64,
+        foreign_volume_name=config.volume_names["public-download-app"],
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_foreign_same_project_container_blocks_cleanup_before_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        referencing_container=True,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+        foreign_image_id="sha256:" + "c" * 64,
+        foreign_same_project=True,
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_foreign_project_network_blocks_cleanup_before_compose(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        blocker="networks",
+        image_id=image_id,
+        tag=tag,
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="network deletion scope is not empty",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_candidate_reference_is_rechecked_after_compose_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        project_candidate_containers=True,
+        retain_project_containers_after_down=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == [
+        ["config", "--format", "json"],
+        ["down", "--remove-orphans"],
+    ]
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_volume_reference_is_rechecked_after_compose_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+        post_down_foreign_volume_name=(
+            config.volume_names["public-download-state"]
+        ),
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="foreign or ambiguous container reference",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == [
+        ["config", "--format", "json"],
+        ["down", "--remove-orphans"],
+    ]
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_project_network_is_rechecked_after_compose_down(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        project_candidate_containers=True,
+        project_compose_file=str(config.compose_file),
+        project_working_dir=str(config.operation_root),
+        project_volume_names=list(config.volume_names.values()),
+        post_down_project_network=True,
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="network deletion scope is not empty",
+    ):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == [
+        ["config", "--format", "json"],
+        ["down", "--remove-orphans"],
+    ]
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_volume_preflight_detects_late_ambiguity_before_any_volume_delete(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    first = config.volume_names["public-download-app"]
+    second = config.volume_names["public-download-state"]
+    runner = FakeCleanupRunner(
+        volume_labels={
+            first: {
+                "run.chummer.public-download-operation": config.project_name,
+                "run.chummer.public-download-logical-volume": (
+                    "public-download-app"
+                ),
+            },
+            second: {
+                "run.chummer.public-download-operation": config.project_name,
+                "run.chummer.public-download-logical-volume": "wrong-logical",
+            },
+        }
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert not any(call[:2] == ["volume", "rm"] for call in runner.docker_calls)
+    assert recorded == []
+
+
+@pytest.mark.parametrize(
+    "blocker",
+    (
+        "containers",
+        "networks",
+        "labeledVolumes",
+        "exactVolume",
+        "listener",
+        "malformed",
+        "probeFailure",
+    ),
+)
+def test_no_runtime_cleanup_fails_closed_on_ambiguous_resources(
+    tmp_path: Path,
+    blocker: str,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    runner = FakeCleanupRunner(blocker=blocker)
+    actions, recorded = concrete_cleanup_actions(config, runner, {})
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert recorded == []
+    assert not any(
+        call[:2] in (["volume", "rm"], ["image", "rm"])
+        for call in runner.docker_calls
+    )
+
+
+def test_cleanup_removes_only_exact_bound_unused_candidate_image(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, binding = candidate_binding(config)
+    runner = FakeCleanupRunner(image_id=image_id, tag=tag)
+    actions, _recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {
+            "candidateImagePlan": candidate_plan(config, tag),
+            "candidateImage": binding,
+        },
+    )
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert receipt["candidateImage"] == {
+        "disposition": "removed",
+        "candidateTag": tag,
+        "candidateImageId": image_id,
+    }
+    assert ["image", "rm", image_id] in runner.docker_calls
+    assert runner.compose_calls == []
+
+
+def test_bound_untagged_image_cleanup_retries_by_exact_id(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, binding = candidate_binding(config)
+    runner = FakeCleanupRunner(image_id=image_id, tag=tag)
+    runner.tag_present = False
+    actions, _recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {
+            "candidateImagePlan": candidate_plan(config, tag),
+            "candidateImage": binding,
+        },
+    )
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert receipt["candidateImage"]["disposition"] == "removed"
+    assert ["image", "rm", image_id] in runner.docker_calls
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ("missing-plan", "source-head", "context-digest"),
+)
+def test_bound_candidate_plan_tamper_blocks_cleanup_before_mutation(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    receipts = complete_runtime_receipts(config)
+    plan = receipts.get("candidateImagePlan")
+    assert isinstance(plan, dict)
+    if tamper == "missing-plan":
+        del receipts["candidateImagePlan"]
+    elif tamper == "source-head":
+        plan["sourceHead"] = "f" * 40
+    else:
+        plan["immutableBuildContextDigests"]["default"] = "9" * 64
+    runner = FakeCleanupRunner(image_id=image_id, tag=tag)
+    actions, recorded = concrete_cleanup_actions(config, runner, receipts)
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert not any(
+        call[:2] == ["volume", "rm"] for call in runner.docker_calls
+    )
+    assert recorded == []
+
+
+def test_planned_image_is_validated_bound_and_removed_after_build_crash(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    runner = FakeCleanupRunner(image_id=image_id, tag=tag)
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {"candidateImagePlan": candidate_plan(config, tag)},
+    )
+
+    receipt = actions.cleanup_sidecar_resources(config)
+
+    assert receipt["candidateImage"]["disposition"] == "removed"
+    assert ["image", "rm", image_id] in runner.docker_calls
+    assert recorded[0][0:2] == (
+        "candidate-image-recovered",
+        "candidateImage",
+    )
+    assert recorded[-1][0:2] == ("cleaned", "cleanup")
+
+
+@pytest.mark.parametrize(
+    "ambiguity",
+    ("tag-drift", "container", "extra-tag", "repo-digest"),
+)
+def test_candidate_image_cleanup_fails_closed_on_identity_ambiguity(
+    tmp_path: Path,
+    ambiguity: str,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, binding = candidate_binding(config)
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        tag_image_id=(
+            "sha256:" + "c" * 64 if ambiguity == "tag-drift" else image_id
+        ),
+        referencing_container=ambiguity == "container",
+        repo_tags=(
+            [tag, "chummer-run-api:unexpected-alias"]
+            if ambiguity == "extra-tag"
+            else None
+        ),
+        repo_digests=(
+            ["registry.invalid/chummer@sha256:" + "d" * 64]
+            if ambiguity == "repo-digest"
+            else None
+        ),
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        {
+            "candidateImagePlan": candidate_plan(config, tag),
+            "candidateImage": binding,
+        },
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert ["image", "rm", image_id] not in runner.docker_calls
+    assert recorded == []
+
+
+def test_candidate_preflight_precedes_compose_and_volume_deletion(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    image_id, tag, _binding = candidate_binding(config)
+    logical = "public-download-app"
+    volume = config.volume_names[logical]
+    runner = FakeCleanupRunner(
+        image_id=image_id,
+        tag=tag,
+        tag_image_id="sha256:" + "c" * 64,
+        volume_labels={
+            volume: {
+                "run.chummer.public-download-operation": config.project_name,
+                "run.chummer.public-download-logical-volume": logical,
+            }
+        },
+    )
+    actions, recorded = concrete_cleanup_actions(
+        config,
+        runner,
+        complete_runtime_receipts(config),
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions.cleanup_sidecar_resources(config)
+
+    assert runner.compose_calls == []
+    assert not any(call[:2] == ["volume", "rm"] for call in runner.docker_calls)
+    assert recorded == []
+
+
 def test_sidecar_start_removes_only_exact_project_orphans() -> None:
     require_topology_b_surface()
     start = class_method_node("TopologyBActions", "start_sidecar_runtime")
@@ -944,6 +2411,7 @@ def test_pre_cloudflare_failure_cleans_without_rollback_reprobe_dead_end(
     with pytest.raises(controller.CutoverError):
         controller.execute_topology_b(config, actions=actions)
 
+    assert len(actions.primary_failures) == 1
     assert actions.events[-1] == "cleanup_sidecar"
     assert "cloudflare_rollback" not in actions.events
     assert (
@@ -951,6 +2419,114 @@ def test_pre_cloudflare_failure_cleans_without_rollback_reprobe_dead_end(
         not in actions.events
     )
     assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
+
+
+def test_cleanup_failure_does_not_discard_primary_failure(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    actions = RecordingActions(fail_at="materialize_compose")
+
+    def fail_cleanup(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise RuntimeError("forced cleanup failure")
+
+    actions.cleanup_sidecar_resources = fail_cleanup  # type: ignore[method-assign]
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="primary failure evidence was retained",
+    ):
+        controller.execute_topology_b(config, actions=actions)
+
+    assert len(actions.primary_failures) == 1
+    assert "materialize_compose" in str(actions.primary_failures[0])
+
+
+def test_primary_failure_write_failure_stops_before_cleanup(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    actions = RecordingActions(fail_at="materialize_compose")
+
+    def fail_failure_receipt(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise OSError("simulated journal write failure")
+
+    actions.record_primary_failure = fail_failure_receipt  # type: ignore[method-assign]
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="primary failure evidence could not be retained",
+    ):
+        controller.execute_topology_b(config, actions=actions)
+
+    assert "cleanup_sidecar" not in actions.events
+
+
+def test_post_apply_evidence_failure_does_not_preempt_exact_recovery(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    actions = RecordingActions(
+        fail_at="probe_public_chummer.run,www.chummer.run"
+    )
+
+    def fail_failure_receipt(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        actions.events.append("primary_failure_write")
+        raise OSError("simulated journal write failure")
+
+    actions.record_primary_failure = fail_failure_receipt  # type: ignore[method-assign]
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="after exact rollback and cleanup",
+    ):
+        controller.execute_topology_b(config, actions=actions)
+
+    assert actions.events[-4:] == [
+        "cloudflare_rollback",
+        "probe_incumbent_after-rollback_chummer.run,www.chummer.run",
+        "primary_failure_write",
+        "cleanup_sidecar",
+    ]
+
+
+def test_rollback_uncertainty_is_not_masked_by_evidence_failure(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    actions = RecordingActions(
+        fail_at="probe_public_chummer.run,www.chummer.run"
+    )
+    original_record = actions.record
+
+    def fail_rollback(event: str, result: Any = None) -> Any:
+        if event == "cloudflare_rollback":
+            actions.events.append(event)
+            raise RuntimeError("rollback uncertain")
+        return original_record(event, result)
+
+    def fail_failure_receipt(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        actions.events.append("primary_failure_write")
+        raise OSError("simulated journal write failure")
+
+    actions.record = fail_rollback  # type: ignore[method-assign]
+    actions.record_primary_failure = fail_failure_receipt  # type: ignore[method-assign]
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="rollback or incumbent verification is uncertain",
+    ):
+        controller.execute_topology_b(config, actions=actions)
+
+    assert actions.events[-2:] == [
+        "cloudflare_rollback",
+        "primary_failure_write",
+    ]
+    assert "cleanup_sidecar" not in actions.events
 
 
 def test_execute_failure_after_cf_apply_rolls_back_before_exact_cleanup(
