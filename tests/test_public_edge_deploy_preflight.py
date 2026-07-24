@@ -4546,7 +4546,9 @@ def test_deploy_wires_one_snapshot_to_code_deploy_and_release_receipt() -> None:
         encoding="utf-8"
     )
 
-    assert "--purpose code-deploy" in deploy
+    assert 'projection_purpose="code-deploy"' in deploy
+    assert 'projection_purpose="candidate-import"' in deploy
+    assert '--purpose "$projection_purpose"' in deploy
     assert "--output-name HUB_LOCAL_RELEASE_PROOF.generated.json" in deploy
     assert "--output-name RELEASE_CHANNEL.generated.json" in deploy
     assert "--public-projection-purpose code-deploy" in deploy
@@ -4589,6 +4591,12 @@ def test_public_download_wrapper_passes_only_private_cloudflare_credentials_path
     assert '--cloudflare-account-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID"' in branch
     assert '--cloudflare-tunnel-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID"' in branch
     assert "--manifest-closure-restoration-spec" in branch
+    assert "--release-candidate-root" in branch
+    assert "--candidate-import-authority" in branch
+    assert "--candidate-import-authority-sha256" in branch
+    assert "--direct-import-receipt" in branch
+    assert "--direct-import-receipt-sha256" in branch
+    assert "--projection-snapshot-tree-sha256" in branch
     assert "--final-gold-source" in branch
     assert "--fleet-source" in branch
     assert "--operation-root" in branch
@@ -4608,8 +4616,8 @@ def test_public_download_wrapper_passes_only_private_cloudflare_credentials_path
     ):
         assert secret_name not in branch
 
-    clean_env = branch.index('"$TRUSTED_ENV" -i')
     controller = branch.index('"$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER"')
+    clean_env = branch.rindex('"$TRUSTED_ENV" -i', 0, controller)
     assert clean_env < controller
     controller_environment = branch[clean_env:controller]
     assert "HOME=" not in controller_environment
