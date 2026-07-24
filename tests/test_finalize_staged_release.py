@@ -41,6 +41,191 @@ def registry_current(snapshot: bytes) -> bytes:
     ).encode()
 
 
+def test_registry_tool_argv_matches_pinned_release_scope_contract() -> None:
+    paths = {
+        name: Path(f"/owner/{name}.json")
+        for name in (
+            "manifest",
+            "scope",
+            "current",
+            "snapshot",
+            "decision",
+            "scorecard",
+            "convergence",
+            "predecessor-current",
+            "predecessor-snapshot",
+            "predecessor-decision",
+            "output",
+            "response",
+        )
+    }
+    output_dir = Path("/owner/preview-authority")
+    scope_sha256 = "a" * 64
+    scope_arguments = [
+        "--release-scope-decision",
+        str(paths["scope"]),
+        "--expected-release-scope-decision-sha256",
+        scope_sha256,
+    ]
+    proof_arguments = [
+        "--scorecard",
+        str(paths["scorecard"]),
+        "--convergence",
+        str(paths["convergence"]),
+        "--predecessor-current",
+        str(paths["predecessor-current"]),
+        "--predecessor-snapshot",
+        str(paths["predecessor-snapshot"]),
+        "--predecessor-decision",
+        str(paths["predecessor-decision"]),
+    ]
+
+    assert MODULE._registry_authority_materializer_arguments(
+        manifest=paths["manifest"],
+        release_scope_decision=paths["scope"],
+        expected_release_scope_sha256=scope_sha256,
+        output_dir=output_dir,
+        registry_commit="b" * 40,
+        generated_at="2026-07-24T08:00:00Z",
+        next_action="Retain preview posture.",
+        scorecard=paths["scorecard"],
+        convergence=paths["convergence"],
+        predecessor_current=paths["predecessor-current"],
+        predecessor_snapshot=paths["predecessor-snapshot"],
+        predecessor_decision=paths["predecessor-decision"],
+    ) == [
+        "--manifest",
+        str(paths["manifest"]),
+        *scope_arguments,
+        "--output-dir",
+        str(output_dir),
+        "--registry-commit",
+        "b" * 40,
+        "--decision-status",
+        "preview_ready",
+        "--generated-at",
+        "2026-07-24T08:00:00Z",
+        "--next-action",
+        "Retain preview posture.",
+        *proof_arguments,
+    ]
+    assert MODULE._registry_authority_verifier_arguments(
+        manifest=paths["manifest"],
+        release_scope_decision=paths["scope"],
+        expected_release_scope_sha256=scope_sha256,
+        current=paths["current"],
+        snapshot=paths["snapshot"],
+        decision=paths["decision"],
+        scorecard=paths["scorecard"],
+        convergence=paths["convergence"],
+        predecessor_current=paths["predecessor-current"],
+        predecessor_snapshot=paths["predecessor-snapshot"],
+        predecessor_decision=paths["predecessor-decision"],
+    ) == [
+        "--manifest",
+        str(paths["manifest"]),
+        *scope_arguments,
+        "--current",
+        str(paths["current"]),
+        "--snapshot",
+        str(paths["snapshot"]),
+        "--decision",
+        str(paths["decision"]),
+        *proof_arguments,
+    ]
+    assert MODULE._registry_publish_materializer_arguments(
+        manifest=paths["manifest"],
+        release_scope_decision=paths["scope"],
+        expected_release_scope_sha256=scope_sha256,
+        current=paths["current"],
+        snapshot=paths["snapshot"],
+        decision=paths["decision"],
+        scorecard=paths["scorecard"],
+        convergence=paths["convergence"],
+        predecessor_current=paths["predecessor-current"],
+        predecessor_snapshot=paths["predecessor-snapshot"],
+        predecessor_decision=paths["predecessor-decision"],
+        expected_current_snapshot_sha256="c" * 64,
+        output=paths["output"],
+    ) == [
+        "--manifest",
+        str(paths["manifest"]),
+        *scope_arguments,
+        "--current",
+        str(paths["current"]),
+        "--snapshot",
+        str(paths["snapshot"]),
+        "--decision",
+        str(paths["decision"]),
+        *proof_arguments,
+        "--expected-current-snapshot-sha256",
+        "c" * 64,
+        "--output",
+        str(paths["output"]),
+    ]
+    assert MODULE._registry_publish_verifier_arguments(
+        manifest=paths["manifest"],
+        release_scope_decision=paths["scope"],
+        expected_release_scope_sha256=scope_sha256,
+        current=paths["current"],
+        snapshot=paths["snapshot"],
+        decision=paths["decision"],
+        scorecard=paths["scorecard"],
+        convergence=paths["convergence"],
+        predecessor_current=paths["predecessor-current"],
+        predecessor_snapshot=paths["predecessor-snapshot"],
+        predecessor_decision=paths["predecessor-decision"],
+        response=paths["response"],
+        output=paths["output"],
+    ) == [
+        "--manifest",
+        str(paths["manifest"]),
+        *scope_arguments,
+        "--current",
+        str(paths["current"]),
+        "--snapshot",
+        str(paths["snapshot"]),
+        "--decision",
+        str(paths["decision"]),
+        "--response",
+        str(paths["response"]),
+        *proof_arguments,
+        "--output",
+        str(paths["output"]),
+    ]
+
+
+def test_registry_tool_argv_fails_closed_on_scope_or_partial_proof_drift() -> None:
+    common = {
+        "manifest": Path("/owner/manifest.json"),
+        "release_scope_decision": Path("/owner/scope.json"),
+        "current": Path("/owner/current.json"),
+        "snapshot": Path("/owner/snapshot.json"),
+        "decision": Path("/owner/decision.json"),
+    }
+    with pytest.raises(
+        MODULE.FinalizerError,
+        match="approved release-scope decision digest",
+    ):
+        MODULE._registry_publish_materializer_arguments(
+            **common,
+            expected_release_scope_sha256="not-a-sha",
+            expected_current_snapshot_sha256="c" * 64,
+            output=Path("/owner/request.json"),
+        )
+    with pytest.raises(
+        MODULE.FinalizerError,
+        match="one exact set",
+    ):
+        MODULE._registry_publish_verifier_arguments(
+            **common,
+            expected_release_scope_sha256="a" * 64,
+            scorecard=Path("/owner/scorecard.json"),
+            response=Path("/owner/response.json"),
+            output=Path("/owner/receipt.json"),
+        )
+
+
 def test_scorecard_handoff_binding_rejects_scope_or_release_drift_before_registry() -> None:
     scorecard_raw = b'{"release_version":"run-test"}\n'
     ui_frame_raw = b'{"contract_name":"chummer.ui-frame-integrity/v2"}\n'

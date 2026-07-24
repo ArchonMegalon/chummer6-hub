@@ -33,6 +33,7 @@ CHECKPOINT_FIELDS = {
     "hubAuthorityAdvanceUrl",
     "liveConvergenceBaseUrl",
     "expectedManifestSha256",
+    "expectedReleaseScopeDecisionSha256",
     "expectedRegistrySnapshotSha256",
     "expectedRegistryDecisionSha256",
     "files",
@@ -51,6 +52,7 @@ FILE_FIELDS = {
     "successorDecision",
     "scorecard",
     "convergence",
+    "releaseScopeDecision",
     "responseVerifier",
     "registryInspector",
     "liveConvergenceVerifier",
@@ -59,6 +61,8 @@ REQUEST_FIELDS = {
     "generationId",
     "expectedShelfPointerSha256",
     "expectedShelfInventoryDigest",
+    "expectedReleaseScopeDecisionSha256",
+    "releaseScopeDecisionBytes",
     "predecessorCurrentBytes",
     "predecessorSnapshotBytes",
     "predecessorDecisionBytes",
@@ -69,6 +73,7 @@ REQUEST_FIELDS = {
     "convergenceBytes",
 }
 REQUEST_FILE_BINDINGS = {
+    "releaseScopeDecisionBytes": "releaseScopeDecision",
     "predecessorCurrentBytes": "predecessorCurrent",
     "predecessorSnapshotBytes": "predecessorSnapshot",
     "predecessorDecisionBytes": "predecessorDecision",
@@ -99,6 +104,8 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     create.add_argument("--hub-authority-advance-url", required=True)
     create.add_argument("--live-convergence-base-url", required=True)
     create.add_argument("--expected-manifest-sha256", required=True)
+    create.add_argument("--release-scope-decision", type=Path, required=True)
+    create.add_argument("--expected-release-scope-sha256", required=True)
     create.add_argument("--request", type=Path, required=True)
     create.add_argument("--predecessor-current", type=Path, required=True)
     create.add_argument("--predecessor-snapshot", type=Path, required=True)
@@ -324,6 +331,7 @@ def _validate_request(
     request_raw: bytes,
     generation_id: str,
     file_raw: dict[str, bytes],
+    expected_release_scope_sha256: str,
 ) -> dict[str, Any]:
     request = _strict_json(request_raw, "Hub authority request")
     if set(request) != REQUEST_FIELDS or request.get("generationId") != generation_id:
@@ -333,6 +341,22 @@ def _validate_request(
     if not isinstance(inventory, str) or not inventory.startswith("sha256:"):
         raise CheckpointError("request shelf inventory digest is invalid")
     _require_sha(inventory[7:], "request shelf inventory digest")
+    request_scope_sha256 = _require_sha(
+        request.get("expectedReleaseScopeDecisionSha256"),
+        "request release-scope decision digest",
+    )
+    if (
+        not hmac.compare_digest(
+            request_scope_sha256, expected_release_scope_sha256
+        )
+        or not hmac.compare_digest(
+            _sha(file_raw["releaseScopeDecision"]),
+            expected_release_scope_sha256,
+        )
+    ):
+        raise CheckpointError(
+            "Hub authority request release-scope digest differs from exact source bytes"
+        )
     for request_field, checkpoint_field in REQUEST_FILE_BINDINGS.items():
         if not hmac.compare_digest(
             _decode(request.get(request_field), request_field), file_raw[checkpoint_field]
@@ -351,6 +375,10 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
         raise CheckpointError("authority checkpoint releaseVersion is invalid")
     expected_manifest_sha256 = _require_sha(
         args.expected_manifest_sha256.strip(), "expected manifest digest"
+    )
+    expected_release_scope_sha256 = _require_sha(
+        args.expected_release_scope_sha256.strip(),
+        "expected release-scope decision digest",
     )
     live_origin = _live_origin(args.live_convergence_base_url)
     registry_url = _https_url(
@@ -381,6 +409,11 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
         "successorDecision": (args.successor_decision, MAX_INPUT_BYTES, None),
         "scorecard": (args.scorecard, MAX_INPUT_BYTES, None),
         "convergence": (args.convergence, MAX_INPUT_BYTES, None),
+        "releaseScopeDecision": (
+            args.release_scope_decision,
+            MAX_INPUT_BYTES,
+            None,
+        ),
         "responseVerifier": (args.response_verifier, MAX_INPUT_BYTES, None),
         "registryInspector": (args.registry_inspector, MAX_INPUT_BYTES, None),
         "liveConvergenceVerifier": (args.live_convergence_verifier, MAX_INPUT_BYTES, None),
@@ -391,7 +424,12 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
         files[name], file_raw[name] = _file_entry(
             path, root, name, maximum, exact_mode=exact_mode
         )
-    _validate_request(file_raw["request"], generation_id, file_raw)
+    _validate_request(
+        file_raw["request"],
+        generation_id,
+        file_raw,
+        expected_release_scope_sha256,
+    )
     successor_current = _strict_json(file_raw["successorCurrent"], "successor CURRENT.json")
     successor_snapshot = _strict_json(file_raw["successorSnapshot"], "successor SNAPSHOT.json")
     successor_decision = _strict_json(file_raw["successorDecision"], "successor RELEASE_DECISION.json")
@@ -420,8 +458,8 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
     if not evidence_directory.is_dir():
         raise CheckpointError("release evidence directory must be a directory")
     return {
-        "contractName": "chummer.release-authority-transaction-checkpoint/v2",
-        "contractVersion": 2,
+        "contractName": "chummer.release-authority-transaction-checkpoint/v3",
+        "contractVersion": 3,
         "createdAtUtc": dt.datetime.now(dt.timezone.utc)
         .replace(microsecond=0)
         .isoformat()
@@ -433,6 +471,7 @@ def _create(args: argparse.Namespace) -> dict[str, Any]:
         "hubAuthorityAdvanceUrl": hub_url,
         "liveConvergenceBaseUrl": live_origin,
         "expectedManifestSha256": expected_manifest_sha256,
+        "expectedReleaseScopeDecisionSha256": expected_release_scope_sha256,
         "expectedRegistrySnapshotSha256": expected_snapshot_sha256,
         "expectedRegistryDecisionSha256": expected_decision_sha256,
         "files": files,
@@ -465,8 +504,8 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
     generation_id = checkpoint.get("generationId")
     release_version = checkpoint.get("releaseVersion")
     if (
-        checkpoint.get("contractName") != "chummer.release-authority-transaction-checkpoint/v2"
-        or checkpoint.get("contractVersion") != 2
+        checkpoint.get("contractName") != "chummer.release-authority-transaction-checkpoint/v3"
+        or checkpoint.get("contractVersion") != 3
         or checkpoint.get("state") != "registry_preview_pending_or_published"
         or not isinstance(generation_id, str)
         or GENERATION_ID.fullmatch(generation_id) is None
@@ -477,6 +516,10 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
         raise CheckpointError("authority transaction checkpoint identity is invalid")
     expected_manifest_sha256 = _require_sha(
         checkpoint.get("expectedManifestSha256"), "checkpoint manifest digest"
+    )
+    expected_release_scope_sha256 = _require_sha(
+        checkpoint.get("expectedReleaseScopeDecisionSha256"),
+        "checkpoint release-scope decision digest",
     )
     expected_snapshot_sha256 = _require_sha(
         checkpoint.get("expectedRegistrySnapshotSha256"), "checkpoint Registry snapshot digest"
@@ -539,7 +582,12 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
         )
     ):
         raise CheckpointError("resume is not executing the exact checkpointed bootstrap bytes")
-    _validate_request(file_raw["request"], generation_id, file_raw)
+    _validate_request(
+        file_raw["request"],
+        generation_id,
+        file_raw,
+        expected_release_scope_sha256,
+    )
 
     successor_current = _strict_json(file_raw["successorCurrent"], "successor CURRENT.json")
     successor_snapshot = _strict_json(file_raw["successorSnapshot"], "successor SNAPSHOT.json")
@@ -589,7 +637,7 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
     if not evidence_directory.is_dir():
         raise CheckpointError("checkpoint evidence directory is not a directory")
     return {
-        "contractName": "chummer.release-authority-transaction-resolution/v2",
+        "contractName": "chummer.release-authority-transaction-resolution/v3",
         "status": "pass",
         "checkpointPath": str(checkpoint_path),
         "checkpointSha256": expected_checkpoint_sha256,
@@ -599,6 +647,7 @@ def _resolve(args: argparse.Namespace) -> dict[str, Any]:
         "hubAuthorityAdvanceUrl": hub_url,
         "liveConvergenceBaseUrl": live_origin,
         "expectedManifestSha256": expected_manifest_sha256,
+        "expectedReleaseScopeDecisionSha256": expected_release_scope_sha256,
         "expectedRegistrySnapshotSha256": expected_snapshot_sha256,
         "expectedRegistryDecisionSha256": expected_decision_sha256,
         "executedBootstrapSha256": _sha(executing_bootstrap_raw),

@@ -31,6 +31,11 @@ def append_part(digest, label: str, raw: bytes) -> None:
 
 def fixture(tmp_path: Path):
     values = {
+        "releaseScopeDecisionBytes": {
+            "contractName": "chummer.release-scope-decision/v1",
+            "releaseVersion": VERSION,
+            "status": "approved",
+        },
         "predecessorCurrentBytes": {"releaseVersion": VERSION, "status": "review_required"},
         "predecessorSnapshotBytes": {"releaseVersion": VERSION, "releaseDecisionStatus": "review_required"},
         "predecessorDecisionBytes": {
@@ -57,10 +62,12 @@ def fixture(tmp_path: Path):
 
     pointer = "a" * 64
     inventory = "b" * 64
+    scope_sha256 = hashlib.sha256(raws["releaseScopeDecisionBytes"]).hexdigest()
     request = {
         "generationId": GENERATION,
         "expectedShelfPointerSha256": pointer,
         "expectedShelfInventoryDigest": "sha256:" + inventory,
+        "expectedReleaseScopeDecisionSha256": scope_sha256,
         **{name: base64.b64encode(raw).decode() for name, raw in raws.items()},
     }
     request_path = tmp_path / "request.json"
@@ -70,6 +77,8 @@ def fixture(tmp_path: Path):
     append_part(digest, "generation", GENERATION.encode())
     append_part(digest, "shelf-pointer", pointer.encode())
     append_part(digest, "shelf-inventory", inventory.encode())
+    append_part(digest, "release-scope-digest", scope_sha256.encode())
+    append_part(digest, "release-scope", raws["releaseScopeDecisionBytes"])
     for label, name in (
         ("predecessor-current", "predecessorCurrentBytes"),
         ("predecessor-snapshot", "predecessorSnapshotBytes"),
@@ -130,6 +139,10 @@ def command(tmp_path: Path):
         str(paths["scorecardBytes"]),
         "--convergence",
         str(paths["convergenceBytes"]),
+        "--release-scope-decision",
+        str(paths["releaseScopeDecisionBytes"]),
+        "--expected-release-scope-sha256",
+        hashlib.sha256(paths["releaseScopeDecisionBytes"].read_bytes()).hexdigest(),
         "--output",
         str(output),
     ], response, output
@@ -140,9 +153,13 @@ def test_verifies_exact_authority_advance_response(tmp_path: Path) -> None:
     completed = subprocess.run(invocation, text=True, capture_output=True)
     assert completed.returncode == 0, completed.stderr
     receipt = json.loads(output.read_text(encoding="utf-8"))
+    assert receipt["contractName"] == "chummer.release-authority-advance-response/v2"
     assert receipt["status"] == "pass"
     assert receipt["revisionId"].startswith("auth-")
     assert receipt["recovered"] is False
+    assert receipt["releaseScopeDecisionSha256"] == hashlib.sha256(
+        (tmp_path / "releaseScopeDecisionBytes.json").read_bytes()
+    ).hexdigest()
 
 
 def test_rejects_revision_or_digest_tamper(tmp_path: Path) -> None:
@@ -175,4 +192,28 @@ def test_rejects_unknown_response_field_and_nonboolean_recovery(tmp_path: Path) 
     recovered = subprocess.run(invocation, text=True, capture_output=True)
     assert recovered.returncode == 1
     assert "recovered must be boolean" in recovered.stderr
+    assert not output.exists()
+
+
+def test_rejects_release_scope_digest_or_exact_byte_drift(tmp_path: Path) -> None:
+    invocation, _, output = command(tmp_path)
+    scope_path = tmp_path / "releaseScopeDecisionBytes.json"
+    scope_path.write_bytes(scope_path.read_bytes() + b" ")
+    exact_byte_drift = subprocess.run(
+        invocation, text=True, capture_output=True
+    )
+    assert exact_byte_drift.returncode == 1
+    assert "releaseScopeDecisionBytes differs from exact input bytes" in exact_byte_drift.stderr
+    assert not output.exists()
+
+    second = tmp_path / "second"
+    second.mkdir()
+    invocation, _, output = command(second)
+    request_path = second / "request.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["expectedReleaseScopeDecisionSha256"] = "f" * 64
+    write_json(request_path, request)
+    digest_drift = subprocess.run(invocation, text=True, capture_output=True)
+    assert digest_drift.returncode == 1
+    assert "release-scope digest differs from exact input bytes" in digest_drift.stderr
     assert not output.exists()

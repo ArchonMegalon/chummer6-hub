@@ -523,6 +523,229 @@ def _run_tool(
     return completed.stdout
 
 
+def _registry_scope_arguments(
+    release_scope_decision: Path,
+    expected_release_scope_sha256: Any,
+) -> list[str]:
+    return [
+        "--release-scope-decision",
+        str(release_scope_decision),
+        "--expected-release-scope-decision-sha256",
+        _require_sha(
+            expected_release_scope_sha256,
+            "approved release-scope decision digest",
+        ),
+    ]
+
+
+def _registry_authority_materializer_arguments(
+    *,
+    manifest: Path,
+    release_scope_decision: Path,
+    expected_release_scope_sha256: Any,
+    output_dir: Path,
+    registry_commit: str,
+    generated_at: str,
+    next_action: str,
+    scorecard: Path,
+    convergence: Path,
+    predecessor_current: Path,
+    predecessor_snapshot: Path,
+    predecessor_decision: Path,
+) -> list[str]:
+    return [
+        "--manifest",
+        str(manifest),
+        *_registry_scope_arguments(
+            release_scope_decision, expected_release_scope_sha256
+        ),
+        "--output-dir",
+        str(output_dir),
+        "--registry-commit",
+        registry_commit,
+        "--decision-status",
+        "preview_ready",
+        "--generated-at",
+        generated_at,
+        "--next-action",
+        next_action,
+        "--scorecard",
+        str(scorecard),
+        "--convergence",
+        str(convergence),
+        "--predecessor-current",
+        str(predecessor_current),
+        "--predecessor-snapshot",
+        str(predecessor_snapshot),
+        "--predecessor-decision",
+        str(predecessor_decision),
+    ]
+
+
+def _registry_authority_verifier_arguments(
+    *,
+    manifest: Path,
+    release_scope_decision: Path,
+    expected_release_scope_sha256: Any,
+    current: Path,
+    snapshot: Path,
+    decision: Path,
+    scorecard: Path,
+    convergence: Path,
+    predecessor_current: Path,
+    predecessor_snapshot: Path,
+    predecessor_decision: Path,
+) -> list[str]:
+    return [
+        "--manifest",
+        str(manifest),
+        *_registry_scope_arguments(
+            release_scope_decision, expected_release_scope_sha256
+        ),
+        "--current",
+        str(current),
+        "--snapshot",
+        str(snapshot),
+        "--decision",
+        str(decision),
+        "--scorecard",
+        str(scorecard),
+        "--convergence",
+        str(convergence),
+        "--predecessor-current",
+        str(predecessor_current),
+        "--predecessor-snapshot",
+        str(predecessor_snapshot),
+        "--predecessor-decision",
+        str(predecessor_decision),
+    ]
+
+
+def _registry_optional_proof_arguments(
+    *,
+    scorecard: Optional[Path],
+    convergence: Optional[Path],
+    predecessor_current: Optional[Path],
+    predecessor_snapshot: Optional[Path],
+    predecessor_decision: Optional[Path],
+) -> list[str]:
+    proof_paths = (
+        scorecard,
+        convergence,
+        predecessor_current,
+        predecessor_snapshot,
+        predecessor_decision,
+    )
+    if any(path is not None for path in proof_paths) and not all(
+        path is not None for path in proof_paths
+    ):
+        raise FinalizerError(
+            "Registry preview proof arguments must be supplied as one exact set"
+        )
+    if scorecard is None:
+        return []
+    assert convergence is not None
+    assert predecessor_current is not None
+    assert predecessor_snapshot is not None
+    assert predecessor_decision is not None
+    return [
+        "--scorecard",
+        str(scorecard),
+        "--convergence",
+        str(convergence),
+        "--predecessor-current",
+        str(predecessor_current),
+        "--predecessor-snapshot",
+        str(predecessor_snapshot),
+        "--predecessor-decision",
+        str(predecessor_decision),
+    ]
+
+
+def _registry_publish_materializer_arguments(
+    *,
+    manifest: Path,
+    release_scope_decision: Path,
+    expected_release_scope_sha256: Any,
+    current: Path,
+    snapshot: Path,
+    decision: Path,
+    expected_current_snapshot_sha256: str,
+    output: Path,
+    scorecard: Optional[Path] = None,
+    convergence: Optional[Path] = None,
+    predecessor_current: Optional[Path] = None,
+    predecessor_snapshot: Optional[Path] = None,
+    predecessor_decision: Optional[Path] = None,
+) -> list[str]:
+    return [
+        "--manifest",
+        str(manifest),
+        *_registry_scope_arguments(
+            release_scope_decision, expected_release_scope_sha256
+        ),
+        "--current",
+        str(current),
+        "--snapshot",
+        str(snapshot),
+        "--decision",
+        str(decision),
+        *_registry_optional_proof_arguments(
+            scorecard=scorecard,
+            convergence=convergence,
+            predecessor_current=predecessor_current,
+            predecessor_snapshot=predecessor_snapshot,
+            predecessor_decision=predecessor_decision,
+        ),
+        "--expected-current-snapshot-sha256",
+        expected_current_snapshot_sha256,
+        "--output",
+        str(output),
+    ]
+
+
+def _registry_publish_verifier_arguments(
+    *,
+    manifest: Path,
+    release_scope_decision: Path,
+    expected_release_scope_sha256: Any,
+    current: Path,
+    snapshot: Path,
+    decision: Path,
+    response: Path,
+    output: Path,
+    scorecard: Optional[Path] = None,
+    convergence: Optional[Path] = None,
+    predecessor_current: Optional[Path] = None,
+    predecessor_snapshot: Optional[Path] = None,
+    predecessor_decision: Optional[Path] = None,
+) -> list[str]:
+    return [
+        "--manifest",
+        str(manifest),
+        *_registry_scope_arguments(
+            release_scope_decision, expected_release_scope_sha256
+        ),
+        "--current",
+        str(current),
+        "--snapshot",
+        str(snapshot),
+        "--decision",
+        str(decision),
+        "--response",
+        str(response),
+        *_registry_optional_proof_arguments(
+            scorecard=scorecard,
+            convergence=convergence,
+            predecessor_current=predecessor_current,
+            predecessor_snapshot=predecessor_snapshot,
+            predecessor_decision=predecessor_decision,
+        ),
+        "--output",
+        str(output),
+    ]
+
+
 class HttpsTransport:
     def __init__(self, timeout: int):
         self.timeout = timeout
@@ -1168,20 +1391,24 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
     preview_dir = evidence / "preview-authority"
     _run_tool(
         files["registryAuthorityMaterializer"],
-        [
-            "--manifest", str(manifest),
-            "--output-dir", str(preview_dir),
-            "--registry-commit", registry_commit,
-            "--decision-status", "preview_ready",
-            "--support-owner", args.support_owner,
-            "--generated-at", _utc_now(),
-            "--next-action", "Close retained flagship gaps before any stable or gold claim.",
-            "--scorecard", str(scorecard_output),
-            "--convergence", str(convergence),
-            "--predecessor-current", str(predecessor_current),
-            "--predecessor-snapshot", str(predecessor_snapshot),
-            "--predecessor-decision", str(predecessor_decision),
-        ],
+        _registry_authority_materializer_arguments(
+            manifest=manifest,
+            release_scope_decision=files["releaseScopeDecision"],
+            expected_release_scope_sha256=handoff[
+                "releaseScopeDecisionSha256"
+            ],
+            output_dir=preview_dir,
+            registry_commit=registry_commit,
+            generated_at=_utc_now(),
+            next_action=(
+                "Close retained flagship gaps before any stable or gold claim."
+            ),
+            scorecard=scorecard_output,
+            convergence=convergence,
+            predecessor_current=predecessor_current,
+            predecessor_snapshot=predecessor_snapshot,
+            predecessor_decision=predecessor_decision,
+        ),
         stdout_path=evidence / "PREVIEW_AUTHORITY_MATERIALIZATION.generated.json",
         root=root,
     )
@@ -1190,17 +1417,21 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
     preview_decision = preview_dir / "RELEASE_DECISION.json"
     _run_tool(
         files["registryAuthorityVerifier"],
-        [
-            "--manifest", str(manifest),
-            "--current", str(preview_current),
-            "--snapshot", str(preview_snapshot),
-            "--decision", str(preview_decision),
-            "--scorecard", str(scorecard_output),
-            "--convergence", str(convergence),
-            "--predecessor-current", str(predecessor_current),
-            "--predecessor-snapshot", str(predecessor_snapshot),
-            "--predecessor-decision", str(predecessor_decision),
-        ],
+        _registry_authority_verifier_arguments(
+            manifest=manifest,
+            release_scope_decision=files["releaseScopeDecision"],
+            expected_release_scope_sha256=handoff[
+                "releaseScopeDecisionSha256"
+            ],
+            current=preview_current,
+            snapshot=preview_snapshot,
+            decision=preview_decision,
+            scorecard=scorecard_output,
+            convergence=convergence,
+            predecessor_current=predecessor_current,
+            predecessor_snapshot=predecessor_snapshot,
+            predecessor_decision=predecessor_decision,
+        ),
         stdout_path=evidence / "PREVIEW_AUTHORITY_VERIFICATION.generated.json",
         root=root,
     )
@@ -1249,32 +1480,40 @@ def _prepare_transaction(args: argparse.Namespace, root: Path) -> tuple[dict[str
         registry_before_snapshot = _sha(body)
     _run_tool(
         files["registryPublishMaterializer"],
-        [
-            "--manifest", str(manifest),
-            "--current", str(predecessor_current),
-            "--snapshot", str(predecessor_snapshot),
-            "--decision", str(predecessor_decision),
-            "--expected-current-snapshot-sha256", registry_before_snapshot,
-            "--output", str(review_request),
-        ],
+        _registry_publish_materializer_arguments(
+            manifest=manifest,
+            release_scope_decision=files["releaseScopeDecision"],
+            expected_release_scope_sha256=handoff[
+                "releaseScopeDecisionSha256"
+            ],
+            current=predecessor_current,
+            snapshot=predecessor_snapshot,
+            decision=predecessor_decision,
+            expected_current_snapshot_sha256=registry_before_snapshot,
+            output=review_request,
+        ),
         stdout_path=evidence / "REGISTRY_REVIEW_REQUEST.generated.json",
         root=root,
     )
     _run_tool(
         files["registryPublishMaterializer"],
-        [
-            "--manifest", str(manifest),
-            "--current", str(preview_current),
-            "--snapshot", str(preview_snapshot),
-            "--decision", str(preview_decision),
-            "--scorecard", str(scorecard_output),
-            "--convergence", str(convergence),
-            "--predecessor-current", str(predecessor_current),
-            "--predecessor-snapshot", str(predecessor_snapshot),
-            "--predecessor-decision", str(predecessor_decision),
-            "--expected-current-snapshot-sha256", _sha(predecessor_snapshot_raw),
-            "--output", str(preview_request),
-        ],
+        _registry_publish_materializer_arguments(
+            manifest=manifest,
+            release_scope_decision=files["releaseScopeDecision"],
+            expected_release_scope_sha256=handoff[
+                "releaseScopeDecisionSha256"
+            ],
+            current=preview_current,
+            snapshot=preview_snapshot,
+            decision=preview_decision,
+            scorecard=scorecard_output,
+            convergence=convergence,
+            predecessor_current=predecessor_current,
+            predecessor_snapshot=predecessor_snapshot,
+            predecessor_decision=predecessor_decision,
+            expected_current_snapshot_sha256=_sha(predecessor_snapshot_raw),
+            output=preview_request,
+        ),
         stdout_path=evidence / "REGISTRY_PREVIEW_REQUEST.generated.json",
         root=root,
     )
@@ -1401,14 +1640,18 @@ def _execute_transaction(
             _write_new(response_path, root, review_response, "Registry review response")
             _run_tool(
                 files["registryPublishVerifier"],
-                [
-                    "--manifest", str(files["manifest"]),
-                    "--current", str(files["predecessorCurrent"]),
-                    "--snapshot", str(files["predecessorSnapshot"]),
-                    "--decision", str(files["predecessorDecision"]),
-                    "--response", str(response_path),
-                    "--output", str(evidence / "REGISTRY_REVIEW_RESPONSE.generated.json"),
-                ],
+                _registry_publish_verifier_arguments(
+                    manifest=files["manifest"],
+                    release_scope_decision=files["releaseScopeDecision"],
+                    expected_release_scope_sha256=checkpoint[
+                        "releaseScopeDecisionSha256"
+                    ],
+                    current=files["predecessorCurrent"],
+                    snapshot=files["predecessorSnapshot"],
+                    decision=files["predecessorDecision"],
+                    response=response_path,
+                    output=evidence / "REGISTRY_REVIEW_RESPONSE.generated.json",
+                ),
             )
             _checkpoint_add_file(checkpoint, "registryReviewResponse", response_path, root)
         _verify_registry_current(
@@ -1449,6 +1692,10 @@ def _execute_transaction(
                     "--successor-decision", str(files["previewDecision"]),
                     "--scorecard", str(files["scorecard"]),
                     "--convergence", str(files["stagedConvergence"]),
+                    "--release-scope-decision",
+                    str(files["releaseScopeDecision"]),
+                    "--expected-release-scope-sha256",
+                    checkpoint["releaseScopeDecisionSha256"],
                     "--output", str(receipt_path),
                 ],
             )
@@ -1488,19 +1735,23 @@ def _execute_transaction(
             receipt_path = evidence / "REGISTRY_PREVIEW_RESPONSE.generated.json"
             _run_tool(
                 files["registryPublishVerifier"],
-                [
-                    "--manifest", str(files["manifest"]),
-                    "--current", str(files["previewCurrent"]),
-                    "--snapshot", str(files["previewSnapshot"]),
-                    "--decision", str(files["previewDecision"]),
-                    "--scorecard", str(files["scorecard"]),
-                    "--convergence", str(files["stagedConvergence"]),
-                    "--predecessor-current", str(files["predecessorCurrent"]),
-                    "--predecessor-snapshot", str(files["predecessorSnapshot"]),
-                    "--predecessor-decision", str(files["predecessorDecision"]),
-                    "--response", str(response_path),
-                    "--output", str(receipt_path),
-                ],
+                _registry_publish_verifier_arguments(
+                    manifest=files["manifest"],
+                    release_scope_decision=files["releaseScopeDecision"],
+                    expected_release_scope_sha256=checkpoint[
+                        "releaseScopeDecisionSha256"
+                    ],
+                    current=files["previewCurrent"],
+                    snapshot=files["previewSnapshot"],
+                    decision=files["previewDecision"],
+                    scorecard=files["scorecard"],
+                    convergence=files["stagedConvergence"],
+                    predecessor_current=files["predecessorCurrent"],
+                    predecessor_snapshot=files["predecessorSnapshot"],
+                    predecessor_decision=files["predecessorDecision"],
+                    response=response_path,
+                    output=receipt_path,
+                ),
             )
             for name, path in (
                 ("registryPreviewResponse", response_path),
