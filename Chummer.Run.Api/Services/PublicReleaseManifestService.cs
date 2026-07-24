@@ -184,6 +184,7 @@ public sealed class PublicReleaseManifestService
                                     ReleaseShelfGenerationStore.CanonicalManifestFileName)),
                             "registry"),
                         snapshot),
+                    snapshot,
                     publicProjection);
             WriteManifestCache(manifestCacheKey, immutableManifest, now);
             return immutableManifest;
@@ -983,11 +984,12 @@ public sealed class PublicReleaseManifestService
         guarded = ApplyFlagshipReadinessGuard(guarded);
         guarded = ApplyGoldReadinessGuard(guarded);
         guarded = ApplyImportRouteParityGuard(guarded);
-        return ApplyPublicProjectionSnapshotGuard(guarded, publicProjection);
+        return ApplyPublicProjectionSnapshotGuard(guarded, snapshot, publicProjection);
     }
 
-    private PublicReleaseManifestDto ApplyPublicProjectionSnapshotGuard(
+    internal static PublicReleaseManifestDto ApplyPublicProjectionSnapshotGuard(
         PublicReleaseManifestDto manifest,
+        ReleaseShelfSnapshot snapshot,
         PublicProjectionOutputSnapshot projection)
     {
         if (!projection.IsConfigured || projection.IsValid)
@@ -1017,14 +1019,45 @@ public sealed class PublicReleaseManifestService
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
                 $"Treat the current release as review-required because {reason}."),
-            KnownIssueSummary = AppendDistinctSentence(
-                manifest.KnownIssueSummary,
-                "Current public projection authentication is incomplete, so launch-ready and no-blocker claims remain withheld."),
+            // A conservative layout-v1 preview's known-issue summary is part of its
+            // sealed Registry authority envelope. Keep that exact field immutable
+            // while recording the runtime warning in non-authority presentation
+            // summaries. Optimistic, terminal, ambiguous, and legacy postures retain
+            // the established known-issue warning and therefore fail closed.
+            KnownIssueSummary =
+                CanPreserveSealedReviewKnownIssue(snapshot, manifest)
+                    ? manifest.KnownIssueSummary
+                    : AppendDistinctSentence(
+                        manifest.KnownIssueSummary,
+                        "Current public projection authentication is incomplete, so launch-ready and no-blocker claims remain withheld."),
             FixAvailabilitySummary = AppendDistinctSentence(
                 manifest.FixAvailabilitySummary,
                 "Only announce a fixed release after one authenticated CURRENT snapshot is deployed across every public route.")
         });
     }
+
+    private static bool CanPreserveSealedReviewKnownIssue(
+        ReleaseShelfSnapshot snapshot,
+        PublicReleaseManifestDto manifest)
+        => !snapshot.IsLegacy
+           && string.Equals(
+               NormalizeStateToken(manifest.Status),
+               "published",
+               StringComparison.Ordinal)
+           && string.Equals(
+               NormalizeStateToken(manifest.Channel),
+               "preview",
+               StringComparison.Ordinal)
+           && string.Equals(
+               NormalizeStateToken(manifest.RolloutState),
+               "public_release_review_required",
+               StringComparison.Ordinal)
+           && string.Equals(
+               NormalizeStateToken(manifest.SupportabilityState),
+               "review_required",
+               StringComparison.Ordinal)
+           && !string.IsNullOrWhiteSpace(manifest.KnownIssueSummary)
+           && !NarrativeMakesOptimisticSupportClaim(manifest.KnownIssueSummary);
 
     private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(
         PublicReleaseManifestDto manifest,

@@ -81,12 +81,25 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     {
         ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
         TryApplyCanonicalManifestNoStoreHeaders(snapshot);
+        PublicReleaseTruthProjectionDto? releaseTruth =
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
+        if (!snapshot.IsLegacy
+            && HasAuthenticatedReleaseAuthority(HttpContext, releaseTruth))
+        {
+            byte[]? manifestBytes = EmbedReleaseTruth(
+                _releases.LoadGenerationCompatibilityManifestBytes(snapshot),
+                releaseTruth);
+            return manifestBytes is null
+                ? NotFound()
+                : File(manifestBytes, "application/json; charset=utf-8");
+        }
+
         PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
             snapshot,
             _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
         return Ok(manifest with
         {
-            ReleaseTruth = PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext)
+            ReleaseTruth = releaseTruth
         });
     }
 
@@ -1654,6 +1667,18 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     private static string? NormalizeOptionalRoute(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool HasAuthenticatedReleaseAuthority(
+        HttpContext? context,
+        PublicReleaseTruthProjectionDto? releaseTruth)
+    {
+        string? authoritySnapshotSha256 =
+            PublicReleaseTruthProjectionMiddleware.TryGetAuthoritySnapshotSha256(context);
+        return releaseTruth?.AuthorityBound == true
+               && authoritySnapshotSha256 is { Length: 64 }
+               && authoritySnapshotSha256.All(static character =>
+                   character is >= '0' and <= '9' or >= 'a' and <= 'f');
+    }
 
     private static string? EmbedReleaseTruth(
         string? manifestJson,

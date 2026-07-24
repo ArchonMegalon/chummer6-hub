@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
@@ -485,6 +486,100 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     }
 
     [Fact]
+    public void InvalidCandidateImportProjectionCannotMutateSealedReviewAuthority()
+    {
+        using GenerationFixture fixture = new();
+        PublicReleaseManifestDto sealedManifest =
+            fixture.SealReviewRequiredPublicByteAuthority();
+        string candidateProjectionLeaf =
+            fixture.ConfigureInvalidCandidateImportProjectionLeaf();
+
+        PublicProjectionOutputSnapshot publicProjection =
+            new PublicProjectionSnapshotService(fixture.Configuration)
+                .LoadHubLocalReleaseProof();
+        PublicReleaseManifestDto guardedManifest =
+            fixture.ManifestService.LoadManifest();
+        PublicReleaseTruthCapture capture =
+            fixture.CreateReleaseTruthProjectionService().CaptureWithAuthority();
+
+        Assert.Equal(candidateProjectionLeaf, fixture.Configuration[
+            PublicProjectionSnapshotService.SnapshotRootConfigurationKey]);
+        Assert.True(publicProjection.IsConfigured);
+        Assert.False(publicProjection.IsValid);
+        Assert.Equal(sealedManifest.KnownIssueSummary, guardedManifest.KnownIssueSummary);
+        Assert.Equal("review_required", guardedManifest.ProofStatus);
+        Assert.Contains(
+            "public projection",
+            guardedManifest.SupportabilitySummary,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(
+            PublicReleaseTruthProjectionDto.Missing,
+            capture.AuthoritySnapshotSha256);
+        Assert.True(capture.Projection.AuthorityBound);
+        Assert.True(capture.Projection.ReviewRequiredPublicByteHandoffsAllowed);
+        Assert.False(capture.Projection.AvailabilityClaimsAllowed);
+    }
+
+    [Fact]
+    public async Task StableCompatibilityManifestAddsOnlyAuthorityTruthToSealedLayoutV1Bytes()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto releaseTruth =
+            BuildReviewRequiredPublicByteHandoff(manifest, artifact);
+        byte[] sealedCompatibility = fixture.ReadCompatibilityManifestBytes(
+            GenerationFixture.PublicWindowsGenerationId);
+
+        FileContentResult result =
+            Assert.IsType<FileContentResult>(
+                await fixture.InvokeReleaseManifestWithAuthenticatedTruthAsync(
+                    releaseTruth));
+        JsonObject served = JsonNode.Parse(result.FileContents)!.AsObject();
+        JsonNode? embeddedReleaseTruth = served["releaseTruth"];
+        Assert.NotNull(embeddedReleaseTruth);
+        Assert.True(served.Remove("releaseTruth"));
+        JsonNode sealedBody = JsonNode.Parse(sealedCompatibility)!;
+
+        Assert.True(JsonNode.DeepEquals(sealedBody, served));
+        Assert.Equal("application/json; charset=utf-8", result.ContentType);
+        Assert.Equal(
+            GenerationFixture.PublicWindowsGenerationId,
+            fixture.Controller.Response.Headers["X-Chummer-Release-Generation"].ToString());
+        Assert.Equal(
+            "private, no-store, max-age=0",
+            fixture.Controller.Response.Headers.CacheControl.ToString());
+        Assert.Equal(
+            "no-store, max-age=0",
+            fixture.Controller.Response.Headers["CDN-Cache-Control"].ToString());
+        Assert.Equal(
+            "no-store, max-age=0",
+            fixture.Controller.Response.Headers["Cloudflare-CDN-Cache-Control"].ToString());
+    }
+
+    [Fact]
+    public void StableCompatibilityManifestWithUnauthenticatedTruthKeepsGuardedFallback()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        fixture.SetReleaseTruth(BuildReviewRequiredPublicByteHandoff(manifest, artifact));
+        fixture.RevokeArtifact(GenerationFixture.ArtifactId);
+
+        IActionResult result = fixture.Controller.ReleaseManifest();
+
+        OkObjectResult guarded = Assert.IsType<OkObjectResult>(result);
+        PublicReleaseManifestDto payload =
+            Assert.IsType<PublicReleaseManifestDto>(guarded.Value);
+        Assert.Empty(payload.Downloads);
+        Assert.Null(
+            PublicReleaseTruthProjectionMiddleware.TryGetAuthoritySnapshotSha256(
+                fixture.Controller.HttpContext));
+    }
+
+    [Fact]
     public async Task CompletionClaimsStayBoundToPromotedGenerationWhenCurrentShelfAdvances()
     {
         using GenerationFixture fixture = new();
@@ -742,6 +837,35 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             => Controller.HttpContext.Items[
                 PublicReleaseTruthProjectionMiddleware.HttpContextItemKey] = projection;
 
+        public async Task<IActionResult> InvokeReleaseManifestWithAuthenticatedTruthAsync(
+            PublicReleaseTruthProjectionDto projection)
+        {
+            IActionResult? result = null;
+            var middleware = new PublicReleaseTruthProjectionMiddleware(context =>
+            {
+                Controller.ControllerContext =
+                    new ControllerContext { HttpContext = context };
+                _httpContextAccessor.HttpContext = context;
+                result = Controller.ReleaseManifest();
+                return Task.CompletedTask;
+            });
+            var context = new DefaultHttpContext();
+            context.Request.Method = HttpMethods.Get;
+            context.Request.Path = "/downloads/releases.json";
+            var promotions = new ReleaseBundlePromotionService(
+                Configuration,
+                NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint: null);
+            await middleware.InvokeAsync(
+                context,
+                new FixedReleaseTruthProjection(projection, new string('d', 64)),
+                promotions,
+                new ReleaseShelfGenerationStore(Configuration));
+            return result
+                ?? throw new InvalidOperationException(
+                    "Authenticated release manifest middleware did not invoke the controller.");
+        }
+
         public void RevokeArtifact(string artifactId)
             => Configuration["CHUMMER_RELEASE_REVOKED_ARTIFACT_IDS"] = artifactId;
 
@@ -750,6 +874,98 @@ public sealed class GenerationBoundDownloadAuthorizationTests
 
         public void SetConfiguration(string key, string? value)
             => Configuration[key] = value;
+
+        public PublicReleaseTruthProjectionService CreateReleaseTruthProjectionService()
+            => new(
+                ManifestService,
+                new ReleaseSelectionService(new PublicCanonFileLoader(Configuration)),
+                DeliveryPolicy);
+
+        public byte[] ReadCompatibilityManifestBytes(string generationId)
+            => ManifestService.LoadGenerationCompatibilityManifestBytes(
+                ManifestService.CaptureShelfGeneration(generationId))
+                ?? throw new InvalidDataException(
+                    $"Generation '{generationId}' has no compatibility manifest.");
+
+        public string ConfigureInvalidCandidateImportProjectionLeaf()
+        {
+            string leaf = Path.Combine(_root, "candidate-import-projection-leaf");
+            Directory.CreateDirectory(leaf);
+            File.WriteAllText(
+                Path.Combine(
+                    leaf,
+                    "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"),
+                "{\"status\":\"candidate_import_ready\"}\n");
+            Configuration[PublicProjectionSnapshotService.SnapshotRootConfigurationKey] =
+                leaf;
+            Configuration[PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] =
+                "true";
+            return leaf;
+        }
+
+        public PublicReleaseManifestDto SealReviewRequiredPublicByteAuthority()
+        {
+            Activate(PublicWindowsGenerationId);
+            ReleaseShelfSnapshot snapshot = ManifestService.CaptureShelfSnapshot();
+            var releaseSelection =
+                new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
+            PublicReleaseManifestDto manifest = DeliveryPolicy.FilterRevokedArtifacts(
+                snapshot,
+                releaseSelection.ApplyAccessPolicy(ManifestService.LoadManifest(snapshot)));
+            byte[] canonicalBytes =
+                ManifestService.LoadGenerationCanonicalManifestBytes(snapshot)
+                ?? throw new InvalidDataException(
+                    "Review-required authority source is missing its canonical manifest.");
+            PublicReleaseTruthProjectionTests.AuthorityEnvelope authority =
+                PublicReleaseTruthProjectionTests.BuildAuthorityEnvelope(
+                    manifest,
+                    "review_required",
+                    manifestBytesOverride: canonicalBytes,
+                    publicByteHandoff: true);
+            string generationRoot = Path.Combine(
+                _downloadsRoot,
+                ReleaseShelfGenerationStore.GenerationsDirectoryName,
+                PublicWindowsGenerationId);
+            WriteAuthorityFile(
+                generationRoot,
+                PublicReleaseAuthorityEnvelopeProjection.CurrentInventoryPath,
+                authority.CurrentBytes);
+            WriteAuthorityFile(
+                generationRoot,
+                PublicReleaseAuthorityEnvelopeProjection.SnapshotInventoryPath,
+                authority.SnapshotBytes);
+            WriteAuthorityFile(
+                generationRoot,
+                "release-evidence/" + PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath,
+                authority.DecisionBytes);
+
+            string canonicalPath = Path.Combine(
+                generationRoot,
+                ReleaseShelfGenerationStore.CanonicalManifestFileName);
+            string compatibilityPath = Path.Combine(
+                generationRoot,
+                ReleaseShelfGenerationStore.CompatibilityManifestFileName);
+            var metadata = new GenerationMetadata(
+                Version: manifest.Version,
+                CanonicalSha256: Sha256(canonicalPath),
+                CompatibilitySha256: Sha256(compatibilityPath),
+                InventoryDigest:
+                    ReleaseShelfGenerationStore.ComputeInventoryDigest(generationRoot));
+            _generations[PublicWindowsGenerationId] = metadata;
+            Dictionary<string, object?> candidate = BuildPointer(
+                PublicWindowsGenerationId,
+                metadata,
+                "chummer.release-shelf.activation-candidate/v1");
+            candidate["contractName"] = "chummer.release-shelf-activation-candidate";
+            candidate["inventory"] =
+                ReleaseShelfGenerationStore.BuildInventory(generationRoot);
+            File.WriteAllText(
+                Path.Combine(generationRoot, "activation-candidate.json"),
+                JsonSerializer.Serialize(candidate));
+            Activate(PublicWindowsGenerationId);
+            SetQuery(null, null);
+            return manifest;
+        }
 
         public void WriteAndActivateChannelWideRevokedGeneration()
         {
@@ -918,6 +1134,10 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["rid"] = rid,
                         ["arch"] = arch,
                         ["kind"] = kind,
+                        ["compatibilityState"] =
+                            generationId == PublicWindowsGenerationId
+                                ? "compatible"
+                                : null,
                         ["platformLabel"] = "Shared account-required installer",
                         ["fileName"] = artifactFileName,
                         ["downloadUrl"] = artifactDownloadUrl,
@@ -1107,6 +1327,18 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             return Convert.ToHexStringLower(SHA256.HashData(stream));
         }
 
+        private static void WriteAuthorityFile(
+            string generationRoot,
+            string relativePath,
+            ReadOnlyMemory<byte> bytes)
+        {
+            string path = Path.Combine(
+                generationRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, bytes.ToArray());
+        }
+
         private static void WriteCommittedActivationJournal(
             string downloadsRoot,
             byte[] targetPointerBytes,
@@ -1210,6 +1442,31 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string ActivationReceiptId,
             string IntentSha256,
             DateTimeOffset ResolvedAtUtc);
+
+        private sealed class FixedReleaseTruthProjection(
+            PublicReleaseTruthProjectionDto projection,
+            string authoritySnapshotSha256)
+            : IReleaseTruthProjection
+        {
+            public PublicReleaseTruthCapture CaptureWithAuthority()
+                => new(projection, authoritySnapshotSha256);
+
+            public PublicReleaseTruthCapture CaptureGenerationWithAuthority(
+                string generationId)
+                => new(projection, authoritySnapshotSha256);
+
+            public PublicReleaseTruthProjectionDto Capture() => projection;
+
+            public PublicReleaseTruthProjectionDto CaptureGeneration(
+                string generationId)
+                => projection;
+
+            public PublicReleaseTruthProjectionDto Project(
+                PublicReleaseManifestDto manifest,
+                string? immutableManifestSha256,
+                ReadOnlyMemory<byte>? immutableAuthorityManifestBytes)
+                => projection;
+        }
 
         private sealed record GenerationMetadata(
             string Version,
