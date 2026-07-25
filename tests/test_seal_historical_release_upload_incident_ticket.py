@@ -229,6 +229,8 @@ def materialize_args(
         str(crypto.openssl),
         "--openssl-sha256",
         crypto.openssl_sha256,
+        "--seal-openssl-sha256",
+        receipt["opensslExecutableSha256"],
         "--envelope",
         str(fixture.output),
         "--envelope-sha256",
@@ -465,6 +467,78 @@ def test_transaction_recovers_after_link_crash_without_overwrite(
     assert receipt["envelopeSha256"] == digest(fixture.output)
     assert fixture.marker.exists()
     assert not list(fixture.output.parent.glob(".chummer-ticket-intake-*.stage"))
+    assert_no_plaintext_in_public_results(capsys)
+
+
+@pytest.mark.parametrize("transaction_kind", ("seal", "materialize"))
+def test_transaction_recovers_after_commit_marker_link_before_stage_unlink(
+    transaction_kind: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = build_fixture(tmp_path)
+    if transaction_kind == "seal":
+        arguments = seal_args(fixture)
+        execute = seal.run
+        final_paths = (fixture.output, fixture.receipt, fixture.marker)
+        stage_parent = fixture.output.parent
+    else:
+        assert seal.run(seal_args(fixture)) == 0
+        capsys.readouterr()
+        stage_parent = tmp_path / "materialized-after-commit-link"
+        stage_parent.mkdir(mode=0o700)
+        ticket = stage_parent / "ticket"
+        authority = stage_parent / "authority.json"
+        marker = stage_parent / "commit.json"
+        arguments = materialize_args(
+            fixture,
+            ticket=ticket,
+            authority=authority,
+            marker=marker,
+        )
+        execute = materialize.run
+        final_paths = (ticket, authority, marker)
+
+    transaction_module = (
+        seal if transaction_kind == "seal" else materialize.seal
+    )
+    original_unlink = transaction_module._safe_unlink_identity
+    interrupted = False
+
+    def interrupt_before_first_stage_unlink(
+        parent_descriptor: int,
+        name: str,
+        expected: os.stat_result,
+    ) -> None:
+        nonlocal interrupted
+        if not interrupted and name.startswith("artifact-"):
+            interrupted = True
+            raise OSError("simulated crash before staged-link cleanup")
+        original_unlink(parent_descriptor, name, expected)
+
+    monkeypatch.setattr(
+        transaction_module,
+        "_safe_unlink_identity",
+        interrupt_before_first_stage_unlink,
+    )
+    assert execute(arguments) == 2
+    assert interrupted is True
+    assert all(path.exists() for path in final_paths)
+    assert all(path.stat().st_nlink == 2 for path in final_paths)
+    stages = list(stage_parent.glob(".chummer-ticket-intake-*.stage"))
+    assert len(stages) == 1
+    assert (stages[0] / "transaction.json").is_file()
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        transaction_module,
+        "_safe_unlink_identity",
+        original_unlink,
+    )
+    assert execute(arguments) == 0
+    assert all(path.stat().st_nlink == 1 for path in final_paths)
+    assert not list(stage_parent.glob(".chummer-ticket-intake-*.stage"))
     assert_no_plaintext_in_public_results(capsys)
 
 
@@ -724,4 +798,51 @@ def test_explicit_pinned_non_system_openssl_path_is_supported(
     monkeypatch.setenv("PATH", str(tmp_path / "untrusted-path"))
     assert seal.run(seal_args(fixture)) == 0
     assert fixture.output.exists()
+    assert_no_plaintext_in_public_results(capsys)
+
+
+def test_mac_seal_linux_materialization_accepts_distinct_pinned_openssl_binaries(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    fixture = build_fixture(tmp_path)
+    sealing_openssl_sha256 = fixture.crypto.openssl_sha256
+    assert seal.run(seal_args(fixture)) == 0
+    capsys.readouterr()
+
+    linux_openssl = tmp_path / "linux-openssl"
+    shutil.copy2(fixture.crypto.openssl, linux_openssl)
+    with linux_openssl.open("ab") as executable:
+        executable.write(b"\n")
+    linux_openssl.chmod(0o700)
+    fixture.crypto = replace(
+        fixture.crypto,
+        openssl=linux_openssl,
+        openssl_sha256=digest(linux_openssl),
+    )
+    assert fixture.crypto.openssl_sha256 != sealing_openssl_sha256
+
+    destination = tmp_path / "distinct-openssl-materialized"
+    destination.mkdir(mode=0o700)
+    ticket = destination / "ticket"
+    authority = destination / "authority.json"
+    marker = destination / "commit.json"
+    assert (
+        materialize.run(
+            materialize_args(
+                fixture,
+                ticket=ticket,
+                authority=authority,
+                marker=marker,
+            )
+        )
+        == 0
+    )
+    payload = json.loads(authority.read_text(encoding="utf-8"))
+    assert payload["opensslExecutableSha256"] == sealing_openssl_sha256
+    assert (
+        payload["materializationOpensslExecutableSha256"]
+        == fixture.crypto.openssl_sha256
+    )
+    assert ticket.read_bytes() == INCIDENT_TICKET
     assert_no_plaintext_in_public_results(capsys)

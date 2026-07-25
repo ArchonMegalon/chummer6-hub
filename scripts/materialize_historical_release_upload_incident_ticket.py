@@ -68,6 +68,7 @@ AUTHORITY_FIELDS = {
     "recipientCertificateSha256",
     "signerCertificateSha256",
     "opensslExecutableSha256",
+    "materializationOpensslExecutableSha256",
     "materializationTransactionId",
     "quarantineStatus",
     "revocationStatus",
@@ -120,7 +121,7 @@ def _validate_seal_receipt(
     inventory_commitment_sha256: str,
     recipient_certificate_sha256: str,
     signer_certificate_sha256: str,
-    openssl_executable_sha256: str,
+    sealing_openssl_executable_sha256: str,
 ) -> None:
     if set(receipt) != SEAL_RECEIPT_FIELDS:
         raise MaterializeError("seal receipt fields are not exact")
@@ -142,7 +143,7 @@ def _validate_seal_receipt(
         or receipt.get("signerCertificateSha256")
         != signer_certificate_sha256
         or receipt.get("opensslExecutableSha256")
-        != openssl_executable_sha256
+        != sealing_openssl_executable_sha256
         or receipt.get("plaintextEmitted") is not False
         or receipt.get("quarantineStatus") != "pending"
         or receipt.get("revocationStatus") != "pending"
@@ -150,12 +151,11 @@ def _validate_seal_receipt(
         or type(receipt.get("candidateCount")) is not int
         or receipt["candidateCount"] < 1
         or receipt.get("distinctIncidentBearerCount") != 1
-        or seal.TRANSACTION_ID.fullmatch(
-            str(receipt.get("transactionId"))
-        )
-        is None
+        or type(receipt.get("transactionId")) is not str
+        or seal.TRANSACTION_ID.fullmatch(receipt["transactionId"]) is None
         or any(
-            seal.SHA256_HEX.fullmatch(str(receipt.get(field))) is None
+            type(receipt.get(field)) is not str
+            or seal.SHA256_HEX.fullmatch(receipt[field]) is None
             for field in (
                 "contextSha256",
                 "inventoryCommitmentSha256",
@@ -297,14 +297,16 @@ def _read_committed_authority(
         or authority.get("status") != "materialized_pending_revocation"
         or authority.get("quarantineStatus") != "pending"
         or authority.get("revocationStatus") != "pending"
+        or type(authority.get("materializationTransactionId")) is not str
         or seal.TRANSACTION_ID.fullmatch(
-            str(authority.get("materializationTransactionId"))
+            authority["materializationTransactionId"]
         )
         is None
         or type(authority.get("ticketSizeBytes")) is not int
         or not 0 < authority["ticketSizeBytes"] <= seal.MAX_TICKET_BYTES
         or any(
-            seal.SHA256_HEX.fullmatch(str(authority.get(field))) is None
+            type(authority.get(field)) is not str
+            or seal.SHA256_HEX.fullmatch(authority[field]) is None
             for field in (
                 "ticketPathSha256",
                 "ticketSha256",
@@ -313,6 +315,7 @@ def _read_committed_authority(
                 "recipientCertificateSha256",
                 "signerCertificateSha256",
                 "opensslExecutableSha256",
+                "materializationOpensslExecutableSha256",
             )
         )
     ):
@@ -380,6 +383,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--openssl-path", type=Path, required=True)
     parser.add_argument("--openssl-sha256", required=True)
+    parser.add_argument("--seal-openssl-sha256", required=True)
     parser.add_argument("--envelope", type=Path, required=True)
     parser.add_argument("--envelope-sha256", required=True)
     parser.add_argument("--seal-receipt", type=Path, required=True)
@@ -406,7 +410,11 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
         raise MaterializeError(f"--confirm requires {CONFIRMATION}")
     openssl_sha256 = seal._validate_sha256(
         options.openssl_sha256,
-        "OpenSSL executable SHA-256",
+        "materialization OpenSSL executable SHA-256",
+    )
+    seal_openssl_sha256 = seal._validate_sha256(
+        options.seal_openssl_sha256,
+        "sealing OpenSSL executable SHA-256",
     )
     envelope_sha256 = seal._validate_sha256(
         options.envelope_sha256,
@@ -477,7 +485,7 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             inventory_commitment_sha256=inventory_commitment,
             recipient_certificate_sha256=recipient_sha256,
             signer_certificate_sha256=signer_sha256,
-            openssl_executable_sha256=openssl_sha256,
+            sealing_openssl_executable_sha256=seal_openssl_sha256,
         )
         recipient_certificate = seal._open_pinned_file(
             options.recipient_cert,
@@ -528,13 +536,23 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
                 "inventoryCommitmentSha256": inventory_commitment,
                 "recipientCertificateSha256": recipient_sha256,
                 "signerCertificateSha256": signer_sha256,
-                "opensslExecutableSha256": openssl_sha256,
+                "opensslExecutableSha256": seal_openssl_sha256,
+                "materializationOpensslExecutableSha256": openssl_sha256,
                 "ticketOutputName": ticket_path.name,
                 "authorityOutputName": options.authority_output.name,
                 "commitMarkerName": options.commit_marker.name,
             }
         )
         transaction_id = context_sha256[:32]
+        seal._recover_fully_linked_transaction(
+            final_paths=(
+                ticket_path,
+                options.authority_output,
+                options.commit_marker,
+            ),
+            transaction_id=transaction_id,
+            context_sha256=context_sha256,
+        )
         existing = _read_committed_authority(
             options.authority_output,
             transaction_id=transaction_id,
@@ -571,7 +589,8 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             "inventoryCommitmentSha256": inventory_commitment,
             "recipientCertificateSha256": recipient_sha256,
             "signerCertificateSha256": signer_sha256,
-            "opensslExecutableSha256": openssl_sha256,
+            "opensslExecutableSha256": seal_openssl_sha256,
+            "materializationOpensslExecutableSha256": openssl_sha256,
             "materializationTransactionId": transaction_id,
             "quarantineStatus": "pending",
             "revocationStatus": "pending",

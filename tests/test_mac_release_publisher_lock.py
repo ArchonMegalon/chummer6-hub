@@ -93,3 +93,62 @@ def test_bootstrap_publisher_waits_while_sealer_holds_exclusive_lock(
         if process is not None and process.poll() is None:
             process.kill()
             process.wait(timeout=5)
+
+
+def test_bootstrap_lock_held_flag_without_inherited_fd_fails_closed(
+    tmp_path: Path,
+) -> None:
+    release_root = tmp_path / "release"
+    work_root = release_root / "run-legacy-lock-flag"
+    environment = bootstrap_environment(work_root)
+    environment["CHUMMER_RELEASE_PUBLISHER_LOCK_HELD"] = "1"
+    completed = subprocess.run(
+        ("/bin/bash", str(BOOTSTRAP)),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+        timeout=15,
+    )
+    assert completed.returncode != 0
+    assert (
+        b"CHUMMER_RELEASE_PUBLISHER_LOCK_HELD is not publisher-lock authority"
+        in completed.stderr
+    )
+    assert not (release_root / LOCK_NAME).exists()
+    assert not work_root.exists()
+
+
+def test_bootstrap_child_inherits_and_validates_publisher_lock_fd(
+    tmp_path: Path,
+) -> None:
+    release_root = tmp_path / "release"
+    release_root.mkdir(mode=0o700)
+    lock_path = release_root / LOCK_NAME
+    lock_path.write_bytes(LOCK_CONTRACT)
+    lock_path.chmod(0o600)
+    descriptor = os.open(lock_path, os.O_RDWR)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        environment = bootstrap_environment(
+            release_root / "run-inherited-lock-fd"
+        )
+        environment["CHUMMER_RELEASE_PUBLISHER_LOCK_FD"] = str(descriptor)
+        completed = subprocess.run(
+            ("/bin/bash", str(BOOTSTRAP)),
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+            pass_fds=(descriptor,),
+            timeout=15,
+        )
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
+    assert completed.returncode != 0
+    assert b"CHUMMER_RELEASE_SCOPE_DECISION_PATH is required" in completed.stderr
+    assert b"inherited release-root publisher lock validation failed" not in (
+        completed.stderr
+    )
+    assert b"incident-release-upload" not in completed.stdout + completed.stderr

@@ -30,6 +30,16 @@ CONTRACT_NAME = "chummer.release-upload-incident-ticket-seal/v2"
 COMMIT_CONTRACT_NAME = (
     "chummer.release-upload-incident-ticket-seal-commit/v1"
 )
+TRANSACTION_CONTRACT_NAME = (
+    "chummer.release-upload-incident-ticket-transaction/v1"
+)
+TRANSACTION_ARTIFACT_FIELDS = {
+    "stageFile",
+    "sha256",
+    "sizeBytes",
+    "device",
+    "inode",
+}
 PUBLISHER_LOCK_CONTRACT = "chummer.mac-release-root-publisher-lock/v1\n"
 PUBLISHER_LOCK_NAME = ".chummer-release-publisher.lock"
 CONFIRMATION = "SEAL_HISTORICAL_RELEASE_UPLOAD_INCIDENT_TICKET"
@@ -1088,6 +1098,365 @@ def _safe_unlink_identity(
     os.unlink(name, dir_fd=parent_descriptor)
 
 
+def _safe_rmdir_identity(
+    *,
+    parent_descriptor: int,
+    stage_descriptor: int,
+    stage_name: str,
+    expected: os.stat_result,
+) -> None:
+    opened = os.fstat(stage_descriptor)
+    linked = os.stat(
+        stage_name,
+        dir_fd=parent_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        not stat.S_ISDIR(opened.st_mode)
+        or opened.st_uid != os.geteuid()
+        or stat.S_IMODE(opened.st_mode) != 0o700
+        or opened.st_dev != expected.st_dev
+        or opened.st_ino != expected.st_ino
+        or linked.st_dev != expected.st_dev
+        or linked.st_ino != expected.st_ino
+    ):
+        raise SealError("transaction stage directory identity changed")
+    os.rmdir(stage_name, dir_fd=parent_descriptor)
+    os.fsync(parent_descriptor)
+
+
+def _read_transaction_manifest(
+    *,
+    stage_descriptor: int,
+    transaction_id: str,
+    context_sha256: str,
+    expected_names: set[str],
+) -> tuple[dict[str, dict[str, Any]], os.stat_result]:
+    manifest_bytes, manifest_metadata = _read_private_file_at(
+        stage_descriptor,
+        "transaction.json",
+        maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
+    )
+    try:
+        manifest = json.loads(manifest_bytes)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise SealError("transaction manifest is malformed") from exc
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest)
+        != {
+            "contractName",
+            "transactionId",
+            "contextSha256",
+            "artifacts",
+        }
+        or manifest.get("contractName") != TRANSACTION_CONTRACT_NAME
+        or manifest.get("transactionId") != transaction_id
+        or manifest.get("contextSha256") != context_sha256
+        or _canonical_json_bytes(manifest) != manifest_bytes
+    ):
+        raise SealError("transaction manifest binding is invalid")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict) or set(artifacts) != expected_names:
+        raise SealError("transaction manifest output set changed")
+
+    stage_files: set[str] = set()
+    typed_artifacts: dict[str, dict[str, Any]] = {}
+    for final_name, record in artifacts.items():
+        if (
+            not isinstance(final_name, str)
+            or not isinstance(record, dict)
+            or set(record) != TRANSACTION_ARTIFACT_FIELDS
+            or type(record.get("stageFile")) is not str
+            or re.fullmatch(r"artifact-[0-9]+", record["stageFile"]) is None
+            or type(record.get("sha256")) is not str
+            or SHA256_HEX.fullmatch(record["sha256"]) is None
+            or type(record.get("sizeBytes")) is not int
+            or record["sizeBytes"] < 0
+            or type(record.get("device")) is not int
+            or record["device"] < 0
+            or type(record.get("inode")) is not int
+            or record["inode"] < 1
+            or record["stageFile"] in stage_files
+        ):
+            raise SealError("transaction artifact record is malformed")
+        stage_files.add(record["stageFile"])
+        typed_artifacts[final_name] = record
+
+    entries = set(os.listdir(stage_descriptor))
+    if (
+        "transaction.json" not in entries
+        or not entries.issubset(stage_files | {"transaction.json"})
+    ):
+        raise SealError("transaction stage has unknown entries")
+    return typed_artifacts, manifest_metadata
+
+
+def _read_transaction_artifact(
+    parent_descriptor: int,
+    name: str,
+    record: Mapping[str, Any],
+) -> tuple[bytes, os.stat_result] | None:
+    try:
+        content, metadata = _read_private_file_at(
+            parent_descriptor,
+            name,
+            maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
+            maximum_links=2,
+        )
+    except FileNotFoundError:
+        return None
+    if (
+        len(content) != record["sizeBytes"]
+        or hashlib.sha256(content).hexdigest() != record["sha256"]
+        or metadata.st_dev != record["device"]
+        or metadata.st_ino != record["inode"]
+    ):
+        raise SealError("transaction artifact identity or content changed")
+    return content, metadata
+
+
+def _ordered_transaction_records(
+    artifacts: Mapping[str, Mapping[str, Any]],
+) -> list[tuple[str, Mapping[str, Any]]]:
+    return sorted(
+        artifacts.items(),
+        key=lambda item: int(item[1]["stageFile"].removeprefix("artifact-")),
+    )
+
+
+def _finish_transaction_stage(
+    *,
+    parent_descriptor: int,
+    stage_descriptor: int,
+    stage_name: str,
+    stage_metadata: os.stat_result,
+    artifacts: Mapping[str, Mapping[str, Any]],
+    manifest_metadata: os.stat_result,
+    allow_linking_missing_finals: bool,
+) -> bool:
+    ordered = _ordered_transaction_records(artifacts)
+    seen_retained_stage = False
+    for final_name, record in ordered:
+        stage_file = record["stageFile"]
+        try:
+            os.stat(
+                stage_file,
+                dir_fd=stage_descriptor,
+                follow_symlinks=False,
+            )
+            seen_retained_stage = True
+        except FileNotFoundError:
+            if seen_retained_stage:
+                raise SealError(
+                    "transaction stage cleanup order is inconsistent"
+                )
+
+        staged = _read_transaction_artifact(
+            stage_descriptor,
+            stage_file,
+            record,
+        )
+        final = _read_transaction_artifact(
+            parent_descriptor,
+            final_name,
+            record,
+        )
+        if final is None:
+            if not allow_linking_missing_finals:
+                return False
+            if staged is None or staged[1].st_nlink != 1:
+                raise SealError("staged transaction artifact is incomplete")
+            try:
+                os.link(
+                    stage_file,
+                    final_name,
+                    src_dir_fd=stage_descriptor,
+                    dst_dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileExistsError as exc:
+                raise SealError(
+                    "transaction output appeared during commit"
+                ) from exc
+            os.fsync(parent_descriptor)
+            staged = _read_transaction_artifact(
+                stage_descriptor,
+                stage_file,
+                record,
+            )
+            final = _read_transaction_artifact(
+                parent_descriptor,
+                final_name,
+                record,
+            )
+        if final is None:
+            raise SealError("transaction output was not published")
+        if staged is None:
+            if final[1].st_nlink != 1:
+                raise SealError(
+                    "cleaned transaction output link count is invalid"
+                )
+            continue
+        if (
+            staged[1].st_nlink != 2
+            or final[1].st_nlink != 2
+            or staged[1].st_dev != final[1].st_dev
+            or staged[1].st_ino != final[1].st_ino
+        ):
+            raise SealError(
+                "published transaction output is not the exact staged inode"
+            )
+
+    for final_name, record in ordered:
+        stage_file = record["stageFile"]
+        staged = _read_transaction_artifact(
+            stage_descriptor,
+            stage_file,
+            record,
+        )
+        final = _read_transaction_artifact(
+            parent_descriptor,
+            final_name,
+            record,
+        )
+        if final is None:
+            raise SealError("transaction output disappeared during cleanup")
+        if staged is None:
+            if final[1].st_nlink != 1:
+                raise SealError(
+                    "cleaned transaction output link count is invalid"
+                )
+            continue
+        if (
+            staged[1].st_nlink != 2
+            or final[1].st_nlink != 2
+            or staged[1].st_dev != final[1].st_dev
+            or staged[1].st_ino != final[1].st_ino
+        ):
+            raise SealError(
+                "transaction cleanup identity changed before unlink"
+            )
+        _safe_unlink_identity(
+            stage_descriptor,
+            stage_file,
+            staged[1],
+        )
+        os.fsync(stage_descriptor)
+        cleaned = _read_transaction_artifact(
+            parent_descriptor,
+            final_name,
+            record,
+        )
+        if (
+            cleaned is None
+            or cleaned[1].st_dev != final[1].st_dev
+            or cleaned[1].st_ino != final[1].st_ino
+            or cleaned[1].st_nlink != 1
+        ):
+            raise SealError(
+                "transaction output did not become a single durable link"
+            )
+
+    _safe_unlink_identity(
+        stage_descriptor,
+        "transaction.json",
+        manifest_metadata,
+    )
+    os.fsync(stage_descriptor)
+    _safe_rmdir_identity(
+        parent_descriptor=parent_descriptor,
+        stage_descriptor=stage_descriptor,
+        stage_name=stage_name,
+        expected=stage_metadata,
+    )
+    return True
+
+
+def _recover_fully_linked_transaction(
+    *,
+    final_paths: Sequence[Path],
+    transaction_id: str,
+    context_sha256: str,
+) -> bool:
+    parent, parent_descriptor = _ensure_same_private_parent(final_paths)
+    stage_name = f".chummer-ticket-intake-{transaction_id}.stage"
+    stage_descriptor: int | None = None
+    try:
+        try:
+            stage_descriptor = os.open(
+                stage_name,
+                _directory_open_flags(),
+                dir_fd=parent_descriptor,
+            )
+        except FileNotFoundError:
+            return False
+        stage_metadata = os.fstat(stage_descriptor)
+        linked_stage = os.stat(
+            stage_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (
+            not stat.S_ISDIR(stage_metadata.st_mode)
+            or stage_metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(stage_metadata.st_mode) != 0o700
+            or linked_stage.st_dev != stage_metadata.st_dev
+            or linked_stage.st_ino != stage_metadata.st_ino
+        ):
+            raise SealError("transaction stage directory is unsafe")
+        _assert_no_extended_acl(
+            stage_descriptor,
+            str(parent / stage_name),
+        )
+        expected_names = {path.name for path in final_paths}
+        try:
+            artifacts, manifest_metadata = _read_transaction_manifest(
+                stage_descriptor=stage_descriptor,
+                transaction_id=transaction_id,
+                context_sha256=context_sha256,
+                expected_names=expected_names,
+            )
+        except FileNotFoundError:
+            final_existence: list[bool] = []
+            for path in final_paths:
+                try:
+                    os.stat(
+                        path.name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                    final_existence.append(True)
+                except FileNotFoundError:
+                    final_existence.append(False)
+            if not any(final_existence):
+                return False
+            if os.listdir(stage_descriptor) or not all(final_existence):
+                raise SealError(
+                    "transaction stage lost its retained manifest"
+                )
+            _safe_rmdir_identity(
+                parent_descriptor=parent_descriptor,
+                stage_descriptor=stage_descriptor,
+                stage_name=stage_name,
+                expected=stage_metadata,
+            )
+            return True
+        return _finish_transaction_stage(
+            parent_descriptor=parent_descriptor,
+            stage_descriptor=stage_descriptor,
+            stage_name=stage_name,
+            stage_metadata=stage_metadata,
+            artifacts=artifacts,
+            manifest_metadata=manifest_metadata,
+            allow_linking_missing_finals=False,
+        )
+    finally:
+        if stage_descriptor is not None:
+            os.close(stage_descriptor)
+        os.close(parent_descriptor)
+
+
 def _cleanup_uncommitted_stage(
     *,
     parent_descriptor: int,
@@ -1151,7 +1520,7 @@ def _publish_transaction(
             artifacts: dict[str, dict[str, Any]] = {}
             for index, (path, content) in enumerate(outputs.items()):
                 stage_file = f"artifact-{index}"
-                descriptor, _metadata = _create_private_file_at(
+                descriptor, metadata = _create_private_file_at(
                     stage_descriptor,
                     stage_file,
                     content,
@@ -1161,6 +1530,8 @@ def _publish_transaction(
                     "stageFile": stage_file,
                     "sha256": hashlib.sha256(content).hexdigest(),
                     "sizeBytes": len(content),
+                    "device": metadata.st_dev,
+                    "inode": metadata.st_ino,
                 }
             marker_payload = {
                 "contractName": commit_contract_name,
@@ -1177,7 +1548,7 @@ def _publish_transaction(
             }
             marker_bytes = _canonical_json_bytes(marker_payload)
             marker_stage = f"artifact-{len(outputs)}"
-            marker_descriptor, _marker_metadata = _create_private_file_at(
+            marker_descriptor, marker_metadata = _create_private_file_at(
                 stage_descriptor,
                 marker_stage,
                 marker_bytes,
@@ -1187,11 +1558,11 @@ def _publish_transaction(
                 "stageFile": marker_stage,
                 "sha256": hashlib.sha256(marker_bytes).hexdigest(),
                 "sizeBytes": len(marker_bytes),
+                "device": marker_metadata.st_dev,
+                "inode": marker_metadata.st_ino,
             }
             manifest = {
-                "contractName": (
-                    "chummer.release-upload-incident-ticket-transaction/v1"
-                ),
+                "contractName": TRANSACTION_CONTRACT_NAME,
                 "transactionId": transaction_id,
                 "contextSha256": context_sha256,
                 "artifacts": artifacts,
@@ -1231,12 +1602,13 @@ def _publish_transaction(
             str(parent / stage_name),
         )
         try:
-            manifest_bytes, _ = _read_private_file_at(
-                stage_descriptor,
-                "transaction.json",
-                maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
+            artifacts, manifest_metadata = _read_transaction_manifest(
+                stage_descriptor=stage_descriptor,
+                transaction_id=transaction_id,
+                context_sha256=context_sha256,
+                expected_names={path.name for path in all_paths},
             )
-        except (FileNotFoundError, SealError):
+        except FileNotFoundError:
             if stage_was_created:
                 raise
             _cleanup_uncommitted_stage(
@@ -1245,10 +1617,14 @@ def _publish_transaction(
                 stage_name=stage_name,
                 final_names={path.name for path in all_paths},
             )
+            _safe_rmdir_identity(
+                parent_descriptor=parent_descriptor,
+                stage_descriptor=stage_descriptor,
+                stage_name=stage_name,
+                expected=stage_metadata,
+            )
             os.close(stage_descriptor)
             stage_descriptor = None
-            os.rmdir(stage_name, dir_fd=parent_descriptor)
-            os.fsync(parent_descriptor)
             return _publish_transaction(
                 outputs=outputs,
                 commit_marker_path=commit_marker_path,
@@ -1256,159 +1632,15 @@ def _publish_transaction(
                 context_sha256=context_sha256,
                 commit_contract_name=commit_contract_name,
             )
-        try:
-            manifest = json.loads(manifest_bytes)
-        except (UnicodeError, json.JSONDecodeError) as exc:
-            if not stage_was_created:
-                _cleanup_uncommitted_stage(
-                    parent_descriptor=parent_descriptor,
-                    stage_descriptor=stage_descriptor,
-                    stage_name=stage_name,
-                    final_names={path.name for path in all_paths},
-                )
-                os.close(stage_descriptor)
-                stage_descriptor = None
-                os.rmdir(stage_name, dir_fd=parent_descriptor)
-                os.fsync(parent_descriptor)
-                return _publish_transaction(
-                    outputs=outputs,
-                    commit_marker_path=commit_marker_path,
-                    transaction_id=transaction_id,
-                    context_sha256=context_sha256,
-                    commit_contract_name=commit_contract_name,
-                )
-            raise SealError("transaction manifest is malformed") from exc
-        if (
-            not isinstance(manifest, dict)
-            or manifest.get("contractName")
-            != "chummer.release-upload-incident-ticket-transaction/v1"
-            or manifest.get("transactionId") != transaction_id
-            or manifest.get("contextSha256") != context_sha256
-            or _canonical_json_bytes(manifest) != manifest_bytes
-        ):
-            raise SealError("transaction manifest binding is invalid")
-        artifacts = manifest.get("artifacts")
-        if not isinstance(artifacts, dict):
-            raise SealError("transaction manifest artifacts are malformed")
-        expected_names = {path.name for path in all_paths}
-        if set(artifacts) != expected_names:
-            raise SealError("transaction manifest output set changed")
-
-        for final_path in all_paths:
-            record = artifacts.get(final_path.name)
-            if (
-                not isinstance(record, dict)
-                or set(record) != {"stageFile", "sha256", "sizeBytes"}
-                or not isinstance(record.get("stageFile"), str)
-                or SHA256_HEX.fullmatch(str(record.get("sha256"))) is None
-                or type(record.get("sizeBytes")) is not int
-                or record["sizeBytes"] < 0
-            ):
-                raise SealError("transaction artifact record is malformed")
-            stage_file = record["stageFile"]
-            try:
-                final_content, final_metadata = _read_private_file_at(
-                    parent_descriptor,
-                    final_path.name,
-                    maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
-                    maximum_links=2,
-                )
-            except FileNotFoundError:
-                final_content = None
-                final_metadata = None
-            except SealError:
-                raise
-            if final_content is not None:
-                if (
-                    len(final_content) != record["sizeBytes"]
-                    or hashlib.sha256(final_content).hexdigest()
-                    != record["sha256"]
-                ):
-                    raise SealError("existing transaction output does not match")
-                try:
-                    staged_content, staged_metadata = _read_private_file_at(
-                        stage_descriptor,
-                        record["stageFile"],
-                        maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
-                        maximum_links=2,
-                    )
-                except FileNotFoundError:
-                    staged_content = None
-                    staged_metadata = None
-                if staged_content is not None and (
-                    hashlib.sha256(staged_content).hexdigest()
-                    != record["sha256"]
-                    or final_metadata is None
-                    or staged_metadata is None
-                    or final_metadata.st_dev != staged_metadata.st_dev
-                    or final_metadata.st_ino != staged_metadata.st_ino
-                ):
-                    raise SealError(
-                        "existing transaction output was not staged here"
-                    )
-                continue
-
-            staged_content, staged_metadata = _read_private_file_at(
-                stage_descriptor,
-                stage_file,
-                maximum_bytes=MAX_TRANSACTION_FILE_BYTES,
-                maximum_links=2,
-            )
-            if (
-                len(staged_content) != record["sizeBytes"]
-                or hashlib.sha256(staged_content).hexdigest()
-                != record["sha256"]
-            ):
-                raise SealError("staged transaction artifact does not match")
-            try:
-                os.link(
-                    stage_file,
-                    final_path.name,
-                    src_dir_fd=stage_descriptor,
-                    dst_dir_fd=parent_descriptor,
-                    follow_symlinks=False,
-                )
-            except FileExistsError as exc:
-                raise SealError("transaction output appeared during commit") from exc
-            os.fsync(parent_descriptor)
-            linked = os.stat(
-                final_path.name,
-                dir_fd=parent_descriptor,
-                follow_symlinks=False,
-            )
-            if (
-                linked.st_dev != staged_metadata.st_dev
-                or linked.st_ino != staged_metadata.st_ino
-                or linked.st_nlink != 2
-            ):
-                raise SealError("transaction output identity changed")
-
-        for record in artifacts.values():
-            stage_file = record["stageFile"]
-            try:
-                metadata = os.stat(
-                    stage_file,
-                    dir_fd=stage_descriptor,
-                    follow_symlinks=False,
-                )
-            except FileNotFoundError:
-                continue
-            _safe_unlink_identity(stage_descriptor, stage_file, metadata)
-        manifest_metadata = os.stat(
-            "transaction.json",
-            dir_fd=stage_descriptor,
-            follow_symlinks=False,
+        _finish_transaction_stage(
+            parent_descriptor=parent_descriptor,
+            stage_descriptor=stage_descriptor,
+            stage_name=stage_name,
+            stage_metadata=stage_metadata,
+            artifacts=artifacts,
+            manifest_metadata=manifest_metadata,
+            allow_linking_missing_finals=True,
         )
-        _safe_unlink_identity(
-            stage_descriptor,
-            "transaction.json",
-            manifest_metadata,
-        )
-        os.fsync(stage_descriptor)
-        os.close(stage_descriptor)
-        stage_descriptor = None
-        os.rmdir(stage_name, dir_fd=parent_descriptor)
-        os.fsync(parent_descriptor)
     finally:
         if stage_descriptor is not None:
             os.close(stage_descriptor)
@@ -1616,6 +1848,15 @@ def seal(options: argparse.Namespace) -> Mapping[str, Any]:
             }
         )
         transaction_id = context_sha256[:32]
+        _recover_fully_linked_transaction(
+            final_paths=(
+                options.output,
+                options.receipt,
+                options.commit_marker,
+            ),
+            transaction_id=transaction_id,
+            context_sha256=context_sha256,
+        )
         existing = _load_existing_committed_receipt(
             output_path=options.output,
             receipt_path=options.receipt,

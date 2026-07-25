@@ -7314,11 +7314,179 @@ PY
   return 0
 }
 
+validate_inherited_release_root_publisher_lock() {
+  local python_bin="$1"
+  local work_root="$2"
+  local lock_fd="$3"
+  command "$python_bin" -I -S - "$lock_fd" "$work_root" <<'PY'
+from __future__ import annotations
+
+import fcntl
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+LOCK_NAME = ".chummer-release-publisher.lock"
+LOCK_CONTRACT = b"chummer.mac-release-root-publisher-lock/v1\n"
+
+
+def directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+
+
+def open_absolute_directory(path: Path) -> int:
+    if not path.is_absolute():
+        raise SystemExit("inherited publisher lock release root is not absolute")
+    descriptor = os.open(os.sep, directory_flags())
+    try:
+        for component in path.parts[1:]:
+            if component in ("", ".", ".."):
+                raise SystemExit(
+                    "inherited publisher lock release root is not canonical"
+                )
+            next_descriptor = os.open(
+                component,
+                directory_flags(),
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise SystemExit(
+                "inherited publisher lock release root is unsafe"
+            )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    if completed.returncode != 0 or len(completed.stdout.splitlines()) != 1:
+        raise SystemExit(
+            "inherited publisher lock has an unverifiable or extended macOS ACL"
+        )
+
+
+if len(sys.argv) != 3 or not sys.argv[1].isdigit():
+    raise SystemExit("inherited publisher lock descriptor is invalid")
+lock_descriptor = int(sys.argv[1], 10)
+work_root = Path(sys.argv[2])
+if (
+    str(lock_descriptor) != sys.argv[1]
+    or lock_descriptor < 3
+    or lock_descriptor > 255
+    or not work_root.is_absolute()
+    or not work_root.name.startswith("run-")
+    or work_root.name in ("", ".", "..")
+):
+    raise SystemExit("inherited publisher lock descriptor is invalid")
+
+root_descriptor = open_absolute_directory(work_root.parent)
+probe_descriptor: int | None = None
+try:
+    metadata = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    access_mode = fcntl.fcntl(lock_descriptor, fcntl.F_GETFL) & os.O_ACCMODE
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or linked.st_dev != metadata.st_dev
+        or linked.st_ino != metadata.st_ino
+        or access_mode != os.O_RDWR
+        or os.pread(lock_descriptor, 257, 0) != LOCK_CONTRACT
+    ):
+        raise SystemExit(
+            "inherited publisher lock does not match the canonical authority"
+        )
+    assert_no_macos_acl(lock_descriptor)
+
+    probe_descriptor = os.open(
+        LOCK_NAME,
+        os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=root_descriptor,
+    )
+    try:
+        fcntl.flock(probe_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pass
+    else:
+        fcntl.flock(probe_descriptor, fcntl.LOCK_UN)
+        raise SystemExit(
+            "inherited publisher descriptor has no held lock authority"
+        )
+
+    fcntl.flock(lock_descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    after = os.fstat(lock_descriptor)
+    linked_after = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        after.st_dev != metadata.st_dev
+        or after.st_ino != metadata.st_ino
+        or after.st_nlink != 1
+        or linked_after.st_dev != after.st_dev
+        or linked_after.st_ino != after.st_ino
+        or os.pread(lock_descriptor, 257, 0) != LOCK_CONTRACT
+    ):
+        raise SystemExit("inherited publisher lock identity changed")
+finally:
+    if probe_descriptor is not None:
+        os.close(probe_descriptor)
+    os.close(root_descriptor)
+PY
+}
+
+
 run_main_under_release_root_publisher_lock() {
-  if [[ "${CHUMMER_RELEASE_PUBLISHER_LOCK_HELD:-0}" == "1" ]]; then
-    main "$@"
-    return
-  fi
+  [[ -z "${CHUMMER_RELEASE_PUBLISHER_LOCK_HELD+x}" ]] \
+    || die "CHUMMER_RELEASE_PUBLISHER_LOCK_HELD is not publisher-lock authority"
 
   local python_bin
   python_bin="$(resolve_release_python)" \
@@ -7328,6 +7496,17 @@ run_main_under_release_root_publisher_lock() {
     || die "CHUMMER_MAC_RELEASE_WORK_ROOT must be absolute before acquiring the release-root publisher lock"
   [[ "${work_root##*/}" == run-* ]] \
     || die "CHUMMER_MAC_RELEASE_WORK_ROOT must name a run-* child of the shared release root"
+  if [[ -n "${CHUMMER_RELEASE_PUBLISHER_LOCK_FD+x}" ]]; then
+    [[ "$CHUMMER_RELEASE_PUBLISHER_LOCK_FD" =~ ^[0-9]+$ ]] \
+      || die "CHUMMER_RELEASE_PUBLISHER_LOCK_FD must identify an inherited descriptor"
+    validate_inherited_release_root_publisher_lock \
+      "$python_bin" \
+      "$work_root" \
+      "$CHUMMER_RELEASE_PUBLISHER_LOCK_FD" \
+      || die "inherited release-root publisher lock validation failed"
+    main "$@"
+    return
+  fi
   local executed_bootstrap_path
   executed_bootstrap_path="$(resolve_executed_bootstrap_path)" \
     || die "executed bootstrap must be an absolute regular file before acquiring the release-root publisher lock"
@@ -7553,12 +7732,14 @@ try:
     ):
         raise SystemExit("release-root publisher lock identity changed")
     environment = os.environ.copy()
-    environment["CHUMMER_RELEASE_PUBLISHER_LOCK_HELD"] = "1"
+    environment.pop("CHUMMER_RELEASE_PUBLISHER_LOCK_HELD", None)
+    environment["CHUMMER_RELEASE_PUBLISHER_LOCK_FD"] = str(lock_descriptor)
     completed = subprocess.run(
         ("/bin/bash", str(script), *child_arguments),
         check=False,
         stdin=3,
         env=environment,
+        pass_fds=(lock_descriptor,),
     )
     raise SystemExit(completed.returncode)
 finally:
