@@ -237,6 +237,7 @@ app.Use(async (context, next) =>
     string robotsPolicy = ResolveRobotsPolicy(context.Request.Path);
     context.Response.OnStarting(() =>
     {
+        HubSecurityHeaders.Apply(context.Response.Headers);
         context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
         if (requiresNoStore)
         {
