@@ -289,6 +289,7 @@ def test_managed_control_paths_close_the_strict_postdeploy_contract() -> None:
         "/api/ready/public-downloads",
         *postdeploy.UNAVAILABLE_READINESS_PATHS,
         *postdeploy.PRIVATE_PATHS,
+        *postdeploy.INSTALL_ROUTE_DENIAL_PATHS,
     }
 
     assert set(transaction.MANAGED_CONTROL_PATHS) == required

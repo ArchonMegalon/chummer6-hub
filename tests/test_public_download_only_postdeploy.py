@@ -25,13 +25,14 @@ class Response:
         payload: dict[str, object],
         *,
         private: bool = False,
+        content_type: str = "application/json",
     ) -> None:
         self.status_code = status
         self._payload = payload
-        self.headers = {"Content-Type": "application/json"}
+        self.headers = {"Content-Type": content_type}
         if private:
             self.headers = {
-                "Content-Type": "application/problem+json; charset=utf-8",
+                "Content-Type": content_type,
                 "Cache-Control": "private, no-store, max-age=0",
                 "Pragma": "no-cache",
                 "Expires": "0",
@@ -74,7 +75,13 @@ class StreamResponse:
 
 
 class DeliveryFixture:
-    def __init__(self, tmp_path: Path, *, embed_metadata: bool = True) -> None:
+    def __init__(
+        self,
+        tmp_path: Path,
+        *,
+        embed_metadata: bool = True,
+        semantic_payload_route: bool = False,
+    ) -> None:
         self.base_url = "https://chummer.run"
         self.generation = "generation-a"
         self.version = "run-test"
@@ -82,7 +89,15 @@ class DeliveryFixture:
         self.installer_name = "chummer-avalonia-win-x64-installer.exe"
         self.payload_name = "chummer-avalonia-win-x64-payload.zip"
         self.installer_url = f"{self.base_url}/downloads/files/{self.installer_name}"
-        self.payload_url = f"{self.base_url}/downloads/files/{self.payload_name}"
+        self.payload_url = (
+            f"{self.base_url}/downloads/files/{self.payload_name}"
+        )
+        self.manifest_payload_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/payload"
+            if semantic_payload_route
+            else self.payload_url
+        )
         self.sidecar_url = self.payload_url + ".json"
         self.canonical_url = (
             f"{self.base_url}/downloads/RELEASE_CHANNEL.generated.json"
@@ -116,6 +131,7 @@ class DeliveryFixture:
             "id": self.artifact_id,
             "platform": "windows",
             "rid": "win-x64",
+            "arch": "x64",
             "kind": "installer",
             "head": "avalonia",
             "channel": "preview",
@@ -138,7 +154,9 @@ class DeliveryFixture:
             "sha256": hashlib.sha256(self.installer_bytes).hexdigest(),
             "sizeBytes": len(self.installer_bytes),
             "payloadFileName": self.payload_name,
-            "payloadDownloadUrl": f"/downloads/files/{self.payload_name}",
+            "payloadDownloadUrl": self.manifest_payload_url.removeprefix(
+                self.base_url
+            ),
             "payloadSha256": self.payload_sha256,
             "payloadSizeBytes": len(self.payload_bytes),
         }
@@ -160,6 +178,7 @@ class DeliveryFixture:
             "rolloutState": "coverage_incomplete",
             "supportabilityState": "review_required",
             "status": "published",
+            "registryCommit": "d" * 40,
             "desktopTupleCoverage": {"desktopRouteTruth": [self.route]},
             "artifacts": [self.artifact],
         }
@@ -181,6 +200,8 @@ class DeliveryFixture:
         self.root = tmp_path / "bundle"
         self.files = self.root / "files"
         self.files.mkdir(parents=True)
+        self.evidence_root = self.root / "release-evidence"
+        self.evidence_root.mkdir()
         self.local_manifest = self.root / "releases.json"
         self.local_canonical = self.root / "RELEASE_CHANNEL.generated.json"
         self.responses: dict[str, StreamResponse] = {}
@@ -194,18 +215,138 @@ class DeliveryFixture:
         canonical_bytes = self.json_bytes(self.canonical)
         manifest_bytes = self.json_bytes(self.compatibility)
         sidecar_bytes = self.json_bytes(self.sidecar)
+        release_scope_sha256 = "a" * 64
+        evidence_registry_commit = "b" * 40
+        artifact_handoff: dict[str, object] = {
+            "contractName": "chummer.public-preview-byte-handoff/v1",
+            "status": "approved_public_preview_bytes",
+            "sourcePublicationState": "preview",
+            "releaseScopeDecisionSha256": release_scope_sha256,
+            "releaseVersion": self.version,
+            "channel": "preview",
+            "artifactId": self.artifact_id,
+            "head": "avalonia",
+            "platform": "windows",
+            "rid": "win-x64",
+            "arch": "x64",
+            "sha256": hashlib.sha256(self.installer_bytes).hexdigest(),
+            "sizeBytes": len(self.installer_bytes),
+            "artifactAccessClass": "open_public",
+            "signingRequirement": "preview_unsigned_allowed",
+            "downloadUrl": f"/downloads/files/{self.installer_name}",
+            "publicInstallRoute": (
+                f"/downloads/install/{self.artifact_id}"
+            ),
+        }
+        release_decision: dict[str, object] = {
+            "artifactAccessClass": "open_public",
+            "artifactHandoff": artifact_handoff,
+            "channel": "preview",
+            "contractName": "chummer.preview-release-decision/v2",
+            "manifestSha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "platforms": ["windows"],
+            "primaryHeadByPlatform": {"windows": "avalonia"},
+            "registryCommit": evidence_registry_commit,
+            "releaseDecisionStatus": "review_required",
+            "releaseScopeDecisionSha256": release_scope_sha256,
+            "releaseVersion": self.version,
+            "status": "review_required",
+            "verdict": "PREVIEW_RELEASE_REVIEW_REQUIRED",
+        }
+        decision_bytes = self.json_bytes(release_decision)
+        decision_sha256 = hashlib.sha256(decision_bytes).hexdigest()
+        authority_snapshot: dict[str, object] = {
+            "artifactCount": 1,
+            "artifacts": [
+                {
+                    "arch": "x64",
+                    "artifactId": self.artifact_id,
+                    "downloadUrl": f"/downloads/files/{self.installer_name}",
+                    "head": "avalonia",
+                    "installAccessClass": "open_public",
+                    "kind": "installer",
+                    "platform": "windows",
+                    "publicInstallRoute": (
+                        f"/downloads/install/{self.artifact_id}"
+                    ),
+                    "rid": "win-x64",
+                    "sha256": hashlib.sha256(
+                        self.installer_bytes
+                    ).hexdigest(),
+                    "sizeBytes": len(self.installer_bytes),
+                }
+            ],
+            "authorityContract": "chummer.release-authority-snapshot/v2",
+            "availablePlatforms": ["windows"],
+            "channel": "preview",
+            "downloadAccessPosture": "open_public",
+            "knownIssueSummary": (
+                "Preview release remains review-required."
+            ),
+            "manifestSha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "primaryHeadByPlatform": {"windows": "avalonia"},
+            "registryCommit": evidence_registry_commit,
+            "releaseDecisionSha256": decision_sha256,
+            "releaseDecisionStatus": "review_required",
+            "releaseVersion": self.version,
+            "rolloutState": "public_release_review_required",
+            "status": "published",
+            "supportabilityState": "review_required",
+        }
+        snapshot_bytes = self.json_bytes(authority_snapshot)
+        current: dict[str, object] = {
+            "decisionSha256": decision_sha256,
+            "releaseVersion": self.version,
+            "snapshotSha256": hashlib.sha256(
+                snapshot_bytes
+            ).hexdigest(),
+            "status": "review_required",
+        }
+        self.release_truth: dict[str, object] = {
+            "contractName": "chummer.release-truth-projection/v1",
+            "releaseVersion": self.version,
+            "channel": "preview",
+            "releaseStatus": "published",
+            "rolloutState": "public_release_review_required",
+            "supportabilityState": "review_required",
+            "availablePlatforms": ["windows"],
+            "primaryHeadByPlatform": {"windows": "avalonia"},
+            "artifactCount": 1,
+            "downloadAccessPosture": "open_public",
+            "knownIssueSummary": "Preview release remains review-required.",
+            "manifestSha256": hashlib.sha256(canonical_bytes).hexdigest(),
+            "registryCommit": evidence_registry_commit,
+            "releaseDecisionStatus": "review_required",
+            "releaseDecisionSha256": decision_sha256,
+            "releaseScopeDecisionSha256": release_scope_sha256,
+            "artifactHandoff": artifact_handoff,
+        }
+        live_canonical = {**self.canonical, "releaseTruth": self.release_truth}
+        live_compatibility = {
+            **self.compatibility,
+            "releaseTruth": self.release_truth,
+        }
+        live_canonical_bytes = self.json_bytes(live_canonical)
+        live_manifest_bytes = self.json_bytes(live_compatibility)
         self.local_canonical.write_bytes(canonical_bytes)
         self.local_manifest.write_bytes(manifest_bytes)
         (self.files / f"{self.payload_name}.json").write_bytes(sidecar_bytes)
+        (self.evidence_root / "CURRENT.json").write_bytes(
+            self.json_bytes(current)
+        )
+        (self.evidence_root / "SNAPSHOT.json").write_bytes(snapshot_bytes)
+        (self.evidence_root / "RELEASE_DECISION.json").write_bytes(
+            decision_bytes
+        )
         self.responses = {
             self.canonical_url: StreamResponse(
                 self.canonical_url,
-                canonical_bytes,
+                live_canonical_bytes,
                 generation=self.generation,
             ),
             self.compatibility_url: StreamResponse(
                 self.compatibility_url,
-                manifest_bytes,
+                live_manifest_bytes,
                 generation=self.generation,
             ),
             self.installer_url: StreamResponse(
@@ -254,6 +395,52 @@ class DeliveryFixture:
             )
 
 
+def control_release_truth() -> dict[str, object]:
+    release_scope_sha256 = "a" * 64
+    return {
+        "artifactCount": 1,
+        "artifactHandoff": {
+            "arch": "x64",
+            "artifactAccessClass": "open_public",
+            "artifactId": "avalonia-win-x64-installer",
+            "channel": "preview",
+            "contractName": "chummer.public-preview-byte-handoff/v1",
+            "downloadUrl": (
+                "/downloads/files/"
+                "chummer-avalonia-win-x64-installer.exe"
+            ),
+            "head": "avalonia",
+            "platform": "windows",
+            "publicInstallRoute": (
+                "/downloads/install/avalonia-win-x64-installer"
+            ),
+            "releaseScopeDecisionSha256": release_scope_sha256,
+            "releaseVersion": "run-test",
+            "rid": "win-x64",
+            "sha256": "b" * 64,
+            "signingRequirement": "preview_unsigned_allowed",
+            "sizeBytes": 1,
+            "sourcePublicationState": "preview",
+            "status": "approved_public_preview_bytes",
+        },
+        "availablePlatforms": ["windows"],
+        "channel": "preview",
+        "contractName": "chummer.release-truth-projection/v1",
+        "downloadAccessPosture": "open_public",
+        "knownIssueSummary": "Preview release remains review-required.",
+        "manifestSha256": "c" * 64,
+        "primaryHeadByPlatform": {"windows": "avalonia"},
+        "registryCommit": "d" * 40,
+        "releaseDecisionSha256": "e" * 64,
+        "releaseDecisionStatus": "review_required",
+        "releaseScopeDecisionSha256": release_scope_sha256,
+        "releaseStatus": "published",
+        "releaseVersion": "run-test",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+    }
+
+
 def responses() -> dict[str, Response]:
     serving = {
         "contractName": postdeploy.READINESS_CONTRACT,
@@ -273,8 +460,26 @@ def responses() -> dict[str, Response]:
             for path in postdeploy.UNAVAILABLE_READINESS_PATHS
         },
         **{
-            path: Response(503, postdeploy.PROBLEM, private=True)
+            path: Response(
+                503,
+                postdeploy.PROBLEM,
+                private=True,
+                content_type="application/problem+json; charset=utf-8",
+            )
             for path in postdeploy.PRIVATE_PATHS
+        },
+        **{
+            path: Response(
+                409,
+                {
+                    "message": "Install handoff is withheld.",
+                    "status": "review_required",
+                    "releaseTruth": control_release_truth(),
+                },
+                private=True,
+                content_type="application/json; charset=utf-8",
+            )
+            for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
         },
     }
     return result
@@ -298,6 +503,12 @@ def test_control_plane_accepts_serving_only_and_private_fail_closed(
     assert result["privateBoundaryStatuses"] == {
         path: 503 for path in postdeploy.PRIVATE_PATHS
     }
+    assert result["installRouteDenialStatuses"] == {
+        path: 409 for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
+    }
+    assert result["installRouteReleaseTruthSha256"] == (
+        postdeploy._canonical_object_sha256(control_release_truth())
+    )
 
 
 def test_control_plane_rejects_global_readiness_claim(
@@ -319,6 +530,54 @@ def test_control_plane_rejects_global_readiness_claim(
             )
 
 
+def test_control_plane_rejects_install_route_without_review_denial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    fixture["/downloads/install/public-download-only-probe"] = Response(
+        503,
+        postdeploy.PROBLEM,
+        private=True,
+        content_type="application/problem+json; charset=utf-8",
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="review-required install denial"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_optimistic_release_truth_extension(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    denial = fixture["/downloads/install/public-download-only-probe"]
+    denial._payload["releaseTruth"]["stable"] = True
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="review-required install denial",
+        ):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
 def test_control_plane_rejects_private_problem_body_drift(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -327,6 +586,7 @@ def test_control_plane_rejects_private_problem_body_drift(
         503,
         {**postdeploy.PROBLEM, "detail": "different"},
         private=True,
+        content_type="application/problem+json; charset=utf-8",
     )
     monkeypatch.setattr(
         postdeploy,
@@ -335,6 +595,43 @@ def test_control_plane_rejects_private_problem_body_drift(
     )
     with postdeploy.anonymous_session() as session:
         with pytest.raises(ValueError, match="private 503 boundary"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+@pytest.mark.parametrize(
+    ("path", "content_type", "message"),
+    (
+        (
+            "/api/v1/install-linking/me",
+            "application/problem+jsonx",
+            "private 503 boundary",
+        ),
+        (
+            "/downloads/install/public-download-only-probe",
+            "application/jsonp",
+            "review-required install denial",
+        ),
+    ),
+)
+def test_control_plane_rejects_mime_suffix_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    content_type: str,
+    message: str,
+) -> None:
+    fixture = responses()
+    fixture[path].headers["Content-Type"] = content_type
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, request_path, _timeout: fixture[request_path],
+    )
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match=message):
             postdeploy.verify_control_plane(
                 session,
                 "https://chummer.run",
@@ -604,7 +901,14 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
 
     assert result["status"] == "pass"
     assert result["generationId"] == fixture.generation
+    assert (
+        fixture.canonical["registryCommit"]
+        != fixture.release_truth["registryCommit"]
+    )
     assert result["generationHeader"] == postdeploy.GENERATION_HEADER
+    assert result["releaseTruthSha256"] == (
+        postdeploy._canonical_object_sha256(fixture.release_truth)
+    )
     assert [url for url, _ in calls] == [
         fixture.canonical_url,
         fixture.compatibility_url,
@@ -617,6 +921,303 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
     assert artifact["policy"]["stable"] is False
     assert artifact["policy"]["update"] is False
     assert artifact["embeddedInstallerMetadataAgrees"] is True
+
+
+def test_strict_delivery_accepts_sealed_legacy_rows_with_release_truth(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    for key in ("artifactByteVisibility", "previewPolicy", "signature"):
+        fixture.artifact.pop(key)
+        fixture.compatibility["downloads"][0].pop(key, None)
+    for key in ("routeAuthority", "publicationState", "visibility"):
+        fixture.route.pop(key)
+    fixture.route.update(
+        {
+            "promotionState": "promoted",
+            "updateEligibility": "eligible",
+            "publicInstallRoute": (
+                f"/downloads/install/{fixture.artifact_id}"
+            ),
+        }
+    )
+    fixture.rewrite()
+    fixture.install(monkeypatch)
+
+    result = fixture.verify()
+
+    assert result["status"] == "pass"
+    assert result["artifacts"][0]["policy"]["stable"] is False
+    assert result["artifacts"][0]["policy"]["update"] is False
+
+
+def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    for key in ("artifactByteVisibility", "previewPolicy", "signature"):
+        fixture.artifact.pop(key)
+        fixture.compatibility["downloads"][0].pop(key, None)
+    for key in ("routeAuthority", "publicationState", "visibility"):
+        fixture.route.pop(key)
+    fixture.route.update(
+        {
+            "promotionState": "promoted",
+            "updateEligibility": "eligible",
+            "publicInstallRoute": "/downloads/install/unrelated-artifact",
+        }
+    )
+    fixture.rewrite()
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="legacy route truth shape"):
+        fixture.verify()
+
+
+def test_strict_delivery_uses_sidecar_raw_url_for_semantic_manifest_payload_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
+    calls = fixture.install(monkeypatch)
+
+    result = fixture.verify()
+
+    requested_urls = [url for url, _stream in calls]
+    assert result["status"] == "pass"
+    assert fixture.manifest_payload_url != fixture.payload_url
+    assert fixture.payload_url in requested_urls
+    assert fixture.manifest_payload_url not in requested_urls
+
+
+def test_www_delivery_accepts_canonical_apex_sidecar_url(
+    tmp_path: Path,
+) -> None:
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+    )
+
+    _canonical, _generation, expectations = (
+        postdeploy.derive_download_expectations(
+            base_url="https://www.chummer.run",
+            local_manifest_path=fixture.local_manifest,
+            local_canonical_manifest_path=fixture.local_canonical,
+        )
+    )
+
+    assert expectations[0].payload_url == fixture.payload_url
+    assert expectations[0].payload_probe_url == (
+        "https://www.chummer.run/downloads/files/"
+        f"{fixture.payload_name}"
+    )
+    assert expectations[0].sidecar_probe_url == (
+        "https://www.chummer.run/downloads/files/"
+        f"{fixture.payload_name}.json"
+    )
+
+
+def test_strict_delivery_accepts_generation_scoped_sidecar_and_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+    )
+    generation_root = (
+        fixture.root / "generations" / fixture.generation
+    )
+    generation_files = generation_root / "files"
+    generation_evidence = generation_root / "release-evidence"
+    generation_files.mkdir(parents=True)
+    generation_evidence.mkdir()
+    (fixture.files / f"{fixture.payload_name}.json").replace(
+        generation_files / f"{fixture.payload_name}.json"
+    )
+    for name in ("CURRENT.json", "SNAPSHOT.json", "RELEASE_DECISION.json"):
+        (fixture.evidence_root / name).replace(
+            generation_evidence / name
+        )
+    fixture.install(monkeypatch)
+
+    assert fixture.verify()["status"] == "pass"
+
+
+def test_strict_delivery_rejects_disagreeing_sidecar_copies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    generation_files = (
+        fixture.root
+        / "generations"
+        / fixture.generation
+        / "files"
+    )
+    generation_files.mkdir(parents=True)
+    (
+        generation_files / f"{fixture.payload_name}.json"
+    ).write_bytes(b"{}\n")
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="sidecar copies disagree"):
+        fixture.verify()
+
+
+def test_strict_delivery_rejects_disagreeing_release_evidence_copies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    generation_evidence = (
+        fixture.root
+        / "generations"
+        / fixture.generation
+        / "release-evidence"
+    )
+    generation_evidence.mkdir(parents=True)
+    for name in ("CURRENT.json", "SNAPSHOT.json", "RELEASE_DECISION.json"):
+        (generation_evidence / name).write_bytes(
+            (fixture.evidence_root / name).read_bytes()
+        )
+    with (generation_evidence / "CURRENT.json").open("ab") as handle:
+        handle.write(b" ")
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="evidence copies disagree"):
+        fixture.verify()
+
+
+def test_strict_delivery_rejects_mutated_release_evidence_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    with (fixture.evidence_root / "RELEASE_DECISION.json").open(
+        "ab"
+    ) as handle:
+        handle.write(b" ")
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="CURRENT.json is not closed"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "registryCommit",
+        "releaseDecisionSha256",
+        "releaseScopeDecisionSha256",
+    ),
+)
+def test_strict_delivery_rejects_release_truth_authority_not_in_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    replacement = "e" * (40 if field == "registryCommit" else 64)
+    for url in (fixture.canonical_url, fixture.compatibility_url):
+        payload = json.loads(fixture.responses[url].body.decode("utf-8"))
+        payload["releaseTruth"][field] = replacement
+        if field == "releaseScopeDecisionSha256":
+            payload["releaseTruth"]["artifactHandoff"][field] = replacement
+        fixture.responses[url] = StreamResponse(
+            url,
+            fixture.json_bytes(payload),
+            generation=fixture.generation,
+        )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match="expected review-required authority",
+    ):
+        fixture.verify()
+
+
+def test_strict_delivery_rejects_optimistic_release_truth_extension(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    for url in (fixture.canonical_url, fixture.compatibility_url):
+        payload = json.loads(fixture.responses[url].body.decode("utf-8"))
+        payload["releaseTruth"]["stable"] = True
+        fixture.responses[url] = StreamResponse(
+            url,
+            fixture.json_bytes(payload),
+            generation=fixture.generation,
+        )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="unexpected authority schema"):
+        fixture.verify()
+
+
+def test_sidecar_lookup_rejects_unsafe_generation_segment(
+    tmp_path: Path,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+
+    with pytest.raises(ValueError, match="safe path segment"):
+        postdeploy._find_sidecar_bytes(
+            fixture.local_manifest,
+            fixture.local_canonical,
+            f"{fixture.payload_name}.json",
+            "../generation-a",
+        )
+
+
+def test_strict_delivery_rejects_cross_generation_semantic_payload_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
+    drifted = fixture.manifest_payload_url.replace(
+        fixture.generation,
+        "generation-b",
+    )
+    fixture.artifact["payloadDownloadUrl"] = drifted.removeprefix(
+        fixture.base_url
+    )
+    fixture.compatibility["downloads"][0]["payloadDownloadUrl"] = (
+        drifted.removeprefix(fixture.base_url)
+    )
+    fixture.rewrite()
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match="not filename- or generation-bound",
+    ):
+        fixture.verify()
+
+
+def test_strict_delivery_rejects_release_truth_signing_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    payload = json.loads(
+        fixture.responses[fixture.canonical_url].body.decode("utf-8")
+    )
+    payload["releaseTruth"]["artifactHandoff"]["signingRequirement"] = (
+        "stable_signature_required"
+    )
+    fixture.responses[fixture.canonical_url] = StreamResponse(
+        fixture.canonical_url,
+        fixture.json_bytes(payload),
+        generation=fixture.generation,
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match="artifact handoff disagrees"):
+        fixture.verify()
 
 
 def test_strict_delivery_rejects_redirect(

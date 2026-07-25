@@ -43,6 +43,8 @@ public sealed class InstallLinkingRequestAdmissionMiddleware(RequestDelegate nex
                 status = StatusCodes.Status503ServiceUnavailable,
                 detail = UnavailableMessage
             },
+            options: null,
+            contentType: "application/problem+json; charset=utf-8",
             cancellationToken: context.RequestAborted);
     }
 
