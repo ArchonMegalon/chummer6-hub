@@ -962,7 +962,7 @@ def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_qui
     assert result.returncode == 2
     assert TOPOLOGY_B_GUARD_MESSAGE in result.stderr
     assert (
-        "initial-release-shelf-public-download-cutover-recover"
+        "initial-release-shelf-public-download-cutover-retire"
         in result.stderr
     )
     assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
@@ -983,6 +983,7 @@ def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_qui
         "initial-release-shelf-cutover-recover",
         "initial-release-shelf-public-download-cutover",
         "initial-release-shelf-public-download-cutover-recover",
+        "initial-release-shelf-public-download-cutover-retire",
     ],
 )
 def test_topology_b_guard_allows_supported_recovery_and_download_routes(

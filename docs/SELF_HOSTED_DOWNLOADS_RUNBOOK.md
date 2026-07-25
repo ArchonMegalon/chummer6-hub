@@ -127,6 +127,44 @@ transaction journal exists, a normal deploy reconciles it and exits without star
 transaction. After re-establishing the same source and runtime-proof authorities, request explicit
 idempotent recovery only with `scripts/deploy_public_edge_portal.sh recover`.
 
+### Committed public-download sidecar retirement
+
+Topology-B recovery and retirement are deliberately different operations. Use
+`initial-release-shelf-public-download-cutover-recover` only to reconcile an interrupted cutover:
+an uncommitted journal may return to its prior configuration, while a terminal committed journal
+remains committed and its sidecar stays authoritative. Use
+`initial-release-shelf-public-download-cutover-retire` only when an already committed sidecar must
+be decommissioned in favor of the exact incumbent captured before that cutover.
+
+Retirement requires `CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID` to name the existing committed operation
+(the suffix after `chummer-public-download-`), not a new retry identifier. The clean launcher must
+also receive the current source authority pins, the exact Cloudflare account and tunnel identifiers,
+and `CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE` as an absolute canonical path to an
+owner-owned, single-link, readable, owner-only credential file. The wrapper validates file metadata
+and passes only its path to the environment-scrubbed controller; neither the wrapper nor the
+retirement receipts print credential content. If that governed credential path is unavailable,
+retirement is blocked until an operator restores or supplies it through the approved secret lane.
+Do not search arbitrary secret roots or copy credentials into a release workspace.
+
+The retirement controller first binds the active authority to terminal `cloudflare-committed.json`
+evidence and re-reads the live tunnel configuration at the exact committed target version and hash.
+It then durably authorizes retirement, re-reads immediately before the PUT, restores the captured
+`priorConfig` object and hash, polls bounded configuration and connector convergence, and proves HTTP 200 plus
+the exact captured body hashes and sizes for both `RELEASE_CHANNEL.generated.json` and
+`releases.json` on `chummer.run` and `www.chummer.run`. Only after a final Cloudflare re-read does it
+atomically move `public-download-active-runtime-authority.json` into the operation-private retired
+authority receipt and clean the exact sidecar Compose project, volumes, and candidate image.
+Cleanup reconstructs the original runtime inputs from the journal and verifies the historical
+Compose sources from the operation's captured Git commit, so a deleted sealed build workspace or a
+newer controller commit cannot silently redefine the cleanup boundary.
+
+An exit status of `76` means the outcome is intentionally uncertain and the authenticated shared
+mutation lock remains held. Inspect the durable receipts, recover that exact lock through the
+authenticated stale-lock procedure below, and rerun the same retirement operation ID. A resumed
+retirement accepts only the exact committed target or the exact restored prior config and never
+silently reapplies the sidecar target. Never delete, rename, or edit the active-authority marker by
+hand.
+
 ### Authenticated manual stale-lock recovery
 
 The shared mutation lock never expires automatically. A failed acquisition remains a hard stop.
