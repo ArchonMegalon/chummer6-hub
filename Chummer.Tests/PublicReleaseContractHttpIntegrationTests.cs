@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.PublicSurface;
@@ -103,6 +104,47 @@ public sealed class PublicReleaseContractHttpIntegrationTests
             context.Response.Headers.CacheControl.ToString());
     }
 
+    [Theory]
+    [InlineData(
+        "/downloads/g/generation-a/files/chummer+setup.exe",
+        "/downloads/g/generation-a/files/chummer+setup.exe",
+        "chummer+setup.exe",
+        true)]
+    [InlineData(
+        "/downloads/g/generation-a/files/chummer+setup.exe",
+        "/downloads/g/generation-a/files/chummer%2Bsetup.exe",
+        "chummer+setup.exe",
+        false)]
+    [InlineData(
+        "/downloads/g/generation-a/files/chummer..setup.exe",
+        "/downloads/g/generation-a/files/chummer..setup.exe",
+        "chummer..setup.exe",
+        false)]
+    [InlineData(
+        "/downloads/g/generation-a/files/nested/setup.exe",
+        "/downloads/g/generation-a/files/nested/setup.exe",
+        "nested/setup.exe",
+        false)]
+    public void GenerationFileContractRequiresExactPortableRawTarget(
+        string path,
+        string rawTarget,
+        string fileName,
+        bool expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = path;
+        context.Features.Get<IHttpRequestFeature>()!.RawTarget = rawTarget;
+
+        Assert.Equal(
+            expected,
+            PublicReleaseContractRequestPolicy
+                .IsCanonicalGenerationFileRequest(
+                    context.Request,
+                    "generation-a",
+                    fileName));
+    }
+
     private static void AssertNoStoreHeaders(HttpResponseMessage response)
     {
         Assert.True(response.Headers.CacheControl?.Private);
@@ -159,6 +201,11 @@ public sealed class PublicReleaseContractHttpIntegrationTests
             builder.Services.AddSingleton<ReleaseShelfGenerationStore>();
 
             WebApplication app = builder.Build();
+            app.Use((context, next) =>
+                PublicReleaseResponseCachePolicy.InvokeNoStoreBoundaryAsync(
+                    context,
+                    next,
+                    requiresNoStore: true));
             app.UseRouting();
             app.UseMiddleware<PublicReleaseTruthProjectionMiddleware>();
             app.MapControllers();

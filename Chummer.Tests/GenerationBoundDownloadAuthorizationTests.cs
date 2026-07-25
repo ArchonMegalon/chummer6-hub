@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,7 +9,11 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -574,6 +579,232 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     }
 
     [Theory]
+    [InlineData(
+        "GET",
+        "/downloads/g/generation-windows-public/files/chummer-windows-public-installer.exe",
+        "application/octet-stream")]
+    [InlineData(
+        "HEAD",
+        "/downloads/g/generation-windows-public/files/chummer-windows-public-installer.exe",
+        "application/octet-stream")]
+    [InlineData(
+        "GET",
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload",
+        "application/octet-stream")]
+    [InlineData(
+        "HEAD",
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload",
+        "application/octet-stream")]
+    [InlineData(
+        "GET",
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/metadata",
+        "application/json; charset=utf-8")]
+    [InlineData(
+        "HEAD",
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/metadata",
+        "application/json; charset=utf-8")]
+    public async Task ProductionNoStoreBoundaryPreservesVerifiedCanonicalGenerationBytes(
+        string method,
+        string target,
+        string expectedContentType)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        await using GenerationHttpApp app = await fixture.StartHttpAppAsync();
+        using HttpClient client = app.CreateClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), target);
+
+        using HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            PublicReleaseResponseCachePolicy.ImmutableCacheControl,
+            response.Headers.CacheControl?.ToString());
+        Assert.Equal(
+            GenerationFixture.PublicWindowsGenerationId,
+            Assert.Single(response.Headers.GetValues(
+                "X-Chummer-Release-Generation")));
+        Assert.Equal(
+            expectedContentType,
+            response.Content.Headers.ContentType?.ToString());
+        Assert.Null(response.Content.Headers.ContentDisposition);
+        Assert.True(response.Content.Headers.ContentLength > 0);
+        Assert.False(response.Headers.Contains("CDN-Cache-Control"));
+        Assert.False(response.Headers.Contains("Cloudflare-CDN-Cache-Control"));
+        Assert.False(response.Headers.Contains("Surrogate-Control"));
+        Assert.False(response.Headers.Contains("Pragma"));
+        Assert.Null(response.Content.Headers.Expires);
+
+        byte[] body = await response.Content.ReadAsByteArrayAsync();
+        if (method == HttpMethods.Head)
+        {
+            Assert.Empty(body);
+        }
+        else
+        {
+            Assert.Equal(response.Content.Headers.ContentLength, body.LongLength);
+        }
+    }
+
+    [Theory]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer",
+        HttpStatusCode.OK)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/releases.json",
+        HttpStatusCode.OK)]
+    [InlineData(
+        "/downloads/install/shared-account-required-installer/payload",
+        HttpStatusCode.OK)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/files/chummer-windows-public-installer.exe?unknown=value",
+        HttpStatusCode.OK)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/PAYLOAD",
+        HttpStatusCode.NotFound)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload?unknown=value",
+        HttpStatusCode.NotFound)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload?ticket=invalid",
+        HttpStatusCode.Unauthorized)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload?claimCode=invalid",
+        HttpStatusCode.Unauthorized)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/install/shared-account-required-installer/payload/",
+        HttpStatusCode.NotFound)]
+    [InlineData(
+        "/downloads/g/generation-windows-public/files/missing.exe",
+        HttpStatusCode.NotFound)]
+    public async Task ProductionNoStoreBoundaryRejectsUnmarkedCredentialAndNoncanonicalVariants(
+        string target,
+        HttpStatusCode expectedStatus)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        await using GenerationHttpApp app = await fixture.StartHttpAppAsync();
+        using HttpClient client = app.CreateClient();
+
+        using HttpResponseMessage response = await client.GetAsync(target);
+
+        Assert.Equal(expectedStatus, response.StatusCode);
+        AssertPrivateNoStoreHeaders(response);
+    }
+
+    [Fact]
+    public async Task ProductionNoStoreBoundaryRejectsCredentialHeadersAndRanges()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        await using GenerationHttpApp app = await fixture.StartHttpAppAsync();
+        using HttpClient client = app.CreateClient();
+        string target =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/files/{GenerationFixture.PublicWindowsFileName}";
+
+        (string Name, string Value)[] privateRequestHeaders =
+        [
+            ("Authorization", "Bearer test-credential"),
+            ("Cookie", "session=test-credential"),
+            ("Proxy-Authorization", "Bearer test-credential"),
+            ("If-None-Match", "\"test-etag\""),
+            ("If-Modified-Since", "Wed, 21 Oct 2015 07:28:00 GMT")
+        ];
+        foreach ((string name, string value) in privateRequestHeaders)
+        {
+            using var privateRequest =
+                new HttpRequestMessage(HttpMethod.Get, target);
+            Assert.True(
+                privateRequest.Headers.TryAddWithoutValidation(name, value));
+            using HttpResponseMessage privateResponse =
+                await client.SendAsync(privateRequest);
+            Assert.Equal(HttpStatusCode.OK, privateResponse.StatusCode);
+            AssertPrivateNoStoreHeaders(privateResponse);
+        }
+
+        using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, target);
+        rangeRequest.Headers.Range =
+            new System.Net.Http.Headers.RangeHeaderValue(0, 3);
+        using HttpResponseMessage range = await client.SendAsync(rangeRequest);
+        Assert.Equal(HttpStatusCode.PartialContent, range.StatusCode);
+        AssertPrivateNoStoreHeaders(range);
+
+        using var unsatisfiedRangeRequest =
+            new HttpRequestMessage(HttpMethod.Get, target);
+        unsatisfiedRangeRequest.Headers.Range =
+            new System.Net.Http.Headers.RangeHeaderValue(
+                long.MaxValue - 1,
+                long.MaxValue);
+        using HttpResponseMessage unsatisfiedRange =
+            await client.SendAsync(unsatisfiedRangeRequest);
+        Assert.Equal(
+            HttpStatusCode.RequestedRangeNotSatisfiable,
+            unsatisfiedRange.StatusCode);
+        AssertPrivateNoStoreHeaders(unsatisfiedRange);
+    }
+
+    [Fact]
+    public async Task ProductionNoStoreBoundaryKeepsValidCredentialDownloadsPrivate()
+    {
+        using GenerationFixture fixture = new();
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact("generation-a");
+        ReleaseShelfSnapshot snapshot =
+            fixture.ManifestService.CaptureShelfGeneration("generation-a");
+        InstallBootstrapTicketIssueResult ticket =
+            fixture.InstallBootstrapTickets.IssueBound(
+                artifact.Id,
+                fixture.DeliveryPolicy.BuildCredentialBindings(
+                    snapshot,
+                    [artifact]),
+                "generation-a",
+                "user-generation-a",
+                "subject-generation-a");
+        DownloadDispatchResult dispatch = fixture.InstallLinking.IssueDownload(
+            manifest,
+            artifact,
+            "user-generation-a",
+            "subject-generation-a");
+        Assert.NotNull(dispatch.ClaimTicket);
+
+        await using GenerationHttpApp app = await fixture.StartHttpAppAsync();
+        using HttpClient client = app.CreateClient();
+        string[] targets =
+        [
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/payload?ticket={Uri.EscapeDataString(ticket.Ticket)}",
+            $"/downloads/g/generation-a/files/{GenerationFixture.FileName}?claimCode={Uri.EscapeDataString(dispatch.ClaimTicket!.ClaimCode)}"
+        ];
+        foreach (string target in targets)
+        {
+            using HttpResponseMessage response = await client.GetAsync(target);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+            AssertPrivateNoStoreHeaders(response);
+        }
+    }
+
+    [Fact]
+    public async Task ProductionNoStoreBoundaryKeepsVerificationErrorsPrivate()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        _ = fixture.LoadArtifact(
+            GenerationFixture.PublicWindowsGenerationId);
+        fixture.CorruptGenerationCompanion(
+            GenerationFixture.PublicWindowsGenerationId,
+            "payload");
+        await using GenerationHttpApp app = await fixture.StartHttpAppAsync();
+        using HttpClient client = app.CreateClient();
+        string target =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/payload";
+
+        using HttpResponseMessage response = await client.GetAsync(target);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        AssertPrivateNoStoreHeaders(response);
+    }
+
+    [Theory]
     [InlineData("GET", "payload")]
     [InlineData("HEAD", "payload")]
     [InlineData("GET", "metadata")]
@@ -1099,6 +1330,55 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         Assert.Equal("0", headers.Expires.ToString());
     }
 
+    private static void AssertPrivateNoStoreHeaders(
+        HttpResponseMessage response)
+    {
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal(TimeSpan.Zero, response.Headers.CacheControl?.MaxAge);
+        Assert.Equal(
+            "no-store, max-age=0",
+            Assert.Single(response.Headers.GetValues("CDN-Cache-Control")));
+        Assert.Equal(
+            "no-store, max-age=0",
+            Assert.Single(response.Headers.GetValues(
+                "Cloudflare-CDN-Cache-Control")));
+        Assert.Equal(
+            "no-store",
+            Assert.Single(response.Headers.GetValues("Surrogate-Control")));
+        Assert.Equal(
+            "no-cache",
+            Assert.Single(response.Headers.GetValues("Pragma")));
+        Assert.DoesNotContain(
+            "immutable",
+            response.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+    }
+
+    private sealed class GenerationHttpApp(
+        WebApplication application) : IAsyncDisposable
+    {
+        public HttpClient CreateClient()
+        {
+            IServer server =
+                application.Services.GetRequiredService<IServer>();
+            IServerAddressesFeature addresses = server.Features
+                .Get<IServerAddressesFeature>()
+                ?? throw new InvalidOperationException(
+                    "Kestrel did not expose a bound address.");
+            return new HttpClient
+            {
+                BaseAddress = new Uri(addresses.Addresses.Single())
+            };
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await application.StopAsync();
+            await application.DisposeAsync();
+        }
+    }
+
     private sealed class GenerationFixture : IDisposable
     {
         public const string ArtifactId = "shared-account-required-installer";
@@ -1397,6 +1677,39 @@ public sealed class GenerationBoundDownloadAuthorizationTests
 
         public void SetConfiguration(string key, string? value)
             => Configuration[key] = value;
+
+        public async Task<GenerationHttpApp> StartHttpAppAsync()
+        {
+            _httpContextAccessor.HttpContext = null;
+            WebApplicationBuilder builder = WebApplication.CreateBuilder();
+            builder.WebHost.ConfigureKestrel(
+                options => options.Listen(IPAddress.Loopback, 0));
+            builder.Services
+                .AddControllers()
+                .AddApplicationPart(
+                    typeof(DownloadsCompatibilityController).Assembly)
+                .AddControllersAsServices();
+            builder.Services.AddSingleton(Controller);
+
+            WebApplication app = builder.Build();
+            app.Use((context, next) =>
+                PublicReleaseResponseCachePolicy.InvokeNoStoreBoundaryAsync(
+                    context,
+                    next,
+                    requiresNoStore: true));
+            app.UseRouting();
+            app.MapControllers();
+            try
+            {
+                await app.StartAsync();
+                return new GenerationHttpApp(app);
+            }
+            catch
+            {
+                await app.DisposeAsync();
+                throw;
+            }
+        }
 
         public PublicReleaseTruthProjectionService CreateReleaseTruthProjectionService()
             => new(

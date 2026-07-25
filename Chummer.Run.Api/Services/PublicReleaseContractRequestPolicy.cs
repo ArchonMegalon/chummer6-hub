@@ -66,6 +66,16 @@ internal static class PublicReleaseContractRequestPolicy
                    $"{GenerationInstallPrefix}{generationId}/install/{artifactId}/{routeRole}");
     }
 
+    internal static bool IsCanonicalGenerationFileRequest(
+        HttpRequest request,
+        string generationId,
+        string fileName)
+        => IsCanonicalGenerationId(generationId)
+           && IsCanonicalPortableFileName(fileName)
+           && IsExactRequestTarget(
+               request,
+               $"{GenerationInstallPrefix}{generationId}/files/{fileName}");
+
     internal static bool IsCanonicalReleaseTruthRequest(
         HttpRequest request,
         string? generationId)
@@ -102,6 +112,14 @@ internal static class PublicReleaseContractRequestPolicy
            && value.All(static character =>
                char.IsAsciiLetterOrDigit(character)
                || character is '.' or '_' or '-');
+
+    private static bool IsCanonicalPortableFileName(string value)
+        => value.Length is > 0 and <= 255
+           && char.IsAsciiLetterOrDigit(value[0])
+           && !value.Contains("..", StringComparison.Ordinal)
+           && value.All(static character =>
+               char.IsAsciiLetterOrDigit(character)
+               || character is '.' or '_' or '+' or '-');
 
     private static bool IsCompanionRole(string value)
         => value is "payload" or "metadata";

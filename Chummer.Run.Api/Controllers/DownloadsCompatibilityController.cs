@@ -1309,7 +1309,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                 enableRangeProcessing: true);
             ApplyVerifiedGenerationCacheHeaders(
                 result,
-                immutableGenerationPath);
+                immutableGenerationPath,
+                binding,
+                isRawArtifactPath);
             return result;
         }
 
@@ -1381,7 +1383,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                 enableRangeProcessing: true);
             ApplyVerifiedGenerationCacheHeaders(
                 result,
-                immutableGenerationPath);
+                immutableGenerationPath,
+                binding,
+                isRawArtifactPath);
             return result;
         }
 
@@ -1420,16 +1424,26 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     private void ApplyVerifiedGenerationCacheHeaders(
         IActionResult result,
-        bool immutableGenerationPath)
+        bool immutableGenerationPath,
+        ArtifactDeliveryBinding binding,
+        bool isRawArtifactPath)
     {
         if (!immutableGenerationPath)
         {
             return;
         }
 
-        if (result is FileStreamResult)
+        if (result is FileStreamResult fileResult)
         {
             TryApplyImmutableGenerationHeaders();
+            PublicReleaseResponseCachePolicy
+                .MarkVerifiedImmutableGenerationResponse(
+                    HttpContext,
+                    binding,
+                    fileResult,
+                    isRawArtifactPath
+                        ? VerifiedImmutableGenerationRouteKind.File
+                        : VerifiedImmutableGenerationRouteKind.Companion);
             return;
         }
 
