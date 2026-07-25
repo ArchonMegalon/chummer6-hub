@@ -1941,7 +1941,10 @@ if ! install_linking_build_source_provenance="$(
 import pathlib, re, sys
 scripts = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(scripts))
-from materialize_install_linking_cutover_boundary import bind_active_build_info
+from materialize_install_linking_cutover_boundary import (
+    bind_active_build_info,
+    select_exact_build_context_provenance,
+)
 
 path, digest, payload = bind_active_build_info(
     pathlib.Path(sys.argv[2]),
@@ -1954,13 +1957,14 @@ if str(path) != sys.argv[2] or digest != sys.argv[6]:
 provenance = payload.get("buildSourceProvenance")
 if not isinstance(provenance, dict):
     raise SystemExit(1)
+_build_context_name, build_context = (
+    select_exact_build_context_provenance(provenance)
+)
 values = (
     (provenance.get("hub-registry") or {}).get("head"),
     (provenance.get("design-product") or {}).get("head"),
     (provenance.get("fleet-media-factory-contracts") or {}).get("head"),
-    (provenance.get("canonical-build-context") or {}).get(
-        "dockerignoreSha256"
-    ),
+    build_context.get("dockerignoreSha256"),
 )
 if (
     any(not isinstance(value, str) or "|" in value or "\n" in value for value in values)

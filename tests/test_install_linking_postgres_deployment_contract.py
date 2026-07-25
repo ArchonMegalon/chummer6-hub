@@ -13,6 +13,7 @@ SECURITY_DOC_PATH = ROOT / "docs" / "INSTALL_LINKING_STORE_SECURITY.md"
 RUNBOOK_PATH = ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
 DOCKERFILE_PATH = ROOT / "Chummer.Run.Api" / "Dockerfile"
 DOCKERIGNORE_PATH = ROOT / ".dockerignore"
+DEPLOY_PATH = ROOT / "scripts" / "deploy_public_edge_portal.sh"
 
 
 class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
@@ -90,6 +91,30 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
                     ["/tmp:rw,noexec,nosuid,nodev,mode=1777"],
                     service["tmpfs"],
                 )
+
+    def test_activation_parser_uses_the_exact_validated_build_context(self) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        parser_start = deploy.index(
+            "# InstallLinking candidate build-source provenance parser."
+        )
+        parser_end = deploy.index(
+            '  echo "InstallLinking candidate build-source provenance is invalid"',
+            parser_start,
+        )
+        parser = deploy[parser_start:parser_end]
+
+        self.assertIn(
+            "select_exact_build_context_provenance",
+            parser,
+        )
+        self.assertIn(
+            "build_context.get(\"dockerignoreSha256\")",
+            parser,
+        )
+        self.assertNotIn(
+            'provenance.get("canonical-build-context")',
+            parser,
+        )
 
     def test_docker_context_includes_every_named_context_input(self) -> None:
         dockerignore = DOCKERIGNORE_PATH.read_text(encoding="utf-8")

@@ -641,14 +641,19 @@ CANDIDATE_BUILD_INFO_KEYS = {
     "status",
     "uniqueTagsPreserveCanonicalRecoveryAuthority",
 }
-BUILD_SOURCE_PROVENANCE_KEYS = {
+BUILD_SOURCE_PROVENANCE_FIXED_KEYS = {
     "build-dependency-contract",
-    "canonical-build-context",
     "design-product",
     "fleet-media-factory-contracts",
     "hub-registry",
     "run-services-source",
 }
+BUILD_CONTEXT_PROVENANCE_NAMES = frozenset(
+    {
+        "canonical-build-context",
+        "synthetic-build-context",
+    }
+)
 GIT_BUILD_SOURCE_PROVENANCE_KEYS = {
     "consumedPathSha256",
     "contextFileSetSha256",
@@ -660,6 +665,14 @@ GIT_BUILD_SOURCE_PROVENANCE_KEYS = {
     "sensitivePathCount",
     "trackedInputCount",
 }
+SYNTHETIC_GIT_BUILD_SOURCE_PROVENANCE_KEYS = (
+    GIT_BUILD_SOURCE_PROVENANCE_KEYS
+    | {
+        "contentSha256",
+        "sourceKind",
+    }
+)
+SYNTHETIC_GIT_SOURCE_KIND = "standalone-git-repository"
 BUILD_CONTEXT_PROVENANCE_KEYS = {
     "consumedPathSha256",
     "dockerignoreSha256",
@@ -719,12 +732,22 @@ BUILD_CONTEXT_POLICY_KEYS = {
     "effectiveDockerignoreSha256",
     "repositoryContained",
 }
-BUILD_CONTEXT_POLICY_BOUNDARIES = {
-    "canonical-build-context": "canonical-root-with-explicit-allowlist",
+BUILD_CONTEXT_POLICY_STATIC_BOUNDARIES = {
     "design-product": "exact-clean-repository",
     "fleet-media-factory-contracts": "exact-clean-repository-subtree",
+    "hub-registry-source": "exact-clean-repository",
     "run-services-source": "exact-clean-repository",
 }
+BUILD_CONTEXT_POLICY_BUILD_BOUNDARIES = {
+    "canonical-build-context": "canonical-root-with-explicit-allowlist",
+    "synthetic-build-context": "synthetic-root-with-explicit-allowlist",
+}
+BUILD_CONTEXT_POLICY_NULL_DOCKERIGNORE_NAMES = frozenset(
+    {
+        "fleet-media-factory-contracts",
+        "hub-registry-source",
+    }
+)
 RUN_SERVICES_PACKAGE_INPUTS = {
     "Directory.Build.props",
     "global.json",
@@ -2250,10 +2273,50 @@ def validate_existing_boundary_chain(
     return authority_identity_sha256
 
 
+def select_exact_build_context_provenance(
+    provenance: Any,
+) -> tuple[str, dict[str, Any]]:
+    if not isinstance(provenance, dict):
+        raise ValueError(
+            "InstallLinking build-source provenance is not an object"
+        )
+    context_names = BUILD_CONTEXT_PROVENANCE_NAMES & set(provenance)
+    if len(context_names) != 1:
+        raise ValueError(
+            "InstallLinking build-source provenance must select exactly one "
+            "reviewed build context"
+        )
+    context_name = next(iter(context_names))
+    if set(provenance) != BUILD_SOURCE_PROVENANCE_FIXED_KEYS | {
+        context_name
+    }:
+        raise ValueError(
+            "InstallLinking build-source provenance is open-schema"
+        )
+    context = provenance.get(context_name)
+    if (
+        not isinstance(context, dict)
+        or set(context) != BUILD_CONTEXT_PROVENANCE_KEYS
+        or any(
+            re.fullmatch(
+                r"[0-9a-f]{64}",
+                str(context.get(key) or ""),
+            )
+            is None
+            for key in BUILD_CONTEXT_PROVENANCE_KEYS
+        )
+    ):
+        raise ValueError(
+            "InstallLinking build-context provenance is invalid"
+        )
+    return context_name, context
+
+
 def _valid_build_dependency_provenance(
     provenance: Any,
     *,
-    canonical_context_dockerignore_sha256: str,
+    build_context_name: str,
+    build_context_dockerignore_sha256: str,
 ) -> bool:
     if (
         not isinstance(provenance, dict)
@@ -2316,13 +2379,22 @@ def _valid_build_dependency_provenance(
     ):
         return False
 
+    build_context_boundary = BUILD_CONTEXT_POLICY_BUILD_BOUNDARIES.get(
+        build_context_name
+    )
+    if build_context_boundary is None:
+        return False
+    expected_context_policy_boundaries = {
+        **BUILD_CONTEXT_POLICY_STATIC_BOUNDARIES,
+        build_context_name: build_context_boundary,
+    }
     context_policies = provenance.get("contextPolicies")
     if (
         not isinstance(context_policies, dict)
-        or set(context_policies) != set(BUILD_CONTEXT_POLICY_BOUNDARIES)
+        or set(context_policies) != set(expected_context_policy_boundaries)
     ):
         return False
-    for name, expected_boundary in BUILD_CONTEXT_POLICY_BOUNDARIES.items():
+    for name, expected_boundary in expected_context_policy_boundaries.items():
         policy = context_policies.get(name)
         if (
             not isinstance(policy, dict)
@@ -2335,7 +2407,7 @@ def _valid_build_dependency_provenance(
         effective_dockerignore = policy.get(
             "effectiveDockerignoreSha256"
         )
-        if name == "fleet-media-factory-contracts":
+        if name in BUILD_CONTEXT_POLICY_NULL_DOCKERIGNORE_NAMES:
             if dockerignore is not None or effective_dockerignore is not None:
                 return False
         elif (
@@ -2348,10 +2420,10 @@ def _valid_build_dependency_provenance(
         ):
             return False
     return (
-        context_policies["canonical-build-context"].get(
+        context_policies[build_context_name].get(
             "dockerignoreSha256"
         )
-        == canonical_context_dockerignore_sha256
+        == build_context_dockerignore_sha256
     )
 
 
@@ -2380,19 +2452,31 @@ def bind_active_build_info(
         "operatorCriticalEnvironmentSha256"
     )
     build_source_provenance = payload.get("buildSourceProvenance")
-    build_source_provenance_valid = (
-        isinstance(build_source_provenance, dict)
-        and set(build_source_provenance) == BUILD_SOURCE_PROVENANCE_KEYS
-    )
+    build_context_name: str | None = None
+    build_context: dict[str, Any] | None = None
+    try:
+        build_context_name, build_context = (
+            select_exact_build_context_provenance(
+                build_source_provenance
+            )
+        )
+        build_source_provenance_valid = True
+    except ValueError:
+        build_source_provenance_valid = False
     if build_source_provenance_valid:
-        for name in BUILD_SOURCE_PROVENANCE_KEYS - {
+        synthetic = build_context_name == "synthetic-build-context"
+        expected_git_keys = (
+            SYNTHETIC_GIT_BUILD_SOURCE_PROVENANCE_KEYS
+            if synthetic
+            else GIT_BUILD_SOURCE_PROVENANCE_KEYS
+        )
+        for name in BUILD_SOURCE_PROVENANCE_FIXED_KEYS - {
             "build-dependency-contract",
-            "canonical-build-context",
         }:
             source = build_source_provenance.get(name)
             if (
                 not isinstance(source, dict)
-                or set(source) != GIT_BUILD_SOURCE_PROVENANCE_KEYS
+                or set(source) != expected_git_keys
                 or source.get("head") != source.get("originMain")
                 or re.fullmatch(
                     r"[0-9a-f]{40}",
@@ -2417,34 +2501,32 @@ def bind_active_build_info(
                 or isinstance(source.get("trackedInputCount"), bool)
                 or not isinstance(source.get("trackedInputCount"), int)
                 or source["trackedInputCount"] <= 0
+                or (
+                    synthetic
+                    and (
+                        source.get("sourceKind")
+                        != SYNTHETIC_GIT_SOURCE_KIND
+                        or re.fullmatch(
+                            r"[0-9a-f]{64}",
+                            str(source.get("contentSha256") or ""),
+                        )
+                        is None
+                    )
+                )
             ):
                 build_source_provenance_valid = False
                 break
-        canonical_context = build_source_provenance.get(
-            "canonical-build-context"
-        )
-        if (
-            not isinstance(canonical_context, dict)
-            or set(canonical_context) != BUILD_CONTEXT_PROVENANCE_KEYS
-            or any(
-                re.fullmatch(
-                    r"[0-9a-f]{64}",
-                    str(canonical_context.get(key) or ""),
-                )
-                is None
-                for key in BUILD_CONTEXT_PROVENANCE_KEYS
-            )
-        ):
-            build_source_provenance_valid = False
         build_dependency_provenance = build_source_provenance.get(
             "build-dependency-contract"
         )
         if (
-            not isinstance(canonical_context, dict)
+            build_context_name is None
+            or not isinstance(build_context, dict)
             or not _valid_build_dependency_provenance(
                 build_dependency_provenance,
-                canonical_context_dockerignore_sha256=str(
-                    canonical_context.get("dockerignoreSha256") or ""
+                build_context_name=build_context_name,
+                build_context_dockerignore_sha256=str(
+                    build_context.get("dockerignoreSha256") or ""
                 ),
             )
         ):

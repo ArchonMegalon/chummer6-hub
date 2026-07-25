@@ -187,6 +187,12 @@ def build_info(tmp_path: Path) -> Path:
                         "effectiveDockerignoreSha256": None,
                         "repositoryContained": True,
                     },
+                    "hub-registry-source": {
+                        "contextBoundary": "exact-clean-repository",
+                        "dockerignoreSha256": None,
+                        "effectiveDockerignoreSha256": None,
+                        "repositoryContained": True,
+                    },
                     "run-services-source": {
                         "contextBoundary": "exact-clean-repository",
                         "dockerignoreSha256": "d" * 64,
@@ -270,6 +276,36 @@ def build_info(tmp_path: Path) -> Path:
         "status": "pass",
         "uniqueTagsPreserveCanonicalRecoveryAuthority": True,
     }
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+    return path
+
+
+def synthetic_build_info(tmp_path: Path) -> Path:
+    path = build_info(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    provenance = payload["buildSourceProvenance"]
+    provenance["synthetic-build-context"] = provenance.pop(
+        "canonical-build-context"
+    )
+    for source_name in (
+        "run-services-source",
+        "hub-registry",
+        "design-product",
+        "fleet-media-factory-contracts",
+    ):
+        source = provenance[source_name]
+        source["contentSha256"] = source["contextFileSetSha256"]
+        source["sourceKind"] = "standalone-git-repository"
+    policies = provenance["build-dependency-contract"]["contextPolicies"]
+    synthetic_policy = policies.pop("canonical-build-context")
+    synthetic_policy["contextBoundary"] = (
+        "synthetic-root-with-explicit-allowlist"
+    )
+    policies["synthetic-build-context"] = synthetic_policy
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -1798,6 +1834,82 @@ def test_candidate_build_info_is_closed_and_identity_bound(
     payload = read_json(path)
     payload["candidateImageId"] = "sha256:" + "f" * 64
     write_canonical(module, path, payload)
+    with pytest.raises(ValueError, match="build-info contract"):
+        module.bind_active_build_info(
+            path,
+            cutover_id="2026-07-17T12:00:00Z",
+            candidate_image_id=CANDIDATE_IMAGE,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        )
+
+
+def test_candidate_build_info_accepts_runner_shaped_synthetic_provenance(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+
+    bound_path, digest, payload = module.bind_active_build_info(
+        path,
+        cutover_id="2026-07-17T12:00:00Z",
+        candidate_image_id=CANDIDATE_IMAGE,
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+    )
+    context_name, context = (
+        module.select_exact_build_context_provenance(
+            payload["buildSourceProvenance"]
+        )
+    )
+
+    assert bound_path == path
+    assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert context_name == "synthetic-build-context"
+    assert context["dockerignoreSha256"] == "a" * 64
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "mixed-contexts",
+        "open-git-schema",
+        "wrong-source-kind",
+        "content-digest",
+        "policy-name",
+        "policy-boundary",
+    ),
+)
+def test_candidate_build_info_rejects_adversarial_synthetic_provenance(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+    payload = read_json(path)
+    provenance = payload["buildSourceProvenance"]
+    dependency = provenance["build-dependency-contract"]
+    if mutation == "mixed-contexts":
+        provenance["canonical-build-context"] = dict(
+            provenance["synthetic-build-context"]
+        )
+    elif mutation == "open-git-schema":
+        provenance["hub-registry"]["unreviewedField"] = "0" * 64
+    elif mutation == "wrong-source-kind":
+        provenance["hub-registry"]["sourceKind"] = "linked-worktree"
+    elif mutation == "content-digest":
+        provenance["hub-registry"]["contentSha256"] = "0" * 63
+    elif mutation == "policy-name":
+        policies = dependency["contextPolicies"]
+        policies["canonical-build-context"] = policies.pop(
+            "synthetic-build-context"
+        )
+    elif mutation == "policy-boundary":
+        dependency["contextPolicies"]["synthetic-build-context"][
+            "contextBoundary"
+        ] = "canonical-root-with-explicit-allowlist"
+    else:  # pragma: no cover - the parameter list is closed.
+        raise AssertionError(mutation)
+    write_canonical(module, path, payload)
+
     with pytest.raises(ValueError, match="build-info contract"):
         module.bind_active_build_info(
             path,
