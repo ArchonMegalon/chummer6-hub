@@ -14,13 +14,13 @@ public static class HubSecurityHeaders
     {
         ArgumentNullException.ThrowIfNull(headers);
 
-        headers["Content-Security-Policy"] = ContentSecurityPolicy;
-        headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups";
-        headers["Permissions-Policy"] = PermissionsPolicy;
-        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-        headers["Strict-Transport-Security"] = "max-age=31536000";
-        headers["X-Content-Type-Options"] = "nosniff";
-        headers["X-Frame-Options"] = "DENY";
-        headers["X-Permitted-Cross-Domain-Policies"] = "none";
+        headers.TryAdd("Content-Security-Policy", ContentSecurityPolicy);
+        headers.TryAdd("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+        headers.TryAdd("Permissions-Policy", PermissionsPolicy);
+        headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+        headers.TryAdd("Strict-Transport-Security", "max-age=31536000");
+        headers.TryAdd("X-Content-Type-Options", "nosniff");
+        headers.TryAdd("X-Frame-Options", "DENY");
+        headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
     }
 }

@@ -47,3 +47,6 @@ def test_security_header_contract_is_bounded_and_nonbreaking() -> None:
     assert "script-src" not in source
     assert "unsafe-inline" not in source
     assert "unsafe-eval" not in source
+    assert source.count("headers.TryAdd(") == len(expected_values)
+    assert 'headers["Content-Security-Policy"] =' not in source
+    assert 'headers["Referrer-Policy"] =' not in source

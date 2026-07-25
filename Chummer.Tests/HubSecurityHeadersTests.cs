@@ -7,10 +7,9 @@ namespace Chummer.Tests;
 public sealed class HubSecurityHeadersTests
 {
     [Fact]
-    public void Apply_sets_one_exact_fail_closed_value_for_each_header()
+    public void Apply_sets_one_exact_default_value_for_each_missing_header()
     {
         DefaultHttpContext context = new();
-        context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
 
         HubSecurityHeaders.Apply(context.Response.Headers);
         HubSecurityHeaders.Apply(context.Response.Headers);
@@ -39,6 +38,32 @@ public sealed class HubSecurityHeadersTests
         Assert.Equal(
             "none",
             Assert.Single(context.Response.Headers["X-Permitted-Cross-Domain-Policies"]));
+    }
+
+    [Fact]
+    public void Apply_preserves_route_specific_policies()
+    {
+        DefaultHttpContext context = new();
+        const string routeCsp =
+            "default-src 'none'; frame-src https://example.invalid; form-action 'self'";
+        context.Response.Headers["Content-Security-Policy"] = routeCsp;
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+
+        HubSecurityHeaders.Apply(context.Response.Headers);
+
+        Assert.Equal(
+            routeCsp,
+            Assert.Single(context.Response.Headers["Content-Security-Policy"]));
+        Assert.Equal(
+            "no-referrer",
+            Assert.Single(context.Response.Headers["Referrer-Policy"]));
+        Assert.Equal(
+            "SAMEORIGIN",
+            Assert.Single(context.Response.Headers["X-Frame-Options"]));
+        Assert.Equal(
+            "nosniff",
+            Assert.Single(context.Response.Headers["X-Content-Type-Options"]));
     }
 
     [Fact]
