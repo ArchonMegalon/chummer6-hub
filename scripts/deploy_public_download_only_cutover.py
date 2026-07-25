@@ -5680,6 +5680,9 @@ class TopologyBActionsProtocol(Protocol):
     def retire_active_authority(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
+    def adopt_terminal_committed_retirement(
+        self, config: Any, *args: Any
+    ) -> dict[str, Any] | None: ...
     def verify_retired_authority_connectors(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
@@ -9061,6 +9064,60 @@ class TopologyBActions:
         )
         return receipt
 
+    def adopt_terminal_committed_retirement(
+        self,
+        config: SidecarConfig,
+        authorization: Mapping[str, Any],
+        restoration: Mapping[str, Any],
+        retirement_evidence: Mapping[str, Any],
+        retired_authority: Mapping[str, Any],
+        incumbent: Mapping[str, Any],
+        *_args: Any,
+    ) -> dict[str, Any] | None:
+        if not (
+            config.retirement_receipt.exists()
+            or config.retirement_receipt.is_symlink()
+        ):
+            return None
+        receipts = self._state.get("receipts")
+        cleanup = (
+            receipts.get("cleanup")
+            if isinstance(receipts, dict)
+            else None
+        )
+        latest_connector_gate = (
+            receipts.get(
+                "retirementConnectorResumeGate",
+                receipts.get("retirementPostMarkerConnectorGate"),
+            )
+            if isinstance(receipts, dict)
+            else None
+        )
+        if not isinstance(cleanup, dict) or not isinstance(
+            latest_connector_gate,
+            dict,
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement lacks its durable boundary "
+                "receipts"
+            )
+        terminal = self.finalize_committed_retirement(
+            config,
+            authorization,
+            restoration,
+            retirement_evidence,
+            retired_authority,
+            incumbent,
+            cleanup,
+        )
+        return {
+            "cleanup": copy.deepcopy(cleanup),
+            "postMarkerConnectors": copy.deepcopy(
+                latest_connector_gate
+            ),
+            "terminalReceipt": copy.deepcopy(terminal),
+        }
+
     def _validated_retirement_connector_boundary(
         self,
         value: Any,
@@ -12077,25 +12134,62 @@ def retire_topology_b(
             restoration,
             retirement_evidence,
         )
-        post_marker_connectors = (
-            action_boundary.verify_retired_authority_connectors(
+        adopted_terminal = (
+            action_boundary.adopt_terminal_committed_retirement(
                 config,
                 authorization,
                 restoration,
                 retirement_evidence,
                 retired_authority,
+                incumbent,
             )
         )
-        cleanup = action_boundary.cleanup_sidecar_resources(config)
-        terminal = action_boundary.finalize_committed_retirement(
-            config,
-            authorization,
-            restoration,
-            retirement_evidence,
-            retired_authority,
-            incumbent,
-            cleanup,
-        )
+        if adopted_terminal is not None:
+            if (
+                not isinstance(adopted_terminal, dict)
+                or set(adopted_terminal)
+                != {
+                    "cleanup",
+                    "postMarkerConnectors",
+                    "terminalReceipt",
+                }
+                or not all(
+                    isinstance(adopted_terminal.get(name), dict)
+                    for name in (
+                        "cleanup",
+                        "postMarkerConnectors",
+                        "terminalReceipt",
+                    )
+                )
+            ):
+                raise RecoveryUncertain(
+                    "terminal topology-B retirement adoption is malformed"
+                )
+            post_marker_connectors = adopted_terminal[
+                "postMarkerConnectors"
+            ]
+            cleanup = adopted_terminal["cleanup"]
+            terminal = adopted_terminal["terminalReceipt"]
+        else:
+            post_marker_connectors = (
+                action_boundary.verify_retired_authority_connectors(
+                    config,
+                    authorization,
+                    restoration,
+                    retirement_evidence,
+                    retired_authority,
+                )
+            )
+            cleanup = action_boundary.cleanup_sidecar_resources(config)
+            terminal = action_boundary.finalize_committed_retirement(
+                config,
+                authorization,
+                restoration,
+                retirement_evidence,
+                retired_authority,
+                incumbent,
+                cleanup,
+            )
         return {
             "contractName": TOPOLOGY_B_CONTRACT,
             "status": "pass",

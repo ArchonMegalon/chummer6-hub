@@ -1088,6 +1088,12 @@ class RecordingActions:
     ) -> dict[str, Any]:
         return self.record("retire_active_authority")
 
+    def adopt_terminal_committed_retirement(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any] | None:
+        self.record("adopt_terminal_committed_retirement", False)
+        return None
+
     def verify_retired_authority_connectors(
         self, _config: Any, *_args: Any
     ) -> dict[str, Any]:
@@ -3308,6 +3314,7 @@ def test_explicit_retirement_restores_proves_retires_then_cleans(
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3334,6 +3341,7 @@ class FatalRetirementBoundary(BaseException):
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3406,6 +3414,7 @@ def test_keyboard_interrupt_outside_retirement_keeps_normal_semantics(
     (
         "restore_committed_prior",
         "retire_active_authority",
+        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
     ),
 )
@@ -3453,6 +3462,9 @@ class Actions:
         return maybe_block("commit_retirement_evidence")
     def retire_active_authority(self, *_args):
         return maybe_block("retire_active_authority")
+    def adopt_terminal_committed_retirement(self, *_args):
+        maybe_block("adopt_terminal_committed_retirement")
+        return None
     def verify_retired_authority_connectors(self, *_args):
         return maybe_block("verify_retired_authority_connectors")
     def cleanup_sidecar_resources(self, *_args):
@@ -3526,6 +3538,7 @@ raise SystemExit(0)
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3559,7 +3572,10 @@ def test_retirement_partial_failure_is_uncertain_and_never_reapplies_target(
     }:
         assert "retire_active_authority" not in actions.events
         assert "cleanup_sidecar" not in actions.events
-    if failure_event == "verify_retired_authority_connectors":
+    if failure_event in {
+        "adopt_terminal_committed_retirement",
+        "verify_retired_authority_connectors",
+    }:
         assert "retire_active_authority" in actions.events
         assert "cleanup_sidecar" not in actions.events
 
@@ -4079,6 +4095,94 @@ def post_marker_connector_actions(
     )
 
 
+def terminal_adoption_actions(
+    tmp_path: Path,
+) -> tuple[
+    Any,
+    SimpleNamespace,
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    evidence_path = config.operation_root / "retirement-evidence.json"
+    evidence_path.write_text(
+        '{"evidence":"committed"}\n',
+        encoding="utf-8",
+    )
+    evidence_path.chmod(0o600)
+    config.operation = controller.RETIRE_OPERATION
+    config.cloudflare_retirement_evidence = evidence_path
+    config.retirement_receipt = (
+        config.operation_root / "retirement.json"
+    )
+    config.project_name = "retirement-adoption-test"
+    config.source_head = "a" * 40
+    config.controller_source_head = "b" * 40
+    incumbent = {"incumbent": "exact"}
+    cleanup = {"cleanup": "exact"}
+    post_marker_convergence = retirement_connector_gate(
+        13,
+        "connector-post-marker",
+    )
+    post_marker_gate = retirement_connector_boundary(
+        operation_root=config.operation_root,
+        boundary="post-marker",
+        version=13,
+        retired_authority_sha256=authorization[
+            "activeAuthoritySha256"
+        ],
+        marker_gate=actions._state["receipts"][
+            "retirementConnectorGate"
+        ],
+        convergence=post_marker_convergence,
+    )
+    actions._state["receipts"].update(
+        {
+            "cleanup": cleanup,
+            "retirementPostMarkerConnectorGate": post_marker_gate,
+        }
+    )
+    actions._validated_retirement_baseline = lambda: incumbent
+    actions.authorize_committed_retirement = (
+        lambda *_args: authorization
+    )
+    actions.restore_committed_prior = lambda *_args: restoration
+    actions.probe_public_incumbent = (
+        lambda *_args, **_kwargs: incumbent
+    )
+    actions.commit_retirement_evidence = (
+        lambda *_args: retirement_evidence
+    )
+    actions.retire_active_authority = (
+        lambda *_args: retired_authority
+    )
+    actions.verify_retired_authority_connectors = (
+        lambda *_args: post_marker_gate
+    )
+    actions.cleanup_sidecar_resources = lambda *_args: cleanup
+    return (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+        incumbent,
+        cleanup,
+    )
+
+
 def test_post_marker_connector_gate_precedes_cleanup_and_is_immutable(
     tmp_path: Path,
 ) -> None:
@@ -4472,6 +4576,116 @@ def test_terminal_retirement_binds_marker_post_marker_and_latest_gates(
         != terminal["latestConnectorGateSha256"]
     )
     assert json.loads(terminal_path.read_text(encoding="utf-8")) == terminal
+
+
+def test_terminal_receipt_write_interruption_is_adopted_before_reverify(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        _authorization,
+        _restoration,
+        _retirement_evidence,
+        _retired_authority,
+        _incumbent,
+        _cleanup,
+    ) = terminal_adoption_actions(tmp_path)
+    durable_record = actions._record
+
+    def interrupt_after_terminal_write(
+        _phase: str,
+        name: str,
+        _receipt: dict[str, Any],
+    ) -> None:
+        assert name == "retirement"
+        assert config.retirement_receipt.is_file()
+        raise OSError("simulated interruption after terminal write")
+
+    actions._record = interrupt_after_terminal_write
+
+    with pytest.raises(controller.RecoveryUncertain) as raised:
+        controller.retire_topology_b(config, actions=actions)
+
+    assert isinstance(raised.value.__cause__, OSError)
+    terminal_raw = config.retirement_receipt.read_bytes()
+    terminal = json.loads(terminal_raw)
+    assert "retirement" not in actions._state["receipts"]
+    assert (
+        "retirementConnectorResumeGate"
+        not in actions._state["receipts"]
+    )
+
+    def unexpected(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError(
+            "terminal adoption must precede re-verification and cleanup"
+        )
+
+    actions._record = durable_record
+    actions.verify_retired_authority_connectors = unexpected
+    actions.cleanup_sidecar_resources = unexpected
+
+    resumed = controller.retire_topology_b(config, actions=actions)
+    repeated = controller.retire_topology_b(config, actions=actions)
+
+    assert resumed["terminalReceipt"] == terminal
+    assert repeated == resumed
+    assert actions._state["receipts"]["retirement"] == terminal
+    assert config.retirement_receipt.read_bytes() == terminal_raw
+    assert (
+        "retirementConnectorResumeGate"
+        not in actions._state["receipts"]
+    )
+
+
+def test_terminal_receipt_adoption_rejects_tampering(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        _authorization,
+        _restoration,
+        _retirement_evidence,
+        _retired_authority,
+        _incumbent,
+        _cleanup,
+    ) = terminal_adoption_actions(tmp_path)
+    durable_record = actions._record
+
+    def interrupt_after_terminal_write(
+        _phase: str,
+        _name: str,
+        _receipt: dict[str, Any],
+    ) -> None:
+        raise OSError("simulated interruption after terminal write")
+
+    actions._record = interrupt_after_terminal_write
+    with pytest.raises(controller.RecoveryUncertain):
+        controller.retire_topology_b(config, actions=actions)
+
+    tampered = json.loads(
+        config.retirement_receipt.read_text(encoding="utf-8")
+    )
+    tampered["latestConnectorGateSha256"] = "0" * 64
+    config.retirement_receipt.write_text(
+        json.dumps(tampered, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    config.retirement_receipt.chmod(0o600)
+    actions._record = durable_record
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="terminal topology-B retirement receipt drifted",
+    ):
+        controller.retire_topology_b(config, actions=actions)
+
+    assert "retirement" not in actions._state["receipts"]
+    assert (
+        "retirementConnectorResumeGate"
+        not in actions._state["receipts"]
+    )
 
 
 def test_retirement_cleanup_reconstructs_original_runtime_inputs(

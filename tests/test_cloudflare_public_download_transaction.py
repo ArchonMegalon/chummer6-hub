@@ -123,19 +123,13 @@ class FakeApi:
             raise TimeoutError("simulated response loss")
         return response
 
-    def list_connections(
-        self,
-        *,
-        page: int,
-        per_page: int,
-    ) -> Mapping[str, Any]:
+    def list_connections(self) -> Mapping[str, Any]:
         connector_ids = list(
             reversed(sorted(self.connector_versions))
         )
-        start = (page - 1) * per_page
         result = [
             {"id": connector_id}
-            for connector_id in connector_ids[start : start + per_page]
+            for connector_id in connector_ids
         ]
         return {
             "success": True,
@@ -144,8 +138,8 @@ class FakeApi:
             "result": result,
             "result_info": {
                 "count": len(result),
-                "page": page,
-                "per_page": per_page,
+                "page": 1,
+                "per_page": 20,
                 "total_count": len(connector_ids),
             },
         }
@@ -168,20 +162,14 @@ class ChangingConnectorApi:
         self.list_calls = 0
         self.current: dict[str, int | None] = {}
 
-    def list_connections(
-        self,
-        *,
-        page: int,
-        per_page: int,
-    ) -> Mapping[str, Any]:
+    def list_connections(self) -> Mapping[str, Any]:
         index = min(self.list_calls, len(self.snapshots) - 1)
         self.current = dict(self.snapshots[index])
         self.list_calls += 1
         connector_ids = list(reversed(sorted(self.current)))
-        start = (page - 1) * per_page
         result = [
             {"id": connector_id}
-            for connector_id in connector_ids[start : start + per_page]
+            for connector_id in connector_ids
         ]
         return {
             "success": True,
@@ -190,8 +178,8 @@ class ChangingConnectorApi:
             "result": result,
             "result_info": {
                 "count": len(result),
-                "page": page,
-                "per_page": per_page,
+                "page": 1,
+                "per_page": 20,
                 "total_count": len(connector_ids),
             },
         }
@@ -212,16 +200,12 @@ class ScriptedConnectionsApi:
     ) -> None:
         self.responses = [copy.deepcopy(dict(value)) for value in responses]
         self.versions = dict(versions)
-        self.list_calls: list[tuple[int, int]] = []
+        self.list_calls = 0
 
-    def list_connections(
-        self,
-        *,
-        page: int,
-        per_page: int,
-    ) -> Mapping[str, Any]:
-        self.list_calls.append((page, per_page))
-        return self.responses[len(self.list_calls) - 1]
+    def list_connections(self) -> Mapping[str, Any]:
+        response = self.responses[self.list_calls]
+        self.list_calls += 1
+        return response
 
     def get_connector(self, connector_id: str) -> Mapping[str, Any]:
         result: dict[str, Any] = {"id": connector_id}
@@ -231,13 +215,15 @@ class ScriptedConnectionsApi:
         return {"success": True, "result": result}
 
 
-def connections_page(
+def connections_response(
     connector_ids: list[str],
     *,
-    page: int,
-    total_count: int,
-    per_page: int = transaction.CONNECTIONS_PAGE_SIZE,
+    page: int = 1,
+    total_count: int | None = None,
+    per_page: int = 20,
 ) -> dict[str, Any]:
+    if total_count is None:
+        total_count = len(connector_ids)
     return {
         "success": True,
         "errors": [],
@@ -476,21 +462,14 @@ def test_transport_uses_documented_configuration_connection_and_connector_paths(
     monkeypatch.setattr(api, "_request", record)
     api.get_configuration()
     api.put_configuration(base_config())
-    api.list_connections(
-        page=1,
-        per_page=transaction.CONNECTIONS_PAGE_SIZE,
-    )
+    api.list_connections()
     api.get_connector("connector-1")
 
     prefix = "/accounts/account/cfd_tunnel/tunnel"
-    connections_path = (
-        prefix
-        + f"/connections?page=1&per_page={transaction.CONNECTIONS_PAGE_SIZE}"
-    )
     assert calls == [
         ("GET", prefix + "/configurations", None),
         ("PUT", prefix + "/configurations", {"config": base_config()}),
-        ("GET", connections_path, None),
+        ("GET", prefix + "/connections", None),
         ("GET", prefix + "/connectors/connector-1", None),
     ]
 
@@ -529,24 +508,14 @@ def test_capture_requires_at_least_one_preexisting_connector(
         capture(tmp_path, api)
 
 
-def test_connector_capture_exhausts_every_bounded_page() -> None:
-    first_page = [
-        f"connector-{index:04d}"
-        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
-    ]
-    final_id = "connector-final"
-    all_ids = [*first_page, final_id]
+def test_connector_capture_accepts_complete_provider_single_page_above_20() -> None:
+    all_ids = [f"connector-{index:04d}" for index in range(21)]
     api = ScriptedConnectionsApi(
         [
-            connections_page(
-                first_page,
-                page=1,
+            connections_response(
+                all_ids,
                 total_count=len(all_ids),
-            ),
-            connections_page(
-                [final_id],
-                page=2,
-                total_count=len(all_ids),
+                per_page=20,
             ),
         ],
         {connector_id: 12 for connector_id in all_ids},
@@ -554,43 +523,30 @@ def test_connector_capture_exhausts_every_bounded_page() -> None:
 
     captured = transaction.capture_preexisting_connectors(api)
 
-    assert api.list_calls == [
-        (1, transaction.CONNECTIONS_PAGE_SIZE),
-        (2, transaction.CONNECTIONS_PAGE_SIZE),
-    ]
+    assert api.list_calls == 1
     assert [row["id"] for row in captured] == sorted(all_ids)
 
 
 @pytest.mark.parametrize(
     "responses,match",
     (
-            (
-                [
-                    {
-                        **connections_page(
-                            ["connector-a"],
-                            page=1,
-                            total_count=1,
-                        ),
-                        "result_info": {
-                            "count": 1,
-                            "page": 1,
-                            "per_page": (
-                                transaction.CONNECTIONS_PAGE_SIZE
-                            ),
-                        },
-                    }
-                ],
+        (
+            [
+                {
+                    **connections_response(["connector-a"]),
+                    "result_info": {
+                        "count": 1,
+                        "page": 1,
+                        "per_page": 20,
+                    },
+                }
+            ],
             "result_info shape",
         ),
         (
             [
                 {
-                    **connections_page(
-                        ["connector-a"],
-                        page=1,
-                        total_count=1,
-                    ),
+                    **connections_response(["connector-a"]),
                     "unexpected": True,
                 }
             ],
@@ -598,27 +554,29 @@ def test_connector_capture_exhausts_every_bounded_page() -> None:
         ),
         (
             [
-                connections_page(
-                    ["connector-a"],
-                    page=1,
-                    total_count=(
-                        transaction.CONNECTIONS_PAGE_SIZE
-                        * transaction.MAX_CONNECTION_PAGES
-                        + 1
-                    ),
+                connections_response(
+                    [
+                        f"connector-{index:04d}"
+                        for index in range(
+                            transaction.MAX_CURRENT_CONNECTORS + 1
+                        )
+                    ],
                 )
             ],
-            "pagination metadata",
+            "single-page metadata",
         ),
         (
             [
-                connections_page(
+                connections_response(
                     ["connector-a"],
                     page=2,
-                    total_count=1,
                 )
             ],
-            "pagination metadata",
+            "single-page metadata",
+        ),
+        (
+            [connections_response(["connector-a"], per_page=0)],
+            "single-page metadata",
         ),
     ),
 )
@@ -635,56 +593,29 @@ def test_connector_capture_rejects_response_or_bound_drift(
         transaction.capture_preexisting_connectors(api)
 
 
-def test_connector_capture_rejects_total_count_page_instability() -> None:
-    first_page = [
-        f"connector-{index:04d}"
-        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
-    ]
+def test_connector_capture_rejects_incomplete_single_page_metadata() -> None:
+    returned = [f"connector-{index:04d}" for index in range(20)]
     api = ScriptedConnectionsApi(
         [
-            connections_page(
-                first_page,
-                page=1,
-                total_count=len(first_page) + 1,
-            ),
-            connections_page(
-                ["connector-final"],
-                page=2,
-                total_count=len(first_page) + 2,
+            connections_response(
+                returned,
+                total_count=len(returned) + 1,
             ),
         ],
-        {
-            **{connector_id: 12 for connector_id in first_page},
-            "connector-final": 12,
-        },
+        {connector_id: 12 for connector_id in returned},
     )
 
     with pytest.raises(
         transaction.ValidationError,
-        match="invalid or unstable",
+        match="invalid or incomplete",
     ):
         transaction.capture_preexisting_connectors(api)
 
 
-def test_connector_capture_rejects_cross_page_duplicates() -> None:
-    first_page = [
-        f"connector-{index:04d}"
-        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
-    ]
+def test_connector_capture_rejects_single_page_duplicates() -> None:
     api = ScriptedConnectionsApi(
-        [
-            connections_page(
-                first_page,
-                page=1,
-                total_count=len(first_page) + 1,
-            ),
-            connections_page(
-                [first_page[-1]],
-                page=2,
-                total_count=len(first_page) + 1,
-            ),
-        ],
-        {connector_id: 12 for connector_id in first_page},
+        [connections_response(["connector-a", "connector-a"])],
+        {"connector-a": 12},
     )
 
     with pytest.raises(transaction.ValidationError, match="duplicates"):
