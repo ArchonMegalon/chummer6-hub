@@ -287,6 +287,65 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["live"]["pageArtifactIds"], ["avalonia-linux-x64-installer"])
         self.assertEqual(len(receipt["live"]["artifactProbes"]), 1)
 
+    def test_scoped_cutover_can_skip_page_artifact_alignment_without_hiding_manifest_checks(self) -> None:
+        releases_payload = make_releases_manifest()
+        canonical_payload = make_canonical_manifest()
+        live_releases_payload = releases_payload
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                if url == "https://chummer.run/downloads":
+                    return FakeResponse(url=url, text="<html>incumbent downloads page</html>")
+                if url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=live_releases_payload)
+                if url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                    page_artifact_alignment_required=False,
+                )
+
+                live_releases_payload = clone_payload(releases_payload)
+                live_releases_payload["version"] = "run-drifted"
+                drifted_receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                    page_artifact_alignment_required=False,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertEqual(receipt["live"]["pageArtifactIds"], [])
+        self.assertEqual(
+            receipt["live"]["missingPageArtifactIds"],
+            ["avalonia-linux-x64-installer"],
+        )
+        self.assertFalse(receipt["alignment"]["pageArtifactAlignmentRequired"])
+        self.assertFalse(receipt["alignment"]["pageArtifactIdsAligned"])
+        self.assertEqual(drifted_receipt["status"], "fail")
+        self.assertTrue(
+            any(
+                "local projected public manifest and live releases.json differ for version"
+                in failure
+                for failure in drifted_receipt["failures"]
+            )
+        )
+
     def test_matching_local_and_live_bundle_truth_passes_for_linux_and_windows_public_installers(self) -> None:
         releases_payload, canonical_payload = add_windows_bootstrap_artifact(
             releases_payload=make_releases_manifest(),

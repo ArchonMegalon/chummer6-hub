@@ -890,6 +890,50 @@ def test_cli_requires_explicit_delivery_phase(tmp_path: Path) -> None:
     assert raised.value.code == 2
 
 
+def test_main_disables_page_artifact_alignment_for_scoped_cutover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def evaluate(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"status": "pass"}
+
+    truth_gate = SimpleNamespace(requests=None, evaluate=evaluate)
+    monkeypatch.setattr(
+        postdeploy,
+        "verify_control_plane",
+        lambda *args, **kwargs: {"installRouteReleaseTruthSha256": "a" * 64},
+    )
+    monkeypatch.setattr(postdeploy, "load_truth_gate", lambda source_root: truth_gate)
+    monkeypatch.setattr(
+        postdeploy,
+        "verify_public_download_delivery",
+        lambda **kwargs: {"releaseTruthSha256": "a" * 64},
+    )
+
+    result = postdeploy.main(
+        [
+            "--base-url",
+            "https://chummer.run",
+            "--source-root",
+            str(ROOT),
+            "--local-manifest",
+            str(tmp_path / "releases.json"),
+            "--local-canonical-manifest",
+            str(tmp_path / "canonical.json"),
+            "--delivery-phase",
+            postdeploy.DELIVERY_PHASE_WINDOWS_PREVIEW,
+            "--output",
+            str(tmp_path / "receipt.json"),
+        ]
+    )
+
+    assert result == 0
+    assert captured["page_artifact_alignment_required"] is False
+
+
 def test_strict_delivery_accepts_exact_anonymous_gets(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

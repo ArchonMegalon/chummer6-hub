@@ -683,6 +683,7 @@ def analyze_live_snapshot(
     local_projected_summary: dict[str, Any],
     local_canonical_summary: dict[str, Any],
     snapshot: dict[str, Any],
+    page_artifact_alignment_required: bool = True,
 ) -> dict[str, Any]:
     downloads_response = snapshot["downloadsResponse"]
     live_releases_response = snapshot["releasesResponse"]
@@ -749,13 +750,13 @@ def analyze_live_snapshot(
         if row["installAccessClass"] in {"", "open_public"}
     )
     unknown_page_artifact_ids = sorted(set(page_artifact_ids) - set(live_manifest_summary["artifactIds"]))
-    if unknown_page_artifact_ids:
+    if page_artifact_alignment_required and unknown_page_artifact_ids:
         failures.append(
             "downloads page exposes artifact ids missing from live releases.json: "
             + ", ".join(unknown_page_artifact_ids)
         )
     missing_page_artifact_ids = sorted(set(live_public_artifact_ids) - set(page_artifact_ids))
-    if live_public_artifact_ids and missing_page_artifact_ids:
+    if page_artifact_alignment_required and live_public_artifact_ids and missing_page_artifact_ids:
         failures.append(
             "downloads page is missing public artifact call-to-action ids: "
             + ", ".join(missing_page_artifact_ids)
@@ -786,6 +787,7 @@ def evaluate(
     live_confirmation_count: int = 1,
     live_confirmation_delay_seconds: float = 0.0,
     live_max_samples: int = 1,
+    page_artifact_alignment_required: bool = True,
 ) -> dict[str, Any]:
     base = base_url.rstrip("/")
     local_manifest_payload = load_json(local_manifest_path)
@@ -833,6 +835,7 @@ def evaluate(
             local_projected_summary=local_projected_summary,
             local_canonical_summary=local_canonical_summary,
             snapshot=snapshot,
+            page_artifact_alignment_required=page_artifact_alignment_required,
         )
         sample_failures = list(live_analysis["failures"])
         matched_local_truth = len(sample_failures) == 0
@@ -919,6 +922,8 @@ def evaluate(
             "canonicalManifest": live_canonical_summary,
             "pageArtifactIds": page_artifact_ids,
             "publicArtifactIds": live_public_artifact_ids,
+            "unknownPageArtifactIds": unknown_page_artifact_ids,
+            "missingPageArtifactIds": missing_page_artifact_ids,
             "confirmation": {
                 "requiredConsecutiveMatches": required_consecutive_matches,
                 "delaySeconds": live_confirmation_delay_seconds,
@@ -955,7 +960,10 @@ def evaluate(
                 and local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
                 and local_canonical_summary == live_canonical_summary
             ),
-            "pageArtifactIdsAligned": not unknown_page_artifact_ids and not missing_page_artifact_ids,
+            "pageArtifactAlignmentRequired": page_artifact_alignment_required,
+            "pageArtifactIdsAligned": (
+                not unknown_page_artifact_ids and not missing_page_artifact_ids
+            ),
             "artifactProbesPassed": all(
                 probe["statusCode"] in range(200, 300) and probe["sizeMatches"]
                 for probe in artifact_probes
