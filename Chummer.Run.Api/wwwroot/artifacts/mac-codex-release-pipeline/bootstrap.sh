@@ -7314,6 +7314,263 @@ PY
   return 0
 }
 
+run_main_under_release_root_publisher_lock() {
+  if [[ "${CHUMMER_RELEASE_PUBLISHER_LOCK_HELD:-0}" == "1" ]]; then
+    main "$@"
+    return
+  fi
+
+  local python_bin
+  python_bin="$(resolve_release_python)" \
+    || die "release bootstrap requires Python 3.11 or newer before acquiring the release-root publisher lock"
+  local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
+  [[ "$work_root" == /* ]] \
+    || die "CHUMMER_MAC_RELEASE_WORK_ROOT must be absolute before acquiring the release-root publisher lock"
+  [[ "${work_root##*/}" == run-* ]] \
+    || die "CHUMMER_MAC_RELEASE_WORK_ROOT must name a run-* child of the shared release root"
+  local executed_bootstrap_path
+  executed_bootstrap_path="$(resolve_executed_bootstrap_path)" \
+    || die "executed bootstrap must be an absolute regular file before acquiring the release-root publisher lock"
+  export CHUMMER_MAC_RELEASE_WORK_ROOT="$work_root"
+
+  command "$python_bin" -I -S - "$executed_bootstrap_path" "$work_root" "$@" 3<&0 <<'PY'
+from __future__ import annotations
+
+import errno
+import fcntl
+import os
+from pathlib import Path
+import resource
+import stat
+import subprocess
+import sys
+
+LOCK_NAME = ".chummer-release-publisher.lock"
+LOCK_CONTRACT = b"chummer.mac-release-root-publisher-lock/v1\n"
+
+try:
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+except (OSError, ValueError) as error:
+    raise SystemExit(
+        "unable to disable core dumps before holding release credentials"
+    ) from error
+
+
+def directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+
+
+def open_or_create_release_root(path: Path) -> int:
+    if not path.is_absolute():
+        raise SystemExit("release root must be absolute")
+    descriptor = os.open(os.sep, directory_flags())
+    try:
+        for component in path.parts[1:]:
+            if component in ("", ".", ".."):
+                raise SystemExit("release root is not canonical")
+            try:
+                next_descriptor = os.open(
+                    component,
+                    directory_flags(),
+                    dir_fd=descriptor,
+                )
+            except FileNotFoundError:
+                os.mkdir(component, 0o700, dir_fd=descriptor)
+                next_descriptor = os.open(
+                    component,
+                    directory_flags(),
+                    dir_fd=descriptor,
+                )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise SystemExit(
+                "release root must be caller-owned and non-writable by other principals"
+            )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    if completed.returncode != 0 or len(completed.stdout.splitlines()) != 1:
+        raise SystemExit(
+            "release-root publisher lock has an unverifiable or extended macOS ACL"
+        )
+
+
+def read_exact(descriptor: int, maximum: int) -> bytes:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = maximum + 1
+    while remaining:
+        chunk = os.read(descriptor, remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    value = b"".join(chunks)
+    if len(value) > maximum:
+        raise SystemExit("release-root publisher lock contract is oversized")
+    return value
+
+
+def fsync_directory(descriptor: int) -> None:
+    try:
+        os.fsync(descriptor)
+    except OSError as error:
+        if error.errno not in {
+            errno.EINVAL,
+            getattr(errno, "ENOTSUP", errno.EINVAL),
+            getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+        }:
+            raise
+
+
+def write_all(descriptor: int, value: bytes) -> None:
+    offset = 0
+    while offset < len(value):
+        written = os.write(descriptor, value[offset:])
+        if written <= 0:
+            raise SystemExit(
+                "release-root publisher lock initialization was incomplete"
+            )
+        offset += written
+
+
+script = Path(sys.argv[1])
+work_root = Path(sys.argv[2])
+child_arguments = sys.argv[3:]
+if (
+    not script.is_absolute()
+    or not work_root.is_absolute()
+    or work_root.name in ("", ".", "..")
+    or not work_root.name.startswith("run-")
+):
+    raise SystemExit("publisher lock bootstrap arguments are invalid")
+
+release_root = work_root.parent
+root_descriptor = open_or_create_release_root(release_root)
+lock_descriptor: int | None = None
+try:
+    flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    created = False
+    try:
+        lock_descriptor = os.open(
+            LOCK_NAME,
+            flags | os.O_EXCL,
+            0o600,
+            dir_fd=root_descriptor,
+        )
+        created = True
+    except FileExistsError:
+        lock_descriptor = os.open(
+            LOCK_NAME,
+            flags & ~os.O_CREAT,
+            dir_fd=root_descriptor,
+        )
+    if created:
+        os.fchmod(lock_descriptor, 0o600)
+    initial = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        not stat.S_ISREG(initial.st_mode)
+        or initial.st_uid != os.geteuid()
+        or stat.S_IMODE(initial.st_mode) != 0o600
+        or initial.st_nlink != 1
+        or linked.st_dev != initial.st_dev
+        or linked.st_ino != initial.st_ino
+    ):
+        raise SystemExit("release-root publisher lock is unsafe")
+    assert_no_macos_acl(lock_descriptor)
+    fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+    content = read_exact(lock_descriptor, 256)
+    if not content:
+        os.lseek(lock_descriptor, 0, os.SEEK_SET)
+        write_all(lock_descriptor, LOCK_CONTRACT)
+        os.ftruncate(lock_descriptor, len(LOCK_CONTRACT))
+        os.fsync(lock_descriptor)
+        fsync_directory(root_descriptor)
+    elif content != LOCK_CONTRACT:
+        raise SystemExit("release-root publisher lock contract is invalid")
+    fcntl.flock(lock_descriptor, fcntl.LOCK_SH)
+    held = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        held.st_dev != initial.st_dev
+        or held.st_ino != initial.st_ino
+        or held.st_nlink != 1
+        or linked.st_dev != held.st_dev
+        or linked.st_ino != held.st_ino
+    ):
+        raise SystemExit("release-root publisher lock identity changed")
+    environment = os.environ.copy()
+    environment["CHUMMER_RELEASE_PUBLISHER_LOCK_HELD"] = "1"
+    completed = subprocess.run(
+        ("/bin/bash", str(script), *child_arguments),
+        check=False,
+        stdin=3,
+        env=environment,
+    )
+    raise SystemExit(completed.returncode)
+finally:
+    if lock_descriptor is not None:
+        try:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_descriptor)
+    os.close(root_descriptor)
+PY
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main "$@"
+  run_main_under_release_root_publisher_lock "$@"
 fi
