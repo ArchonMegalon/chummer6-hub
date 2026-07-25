@@ -12,6 +12,7 @@ set -euo pipefail
 umask 077
 
 bootstrap_tmp_paths=()
+BOOTSTRAP_TMP_CLEANUP_COMPLETE=0
 BOOTSTRAP_RELEASE_STAGE_ACCEPTED=0
 BOOTSTRAP_RELEASE_CURRENT_ACTIVATED=0
 BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH=""
@@ -19,6 +20,7 @@ BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
 BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
 RELEASE_PYTHON_BIN=""
 export -n \
+  BOOTSTRAP_TMP_CLEANUP_COMPLETE \
   BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN \
   BOOTSTRAP_RELEASE_STAGE_SESSION_ID \
   BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH \
@@ -129,8 +131,14 @@ array_values_nul() {
 }
 
 cleanup_bootstrap_tmp_paths() {
-  local status="$?"
+  local incoming_status="$?"
+  local status="${1:-$incoming_status}"
   local path
+  if [[ "${BOOTSTRAP_TMP_CLEANUP_COMPLETE:-0}" == "1" ]]; then
+    return "$status"
+  fi
+  BOOTSTRAP_TMP_CLEANUP_COMPLETE=1
+
   if (( $(array_count bootstrap_tmp_paths) > 0 )); then
     while IFS= read -r -d '' path; do
       if [[ -f "$path" || -L "$path" ]]; then
@@ -156,6 +164,20 @@ cleanup_bootstrap_tmp_paths() {
       "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
   fi
   return "$status"
+}
+
+exit_bootstrap_on_signal() {
+  local exit_status="$1"
+  trap - HUP INT TERM
+  cleanup_bootstrap_tmp_paths "$exit_status" || true
+  exit "$exit_status"
+}
+
+install_bootstrap_cleanup_traps() {
+  trap cleanup_bootstrap_tmp_paths EXIT
+  trap 'exit_bootstrap_on_signal 129' HUP
+  trap 'exit_bootstrap_on_signal 130' INT
+  trap 'exit_bootstrap_on_signal 143' TERM
 }
 
 require_all_reviewed_commit_pins() {
@@ -208,6 +230,42 @@ resolve_release_python() {
     fi
   done
   return 1
+}
+
+default_hub_local_proof_mutation_lock_path() {
+  local python_bin="$1"
+  "$python_bin" -I -S - <<'PY'
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import stat
+import tempfile
+
+
+lock_root = (
+    Path(os.path.abspath(tempfile.gettempdir()))
+    / f"chummer-public-edge-mutation-{os.getuid()}"
+)
+try:
+    lock_root.mkdir(mode=0o700)
+except FileExistsError:
+    pass
+else:
+    os.chmod(lock_root, 0o700)
+metadata = lock_root.lstat()
+if (
+    not stat.S_ISDIR(metadata.st_mode)
+    or stat.S_ISLNK(metadata.st_mode)
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o700
+):
+    raise SystemExit(
+        "portable Hub proof mutation-lock root is not a caller-owned "
+        "mode-0700 real directory"
+    )
+print(lock_root / "public-edge-mutation.lock")
+PY
 }
 
 sanitize_hub_generator_diagnostic() {
@@ -2010,8 +2068,7 @@ generate_hub_local_release_proof() {
   local timeout_seconds="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}"
   local skip_rebuild="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}"
   local python_bin="${RELEASE_PYTHON_BIN:-}"
-  local mutation_lock_root=""
-  local mutation_lock_path=""
+  local mutation_lock_path="${CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH:-}"
   local diagnostic_path=""
   local generator_status=0
   local sanitizer_status=0
@@ -2024,12 +2081,10 @@ generate_hub_local_release_proof() {
 
   if [[ -f "$generator_path" ]]; then
     require_hub_projection_authority_handoffs "$python_bin"
-    mutation_lock_root="$(mktemp -d "${TMPDIR:-/tmp}/chummer-hub-local-proof-lock.XXXXXX")" \
-      || die "unable to create a private temporary root for Hub proof mutation authority"
-    chmod 700 "$mutation_lock_root" \
-      || die "unable to secure the private temporary root for Hub proof mutation authority"
-    mutation_lock_path="$mutation_lock_root/public-edge-mutation.lock"
-    bootstrap_tmp_paths+=("$mutation_lock_path" "$mutation_lock_root")
+    if [[ -z "$mutation_lock_path" ]]; then
+      mutation_lock_path="$(default_hub_local_proof_mutation_lock_path "$python_bin")" \
+        || die "unable to establish the portable shared Hub proof mutation authority"
+    fi
     diagnostic_path="$(mktemp)"
     bootstrap_tmp_paths+=("$diagnostic_path")
     set +e
@@ -5259,7 +5314,7 @@ PY
 }
 
 main() {
-  trap cleanup_bootstrap_tmp_paths EXIT
+  install_bootstrap_cleanup_traps
 
   local release_scope_source="${CHUMMER_RELEASE_SCOPE_DECISION_PATH:-}"
   local release_scope_expected_sha256="${CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256:-}"

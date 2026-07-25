@@ -703,6 +703,37 @@ public sealed class ReleaseShelfGenerationStoreTests
     }
 
     [Theory]
+    [InlineData(
+        "open_public",
+        "/downloads/g/generation-a/files/chummer-payload.zip")]
+    [InlineData(
+        "account_required",
+        "/downloads/g/generation-a/install/test-installer/payload")]
+    public void CaptureAcceptsAccessClassSpecificGenerationPayloadRoute(
+        string installAccessClass,
+        string expectedPayloadUrl)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            installAccessClass: installAccessClass,
+            payloadFileName: "chummer-payload.zip");
+        fixture.Activate("generation-a", "run-a");
+        var store = fixture.CreateStore();
+
+        ReleaseShelfSnapshot snapshot = store.Capture();
+        var service = new PublicReleaseManifestService(
+            fixture.Configuration,
+            store);
+        PublicReleaseArtifactDto artifact = Assert.Single(
+            service.LoadManifest(snapshot).Downloads);
+
+        Assert.Equal(expectedPayloadUrl, artifact.PayloadDownloadUrl);
+    }
+
+    [Theory]
     [InlineData("/downloads/g/generation-a/install/test-installer/claim")]
     [InlineData("/downloads/g/generation-a/install/test-installer?ticket=x")]
     [InlineData("/downloads/g/generation-a/install/test-installer#claim")]
@@ -1499,7 +1530,8 @@ public sealed class ReleaseShelfGenerationStoreTests
             string? compatibilityGenerationIdOverride = null,
             Func<ReadOnlyMemory<byte>, IReadOnlyDictionary<string, byte[]>>? generationBoundFilesFactory = null,
             bool includeSemanticNavigationRoutes = false,
-            string? semanticNavigationLookalikeRoute = null)
+            string? semanticNavigationLookalikeRoute = null,
+            string? payloadFileName = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1527,6 +1559,21 @@ public sealed class ReleaseShelfGenerationStoreTests
                 ?? (string.Equals(installAccessClass, "open_public", StringComparison.Ordinal)
                     ? $"/downloads/g/{generationId}/files/chummer-test.bin"
                     : $"/downloads/g/{generationId}/install/test-installer");
+            var canonicalArtifact = new Dictionary<string, object?>
+            {
+                ["artifactId"] = "test-installer",
+                ["head"] = "avalonia",
+                ["platform"] = "linux",
+                ["rid"] = "linux-x64",
+                ["arch"] = "x64",
+                ["kind"] = "installer",
+                ["platformLabel"] = "Test installer",
+                ["fileName"] = "chummer-test.bin",
+                ["downloadUrl"] = artifactDownloadUrl,
+                ["sha256"] = artifactSha,
+                ["sizeBytes"] = artifact.Length,
+                ["installAccessClass"] = installAccessClass
+            };
             var canonical = new Dictionary<string, object?>
             {
                 ["generationId"] = generationId,
@@ -1537,22 +1584,18 @@ public sealed class ReleaseShelfGenerationStoreTests
                 ["status"] = "published",
                 ["artifacts"] = new object[]
                 {
-                    new Dictionary<string, object?>
-                    {
-                        ["artifactId"] = "test-installer",
-                        ["head"] = "avalonia",
-                        ["platform"] = "linux",
-                        ["rid"] = "linux-x64",
-                        ["arch"] = "x64",
-                        ["kind"] = "installer",
-                        ["platformLabel"] = "Test installer",
-                        ["fileName"] = "chummer-test.bin",
-                        ["downloadUrl"] = artifactDownloadUrl,
-                        ["sha256"] = artifactSha,
-                        ["sizeBytes"] = artifact.Length,
-                        ["installAccessClass"] = installAccessClass
-                    }
+                    canonicalArtifact
                 }
+            };
+            var compatibilityArtifact = new Dictionary<string, object?>
+            {
+                ["id"] = "test-installer",
+                ["platform"] = "linux",
+                ["url"] = artifactDownloadUrl,
+                ["sha256"] = artifactSha,
+                ["sizeBytes"] = artifact.Length,
+                ["fileName"] = "chummer-test.bin",
+                ["installAccessClass"] = installAccessClass
             };
             var compatibility = new Dictionary<string, object?>
             {
@@ -1563,18 +1606,46 @@ public sealed class ReleaseShelfGenerationStoreTests
                 ["status"] = "published",
                 ["downloads"] = new object[]
                 {
-                    new Dictionary<string, object?>
-                    {
-                        ["id"] = "test-installer",
-                        ["platform"] = "linux",
-                        ["url"] = artifactDownloadUrl,
-                        ["sha256"] = artifactSha,
-                        ["sizeBytes"] = artifact.Length,
-                        ["fileName"] = "chummer-test.bin",
-                        ["installAccessClass"] = installAccessClass
-                    }
+                    compatibilityArtifact
                 }
             };
+            if (!string.IsNullOrWhiteSpace(payloadFileName))
+            {
+                byte[] payload = Encoding.UTF8.GetBytes("payload-" + artifactBytes);
+                string payloadSha = Convert.ToHexStringLower(SHA256.HashData(payload));
+                string payloadDownloadUrl = string.Equals(
+                    installAccessClass,
+                    "open_public",
+                    StringComparison.Ordinal)
+                    ? $"/downloads/g/{generationId}/files/{payloadFileName}"
+                    : $"/downloads/g/{generationId}/install/test-installer/payload";
+                File.WriteAllBytes(
+                    Path.Combine(generationRoot, "files", payloadFileName),
+                    payload);
+                File.WriteAllText(
+                    Path.Combine(generationRoot, "files", payloadFileName + ".json"),
+                    JsonSerializer.Serialize(new
+                    {
+                        contractName = "chummer6-ui.windows_bootstrap_payload",
+                        downloadUrl = payloadDownloadUrl,
+                        fileName = payloadFileName,
+                        installerFileName = "chummer-test.bin",
+                        releaseVersion = version,
+                        sha256 = payloadSha,
+                        sizeBytes = payload.Length
+                    }));
+                foreach (Dictionary<string, object?> row in new[]
+                         {
+                             canonicalArtifact,
+                             compatibilityArtifact
+                         })
+                {
+                    row["payloadFileName"] = payloadFileName;
+                    row["payloadDownloadUrl"] = payloadDownloadUrl;
+                    row["payloadSha256"] = payloadSha;
+                    row["payloadSizeBytes"] = payload.Length;
+                }
+            }
             if (omitCanonicalGenerationId)
             {
                 canonical.Remove("generationId");

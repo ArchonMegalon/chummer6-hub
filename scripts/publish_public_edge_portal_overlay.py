@@ -2308,12 +2308,26 @@ def _read_mutation_lock_token(lock_path: Path) -> str:
 
 
 @contextmanager
-def public_edge_mutation_lock(*, activate: bool, inherited_token: str = ""):
-    """Acquire the fixed host mutation authority before the overlay publish lock."""
+def public_edge_mutation_lock(
+    *,
+    activate: bool,
+    inherited_token: str = "",
+    lock_path: Path | None = None,
+):
+    """Acquire the selected host mutation authority before the overlay publish lock."""
     if not activate:
         yield None
         return
-    lock_path = PUBLIC_EDGE_MUTATION_LOCK
+    selected_lock_path = (
+        Path(lock_path)
+        if lock_path is not None
+        else PUBLIC_EDGE_MUTATION_LOCK
+    )
+    if not selected_lock_path.is_absolute():
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock path must be absolute"
+        )
+    lock_path = normalized_absolute_path(selected_lock_path)
     lock_root = lock_path.parent
     _validate_mutation_lock_root(lock_root)
     normalized_inherited_token = str(inherited_token or "").strip()

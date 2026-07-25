@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -731,8 +732,10 @@ def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path
     assert mutation_lock_path.name == "public-edge-mutation.lock"
     assert mutation_lock_path.parent.parent == temp_root
     assert "/docker/" not in str(mutation_lock_path)
-    assert not mutation_lock_path.parent.exists()
-    assert list(temp_root.iterdir()) == []
+    assert mutation_lock_path.parent.is_dir()
+    assert stat.S_IMODE(mutation_lock_path.parent.stat().st_mode) == 0o700
+    assert not mutation_lock_path.exists()
+    assert list(temp_root.iterdir()) == [mutation_lock_path.parent]
 
 
 def test_hub_generator_recovery_uses_python_312_and_all_immutable_handoffs(tmp_path: Path) -> None:
@@ -990,7 +993,10 @@ def test_hosted_upload_uses_stdin_config_without_credential_file() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
     cleanup_init_index = bootstrap.index("bootstrap_tmp_paths=()")
     main_index = bootstrap.index("main() {")
-    cleanup_trap_index = bootstrap.index("trap cleanup_bootstrap_tmp_paths EXIT", main_index)
+    cleanup_trap_index = bootstrap.index(
+        "install_bootstrap_cleanup_traps",
+        main_index,
+    )
     auth_capture_index = bootstrap.index(
         "capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source",
         cleanup_trap_index,

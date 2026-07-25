@@ -162,6 +162,42 @@ public sealed class ReleaseBundlePromotionServiceTests
             {
                 Assert.False(File.Exists(Path.Combine(stagedRoot, "files", fileName)));
             }
+            foreach (PublicReleaseArtifactDto artifact in manifest.Downloads)
+            {
+                if (string.IsNullOrWhiteSpace(artifact.PayloadFileName))
+                {
+                    continue;
+                }
+
+                JsonObject sidecar = JsonNode.Parse(
+                    File.ReadAllBytes(
+                        Path.Combine(
+                            stagedRoot,
+                            "files",
+                            artifact.PayloadFileName + ".json")))!.AsObject();
+                string expectedPayloadUrl = string.Equals(
+                    artifact.InstallAccessClass,
+                    "open_public",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? $"https://chummer.run/downloads/g/gen-unsigned-windows-profile-aur-policy/files/{artifact.PayloadFileName}"
+                    : $"/downloads/g/gen-unsigned-windows-profile-aur-policy/install/{artifact.Id}/payload";
+                Assert.Equal(
+                    expectedPayloadUrl,
+                    sidecar["downloadUrl"]?.GetValue<string>());
+                if (string.Equals(
+                        artifact.InstallAccessClass,
+                        "open_public",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    Assert.Equal(
+                        "download",
+                        sidecar["payloadAcquisitionMode"]?.GetValue<string>());
+                }
+                else
+                {
+                    Assert.False(sidecar.ContainsKey("payloadAcquisitionMode"));
+                }
+            }
 
             IConfiguration stagedConfiguration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -716,7 +752,9 @@ public sealed class ReleaseBundlePromotionServiceTests
                   "id": "open",
                   "fileName": "open.bin",
                   "url": "/downloads/files/open.bin",
-                  "installAccessClass": "open_public"
+                  "installAccessClass": "open_public",
+                  "payloadFileName": "open.zip",
+                  "payloadDownloadUrl": "/downloads/files/open.zip"
                 },
                 {
                   "id": "protected",
@@ -778,7 +816,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             "generation-parity",
             compatibility);
 
-        const string expected = "{\"artifactIdentityRegistry\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/g/generation-parity/install/protected\"}],\"artifactPublicationBindings\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"channel\":\"preview\",\"desktopSurfaceRefs\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"desktopTupleCoverage\":{\"desktopRouteTruth\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/install/missing\"}]},\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"extension\":{\"publicInstallRoute\":\"/downloads/g/generation-parity/files/open.bin\"},\"generationId\":\"generation-parity\",\"installAwareArtifactRegistry\":[{\"conciergeAssetRefs\":{\"publicTrustWrapper\":\"/downloads/install/open\"},\"recoveryProofRefs\":[\"/downloads/install/open\",\"startup-smoke/startup-smoke-open.receipt.json\"]}],\"publicTrustMetrics\":{\"revocationFacts\":{\"activeRevocations\":[{\"publicInstallRoute\":\"/downloads/install/open\"}]}},\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
+        const string expected = "{\"artifactIdentityRegistry\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/g/generation-parity/install/protected\"}],\"artifactPublicationBindings\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"channel\":\"preview\",\"desktopSurfaceRefs\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"desktopTupleCoverage\":{\"desktopRouteTruth\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/install/missing\"}]},\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/files/open.zip\",\"payloadFileName\":\"open.zip\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"extension\":{\"publicInstallRoute\":\"/downloads/g/generation-parity/files/open.bin\"},\"generationId\":\"generation-parity\",\"installAwareArtifactRegistry\":[{\"conciergeAssetRefs\":{\"publicTrustWrapper\":\"/downloads/install/open\"},\"recoveryProofRefs\":[\"/downloads/install/open\",\"startup-smoke/startup-smoke-open.receipt.json\"]}],\"publicTrustMetrics\":{\"revocationFacts\":{\"activeRevocations\":[{\"publicInstallRoute\":\"/downloads/install/open\"}]}},\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
         Assert.Equal(expected, Encoding.UTF8.GetString(projected));
     }
 
@@ -4218,6 +4256,10 @@ public sealed class ReleaseBundlePromotionServiceTests
             result.GenerationId!,
             "files/chummer-avalonia-win-x64-payload.zip.json");
         Assert.Equal(expectedUrl, sidecar.RootElement.GetProperty("downloadUrl").GetString());
+        Assert.False(
+            sidecar.RootElement.TryGetProperty(
+                "payloadAcquisitionMode",
+                out _));
         using JsonDocument compatibility = fixture.ReadGenerationJson(result.GenerationId!, "releases.json");
         Assert.Equal(
             expectedUrl,
@@ -4228,6 +4270,129 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(
             expectedUrl,
             canonical.RootElement.GetProperty("artifacts")[0].GetProperty("payloadDownloadUrl").GetString());
+    }
+
+    [Fact]
+    public async Task PromotionSealsOpenPublicPayloadSidecarWithAbsoluteGenerationUrlAndFinalInventoryDigest()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        const string payloadFileName =
+            "chummer-avalonia-win+x64-payload.zip";
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260725-open-public-payload-sidecar",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    InstallAccessClass: "open_public",
+                    InstallerMode: "bootstrap_payload",
+                    PayloadFileName: payloadFileName,
+                    PayloadBytes: "windows-payload"u8.ToArray())
+            ]);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+        string relativePayloadUrl =
+            $"/downloads/g/{result.GenerationId}/files/{payloadFileName}";
+        string absolutePayloadUrl = "https://chummer.run" + relativePayloadUrl;
+        string sidecarPath = $"files/{payloadFileName}.json";
+        byte[] sidecarBytes = fixture.ReadGenerationBytes(
+            result.GenerationId!,
+            sidecarPath);
+        using JsonDocument sidecar = JsonDocument.Parse(sidecarBytes);
+        Assert.Equal(
+            absolutePayloadUrl,
+            sidecar.RootElement.GetProperty("downloadUrl").GetString());
+        Assert.Equal(
+            "download",
+            sidecar.RootElement.GetProperty("payloadAcquisitionMode").GetString());
+
+        using JsonDocument compatibility = fixture.ReadGenerationJson(
+            result.GenerationId!,
+            "releases.json");
+        Assert.Equal(
+            relativePayloadUrl,
+            compatibility.RootElement.GetProperty("downloads")[0]
+                .GetProperty("payloadDownloadUrl").GetString());
+        using JsonDocument canonical = fixture.ReadGenerationJson(
+            result.GenerationId!,
+            "RELEASE_CHANNEL.generated.json");
+        Assert.Equal(
+            relativePayloadUrl,
+            canonical.RootElement.GetProperty("artifacts")[0]
+                .GetProperty("payloadDownloadUrl").GetString());
+
+        using JsonDocument activationCandidate = fixture.ReadGenerationJson(
+            result.GenerationId!,
+            "activation-candidate.json");
+        JsonElement sidecarInventory = activationCandidate.RootElement
+            .GetProperty("inventory")
+            .EnumerateArray()
+            .Single(row => string.Equals(
+                row.GetProperty("path").GetString(),
+                sidecarPath,
+                StringComparison.Ordinal));
+        Assert.Equal(
+            Convert.ToHexStringLower(SHA256.HashData(sidecarBytes)),
+            sidecarInventory.GetProperty("sha256").GetString());
+    }
+
+    [Fact]
+    public async Task StageAsyncAcceptsAndSealsOpenPublicPayloadSidecar()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        const string payloadFileName =
+            "chummer-avalonia-win-x64-payload.zip";
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260725-stage-open-public-payload",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-stage-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    InstallAccessClass: "open_public",
+                    InstallerMode: "bootstrap_payload",
+                    PayloadFileName: payloadFileName,
+                    PayloadBytes: "windows-stage-payload"u8.ToArray())
+            ]);
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundlePath,
+            "session-open-public-payload");
+        string relativePayloadUrl =
+            $"/downloads/g/{staged.GenerationId}/files/{payloadFileName}";
+        using JsonDocument sidecar = fixture.ReadGenerationJson(
+            staged.GenerationId,
+            $"files/{payloadFileName}.json");
+        Assert.Equal(
+            "https://chummer.run" + relativePayloadUrl,
+            sidecar.RootElement.GetProperty("downloadUrl").GetString());
+        Assert.Equal(
+            "download",
+            sidecar.RootElement.GetProperty("payloadAcquisitionMode").GetString());
+        using JsonDocument compatibility = fixture.ReadGenerationJson(
+            staged.GenerationId,
+            "releases.json");
+        Assert.Equal(
+            relativePayloadUrl,
+            compatibility.RootElement.GetProperty("downloads")[0]
+                .GetProperty("payloadDownloadUrl").GetString());
     }
 
     [Theory]

@@ -135,18 +135,38 @@ def _load_public_edge_overlay_module():
     return module
 
 
+def _is_macos_host() -> bool:
+    return sys.platform == "darwin"
+
+
+def _default_public_edge_proof_mutation_lock_path(overlay) -> Path:
+    if not _is_macos_host():
+        return Path(overlay.PUBLIC_EDGE_MUTATION_LOCK)
+    return (
+        Path(os.path.abspath(tempfile.gettempdir()))
+        / f"chummer-public-edge-mutation-{os.getuid()}"
+        / "public-edge-mutation.lock"
+    )
+
+
 @contextmanager
 def _public_edge_proof_mutation_lock():
     """Serialize proof replacement with standalone overlay deploy/recovery."""
 
     overlay = _load_public_edge_overlay_module()
-    portable_lock_path = str(
+    configured_lock_path = str(
         os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH") or ""
     ).strip()
-    if portable_lock_path:
-        overlay.PUBLIC_EDGE_MUTATION_LOCK = Path(portable_lock_path)
-    with overlay.public_edge_mutation_lock(activate=True):
-        yield
+    lock_path = (
+        Path(configured_lock_path)
+        if configured_lock_path
+        else _default_public_edge_proof_mutation_lock_path(overlay)
+    )
+    with overlay.public_edge_mutation_lock(
+        activate=True,
+        lock_path=lock_path,
+    ) as acquired_lock_path:
+        yield acquired_lock_path
 
 
 def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:

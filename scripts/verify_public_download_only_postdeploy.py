@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 import tempfile
 from typing import Any, Mapping, NamedTuple
-from urllib.parse import ParseResult, urljoin, urlparse
+from urllib.parse import ParseResult, unquote, urljoin, urlparse
 
 import requests
 
@@ -337,7 +337,10 @@ def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
     raw = str(value or "").strip()
     if not raw:
         raise ValueError(f"{label} URL is missing")
-    resolved = urljoin(base_url.rstrip("/") + "/", raw)
+    raw_parsed = urlparse(raw)
+    if not raw_parsed.scheme or not raw_parsed.netloc:
+        raise ValueError(f"{label} URL must be an absolute HTTPS URL")
+    resolved = raw
     parsed = urlparse(resolved)
     base = urlparse(base_url)
     same_origin = _origin(parsed) == _origin(base)
@@ -364,12 +367,30 @@ def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
     return resolved
 
 
+def _decoded_payload_path(url: str) -> str:
+    path = urlparse(url).path
+    offset = 0
+    while offset < len(path):
+        if path[offset] != "%":
+            offset += 1
+            continue
+        escape = path[offset : offset + 3]
+        if len(escape) != 3 or escape[1:].lower() != "2b":
+            raise ValueError(
+                "payload URL contains noncanonical percent encoding"
+            )
+        offset += 3
+    # Deliberately not unquote_plus: '+' is a literal path character.
+    return unquote(path)
+
+
 def _host_local_mirror_url(base_url: str, canonical_url: str) -> str:
     base = urlparse(base_url)
     canonical = urlparse(canonical_url)
     return canonical._replace(
         scheme=base.scheme,
         netloc=base.netloc,
+        path=_decoded_payload_path(canonical_url),
     ).geturl()
 
 
@@ -696,14 +717,15 @@ def _validate_sidecar(payload: Mapping[str, Any], expected: DownloadExpectation)
     if str(payload.get("payloadAcquisitionMode") or "").strip().lower() != "download":
         raise ValueError("bootstrap sidecar payload acquisition is not download")
     raw_download_url = str(payload.get("downloadUrl") or "").strip()
-    parsed_download_url = urlparse(raw_download_url)
-    if parsed_download_url.scheme.lower() != "https" or not parsed_download_url.hostname:
-        raise ValueError("bootstrap sidecar downloadUrl is not absolute HTTPS")
-    if _canonical_payload_url(
+    normalized_download_url = _canonical_payload_url(
         expected.installer_url,
         raw_download_url,
         "bootstrap sidecar payload",
-    ) != expected.payload_url:
+    )
+    if _host_local_mirror_url(
+        expected.installer_url,
+        normalized_download_url,
+    ) != _host_local_mirror_url(expected.installer_url, expected.payload_url):
         raise ValueError("bootstrap sidecar downloadUrl disagrees with manifest")
     if str(payload.get("sha256") or "").strip().lower() != expected.payload_sha256:
         raise ValueError("bootstrap sidecar sha256 disagrees with manifest")
@@ -776,19 +798,19 @@ def derive_download_expectations(
         )
         if Path(urlparse(installer_url).path).name != installer_file_name:
             raise ValueError(f"{artifact_id} installer URL filename disagrees with manifest")
-        payload_path = urlparse(manifest_payload_url).path
-        semantic_payload_path = (
-            f"/downloads/g/{expected_generation}/install/"
-            f"{artifact_id}/payload"
-            if expected_generation
-            else None
-        )
-        if (
-            Path(payload_path).name != payload_file_name
-            and payload_path != semantic_payload_path
-        ):
+        # URL paths preserve literal '+'. Decode percent escapes without applying
+        # form/query semantics, where '+' would incorrectly become a space.
+        payload_path = _decoded_payload_path(manifest_payload_url)
+        if not expected_generation:
             raise ValueError(
-                f"{artifact_id} payload URL is not filename- or generation-bound"
+                f"{artifact_id} payload URL cannot be generation-bound without a generation id"
+            )
+        expected_payload_path = (
+            f"/downloads/g/{expected_generation}/files/{payload_file_name}"
+        )
+        if payload_path != expected_payload_path:
+            raise ValueError(
+                f"{artifact_id} open_public payload URL must be the generation-bound files route"
             )
 
         installer_sha256 = _required_sha256(artifact, "sha256", artifact_id)
@@ -842,15 +864,19 @@ def derive_download_expectations(
             sidecar_bytes,
             f"local {sidecar_file_name}",
         )
-        payload_url = _canonical_payload_url(
+        sidecar_payload_url = _canonical_payload_url(
             base,
             sidecar_payload.get("downloadUrl"),
             f"{artifact_id} sidecar payload",
         )
-        if Path(urlparse(payload_url).path).name != payload_file_name:
+        if _host_local_mirror_url(
+            base,
+            sidecar_payload_url,
+        ) != _host_local_mirror_url(base, manifest_payload_url):
             raise ValueError(
-                f"{artifact_id} sidecar payload URL filename disagrees"
+                f"{artifact_id} sidecar payload URL disagrees with manifest"
             )
+        payload_url = manifest_payload_url
         expectation = DownloadExpectation(
             artifact_id=artifact_id,
             release_version=version,
