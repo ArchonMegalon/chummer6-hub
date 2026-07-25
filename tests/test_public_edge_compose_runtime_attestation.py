@@ -27,6 +27,22 @@ def load_module():
     return module
 
 
+def test_portal_compose_pins_production_https_policy_against_env_drift() -> None:
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(
+        encoding="utf-8"
+    )
+    portal = compose[
+        compose.index("  chummer-portal:\n") :
+        compose.index("\n  chummer-run-cloudflared:", compose.index("  chummer-portal:\n"))
+    ]
+
+    assert "ASPNETCORE_ENVIRONMENT: Production" in portal
+    assert "AllowedHosts: chummer.run" in portal
+    assert "CHUMMER_PUBLIC_ALLOWED_HOSTS: chummer.run" in portal
+    assert "CHUMMER_PUBLIC_CANONICAL_ORIGIN: https://chummer.run" in portal
+    assert "${CHUMMER_PUBLIC_CANONICAL_ORIGIN" not in portal
+
+
 def rendered_compose(
     *,
     source_root: Path,
@@ -151,6 +167,7 @@ def rendered_compose(
                     "host.docker.internal=host-gateway",
                 ],
                 "environment": {
+                    "ASPNETCORE_ENVIRONMENT": "Production",
                     "AllowedHosts": "chummer.run",
                     "CHUMMER_DATA_PROTECTION_KEYS_PATH": (
                         "/app/state/data-protection-keys-v2"
@@ -207,6 +224,14 @@ def rendered_compose(
                     bind(
                         str(runtime_proof_bind_source),
                         "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json",
+                        read_only=True,
+                    ),
+                    bind(
+                        str(runtime_proof_bind_source),
+                        (
+                            "/app/wwwroot/proofs/mac-codex-release/"
+                            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+                        ),
                         read_only=True,
                     ),
                     bind(
@@ -409,6 +434,24 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
         fixture_runtime_proof(projection_root)
     )
     assert receipt["runtimeProofBindSourceReadOnly"] is True
+    compatibility = receipt["productionRuntimeCompatibility"]
+    assert compatibility["status"] == "pass"
+    assert all(compatibility["checks"].values())
+    assert compatibility["secretValuesPersisted"] is False
+    topology = receipt["portalOverlayMountTopology"]
+    assert topology["status"] == "pass"
+    assert topology["sourcePathsPersisted"] is False
+    assert topology["sourceContentPersisted"] is False
+    assert {
+        row["containerTarget"] for row in topology["destinations"]
+    } == {
+        "/app",
+        "/app/state",
+        (
+            "/app/wwwroot/proofs/mac-codex-release/"
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ),
+    }
     assert (
         stat.S_IMODE(fixture_runtime_proof(projection_root).stat().st_mode) == 0o644
     )
@@ -577,7 +620,7 @@ def test_compose_attestation_rejects_projection_mount_drift(
     if drift == "obsolete-target":
         projection_mount["target"] = (
             "/app/wwwroot/proofs/mac-codex-release/"
-            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            "OBSOLETE_RELEASE_PROOF.generated.json"
         )
     elif drift == "wrong-source":
         projection_mount["source"] = "/attacker/projection"
@@ -1255,6 +1298,24 @@ def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
                 CHUMMER_PUBLIC_CANONICAL_ORIGIN="https://attacker.invalid"
             ),
             "CANONICAL_ORIGIN is not the canonical literal value",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"]["environment"].update(
+                CHUMMER_PUBLIC_CANONICAL_ORIGIN=""
+            ),
+            "CANONICAL_ORIGIN is not the canonical literal value",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"]["environment"].update(
+                CHUMMER_PUBLIC_CANONICAL_ORIGIN="http://chummer.run"
+            ),
+            "CANONICAL_ORIGIN is not the canonical literal value",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"]["environment"].update(
+                ASPNETCORE_ENVIRONMENT="Development"
+            ),
+            "ASPNETCORE_ENVIRONMENT is not the canonical literal value",
         ),
         (
             lambda payload: payload["services"]["chummer-portal"]["environment"].update(

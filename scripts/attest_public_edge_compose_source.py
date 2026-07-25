@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture and revalidate the immutable public-edge Compose source binding."""
+"""Capture immutable Compose source and digest-only environment bindings."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from typing import Any
 
 
 CONTRACT = "chummer.public-edge.compose-source-binding/v1"
+ENVIRONMENT_CONTRACT = "chummer.public-edge.compose-environment-binding/v1"
 MAX_COMPOSE_BYTES = 8 * 1024 * 1024
+MAX_ENVIRONMENT_BYTES = 1024 * 1024
 MAX_RECEIPT_BYTES = 64 * 1024
 
 
@@ -284,6 +286,90 @@ def verify(source: Path, snapshot: Path, receipt: Path) -> dict[str, Any]:
     return {"contractName": CONTRACT, "status": "pass", "sha256": digest}
 
 
+def capture_environment(source: Path, receipt: Path) -> dict[str, Any]:
+    """Bind an owner-only Compose environment file without copying its contents."""
+    source_raw, source_metadata = read_stable_file(
+        source,
+        label="public edge Compose environment",
+        maximum_bytes=MAX_ENVIRONMENT_BYTES,
+        expected_mode=0o600,
+    )
+    payload = {
+        "contractName": ENVIRONMENT_CONTRACT,
+        "status": "pass",
+        "sourcePath": str(source),
+        "sha256": hashlib.sha256(source_raw).hexdigest(),
+        "sourceIdentity": file_identity(source_metadata),
+        "sourceContentPersisted": False,
+    }
+    write_new_file(
+        receipt,
+        render_receipt(payload),
+        mode=0o600,
+        label="public edge Compose environment receipt",
+    )
+    return payload
+
+
+def load_environment_receipt(path: Path) -> dict[str, Any]:
+    raw, _ = read_stable_file(
+        path,
+        label="public edge Compose environment receipt",
+        maximum_bytes=MAX_RECEIPT_BYTES,
+        expected_mode=0o600,
+    )
+    try:
+        payload = json.loads(raw, object_pairs_hook=reject_duplicates)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ComposeSourceError(
+            "public edge Compose environment receipt is malformed"
+        ) from exc
+    if not isinstance(payload, dict) or set(payload) != {
+        "contractName",
+        "status",
+        "sourcePath",
+        "sha256",
+        "sourceIdentity",
+        "sourceContentPersisted",
+    }:
+        raise ComposeSourceError(
+            "public edge Compose environment receipt fields are invalid"
+        )
+    if (
+        payload.get("contractName") != ENVIRONMENT_CONTRACT
+        or payload.get("status") != "pass"
+        or payload.get("sourceContentPersisted") is not False
+    ):
+        raise ComposeSourceError(
+            "public edge Compose environment receipt is not pass"
+        )
+    return payload
+
+
+def verify_environment(source: Path, receipt: Path) -> dict[str, Any]:
+    payload = load_environment_receipt(receipt)
+    if payload.get("sourcePath") != str(source):
+        raise ComposeSourceError("public edge Compose environment path changed")
+    source_raw, source_metadata = read_stable_file(
+        source,
+        label="public edge Compose environment",
+        maximum_bytes=MAX_ENVIRONMENT_BYTES,
+        expected_mode=0o600,
+    )
+    digest = hashlib.sha256(source_raw).hexdigest()
+    if (
+        digest != payload.get("sha256")
+        or file_identity(source_metadata) != payload.get("sourceIdentity")
+    ):
+        raise ComposeSourceError("public edge Compose environment binding changed")
+    return {
+        "contractName": ENVIRONMENT_CONTRACT,
+        "status": "pass",
+        "sha256": digest,
+        "sourceContentPersisted": False,
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -292,6 +378,10 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--source", required=True)
         child.add_argument("--snapshot", required=True)
         child.add_argument("--receipt", required=True)
+    for command in ("capture-environment", "verify-environment"):
+        child = commands.add_parser(command)
+        child.add_argument("--source", required=True)
+        child.add_argument("--receipt", required=True)
     return parser
 
 
@@ -299,13 +389,20 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         source = normalized_absolute_path(args.source, "Compose source")
-        snapshot = normalized_absolute_path(args.snapshot, "Compose snapshot")
         receipt = normalized_absolute_path(args.receipt, "Compose receipt")
-        result = (
-            capture(source, snapshot, receipt)
-            if args.command == "capture"
-            else verify(source, snapshot, receipt)
-        )
+        if args.command in {"capture", "verify"}:
+            snapshot = normalized_absolute_path(args.snapshot, "Compose snapshot")
+            result = (
+                capture(source, snapshot, receipt)
+                if args.command == "capture"
+                else verify(source, snapshot, receipt)
+            )
+        else:
+            result = (
+                capture_environment(source, receipt)
+                if args.command == "capture-environment"
+                else verify_environment(source, receipt)
+            )
     except (ComposeSourceError, OSError, ValueError, TypeError) as exc:
         print(f"public_edge_compose_source_attestation: {exc}", file=sys.stderr)
         return 1

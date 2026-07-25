@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import importlib.util
 import hashlib
 import json
@@ -355,6 +356,7 @@ def test_staged_payload_fingerprint_prunes_private_state_contents(tmp_path: Path
     private_target = state / "private-target"
     private_target.write_bytes(b"secret")
     (state / "private-link").symlink_to(private_target)
+    module.ensure_required_compose_mountpoints(root)
     module.normalize_payload_modes(root)
 
     rows = module.staged_payload_rows(root)
@@ -369,11 +371,16 @@ def test_staged_payload_fingerprint_prunes_private_state_contents(tmp_path: Path
     assert fingerprint["excludedRelativePaths"] == (
         module.staged_payload_runtime_mount_exclusions()
     )
-    assert fingerprint["excludedRelativePaths"] == []
+    assert fingerprint["excludedRelativePaths"] == [
+        (
+            "wwwroot/proofs/mac-codex-release/"
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+    ]
     assert after_private_state_refresh == fingerprint
 
 
-def test_staged_payload_fingerprint_requires_no_obsolete_nested_mountpoint(
+def test_staged_payload_fingerprint_requires_inert_nested_mountpoint(
     tmp_path: Path,
 ) -> None:
     module = load_module()
@@ -381,12 +388,23 @@ def test_staged_payload_fingerprint_requires_no_obsolete_nested_mountpoint(
     root.mkdir()
     (root / "state").mkdir()
     (root / "Chummer.Run.Api.dll").write_bytes(b"assembly")
+    created = module.ensure_required_compose_mountpoints(root)
     module.normalize_payload_modes(root)
 
     fingerprint = module.staged_payload_fingerprint(root)
 
-    assert module.REQUIRED_COMPOSE_MOUNTPOINTS == ()
-    assert fingerprint["excludedRelativePaths"] == []
+    expected = (
+        Path("wwwroot")
+        / "proofs"
+        / "mac-codex-release"
+        / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    assert module.REQUIRED_COMPOSE_MOUNTPOINTS == (expected,)
+    assert created == [expected.as_posix()]
+    assert (root / expected).read_bytes() == (
+        module.COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES
+    )
+    assert fingerprint["excludedRelativePaths"] == [expected.as_posix()]
     assert fingerprint["fileCount"] == 1
 
 
@@ -427,6 +445,89 @@ def test_v3_runtime_mount_exclusions_exactly_match_nested_read_only_app_binds() 
     assert "state" not in exclusions
 
 
+def test_compose_mountpoint_materialization_replaces_source_bytes_with_inert_placeholder(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    root = tmp_path / "overlay"
+    (root / "state").mkdir(parents=True)
+    target = root / module.REQUIRED_COMPOSE_MOUNTPOINTS[0]
+    target.parent.mkdir(parents=True)
+    target.write_text("credential-like-source-content\n", encoding="utf-8")
+
+    created = module.ensure_required_compose_mountpoints(root)
+    module.normalize_payload_modes(root)
+    receipt = module.compose_mountpoint_compatibility(root)
+
+    assert created == []
+    assert target.read_bytes() == module.COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES
+    assert receipt["status"] == "pass"
+    assert receipt["entries"][0]["sourceContentCopied"] is False
+    assert "credential-like-source-content" not in json.dumps(receipt)
+
+
+def test_source_wwwroot_merge_never_copies_runtime_generated_proof(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    source = tmp_path / "source-wwwroot"
+    destination = tmp_path / "staging-wwwroot"
+    excluded = module.RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS[0].relative_to(
+        "wwwroot"
+    )
+    generated_proof = source / excluded
+    generated_proof.parent.mkdir(parents=True)
+    generated_proof.write_bytes(b"credential-like-runtime-proof-sentinel\n")
+    (source / "index.html").write_text("public\n", encoding="utf-8")
+
+    copied = module.merge_optional_tree(
+        source,
+        destination,
+        excluded_relative_paths=(excluded,),
+    )
+
+    assert copied is True
+    assert (destination / "index.html").read_text(encoding="utf-8") == "public\n"
+    assert not (destination / excluded).exists()
+    assert all(
+        b"credential-like-runtime-proof-sentinel" not in candidate.read_bytes()
+        for candidate in destination.rglob("*")
+        if candidate.is_file()
+    )
+
+
+def test_compose_mountpoint_compatibility_fails_when_target_is_missing(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    root = tmp_path / "overlay"
+    root.mkdir()
+
+    receipt = module.compose_mountpoint_compatibility(root)
+
+    assert receipt["status"] == "fail"
+    assert receipt["entries"][0]["status"] == "fail"
+    assert receipt["failures"]
+
+
+def test_compose_mountpoint_materialization_fails_closed_on_read_only_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    root = tmp_path / "overlay"
+    root.mkdir()
+
+    def fail_write(_path: Path, _payload: bytes) -> None:
+        raise OSError(errno.EROFS, "read-only file system")
+
+    monkeypatch.setattr(module, "atomic_write_bytes", fail_write)
+
+    with pytest.raises(OSError, match="read-only file system"):
+        module.ensure_required_compose_mountpoints(root)
+    assert not (root / module.REQUIRED_COMPOSE_MOUNTPOINTS[0]).exists()
+
+
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "hardlink"])
 def test_staged_payload_fingerprint_rejects_aliasing_files(
     tmp_path: Path,
@@ -456,6 +557,7 @@ def test_staged_payload_rows_bind_modes_and_policy_rejects_mode_drift(
     (root / "state").mkdir()
     payload = root / "Chummer.Run.Api.dll"
     payload.write_bytes(b"assembly")
+    module.ensure_required_compose_mountpoints(root)
     module.normalize_payload_modes(root)
     baseline_rows = module.staged_payload_rows(root)
 
@@ -948,7 +1050,16 @@ def test_main_persists_shared_mutation_lock_receipt_while_both_locks_are_held(
         build_root=tmp_path / "build",
     )
     args.activate = True
+    args.shared_mutation_lock_token = "a" * 64
     module.PUBLIC_EDGE_MUTATION_LOCK = tmp_path / ".state" / "public-edge-mutation.lock"
+    module.PUBLIC_EDGE_MUTATION_LOCK.parent.mkdir(mode=0o700)
+    module.PUBLIC_EDGE_MUTATION_LOCK.mkdir(mode=0o700)
+    token_path = (
+        module.PUBLIC_EDGE_MUTATION_LOCK
+        / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    )
+    token_path.write_text(args.shared_mutation_lock_token + "\n", encoding="ascii")
+    token_path.chmod(0o600)
     monkeypatch.setattr(module, "parse_args", lambda: args)
     monkeypatch.setattr(
         module,
@@ -972,10 +1083,48 @@ def test_main_persists_shared_mutation_lock_receipt_while_both_locks_are_held(
         "required": True,
         "status": "held",
         "path": str(module.PUBLIC_EDGE_MUTATION_LOCK),
-        "inherited": False,
+        "inherited": True,
         "acquiredBeforeOverlayPublishLock": True,
     }
-    assert not module.PUBLIC_EDGE_MUTATION_LOCK.exists()
+    assert module.PUBLIC_EDGE_MUTATION_LOCK.exists()
+
+
+def test_main_rejects_standalone_activation_before_any_overlay_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    release_channel_receipt = tmp_path / "release.json"
+    release_channel_receipt.write_text("{}\n", encoding="utf-8")
+    staging_root = tmp_path / "staging" / "app"
+    active_root = tmp_path / "active" / "app"
+    active_root.mkdir(parents=True)
+    (active_root / "incumbent.txt").write_text("preserve\n", encoding="utf-8")
+    args = publisher_args(
+        output=tmp_path / "receipt.json",
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256="0" * 64,
+        source_root=source_root,
+        staging_root=staging_root,
+        active_root=active_root,
+        backup_root=tmp_path / "backups",
+        build_root=tmp_path / "build",
+    )
+    args.activate = True
+    monkeypatch.setattr(module, "parse_args", lambda: args)
+
+    assert module.main() == 1
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["activationStatus"] == "blocked_by_preflight_failure"
+    assert "standalone overlay activation is forbidden" in payload["warning"]
+    assert (active_root / "incumbent.txt").read_text(encoding="utf-8") == (
+        "preserve\n"
+    )
+    assert not staging_root.exists()
 
 
 def publisher_args(
@@ -1948,6 +2097,13 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
     workspace_root = tmp_path
     source_root = workspace_root / "chummer.run-services"
     make_source_tree(source_root)
+    generated_proof = (
+        source_root
+        / "Chummer.Run.Api"
+        / module.RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS[0]
+    )
+    generated_proof.parent.mkdir(parents=True, exist_ok=True)
+    generated_proof.write_bytes(b"credential-like-runtime-proof-sentinel\n")
 
     design_root = workspace_root / "chummer-design"
     (design_root / ".dockerignore").parent.mkdir(parents=True, exist_ok=True)
@@ -2044,6 +2200,16 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
     assert not (build_source_root / ".vexp").exists()
     assert not (build_source_root / ".pytest_cache").exists()
     assert not (build_source_root / "Chummer.Run.Api" / "bin_tmp").exists()
+    assert not (
+        build_source_root
+        / "Chummer.Run.Api"
+        / module.RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS[0]
+    ).exists()
+    assert all(
+        b"credential-like-runtime-proof-sentinel" not in candidate.read_bytes()
+        for candidate in build_root.rglob("*")
+        if candidate.is_file()
+    )
     assert (build_source_root / ".codex-design" / "marker.txt").is_file()
     assert (build_root / "workspace" / "chummer-core-engine" / "Chummer.Contracts" / "marker.txt").is_file()
     assert not (build_root / "workspace" / "chummer-core-engine" / "unrelated").exists()
@@ -2471,14 +2637,23 @@ def test_materialize_stages_and_verifies_overlay_without_activation(tmp_path: Pa
     assert (
         staging_root / "wwwroot" / "media" / "product" / "proof-builder-trail.png"
     ).read_text(encoding="utf-8") == "png\n"
-    assert not (
+    assert (
         staging_root
         / "wwwroot"
         / "proofs"
         / "mac-codex-release"
         / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    ).exists()
-    assert payload["composeMountpointsCreated"] == []
+    ).read_bytes() == module.COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES
+    assert payload["composeMountpointsCreated"] == [
+        (
+            "wwwroot/proofs/mac-codex-release/"
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        )
+    ]
+    mountpoint_receipt = payload["composeMountpointCompatibility"]
+    assert mountpoint_receipt["status"] == "pass"
+    assert mountpoint_receipt["parentOverlayReadOnly"] is True
+    assert mountpoint_receipt["entries"][0]["sourceContentCopied"] is False
     assert (staging_root / ".codex-design" / "marker.txt").read_text(encoding="utf-8") == "design\n"
     build_info = json.loads((staging_root / module.OVERLAY_BUILD_INFO_RELATIVE_PATH).read_text(encoding="utf-8"))
     assert build_info["contractName"] == module.CONTRACT_NAME
@@ -2867,6 +3042,40 @@ def test_copy_activation_backup_rename_failure_atomically_restores_exact_prior_a
         )
 
     assert raised.value.rollback_status == "exact_prior_active_restored"
+    assert raised.value.reason == "activation_transaction_failed"
+    assert (active_root / "old.txt").read_text(encoding="utf-8") == "old\n"
+    assert not (active_root / "new.txt").exists()
+    assert (staging_root / "new.txt").read_text(encoding="utf-8") == "new\n"
+    assert not module.activation_transaction_journal_path(active_root).exists()
+    assert not list(backup_root.rglob("app"))
+
+
+def test_copy_activation_runtime_compatibility_failure_rolls_back_exact_prior_active(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "overlay-next" / "app"
+    active_root = tmp_path / "overlay" / "app"
+    backup_root = tmp_path / "backups"
+    staging_root.mkdir(parents=True)
+    active_root.mkdir(parents=True)
+    (staging_root / "new.txt").write_text("new\n", encoding="utf-8")
+    (active_root / "old.txt").write_text("old\n", encoding="utf-8")
+
+    def fail_runtime_rehearsal(_root: Path) -> None:
+        raise RuntimeError("injected container recreation incompatibility")
+
+    with pytest.raises(module.OverlayActivationError) as raised:
+        module.activate_overlay_tree(
+            staging_root,
+            active_root,
+            mode="copy",
+            backup_root=backup_root,
+            post_install_check_fn=fail_runtime_rehearsal,
+        )
+
+    assert raised.value.rollback_status == "exact_prior_active_restored"
+    assert raised.value.reason == "activation_post_install_compatibility_failed"
     assert (active_root / "old.txt").read_text(encoding="utf-8") == "old\n"
     assert not (active_root / "new.txt").exists()
     assert (staging_root / "new.txt").read_text(encoding="utf-8") == "new\n"
@@ -4002,6 +4211,8 @@ def test_isolated_overlay_process_env_scrubs_every_inherited_retired_play_transp
     }
     inherited["CHUMMER_PUBLIC_PLAY_PROXY_ENABLED"] = "true"
     inherited["UNRELATED_SETTING"] = "preserved"
+    inherited["CHUMMER_PUBLIC_CANONICAL_ORIGIN"] = "http://stale.invalid"
+    inherited["CHUMMER_PUBLIC_ALLOWED_HOSTS"] = "stale.invalid"
     downloads_root = tmp_path / "release-shelf"
 
     env = module.build_isolated_overlay_process_env(
@@ -4015,11 +4226,58 @@ def test_isolated_overlay_process_env_scrubs_every_inherited_retired_play_transp
     assert module.RETIRED_PUBLIC_PLAY_PROXY_ENV_NAMES.isdisjoint(env)
     assert env["UNRELATED_SETTING"] == "preserved"
     assert env["ASPNETCORE_URLS"] == "http://127.0.0.1:5010"
+    assert env["CHUMMER_PUBLIC_CANONICAL_ORIGIN"] == "https://chummer.run"
+    assert "chummer.run" in env["CHUMMER_PUBLIC_ALLOWED_HOSTS"]
+    rehearsal = dict(env)
+    rehearsal["ASPNETCORE_ENVIRONMENT"] = "Production"
+    compatibility = module.production_runtime_environment_compatibility(
+        rehearsal
+    )
+    assert compatibility["status"] == "pass"
+    assert all(compatibility["checks"].values())
+    assert compatibility["secretValuesPersisted"] is False
     assert env["CHUMMER_DOWNLOADS_SOURCE_ROOT"] == str(downloads_root)
     assert env["CHUMMER_DATA_PROTECTION_KEYS_PATH"] == str(
         tmp_path / "tmp" / "data-protection-keys"
     )
     assert (tmp_path / "tmp" / "data-protection-keys").stat().st_mode & 0o777 == 0o700
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {
+            "ASPNETCORE_ENVIRONMENT": "Production",
+            "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "",
+            "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+        },
+        {
+            "ASPNETCORE_ENVIRONMENT": "Production",
+            "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "http://chummer.run",
+            "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+        },
+        {
+            "ASPNETCORE_ENVIRONMENT": "Production",
+            "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://stale.invalid",
+            "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+        },
+        {
+            "ASPNETCORE_ENVIRONMENT": "Development",
+            "CHUMMER_PUBLIC_CANONICAL_ORIGIN": "https://chummer.run",
+            "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
+        },
+    ],
+)
+def test_production_runtime_compatibility_rejects_stale_or_unsafe_environment(
+    environment: dict[str, str],
+) -> None:
+    module = load_module()
+
+    receipt = module.production_runtime_environment_compatibility(environment)
+
+    assert receipt["status"] == "fail"
+    assert not all(receipt["checks"].values())
+    assert receipt["secretValuesPersisted"] is False
 
 
 def test_operation_restore_publish_commands_bind_locked_restore_and_no_restore_publish(

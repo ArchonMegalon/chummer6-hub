@@ -1155,11 +1155,13 @@ OVERLAY_ACTIVATION_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-activation.json"
 OVERLAY_ROLLBACK_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-rollback.json"
 OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.json"
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
+PREACTIVATION_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/preactivation-compose-runtime-attestation.json"
 DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
 PRECOMPLETION_TRANSACTION_BACKUP="$DEPLOY_RECEIPT_DIR/precompletion-overlay-transaction.json"
 STEADY_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/steady-compose-runtime-attestation.json"
 COMPOSE_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/docker-compose.public-edge.snapshot.yml"
 COMPOSE_SOURCE_BINDING_RECEIPT="$DEPLOY_RECEIPT_DIR/compose-source-binding.json"
+COMPOSE_ENVIRONMENT_BINDING_RECEIPT="$DEPLOY_RECEIPT_DIR/compose-environment-binding.json"
 FINAL_COMPOSE_ATTESTATION_OUTPUT="$COMPOSE_ATTESTATION_OUTPUT"
 FINAL_COMPOSE_ATTESTATION_SNAPSHOT="$DEPLOY_RECEIPT_DIR/cutover-final-compose-attestation.json"
 PUBLICATION_READINESS_ATTESTATION="$DEPLOY_RECEIPT_DIR/cutover-final-publication-readiness.json"
@@ -1317,6 +1319,9 @@ configure_compose_operation() {
     CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="$PROJECTION_SNAPSHOT_ROOT"
     CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE="$RUNTIME_PROOF_BIND_SOURCE"
     CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT"
+    ASPNETCORE_ENVIRONMENT=Production
+    CHUMMER_PUBLIC_ALLOWED_HOSTS=chummer.run
+    CHUMMER_PUBLIC_CANONICAL_ORIGIN="$CANONICAL_BASE_URL"
     CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED="$layout_v1_required"
     CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED="$initial_migration_allowed"
     "$TRUSTED_DOCKER" --context "$CANONICAL_DOCKER_CONTEXT" compose
@@ -1357,6 +1362,12 @@ if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" capture \
   echo "failed to capture the immutable public-edge Compose source" >&2
   exit 2
 fi
+if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" capture-environment \
+  --source "$ENV_FILE" \
+  --receipt "$COMPOSE_ENVIRONMENT_BINDING_RECEIPT" >/dev/null; then
+  echo "failed to bind the owner-only public-edge Compose environment" >&2
+  exit 2
+fi
 
 verify_compose_source_binding() {
   trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" verify \
@@ -1365,15 +1376,37 @@ verify_compose_source_binding() {
     --receipt "$COMPOSE_SOURCE_BINDING_RECEIPT" >/dev/null
 }
 
+verify_compose_environment_binding() {
+  trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" verify-environment \
+    --source "$ENV_FILE" \
+    --receipt "$COMPOSE_ENVIRONMENT_BINDING_RECEIPT" >/dev/null
+}
+
 run_compose_source_guarded() {
   local command_status=0
+  if ! verify_compose_source_binding \
+    || ! verify_compose_environment_binding; then
+    echo "public-edge Compose source or environment changed before a guarded read" >&2
+    return 2
+  fi
+  "$@" || command_status=$?
+  if ! verify_compose_source_binding \
+    || ! verify_compose_environment_binding; then
+    echo "public-edge Compose source or environment changed during a guarded read" >&2
+    return 2
+  fi
+  return "$command_status"
+}
+
+run_compose_source_only_guarded() {
+  local command_status=0
   if ! verify_compose_source_binding; then
-    echo "public-edge Compose source changed before a guarded read" >&2
+    echo "public-edge Compose source changed before recovery" >&2
     return 2
   fi
   "$@" || command_status=$?
   if ! verify_compose_source_binding; then
-    echo "public-edge Compose source changed during a guarded read" >&2
+    echo "public-edge Compose source changed during recovery" >&2
     return 2
   fi
   return "$command_status"
@@ -1709,7 +1742,10 @@ print(
 }
 
 run_deploy_recovery() {
-  run_compose_source_guarded \
+  # Recovery resolves existing containers by immutable Docker labels and never
+  # interpolates the mutable environment file, so it remains available after an
+  # environment-binding failure.
+  run_compose_source_only_guarded \
     trusted_source_python "$SOURCE_ROOT/scripts/public_edge_deploy_recovery.py" \
     --source-root "$SOURCE_ROOT" \
     --active-root "$OVERLAY_ROOT" \
@@ -3582,6 +3618,26 @@ if ! verify_install_linking_state_volume_inventory_transition \
   "$INSTALL_LINKING_PREACTIVATION_VOLUME_INVENTORY_SHA256"; then
   retain_unknown_postquiesce_authority \
     "pre-activation state-volume consumer transition"
+fi
+
+# Re-render and attest the exact Compose runtime immediately before the overlay
+# exchange. This closes the gap between the earlier source/build gate and
+# recreation: an empty, HTTP, or otherwise stale canonical origin and any mount
+# destination drift fail while the durable transaction can still restore the
+# incumbent. The new compatibility sections persist only public-value digests and
+# container destinations; they do not duplicate bind-source bytes.
+if ! compose_cli --profile install-linking-postgres-admin config --format json \
+  | trusted_source_python "$SOURCE_ROOT/scripts/validate_public_edge_compose_runtime.py" \
+      --operation "$COMPOSE_ATTESTATION_OPERATION" \
+      --project-name "$COMPOSE_PROJECT" \
+      --source-root "$SOURCE_ROOT" \
+      --build-context "$BUILD_CONTEXT" \
+      --overlay-root "$OVERLAY_ROOT" \
+      --projection-root "$PROJECTION_SNAPSHOT_ROOT" \
+      --runtime-proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
+      --published-port "$PUBLIC_EDGE_PORT" \
+      --output "$PREACTIVATION_COMPOSE_ATTESTATION_OUTPUT"; then
+  abort_portal_recreate "pre-activation Compose runtime compatibility" 1
 fi
 
 # The stopped portal no longer has the active root bind-mounted. Reuse-staging

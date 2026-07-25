@@ -4672,6 +4672,46 @@ def test_compose_source_guard_rejects_change_after_capture(
         attestor.verify(source, snapshot, receipt)
 
 
+@pytest.mark.parametrize("mutation", ["content", "exchange"])
+def test_compose_environment_binding_rejects_drift_without_copying_content(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    attestor = load_compose_source_attestor()
+    source = tmp_path / ".env"
+    sentinel = "DATABASE_PASSWORD=credential-like-sentinel\n"
+    source.write_text(
+        sentinel
+        + "CHUMMER_PUBLIC_CANONICAL_ORIGIN=https://chummer.run\n",
+        encoding="utf-8",
+    )
+    source.chmod(0o600)
+    receipt_root = tmp_path / "receipts"
+    receipt_root.mkdir(mode=0o700)
+    receipt = receipt_root / "compose-environment.json"
+
+    captured = attestor.capture_environment(source, receipt)
+
+    assert captured["status"] == "pass"
+    assert captured["sourceContentPersisted"] is False
+    assert sentinel not in receipt.read_text(encoding="utf-8")
+    assert attestor.verify_environment(source, receipt)["status"] == "pass"
+    if mutation == "content":
+        source.write_text(
+            sentinel + "CHUMMER_PUBLIC_CANONICAL_ORIGIN=http://stale.invalid\n",
+            encoding="utf-8",
+        )
+        source.chmod(0o600)
+    else:
+        retired = tmp_path / "retired.env"
+        source.rename(retired)
+        source.write_bytes(retired.read_bytes())
+        source.chmod(0o600)
+
+    with pytest.raises(attestor.ComposeSourceError, match="changed"):
+        attestor.verify_environment(source, receipt)
+
+
 def test_deploy_seals_every_compose_read_to_one_guarded_snapshot() -> None:
     deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
         encoding="utf-8"
@@ -4683,6 +4723,15 @@ def test_deploy_seals_every_compose_read_to_one_guarded_snapshot() -> None:
     assert "(8#$COMPOSE_FILE_MODE & 8#022)" in deploy
     assert '"$COMPOSE_SOURCE_ATTESTOR" capture' in deploy
     assert '"$COMPOSE_SOURCE_ATTESTOR" verify' in deploy
+    assert '"$COMPOSE_SOURCE_ATTESTOR" capture-environment' in deploy
+    assert '"$COMPOSE_SOURCE_ATTESTOR" verify-environment' in deploy
+    guard = deploy[
+        deploy.index("run_compose_source_guarded() {") :
+        deploy.index("run_compose_source_only_guarded() {")
+    ]
+    command = guard.index('  "$@" || command_status=$?')
+    assert guard.index("verify_compose_environment_binding") < command
+    assert guard.rindex("verify_compose_environment_binding") > command
     assert '-f "$COMPOSE_SOURCE_SNAPSHOT" --project-directory "$SOURCE_ROOT"' in deploy
     assert (
         'compose_cli() {\n  run_compose_source_guarded "${compose_command[@]}" "$@"\n}'
@@ -4712,7 +4761,7 @@ def test_deploy_bounds_initial_release_shelf_cutover_and_returns_to_steady() -> 
         'CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED="$initial_migration_allowed"'
         in deploy
     )
-    assert deploy.count('--operation "$COMPOSE_ATTESTATION_OPERATION"') == 2
+    assert deploy.count('--operation "$COMPOSE_ATTESTATION_OPERATION"') == 3
     request_start = deploy.index(
         'trusted_source_python "$CUTOVER_ATTESTOR" request-start'
     )
@@ -4829,10 +4878,10 @@ def test_runtime_proof_default_matches_canonical_compose_bind_source() -> None:
     )
     assert compose_text.count(
         "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}"
-    ) == 1
+    ) == 2
     assert (
         "/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
-        not in compose_text
+        in compose_text
     )
     assert compose_text.count(
         "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}"

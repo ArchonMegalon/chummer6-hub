@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import ipaddress
 import json
 import os
@@ -49,11 +50,16 @@ EXPECTED_DOWNLOADS_SOURCE = (
 )
 EXPECTED_FLEET_ARTIFACT_ROOT = "/docker/fleet/.codex-studio/published"
 EXPECTED_HUB_PROOF_FILENAME = "HUB_LOCAL_RELEASE_PROOF.generated.json"
+EXPECTED_PUBLIC_HUB_PROOF_TARGET = (
+    "/app/wwwroot/proofs/mac-codex-release/"
+    "HUB_LOCAL_RELEASE_PROOF.generated.json"
+)
 EXPECTED_FINAL_GOLD_SOURCE = (
     "/docker/chummercomplete/chummer.run-services/.codex-studio/published/"
     "FINAL_GOLD_JANITOR.generated.json"
 )
 EXPECTED_PORTAL_ENVIRONMENT = {
+    "ASPNETCORE_ENVIRONMENT": "Production",
     "AllowedHosts": "chummer.run",
     "CHUMMER_DATA_PROTECTION_KEYS_PATH": "/app/state/data-protection-keys-v2",
     "CHUMMER_PUBLIC_ALLOWED_HOSTS": "chummer.run",
@@ -470,6 +476,61 @@ def opaque_read_only_bind_policy(target: str) -> dict[str, Any]:
     }
 
 
+def portal_overlay_mount_topology(portal: dict[str, Any]) -> dict[str, Any]:
+    """Return a source-free receipt for mounts at or below the read-only /app bind."""
+    raw_mounts = portal.get("volumes")
+    if not isinstance(raw_mounts, list):
+        raise ValueError("rendered chummer-portal volumes must be a list")
+    rows: list[dict[str, Any]] = []
+    for index, raw_mount in enumerate(raw_mounts):
+        mount = mapping(
+            raw_mount,
+            label=f"rendered chummer-portal mount {index}",
+        )
+        target = mount.get("target")
+        if not isinstance(target, str):
+            raise ValueError("rendered chummer-portal mount target must be a string")
+        if target != "/app" and not target.startswith("/app/"):
+            continue
+        relative_path = "." if target == "/app" else target.removeprefix("/app/")
+        target_kind = (
+            "file" if target == EXPECTED_PUBLIC_HUB_PROOF_TARGET else "directory"
+        )
+        rows.append(
+            {
+                "containerTarget": target,
+                "relativePath": relative_path,
+                "mountType": mount.get("type"),
+                "readOnly": mount.get("read_only") is True,
+                "targetKind": target_kind,
+                "placeholderRequired": target != "/app",
+            }
+        )
+    rows.sort(key=lambda row: str(row["containerTarget"]))
+    expected_targets = {
+        "/app",
+        "/app/state",
+        EXPECTED_PUBLIC_HUB_PROOF_TARGET,
+    }
+    if {str(row["containerTarget"]) for row in rows} != expected_targets:
+        raise ValueError(
+            "rendered chummer-portal overlay mount topology is not canonical"
+        )
+    canonical = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return {
+        "contractName": "chummer.public_edge_compose_overlay_mount_topology.v1",
+        "status": "pass",
+        "parentOverlayTarget": "/app",
+        "parentOverlayReadOnly": True,
+        "destinationSetSha256": hashlib.sha256(canonical).hexdigest(),
+        "destinations": rows,
+        "sourcePathsPersisted": False,
+        "sourceContentPersisted": False,
+    }
+
+
 def authenticated_projection_directory(value: Path) -> Path:
     path = Path(value)
     if not path.is_absolute():
@@ -813,6 +874,11 @@ def validate_runtime(
                 read_only=True,
             ),
             bind_mount_policy(
+                str(runtime_proof_bind_source),
+                EXPECTED_PUBLIC_HUB_PROOF_TARGET,
+                read_only=True,
+            ),
+            bind_mount_policy(
                 str(projection_root),
                 "/public-projection",
                 read_only=True,
@@ -1002,6 +1068,30 @@ def validate_runtime(
         "runtimeProofBindSource": str(runtime_proof_bind_source),
         "runtimeProofBindSourceReadOnly": True,
         "publishedPort": published_port,
+        "productionRuntimeCompatibility": {
+            "contractName": (
+                "chummer.public_edge_production_runtime_compatibility.v1"
+            ),
+            "status": "pass",
+            "checks": {
+                "productionEnvironment": True,
+                "canonicalOriginPresent": True,
+                "canonicalOriginAbsoluteHttps": True,
+                "canonicalHostAllowed": True,
+            },
+            "canonicalOriginSha256": hashlib.sha256(
+                EXPECTED_PORTAL_ENVIRONMENT[
+                    "CHUMMER_PUBLIC_CANONICAL_ORIGIN"
+                ].encode("utf-8")
+            ).hexdigest(),
+            "allowedHostsSha256": hashlib.sha256(
+                EXPECTED_PORTAL_ENVIRONMENT[
+                    "CHUMMER_PUBLIC_ALLOWED_HOSTS"
+                ].encode("utf-8")
+            ).hexdigest(),
+            "secretValuesPersisted": False,
+        },
+        "portalOverlayMountTopology": portal_overlay_mount_topology(portal),
         "proxyGates": {key: "false" for key in PROXY_GATE_KEYS},
         "retiredProxyKeysAbsent": True,
         "releaseShelfPosture": expected_release_shelf_posture,

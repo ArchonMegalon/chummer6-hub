@@ -247,12 +247,14 @@ services:
       # address keeps resolution deterministic on the external Docker network.
       - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the certificate SAN-matching PostgreSQL DNS name without a trailing dot}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set the reviewed PostgreSQL address}"
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      # Public policy is literal here so mutable .env drift cannot weaken the
+      # Production/HTTPS-origin startup contract between attestation and create.
+      ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       CHUMMER_ENABLE_HTTPS_REDIRECTION: ${CHUMMER_ENABLE_HTTPS_REDIRECTION:-false}
-      AllowedHosts: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
-      CHUMMER_PUBLIC_ALLOWED_HOSTS: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
-      CHUMMER_PUBLIC_CANONICAL_ORIGIN: ${CHUMMER_PUBLIC_CANONICAL_ORIGIN:-https://chummer.run}
+      AllowedHosts: chummer.run
+      CHUMMER_PUBLIC_ALLOWED_HOSTS: chummer.run
+      CHUMMER_PUBLIC_CANONICAL_ORIGIN: https://chummer.run
       CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
@@ -617,6 +619,10 @@ services:
       # is resolved from that same immutable snapshot by deploy/recovery before Compose runs.
       - ${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}:/public-projection:ro
       - ${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
+      # The same authenticated bytes back the public compatibility path. The
+      # publisher installs an inert target before /app becomes read-only; Docker
+      # replaces it with this bind and never copies proof content into the overlay.
+      - ${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"

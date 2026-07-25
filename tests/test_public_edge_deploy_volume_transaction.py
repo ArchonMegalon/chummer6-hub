@@ -577,6 +577,17 @@ arg_value() {
 case "$*" in
   *runtimeProofBindSource*)
     printf '%s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256";;
+  *"attest_public_edge_compose_source.py capture-environment"*)
+    source="$(arg_value --source "$@")"
+    receipt="$(arg_value --receipt "$@")"
+    /usr/bin/sha256sum -- "$source" | /usr/bin/awk '{print $1}' > "$receipt"
+    /usr/bin/chmod 0600 "$receipt";;
+  *"attest_public_edge_compose_source.py verify-environment"*)
+    source="$(arg_value --source "$@")"
+    receipt="$(arg_value --receipt "$@")"
+    expected="$(/usr/bin/cat "$receipt")"
+    actual="$(/usr/bin/sha256sum -- "$source" | /usr/bin/awk '{print $1}')"
+    [ "$actual" = "$expected" ];;
   *"attest_public_edge_compose_source.py capture"*)
     source="$(arg_value --source "$@")"
     snapshot="$(arg_value --snapshot "$@")"
@@ -587,6 +598,12 @@ case "$*" in
     /usr/bin/chmod 0600 "$receipt";;
   *"attest_public_edge_compose_source.py verify"*)
     [ -f "$(arg_value --snapshot "$@")" ] || exit 90;;
+  *"publish_public_edge_portal_overlay.py --activate"*)
+    if [ "${FAKE_MUTATE_COMPOSE_ENV_AFTER_ATTESTATION:-0}" = 1 ]; then
+      printf '%s\n' 'CHUMMER_PUBLIC_CANONICAL_ORIGIN=http://stale.invalid' \
+        > "$FAKE_COMPOSE_ENV_MUTATION_TARGET"
+      /usr/bin/chmod 0600 "$FAKE_COMPOSE_ENV_MUTATION_TARGET"
+    fi;;
   *"public_edge_overlay_transaction.py snapshot"*)
     output="$(arg_value --output "$@")"
     printf '%s\n' '{"phase":"prepared"}' > "$output"
@@ -993,6 +1010,84 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
         / "active-overlay-transaction.json"
     ).exists()
     assert postdeploy_log.is_file()
+
+
+def test_guarded_deploy_detects_env_drift_after_attestation_and_recovers_before_create(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    environment_file = tmp_path / "public-edge.env"
+    environment_file.write_text(
+        "CHUMMER_PUBLIC_CANONICAL_ORIGIN=https://chummer.run\n",
+        encoding="utf-8",
+    )
+    environment_file.chmod(0o600)
+    deploy_under_test = tmp_path / "deploy-env-binding.sh"
+    original_environment_literal = (
+        'CANONICAL_ENV_FILE="/docker/chummercomplete/chummer.run-services/.env"'
+    )
+    deploy_source = Path(DEPLOY).read_text(encoding="utf-8")
+    assert original_environment_literal in deploy_source
+    deploy_under_test.write_text(
+        deploy_source.replace(
+            original_environment_literal,
+            f'CANONICAL_ENV_FILE="{environment_file}"',
+        ),
+        encoding="utf-8",
+    )
+    deploy_under_test.chmod(0o755)
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_MUTATE_COMPOSE_ENV_AFTER_ATTESTATION": "1",
+            "FAKE_COMPOSE_ENV_MUTATION_TARGET": str(environment_file),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_ENV_FILE": str(environment_file),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(deploy_under_test)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "source or environment changed before a guarded read" in result.stderr
+    assert "volume initialization failed" in result.stderr
+    commands = (
+        docker_log.read_text(encoding="utf-8").splitlines()
+        if docker_log.exists()
+        else []
+    )
+    assert not any("chummer-portal-volume-init" in command for command in commands)
+    python_commands = python_log.read_text(encoding="utf-8").splitlines()
+    assert any(
+        "publish_public_edge_portal_overlay.py --activate" in command
+        for command in python_commands
+    )
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    assert "journal:phase:overlay_activated" in events
+    assert "journal:recovered" in events
+    assert "journal:complete" not in events
 
 
 @pytest.mark.parametrize(

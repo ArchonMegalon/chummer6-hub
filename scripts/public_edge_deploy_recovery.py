@@ -207,30 +207,24 @@ class DockerRuntime:
         )
 
     def service_container(self, service: str) -> str:
-        if (
-            self.runtime_profile
-            == transaction.PUBLIC_DOWNLOAD_ONLY_RUNTIME_PROFILE
-        ):
-            output = self._run(
-                [
-                    *self.docker_base,
-                    "container",
-                    "ls",
-                    "--all",
-                    "--quiet",
-                    "--no-trunc",
-                    "--filter",
-                    f"label=com.docker.compose.project={self.project_name}",
-                    "--filter",
-                    f"label=com.docker.compose.service={service}",
-                ],
-                label=f"resolve {service} container by exact Compose labels",
-            )
-        else:
-            output = self._run(
-                [*self.compose_base, "ps", "--all", "-q", service],
-                label=f"resolve {service} container",
-            )
+        # Recovery must remain available if the mutable Compose environment
+        # drifted. Resolve exact existing identities from Docker labels instead
+        # of asking Compose to interpolate that environment again.
+        output = self._run(
+            [
+                *self.docker_base,
+                "container",
+                "ls",
+                "--all",
+                "--quiet",
+                "--no-trunc",
+                "--filter",
+                f"label=com.docker.compose.project={self.project_name}",
+                "--filter",
+                f"label=com.docker.compose.service={service}",
+            ],
+            label=f"resolve {service} container by exact Compose labels",
+        )
         identities = tuple(line for line in output.splitlines() if line)
         if len(identities) > 1:
             raise RuntimeError(f"Docker recovery {service} container is ambiguous")
