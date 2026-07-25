@@ -116,6 +116,14 @@ CURRENT_CONNECTOR_CONVERGENCE_FIELDS = frozenset(
         "stableObservationsRequired",
     }
 )
+CONNECTIONS_RESPONSE_FIELDS = frozenset(
+    {"success", "errors", "messages", "result", "result_info"}
+)
+CONNECTIONS_RESULT_INFO_FIELDS = frozenset(
+    {"count", "page", "per_page", "total_count"}
+)
+CONNECTIONS_PAGE_SIZE = 20
+MAX_CONNECTION_PAGES = 64
 MAX_JSON_BYTES = 16 * 1024 * 1024
 
 
@@ -150,7 +158,12 @@ class TunnelApi(Protocol):
     def put_configuration(self, config: Mapping[str, Any]) -> Mapping[str, Any]:
         ...
 
-    def list_connections(self) -> Mapping[str, Any]:
+    def list_connections(
+        self,
+        *,
+        page: int,
+        per_page: int,
+    ) -> Mapping[str, Any]:
         ...
 
     def get_connector(self, connector_id: str) -> Mapping[str, Any]:
@@ -437,20 +450,115 @@ def _parse_connector_result(response: Any, expected_id: str) -> int | None:
     return _require_version(result["config_version"], "connector config_version")
 
 
-def capture_preexisting_connectors(api: TunnelApi) -> list[dict[str, Any]]:
-    response = api.list_connections()
-    if not isinstance(response, Mapping) or response.get("success") is not True:
-        raise ValidationError("Cloudflare connections response is unsuccessful")
+def _connections_page(
+    api: TunnelApi,
+    *,
+    page: int,
+    per_page: int,
+    expected_total_count: int | None,
+) -> tuple[list[Any], int]:
+    response = api.list_connections(page=page, per_page=per_page)
+    if (
+        not isinstance(response, Mapping)
+        or set(response) != CONNECTIONS_RESPONSE_FIELDS
+        or response.get("success") is not True
+        or response.get("errors") != []
+        or not isinstance(response.get("messages"), list)
+    ):
+        raise ValidationError(
+            "Cloudflare connections response shape is invalid"
+        )
     result = response.get("result")
+    result_info = response.get("result_info")
     if not isinstance(result, list):
-        raise ValidationError("Cloudflare connections result must be an array")
+        raise ValidationError(
+            "Cloudflare connections result must be an array"
+        )
+    if (
+        not isinstance(result_info, Mapping)
+        or set(result_info) != CONNECTIONS_RESULT_INFO_FIELDS
+    ):
+        raise ValidationError(
+            "Cloudflare connections result_info shape is invalid"
+        )
+    count = result_info.get("count")
+    observed_page = result_info.get("page")
+    observed_per_page = result_info.get("per_page")
+    total_count = result_info.get("total_count")
+    if (
+        any(
+            isinstance(value, bool) or not isinstance(value, int)
+            for value in (
+                count,
+                observed_page,
+                observed_per_page,
+                total_count,
+            )
+        )
+        or count != len(result)
+        or observed_page != page
+        or observed_per_page != per_page
+        or total_count < 0
+        or total_count > per_page * MAX_CONNECTION_PAGES
+        or (
+            expected_total_count is not None
+            and total_count != expected_total_count
+        )
+    ):
+        raise ValidationError(
+            "Cloudflare connections pagination metadata is invalid "
+            "or unstable"
+        )
+    return result, total_count
+
+
+def capture_preexisting_connectors(api: TunnelApi) -> list[dict[str, Any]]:
     connector_ids: list[str] = []
-    for row in result:
-        if not isinstance(row, Mapping):
-            raise ValidationError("Cloudflare connection entry must be an object")
-        connector_ids.append(_require_identifier(row.get("id"), "connector id"))
-    if len(connector_ids) != len(set(connector_ids)):
-        raise ValidationError("Cloudflare connections response contains duplicates")
+    total_count: int | None = None
+    page = 1
+    while True:
+        result, observed_total_count = _connections_page(
+            api,
+            page=page,
+            per_page=CONNECTIONS_PAGE_SIZE,
+            expected_total_count=total_count,
+        )
+        if total_count is None:
+            total_count = observed_total_count
+        remaining = total_count - len(connector_ids)
+        expected_count = min(CONNECTIONS_PAGE_SIZE, remaining)
+        if len(result) != expected_count:
+            raise ValidationError(
+                "Cloudflare connections page is incomplete or unstable"
+            )
+        page_ids: list[str] = []
+        for row in result:
+            if not isinstance(row, Mapping):
+                raise ValidationError(
+                    "Cloudflare connection entry must be an object"
+                )
+            page_ids.append(
+                _require_identifier(row.get("id"), "connector id")
+            )
+        if (
+            len(page_ids) != len(set(page_ids))
+            or set(page_ids).intersection(connector_ids)
+        ):
+            raise ValidationError(
+                "Cloudflare connections response contains duplicates"
+            )
+        connector_ids.extend(page_ids)
+        if len(connector_ids) == total_count:
+            break
+        page += 1
+        if page > MAX_CONNECTION_PAGES:
+            raise ValidationError(
+                "Cloudflare connections pagination exceeds its bound"
+            )
+    if len(connector_ids) != total_count:
+        raise ValidationError(
+            "Cloudflare connections pagination is incomplete"
+        )
     if not connector_ids:
         raise ConvergenceError("tunnel has no preexisting connectors")
     captured: list[dict[str, Any]] = []
@@ -589,7 +697,7 @@ def poll_current_connector_convergence(
                     "converged": converged,
                 }
             )
-            if available and not converged:
+            if not available or not converged:
                 mismatch[connector_id] = observed_version
         if mismatch:
             stable_ids = None
@@ -737,6 +845,14 @@ def validate_current_connector_convergence_receipt(
     if canonical_sha256(connector_set) != value["connectorSetSha256"]:
         raise ValidationError(
             "current connector set digest mismatch"
+        )
+    if any(
+        not row["configVersionAvailable"]
+        or row["configVersion"] != target_version
+        for row in connector_set
+    ):
+        raise ValidationError(
+            "current connector set lacks exact configuration versions"
         )
     convergence = _validate_connector_convergence(
         value["connectorConvergence"],
@@ -1735,8 +1851,31 @@ class CloudflareTunnelApi:
             "PUT", self.tunnel_path + "/configurations", {"config": config}
         )
 
-    def list_connections(self) -> Mapping[str, Any]:
-        return self._request("GET", self.tunnel_path + "/connections")
+    def list_connections(
+        self,
+        *,
+        page: int,
+        per_page: int,
+    ) -> Mapping[str, Any]:
+        if (
+            isinstance(page, bool)
+            or not isinstance(page, int)
+            or page < 1
+            or isinstance(per_page, bool)
+            or not isinstance(per_page, int)
+            or per_page < 1
+            or per_page > CONNECTIONS_PAGE_SIZE
+        ):
+            raise ValidationError(
+                "Cloudflare connections pagination request is invalid"
+            )
+        query = urllib.parse.urlencode(
+            {"page": page, "per_page": per_page}
+        )
+        return self._request(
+            "GET",
+            self.tunnel_path + f"/connections?{query}",
+        )
 
     def get_connector(self, connector_id: str) -> Mapping[str, Any]:
         connector = urllib.parse.quote(

@@ -1088,6 +1088,11 @@ class RecordingActions:
     ) -> dict[str, Any]:
         return self.record("retire_active_authority")
 
+    def verify_retired_authority_connectors(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("verify_retired_authority_connectors")
+
     def finalize_committed_retirement(
         self, _config: Any, *_args: Any
     ) -> dict[str, Any]:
@@ -3303,6 +3308,7 @@ def test_explicit_retirement_restores_proves_retires_then_cleans(
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
     ]
@@ -3328,6 +3334,7 @@ class FatalRetirementBoundary(BaseException):
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
     ),
@@ -3396,7 +3403,11 @@ def test_keyboard_interrupt_outside_retirement_keeps_normal_semantics(
 @pytest.mark.parametrize("signal_number", (signal.SIGINT, signal.SIGTERM))
 @pytest.mark.parametrize(
     "boundary",
-    ("restore_committed_prior", "retire_active_authority"),
+    (
+        "restore_committed_prior",
+        "retire_active_authority",
+        "verify_retired_authority_connectors",
+    ),
 )
 def test_retirement_subprocess_signal_is_status_76_at_destructive_boundaries(
     tmp_path: Path,
@@ -3442,6 +3453,8 @@ class Actions:
         return maybe_block("commit_retirement_evidence")
     def retire_active_authority(self, *_args):
         return maybe_block("retire_active_authority")
+    def verify_retired_authority_connectors(self, *_args):
+        return maybe_block("verify_retired_authority_connectors")
     def cleanup_sidecar_resources(self, *_args):
         return maybe_block("cleanup_sidecar_resources")
     def finalize_committed_retirement(self, *_args):
@@ -3513,6 +3526,7 @@ raise SystemExit(0)
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
+        "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
     ),
@@ -3544,6 +3558,9 @@ def test_retirement_partial_failure_is_uncertain_and_never_reapplies_target(
         "commit_retirement_evidence",
     }:
         assert "retire_active_authority" not in actions.events
+        assert "cleanup_sidecar" not in actions.events
+    if failure_event == "verify_retired_authority_connectors":
+        assert "retire_active_authority" in actions.events
         assert "cleanup_sidecar" not in actions.events
 
 
@@ -3605,6 +3622,42 @@ def retirement_connector_gate(
         "connectorSetTransitions": [ids],
         "attemptsUsed": 2,
         "stableObservationsRequired": 2,
+    }
+
+
+def retirement_connector_boundary(
+    *,
+    operation_root: Path,
+    boundary: str,
+    version: int,
+    retired_authority_sha256: str,
+    marker_gate: Mapping[str, Any],
+    convergence: Mapping[str, Any],
+    verified_at: str = "2026-07-25T00:00:00Z",
+) -> dict[str, Any]:
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    return {
+        "contractName": (
+            "chummer.public-download-retirement-"
+            "connector-boundary/v1"
+        ),
+        "status": "pass",
+        "boundary": boundary,
+        "operationRoot": str(operation_root),
+        "restoredVersion": version,
+        "retiredAuthoritySha256": retired_authority_sha256,
+        "markerConnectorGateSha256": canonical_sha256(marker_gate),
+        "connectorConvergence": dict(convergence),
+        "connectorConvergenceSha256": canonical_sha256(convergence),
+        "verifiedAtUtc": verified_at,
     }
 
 
@@ -3925,11 +3978,275 @@ def test_retirement_atomically_moves_authority_and_is_idempotent(
     assert retired.read_bytes() == authority_raw
     assert retired.stat().st_mode & 0o777 == 0o600
     assert "retirementConnectorGate" in actions._state["receipts"]
-    assert "retirementConnectorResumeGate" in actions._state["receipts"]
-    assert connector_checks == [(True, False), (False, True)]
+    assert "retirementConnectorResumeGate" not in actions._state["receipts"]
+    assert connector_checks == [(True, False)]
+
+
+def post_marker_connector_actions(
+    tmp_path: Path,
+) -> tuple[
+    Any,
+    SimpleNamespace,
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    operation_root = tmp_path / "operation"
+    authority_root = tmp_path / "authority"
+    operation_root.mkdir(mode=0o700)
+    authority_root.mkdir(mode=0o700)
+    active = authority_root / "active.json"
+    retired = operation_root / "retired.json"
+    retired_raw = b'{"authority":"retired"}\n'
+    retired.write_bytes(retired_raw)
+    retired.chmod(0o600)
+    config = SimpleNamespace(
+        active_runtime_authority=active,
+        retired_active_authority=retired,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+        operation_root=operation_root,
+    )
+
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    retired_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    marker_gate = retirement_connector_gate(
+        13,
+        "connector-at-marker",
+    )
+    authorization = {"activeAuthoritySha256": retired_sha256}
+    restoration = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+    }
+    retirement_evidence = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+    }
+    retired_authority = {
+        "activeAuthoritySha256": retired_sha256,
+        "connectorGateSha256": canonical_sha256(marker_gate),
+    }
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "receipts": {
+            "retirementAuthorization": authorization,
+            "cloudflareRetirement": restoration,
+            "retirementEvidence": retirement_evidence,
+            "retiredAuthority": retired_authority,
+            "retirementConnectorGate": marker_gate,
+        }
+    }
+    actions._load_retirement_authority = (
+        lambda _config: (retired_raw, {}, retired)
+    )
+    actions._cloudflare_api = lambda: RetirementTestApi(
+        SimpleNamespace(sha256="1" * 64, version=13)
+    )
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        validate_current_connector_convergence_receipt=(
+            lambda value: value
+        ),
+        canonical_sha256=canonical_sha256,
+    )
+
+    def record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = record
+    return (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+
+def test_post_marker_connector_gate_precedes_cleanup_and_is_immutable(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    observed: list[tuple[bool, bool]] = []
+    gates = [
+        retirement_connector_gate(13, "connector-post-marker"),
+        retirement_connector_gate(13, "connector-added-on-resume"),
+    ]
+
+    def converge(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        observed.append(
+            (
+                config.active_runtime_authority.exists(),
+                config.retired_active_authority.exists(),
+            )
+        )
+        return gates[len(observed) - 1]
+
+    actions.cloudflare.poll_current_connector_convergence = converge
+
+    first = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+    immutable_first = json.loads(json.dumps(first))
+    second = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    receipts = actions._state["receipts"]
+    assert observed == [(False, True), (False, True)]
+    assert first["boundary"] == "post-marker"
+    assert second["boundary"] == "resume-post-marker"
     assert (
-        actions._state["receipts"]["retirementConnectorGate"]
-        != actions._state["receipts"]["retirementConnectorResumeGate"]
+        receipts["retirementPostMarkerConnectorGate"]
+        == immutable_first
+    )
+    assert receipts["retirementConnectorResumeGate"] == second
+    assert first["connectorConvergence"] != second[
+        "connectorConvergence"
+    ]
+
+
+def test_post_marker_connector_receipt_crash_is_safely_resumable(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    convergence = retirement_connector_gate(
+        13,
+        "connector-post-marker",
+    )
+    attempts = 0
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: convergence
+    )
+    durable_record = actions._record
+
+    def fail_once(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("simulated crash before post-marker receipt")
+        durable_record(phase, name, receipt)
+
+    actions._record = fail_once
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="could not become durable",
+    ):
+        actions.verify_retired_authority_connectors(
+            config,
+            authorization,
+            restoration,
+            retirement_evidence,
+            retired_authority,
+        )
+
+    assert config.retired_active_authority.exists()
+    assert not config.active_runtime_authority.exists()
+    assert (
+        "retirementPostMarkerConnectorGate"
+        not in actions._state["receipts"]
+    )
+
+    resumed = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    assert resumed["boundary"] == "post-marker"
+    assert (
+        actions._state["receipts"]
+        ["retirementPostMarkerConnectorGate"]
+        == resumed
+    )
+    assert attempts == 2
+
+
+def test_retirement_cleanup_requires_durable_post_marker_gate(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    config.operation = controller.RETIRE_OPERATION
+    convergence = retirement_connector_gate(
+        13,
+        "connector-post-marker",
+    )
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: convergence
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="connector boundary receipt drifted",
+    ):
+        actions._require_retirement_cleanup_connector_gate(
+            config,
+            actions._state["receipts"],
+        )
+
+    actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    actions._require_retirement_cleanup_connector_gate(
+        config,
+        actions._state["receipts"],
     )
 
 
@@ -4013,7 +4330,7 @@ def test_retirement_does_not_move_authority_before_connector_convergence(
     assert "retiredAuthority" not in actions._state["receipts"]
 
 
-def test_terminal_retirement_binds_marker_and_latest_connector_gates(
+def test_terminal_retirement_binds_marker_post_marker_and_latest_gates(
     tmp_path: Path,
 ) -> None:
     operation_root = tmp_path / "operation"
@@ -4045,7 +4362,11 @@ def test_terminal_retirement_binds_marker_and_latest_connector_gates(
         13,
         "connector-at-marker",
     )
-    latest_gate = retirement_connector_gate(
+    post_marker_convergence = retirement_connector_gate(
+        13,
+        "connector-after-marker",
+    )
+    latest_convergence = retirement_connector_gate(
         13,
         "connector-before-cleanup",
     )
@@ -4068,6 +4389,24 @@ def test_terminal_retirement_binds_marker_and_latest_connector_gates(
     retired_authority = {
         "connectorGateSha256": canonical_sha256(marker_gate)
     }
+    retired_authority_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    post_marker_gate = retirement_connector_boundary(
+        operation_root=operation_root,
+        boundary="post-marker",
+        version=13,
+        retired_authority_sha256=retired_authority_sha256,
+        marker_gate=marker_gate,
+        convergence=post_marker_convergence,
+    )
+    latest_gate = retirement_connector_boundary(
+        operation_root=operation_root,
+        boundary="resume-post-marker",
+        version=13,
+        retired_authority_sha256=retired_authority_sha256,
+        marker_gate=marker_gate,
+        convergence=latest_convergence,
+        verified_at="2026-07-25T00:05:00Z",
+    )
     incumbent = {"incumbent": "exact"}
     cleanup = {"cleanup": "exact"}
     actions = object.__new__(controller.TopologyBActions)
@@ -4079,6 +4418,7 @@ def test_terminal_retirement_binds_marker_and_latest_connector_gates(
             "retiredAuthority": retired_authority,
             "cleanup": cleanup,
             "retirementConnectorGate": marker_gate,
+            "retirementPostMarkerConnectorGate": post_marker_gate,
             "retirementConnectorResumeGate": latest_gate,
         }
     }
@@ -4121,6 +4461,9 @@ def test_terminal_retirement_binds_marker_and_latest_connector_gates(
     assert terminal["connectorGateSha256"] == canonical_sha256(
         marker_gate
     )
+    assert terminal[
+        "postMarkerConnectorGateSha256"
+    ] == canonical_sha256(post_marker_gate)
     assert terminal["latestConnectorGateSha256"] == canonical_sha256(
         latest_gate
     )
@@ -4171,6 +4514,12 @@ def test_retirement_cleanup_reconstructs_original_runtime_inputs(
         compose=lambda *_args, **_kwargs: b"",
     )
     observed: dict[str, Any] = {}
+    connector_gate_checks: list[dict[str, Any]] = []
+    actions._require_retirement_cleanup_connector_gate = (
+        lambda _config, receipts: connector_gate_checks.append(
+            dict(receipts)
+        )
+    )
 
     def fake_replace(
         original: SimpleNamespace,
@@ -4229,6 +4578,7 @@ def test_retirement_cleanup_reconstructs_original_runtime_inputs(
         "/recorded/final-gold.json"
     )
     assert observed["final_gold_sha256"] == "4" * 64
+    assert connector_gate_checks == [{"runtime": runtime}]
 
 
 def test_retirement_cleanup_validates_deleted_source_from_operation_commit(

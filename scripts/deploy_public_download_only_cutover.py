@@ -5680,6 +5680,9 @@ class TopologyBActionsProtocol(Protocol):
     def retire_active_authority(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
+    def verify_retired_authority_connectors(
+        self, config: Any, *args: Any
+    ) -> dict[str, Any]: ...
     def finalize_committed_retirement(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
@@ -8327,6 +8330,7 @@ class TopologyBActions:
                 "retirement-evidence-committed",
                 "retirement-restoration-connectors-reverified",
                 "retirement-connectors-verified",
+                "retirement-post-marker-connectors-verified",
                 "retirement-connectors-reverified",
                 "retirement-authority-retired",
                 "cleaned",
@@ -8933,17 +8937,17 @@ class TopologyBActions:
                     raise RecoveryUncertain(
                         "Cloudflare prior config drifted before authority retirement"
                     )
-                current_connector_gate = (
-                    self.cloudflare.poll_current_connector_convergence(
-                        api,
-                        current.version,
-                        attempts=30,
-                        sleep_fn=time.sleep,
-                        interval_seconds=2.0,
-                    )
-                )
                 if authority_path == config.active_runtime_authority:
-                    marker_connector_gate = current_connector_gate
+                    marker_connector_gate = (
+                        self.cloudflare
+                        .poll_current_connector_convergence(
+                            api,
+                            current.version,
+                            attempts=30,
+                            sleep_fn=time.sleep,
+                            interval_seconds=2.0,
+                        )
+                    )
                     self._record(
                         "retirement-connectors-verified",
                         "retirementConnectorGate",
@@ -8966,11 +8970,6 @@ class TopologyBActions:
                     self._fsync_directory(config.operation_root)
                     disposition = "atomically-retired"
                 else:
-                    self._record(
-                        "retirement-connectors-reverified",
-                        "retirementConnectorResumeGate",
-                        current_connector_gate,
-                    )
                     disposition = "already-atomically-retired"
         except RecoveryUncertain:
             raise
@@ -9062,6 +9061,240 @@ class TopologyBActions:
         )
         return receipt
 
+    def _validated_retirement_connector_boundary(
+        self,
+        value: Any,
+        *,
+        config: SidecarConfig,
+        boundary: str,
+        restored_version: int,
+        retired_authority_sha256: str,
+        marker_connector_gate_sha256: str,
+    ) -> dict[str, Any]:
+        expected_fields = {
+            "contractName",
+            "status",
+            "boundary",
+            "operationRoot",
+            "restoredVersion",
+            "retiredAuthoritySha256",
+            "markerConnectorGateSha256",
+            "connectorConvergence",
+            "connectorConvergenceSha256",
+            "verifiedAtUtc",
+        }
+        if (
+            not isinstance(value, dict)
+            or set(value) != expected_fields
+            or value.get("contractName")
+            != (
+                "chummer.public-download-retirement-"
+                "connector-boundary/v1"
+            )
+            or value.get("status") != "pass"
+            or value.get("boundary") != boundary
+            or value.get("operationRoot") != str(config.operation_root)
+            or value.get("restoredVersion") != restored_version
+            or value.get("retiredAuthoritySha256")
+            != retired_authority_sha256
+            or value.get("markerConnectorGateSha256")
+            != marker_connector_gate_sha256
+            or not isinstance(value.get("verifiedAtUtc"), str)
+        ):
+            raise RecoveryUncertain(
+                "retirement connector boundary receipt drifted"
+            )
+        try:
+            convergence = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    value.get("connectorConvergence")
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "retirement connector boundary convergence drifted"
+            ) from exc
+        if (
+            convergence.get("targetVersion") != restored_version
+            or self.cloudflare.canonical_sha256(convergence)
+            != value.get("connectorConvergenceSha256")
+        ):
+            raise RecoveryUncertain(
+                "retirement connector boundary version drifted"
+            )
+        return value
+
+    def verify_retired_authority_connectors(
+        self,
+        config: SidecarConfig,
+        authorization: Mapping[str, Any],
+        restoration: Mapping[str, Any],
+        retirement_evidence: Mapping[str, Any],
+        retired_authority: Mapping[str, Any],
+        *_args: Any,
+    ) -> dict[str, Any]:
+        receipts = self._state.get("receipts")
+        if (
+            not isinstance(receipts, dict)
+            or receipts.get("retirementAuthorization") != authorization
+            or receipts.get("cloudflareRetirement") != restoration
+            or receipts.get("retirementEvidence") != retirement_evidence
+            or receipts.get("retiredAuthority") != retired_authority
+            or config.active_runtime_authority.exists()
+            or config.active_runtime_authority.is_symlink()
+        ):
+            raise RecoveryUncertain(
+                "post-marker connector verification lacks durable proof"
+            )
+        retired_raw, _active, retired_path = (
+            self._load_retirement_authority(config)
+        )
+        retired_authority_sha256 = sha256_bytes(retired_raw)
+        if (
+            retired_path != config.retired_active_authority
+            or retired_authority_sha256
+            != authorization.get("activeAuthoritySha256")
+            or retired_authority.get("activeAuthoritySha256")
+            != retired_authority_sha256
+        ):
+            raise RecoveryUncertain(
+                "post-marker connector verification lacks retired authority"
+            )
+        try:
+            marker_connector_gate = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    receipts.get("retirementConnectorGate")
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "post-marker connector verification lacks marker proof"
+            ) from exc
+        restored_version = restoration.get("restoredVersion")
+        marker_connector_gate_sha256 = (
+            self.cloudflare.canonical_sha256(marker_connector_gate)
+        )
+        if (
+            type(restored_version) is not int
+            or restored_version < 0
+            or marker_connector_gate.get("targetVersion")
+            != restored_version
+            or retired_authority.get("connectorGateSha256")
+            != marker_connector_gate_sha256
+        ):
+            raise RecoveryUncertain(
+                "post-marker connector verification binding drifted"
+            )
+        existing_post_marker = receipts.get(
+            "retirementPostMarkerConnectorGate"
+        )
+        if existing_post_marker is not None:
+            self._validated_retirement_connector_boundary(
+                existing_post_marker,
+                config=config,
+                boundary="post-marker",
+                restored_version=restored_version,
+                retired_authority_sha256=retired_authority_sha256,
+                marker_connector_gate_sha256=(
+                    marker_connector_gate_sha256
+                ),
+            )
+        existing_resume = receipts.get("retirementConnectorResumeGate")
+        if existing_resume is not None:
+            if existing_post_marker is None:
+                raise RecoveryUncertain(
+                    "resume connector proof predates post-marker proof"
+                )
+            self._validated_retirement_connector_boundary(
+                existing_resume,
+                config=config,
+                boundary="resume-post-marker",
+                restored_version=restored_version,
+                retired_authority_sha256=retired_authority_sha256,
+                marker_connector_gate_sha256=(
+                    marker_connector_gate_sha256
+                ),
+            )
+        api = self._cloudflare_api()
+        try:
+            with self.cloudflare.ExclusiveFileLock(
+                config.cloudflare_lock
+            ):
+                current = self.cloudflare.parse_configuration_response(
+                    api.get_configuration()
+                )
+                if (
+                    current.sha256
+                    != retirement_evidence.get("priorConfigSha256")
+                    or current.version != restored_version
+                ):
+                    raise RecoveryUncertain(
+                        "Cloudflare prior config drifted after authority "
+                        "retirement"
+                    )
+                convergence = (
+                    self.cloudflare
+                    .poll_current_connector_convergence(
+                        api,
+                        current.version,
+                        attempts=30,
+                        sleep_fn=time.sleep,
+                        interval_seconds=2.0,
+                    )
+                )
+        except RecoveryUncertain:
+            raise
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "post-marker connector verification is uncertain"
+            ) from exc
+        boundary = (
+            "post-marker"
+            if existing_post_marker is None
+            else "resume-post-marker"
+        )
+        receipt = {
+            "contractName": (
+                "chummer.public-download-retirement-"
+                "connector-boundary/v1"
+            ),
+            "status": "pass",
+            "boundary": boundary,
+            "operationRoot": str(config.operation_root),
+            "restoredVersion": restored_version,
+            "retiredAuthoritySha256": retired_authority_sha256,
+            "markerConnectorGateSha256": (
+                marker_connector_gate_sha256
+            ),
+            "connectorConvergence": convergence,
+            "connectorConvergenceSha256": (
+                self.cloudflare.canonical_sha256(convergence)
+            ),
+            "verifiedAtUtc": utc_now(),
+        }
+        try:
+            if existing_post_marker is None:
+                self._record(
+                    "retirement-post-marker-connectors-verified",
+                    "retirementPostMarkerConnectorGate",
+                    receipt,
+                )
+            else:
+                self._record(
+                    "retirement-connectors-reverified",
+                    "retirementConnectorResumeGate",
+                    receipt,
+                )
+        except RecoveryUncertain:
+            raise
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "post-marker connector proof could not become durable"
+            ) from exc
+        return receipt
+
     def finalize_committed_retirement(
         self,
         config: SidecarConfig,
@@ -9117,15 +9350,6 @@ class TopologyBActions:
                     receipts.get("retirementConnectorGate")
                 )
             )
-            latest_connector_gate = (
-                self.cloudflare
-                .validate_current_connector_convergence_receipt(
-                    receipts.get(
-                        "retirementConnectorResumeGate",
-                        marker_connector_gate,
-                    )
-                )
-            )
         except Exception as exc:
             raise RecoveryUncertain(
                 "retirement finalization lacks connector-set proof"
@@ -9133,14 +9357,56 @@ class TopologyBActions:
         marker_connector_gate_sha256 = (
             self.cloudflare.canonical_sha256(marker_connector_gate)
         )
+        restored_version = restoration.get("restoredVersion")
+        if type(restored_version) is not int or restored_version < 0:
+            raise RecoveryUncertain(
+                "retirement restored version is invalid"
+            )
+        retired_authority_sha256 = sha256_bytes(retired_raw)
+        post_marker_connector_gate = (
+            self._validated_retirement_connector_boundary(
+                receipts.get("retirementPostMarkerConnectorGate"),
+                config=config,
+                boundary="post-marker",
+                restored_version=restored_version,
+                retired_authority_sha256=retired_authority_sha256,
+                marker_connector_gate_sha256=(
+                    marker_connector_gate_sha256
+                ),
+            )
+        )
+        latest_connector_gate = receipts.get(
+            "retirementConnectorResumeGate",
+            post_marker_connector_gate,
+        )
+        latest_boundary = (
+            "resume-post-marker"
+            if "retirementConnectorResumeGate" in receipts
+            else "post-marker"
+        )
+        latest_connector_gate = (
+            self._validated_retirement_connector_boundary(
+                latest_connector_gate,
+                config=config,
+                boundary=latest_boundary,
+                restored_version=restored_version,
+                retired_authority_sha256=retired_authority_sha256,
+                marker_connector_gate_sha256=(
+                    marker_connector_gate_sha256
+                ),
+            )
+        )
+        post_marker_connector_gate_sha256 = (
+            self.cloudflare.canonical_sha256(
+                post_marker_connector_gate
+            )
+        )
         latest_connector_gate_sha256 = (
             self.cloudflare.canonical_sha256(latest_connector_gate)
         )
         if (
             marker_connector_gate.get("targetVersion")
-            != restoration.get("restoredVersion")
-            or latest_connector_gate.get("targetVersion")
-            != restoration.get("restoredVersion")
+            != restored_version
             or retired_authority.get("connectorGateSha256")
             != marker_connector_gate_sha256
         ):
@@ -9189,6 +9455,9 @@ class TopologyBActions:
             ),
             "retirementEvidenceSha256": sha256_bytes(evidence_raw),
             "connectorGateSha256": marker_connector_gate_sha256,
+            "postMarkerConnectorGateSha256": (
+                post_marker_connector_gate_sha256
+            ),
             "latestConnectorGateSha256": (
                 latest_connector_gate_sha256
             ),
@@ -11060,6 +11329,83 @@ class TopologyBActions:
             "candidateImageId": image_id,
         }
 
+    def _require_retirement_cleanup_connector_gate(
+        self,
+        config: SidecarConfig,
+        receipts: Mapping[str, Any],
+    ) -> None:
+        restoration = receipts.get("cloudflareRetirement")
+        retired_authority = receipts.get("retiredAuthority")
+        if (
+            not isinstance(restoration, Mapping)
+            or not isinstance(retired_authority, Mapping)
+            or config.active_runtime_authority.exists()
+            or config.active_runtime_authority.is_symlink()
+        ):
+            raise RecoveryUncertain(
+                "retirement cleanup lacks retired marker authority"
+            )
+        retired_raw, _active, retired_path = (
+            self._load_retirement_authority(config)
+        )
+        retired_authority_sha256 = sha256_bytes(retired_raw)
+        if (
+            retired_path != config.retired_active_authority
+            or retired_authority.get("activeAuthoritySha256")
+            != retired_authority_sha256
+        ):
+            raise RecoveryUncertain(
+                "retirement cleanup retired authority drifted"
+            )
+        try:
+            marker_connector_gate = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    receipts.get("retirementConnectorGate")
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "retirement cleanup lacks marker connector proof"
+            ) from exc
+        restored_version = restoration.get("restoredVersion")
+        marker_connector_gate_sha256 = (
+            self.cloudflare.canonical_sha256(marker_connector_gate)
+        )
+        if (
+            type(restored_version) is not int
+            or restored_version < 0
+            or marker_connector_gate.get("targetVersion")
+            != restored_version
+            or retired_authority.get("connectorGateSha256")
+            != marker_connector_gate_sha256
+        ):
+            raise RecoveryUncertain(
+                "retirement cleanup marker connector proof drifted"
+            )
+        self._validated_retirement_connector_boundary(
+            receipts.get("retirementPostMarkerConnectorGate"),
+            config=config,
+            boundary="post-marker",
+            restored_version=restored_version,
+            retired_authority_sha256=retired_authority_sha256,
+            marker_connector_gate_sha256=(
+                marker_connector_gate_sha256
+            ),
+        )
+        resume_gate = receipts.get("retirementConnectorResumeGate")
+        if resume_gate is not None:
+            self._validated_retirement_connector_boundary(
+                resume_gate,
+                config=config,
+                boundary="resume-post-marker",
+                restored_version=restored_version,
+                retired_authority_sha256=retired_authority_sha256,
+                marker_connector_gate_sha256=(
+                    marker_connector_gate_sha256
+                ),
+            )
+
     def cleanup_sidecar_resources(
         self,
         config: SidecarConfig,
@@ -11068,6 +11414,11 @@ class TopologyBActions:
         receipts = self._state.get("receipts")
         if not isinstance(receipts, dict):
             raise RecoveryUncertain("topology-B operation receipts are malformed")
+        if getattr(config, "operation", None) == RETIRE_OPERATION:
+            self._require_retirement_cleanup_connector_gate(
+                config,
+                receipts,
+            )
         runtime = receipts.get("runtime")
         if runtime is not None and not isinstance(runtime, dict):
             raise RecoveryUncertain("topology-B runtime receipt is malformed")
@@ -11726,6 +12077,15 @@ def retire_topology_b(
             restoration,
             retirement_evidence,
         )
+        post_marker_connectors = (
+            action_boundary.verify_retired_authority_connectors(
+                config,
+                authorization,
+                restoration,
+                retirement_evidence,
+                retired_authority,
+            )
+        )
         cleanup = action_boundary.cleanup_sidecar_resources(config)
         terminal = action_boundary.finalize_committed_retirement(
             config,
@@ -11749,6 +12109,7 @@ def retire_topology_b(
             "incumbent": incumbent,
             "retirementEvidence": retirement_evidence,
             "retiredAuthority": retired_authority,
+            "postMarkerConnectors": post_marker_connectors,
             "cleanup": cleanup,
             "terminalReceipt": terminal,
         }

@@ -123,13 +123,31 @@ class FakeApi:
             raise TimeoutError("simulated response loss")
         return response
 
-    def list_connections(self) -> Mapping[str, Any]:
+    def list_connections(
+        self,
+        *,
+        page: int,
+        per_page: int,
+    ) -> Mapping[str, Any]:
+        connector_ids = list(
+            reversed(sorted(self.connector_versions))
+        )
+        start = (page - 1) * per_page
+        result = [
+            {"id": connector_id}
+            for connector_id in connector_ids[start : start + per_page]
+        ]
         return {
             "success": True,
-            "result": [
-                {"id": connector_id}
-                for connector_id in reversed(sorted(self.connector_versions))
-            ],
+            "errors": [],
+            "messages": [],
+            "result": result,
+            "result_info": {
+                "count": len(result),
+                "page": page,
+                "per_page": per_page,
+                "total_count": len(connector_ids),
+            },
         }
 
     def get_connector(self, connector_id: str) -> Mapping[str, Any]:
@@ -150,16 +168,32 @@ class ChangingConnectorApi:
         self.list_calls = 0
         self.current: dict[str, int | None] = {}
 
-    def list_connections(self) -> Mapping[str, Any]:
+    def list_connections(
+        self,
+        *,
+        page: int,
+        per_page: int,
+    ) -> Mapping[str, Any]:
         index = min(self.list_calls, len(self.snapshots) - 1)
         self.current = dict(self.snapshots[index])
         self.list_calls += 1
+        connector_ids = list(reversed(sorted(self.current)))
+        start = (page - 1) * per_page
+        result = [
+            {"id": connector_id}
+            for connector_id in connector_ids[start : start + per_page]
+        ]
         return {
             "success": True,
-            "result": [
-                {"id": connector_id}
-                for connector_id in reversed(sorted(self.current))
-            ],
+            "errors": [],
+            "messages": [],
+            "result": result,
+            "result_info": {
+                "count": len(result),
+                "page": page,
+                "per_page": per_page,
+                "total_count": len(connector_ids),
+            },
         }
 
     def get_connector(self, connector_id: str) -> Mapping[str, Any]:
@@ -168,6 +202,56 @@ class ChangingConnectorApi:
         if version is not None:
             result["config_version"] = version
         return {"success": True, "result": result}
+
+
+class ScriptedConnectionsApi:
+    def __init__(
+        self,
+        responses: list[Mapping[str, Any]],
+        versions: Mapping[str, int | None],
+    ) -> None:
+        self.responses = [copy.deepcopy(dict(value)) for value in responses]
+        self.versions = dict(versions)
+        self.list_calls: list[tuple[int, int]] = []
+
+    def list_connections(
+        self,
+        *,
+        page: int,
+        per_page: int,
+    ) -> Mapping[str, Any]:
+        self.list_calls.append((page, per_page))
+        return self.responses[len(self.list_calls) - 1]
+
+    def get_connector(self, connector_id: str) -> Mapping[str, Any]:
+        result: dict[str, Any] = {"id": connector_id}
+        version = self.versions[connector_id]
+        if version is not None:
+            result["config_version"] = version
+        return {"success": True, "result": result}
+
+
+def connections_page(
+    connector_ids: list[str],
+    *,
+    page: int,
+    total_count: int,
+    per_page: int = transaction.CONNECTIONS_PAGE_SIZE,
+) -> dict[str, Any]:
+    return {
+        "success": True,
+        "errors": [],
+        "messages": [],
+        "result": [
+            {"id": connector_id} for connector_id in connector_ids
+        ],
+        "result_info": {
+            "count": len(connector_ids),
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+        },
+    }
 
 
 def capture(
@@ -392,14 +476,21 @@ def test_transport_uses_documented_configuration_connection_and_connector_paths(
     monkeypatch.setattr(api, "_request", record)
     api.get_configuration()
     api.put_configuration(base_config())
-    api.list_connections()
+    api.list_connections(
+        page=1,
+        per_page=transaction.CONNECTIONS_PAGE_SIZE,
+    )
     api.get_connector("connector-1")
 
     prefix = "/accounts/account/cfd_tunnel/tunnel"
+    connections_path = (
+        prefix
+        + f"/connections?page=1&per_page={transaction.CONNECTIONS_PAGE_SIZE}"
+    )
     assert calls == [
         ("GET", prefix + "/configurations", None),
         ("PUT", prefix + "/configurations", {"config": base_config()}),
-        ("GET", prefix + "/connections", None),
+        ("GET", connections_path, None),
         ("GET", prefix + "/connectors/connector-1", None),
     ]
 
@@ -436,6 +527,168 @@ def test_capture_requires_at_least_one_preexisting_connector(
 
     with pytest.raises(transaction.ConvergenceError, match="no preexisting"):
         capture(tmp_path, api)
+
+
+def test_connector_capture_exhausts_every_bounded_page() -> None:
+    first_page = [
+        f"connector-{index:04d}"
+        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
+    ]
+    final_id = "connector-final"
+    all_ids = [*first_page, final_id]
+    api = ScriptedConnectionsApi(
+        [
+            connections_page(
+                first_page,
+                page=1,
+                total_count=len(all_ids),
+            ),
+            connections_page(
+                [final_id],
+                page=2,
+                total_count=len(all_ids),
+            ),
+        ],
+        {connector_id: 12 for connector_id in all_ids},
+    )
+
+    captured = transaction.capture_preexisting_connectors(api)
+
+    assert api.list_calls == [
+        (1, transaction.CONNECTIONS_PAGE_SIZE),
+        (2, transaction.CONNECTIONS_PAGE_SIZE),
+    ]
+    assert [row["id"] for row in captured] == sorted(all_ids)
+
+
+@pytest.mark.parametrize(
+    "responses,match",
+    (
+            (
+                [
+                    {
+                        **connections_page(
+                            ["connector-a"],
+                            page=1,
+                            total_count=1,
+                        ),
+                        "result_info": {
+                            "count": 1,
+                            "page": 1,
+                            "per_page": (
+                                transaction.CONNECTIONS_PAGE_SIZE
+                            ),
+                        },
+                    }
+                ],
+            "result_info shape",
+        ),
+        (
+            [
+                {
+                    **connections_page(
+                        ["connector-a"],
+                        page=1,
+                        total_count=1,
+                    ),
+                    "unexpected": True,
+                }
+            ],
+            "response shape",
+        ),
+        (
+            [
+                connections_page(
+                    ["connector-a"],
+                    page=1,
+                    total_count=(
+                        transaction.CONNECTIONS_PAGE_SIZE
+                        * transaction.MAX_CONNECTION_PAGES
+                        + 1
+                    ),
+                )
+            ],
+            "pagination metadata",
+        ),
+        (
+            [
+                connections_page(
+                    ["connector-a"],
+                    page=2,
+                    total_count=1,
+                )
+            ],
+            "pagination metadata",
+        ),
+    ),
+)
+def test_connector_capture_rejects_response_or_bound_drift(
+    responses: list[Mapping[str, Any]],
+    match: str,
+) -> None:
+    api = ScriptedConnectionsApi(
+        responses,
+        {"connector-a": 12},
+    )
+
+    with pytest.raises(transaction.ValidationError, match=match):
+        transaction.capture_preexisting_connectors(api)
+
+
+def test_connector_capture_rejects_total_count_page_instability() -> None:
+    first_page = [
+        f"connector-{index:04d}"
+        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
+    ]
+    api = ScriptedConnectionsApi(
+        [
+            connections_page(
+                first_page,
+                page=1,
+                total_count=len(first_page) + 1,
+            ),
+            connections_page(
+                ["connector-final"],
+                page=2,
+                total_count=len(first_page) + 2,
+            ),
+        ],
+        {
+            **{connector_id: 12 for connector_id in first_page},
+            "connector-final": 12,
+        },
+    )
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="invalid or unstable",
+    ):
+        transaction.capture_preexisting_connectors(api)
+
+
+def test_connector_capture_rejects_cross_page_duplicates() -> None:
+    first_page = [
+        f"connector-{index:04d}"
+        for index in range(transaction.CONNECTIONS_PAGE_SIZE)
+    ]
+    api = ScriptedConnectionsApi(
+        [
+            connections_page(
+                first_page,
+                page=1,
+                total_count=len(first_page) + 1,
+            ),
+            connections_page(
+                [first_page[-1]],
+                page=2,
+                total_count=len(first_page) + 1,
+            ),
+        ],
+        {connector_id: 12 for connector_id in first_page},
+    )
+
+    with pytest.raises(transaction.ValidationError, match="duplicates"):
+        transaction.capture_preexisting_connectors(api)
 
 
 def test_current_connector_convergence_tracks_additions_and_removals() -> None:
@@ -507,6 +760,28 @@ def test_current_connector_convergence_rejects_an_unstable_set() -> None:
         )
 
 
+def test_current_connector_convergence_rejects_unknown_versions() -> None:
+    api = ChangingConnectorApi(
+        [
+            {"connector-a": None},
+            {"connector-a": None},
+            {"connector-a": None},
+        ]
+    )
+
+    with pytest.raises(
+        transaction.ConvergenceError,
+        match="did not converge",
+    ):
+        transaction.poll_current_connector_convergence(
+            api,
+            12,
+            attempts=3,
+            interval_seconds=0,
+            sleep_fn=lambda _seconds: None,
+        )
+
+
 def test_current_connector_receipt_rejects_omitted_added_connector() -> None:
     api = ChangingConnectorApi(
         [
@@ -524,6 +799,44 @@ def test_current_connector_receipt_rejects_omitted_added_connector() -> None:
     receipt["connectorSet"] = receipt["connectorSet"][:1]
 
     with pytest.raises(transaction.ValidationError):
+        transaction.validate_current_connector_convergence_receipt(
+            receipt
+        )
+
+
+def test_current_connector_receipt_rejects_unknown_version_proof() -> None:
+    api = ChangingConnectorApi(
+        [
+            {"connector-a": 12},
+            {"connector-a": 12},
+        ]
+    )
+    receipt = transaction.poll_current_connector_convergence(
+        api,
+        12,
+        attempts=2,
+        interval_seconds=0,
+        sleep_fn=lambda _seconds: None,
+    )
+    receipt["connectorSet"][0] = {
+        "id": "connector-a",
+        "configVersionAvailable": False,
+        "configVersion": None,
+    }
+    receipt["connectorSetSha256"] = transaction.canonical_sha256(
+        receipt["connectorSet"]
+    )
+    receipt["connectorConvergence"][0] = {
+        "id": "connector-a",
+        "configVersionAvailable": False,
+        "observedConfigVersion": None,
+        "converged": None,
+    }
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="lacks exact configuration versions",
+    ):
         transaction.validate_current_connector_convergence_receipt(
             receipt
         )

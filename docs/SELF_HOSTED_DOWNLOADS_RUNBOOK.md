@@ -151,16 +151,21 @@ evidence and re-reads the live tunnel configuration at the exact committed targe
 It then durably authorizes retirement, re-reads immediately before the PUT, restores the captured
 `priorConfig` object and hash, and polls bounded configuration convergence. Connector authority is
 the current Cloudflare connector set at each retirement transaction, not the set captured during
-the original cutover: the controller re-lists it on every poll, accepts safe additions and removals,
-and requires the same fully converged set in two consecutive observations. It repeats that
-connector-set gate on resume and immediately before moving the authority marker. The original
-committed restoration evidence stays immutable; later observations use separate resume receipts,
-and the terminal receipt binds both the marker-time and latest connector-gate hashes. It also
+the original cutover: the controller exhausts the bounded paginated connection inventory, rejects
+page metadata or membership instability, re-lists it on every poll, accepts safe additions and
+removals, and requires every connector to report the exact restored configuration version in two
+consecutive observations. It repeats that connector-set gate on resume and immediately before
+moving the authority marker. After the marker is durably moved, a separate two-observation gate is
+mandatory before sidecar cleanup; a crash between those steps resumes from the retired marker and
+re-runs the post-marker gate. The original committed restoration and marker evidence stay
+immutable; later observations use separate boundary/resume receipts, and the terminal receipt binds
+the marker-time, first post-marker, and latest connector-gate hashes. It also
 proves HTTP 200 plus the exact captured body hashes and sizes for both
 `RELEASE_CHANNEL.generated.json` and `releases.json` on `chummer.run` and `www.chummer.run`. Only
-after these gates and a final Cloudflare re-read does it atomically move
+after the pre-marker gates and a final Cloudflare re-read does it atomically move
 `public-download-active-runtime-authority.json` into the operation-private retired authority
-receipt and clean the exact sidecar Compose project, volumes, and candidate image.
+receipt. Only after the separate post-marker gate does it clean the exact sidecar Compose project,
+volumes, and candidate image.
 Cleanup reconstructs the original runtime inputs from the journal and verifies the historical
 Compose sources from the operation's captured Git commit, so a deleted sealed build workspace or a
 newer controller commit cannot silently redefine the cleanup boundary.
