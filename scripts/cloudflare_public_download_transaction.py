@@ -46,6 +46,23 @@ MANAGED_HOSTS = ("chummer.run", "www.chummer.run")
 GENERATION_ID_RE2 = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 PORTABLE_FILE_LEAF_RE2 = r"[A-Za-z0-9][A-Za-z0-9._+-]{0,254}"
 PUBLIC_INSTALL_ARTIFACT_ID_RE2 = r"[a-z0-9][a-z0-9-]{0,127}"
+PUBLIC_RELEASE_TRUTH_PATH_RE2 = (
+    r"/api/(v1/)?public/release-truth(/g/"
+    + GENERATION_ID_RE2
+    + r")?"
+)
+CURRENT_PUBLIC_INSTALL_PATH_RE2 = (
+    r"/downloads/install/"
+    + PUBLIC_INSTALL_ARTIFACT_ID_RE2
+    + r"(/(payload|metadata))?"
+)
+GENERATION_PUBLIC_INSTALL_PATH_RE2 = (
+    r"/downloads/g/"
+    + GENERATION_ID_RE2
+    + r"/install/"
+    + PUBLIC_INSTALL_ARTIFACT_ID_RE2
+    + r"(/(payload|metadata))?"
+)
 MANAGED_CONTROL_PATHS = (
     "/api/ready/public-downloads",
     "/api/ready",
@@ -59,8 +76,12 @@ MANAGED_CONTROL_PATH_RE2 = "|".join(MANAGED_CONTROL_PATHS)
 MANAGED_PATH_RE2 = (
     r"^("
     + MANAGED_CONTROL_PATH_RE2
-    + r"|/downloads/install/"
-    + PUBLIC_INSTALL_ARTIFACT_ID_RE2
+    + r"|"
+    + PUBLIC_RELEASE_TRUTH_PATH_RE2
+    + r"|"
+    + GENERATION_PUBLIC_INSTALL_PATH_RE2
+    + r"|"
+    + CURRENT_PUBLIC_INSTALL_PATH_RE2
     + r"|/downloads/"
     r"(releases\.json|RELEASE_CHANNEL\.generated\.json|g/"
     + GENERATION_ID_RE2
@@ -77,6 +98,27 @@ PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2 = (
 PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2 = (
     r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
     r"/[iI][nN][sS][tT][aA][lL][lL]/(.*?/)?\.\.?(/.*)?$"
+)
+CURRENT_INSTALL_COMPANION_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
+    r"/[iI][nN][sS][tT][aA][lL][lL]/[^/]+/"
+    r"([pP][aA][yY][lL][oO][aA][dD]"
+    r"|[mM][eE][tT][aA][dD][aA][tT][aA])(/.*)?$"
+)
+GENERATION_INSTALL_NAMESPACE_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]/[gG]/[^/]+"
+    r"/[iI][nN][sS][tT][aA][lL][lL](/.*)?$"
+)
+RELEASE_TRUTH_NAMESPACE_FAIL_CLOSED_RE2 = (
+    r"^/[aA][pP][iI]/([vV]1/)?[pP][uU][bB][lL][iI][cC]"
+    r"/[rR][eE][lL][eE][aA][sS][eE]-[tT][rR][uU][tT][hH](/.*)?$"
+)
+FAIL_CLOSED_PATHS_RE2 = (
+    PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+    PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
+    CURRENT_INSTALL_COMPANION_FAIL_CLOSED_RE2,
+    GENERATION_INSTALL_NAMESPACE_FAIL_CLOSED_RE2,
+    RELEASE_TRUTH_NAMESPACE_FAIL_CLOSED_RE2,
 )
 SAFE_GENERATION_ID = re.compile(r"^" + GENERATION_ID_RE2 + r"$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -350,18 +392,10 @@ def _managed_rule(hostname: str, origin: str) -> dict[str, str]:
     }
 
 
-def _install_fail_closed_rule(hostname: str) -> dict[str, str]:
+def _fail_closed_rule(hostname: str, path: str) -> dict[str, str]:
     return {
         "hostname": hostname,
-        "path": PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
-        "service": "http_status:404",
-    }
-
-
-def _install_dot_segment_fail_closed_rule(hostname: str) -> dict[str, str]:
-    return {
-        "hostname": hostname,
-        "path": PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
+        "path": path,
         "service": "http_status:404",
     }
 
@@ -372,8 +406,8 @@ def plan_public_download_config(
     """Prepend governed and fail-closed rules without changing prior rules."""
 
     validate_re2_pattern(MANAGED_PATH_RE2)
-    validate_re2_pattern(PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2)
-    validate_re2_pattern(PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2)
+    for path in FAIL_CLOSED_PATHS_RE2:
+        validate_re2_pattern(path)
     normalized_origin = validate_origin(origin)
     prior = validate_tunnel_config(copy.deepcopy(prior_config))
     existing_managed: list[str] = []
@@ -381,11 +415,7 @@ def plan_public_download_config(
         if (
             rule.get("hostname") in MANAGED_HOSTS
             and rule.get("path")
-            in {
-                MANAGED_PATH_RE2,
-                PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
-                PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
-            }
+            in {MANAGED_PATH_RE2, *FAIL_CLOSED_PATHS_RE2}
         ):
             existing_managed.append(str(rule["hostname"]))
     if existing_managed:
@@ -397,9 +427,8 @@ def plan_public_download_config(
     target["ingress"] = [
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
     ] + [
-        _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
-    ] + [
-        _install_dot_segment_fail_closed_rule(hostname)
+        _fail_closed_rule(hostname, path)
+        for path in FAIL_CLOSED_PATHS_RE2
         for hostname in MANAGED_HOSTS
     ] + copy.deepcopy(prior["ingress"])
     validate_planned_config(prior, target, normalized_origin)
@@ -419,9 +448,8 @@ def validate_planned_config(
     expected_prefix = [
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
     ] + [
-        _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
-    ] + [
-        _install_dot_segment_fail_closed_rule(hostname)
+        _fail_closed_rule(hostname, path)
+        for path in FAIL_CLOSED_PATHS_RE2
         for hostname in MANAGED_HOSTS
     ]
     if target["ingress"][: len(expected_prefix)] != expected_prefix:

@@ -81,6 +81,7 @@ class DeliveryFixture:
         *,
         embed_metadata: bool = True,
         semantic_payload_route: bool = False,
+        advertise_metadata_route: bool = False,
         payload_name: str = "chummer-avalonia-win-x64-payload.zip",
     ) -> None:
         self.base_url = "https://chummer.run"
@@ -101,6 +102,20 @@ class DeliveryFixture:
             else self.payload_url
         )
         self.sidecar_url = self.payload_url + ".json"
+        self.current_payload_alias_url = (
+            f"{self.base_url}/downloads/install/"
+            f"{self.artifact_id}/payload"
+        )
+        self.current_sidecar_alias_url = (
+            f"{self.base_url}/downloads/install/"
+            f"{self.artifact_id}/metadata"
+        )
+        self.manifest_metadata_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/metadata"
+            if advertise_metadata_route
+            else None
+        )
         self.canonical_url = (
             f"{self.base_url}/downloads/RELEASE_CHANNEL.generated.json"
         )
@@ -109,7 +124,7 @@ class DeliveryFixture:
         self.payload_sha256 = hashlib.sha256(self.payload_bytes).hexdigest()
         metadata = (
             b"payloadDownloadUrl\x00"
-            + self.payload_url.encode()
+            + self.manifest_payload_url.encode()
             + b"\x00payloadSha256\x00"
             + self.payload_sha256.encode()
             + b"\x00payloadSizeBytes\x00"
@@ -120,7 +135,7 @@ class DeliveryFixture:
         self.installer_bytes = b"MZ\x00" + metadata
         self.sidecar: dict[str, object] = {
             "contractName": postdeploy.SIDECAR_CONTRACT,
-            "downloadUrl": self.payload_url,
+            "downloadUrl": self.manifest_payload_url,
             "fileName": self.payload_name,
             "installerFileName": self.installer_name,
             "payloadAcquisitionMode": "download",
@@ -162,6 +177,13 @@ class DeliveryFixture:
             "payloadSha256": self.payload_sha256,
             "payloadSizeBytes": len(self.payload_bytes),
         }
+        if self.manifest_metadata_url is not None:
+            self.artifact["payloadMetadataFileName"] = (
+                f"{self.payload_name}.json"
+            )
+            self.artifact["payloadMetadataUrl"] = (
+                self.manifest_metadata_url.removeprefix(self.base_url)
+            )
         self.route: dict[str, object] = {
             "artifactId": self.artifact_id,
             "platform": "windows",
@@ -207,6 +229,8 @@ class DeliveryFixture:
         self.local_manifest = self.root / "releases.json"
         self.local_canonical = self.root / "RELEASE_CHANNEL.generated.json"
         self.responses: dict[str, StreamResponse] = {}
+        self.release_truth_responses: dict[str, Response] = {}
+        self.release_truth_route_calls: list[str] = []
         self.rewrite()
 
     @staticmethod
@@ -356,16 +380,39 @@ class DeliveryFixture:
                 self.installer_bytes,
                 generation=self.generation,
             ),
-            self.payload_url: StreamResponse(
-                self.payload_url,
+            self.manifest_payload_url: StreamResponse(
+                self.manifest_payload_url,
                 self.payload_bytes,
                 generation=self.generation,
             ),
-            self.sidecar_url: StreamResponse(
-                self.sidecar_url,
+            self.current_payload_alias_url: StreamResponse(
+                self.current_payload_alias_url,
+                self.payload_bytes,
+                generation=self.generation,
+            ),
+            (self.manifest_metadata_url or self.sidecar_url): StreamResponse(
+                self.manifest_metadata_url or self.sidecar_url,
                 sidecar_bytes,
                 generation=self.generation,
             ),
+            self.current_sidecar_alias_url: StreamResponse(
+                self.current_sidecar_alias_url,
+                sidecar_bytes,
+                generation=self.generation,
+            ),
+        }
+        release_truth_paths = (
+            *postdeploy.CURRENT_RELEASE_TRUTH_PATHS,
+            *(
+                template.format(generation_id=self.generation)
+                for template in (
+                    postdeploy.GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
+                )
+            ),
+        )
+        self.release_truth_responses = {
+            path: Response(200, self.release_truth)
+            for path in release_truth_paths
         }
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
@@ -383,6 +430,18 @@ class DeliveryFixture:
             return self.responses[url]
 
         monkeypatch.setattr(postdeploy, "anonymous_get", fake_get)
+        self.release_truth_route_calls.clear()
+
+        def fake_route_get(
+            _session: object,
+            _base: str,
+            path: str,
+            _timeout: float,
+        ) -> Response:
+            self.release_truth_route_calls.append(path)
+            return self.release_truth_responses[path]
+
+        monkeypatch.setattr(postdeploy, "get", fake_route_get)
         return calls
 
     def verify(self) -> dict[str, object]:
@@ -494,6 +553,10 @@ def responses() -> dict[str, Response]:
             )
             for path in install_route_denial_paths()
         },
+        **{
+            path: Response(200, control_release_truth())
+            for path in postdeploy.CURRENT_RELEASE_TRUTH_PATHS
+        },
     }
     return result
 
@@ -521,6 +584,9 @@ def test_control_plane_accepts_serving_only_and_private_fail_closed(
     }
     assert result["installRouteReleaseTruthSha256"] == (
         postdeploy._canonical_object_sha256(control_release_truth())
+    )
+    assert set(result["currentReleaseTruthRoutes"]) == set(
+        postdeploy.CURRENT_RELEASE_TRUTH_PATHS
     )
 
 
@@ -616,6 +682,36 @@ def test_control_plane_rejects_advertised_install_route_redirect(
 
     with postdeploy.anonymous_session() as session:
         with pytest.raises(ValueError, match="forbidden response header"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+@pytest.mark.parametrize(
+    "path",
+    postdeploy.CURRENT_RELEASE_TRUTH_PATHS,
+)
+def test_control_plane_rejects_unreachable_current_release_truth_route(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    fixture = responses()
+    fixture[path] = Response(404, {"status": "not_found"})
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, request_path, _timeout: fixture[
+            request_path
+        ],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="did not serve the exact authenticated releaseTruth",
+        ):
             postdeploy.verify_control_plane(
                 session,
                 "https://chummer.run",
@@ -1055,18 +1151,40 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
     assert result["releaseTruthSha256"] == (
         postdeploy._canonical_object_sha256(fixture.release_truth)
     )
+    expected_release_truth_paths = [
+        template.format(generation_id=fixture.generation)
+        for template in (
+            postdeploy.GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
+        )
+    ]
+    assert fixture.release_truth_route_calls == (
+        expected_release_truth_paths
+    )
+    assert set(result["releaseTruthRoutes"]) == set(
+        expected_release_truth_paths
+    )
     assert [url for url, _ in calls] == [
         fixture.canonical_url,
         fixture.compatibility_url,
         fixture.installer_url,
         fixture.payload_url,
+        fixture.current_payload_alias_url,
         fixture.sidecar_url,
+        fixture.current_sidecar_alias_url,
     ]
     assert all(stream for _, stream in calls)
     artifact = result["artifacts"][0]
     assert artifact["policy"]["stable"] is False
     assert artifact["policy"]["update"] is False
     assert artifact["embeddedInstallerMetadataAgrees"] is True
+    assert (
+        artifact["currentPayloadAlias"]["url"]
+        == fixture.current_payload_alias_url
+    )
+    assert (
+        artifact["currentSidecarAlias"]["url"]
+        == fixture.current_sidecar_alias_url
+    )
 
 
 def test_strict_delivery_accepts_sealed_legacy_rows_with_release_truth(
@@ -1098,6 +1216,32 @@ def test_strict_delivery_accepts_sealed_legacy_rows_with_release_truth(
     assert result["artifacts"][0]["policy"]["update"] is False
 
 
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/api/v1/public/release-truth/g/generation-a",
+        "/api/public/release-truth/g/generation-a",
+    ),
+)
+def test_strict_delivery_rejects_unreachable_or_drifted_release_truth_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    fixture.release_truth_responses[path] = Response(
+        404,
+        {"status": "not_found"},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="did not serve the exact authenticated releaseTruth",
+    ):
+        fixture.verify()
+
+
 def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1122,24 +1266,74 @@ def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
         fixture.verify()
 
 
-def test_strict_delivery_rejects_unroutable_semantic_manifest_payload_route(
+def test_strict_delivery_probes_advertised_generation_companion_routes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+        advertise_metadata_route=True,
+    )
     calls = fixture.install(monkeypatch)
 
-    with pytest.raises(
-        ValueError,
-        match="open_public payload URL must be the generation-bound files route",
-    ):
-        fixture.verify()
+    result = fixture.verify()
 
     requested_urls = [url for url, _stream in calls]
     assert fixture.manifest_payload_url != fixture.payload_url
-    assert fixture.payload_url in fixture.responses
+    assert fixture.manifest_metadata_url is not None
     assert fixture.payload_url not in requested_urls
-    assert fixture.manifest_payload_url not in requested_urls
+    assert fixture.sidecar_url not in requested_urls
+    assert fixture.manifest_payload_url in requested_urls
+    assert fixture.manifest_metadata_url in requested_urls
+    assert fixture.current_payload_alias_url in requested_urls
+    assert fixture.current_sidecar_alias_url in requested_urls
+    artifact = result["artifacts"][0]
+    assert artifact["payload"]["url"] == fixture.manifest_payload_url
+    assert artifact["sidecar"]["url"] == fixture.manifest_metadata_url
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_current_companion_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.current_payload_alias_url
+        if role == "payload"
+        else fixture.current_sidecar_alias_url
+    )
+    fixture.responses[url].status_code = 404
+
+    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_advertised_companion_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+        advertise_metadata_route=True,
+    )
+    fixture.install(monkeypatch)
+    url = (
+        fixture.manifest_payload_url
+        if role == "payload"
+        else fixture.manifest_metadata_url
+    )
+    assert url is not None
+    fixture.responses[url].status_code = 404
+
+    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
 
 
 def test_www_delivery_accepts_canonical_apex_sidecar_url(
@@ -1397,7 +1591,7 @@ def test_strict_delivery_rejects_cross_generation_payload_file_route(
 
     with pytest.raises(
         ValueError,
-        match="open_public payload URL must be the generation-bound files route",
+        match="payload URL must be the exact generation-bound",
     ):
         fixture.verify()
 

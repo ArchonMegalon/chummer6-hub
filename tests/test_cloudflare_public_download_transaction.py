@@ -325,35 +325,29 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         }
         assert "originRequest" not in rule
         assert "httpHostHeader" not in rule
-    assert [rule["hostname"] for rule in target["ingress"][2:4]] == [
-        "chummer.run",
-        "www.chummer.run",
+    fail_closed_rules = target["ingress"][
+        2 : 2
+        + len(transaction.FAIL_CLOSED_PATHS_RE2)
+        * len(transaction.MANAGED_HOSTS)
     ]
-    for rule in target["ingress"][2:4]:
-        assert rule == {
-            "hostname": rule["hostname"],
-            "path": (
-                transaction.PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2
-            ),
+    assert fail_closed_rules == [
+        {
+            "hostname": hostname,
+            "path": path,
             "service": "http_status:404",
         }
-        assert "originRequest" not in rule
-        assert "httpHostHeader" not in rule
-    assert [rule["hostname"] for rule in target["ingress"][4:6]] == [
-        "chummer.run",
-        "www.chummer.run",
+        for path in transaction.FAIL_CLOSED_PATHS_RE2
+        for hostname in transaction.MANAGED_HOSTS
     ]
-    for rule in target["ingress"][4:6]:
-        assert rule == {
-            "hostname": rule["hostname"],
-            "path": transaction.PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
-            "service": "http_status:404",
-        }
+    for rule in fail_closed_rules:
         assert "originRequest" not in rule
         assert "httpHostHeader" not in rule
-    assert target["ingress"][6:] == prior["ingress"]
+    preserved_offset = 2 + len(fail_closed_rules)
+    assert target["ingress"][preserved_offset:] == prior["ingress"]
     assert target["originRequest"] == prior["originRequest"]
-    assert transaction.canonical_json_bytes(target["ingress"][6:]) == (
+    assert transaction.canonical_json_bytes(
+        target["ingress"][preserved_offset:]
+    ) == (
         transaction.canonical_json_bytes(prior["ingress"])
     )
 
@@ -370,6 +364,41 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
             "www.chummer.run",
             "/downloads/install/unknown-installer",
             "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/unknown-installer/payload",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/metadata",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/UNKNOWN-INSTALLER/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/INSTALL/unknown-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/PAYLOAD",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/payload/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/metadata/extra",
+            "http_status:404",
         ),
         (
             "chummer.run",
@@ -409,6 +438,91 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         (
             "www.chummer.run",
             "/downloads/install/avalonia-win-x64-installer/bootstrap.sh",
+            "http://incumbent:8080",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/DOWNLOADS/g/{GENERATION_ID}/install/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/INSTALL/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/TEST-INSTALLER/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/payload/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/private",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/api/v1/public/release-truth",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/api/public/release-truth",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/api/v1/public/release-truth/g/{GENERATION_ID}",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            f"/api/public/release-truth/g/{GENERATION_ID}",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/API/V1/PUBLIC/RELEASE-TRUTH",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/api/v1/public/release-truth/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/api/v1/public/release-truth/g/{GENERATION_ID}/extra",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/api/v1/public/weekly-pulse",
             "http://incumbent:8080",
         ),
         (
@@ -494,8 +608,17 @@ def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
         "/account/access/install-link",
         "/downloads/install/public-download-only-probe",
         "/downloads/install/avalonia-win-x64-installer",
+        "/downloads/install/avalonia-win-x64-installer/payload",
+        "/downloads/install/avalonia-win-x64-installer/metadata",
+        "/api/v1/public/release-truth",
+        "/api/public/release-truth",
+        f"/api/v1/public/release-truth/g/{GENERATION_ID}",
+        f"/api/public/release-truth/g/{GENERATION_ID}",
         f"/downloads/g/{GENERATION_ID}/releases.json",
         f"/downloads/g/{GENERATION_ID}/RELEASE_CHANNEL.generated.json",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-installer.msi",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-payload.zip",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-payload.zip.json",
@@ -525,7 +648,19 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         "/downloads/install/../admin",
         "/downloads/install/%2e%2e%2fadmin",
         "/downloads/install/avalonia-win-x64-installer/extra",
+        "/downloads/install/avalonia-win-x64-installer/PAYLOAD",
+        "/downloads/install/avalonia-win-x64-installer/METADATA",
+        "/downloads/install/avalonia-win-x64-installer/payload/",
+        "/downloads/install/avalonia-win-x64-installer/metadata/extra",
         "/downloads/install/avalonia-win-x64-installer?next=/admin",
+        "/API/V1/PUBLIC/RELEASE-TRUTH",
+        "/api/V1/public/release-truth",
+        "/api/v1/Public/release-truth",
+        "/api/v1/public/Release-Truth",
+        "/api/v1/public/release-truth/",
+        "/api/v2/public/release-truth",
+        "/api/v1/public/release-truth/private",
+        f"/api/v1/public/release-truth/g/{GENERATION_ID}/extra",
         "/downloads/claim/token",
         "/downloads/upload/file",
         "/downloads/personalized/alice",
@@ -544,8 +679,11 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         f"/downloads/g/{GENERATION_ID}/files/private/Chummer.zip",
         f"/downloads/g/{GENERATION_ID}/files/Chummer%2fprivate.zip",
         f"/downloads/g/{GENERATION_ID}/install/Chummer.zip",
-        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
-        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
+        f"/downloads/g/{GENERATION_ID}/install/TEST-INSTALLER",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/PAYLOAD",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/METADATA",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload/",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata/extra",
         f"/downloads/g/{GENERATION_ID}/payload/Chummer.zip",
         "/downloads/files/private/Chummer.zip",
         "/downloads/files/payload/Chummer.zip",
@@ -622,8 +760,7 @@ def test_malformed_tunnel_configs_fail_closed(bad_config: Any) -> None:
     "path",
     [
         transaction.MANAGED_PATH_RE2,
-        transaction.PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
-        transaction.PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
+        *transaction.FAIL_CLOSED_PATHS_RE2,
     ],
 )
 def test_existing_managed_rule_is_rejected_instead_of_duplicated(
