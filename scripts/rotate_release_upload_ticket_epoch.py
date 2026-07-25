@@ -2831,6 +2831,9 @@ def run_rotation(
                     expected_epoch_sha256=old_epoch_sha256,
                     expected_proof_sha256=request.expected_proof_sha256,
                 )
+                prior_ids_for_recovery = tuple(
+                    item.container_id for item in portals_before
+                )
                 tunnels_before = validate_tunnels(runtime.tunnel_evidence())
                 storage_before = capture_storage_authority(
                     runtime,
@@ -2929,9 +2932,6 @@ def run_rotation(
                     "epochHistoryBootstrapMarkerSha256"
                 ] = bootstrap_marker_sha256
                 atomic_write_private_json(request.output, receipt)
-                prior_ids_for_recovery = tuple(
-                    item.container_id for item in portals_before
-                )
                 runtime.quiesce_portals(prior_ids_for_recovery)
                 runtime.assert_portals_stopped(prior_ids_for_recovery)
                 receipt.update(
@@ -3356,6 +3356,7 @@ def run_rotation(
             not committed and bool(prior_ids_for_recovery)
         )
         restored_old_portal = False
+        precommit_portal_quiescence_proven = False
         if precommit_recovery_required and failure_status == 75:
             try:
                 runtime.restart_portals(prior_ids_for_recovery)
@@ -3378,9 +3379,42 @@ def run_rotation(
                         durable_prior_ids=prior_ids_for_recovery,
                     )
                 )
-                if not receipt["failureContainment"][
-                    "portalQuiescenceProven"
-                ]:
+                precommit_portal_quiescence_proven = (
+                    receipt["failureContainment"].get(
+                        "portalQuiescenceProven"
+                    )
+                    is True
+                )
+                if not precommit_portal_quiescence_proven:
+                    failure_status = 70
+                    code = (
+                        "precommit_portal_quiescence_unproven_"
+                        "connectors_stopped"
+                    )
+            except Exception:
+                failure_status = 70
+                code = (
+                    "precommit_emergency_containment_not_proven"
+                )
+        if (
+            not committed
+            and failure_status == 76
+            and not precommit_portal_quiescence_proven
+        ):
+            try:
+                receipt["failureContainment"] = (
+                    fail_closed_contain_precommit_portals(
+                        runtime,
+                        durable_prior_ids=prior_ids_for_recovery,
+                    )
+                )
+                precommit_portal_quiescence_proven = (
+                    receipt["failureContainment"].get(
+                        "portalQuiescenceProven"
+                    )
+                    is True
+                )
+                if not precommit_portal_quiescence_proven:
                     failure_status = 70
                     code = (
                         "precommit_portal_quiescence_unproven_"
