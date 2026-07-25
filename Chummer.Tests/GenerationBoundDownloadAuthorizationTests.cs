@@ -10,6 +10,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -200,7 +201,10 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             "user-generation-a",
             "subject-generation-a");
 
-        fixture.SetQuery("ticket", primaryOnly.Ticket);
+        fixture.SetCompanionRequest(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/payload",
+            "ticket",
+            primaryOnly.Ticket);
         IActionResult payloadDenied = await fixture.Controller.DownloadGenerationArtifactPayload(
             "generation-a",
             GenerationFixture.ArtifactId,
@@ -218,14 +222,20 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             "user-generation-a",
             "subject-generation-a");
 
-        fixture.SetQuery("ticket", roleBound.Ticket);
+        fixture.SetCompanionRequest(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/payload",
+            "ticket",
+            roleBound.Ticket);
         IActionResult payload = await fixture.Controller.DownloadGenerationArtifactPayload(
             "generation-a",
             GenerationFixture.ArtifactId,
             CancellationToken.None);
         Assert.Equal("payload-a", await ReadFileResultAsync(payload));
 
-        fixture.SetQuery("ticket", roleBound.Ticket);
+        fixture.SetCompanionRequest(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/metadata",
+            "ticket",
+            roleBound.Ticket);
         IActionResult metadata = await fixture.Controller.DownloadGenerationArtifactPayloadMetadata(
             "generation-a",
             GenerationFixture.ArtifactId,
@@ -269,7 +279,10 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             CancellationToken.None);
         Assert.Equal(StatusCodes.Status410Gone, Assert.IsType<ObjectResult>(retainedClaim).StatusCode);
 
-        fixture.SetQuery("ticket", ticketA.Ticket);
+        fixture.SetCompanionRequest(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/payload",
+            "ticket",
+            ticketA.Ticket);
         IActionResult retainedTicket = await fixture.Controller.DownloadGenerationArtifactPayload(
             "generation-a",
             GenerationFixture.ArtifactId,
@@ -440,6 +453,366 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             GenerationFixture.AurPkgbuildFileName,
             CancellationToken.None);
         Assert.IsType<NotFoundResult>(unrelated);
+    }
+
+    [Theory]
+    [InlineData("payload", "payload-windows-public")]
+    [InlineData("metadata", null)]
+    public async Task ReviewRequiredPublicByteHandoffServesOnlyBoundGenerationCompanionsAsImmutable(
+        string role,
+        string? expectedBody)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto projection =
+            BuildReviewRequiredPublicByteHandoff(manifest, artifact);
+        string path =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/{role}";
+        fixture.SetCompanionRequest(path);
+        fixture.SetReleaseTruth(projection);
+
+        IActionResult result = role == "payload"
+            ? await fixture.Controller.DownloadGenerationArtifactPayload(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None)
+            : await fixture.Controller.DownloadGenerationArtifactPayloadMetadata(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        if (expectedBody is not null)
+        {
+            Assert.Equal(expectedBody, await ReadFileResultAsync(result));
+        }
+        else
+        {
+            await Assert.IsType<FileStreamResult>(result).FileStream.DisposeAsync();
+        }
+        Assert.Equal(
+            "public, max-age=31536000, immutable",
+            fixture.Controller.Response.Headers.CacheControl.ToString());
+        Assert.Equal(
+            GenerationFixture.PublicWindowsGenerationId,
+            fixture.Controller.Response.Headers[
+                "X-Chummer-Release-Generation"].ToString());
+    }
+
+    [Fact]
+    public async Task ReviewRequiredGenerationCompanionFailsClosedOnArtifactHandoffBindingDrift()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto projection =
+            BuildReviewRequiredPublicByteHandoff(manifest, artifact);
+        string path =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/payload";
+        fixture.SetCompanionRequest(path);
+        fixture.SetReleaseTruth(projection with
+        {
+            ArtifactHandoff = projection.ArtifactHandoff! with
+            {
+                Sha256 = new string('f', 64)
+            }
+        });
+
+        ObjectResult blocked = Assert.IsType<ObjectResult>(
+            await fixture.Controller.DownloadGenerationArtifactPayload(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None));
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, blocked.StatusCode);
+        Assert.Equal(
+            "private, no-store, max-age=0",
+            fixture.Controller.Response.Headers.CacheControl.ToString());
+        AssertPrivateNoStoreHeaders(fixture.Controller.Response.Headers);
+        Assert.DoesNotContain(
+            "immutable",
+            fixture.Controller.Response.Headers.CacheControl.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("payload")]
+    [InlineData("metadata")]
+    public async Task GenerationCompanionVerificationFailureIsNeverImmutable(
+        string role)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        _ = fixture.LoadArtifact(
+            GenerationFixture.PublicWindowsGenerationId);
+        fixture.CorruptGenerationCompanion(
+            GenerationFixture.PublicWindowsGenerationId,
+            role);
+        string path =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/{role}";
+        fixture.SetCompanionRequest(path);
+
+        IActionResult result = role == "payload"
+            ? await fixture.Controller.DownloadGenerationArtifactPayload(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None)
+            : await fixture.Controller.DownloadGenerationArtifactPayloadMetadata(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        ObjectResult failure = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, failure.StatusCode);
+        AssertPrivateNoStoreHeaders(fixture.Controller.Response.Headers);
+        Assert.DoesNotContain(
+            "immutable",
+            fixture.Controller.Response.Headers.CacheControl.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("GET", "payload")]
+    [InlineData("HEAD", "payload")]
+    [InlineData("GET", "metadata")]
+    [InlineData("HEAD", "metadata")]
+    public async Task ComposedReviewPipelineServesGenerationCompanionsButDeniesCurrentAliases(
+        string method,
+        string role)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, PublicReleaseArtifactDto artifact) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto projection =
+            BuildReviewRequiredPublicByteHandoff(manifest, artifact);
+        string generationPath =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/{role}";
+        var generation = await fixture.InvokeComposedCompanionAsync(
+            projection,
+            generationPath,
+            method,
+            role == "payload"
+                ? controller => controller.DownloadGenerationArtifactPayload(
+                    GenerationFixture.PublicWindowsGenerationId,
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None)
+                : controller => controller.DownloadGenerationArtifactPayloadMetadata(
+                    GenerationFixture.PublicWindowsGenerationId,
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None));
+
+        Assert.True(generation.ControllerInvoked);
+        Assert.IsType<FileStreamResult>(generation.Result);
+        Assert.Equal(
+            "public, max-age=31536000, immutable",
+            generation.Context.Response.Headers.CacheControl.ToString());
+        if (method == HttpMethods.Head)
+        {
+            Assert.Equal(0, generation.Context.Response.Body.Length);
+        }
+        else
+        {
+            Assert.True(generation.Context.Response.Body.Length > 0);
+        }
+
+        string currentPath =
+            $"/downloads/install/{GenerationFixture.ArtifactId}/{role}";
+        var current = await fixture.InvokeComposedCompanionAsync(
+            projection,
+            currentPath,
+            method,
+            role == "payload"
+                ? controller => controller.DownloadCurrentArtifactPayload(
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None)
+                : controller => controller.DownloadCurrentArtifactPayloadMetadata(
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None));
+
+        Assert.False(current.ControllerInvoked);
+        Assert.Null(current.Result);
+        Assert.Equal(StatusCodes.Status409Conflict, current.Context.Response.StatusCode);
+        Assert.Equal(
+            "private, no-store, max-age=0",
+            current.Context.Response.Headers.CacheControl.ToString());
+        AssertPrivateNoStoreHeaders(current.Context.Response.Headers);
+        Assert.DoesNotContain(
+            "immutable",
+            current.Context.Response.Headers.CacheControl.ToString(),
+            StringComparison.Ordinal);
+        if (method == HttpMethods.Head)
+        {
+            Assert.Equal(0, current.Context.Response.Body.Length);
+        }
+        else
+        {
+            current.Context.Response.Body.Position = 0;
+            using JsonDocument denial = await JsonDocument.ParseAsync(
+                current.Context.Response.Body);
+            Assert.Equal(
+                "review_required",
+                denial.RootElement.GetProperty("status").GetString());
+            Assert.Equal(
+                projection.ReleaseDecisionSha256,
+                denial.RootElement.GetProperty("releaseTruth")
+                    .GetProperty("releaseDecisionSha256")
+                    .GetString());
+        }
+    }
+
+    [Theory]
+    [InlineData("GET", "payload")]
+    [InlineData("HEAD", "payload")]
+    [InlineData("GET", "metadata")]
+    [InlineData("HEAD", "metadata")]
+    public async Task ComposedStableCurrentCompanionBypassesUnreadyAdmissionWithoutImmutableCaching(
+        string method,
+        string role)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        (PublicReleaseManifestDto manifest, _) =
+            fixture.LoadArtifact(GenerationFixture.PublicWindowsGenerationId);
+        PublicReleaseTruthProjectionDto projection =
+            BuildStableReleaseTruth(manifest);
+        string path = $"/downloads/install/{GenerationFixture.ArtifactId}/{role}";
+
+        var invocation = await fixture.InvokeComposedCompanionAsync(
+            projection,
+            path,
+            method,
+            role == "payload"
+                ? controller => controller.DownloadCurrentArtifactPayload(
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None)
+                : controller => controller.DownloadCurrentArtifactPayloadMetadata(
+                    GenerationFixture.ArtifactId,
+                    CancellationToken.None));
+
+        Assert.True(invocation.ControllerInvoked);
+        Assert.IsType<FileStreamResult>(invocation.Result);
+        Assert.Equal(
+            "private, no-store, max-age=0",
+            invocation.Context.Response.Headers.CacheControl.ToString());
+        AssertPrivateNoStoreHeaders(invocation.Context.Response.Headers);
+        Assert.DoesNotContain(
+            "immutable",
+            invocation.Context.Response.Headers.CacheControl.ToString(),
+            StringComparison.Ordinal);
+        if (method == HttpMethods.Head)
+        {
+            Assert.Equal(0, invocation.Context.Response.Body.Length);
+        }
+        else
+        {
+            Assert.True(invocation.Context.Response.Body.Length > 0);
+        }
+    }
+
+    [Theory]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/PAYLOAD", "")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?unknown=value")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?ticket=one&ticket=two")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?ticket=one&")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?%74icket=one")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?claimCode=one&claimCode=two")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?ticket=one&claimCode=two")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?ticket=")]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/payload", "?claimCode=")]
+    public async Task CompanionControllerRejectsCaseAndNoncanonicalQueryVariants(
+        string path,
+        string query)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        fixture.SetCompanionRequestTarget(path, query, path + query);
+
+        IActionResult result =
+            await fixture.Controller.DownloadGenerationArtifactPayload(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.DoesNotContain(
+            "immutable",
+            fixture.Controller.Response.Headers.CacheControl.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/downloads/g/generation-windows-public/install/shared-account-required-installer/%70ayload")]
+    [InlineData("/downloads/g/generation-windows-public/install/ignored/../shared-account-required-installer/payload")]
+    public async Task CompanionControllerRejectsEncodedAndTraversalRawTargets(
+        string rawTarget)
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.PublicWindowsGenerationId);
+        string path =
+            $"/downloads/g/{GenerationFixture.PublicWindowsGenerationId}/install/{GenerationFixture.ArtifactId}/payload";
+        fixture.SetCompanionRequestTarget(path, string.Empty, rawTarget);
+
+        IActionResult result =
+            await fixture.Controller.DownloadGenerationArtifactPayload(
+                GenerationFixture.PublicWindowsGenerationId,
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task CompanionControllerPreservesCanonicalClaimCodeRequestContract()
+    {
+        using GenerationFixture fixture = new();
+        string path =
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}/payload";
+        fixture.SetCompanionRequest(
+            path,
+            queryName: "claimCode",
+            queryValue: "unknown-but-canonical");
+
+        IActionResult result =
+            await fixture.Controller.DownloadGenerationArtifactPayload(
+                "generation-a",
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        AssertPrivateNoStoreHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Theory]
+    [InlineData(
+        "/downloads/install/shared-account-required-installer/payload",
+        "?unknown=value",
+        "/downloads/install/shared-account-required-installer/payload?unknown=value")]
+    [InlineData(
+        "/downloads/install/shared-account-required-installer/payload",
+        "",
+        "/downloads/install/shared-account-required-installer/%70ayload")]
+    [InlineData(
+        "/downloads/install/SHARED-account-required-installer/payload",
+        "",
+        "/downloads/install/SHARED-account-required-installer/payload")]
+    public async Task CurrentCompanionControllerRejectsNoncanonicalTargetsWithNoStore(
+        string path,
+        string query,
+        string rawTarget)
+    {
+        using GenerationFixture fixture = new();
+        fixture.SetCompanionRequestTarget(path, query, rawTarget);
+
+        IActionResult result =
+            await fixture.Controller.DownloadCurrentArtifactPayload(
+                GenerationFixture.ArtifactId,
+                CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+        AssertPrivateNoStoreHeaders(fixture.Controller.Response.Headers);
     }
 
     [Fact]
@@ -679,12 +1052,51 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         };
     }
 
+    private static PublicReleaseTruthProjectionDto BuildStableReleaseTruth(
+        PublicReleaseManifestDto manifest)
+        => new(
+            ContractName: PublicReleaseTruthProjectionDto.Schema,
+            ReleaseVersion: manifest.Version,
+            Channel: "stable",
+            ReleaseStatus: "published",
+            RolloutState: "public_stable",
+            SupportabilityState: "gold_supported",
+            AvailablePlatforms: ["windows"],
+            PrimaryHeadByPlatform: new Dictionary<string, string>(
+                StringComparer.Ordinal)
+            {
+                ["windows"] = "avalonia"
+            },
+            ArtifactCount: 1,
+            DownloadAccessPosture: "open_public",
+            KnownIssueSummary: string.Empty,
+            ManifestSha256: new string('a', 64),
+            RegistryCommit: new string('b', 40),
+            ReleaseDecisionStatus: "stable_ready",
+            ReleaseDecisionSha256: new string('c', 64));
+
     private static async Task<string> ReadFileResultAsync(IActionResult result)
     {
         FileStreamResult file = Assert.IsType<FileStreamResult>(result);
         await using Stream stream = file.FileStream;
         using StreamReader reader = new(stream, Encoding.UTF8);
         return await reader.ReadToEndAsync();
+    }
+
+    private static void AssertPrivateNoStoreHeaders(IHeaderDictionary headers)
+    {
+        Assert.Equal(
+            "private, no-store, max-age=0",
+            headers.CacheControl.ToString());
+        Assert.Equal(
+            "no-store, max-age=0",
+            headers["CDN-Cache-Control"].ToString());
+        Assert.Equal(
+            "no-store, max-age=0",
+            headers["Cloudflare-CDN-Cache-Control"].ToString());
+        Assert.Equal("no-store", headers["Surrogate-Control"].ToString());
+        Assert.Equal("no-cache", headers.Pragma.ToString());
+        Assert.Equal("0", headers.Expires.ToString());
     }
 
     private sealed class GenerationFixture : IDisposable
@@ -762,6 +1174,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
 
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(configuration);
+            services.AddLogging();
+            services.AddControllers();
             services.AddHubPublicGuideContext();
             _serviceProvider = services.BuildServiceProvider();
             _httpContextAccessor = _serviceProvider.GetRequiredService<IHttpContextAccessor>();
@@ -833,6 +1247,92 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             _httpContextAccessor.HttpContext = context;
         }
 
+        public void SetCompanionRequest(
+            string path,
+            string? queryName = null,
+            string? queryValue = null,
+            string? rawTarget = null,
+            string method = "GET")
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = method;
+            context.Request.Path = path;
+            if (!string.IsNullOrWhiteSpace(queryName) && queryValue is not null)
+            {
+                context.Request.QueryString = QueryString.Create(
+                    queryName,
+                    queryValue);
+            }
+            context.Features.Get<IHttpRequestFeature>()!.RawTarget =
+                rawTarget ?? path + context.Request.QueryString.Value;
+            Controller.ControllerContext =
+                new ControllerContext { HttpContext = context };
+            _httpContextAccessor.HttpContext = context;
+        }
+
+        public void SetCompanionRequestTarget(
+            string path,
+            string query,
+            string rawTarget,
+            string method = "GET")
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = method;
+            context.Request.Path = path;
+            context.Request.QueryString = new QueryString(query);
+            context.Features.Get<IHttpRequestFeature>()!.RawTarget = rawTarget;
+            Controller.ControllerContext =
+                new ControllerContext { HttpContext = context };
+            _httpContextAccessor.HttpContext = context;
+        }
+
+        public async Task<(
+            IActionResult? Result,
+            HttpContext Context,
+            bool ControllerInvoked)> InvokeComposedCompanionAsync(
+            PublicReleaseTruthProjectionDto projection,
+            string path,
+            string method,
+            Func<DownloadsCompatibilityController, Task<IActionResult>> action)
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = method;
+            context.Request.Path = path;
+            context.Features.Get<IHttpRequestFeature>()!.RawTarget = path;
+            context.Response.Body = new MemoryStream();
+            context.RequestServices = _serviceProvider;
+            IActionResult? result = null;
+            bool controllerInvoked = false;
+            var admission = new InstallLinkingRequestAdmissionMiddleware(
+                async controllerContext =>
+                {
+                    controllerInvoked = true;
+                    Controller.ControllerContext =
+                        new ControllerContext { HttpContext = controllerContext };
+                    _httpContextAccessor.HttpContext = controllerContext;
+                    result = await action(Controller);
+                    await result.ExecuteResultAsync(
+                        Controller.ControllerContext);
+                });
+            var releaseTruth = new PublicReleaseTruthProjectionMiddleware(
+                admissionContext => admission.InvokeAsync(
+                    admissionContext,
+                    new UnavailableCompanionReadinessProbe()));
+            var promotions = new ReleaseBundlePromotionService(
+                Configuration,
+                NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint: null);
+
+            await releaseTruth.InvokeAsync(
+                context,
+                new FixedReleaseTruthProjection(
+                    projection,
+                    new string('d', 64)),
+                promotions,
+                new ReleaseShelfGenerationStore(Configuration));
+            return (result, context, controllerInvoked);
+        }
+
         public void SetReleaseTruth(PublicReleaseTruthProjectionDto projection)
             => Controller.HttpContext.Items[
                 PublicReleaseTruthProjectionMiddleware.HttpContextItemKey] = projection;
@@ -871,6 +1371,29 @@ public sealed class GenerationBoundDownloadAuthorizationTests
 
         public void RevokeDigest(string sha256)
             => Configuration["CHUMMER_RELEASE_REVOKED_SHA256"] = sha256;
+
+        public void CorruptGenerationCompanion(
+            string generationId,
+            string role)
+        {
+            string fileName = role switch
+            {
+                "payload" => PayloadFileName,
+                "metadata" => PayloadFileName + ".json",
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(role),
+                    role,
+                    "Unknown companion role.")
+            };
+            File.WriteAllText(
+                Path.Combine(
+                    _downloadsRoot,
+                    ReleaseShelfGenerationStore.GenerationsDirectoryName,
+                    generationId,
+                    "files",
+                    fileName),
+                "tampered-companion-bytes");
+        }
 
         public void SetConfiguration(string key, string? value)
             => Configuration[key] = value;
@@ -1466,6 +1989,13 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 string? immutableManifestSha256,
                 ReadOnlyMemory<byte>? immutableAuthorityManifestBytes)
                 => projection;
+        }
+
+        private sealed class UnavailableCompanionReadinessProbe
+            : IInstallLinkingStoreReadinessProbe
+        {
+            public InstallLinkingStoreReadiness Evaluate()
+                => new(false, "store_unready");
         }
 
         private sealed record GenerationMetadata(

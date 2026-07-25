@@ -55,13 +55,18 @@ public sealed class InstallLinkingRequestAdmissionMiddleware(RequestDelegate nex
         return path.StartsWithSegments("/api/v1/install-linking", StringComparison.OrdinalIgnoreCase)
             || path.Equals("/account/access/install-link", StringComparison.OrdinalIgnoreCase)
             || (path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
-                && !IsCanonicalPublicInstallDispatchPath(value))
+                && !IsCanonicalPublicInstallRoute(value))
             || (value.StartsWith("/install-", StringComparison.OrdinalIgnoreCase)
                 && value.EndsWith(".sh", StringComparison.OrdinalIgnoreCase));
     }
 
-    internal static bool IsCanonicalPublicInstallDispatchPath(string path)
+    internal static bool IsCanonicalPublicInstallRoute(string path)
     {
+        if (PublicReleaseContractRequestPolicy.IsCanonicalCurrentCompanionPath(path))
+        {
+            return true;
+        }
+
         if (!path.StartsWith(PublicInstallDispatchPrefix, StringComparison.Ordinal))
         {
             return false;

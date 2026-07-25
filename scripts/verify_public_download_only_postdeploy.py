@@ -23,6 +23,7 @@ GENERATION_HEADER = "X-Chummer-Release-Generation"
 SIDECAR_CONTRACT = "chummer6-ui.windows_bootstrap_payload"
 STREAM_CHUNK_BYTES = 64 * 1024
 MAXIMUM_MANIFEST_BYTES = 8 * 1024 * 1024
+IMMUTABLE_GENERATION_CACHE_CONTROL = "public, max-age=31536000, immutable"
 PROBLEM = {
     "type": "https://chummer.run/problems/install-linking-unavailable",
     "title": "Install-linking unavailable.",
@@ -538,9 +539,66 @@ def _verify_release_truth_routes(
             raise ValueError(
                 f"{path} did not serve the exact authenticated releaseTruth"
             )
+        _require_private_no_store_headers(response, path)
         receipts[path] = {
             "statusCode": response.status_code,
             "sha256": expected_sha256,
+        }
+    return receipts
+
+
+def _require_private_no_store_headers(
+    response: requests.Response,
+    label: str,
+) -> None:
+    required = {
+        "Cache-Control": "private, no-store, max-age=0",
+        "CDN-Cache-Control": "no-store, max-age=0",
+        "Cloudflare-CDN-Cache-Control": "no-store, max-age=0",
+        "Surrogate-Control": "no-store",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    for name, expected in required.items():
+        present, actual = _header(response.headers, name)
+        if not present or actual != expected:
+            raise ValueError(
+                f"{label} did not enforce private no-store header {name}"
+            )
+
+
+def _verify_current_companion_denials(
+    *,
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+    artifact_id: str,
+    expected_release_truth: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    expected = dict(expected_release_truth)
+    expected_sha256 = _canonical_object_sha256(expected)
+    receipts: dict[str, dict[str, Any]] = {}
+    for role in ("payload", "metadata"):
+        path = f"/downloads/install/{artifact_id}/{role}"
+        response = get(session, base_url, path, timeout)
+        _reject_credential_headers(response, path)
+        payload = require_json(response, path)
+        if (
+            response.status_code != 409
+            or _media_type(response.headers) != "application/json"
+            or set(payload) != {"message", "releaseTruth", "status"}
+            or payload.get("status") != "review_required"
+            or not str(payload.get("message") or "").strip()
+            or payload.get("releaseTruth") != expected
+        ):
+            raise ValueError(
+                f"{path} did not enforce the exact authenticated review denial"
+            )
+        _require_private_no_store_headers(response, path)
+        receipts[role] = {
+            "path": path,
+            "statusCode": response.status_code,
+            "releaseTruthSha256": expected_sha256,
         }
     return receipts
 
@@ -1077,6 +1135,7 @@ def _stream_exact_get(
     timeout: float,
     generation_id: str | None,
     capture: bool,
+    expected_cache_control: str | None = None,
 ) -> tuple[dict[str, Any], bytes]:
     response = anonymous_get(session, url, timeout, stream=True)
     try:
@@ -1112,6 +1171,20 @@ def _stream_exact_get(
                 f"{generation_id!r}"
             )
 
+        observed_cache_control: str | None = None
+        if expected_cache_control is not None:
+            present, observed_cache_control = _header(
+                response.headers,
+                "Cache-Control",
+            )
+            if (
+                not present
+                or observed_cache_control != expected_cache_control
+            ):
+                raise ValueError(
+                    f"{label} did not enforce immutable Cache-Control"
+                )
+
         digest = hashlib.sha256()
         size = 0
         body_parts: list[bytes] = []
@@ -1129,18 +1202,18 @@ def _stream_exact_get(
             raise ValueError(f"{label} streamed size {size} does not match Content-Length")
         if observed_sha256 != expected_sha256:
             raise ValueError(f"{label} streamed sha256 does not match expected bytes")
-        return (
-            {
-                "method": "GET",
-                "url": url,
-                "statusCode": 200,
-                "contentLength": content_length,
-                "sizeBytes": size,
-                "sha256": observed_sha256,
-                "generationId": observed_generation,
-            },
-            b"".join(body_parts),
-        )
+        receipt: dict[str, Any] = {
+            "method": "GET",
+            "url": url,
+            "statusCode": 200,
+            "contentLength": content_length,
+            "sizeBytes": size,
+            "sha256": observed_sha256,
+            "generationId": observed_generation,
+        }
+        if observed_cache_control is not None:
+            receipt["cacheControl"] = observed_cache_control
+        return receipt, b"".join(body_parts)
     finally:
         response.close()
 
@@ -1929,6 +2002,7 @@ def verify_public_download_delivery(
     expectations: list[DownloadExpectation] = []
     release_truth_sha256: str | None = None
     release_truth_routes: dict[str, dict[str, Any]] = {}
+    authenticated_release_truth: dict[str, Any] | None = None
     if delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW:
         _canonical_bytes, _generation, expectations = (
             derive_download_expectations(
@@ -1987,6 +2061,7 @@ def verify_public_download_delivery(
         release_truth_sha256 = _canonical_object_sha256(
             canonical_release_truth
         )
+        authenticated_release_truth = canonical_release_truth
         release_truth_routes = _verify_release_truth_routes(
             session=session,
             base_url=base,
@@ -2004,6 +2079,14 @@ def verify_public_download_delivery(
 
     artifact_receipts: list[dict[str, Any]] = []
     for expected in expectations:
+        generation_companion_payload_url = (
+            f"{base}/downloads/g/{generation_id}/install/"
+            f"{expected.artifact_id}/payload"
+        )
+        generation_companion_metadata_url = (
+            f"{base}/downloads/g/{generation_id}/install/"
+            f"{expected.artifact_id}/metadata"
+        )
         installer_receipt, installer_bytes = _stream_exact_get(
             session=session,
             url=expected.installer_url,
@@ -2023,19 +2106,12 @@ def verify_public_download_delivery(
             timeout=timeout,
             generation_id=generation_id,
             capture=False,
-        )
-        current_payload_alias_url = (
-            f"{base}/downloads/install/{expected.artifact_id}/payload"
-        )
-        current_payload_alias_receipt, _ = _stream_exact_get(
-            session=session,
-            url=current_payload_alias_url,
-            label=f"{expected.artifact_id} current payload alias",
-            expected_sha256=expected.payload_sha256,
-            expected_size_bytes=expected.payload_size_bytes,
-            timeout=timeout,
-            generation_id=generation_id,
-            capture=False,
+            expected_cache_control=(
+                IMMUTABLE_GENERATION_CACHE_CONTROL
+                if expected.payload_probe_url
+                == generation_companion_payload_url
+                else None
+            ),
         )
         sidecar_receipt, sidecar_bytes = _stream_exact_get(
             session=session,
@@ -2046,26 +2122,56 @@ def verify_public_download_delivery(
             timeout=timeout,
             generation_id=generation_id,
             capture=True,
+            expected_cache_control=(
+                IMMUTABLE_GENERATION_CACHE_CONTROL
+                if expected.sidecar_probe_url
+                == generation_companion_metadata_url
+                else None
+            ),
         )
-        current_sidecar_alias_url = (
-            f"{base}/downloads/install/{expected.artifact_id}/metadata"
-        )
-        current_sidecar_alias_receipt, current_sidecar_alias_bytes = (
-            _stream_exact_get(
+        if expected.payload_probe_url == generation_companion_payload_url:
+            generation_companion_payload_receipt = payload_receipt
+        else:
+            generation_companion_payload_receipt, _ = _stream_exact_get(
                 session=session,
-                url=current_sidecar_alias_url,
-                label=f"{expected.artifact_id} current sidecar alias",
+                url=generation_companion_payload_url,
+                label=f"{expected.artifact_id} generation payload companion",
+                expected_sha256=expected.payload_sha256,
+                expected_size_bytes=expected.payload_size_bytes,
+                timeout=timeout,
+                generation_id=generation_id,
+                capture=False,
+                expected_cache_control=(
+                    IMMUTABLE_GENERATION_CACHE_CONTROL
+                ),
+            )
+        if expected.sidecar_probe_url == generation_companion_metadata_url:
+            generation_companion_metadata_receipt = sidecar_receipt
+        else:
+            generation_companion_metadata_receipt, _ = _stream_exact_get(
+                session=session,
+                url=generation_companion_metadata_url,
+                label=f"{expected.artifact_id} generation metadata companion",
                 expected_sha256=expected.sidecar_sha256,
                 expected_size_bytes=expected.sidecar_size_bytes,
                 timeout=timeout,
                 generation_id=generation_id,
-                capture=True,
+                capture=False,
+                expected_cache_control=(
+                    IMMUTABLE_GENERATION_CACHE_CONTROL
+                ),
             )
-        )
-        if current_sidecar_alias_bytes != sidecar_bytes:
+        if authenticated_release_truth is None:
             raise ValueError(
-                f"{expected.artifact_id} current sidecar alias bytes disagree"
+                "current companion denials require authenticated releaseTruth"
             )
+        current_companion_denials = _verify_current_companion_denials(
+            session=session,
+            base_url=base,
+            timeout=timeout,
+            artifact_id=expected.artifact_id,
+            expected_release_truth=authenticated_release_truth,
+        )
         _validate_sidecar(
             _json_object(sidecar_bytes, f"live {expected.sidecar_file_name}"),
             expected,
@@ -2088,9 +2194,12 @@ def verify_public_download_delivery(
                 },
                 "installer": installer_receipt,
                 "payload": payload_receipt,
-                "currentPayloadAlias": current_payload_alias_receipt,
                 "sidecar": sidecar_receipt,
-                "currentSidecarAlias": current_sidecar_alias_receipt,
+                "generationCompanions": {
+                    "payload": generation_companion_payload_receipt,
+                    "metadata": generation_companion_metadata_receipt,
+                },
+                "currentCompanionDenials": current_companion_denials,
                 "embeddedInstallerMetadataAgrees": True,
             }
         )

@@ -106,8 +106,16 @@ CURRENT_INSTALL_COMPANION_FAIL_CLOSED_RE2 = (
     r"|[mM][eE][tT][aA][dD][aA][tT][aA])(/.*)?$"
 )
 GENERATION_INSTALL_NAMESPACE_FAIL_CLOSED_RE2 = (
-    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]/[gG]/[^/]+"
-    r"/[iI][nN][sS][tT][aA][lL][lL](/.*)?$"
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]/[gG]/(.*?/)?"
+    r"[iI][nN][sS][tT][aA][lL][lL](/.*)?$"
+)
+CURRENT_FILES_NAMESPACE_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
+    r"/[fF][iI][lL][eE][sS](/.*)?$"
+)
+GENERATION_FILES_NAMESPACE_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]/[gG]/(.*?/)?"
+    r"[fF][iI][lL][eE][sS](/.*)?$"
 )
 RELEASE_TRUTH_NAMESPACE_FAIL_CLOSED_RE2 = (
     r"^/[aA][pP][iI]/([vV]1/)?[pP][uU][bB][lL][iI][cC]"
@@ -118,6 +126,8 @@ FAIL_CLOSED_PATHS_RE2 = (
     PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
     CURRENT_INSTALL_COMPANION_FAIL_CLOSED_RE2,
     GENERATION_INSTALL_NAMESPACE_FAIL_CLOSED_RE2,
+    CURRENT_FILES_NAMESPACE_FAIL_CLOSED_RE2,
+    GENERATION_FILES_NAMESPACE_FAIL_CLOSED_RE2,
     RELEASE_TRUTH_NAMESPACE_FAIL_CLOSED_RE2,
 )
 SAFE_GENERATION_ID = re.compile(r"^" + GENERATION_ID_RE2 + r"$")

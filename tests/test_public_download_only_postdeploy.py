@@ -34,6 +34,9 @@ class Response:
             self.headers = {
                 "Content-Type": content_type,
                 "Cache-Control": "private, no-store, max-age=0",
+                "CDN-Cache-Control": "no-store, max-age=0",
+                "Cloudflare-CDN-Cache-Control": "no-store, max-age=0",
+                "Surrogate-Control": "no-store",
                 "Pragma": "no-cache",
                 "Expires": "0",
             }
@@ -115,6 +118,14 @@ class DeliveryFixture:
             f"{self.artifact_id}/metadata"
             if advertise_metadata_route
             else None
+        )
+        self.generation_payload_companion_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/payload"
+        )
+        self.generation_metadata_companion_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/metadata"
         )
         self.canonical_url = (
             f"{self.base_url}/downloads/RELEASE_CHANNEL.generated.json"
@@ -385,20 +396,30 @@ class DeliveryFixture:
                 self.payload_bytes,
                 generation=self.generation,
             ),
-            self.current_payload_alias_url: StreamResponse(
-                self.current_payload_alias_url,
-                self.payload_bytes,
-                generation=self.generation,
-            ),
             (self.manifest_metadata_url or self.sidecar_url): StreamResponse(
                 self.manifest_metadata_url or self.sidecar_url,
                 sidecar_bytes,
                 generation=self.generation,
             ),
-            self.current_sidecar_alias_url: StreamResponse(
-                self.current_sidecar_alias_url,
+            self.generation_payload_companion_url: StreamResponse(
+                self.generation_payload_companion_url,
+                self.payload_bytes,
+                generation=self.generation,
+                headers={
+                    "Cache-Control": (
+                        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+                    )
+                },
+            ),
+            self.generation_metadata_companion_url: StreamResponse(
+                self.generation_metadata_companion_url,
                 sidecar_bytes,
                 generation=self.generation,
+                headers={
+                    "Cache-Control": (
+                        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+                    )
+                },
             ),
         }
         release_truth_paths = (
@@ -411,9 +432,22 @@ class DeliveryFixture:
             ),
         )
         self.release_truth_responses = {
-            path: Response(200, self.release_truth)
+            path: Response(200, self.release_truth, private=True)
             for path in release_truth_paths
         }
+        for path in (
+            self.current_payload_alias_url.removeprefix(self.base_url),
+            self.current_sidecar_alias_url.removeprefix(self.base_url),
+        ):
+            self.release_truth_responses[path] = Response(
+                409,
+                {
+                    "message": "Install handoff is withheld.",
+                    "status": "review_required",
+                    "releaseTruth": self.release_truth,
+                },
+                private=True,
+            )
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
         calls: list[tuple[str, bool]] = []
@@ -554,7 +588,7 @@ def responses() -> dict[str, Response]:
             for path in install_route_denial_paths()
         },
         **{
-            path: Response(200, control_release_truth())
+            path: Response(200, control_release_truth(), private=True)
             for path in postdeploy.CURRENT_RELEASE_TRUTH_PATHS
         },
     }
@@ -1157,8 +1191,12 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
             postdeploy.GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
         )
     ]
+    expected_current_companion_paths = [
+        fixture.current_payload_alias_url.removeprefix(fixture.base_url),
+        fixture.current_sidecar_alias_url.removeprefix(fixture.base_url),
+    ]
     assert fixture.release_truth_route_calls == (
-        expected_release_truth_paths
+        expected_release_truth_paths + expected_current_companion_paths
     )
     assert set(result["releaseTruthRoutes"]) == set(
         expected_release_truth_paths
@@ -1168,22 +1206,32 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
         fixture.compatibility_url,
         fixture.installer_url,
         fixture.payload_url,
-        fixture.current_payload_alias_url,
         fixture.sidecar_url,
-        fixture.current_sidecar_alias_url,
+        fixture.generation_payload_companion_url,
+        fixture.generation_metadata_companion_url,
     ]
     assert all(stream for _, stream in calls)
     artifact = result["artifacts"][0]
     assert artifact["policy"]["stable"] is False
     assert artifact["policy"]["update"] is False
     assert artifact["embeddedInstallerMetadataAgrees"] is True
-    assert (
-        artifact["currentPayloadAlias"]["url"]
-        == fixture.current_payload_alias_url
+    denials = artifact["currentCompanionDenials"]
+    assert denials["payload"]["path"] == expected_current_companion_paths[0]
+    assert denials["metadata"]["path"] == expected_current_companion_paths[1]
+    assert denials["payload"]["statusCode"] == 409
+    assert denials["metadata"]["statusCode"] == 409
+    companions = artifact["generationCompanions"]
+    assert companions["payload"]["url"] == (
+        fixture.generation_payload_companion_url
     )
-    assert (
-        artifact["currentSidecarAlias"]["url"]
-        == fixture.current_sidecar_alias_url
+    assert companions["metadata"]["url"] == (
+        fixture.generation_metadata_companion_url
+    )
+    assert companions["payload"]["cacheControl"] == (
+        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+    )
+    assert companions["metadata"]["cacheControl"] == (
+        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
     )
 
 
@@ -1286,8 +1334,8 @@ def test_strict_delivery_probes_advertised_generation_companion_routes(
     assert fixture.sidecar_url not in requested_urls
     assert fixture.manifest_payload_url in requested_urls
     assert fixture.manifest_metadata_url in requested_urls
-    assert fixture.current_payload_alias_url in requested_urls
-    assert fixture.current_sidecar_alias_url in requested_urls
+    assert fixture.current_payload_alias_url not in requested_urls
+    assert fixture.current_sidecar_alias_url not in requested_urls
     artifact = result["artifacts"][0]
     assert artifact["payload"]["url"] == fixture.manifest_payload_url
     assert artifact["sidecar"]["url"] == fixture.manifest_metadata_url
@@ -1306,9 +1354,17 @@ def test_strict_delivery_rejects_unreachable_current_companion_alias(
         if role == "payload"
         else fixture.current_sidecar_alias_url
     )
-    fixture.responses[url].status_code = 404
+    path = url.removeprefix(fixture.base_url)
+    fixture.release_truth_responses[path] = Response(
+        404,
+        {"status": "not_found"},
+        private=True,
+    )
 
-    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+    with pytest.raises(
+        ValueError,
+        match="did not enforce the exact authenticated review denial",
+    ):
         fixture.verify()
 
 
@@ -1333,6 +1389,57 @@ def test_strict_delivery_rejects_unreachable_advertised_companion_route(
     fixture.responses[url].status_code = 404
 
     with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_generation_companion_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.generation_payload_companion_url
+        if role == "payload"
+        else fixture.generation_metadata_companion_url
+    )
+    fixture.responses[url].status_code = 404
+
+    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    ("role", "cache_control"),
+    (
+        ("payload", None),
+        ("metadata", "public, max-age=60"),
+    ),
+)
+def test_strict_delivery_rejects_generation_companion_without_immutable_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+    cache_control: str | None,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.generation_payload_companion_url
+        if role == "payload"
+        else fixture.generation_metadata_companion_url
+    )
+    if cache_control is None:
+        fixture.responses[url].headers.pop("Cache-Control")
+    else:
+        fixture.responses[url].headers["Cache-Control"] = cache_control
+
+    with pytest.raises(
+        ValueError,
+        match="did not enforce immutable Cache-Control",
+    ):
         fixture.verify()
 
 

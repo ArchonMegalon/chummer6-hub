@@ -70,7 +70,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
             {
                 context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 context.Response.ContentType = "application/json; charset=utf-8";
-                context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
+                global::Chummer.Run.Api.PrivateResponseCacheHeaders.Apply(
+                    context.Response.Headers);
                 if (!HttpMethods.IsHead(context.Request.Method))
                 {
                     await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -103,7 +104,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         {
             context.Response.StatusCode = StatusCodes.Status409Conflict;
             context.Response.ContentType = "application/json; charset=utf-8";
-            context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
+            global::Chummer.Run.Api.PrivateResponseCacheHeaders.Apply(
+                context.Response.Headers);
             if (!HttpMethods.IsHead(context.Request.Method))
             {
                 await context.Response.WriteAsync(JsonSerializer.Serialize(new
@@ -229,7 +231,9 @@ public sealed class PublicReleaseTruthProjectionMiddleware
         return projection.ReviewRequiredPublicByteHandoffsAllowed
             && (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
             && !request.QueryString.HasValue
-            && IsRawImmutableArtifactRoute(request.Path);
+            && (IsRawImmutableArtifactRoute(request.Path)
+                || PublicReleaseContractRequestPolicy
+                    .IsCanonicalGenerationCompanionRequest(request));
     }
 
     internal static bool IsRawImmutableArtifactRoute(PathString path)

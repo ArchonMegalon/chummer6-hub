@@ -885,6 +885,8 @@ public sealed class PublicReleaseTruthProjectionTests
     [InlineData("/downloads/g/candidate-42/files/example-installer.exe")]
     [InlineData("/downloads/g/candidate-42/files/example-payload.zip")]
     [InlineData("/downloads/g/candidate-42/files/example-payload.zip.json")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer/payload")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer/metadata")]
     public async Task ScopeBoundReviewAllowsOnlyRawImmutableByteRoutes(string route)
     {
         PublicReleaseManifestDto manifest = BuildReviewManifest(BuildPublicArtifact());
@@ -918,8 +920,11 @@ public sealed class PublicReleaseTruthProjectionTests
     [InlineData("/downloads/get/example-installer")]
     [InlineData("/downloads/file/example-installer")]
     [InlineData("/downloads/install/example-installer/payload")]
+    [InlineData("/downloads/install/example-installer/metadata")]
     [InlineData("/downloads/g/candidate-42/install/example-installer")]
-    [InlineData("/downloads/g/candidate-42/install/example-installer/payload")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer/PAYLOAD")]
+    [InlineData("/downloads/g/candidate-42/install/EXAMPLE-installer/payload")]
+    [InlineData("/downloads/g/candidate-42/install/example-installer/payload/")]
     [InlineData("/downloads/proof/windows/current/installers/example-installer")]
     [InlineData("/downloads/current.json")]
     [InlineData("/downloads/files/folder/example-installer.exe")]

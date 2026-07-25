@@ -487,6 +487,51 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         ),
         (
             "chummer.run",
+            "/downloads/g/foo/bar/install/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/files",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/DOWNLOADS/FILES/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/files/private/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/files/Chummer.zip/",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/FILES/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/g/foo/bar/files/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/file/incumbent-artifact",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/index.json",
+            "http://incumbent:8080",
+        ),
+        (
+            "chummer.run",
             "/api/v1/public/release-truth",
             "http://host.docker.internal:8123",
         ),

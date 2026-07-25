@@ -34,7 +34,10 @@ public sealed class InstallLinkingStoreActivationTests
     [Theory]
     [InlineData("/api/v1/install-linking/summary")]
     [InlineData("/account/access/install-link")]
-    [InlineData("/downloads/install/artifact/payload")]
+    [InlineData("/downloads/install/artifact/PAYLOAD")]
+    [InlineData("/downloads/install/ARTIFACT/payload")]
+    [InlineData("/downloads/install/artifact/payload/")]
+    [InlineData("/downloads/install/artifact/payload/nested")]
     [InlineData("/downloads/install/ARTIFACT")]
     [InlineData("/downloads/install/artifact/")]
     [InlineData("/downloads/install/../artifact")]
@@ -84,7 +87,9 @@ public sealed class InstallLinkingStoreActivationTests
     [InlineData("/downloads/install/unknown-artifact")]
     [InlineData("/downloads/install/disabled-artifact")]
     [InlineData("/downloads/install/revoked-artifact")]
-    public async Task Canonical_public_install_dispatch_bypasses_durable_admission_gate(
+    [InlineData("/downloads/install/artifact/payload")]
+    [InlineData("/downloads/install/artifact/metadata")]
+    public async Task Canonical_public_install_routes_bypass_durable_admission_gate(
         string path)
     {
         bool nextInvoked = false;

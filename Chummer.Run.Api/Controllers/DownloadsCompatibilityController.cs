@@ -698,6 +698,14 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ApplyCredentialResponseNoStoreHeaders(httpContext.Response.Headers);
     }
 
+    private void TryApplyCurrentAliasNoStoreHeaders()
+    {
+        if (ControllerContext.HttpContext is HttpContext httpContext)
+        {
+            ApplyCredentialResponseNoStoreHeaders(httpContext.Response.Headers);
+        }
+    }
+
     private static void ApplyGenerationHeader(
         IHeaderDictionary headers,
         ReleaseShelfSnapshot snapshot)
@@ -835,7 +843,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                     allowLegacyUnbound: snapshot.IsLegacy,
                     out _))
             {
-                Response.Headers["Cache-Control"] = "private, no-store";
+                ApplyCredentialResponseNoStoreHeaders(Response.Headers);
                 return BuildVerifiedArtifactFileResult(
                     binding,
                     "application/octet-stream",
@@ -843,7 +851,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                     enableRangeProcessing: true);
             }
 
-            Response.Headers["Cache-Control"] = "private, no-store";
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
             return Unauthorized(new
             {
                 error = "invalid_or_expired_install_ticket",
@@ -911,12 +919,20 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         [FromRoute] string artifactId,
         CancellationToken cancellationToken)
     {
-        TryApplyCredentialResponseNoStoreHeaders();
+        TryApplyCurrentAliasNoStoreHeaders();
+        if (!PublicReleaseContractRequestPolicy.IsCanonicalCurrentCompanionRequest(
+                Request,
+                artifactId,
+                ArtifactDeliveryRoles.Payload))
+        {
+            return Task.FromResult<IActionResult>(NotFound());
+        }
+
         return DownloadArtifactRoleFromSnapshot(
             _releases.CaptureShelfSnapshot(),
             artifactId,
             ArtifactDeliveryRoles.Payload,
-            retainedRawPath: false,
+            generationBoundCompanionPath: false,
             cancellationToken);
     }
 
@@ -926,12 +942,20 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         [FromRoute] string artifactId,
         CancellationToken cancellationToken)
     {
-        TryApplyCredentialResponseNoStoreHeaders();
+        TryApplyCurrentAliasNoStoreHeaders();
+        if (!PublicReleaseContractRequestPolicy.IsCanonicalCurrentCompanionRequest(
+                Request,
+                artifactId,
+                ArtifactDeliveryRoles.PayloadMetadata))
+        {
+            return Task.FromResult<IActionResult>(NotFound());
+        }
+
         return DownloadArtifactRoleFromSnapshot(
             _releases.CaptureShelfSnapshot(),
             artifactId,
             ArtifactDeliveryRoles.PayloadMetadata,
-            retainedRawPath: false,
+            generationBoundCompanionPath: false,
             cancellationToken);
     }
 
@@ -1111,27 +1135,71 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         CancellationToken cancellationToken)
     {
         TryApplyCredentialResponseNoStoreHeaders();
+        if (!PublicReleaseContractRequestPolicy.IsCanonicalGenerationCompanionRequest(
+                Request,
+                generationId,
+                artifactId,
+                role))
+        {
+            return Task.FromResult<IActionResult>(NotFound());
+        }
+
         ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
-        return snapshot is null
-            ? Task.FromResult<IActionResult>(NotFound())
-            : DownloadArtifactRoleFromSnapshot(snapshot, artifactId, role, retainedRawPath: false, cancellationToken);
+        if (snapshot is null)
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+            return Task.FromResult<IActionResult>(NotFound());
+        }
+
+        return DownloadArtifactRoleFromSnapshot(
+            snapshot,
+            artifactId,
+            role,
+            generationBoundCompanionPath: true,
+            cancellationToken);
     }
 
     private async Task<IActionResult> DownloadArtifactRoleFromSnapshot(
         ReleaseShelfSnapshot snapshot,
         string artifactId,
         string role,
-        bool retainedRawPath,
+        bool generationBoundCompanionPath,
         CancellationToken cancellationToken)
     {
         ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId, role);
-        return !resolution.Allowed
-            ? ArtifactDeliveryDenied(resolution)
-            : await DownloadResolvedBindingFromSnapshot(
-                resolution.Binding!,
-                generationBoundRawPath: retainedRawPath,
-                isRawArtifactPath: false,
-                cancellationToken);
+        if (!resolution.Allowed)
+        {
+            if (generationBoundCompanionPath)
+            {
+                ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+            }
+
+            return ArtifactDeliveryDenied(resolution);
+        }
+
+        ArtifactDeliveryBinding binding = resolution.Binding!;
+        PublicReleaseTruthProjectionDto? releaseTruth =
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
+        if (generationBoundCompanionPath
+            && releaseTruth?.ReviewRequiredPublicByteHandoffsAllowed == true
+            && (releaseTruth.ArtifactHandoff is not PublicPreviewByteHandoffDto artifactHandoff
+                || !MatchesReviewRequiredPublicByteHandoff(binding, artifactHandoff)))
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "review_required_public_byte_handoff_binding_mismatch",
+                message = "The review-required release authority does not permit this artifact companion handoff."
+            });
+        }
+
+        return await DownloadResolvedBindingFromSnapshot(
+            binding,
+            generationBoundRawPath: false,
+            isRawArtifactPath: false,
+            immutableGenerationPath: generationBoundCompanionPath,
+            currentCompanionPath: !generationBoundCompanionPath,
+            cancellationToken);
     }
 
     private async Task<IActionResult> DownloadFileFromSnapshot(
@@ -1174,6 +1242,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             resolution.Binding!,
             generationBoundRawPath: generationBound,
             isRawArtifactPath: true,
+            immutableGenerationPath: generationBound,
+            currentCompanionPath: false,
             cancellationToken);
     }
 
@@ -1209,11 +1279,17 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ArtifactDeliveryBinding binding,
         bool generationBoundRawPath,
         bool isRawArtifactPath,
+        bool immutableGenerationPath,
+        bool currentCompanionPath,
         CancellationToken cancellationToken)
     {
         ReleaseShelfSnapshot snapshot = binding.Snapshot;
         PublicReleaseArtifactDto artifact = binding.Artifact;
         TryApplyGenerationHeader(snapshot);
+        if (currentCompanionPath)
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        }
         if (ControllerContext?.HttpContext is null)
         {
             return NotFound();
@@ -1224,18 +1300,17 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             && !binding.RequiresAccount
             && !HasCredentialQuery(Request))
         {
-            if (generationBoundRawPath)
-            {
-                TryApplyImmutableGenerationHeaders();
-            }
-
-            return BuildVerifiedArtifactFileResult(
+            IActionResult result = BuildVerifiedArtifactFileResult(
                 binding,
                 ResolveDirectFileContentType(
                     binding.FileName,
                     binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
                 fileDownloadName: null,
                 enableRangeProcessing: true);
+            ApplyVerifiedGenerationCacheHeaders(
+                result,
+                immutableGenerationPath);
+            return result;
         }
 
         string? bootstrapTicket = Request.Query["ticket"].ToString();
@@ -1279,7 +1354,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                     allowLegacyUnbound: snapshot.IsLegacy,
                     claimCode))
             {
-                Response.Headers["Cache-Control"] = "private, no-store";
+                ApplyCredentialResponseNoStoreHeaders(Response.Headers);
                 return BuildVerifiedArtifactFileResult(
                     binding,
                     "application/octet-stream",
@@ -1287,7 +1362,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                     enableRangeProcessing: true);
             }
 
-            Response.Headers["Cache-Control"] = "private, no-store";
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
             return Unauthorized(new
             {
                 error = "invalid_or_expired_claim_code",
@@ -1297,23 +1372,22 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         if (!binding.RequiresAccount)
         {
-            if (!snapshot.IsLegacy)
-            {
-                TryApplyImmutableGenerationHeaders();
-            }
-
-            return BuildVerifiedArtifactFileResult(
+            IActionResult result = BuildVerifiedArtifactFileResult(
                 binding,
                 ResolveDirectFileContentType(
                     binding.FileName,
                     binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
                 fileDownloadName: null,
                 enableRangeProcessing: true);
+            ApplyVerifiedGenerationCacheHeaders(
+                result,
+                immutableGenerationPath);
+            return result;
         }
 
         if (generationBoundRawPath)
         {
-            Response.Headers["Cache-Control"] = "private, no-store";
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
             return StatusCode(StatusCodes.Status409Conflict, new
             {
                 error = "generation_bound_credential_required",
@@ -1327,7 +1401,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Redirect(BuildInstallLoginHref(artifact));
         }
 
-        Response.Headers["Cache-Control"] = "private, no-store";
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
         ApplyRouteProofHeaders(
             Response.Headers,
             "No current release status record is attached to the public file-output route.",
@@ -1342,6 +1416,24 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                 binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
             fileDownloadName: null,
             enableRangeProcessing: true);
+    }
+
+    private void ApplyVerifiedGenerationCacheHeaders(
+        IActionResult result,
+        bool immutableGenerationPath)
+    {
+        if (!immutableGenerationPath)
+        {
+            return;
+        }
+
+        if (result is FileStreamResult)
+        {
+            TryApplyImmutableGenerationHeaders();
+            return;
+        }
+
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
     }
 
     private IActionResult BuildVerifiedArtifactFileResult(
