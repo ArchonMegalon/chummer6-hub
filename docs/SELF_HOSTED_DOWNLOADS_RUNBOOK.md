@@ -201,6 +201,15 @@ terminal completion receipt, latest post-marker receipt, retired authority,
 canonical publisher digest, and terminal controller source commit. The
 terminal source must be an ancestor of the clean current Hub `main` checkout;
 advancing protected `main` therefore cannot rewrite terminal evidence.
+Validation is type-exact: source heads and digests must be lowercase fixed
+width strings, versions must be JSON integers (never booleans), timestamps
+must be whole-second canonical UTC, and terminal paths must be normalized
+absolute paths under the operation root.
+Both the original post-marker connector receipt and an optional resume
+post-marker receipt are pre-terminal evidence: their `verifiedAtUtc` must be
+no later than the immutable terminal `completedAtUtc`. Envelope refresh only
+revalidates and republishes those exact bytes; it never performs or invents a
+later Cloudflare gate.
 
 Content files use the platform's atomic exclusive rename
 (`renameat2(RENAME_NOREPLACE)` on Linux or

@@ -2705,6 +2705,11 @@ TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT = (
 TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY = "topology-b-retirement"
 TOPOLOGY_B_SOURCE_REPOSITORY = "ArchonMegalon/chummer6-hub"
 TOPOLOGY_B_SOURCE_REF = "refs/heads/main"
+TOPOLOGY_B_CANONICAL_UTC_TIMESTAMP = re.compile(
+    r"^[0-9]{4}-(?:0[1-9]|1[0-2])-"
+    r"(?:0[1-9]|[12][0-9]|3[01])T"
+    r"(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
+)
 CANONICAL_DOWNLOADS_BASE_URL = "https://chummer.run/downloads"
 CANONICAL_DOWNLOADS_MANIFEST_URL = (
     f"{CANONICAL_DOWNLOADS_BASE_URL}/RELEASE_CHANNEL.generated.json"
@@ -12095,7 +12100,10 @@ def _topology_b_canonical_sha256(value: Any) -> str:
 
 
 def _topology_b_utc_timestamp(value: Any, *, label: str) -> datetime:
-    if not isinstance(value, str) or not value.endswith("Z"):
+    if (
+        type(value) is not str
+        or TOPOLOGY_B_CANONICAL_UTC_TIMESTAMP.fullmatch(value) is None
+    ):
         raise RecoveryUncertain(f"{label} is not canonical UTC")
     try:
         parsed = datetime.fromisoformat(
@@ -12106,6 +12114,38 @@ def _topology_b_utc_timestamp(value: Any, *, label: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
         raise RecoveryUncertain(f"{label} is not UTC")
     return parsed.astimezone(UTC)
+
+
+def _topology_b_is_commit(value: Any) -> bool:
+    return type(value) is str and COMMIT.fullmatch(value) is not None
+
+
+def _topology_b_is_sha256(value: Any) -> bool:
+    return type(value) is str and SHA256.fullmatch(value) is not None
+
+
+def _topology_b_canonical_absolute_path(
+    value: Any,
+) -> PurePosixPath | None:
+    if (
+        type(value) is not str
+        or not value.startswith("/")
+        or value.startswith("//")
+        or len(value) > 4096
+        or any(
+            ord(character) < 0x20 or ord(character) == 0x7F
+            for character in value
+        )
+    ):
+        return None
+    candidate = PurePosixPath(value)
+    if (
+        not candidate.is_absolute()
+        or candidate.as_posix() != value
+        or any(part in {".", ".."} for part in candidate.parts)
+    ):
+        return None
+    return candidate
 
 
 def _topology_b_public_directory(path: Path, *, create: bool) -> Path:
@@ -12626,11 +12666,11 @@ def validate_topology_b_public_retirement_bundle(
     now: datetime | None = None,
     allow_expired: bool = False,
 ) -> dict[str, Any]:
-    if COMMIT.fullmatch(expected_source_head) is None:
+    if not _topology_b_is_commit(expected_source_head):
         raise RecoveryUncertain(
             "public retirement proof source authority is invalid"
         )
-    if SHA256.fullmatch(expected_publisher_sha256) is None:
+    if not _topology_b_is_sha256(expected_publisher_sha256):
         raise RecoveryUncertain(
             "public retirement proof publisher authority is invalid"
         )
@@ -12685,24 +12725,37 @@ def validate_topology_b_public_retirement_bundle(
         )
     source = proof.get("source")
     if (
-        proof.get("contractName")
+        any(
+            type(proof.get(field)) is not str
+            for field in (
+                "contractName",
+                "generatedAt",
+                "status",
+                "retiredAuthoritySha256",
+            )
+        )
+        or proof.get("contractName")
         != TOPOLOGY_B_PUBLIC_RETIREMENT_CONTRACT
         or type(proof.get("contractVersion")) is not int
         or proof.get("contractVersion") != 1
         or proof.get("status") != "passed"
-        or not isinstance(source, dict)
+        or type(source) is not dict
         or set(source) != {"repository", "ref", "commit"}
+        or any(
+            type(source.get(field)) is not str
+            for field in ("repository", "ref", "commit")
+        )
         or source.get("repository") != TOPOLOGY_B_SOURCE_REPOSITORY
         or source.get("ref") != TOPOLOGY_B_SOURCE_REF
         or source.get("commit") != expected_source_head
         or proof.get("sidecarAuthorityRetired") is not True
         or type(proof.get("activeSidecarMarkerCount")) is not int
         or proof.get("activeSidecarMarkerCount") != 0
+        or type(proof.get("activeSidecarMarkers")) is not list
         or proof.get("activeSidecarMarkers") != []
-        or SHA256.fullmatch(
-            str(proof.get("retiredAuthoritySha256") or "")
+        or not _topology_b_is_sha256(
+            proof.get("retiredAuthoritySha256")
         )
-        is None
     ):
         raise RecoveryUncertain(
             "public topology-B retirement authority drifted"
@@ -12715,8 +12768,9 @@ def validate_topology_b_public_retirement_bundle(
         label: str,
     ) -> None:
         if (
-            not isinstance(value, dict)
+            type(value) is not dict
             or set(value) != {"sha256", "sizeBytes"}
+            or type(value.get("sha256")) is not str
             or value.get("sha256") != sha256_bytes(raw)
             or type(value.get("sizeBytes")) is not int
             or value["sizeBytes"] != len(raw)
@@ -12762,34 +12816,59 @@ def validate_topology_b_public_retirement_bundle(
         "cleanupSha256",
         "completedAtUtc",
     }
+    terminal_string_fields = terminal_fields - {"restoredVersion"}
+    operation_root = _topology_b_canonical_absolute_path(
+        terminal.get("operationRoot")
+    )
+    retired_authority_path = _topology_b_canonical_absolute_path(
+        terminal.get("retiredAuthorityPath")
+    )
+    retirement_evidence_path = _topology_b_canonical_absolute_path(
+        terminal.get("retirementEvidencePath")
+    )
+    terminal_sha256_fields = (
+        "retiredAuthoritySha256",
+        "retirementEvidenceSha256",
+        "connectorGateSha256",
+        "postMarkerConnectorGateSha256",
+        "latestConnectorGateSha256",
+        "priorConfigSha256",
+        "incumbentBaselineSha256",
+        "incumbentObservationSha256",
+        "cleanupSha256",
+    )
     if (
         set(terminal) != terminal_fields
+        or any(
+            type(terminal.get(field)) is not str
+            for field in terminal_string_fields
+        )
         or terminal.get("contractName")
         != "chummer.public-download-committed-retirement/v1"
         or terminal.get("status") != "retired"
         or terminal.get("operation") != RETIRE_OPERATION
         or terminal.get("controllerSourceHead") != expected_source_head
-        or COMMIT.fullmatch(
-            str(terminal.get("operationSourceHead") or "")
+        or not _topology_b_is_commit(
+            terminal.get("operationSourceHead")
         )
-        is None
+        or not _topology_b_is_commit(
+            terminal.get("controllerSourceHead")
+        )
+        or operation_root is None
+        or type(terminal.get("projectName")) is not str
+        or SIDECAR_PROJECT.fullmatch(terminal["projectName"]) is None
+        or operation_root.name != terminal["projectName"]
+        or retired_authority_path
+        != operation_root / "retired-active-runtime-authority.json"
+        or retirement_evidence_path
+        != operation_root / "cloudflare-retirement-committed.json"
         or terminal.get("retiredAuthoritySha256")
         != proof.get("retiredAuthoritySha256")
         or type(terminal.get("restoredVersion")) is not int
         or terminal["restoredVersion"] < 0
         or any(
-            SHA256.fullmatch(str(terminal.get(field) or "")) is None
-            for field in (
-                "retiredAuthoritySha256",
-                "retirementEvidenceSha256",
-                "connectorGateSha256",
-                "postMarkerConnectorGateSha256",
-                "latestConnectorGateSha256",
-                "priorConfigSha256",
-                "incumbentBaselineSha256",
-                "incumbentObservationSha256",
-                "cleanupSha256",
-            )
+            not _topology_b_is_sha256(terminal.get(field))
+            for field in terminal_sha256_fields
         )
     ):
         raise RecoveryUncertain(
@@ -12821,6 +12900,19 @@ def validate_topology_b_public_retirement_bundle(
     }
     if (
         set(post_marker) != post_marker_fields
+        or any(
+            type(post_marker.get(field)) is not str
+            for field in (
+                "contractName",
+                "status",
+                "boundary",
+                "operationRoot",
+                "retiredAuthoritySha256",
+                "markerConnectorGateSha256",
+                "connectorConvergenceSha256",
+                "verifiedAtUtc",
+            )
+        )
         or post_marker.get("contractName")
         != "chummer.public-download-retirement-connector-boundary/v1"
         or post_marker.get("status") != "pass"
@@ -12835,11 +12927,16 @@ def validate_topology_b_public_retirement_bundle(
         != terminal.get("retiredAuthoritySha256")
         or post_marker.get("markerConnectorGateSha256")
         != terminal.get("connectorGateSha256")
-        or SHA256.fullmatch(
-            str(post_marker.get("connectorConvergenceSha256") or "")
+        or not _topology_b_is_sha256(
+            post_marker.get("retiredAuthoritySha256")
         )
-        is None
-        or not isinstance(post_marker.get("verifiedAtUtc"), str)
+        or not _topology_b_is_sha256(
+            post_marker.get("markerConnectorGateSha256")
+        )
+        or not _topology_b_is_sha256(
+            post_marker.get("connectorConvergenceSha256")
+        )
+        or type(post_marker.get("connectorConvergence")) is not dict
         or _topology_b_canonical_sha256(post_marker)
         != terminal.get("latestConnectorGateSha256")
     ):
@@ -12895,20 +12992,9 @@ def validate_topology_b_public_retirement_bundle(
         post_marker.get("verifiedAtUtc"),
         label="post-marker connector convergence verifiedAtUtc",
     )
-    if boundary == "post-marker" and post_marker_verified > completed:
+    if post_marker_verified > completed:
         raise RecoveryUncertain(
             "post-marker connector convergence is later than completion"
-        )
-    if (
-        boundary == "resume-post-marker"
-        and (
-            post_marker_verified > generated
-            or post_marker_verified > observed_now + timedelta(minutes=5)
-        )
-    ):
-        raise RecoveryUncertain(
-            "resume post-marker connector convergence is later than "
-            "the fresh public envelope"
         )
     if (
         terminal.get("incumbentBaselineSha256")
@@ -12919,7 +13005,7 @@ def validate_topology_b_public_retirement_bundle(
         )
     canonical = proof.get("canonicalAuthority")
     if (
-        not isinstance(canonical, dict)
+        type(canonical) is not dict
         or set(canonical)
         != {
             "baseUrl",
@@ -12927,6 +13013,15 @@ def validate_topology_b_public_retirement_bundle(
             "publisherPath",
             "publisherSha256",
         }
+        or any(
+            type(canonical.get(field)) is not str
+            for field in (
+                "baseUrl",
+                "manifestUrl",
+                "publisherPath",
+                "publisherSha256",
+            )
+        )
         or canonical.get("baseUrl") != CANONICAL_DOWNLOADS_BASE_URL
         or canonical.get("manifestUrl")
         != CANONICAL_DOWNLOADS_MANIFEST_URL
@@ -12947,8 +13042,8 @@ def _topology_b_require_git_ancestor(
     descendant: str,
 ) -> None:
     if (
-        COMMIT.fullmatch(ancestor) is None
-        or COMMIT.fullmatch(descendant) is None
+        not _topology_b_is_commit(ancestor)
+        or not _topology_b_is_commit(descendant)
     ):
         raise RecoveryUncertain(
             "public topology-B source ancestry is malformed"
@@ -13005,10 +13100,11 @@ def materialize_topology_b_public_retirement_proof(
         else None
     )
     if (
-        COMMIT.fullmatch(materializer_source_head) is None
-        or not isinstance(terminal_source_head, str)
-        or COMMIT.fullmatch(terminal_source_head) is None
-        or SHA256.fullmatch(config.canonical_publisher_sha256) is None
+        not _topology_b_is_commit(materializer_source_head)
+        or not _topology_b_is_commit(terminal_source_head)
+        or not _topology_b_is_sha256(
+            config.canonical_publisher_sha256
+        )
         or config.base_url.rstrip("/") != "https://chummer.run"
         or not isinstance(retirement_result, Mapping)
         or retirement_result.get("status") != "pass"
@@ -13087,7 +13183,7 @@ def materialize_topology_b_public_retirement_proof(
     receipts = journal.get("receipts")
     post_marker = None
     original_post_marker = None
-    if isinstance(receipts, dict):
+    if type(receipts) is dict:
         original_post_marker = receipts.get(
             "retirementPostMarkerConnectorGate"
         )
@@ -13099,13 +13195,13 @@ def materialize_topology_b_public_retirement_proof(
         journal.get("schema") != TOPOLOGY_B_OPERATION_SCHEMA
         or journal.get("phase") != "retired"
         or journal.get("operation") != CUTOVER_OPERATION
-        or not isinstance(receipts, dict)
+        or type(receipts) is not dict
         or not _json_semantically_equal(
             receipts.get("retirement"),
             terminal,
         )
-        or not isinstance(original_post_marker, dict)
-        or not isinstance(post_marker, dict)
+        or type(original_post_marker) is not dict
+        or type(post_marker) is not dict
     ):
         raise RecoveryUncertain(
             "public topology-B retirement journal authority drifted"
@@ -13405,22 +13501,21 @@ def materialize_topology_b_public_retirement_proof(
                 )
                 for key in immutable_keys
             )
-            or not isinstance(previous_materializer_source, str)
+            or type(previous_materializer_source) is not str
             or COMMIT.fullmatch(previous_materializer_source) is None
-            or not isinstance(previous_proof, dict)
+            or type(previous_proof) is not dict
             or set(previous_proof)
             != {"path", "url", "sha256", "sizeBytes"}
             or previous_proof.get("path")
             != receipt_expected["proof"]["path"]
             or previous_proof.get("url")
             != receipt_expected["proof"]["url"]
-            or SHA256.fullmatch(
-                str(previous_proof.get("sha256") or "")
+            or not _topology_b_is_sha256(
+                previous_proof.get("sha256")
             )
-            is None
             or type(previous_proof.get("sizeBytes")) is not int
             or previous_proof["sizeBytes"] <= 0
-            or not isinstance(materialization.get("verifiedAtUtc"), str)
+            or type(materialization.get("verifiedAtUtc")) is not str
         ):
             raise RecoveryUncertain(
                 "public topology-B retirement materialization drifted"

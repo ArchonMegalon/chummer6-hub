@@ -94,6 +94,8 @@ def exact_bundle(
 ) -> tuple[dict[str, Any], bytes, dict[str, Any], bytes, dict[str, Any], bytes]:
     generated = (generated_at or datetime.now(UTC)).replace(microsecond=0)
     timestamp = generated.isoformat().replace("+00:00", "Z")
+    project_name = "chummer-public-download-retirement-test"
+    operation_root = f"/private/{project_name}"
     retired_sha256 = "1" * 64
     marker_gate = connector_gate(13)
     convergence = connector_gate(13)
@@ -103,7 +105,7 @@ def exact_bundle(
         ),
         "status": "pass",
         "boundary": "post-marker",
-        "operationRoot": "/private/operation",
+        "operationRoot": operation_root,
         "restoredVersion": 13,
         "retiredAuthoritySha256": retired_sha256,
         "markerConnectorGateSha256": canonical_sha256(marker_gate),
@@ -118,13 +120,17 @@ def exact_bundle(
         ),
         "status": "retired",
         "operation": controller.RETIRE_OPERATION,
-        "operationRoot": "/private/operation",
-        "projectName": "public-retirement-test",
+        "operationRoot": operation_root,
+        "projectName": project_name,
         "operationSourceHead": "a" * 40,
         "controllerSourceHead": "b" * 40,
-        "retiredAuthorityPath": "/private/operation/retired.json",
+        "retiredAuthorityPath": (
+            f"{operation_root}/retired-active-runtime-authority.json"
+        ),
         "retiredAuthoritySha256": retired_sha256,
-        "retirementEvidencePath": "/private/operation/evidence.json",
+        "retirementEvidencePath": (
+            f"{operation_root}/cloudflare-retirement-committed.json"
+        ),
         "retirementEvidenceSha256": "2" * 64,
         "connectorGateSha256": canonical_sha256(marker_gate),
         "postMarkerConnectorGateSha256": canonical_sha256(post_marker),
@@ -322,6 +328,111 @@ def test_public_bundle_validator_rejects_post_marker_boolean_version() -> None:
 
 
 @pytest.mark.parametrize(
+    ("field", "value", "also_post_marker"),
+    (
+        ("operationSourceHead", int("1" * 40), False),
+        ("cleanupSha256", int("5" * 64), False),
+        ("retirementEvidenceSha256", int("2" * 64), False),
+        ("operationRoot", 17, True),
+        ("projectName", 17, False),
+        ("projectName", "forged", False),
+        ("controllerSourceHead", 17, False),
+        ("retiredAuthorityPath", 17, False),
+        ("retirementEvidencePath", 17, False),
+        ("restoredVersion", True, False),
+        ("completedAtUtc", 17, False),
+        (
+            "operationRoot",
+            "/private/chummer-public-download-retirement-test/../forged",
+            True,
+        ),
+    ),
+)
+def test_terminal_receipt_rejects_type_confusion_and_path_grammar(
+    field: str,
+    value: Any,
+    also_post_marker: bool,
+) -> None:
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = (
+        exact_bundle()
+    )
+    terminal[field] = value
+    if also_post_marker:
+        post["operationRoot"] = value
+        digest = canonical_sha256(post)
+        terminal["postMarkerConnectorGateSha256"] = digest
+        terminal["latestConnectorGateSha256"] = digest
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="retirement boundary drifted",
+    ):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+        )
+
+
+def test_terminal_receipt_rejects_noncanonical_timestamp_grammar() -> None:
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = (
+        exact_bundle()
+    )
+    terminal["completedAtUtc"] = "2026-07-25T00:00:00.123Z"
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(controller.RecoveryUncertain, match="canonical UTC"):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+        )
+
+
+def test_public_proof_rejects_numeric_sha256_type_confusion() -> None:
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = (
+        exact_bundle()
+    )
+    numeric_digest = int("1" * 64)
+    proof["retiredAuthoritySha256"] = numeric_digest
+    terminal["retiredAuthoritySha256"] = numeric_digest
+    post["retiredAuthoritySha256"] = numeric_digest
+    digest = canonical_sha256(post)
+    terminal["postMarkerConnectorGateSha256"] = digest
+    terminal["latestConnectorGateSha256"] = digest
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(controller.RecoveryUncertain, match="authority drifted"):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+        )
+
+
+@pytest.mark.parametrize(
     ("mutation", "match"),
     (
         (
@@ -371,7 +482,7 @@ def test_public_bundle_validator_rejects_semantic_inconsistency(
         )
 
 
-def test_resume_post_marker_may_follow_terminal_but_not_fresh_envelope() -> None:
+def test_resume_post_marker_must_precede_terminal_completion() -> None:
     terminal_time = datetime.now(UTC).replace(microsecond=0)
     envelope_time = terminal_time + timedelta(hours=2)
     proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = exact_bundle(
@@ -379,7 +490,7 @@ def test_resume_post_marker_may_follow_terminal_but_not_fresh_envelope() -> None
     )
     post["boundary"] = "resume-post-marker"
     post["verifiedAtUtc"] = (
-        terminal_time + timedelta(hours=1)
+        terminal_time - timedelta(minutes=1)
     ).isoformat().replace("+00:00", "Z")
     terminal["postMarkerConnectorGateSha256"] = "f" * 64
     terminal["latestConnectorGateSha256"] = canonical_sha256(post)
@@ -401,7 +512,7 @@ def test_resume_post_marker_may_follow_terminal_but_not_fresh_envelope() -> None
     )
 
     post["verifiedAtUtc"] = (
-        envelope_time + timedelta(seconds=1)
+        terminal_time + timedelta(seconds=1)
     ).isoformat().replace("+00:00", "Z")
     terminal["latestConnectorGateSha256"] = canonical_sha256(post)
     proof_raw, terminal_raw, post_raw = rebound_bundle(
@@ -411,7 +522,7 @@ def test_resume_post_marker_may_follow_terminal_but_not_fresh_envelope() -> None
     )
     with pytest.raises(
         controller.RecoveryUncertain,
-        match="later than the fresh public envelope",
+        match="later than completion",
     ):
         controller.validate_topology_b_public_retirement_bundle(
             proof_bytes=proof_raw,
@@ -548,7 +659,8 @@ def materialization_fixture(
         post_marker,
         _post_raw,
     ) = exact_bundle()
-    operation_root = tmp_path / "operation"
+    project_name = "chummer-public-download-retirement-test"
+    operation_root = tmp_path / project_name
     receipt_root = tmp_path / "receipts"
     shelf_root = tmp_path / "downloads"
     authority_root = tmp_path / "authority"
@@ -559,7 +671,7 @@ def materialization_fixture(
         (authority_root, 0o700),
     ):
         path.mkdir(mode=mode)
-    retired = operation_root / "retired.json"
+    retired = operation_root / "retired-active-runtime-authority.json"
     retired.write_bytes(b"retired authority\n")
     retired.chmod(0o600)
     controller_head = subprocess.run(
@@ -569,8 +681,12 @@ def materialization_fixture(
         stdout=subprocess.PIPE,
     ).stdout.strip()
     terminal["operationRoot"] = str(operation_root)
+    terminal["projectName"] = project_name
     terminal["controllerSourceHead"] = controller_head
     terminal["retiredAuthorityPath"] = str(retired)
+    terminal["retirementEvidencePath"] = str(
+        operation_root / "cloudflare-retirement-committed.json"
+    )
     terminal["retiredAuthoritySha256"] = hashlib.sha256(
         retired.read_bytes()
     ).hexdigest()

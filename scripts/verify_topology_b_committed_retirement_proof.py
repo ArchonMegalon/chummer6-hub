@@ -39,7 +39,19 @@ def validate_github_context(environment: Mapping[str, str]) -> str:
     actor = environment.get("GITHUB_ACTOR", "")
     triggering_actor = environment.get("GITHUB_TRIGGERING_ACTOR", "")
     if (
-        environment.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+        any(
+            type(value) is not str
+            for value in (
+                source_sha,
+                actor,
+                triggering_actor,
+                environment.get("GITHUB_EVENT_NAME"),
+                environment.get("GITHUB_REPOSITORY"),
+                environment.get("GITHUB_REF"),
+                environment.get("GITHUB_RUN_ATTEMPT"),
+            )
+        )
+        or environment.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
         or environment.get("GITHUB_REPOSITORY")
         != controller.TOPOLOGY_B_SOURCE_REPOSITORY
         or environment.get("GITHUB_REF") != controller.TOPOLOGY_B_SOURCE_REF
@@ -60,12 +72,12 @@ def _preflight_binding(
     field: str,
 ) -> str:
     value = proof.get(field)
-    digest = value.get("sha256") if isinstance(value, dict) else None
-    size = value.get("sizeBytes") if isinstance(value, dict) else None
+    digest = value.get("sha256") if type(value) is dict else None
+    size = value.get("sizeBytes") if type(value) is dict else None
     if (
-        not isinstance(value, dict)
+        type(value) is not dict
         or set(value) != {"sha256", "sizeBytes"}
-        or not isinstance(digest, str)
+        or type(digest) is not str
         or controller.SHA256.fullmatch(digest) is None
         or type(size) is not int
         or size <= 0
@@ -80,7 +92,9 @@ def require_protected_main_ancestry(
     provider_source_sha: str,
 ) -> None:
     if (
-        controller.COMMIT.fullmatch(terminal_source_sha) is None
+        type(terminal_source_sha) is not str
+        or controller.COMMIT.fullmatch(terminal_source_sha) is None
+        or type(provider_source_sha) is not str
         or controller.COMMIT.fullmatch(provider_source_sha) is None
     ):
         fail("Hub source ancestry contains a malformed commit")
@@ -139,7 +153,10 @@ def capture_public_bundle(
     output_dir: Path,
     ancestry_verifier: Callable[[str, str], None] | None = None,
 ) -> dict[str, Any]:
-    if controller.COMMIT.fullmatch(source_sha) is None:
+    if (
+        type(source_sha) is not str
+        or controller.COMMIT.fullmatch(source_sha) is None
+    ):
         fail("Hub source SHA is invalid")
     if not output_dir.is_absolute() or output_dir.exists() or output_dir.is_symlink():
         fail("proof output directory must be a new absolute path")
@@ -169,11 +186,11 @@ def capture_public_bundle(
         proof_source = proof.get("source")
         terminal_source_sha = (
             proof_source.get("commit")
-            if isinstance(proof_source, dict)
+            if type(proof_source) is dict
             else None
         )
         if (
-            not isinstance(terminal_source_sha, str)
+            type(terminal_source_sha) is not str
             or controller.COMMIT.fullmatch(terminal_source_sha) is None
         ):
             fail("topology-B terminal source SHA is malformed")
@@ -208,11 +225,11 @@ def capture_public_bundle(
         canonical = proof.get("canonicalAuthority")
         publisher_sha256 = (
             canonical.get("publisherSha256")
-            if isinstance(canonical, dict)
+            if type(canonical) is dict
             else None
         )
         if (
-            not isinstance(publisher_sha256, str)
+            type(publisher_sha256) is not str
             or controller.SHA256.fullmatch(publisher_sha256) is None
         ):
             fail("canonical publisher SHA-256 is malformed")
