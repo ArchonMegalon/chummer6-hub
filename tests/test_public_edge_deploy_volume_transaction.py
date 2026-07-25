@@ -29,6 +29,10 @@ CANDIDATE_PORTAL_CONTAINER_ID = "b" * 64
 PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
 POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
 ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
+TOPOLOGY_B_GUARD_MESSAGE = (
+    "canonical public edge mutation is blocked while topology-B downloads "
+    "authority exists"
+)
 
 
 def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
@@ -913,6 +917,135 @@ def test_source_replay_preflight_failure_stops_before_quiesce(
     )
     assert not any("container stop" in command for command in docker_commands)
     assert not any(command.startswith("image tag ") for command in docker_commands)
+
+
+@pytest.mark.parametrize(
+    ("operation", "authority_kind"),
+    [
+        ("deploy", "file"),
+        ("deploy", "broken_symlink"),
+        ("initial-release-shelf-cutover", "file"),
+        ("initial-release-shelf-cutover", "broken_symlink"),
+    ],
+)
+def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_quiesce(
+    tmp_path: Path,
+    operation: str,
+    authority_kind: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    authority = receipt_root / "public-download-active-runtime-authority.json"
+    if authority_kind == "file":
+        authority.write_text("{}\n", encoding="utf-8")
+    else:
+        authority.symlink_to(tmp_path / "missing-topology-b-authority.json")
+    docker_log = tmp_path / "docker.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE in result.stderr
+    assert (
+        "initial-release-shelf-public-download-cutover-recover"
+        in result.stderr
+    )
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+    assert set(receipt_root.iterdir()) == {authority}
+    assert not Path(env["FAKE_EVENT_LOG"]).exists()
+    assert not docker_log.exists()
+    trusted_commands = trusted_python_log.read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert not any("--source-replay-preflight" in command for command in trusted_commands)
+    assert not any("--post-quiesce-reproof" in command for command in trusted_commands)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "recover",
+        "initial-release-shelf-cutover-recover",
+        "initial-release-shelf-public-download-cutover",
+        "initial-release-shelf-public-download-cutover-recover",
+    ],
+)
+def test_topology_b_guard_allows_supported_recovery_and_download_routes(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    (
+        receipt_root / "public-download-active-runtime-authority.json"
+    ).write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["CHUMMER_PUBLIC_EDGE_COMPOSE_FILE"] = str(
+        tmp_path / "deliberately-missing-compose.yml"
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE not in result.stderr
+    assert "requires the exact owner-controlled single-link Compose input" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["deploy", "initial-release-shelf-cutover"],
+)
+def test_topology_b_guard_allows_canonical_transaction_recovery(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    (
+        receipt_root / "public-download-active-runtime-authority.json"
+    ).write_text("{}\n", encoding="utf-8")
+    (
+        receipt_root / "active-overlay-transaction.json"
+    ).write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["CHUMMER_PUBLIC_EDGE_COMPOSE_FILE"] = str(
+        tmp_path / "deliberately-missing-compose.yml"
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE not in result.stderr
+    assert "requires the exact owner-controlled single-link Compose input" in result.stderr
 
 
 def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up(

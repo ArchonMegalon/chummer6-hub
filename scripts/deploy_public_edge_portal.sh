@@ -214,6 +214,14 @@ if [[ "$DEPLOY_OPERATION" == recover \
   || -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
 fi
+if [[ "$DEPLOY_OPERATION" == deploy \
+    || "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]] \
+  && ((RECOVERY_ROUTE_REQUESTED == 0)) \
+  && [[ -e "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY" \
+    || -L "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY" ]]; then
+  echo "canonical public edge mutation is blocked while topology-B downloads authority exists; run initial-release-shelf-public-download-cutover-recover first to restore its exact captured incumbent configuration" >&2
+  exit 2
+fi
 
 if [[ "$COMPOSE_FILE_INPUT" != /* ]]; then
   COMPOSE_FILE_INPUT="$SOURCE_ROOT/$COMPOSE_FILE_INPUT"

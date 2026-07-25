@@ -153,6 +153,46 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         ):
             self.assertIn(option, deploy)
 
+    def test_topology_b_authority_blocks_only_fresh_canonical_mutation(
+        self,
+    ) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        guard = deploy.index(
+            "canonical public edge mutation is blocked while topology-B "
+            "downloads authority exists"
+        )
+        guard_start = deploy.rfind(
+            'if [[ "$DEPLOY_OPERATION" == deploy',
+            0,
+            guard,
+        )
+        guard_condition_end = deploy.index("then", guard_start)
+        condition = deploy[guard_start:guard_condition_end]
+
+        self.assertIn(
+            '"$DEPLOY_OPERATION" == initial-release-shelf-cutover',
+            condition,
+        )
+        self.assertIn("RECOVERY_ROUTE_REQUESTED == 0", condition)
+        self.assertIn(
+            '-e "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY"',
+            condition,
+        )
+        self.assertIn(
+            '-L "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY"',
+            condition,
+        )
+        self.assertNotIn(
+            "initial-release-shelf-public-download-cutover",
+            condition,
+        )
+        self.assertLess(guard, deploy.index("deploy_lock_active=1"))
+        self.assertLess(guard, deploy.index("--source-replay-preflight"))
+        self.assertLess(
+            guard,
+            deploy.index("compose_cli stop chummer-run-cloudflared"),
+        )
+
     def test_docker_context_includes_every_named_context_input(self) -> None:
         dockerignore = DOCKERIGNORE_PATH.read_text(encoding="utf-8")
         for marker in (
