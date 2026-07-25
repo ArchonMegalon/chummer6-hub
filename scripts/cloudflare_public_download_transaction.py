@@ -74,6 +74,10 @@ PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2 = (
     r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
     r"/[iI][nN][sS][tT][aA][lL][lL]/[^/]+/?$"
 )
+PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
+    r"/[iI][nN][sS][tT][aA][lL][lL]/(.*?/)?\.\.?(/.*)?$"
+)
 SAFE_GENERATION_ID = re.compile(r"^" + GENERATION_ID_RE2 + r"$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 JOURNAL_FIELDS = frozenset(
@@ -354,6 +358,14 @@ def _install_fail_closed_rule(hostname: str) -> dict[str, str]:
     }
 
 
+def _install_dot_segment_fail_closed_rule(hostname: str) -> dict[str, str]:
+    return {
+        "hostname": hostname,
+        "path": PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
+        "service": "http_status:404",
+    }
+
+
 def plan_public_download_config(
     prior_config: Mapping[str, Any], origin: str
 ) -> dict[str, Any]:
@@ -361,6 +373,7 @@ def plan_public_download_config(
 
     validate_re2_pattern(MANAGED_PATH_RE2)
     validate_re2_pattern(PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2)
+    validate_re2_pattern(PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2)
     normalized_origin = validate_origin(origin)
     prior = validate_tunnel_config(copy.deepcopy(prior_config))
     existing_managed: list[str] = []
@@ -371,6 +384,7 @@ def plan_public_download_config(
             in {
                 MANAGED_PATH_RE2,
                 PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+                PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
             }
         ):
             existing_managed.append(str(rule["hostname"]))
@@ -384,6 +398,9 @@ def plan_public_download_config(
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
     ] + [
         _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
+    ] + [
+        _install_dot_segment_fail_closed_rule(hostname)
+        for hostname in MANAGED_HOSTS
     ] + copy.deepcopy(prior["ingress"])
     validate_planned_config(prior, target, normalized_origin)
     return target
@@ -403,6 +420,9 @@ def validate_planned_config(
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
     ] + [
         _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
+    ] + [
+        _install_dot_segment_fail_closed_rule(hostname)
+        for hostname in MANAGED_HOSTS
     ]
     if target["ingress"][: len(expected_prefix)] != expected_prefix:
         raise ValidationError(

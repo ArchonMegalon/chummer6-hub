@@ -34,7 +34,10 @@ public sealed class InstallLinkingStoreActivationTests
     [Theory]
     [InlineData("/api/v1/install-linking/summary")]
     [InlineData("/account/access/install-link")]
-    [InlineData("/downloads/install/artifact")]
+    [InlineData("/downloads/install/artifact/payload")]
+    [InlineData("/downloads/install/ARTIFACT")]
+    [InlineData("/downloads/install/artifact/")]
+    [InlineData("/downloads/install/../artifact")]
     [InlineData("/install-0123456789abcdef01234567.sh")]
     public async Task Unready_durable_install_link_routes_return_fixed_503(string path)
     {
@@ -74,6 +77,30 @@ public sealed class InstallLinkingStoreActivationTests
         Assert.Equal("private, no-store, max-age=0", context.Response.Headers.CacheControl.ToString());
         Assert.Equal("no-cache", context.Response.Headers.Pragma.ToString());
         Assert.Equal("0", context.Response.Headers.Expires.ToString());
+    }
+
+    [Theory]
+    [InlineData("/downloads/install/artifact")]
+    [InlineData("/downloads/install/unknown-artifact")]
+    [InlineData("/downloads/install/disabled-artifact")]
+    [InlineData("/downloads/install/revoked-artifact")]
+    public async Task Canonical_public_install_dispatch_bypasses_durable_admission_gate(
+        string path)
+    {
+        bool nextInvoked = false;
+        var middleware = new InstallLinkingRequestAdmissionMiddleware(_ =>
+        {
+            nextInvoked = true;
+            return Task.CompletedTask;
+        });
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+
+        await middleware.InvokeAsync(
+            context,
+            new StubReadinessProbe(new InstallLinkingStoreReadiness(false, "store_unready")));
+
+        Assert.True(nextInvoked);
     }
 
     [Fact]

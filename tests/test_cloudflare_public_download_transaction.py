@@ -9,6 +9,7 @@ import re
 import stat
 import sys
 from typing import Any, Mapping
+import urllib.parse
 
 import pytest
 
@@ -338,9 +339,21 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         }
         assert "originRequest" not in rule
         assert "httpHostHeader" not in rule
-    assert target["ingress"][4:] == prior["ingress"]
+    assert [rule["hostname"] for rule in target["ingress"][4:6]] == [
+        "chummer.run",
+        "www.chummer.run",
+    ]
+    for rule in target["ingress"][4:6]:
+        assert rule == {
+            "hostname": rule["hostname"],
+            "path": transaction.PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
+            "service": "http_status:404",
+        }
+        assert "originRequest" not in rule
+        assert "httpHostHeader" not in rule
+    assert target["ingress"][6:] == prior["ingress"]
     assert target["originRequest"] == prior["originRequest"]
-    assert transaction.canonical_json_bytes(target["ingress"][4:]) == (
+    assert transaction.canonical_json_bytes(target["ingress"][6:]) == (
         transaction.canonical_json_bytes(prior["ingress"])
     )
 
@@ -384,6 +397,16 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
             "http_status:404",
         ),
         (
+            "chummer.run",
+            "/downloads/install/../admin",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/../admin",
+            "http_status:404",
+        ),
+        (
             "www.chummer.run",
             "/downloads/install/avalonia-win-x64-installer/bootstrap.sh",
             "http://incumbent:8080",
@@ -413,13 +436,16 @@ def test_composed_ingress_routes_canonical_installs_and_denies_fallthrough(
     assert resolve_ingress_service(target, hostname, path) == expected_service
 
 
-def test_fail_closed_rules_cannot_move_behind_preserved_incumbent() -> None:
+@pytest.mark.parametrize("rule_index", [2, 4])
+def test_fail_closed_rules_cannot_move_behind_preserved_incumbent(
+    rule_index: int,
+) -> None:
     prior = base_config()
     target = transaction.plan_public_download_config(
         prior,
         "http://host.docker.internal:8123",
     )
-    displaced = target["ingress"].pop(2)
+    displaced = target["ingress"].pop(rule_index)
     target["ingress"].insert(-1, displaced)
 
     with pytest.raises(
@@ -431,6 +457,30 @@ def test_fail_closed_rules_cannot_move_behind_preserved_incumbent() -> None:
             target,
             "http://host.docker.internal:8123",
         )
+
+
+@pytest.mark.parametrize(
+    "raw_path",
+    [
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/avalonia-win-x64-installer%2f..%2fadmin",
+        "/DOWNLOADS/INSTALL/%2E%2E%2Fadmin",
+    ],
+)
+def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
+    raw_path: str,
+) -> None:
+    target = transaction.plan_public_download_config(
+        base_config(),
+        "http://host.docker.internal:8123",
+    )
+    decoded_path = urllib.parse.unquote(raw_path)
+
+    assert decoded_path != raw_path
+    assert (
+        resolve_ingress_service(target, "chummer.run", decoded_path)
+        == "http_status:404"
+    )
 
 
 @pytest.mark.parametrize(
@@ -573,6 +623,7 @@ def test_malformed_tunnel_configs_fail_closed(bad_config: Any) -> None:
     [
         transaction.MANAGED_PATH_RE2,
         transaction.PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+        transaction.PUBLIC_INSTALL_DOT_SEGMENT_FAIL_CLOSED_RE2,
     ],
 )
 def test_existing_managed_rule_is_rejected_instead_of_duplicated(

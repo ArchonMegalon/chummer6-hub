@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -761,6 +762,46 @@ public sealed class PublicReleaseTruthProjectionTests
         Assert.Equal(
             Digest(source.AuthoritySnapshotBytes),
             context.Response.Headers[PublicReleaseTruthProjectionMiddleware.AuthoritySnapshotSha256HeaderName]);
+    }
+
+    [Fact]
+    public async Task StableReadyPublicInstallDispatchBypassesUnreadyDurableStoreGate()
+    {
+        PublicReleaseManifestDto manifest = BuildManifest(BuildPublicArtifact());
+        PublicReleaseTruthProjectionDto projection = ProjectAuthority(
+            manifest,
+            BuildAuthorityEnvelope(manifest, "stable_ready"));
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/downloads/install/windows";
+        context.Request.Method = HttpMethods.Get;
+        bool controllerInvoked = false;
+        var admission = new InstallLinkingRequestAdmissionMiddleware(responseContext =>
+        {
+            controllerInvoked = true;
+            responseContext.Response.Redirect(
+                "/downloads/get/windows",
+                permanent: false);
+            return Task.CompletedTask;
+        });
+        var releaseTruth = new PublicReleaseTruthProjectionMiddleware(
+            responseContext => admission.InvokeAsync(
+                responseContext,
+                new UnavailableInstallLinkingReadinessProbe()));
+
+        await InvokeMiddlewareAsync(
+            releaseTruth,
+            context,
+            new StubProjection(projection));
+
+        Assert.True(controllerInvoked);
+        Assert.Equal(StatusCodes.Status302Found, context.Response.StatusCode);
+        Assert.Equal(
+            "/downloads/get/windows",
+            context.Response.Headers.Location.ToString());
+        Assert.Equal(
+            "stable_ready",
+            context.Response.Headers[
+                PublicReleaseTruthProjectionMiddleware.DecisionStatusHeaderName]);
     }
 
     [Theory]
@@ -1625,6 +1666,13 @@ public sealed class PublicReleaseTruthProjectionTests
             string? immutableManifestSha256,
             ReadOnlyMemory<byte>? immutableAuthorityManifestBytes)
             => projection;
+    }
+
+    private sealed class UnavailableInstallLinkingReadinessProbe
+        : IInstallLinkingStoreReadinessProbe
+    {
+        public InstallLinkingStoreReadiness Evaluate()
+            => new(false, "store_unready");
     }
 
     private sealed class ThrowingProjection : IReleaseTruthProjection
