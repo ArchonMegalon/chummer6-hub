@@ -135,6 +135,32 @@ def make_pinned_final_bind_runner(module, tmp_path: Path):
     return runner, commands
 
 
+def test_public_edge_compose_build_syntax_accepts_canonical_project_name() -> None:
+    module = load_module()
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(
+        encoding="utf-8"
+    )
+
+    module.require_public_edge_compose_build_syntax(compose)
+
+
+def test_public_edge_compose_build_syntax_rejects_project_name_drift() -> None:
+    module = load_module()
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(
+        encoding="utf-8"
+    ).replace(
+        "name: chummer6-hub",
+        "name: chummer6-hub-shadow",
+        1,
+    )
+
+    with pytest.raises(
+        module.CutoverError,
+        match="top-level name must use the exact canonical literal",
+    ):
+        module.require_public_edge_compose_build_syntax(compose)
+
+
 def make_synthetic_runner(module, tmp_path: Path, commands: FakeCommands):
     base = make_runner(module, tmp_path, commands)
     workspace = tmp_path / "synthetic"
