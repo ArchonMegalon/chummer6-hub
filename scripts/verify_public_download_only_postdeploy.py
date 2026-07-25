@@ -37,6 +37,8 @@ UNAVAILABLE_READINESS_PATHS = (
 PRIVATE_PATHS = (
     "/api/v1/install-linking/me",
     "/account/access/install-link",
+)
+INSTALL_ROUTE_DENIAL_PATHS = (
     "/downloads/install/public-download-only-probe",
 )
 FORBIDDEN_RESPONSE_HEADERS = (
@@ -62,21 +64,69 @@ DELIVERY_PHASES = (
     DELIVERY_PHASE_BOOTSTRAP,
     DELIVERY_PHASE_WINDOWS_PREVIEW,
 )
+REVIEW_REQUIRED_RELEASE_TRUTH_KEYS = frozenset(
+    {
+        "artifactCount",
+        "artifactHandoff",
+        "availablePlatforms",
+        "channel",
+        "contractName",
+        "downloadAccessPosture",
+        "knownIssueSummary",
+        "manifestSha256",
+        "primaryHeadByPlatform",
+        "registryCommit",
+        "releaseDecisionSha256",
+        "releaseDecisionStatus",
+        "releaseScopeDecisionSha256",
+        "releaseStatus",
+        "releaseVersion",
+        "rolloutState",
+        "supportabilityState",
+    }
+)
+REVIEW_REQUIRED_ARTIFACT_HANDOFF_KEYS = frozenset(
+    {
+        "arch",
+        "artifactAccessClass",
+        "artifactId",
+        "channel",
+        "contractName",
+        "downloadUrl",
+        "head",
+        "platform",
+        "publicInstallRoute",
+        "releaseScopeDecisionSha256",
+        "releaseVersion",
+        "rid",
+        "sha256",
+        "signingRequirement",
+        "sizeBytes",
+        "sourcePublicationState",
+        "status",
+    }
+)
 
 
 class DownloadExpectation(NamedTuple):
     artifact_id: str
     release_version: str
+    head: str
+    rid: str
+    arch: str
     installer_file_name: str
     installer_url: str
     installer_sha256: str
     installer_size_bytes: int
     payload_file_name: str
+    manifest_payload_url: str
     payload_url: str
+    payload_probe_url: str
     payload_sha256: str
     payload_size_bytes: int
     sidecar_file_name: str
     sidecar_url: str
+    sidecar_probe_url: str
     sidecar_sha256: str
     sidecar_size_bytes: int
     sidecar_bytes: bytes
@@ -209,6 +259,13 @@ def _header(headers: Mapping[str, Any], name: str) -> tuple[bool, str]:
     return False, ""
 
 
+def _media_type(headers: Mapping[str, Any]) -> str:
+    present, value = _header(headers, "Content-Type")
+    if not present:
+        return ""
+    return value.split(";", 1)[0].strip().lower()
+
+
 def _reject_credential_headers(response: requests.Response, label: str) -> None:
     for name in FORBIDDEN_RESPONSE_HEADERS:
         present, _ = _header(response.headers, name)
@@ -276,6 +333,46 @@ def _download_url(base_url: str, value: Any, label: str) -> str:
     return resolved
 
 
+def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError(f"{label} URL is missing")
+    resolved = urljoin(base_url.rstrip("/") + "/", raw)
+    parsed = urlparse(resolved)
+    base = urlparse(base_url)
+    same_origin = _origin(parsed) == _origin(base)
+    canonical_apex_for_www = (
+        base.hostname == "www.chummer.run"
+        and parsed.hostname == "chummer.run"
+        and parsed.scheme.lower() == base.scheme.lower()
+        and parsed.port == base.port
+    )
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+        or not (same_origin or canonical_apex_for_www)
+        or not parsed.path.startswith("/downloads/")
+    ):
+        raise ValueError(
+            f"{label} URL is not a credential-free public download URL"
+        )
+    return resolved
+
+
+def _host_local_mirror_url(base_url: str, canonical_url: str) -> str:
+    base = urlparse(base_url)
+    canonical = urlparse(canonical_url)
+    return canonical._replace(
+        scheme=base.scheme,
+        netloc=base.netloc,
+    ).geturl()
+
+
 def _sidecar_url(payload_url: str) -> str:
     parsed = urlparse(payload_url)
     return parsed._replace(path=parsed.path + ".json").geturl()
@@ -305,6 +402,30 @@ def _required_sha256(payload: Mapping[str, Any], key: str, label: str) -> str:
     return value
 
 
+def _required_git_commit(
+    payload: Mapping[str, Any],
+    key: str,
+    label: str,
+) -> str:
+    value = _required_text(payload, key, label).lower()
+    if len(value) != 40 or any(char not in "0123456789abcdef" for char in value):
+        raise ValueError(f"{label} has invalid {key}")
+    return value
+
+
+def _safe_generation_segment(generation_id: str | None) -> str | None:
+    if not generation_id:
+        return None
+    if (
+        Path(generation_id).name != generation_id
+        or generation_id in {".", ".."}
+        or "/" in generation_id
+        or "\\" in generation_id
+    ):
+        raise ValueError("local manifest generation id is not a safe path segment")
+    return generation_id
+
+
 def _json_object(raw: bytes, label: str) -> dict[str, Any]:
     try:
         payload = json.loads(raw.decode("utf-8-sig"))
@@ -313,6 +434,16 @@ def _json_object(raw: bytes, label: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{label} is not a JSON object")
     return payload
+
+
+def _canonical_object_sha256(payload: Mapping[str, Any]) -> str:
+    body = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(body).hexdigest()
 
 
 def _regular_file_bytes(path: Path, label: str) -> bytes:
@@ -325,15 +456,30 @@ def _find_sidecar_bytes(
     local_manifest_path: Path,
     local_canonical_manifest_path: Path,
     sidecar_file_name: str,
+    generation_id: str | None,
 ) -> bytes:
-    roots = (
+    generation_id = _safe_generation_segment(generation_id)
+    roots = [
         local_manifest_path.parent / "files",
         local_canonical_manifest_path.parent / "files",
         local_manifest_path.parent / "bundle" / "files",
         local_canonical_manifest_path.parent / "bundle" / "files",
-    )
+    ]
+    if generation_id:
+        for parent in {
+            local_manifest_path.parent,
+            local_canonical_manifest_path.parent,
+        }:
+            roots.append(
+                parent / "generations" / generation_id / "files"
+            )
+            if (
+                parent.name == generation_id
+                and parent.parent.name == "generations"
+            ):
+                roots.append(parent / "files")
     matches: list[bytes] = []
-    for root in roots:
+    for root in dict.fromkeys(roots):
         path = root / sidecar_file_name
         if path.is_file() and not path.is_symlink():
             matches.append(path.read_bytes())
@@ -439,13 +585,21 @@ def _assert_manifest_policy(
         raise ValueError(f"{artifact_id} is not a preview artifact")
     if str(artifact.get("installAccessClass") or "").strip().lower() != "open_public":
         raise ValueError(f"{artifact_id} is not open_public")
-    if str(artifact.get("artifactByteVisibility") or "").strip().lower() != "public":
+    if (
+        "artifactByteVisibility" in artifact
+        and str(artifact.get("artifactByteVisibility") or "").strip().lower()
+        != "public"
+    ):
         raise ValueError(f"{artifact_id} byte visibility is not public")
     if str(artifact.get("installerMode") or "").strip().lower() != "bootstrap":
         raise ValueError(f"{artifact_id} is not a bootstrap installer")
     if str(artifact.get("payloadAcquisitionMode") or "").strip().lower() != "download":
         raise ValueError(f"{artifact_id} payload acquisition is not download")
-    if str(artifact.get("previewPolicy") or "").strip().lower() != "preview_policy":
+    if (
+        "previewPolicy" in artifact
+        and str(artifact.get("previewPolicy") or "").strip().lower()
+        != "preview_policy"
+    ):
         raise ValueError(f"{artifact_id} preview policy is invalid")
     if artifact.get("publicInstallRoute") is not None:
         raise ValueError(f"{artifact_id} unexpectedly claims a public install route")
@@ -454,13 +608,17 @@ def _assert_manifest_policy(
     if str(artifact.get("version") or artifact.get("releaseVersion") or "").strip() != version:
         raise ValueError(f"{artifact_id} release version disagrees with the manifest")
 
-    signature = artifact.get("signature")
-    if not isinstance(signature, dict) or (
-        str(signature.get("status") or "").strip().lower() != "unsigned"
-        or str(signature.get("policy") or "").strip().lower() != "preview_policy"
-        or signature.get("required") is not False
-    ):
-        raise ValueError(f"{artifact_id} is not unsigned under preview_policy")
+    if "signature" in artifact:
+        signature = artifact.get("signature")
+        if not isinstance(signature, dict) or (
+            str(signature.get("status") or "").strip().lower() != "unsigned"
+            or str(signature.get("policy") or "").strip().lower()
+            != "preview_policy"
+            or signature.get("required") is not False
+        ):
+            raise ValueError(
+                f"{artifact_id} is not unsigned under preview_policy"
+            )
 
     coverage = canonical.get("desktopTupleCoverage")
     route_rows = coverage.get("desktopRouteTruth") if isinstance(coverage, dict) else None
@@ -473,19 +631,57 @@ def _assert_manifest_policy(
     if len(matching_routes) != 1:
         raise ValueError(f"{artifact_id} does not have exactly one route-truth row")
     route = matching_routes[0]
+    normalized_route_schema = any(
+        key in route
+        for key in ("routeAuthority", "publicationState", "visibility")
+    )
     promotion = str(route.get("promotionState") or "").strip().lower()
     update = str(route.get("updateEligibility") or "").strip().lower()
-    if (
-        route.get("publicInstallRoute") is not None
-        or route.get("routeAuthority") is not False
-        or str(route.get("publicationState") or "").strip().lower() != "preview"
-        or str(route.get("visibility") or "").strip().lower() != "public_artifact_only"
-        or promotion in {"promoted", "public_stable", "stable"}
-        or not promotion
-    ):
-        raise ValueError(f"{artifact_id} route truth unexpectedly claims stable/install authority")
-    if update in {"eligible", "automatic", "auto", "auto_update", "enabled", "true"} or not update:
-        raise ValueError(f"{artifact_id} route truth unexpectedly claims update eligibility")
+    if normalized_route_schema:
+        if (
+            route.get("publicInstallRoute") is not None
+            or route.get("routeAuthority") is not False
+            or str(route.get("publicationState") or "").strip().lower()
+            != "preview"
+            or str(route.get("visibility") or "").strip().lower()
+            != "public_artifact_only"
+            or promotion in {"promoted", "public_stable", "stable"}
+            or not promotion
+        ):
+            raise ValueError(
+                f"{artifact_id} route truth unexpectedly claims stable/install authority"
+            )
+        if (
+            update
+            in {
+                "eligible",
+                "automatic",
+                "auto",
+                "auto_update",
+                "enabled",
+                "true",
+            }
+            or not update
+        ):
+            raise ValueError(
+                f"{artifact_id} route truth unexpectedly claims update eligibility"
+            )
+    else:
+        # Layout-v1 authority bytes predate the normalized route fields and are
+        # intentionally immutable. The authenticated releaseTruth wrapper and
+        # runtime 409 boundary conservatively supersede this exact legacy shape.
+        legacy_install_route = str(
+            route.get("publicInstallRoute") or ""
+        ).strip()
+        if (
+            promotion != "promoted"
+            or update != "eligible"
+            or legacy_install_route
+            != f"/downloads/install/{artifact_id}"
+        ):
+            raise ValueError(
+                f"{artifact_id} legacy route truth shape is not recognized"
+            )
 
 
 def _validate_sidecar(payload: Mapping[str, Any], expected: DownloadExpectation) -> None:
@@ -503,7 +699,7 @@ def _validate_sidecar(payload: Mapping[str, Any], expected: DownloadExpectation)
     parsed_download_url = urlparse(raw_download_url)
     if parsed_download_url.scheme.lower() != "https" or not parsed_download_url.hostname:
         raise ValueError("bootstrap sidecar downloadUrl is not absolute HTTPS")
-    if _download_url(
+    if _canonical_payload_url(
         expected.installer_url,
         raw_download_url,
         "bootstrap sidecar payload",
@@ -559,6 +755,9 @@ def derive_download_expectations(
     for artifact in canonical_rows:
         _assert_manifest_policy(canonical, artifact)
         artifact_id = _required_text(artifact, "artifactId", "Windows artifact")
+        head = _required_text(artifact, "head", artifact_id)
+        rid = _required_text(artifact, "rid", artifact_id)
+        arch = _required_text(artifact, "arch", artifact_id)
         compatibility_row = compatibility_by_id.get(artifact_id)
         if compatibility_row is None:
             raise ValueError(f"compatibility manifest is missing {artifact_id}")
@@ -570,15 +769,27 @@ def derive_download_expectations(
             artifact.get("downloadUrl") or artifact.get("url"),
             f"{artifact_id} installer",
         )
-        payload_url = _download_url(
+        manifest_payload_url = _download_url(
             base,
             artifact.get("payloadDownloadUrl"),
-            f"{artifact_id} payload",
+            f"{artifact_id} manifest payload",
         )
         if Path(urlparse(installer_url).path).name != installer_file_name:
             raise ValueError(f"{artifact_id} installer URL filename disagrees with manifest")
-        if Path(urlparse(payload_url).path).name != payload_file_name:
-            raise ValueError(f"{artifact_id} payload URL filename disagrees with manifest")
+        payload_path = urlparse(manifest_payload_url).path
+        semantic_payload_path = (
+            f"/downloads/g/{expected_generation}/install/"
+            f"{artifact_id}/payload"
+            if expected_generation
+            else None
+        )
+        if (
+            Path(payload_path).name != payload_file_name
+            and payload_path != semantic_payload_path
+        ):
+            raise ValueError(
+                f"{artifact_id} payload URL is not filename- or generation-bound"
+            )
 
         installer_sha256 = _required_sha256(artifact, "sha256", artifact_id)
         installer_size = _required_size(artifact, "sizeBytes", artifact_id)
@@ -595,7 +806,7 @@ def derive_download_expectations(
             "installer_sha256": str(compatibility_row.get("sha256") or "").strip().lower(),
             "installer_size": int(compatibility_row.get("sizeBytes") or 0),
             "payload_file_name": str(compatibility_row.get("payloadFileName") or "").strip(),
-            "payload_url": _download_url(
+            "manifest_payload_url": _download_url(
                 base,
                 compatibility_row.get("payloadDownloadUrl"),
                 f"{artifact_id} compatibility payload",
@@ -611,7 +822,7 @@ def derive_download_expectations(
             "installer_sha256": installer_sha256,
             "installer_size": installer_size,
             "payload_file_name": payload_file_name,
-            "payload_url": payload_url,
+            "manifest_payload_url": manifest_payload_url,
             "payload_sha256": payload_sha256,
             "payload_size": payload_size,
             "access": "open_public",
@@ -625,26 +836,49 @@ def derive_download_expectations(
             local_manifest_path,
             local_canonical_manifest_path,
             sidecar_file_name,
+            expected_generation,
         )
+        sidecar_payload = _json_object(
+            sidecar_bytes,
+            f"local {sidecar_file_name}",
+        )
+        payload_url = _canonical_payload_url(
+            base,
+            sidecar_payload.get("downloadUrl"),
+            f"{artifact_id} sidecar payload",
+        )
+        if Path(urlparse(payload_url).path).name != payload_file_name:
+            raise ValueError(
+                f"{artifact_id} sidecar payload URL filename disagrees"
+            )
         expectation = DownloadExpectation(
             artifact_id=artifact_id,
             release_version=version,
+            head=head,
+            rid=rid,
+            arch=arch,
             installer_file_name=installer_file_name,
             installer_url=installer_url,
             installer_sha256=installer_sha256,
             installer_size_bytes=installer_size,
             payload_file_name=payload_file_name,
+            manifest_payload_url=manifest_payload_url,
             payload_url=payload_url,
+            payload_probe_url=_host_local_mirror_url(base, payload_url),
             payload_sha256=payload_sha256,
             payload_size_bytes=payload_size,
             sidecar_file_name=sidecar_file_name,
             sidecar_url=_sidecar_url(payload_url),
+            sidecar_probe_url=_host_local_mirror_url(
+                base,
+                _sidecar_url(payload_url),
+            ),
             sidecar_sha256=hashlib.sha256(sidecar_bytes).hexdigest(),
             sidecar_size_bytes=len(sidecar_bytes),
             sidecar_bytes=sidecar_bytes,
         )
         _validate_sidecar(
-            _json_object(sidecar_bytes, f"local {sidecar_file_name}"),
+            sidecar_payload,
             expectation,
         )
         expectations.append(expectation)
@@ -802,6 +1036,554 @@ def _stream_manifest_get(
         response.close()
 
 
+def _assert_review_required_artifact_handoff(
+    artifact_handoff: Mapping[str, Any],
+    *,
+    expected: DownloadExpectation,
+    expected_release_scope_sha256: str,
+    base_url: str,
+    label: str,
+) -> None:
+    if set(artifact_handoff) != REVIEW_REQUIRED_ARTIFACT_HANDOFF_KEYS:
+        raise ValueError(f"{label} has an unexpected authority schema")
+    public_install_route = str(
+        artifact_handoff.get("publicInstallRoute") or ""
+    ).strip()
+    parsed_install_route = urlparse(public_install_route)
+    if (
+        not public_install_route.startswith("/downloads/install/")
+        or parsed_install_route.scheme
+        or parsed_install_route.netloc
+        or parsed_install_route.params
+        or parsed_install_route.query
+        or parsed_install_route.fragment
+    ):
+        raise ValueError(
+            f"{label} releaseTruth has an invalid withheld install route"
+        )
+
+    handoff_observed = {
+        "contractName": str(
+            artifact_handoff.get("contractName") or ""
+        ).strip(),
+        "status": str(artifact_handoff.get("status") or "").strip().lower(),
+        "sourcePublicationState": str(
+            artifact_handoff.get("sourcePublicationState") or ""
+        ).strip().lower(),
+        "releaseScopeDecisionSha256": _required_sha256(
+            artifact_handoff,
+            "releaseScopeDecisionSha256",
+            f"{label} artifact handoff",
+        ),
+        "releaseVersion": str(
+            artifact_handoff.get("releaseVersion") or ""
+        ).strip(),
+        "channel": str(
+            artifact_handoff.get("channel") or ""
+        ).strip().lower(),
+        "artifactId": str(
+            artifact_handoff.get("artifactId") or ""
+        ).strip(),
+        "platform": str(
+            artifact_handoff.get("platform") or ""
+        ).strip().lower(),
+        "head": str(artifact_handoff.get("head") or "").strip(),
+        "rid": str(artifact_handoff.get("rid") or "").strip(),
+        "arch": str(artifact_handoff.get("arch") or "").strip(),
+        "sha256": _required_sha256(
+            artifact_handoff,
+            "sha256",
+            f"{label} artifact handoff",
+        ),
+        "sizeBytes": _required_size(
+            artifact_handoff,
+            "sizeBytes",
+            f"{label} artifact handoff",
+        ),
+        "artifactAccessClass": str(
+            artifact_handoff.get("artifactAccessClass") or ""
+        ).strip().lower(),
+        "signingRequirement": str(
+            artifact_handoff.get("signingRequirement") or ""
+        ).strip().lower(),
+        "downloadUrl": _download_url(
+            base_url,
+            artifact_handoff.get("downloadUrl"),
+            f"{label} artifact handoff",
+        ),
+    }
+    handoff_required = {
+        "contractName": "chummer.public-preview-byte-handoff/v1",
+        "status": "approved_public_preview_bytes",
+        "sourcePublicationState": "preview",
+        "releaseScopeDecisionSha256": expected_release_scope_sha256,
+        "releaseVersion": expected.release_version,
+        "channel": "preview",
+        "artifactId": expected.artifact_id,
+        "platform": "windows",
+        "head": expected.head,
+        "rid": expected.rid,
+        "arch": expected.arch,
+        "sha256": expected.installer_sha256,
+        "sizeBytes": expected.installer_size_bytes,
+        "artifactAccessClass": "open_public",
+        "signingRequirement": "preview_unsigned_allowed",
+        "downloadUrl": expected.installer_url,
+    }
+    if handoff_observed != handoff_required:
+        raise ValueError(
+            f"{label} releaseTruth artifact handoff disagrees with the preview"
+        )
+    if public_install_route != f"/downloads/install/{expected.artifact_id}":
+        raise ValueError(
+            f"{label} withheld install route disagrees"
+        )
+
+
+def _release_evidence_roots(
+    *,
+    local_manifest_path: Path,
+    local_canonical_manifest_path: Path,
+    generation_id: str | None,
+) -> list[Path]:
+    generation_id = _safe_generation_segment(generation_id)
+    roots: list[Path] = []
+    for parent in dict.fromkeys(
+        (
+            local_manifest_path.parent,
+            local_canonical_manifest_path.parent,
+        )
+    ):
+        roots.extend(
+            (
+                parent / "release-evidence",
+                parent / "bundle" / "release-evidence",
+            )
+        )
+        if generation_id:
+            roots.append(
+                parent / "generations" / generation_id / "release-evidence"
+            )
+            if parent.name == "current":
+                roots.append(
+                    parent.parent
+                    / "generations"
+                    / generation_id
+                    / "release-evidence"
+                )
+            if (
+                parent.name == generation_id
+                and parent.parent.name == "generations"
+            ):
+                roots.append(parent / "release-evidence")
+    return list(dict.fromkeys(roots))
+
+
+def _load_review_required_release_evidence(
+    *,
+    local_manifest_path: Path,
+    local_canonical_manifest_path: Path,
+    generation_id: str | None,
+    expected: DownloadExpectation,
+    expected_manifest_sha256: str,
+    base_url: str,
+) -> dict[str, Any]:
+    evidence_names = (
+        "CURRENT.json",
+        "SNAPSHOT.json",
+        "RELEASE_DECISION.json",
+    )
+    evidence_copies: list[tuple[bytes, bytes, bytes]] = []
+    for root in _release_evidence_roots(
+        local_manifest_path=local_manifest_path,
+        local_canonical_manifest_path=local_canonical_manifest_path,
+        generation_id=generation_id,
+    ):
+        paths = tuple(root / name for name in evidence_names)
+        present = tuple(path.exists() or path.is_symlink() for path in paths)
+        if not any(present):
+            continue
+        if not all(present):
+            raise ValueError(
+                f"local release evidence is incomplete: {root}"
+            )
+        evidence_copies.append(
+            tuple(
+                _regular_file_bytes(
+                    path,
+                    f"local release evidence {path.name}",
+                )
+                for path in paths
+            )
+        )
+    if not evidence_copies:
+        raise ValueError("local review-required release evidence is missing")
+    if any(
+        candidate != evidence_copies[0]
+        for candidate in evidence_copies[1:]
+    ):
+        raise ValueError("local review-required release evidence copies disagree")
+
+    current_bytes, snapshot_bytes, decision_bytes = evidence_copies[0]
+    current = _json_object(current_bytes, "local release evidence CURRENT.json")
+    snapshot = _json_object(
+        snapshot_bytes,
+        "local release evidence SNAPSHOT.json",
+    )
+    decision = _json_object(
+        decision_bytes,
+        "local release evidence RELEASE_DECISION.json",
+    )
+    snapshot_sha256 = hashlib.sha256(snapshot_bytes).hexdigest()
+    decision_sha256 = hashlib.sha256(decision_bytes).hexdigest()
+    if (
+        _required_sha256(
+            current,
+            "snapshotSha256",
+            "local release evidence CURRENT.json",
+        )
+        != snapshot_sha256
+        or _required_sha256(
+            current,
+            "decisionSha256",
+            "local release evidence CURRENT.json",
+        )
+        != decision_sha256
+        or _required_text(
+            current,
+            "releaseVersion",
+            "local release evidence CURRENT.json",
+        )
+        != expected.release_version
+        or str(current.get("status") or "").strip().lower()
+        != "review_required"
+    ):
+        raise ValueError("local release evidence CURRENT.json is not closed")
+
+    registry_commit = _required_git_commit(
+        snapshot,
+        "registryCommit",
+        "local release evidence SNAPSHOT.json",
+    )
+    known_issue_summary = _required_text(
+        snapshot,
+        "knownIssueSummary",
+        "local release evidence SNAPSHOT.json",
+    )
+    snapshot_observed = {
+        "authorityContract": str(
+            snapshot.get("authorityContract") or ""
+        ).strip(),
+        "releaseVersion": str(
+            snapshot.get("releaseVersion") or ""
+        ).strip(),
+        "channel": str(snapshot.get("channel") or "").strip().lower(),
+        "status": str(snapshot.get("status") or "").strip().lower(),
+        "rolloutState": str(
+            snapshot.get("rolloutState") or ""
+        ).strip().lower(),
+        "supportabilityState": str(
+            snapshot.get("supportabilityState") or ""
+        ).strip().lower(),
+        "downloadAccessPosture": str(
+            snapshot.get("downloadAccessPosture") or ""
+        ).strip().lower(),
+        "releaseDecisionStatus": str(
+            snapshot.get("releaseDecisionStatus") or ""
+        ).strip().lower(),
+        "manifestSha256": _required_sha256(
+            snapshot,
+            "manifestSha256",
+            "local release evidence SNAPSHOT.json",
+        ),
+        "releaseDecisionSha256": _required_sha256(
+            snapshot,
+            "releaseDecisionSha256",
+            "local release evidence SNAPSHOT.json",
+        ),
+        "artifactCount": _required_size(
+            snapshot,
+            "artifactCount",
+            "local release evidence SNAPSHOT.json",
+        ),
+        "availablePlatforms": snapshot.get("availablePlatforms"),
+        "primaryHeadByPlatform": snapshot.get(
+            "primaryHeadByPlatform"
+        ),
+    }
+    snapshot_required = {
+        "authorityContract": "chummer.release-authority-snapshot/v2",
+        "releaseVersion": expected.release_version,
+        "channel": "preview",
+        "status": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "downloadAccessPosture": "open_public",
+        "releaseDecisionStatus": "review_required",
+        "manifestSha256": expected_manifest_sha256,
+        "releaseDecisionSha256": decision_sha256,
+        "artifactCount": 1,
+        "availablePlatforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": expected.head},
+    }
+    if snapshot_observed != snapshot_required:
+        raise ValueError(
+            "local release evidence SNAPSHOT.json is not the expected authority"
+        )
+    snapshot_artifacts = _rows(
+        snapshot,
+        "artifacts",
+        "local release evidence SNAPSHOT.json",
+    )
+    if len(snapshot_artifacts) != 1:
+        raise ValueError(
+            "local release evidence SNAPSHOT.json must bind one artifact"
+        )
+    snapshot_artifact = snapshot_artifacts[0]
+    snapshot_artifact_observed = {
+        "artifactId": str(
+            snapshot_artifact.get("artifactId") or ""
+        ).strip(),
+        "head": str(snapshot_artifact.get("head") or "").strip(),
+        "platform": str(
+            snapshot_artifact.get("platform") or ""
+        ).strip().lower(),
+        "rid": str(snapshot_artifact.get("rid") or "").strip(),
+        "arch": str(snapshot_artifact.get("arch") or "").strip(),
+        "kind": str(snapshot_artifact.get("kind") or "").strip().lower(),
+        "installAccessClass": str(
+            snapshot_artifact.get("installAccessClass") or ""
+        ).strip().lower(),
+        "sha256": _required_sha256(
+            snapshot_artifact,
+            "sha256",
+            "local release evidence snapshot artifact",
+        ),
+        "sizeBytes": _required_size(
+            snapshot_artifact,
+            "sizeBytes",
+            "local release evidence snapshot artifact",
+        ),
+        "downloadUrl": _download_url(
+            base_url,
+            snapshot_artifact.get("downloadUrl"),
+            "local release evidence snapshot artifact",
+        ),
+        "publicInstallRoute": str(
+            snapshot_artifact.get("publicInstallRoute") or ""
+        ).strip(),
+    }
+    snapshot_artifact_required = {
+        "artifactId": expected.artifact_id,
+        "head": expected.head,
+        "platform": "windows",
+        "rid": expected.rid,
+        "arch": expected.arch,
+        "kind": "installer",
+        "installAccessClass": "open_public",
+        "sha256": expected.installer_sha256,
+        "sizeBytes": expected.installer_size_bytes,
+        "downloadUrl": expected.installer_url,
+        "publicInstallRoute": f"/downloads/install/{expected.artifact_id}",
+    }
+    if snapshot_artifact_observed != snapshot_artifact_required:
+        raise ValueError(
+            "local release evidence snapshot artifact disagrees with the preview"
+        )
+
+    decision_registry_commit = _required_git_commit(
+        decision,
+        "registryCommit",
+        "local release evidence RELEASE_DECISION.json",
+    )
+    release_scope_sha256 = _required_sha256(
+        decision,
+        "releaseScopeDecisionSha256",
+        "local release evidence RELEASE_DECISION.json",
+    )
+    decision_observed = {
+        "contractName": str(decision.get("contractName") or "").strip(),
+        "releaseVersion": str(
+            decision.get("releaseVersion") or ""
+        ).strip(),
+        "channel": str(decision.get("channel") or "").strip().lower(),
+        "status": str(decision.get("status") or "").strip().lower(),
+        "releaseDecisionStatus": str(
+            decision.get("releaseDecisionStatus") or ""
+        ).strip().lower(),
+        "verdict": str(decision.get("verdict") or "").strip(),
+        "manifestSha256": _required_sha256(
+            decision,
+            "manifestSha256",
+            "local release evidence RELEASE_DECISION.json",
+        ),
+        "artifactAccessClass": str(
+            decision.get("artifactAccessClass") or ""
+        ).strip().lower(),
+        "platforms": decision.get("platforms"),
+        "primaryHeadByPlatform": decision.get("primaryHeadByPlatform"),
+    }
+    decision_required = {
+        "contractName": "chummer.preview-release-decision/v2",
+        "releaseVersion": expected.release_version,
+        "channel": "preview",
+        "status": "review_required",
+        "releaseDecisionStatus": "review_required",
+        "verdict": "PREVIEW_RELEASE_REVIEW_REQUIRED",
+        "manifestSha256": expected_manifest_sha256,
+        "artifactAccessClass": "open_public",
+        "platforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": expected.head},
+    }
+    if (
+        decision_observed != decision_required
+        or decision_registry_commit != registry_commit
+    ):
+        raise ValueError(
+            "local release evidence RELEASE_DECISION.json is not the "
+            "expected authority"
+        )
+    artifact_handoff = decision.get("artifactHandoff")
+    if not isinstance(artifact_handoff, dict):
+        raise ValueError(
+            "local release evidence decision is missing artifactHandoff"
+        )
+    _assert_review_required_artifact_handoff(
+        artifact_handoff,
+        expected=expected,
+        expected_release_scope_sha256=release_scope_sha256,
+        base_url=base_url,
+        label="local release evidence artifact handoff",
+    )
+    return {
+        "registryCommit": registry_commit,
+        "releaseDecisionSha256": decision_sha256,
+        "releaseScopeDecisionSha256": release_scope_sha256,
+        "artifactHandoff": artifact_handoff,
+        "knownIssueSummary": known_issue_summary,
+    }
+
+
+def _assert_review_required_release_truth(
+    payload: Mapping[str, Any],
+    *,
+    expected: DownloadExpectation,
+    expected_manifest_sha256: str,
+    expected_evidence: Mapping[str, Any],
+    base_url: str,
+    label: str,
+) -> dict[str, Any]:
+    release_truth = payload.get("releaseTruth")
+    if not isinstance(release_truth, dict):
+        raise ValueError(f"{label} is missing authenticated releaseTruth")
+    if set(release_truth) != REVIEW_REQUIRED_RELEASE_TRUTH_KEYS:
+        raise ValueError(
+            f"{label} releaseTruth has an unexpected authority schema"
+        )
+    artifact_handoff = release_truth.get("artifactHandoff")
+    if not isinstance(artifact_handoff, dict):
+        raise ValueError(
+            f"{label} releaseTruth is missing its artifact handoff"
+        )
+
+    release_scope_sha256 = _required_sha256(
+        release_truth,
+        "releaseScopeDecisionSha256",
+        f"{label} releaseTruth",
+    )
+    release_decision_sha256 = _required_sha256(
+        release_truth,
+        "releaseDecisionSha256",
+        f"{label} releaseTruth",
+    )
+    observed = {
+        "contractName": str(release_truth.get("contractName") or "").strip(),
+        "releaseVersion": str(
+            release_truth.get("releaseVersion") or ""
+        ).strip(),
+        "channel": str(release_truth.get("channel") or "").strip().lower(),
+        "releaseStatus": str(
+            release_truth.get("releaseStatus") or ""
+        ).strip().lower(),
+        "rolloutState": str(
+            release_truth.get("rolloutState") or ""
+        ).strip().lower(),
+        "supportabilityState": str(
+            release_truth.get("supportabilityState") or ""
+        ).strip().lower(),
+        "downloadAccessPosture": str(
+            release_truth.get("downloadAccessPosture") or ""
+        ).strip().lower(),
+        "releaseDecisionStatus": str(
+            release_truth.get("releaseDecisionStatus") or ""
+        ).strip().lower(),
+        "manifestSha256": _required_sha256(
+            release_truth,
+            "manifestSha256",
+            f"{label} releaseTruth",
+        ),
+        "registryCommit": _required_git_commit(
+            release_truth,
+            "registryCommit",
+            f"{label} releaseTruth",
+        ),
+        "artifactCount": _required_size(
+            release_truth,
+            "artifactCount",
+            f"{label} releaseTruth",
+        ),
+        "availablePlatforms": release_truth.get("availablePlatforms"),
+        "primaryHeadByPlatform": release_truth.get(
+            "primaryHeadByPlatform"
+        ),
+        "knownIssueSummary": _required_text(
+            release_truth,
+            "knownIssueSummary",
+            f"{label} releaseTruth",
+        ),
+        "releaseDecisionSha256": release_decision_sha256,
+        "releaseScopeDecisionSha256": release_scope_sha256,
+    }
+    required = {
+        "contractName": "chummer.release-truth-projection/v1",
+        "releaseVersion": expected.release_version,
+        "channel": "preview",
+        "releaseStatus": "published",
+        "rolloutState": "public_release_review_required",
+        "supportabilityState": "review_required",
+        "downloadAccessPosture": "open_public",
+        "releaseDecisionStatus": "review_required",
+        "manifestSha256": expected_manifest_sha256,
+        "registryCommit": expected_evidence["registryCommit"],
+        "artifactCount": 1,
+        "availablePlatforms": ["windows"],
+        "primaryHeadByPlatform": {"windows": expected.head},
+        "knownIssueSummary": expected_evidence["knownIssueSummary"],
+        "releaseDecisionSha256": expected_evidence[
+            "releaseDecisionSha256"
+        ],
+        "releaseScopeDecisionSha256": expected_evidence[
+            "releaseScopeDecisionSha256"
+        ],
+    }
+    if observed != required:
+        raise ValueError(
+            f"{label} releaseTruth is not the expected review-required authority"
+        )
+    _assert_review_required_artifact_handoff(
+        artifact_handoff,
+        expected=expected,
+        expected_release_scope_sha256=release_scope_sha256,
+        base_url=base_url,
+        label=f"{label} releaseTruth artifact handoff",
+    )
+    if artifact_handoff != expected_evidence["artifactHandoff"]:
+        raise ValueError(
+            f"{label} releaseTruth artifact handoff is not evidence-bound"
+        )
+    return release_truth
+
+
 def _validate_live_canonical_manifest(
     payload: Mapping[str, Any],
     expectations: list[DownloadExpectation],
@@ -835,7 +1617,7 @@ def _validate_live_canonical_manifest(
             "installerSha256": str(artifact.get("sha256") or "").strip().lower(),
             "installerSizeBytes": int(artifact.get("sizeBytes") or 0),
             "payloadFileName": str(artifact.get("payloadFileName") or "").strip(),
-            "payloadUrl": _download_url(
+            "manifestPayloadUrl": _download_url(
                 base_url,
                 artifact.get("payloadDownloadUrl"),
                 f"live {expected.artifact_id} payload",
@@ -850,7 +1632,7 @@ def _validate_live_canonical_manifest(
             "installerSha256": expected.installer_sha256,
             "installerSizeBytes": expected.installer_size_bytes,
             "payloadFileName": expected.payload_file_name,
-            "payloadUrl": expected.payload_url,
+            "manifestPayloadUrl": expected.manifest_payload_url,
             "payloadSha256": expected.payload_sha256,
             "payloadSizeBytes": expected.payload_size_bytes,
         }
@@ -963,6 +1745,7 @@ def verify_public_download_delivery(
     )
 
     expectations: list[DownloadExpectation] = []
+    release_truth_sha256: str | None = None
     if delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW:
         _canonical_bytes, _generation, expectations = (
             derive_download_expectations(
@@ -970,6 +1753,56 @@ def verify_public_download_delivery(
                 local_manifest_path=local_manifest_path,
                 local_canonical_manifest_path=local_canonical_manifest_path,
             )
+        )
+        if len(expectations) != 1:
+            raise ValueError(
+                "Windows preview releaseTruth requires exactly one artifact"
+            )
+        served_canonical = dict(live_canonical)
+        served_canonical.pop("releaseTruth", None)
+        if served_canonical != local_canonical:
+            raise ValueError(
+                "live canonical manifest changed sealed fields outside releaseTruth"
+            )
+        served_compatibility = dict(live_compatibility)
+        served_compatibility.pop("releaseTruth", None)
+        if served_compatibility != local_compatibility:
+            raise ValueError(
+                "live compatibility manifest changed sealed fields outside releaseTruth"
+            )
+        expected_manifest_sha256 = hashlib.sha256(
+            local_canonical_bytes
+        ).hexdigest()
+        expected_evidence = _load_review_required_release_evidence(
+            local_manifest_path=local_manifest_path,
+            local_canonical_manifest_path=local_canonical_manifest_path,
+            generation_id=generation_id,
+            expected=expectations[0],
+            expected_manifest_sha256=expected_manifest_sha256,
+            base_url=base,
+        )
+        canonical_release_truth = _assert_review_required_release_truth(
+            live_canonical,
+            expected=expectations[0],
+            expected_manifest_sha256=expected_manifest_sha256,
+            expected_evidence=expected_evidence,
+            base_url=base,
+            label="live canonical manifest",
+        )
+        compatibility_release_truth = _assert_review_required_release_truth(
+            live_compatibility,
+            expected=expectations[0],
+            expected_manifest_sha256=expected_manifest_sha256,
+            expected_evidence=expected_evidence,
+            base_url=base,
+            label="live compatibility manifest",
+        )
+        if canonical_release_truth != compatibility_release_truth:
+            raise ValueError(
+                "live canonical and compatibility releaseTruth disagree"
+            )
+        release_truth_sha256 = _canonical_object_sha256(
+            canonical_release_truth
         )
         _validate_live_canonical_manifest(
             live_canonical,
@@ -992,7 +1825,7 @@ def verify_public_download_delivery(
         )
         payload_receipt, _ = _stream_exact_get(
             session=session,
-            url=expected.payload_url,
+            url=expected.payload_probe_url,
             label=f"{expected.artifact_id} payload",
             expected_sha256=expected.payload_sha256,
             expected_size_bytes=expected.payload_size_bytes,
@@ -1002,7 +1835,7 @@ def verify_public_download_delivery(
         )
         sidecar_receipt, sidecar_bytes = _stream_exact_get(
             session=session,
-            url=expected.sidecar_url,
+            url=expected.sidecar_probe_url,
             label=f"{expected.artifact_id} sidecar",
             expected_sha256=expected.sidecar_sha256,
             expected_size_bytes=expected.sidecar_size_bytes,
@@ -1052,6 +1885,7 @@ def verify_public_download_delivery(
         "generationId": generation_id,
         "canonicalManifest": canonical_receipt,
         "compatibilityManifest": compatibility_receipt,
+        "releaseTruthSha256": release_truth_sha256,
         "artifacts": artifact_receipts,
     }
 
@@ -1094,10 +1928,9 @@ def verify_control_plane(
         response = get(session, base_url, path, timeout)
         _reject_credential_headers(response, path)
         private_statuses[path] = response.status_code
-        content_type = response.headers.get("Content-Type", "").lower()
         if (
             response.status_code != 503
-            or not content_type.startswith("application/problem+json")
+            or _media_type(response.headers) != "application/problem+json"
             or response.headers.get("Cache-Control")
             != "private, no-store, max-age=0"
             or response.headers.get("Pragma") != "no-cache"
@@ -1105,10 +1938,71 @@ def verify_control_plane(
             or require_json(response, path) != PROBLEM
         ):
             raise ValueError(f"{path} did not enforce the private 503 boundary")
+
+    install_route_denial_statuses: dict[str, int] = {}
+    install_route_release_truth_sha256: str | None = None
+    for path in INSTALL_ROUTE_DENIAL_PATHS:
+        response = get(session, base_url, path, timeout)
+        _reject_credential_headers(response, path)
+        install_route_denial_statuses[path] = response.status_code
+        payload = require_json(response, path)
+        release_truth = payload.get("releaseTruth")
+        if (
+            set(payload) != {"message", "releaseTruth", "status"}
+            or not isinstance(release_truth, dict)
+            or set(release_truth) != REVIEW_REQUIRED_RELEASE_TRUTH_KEYS
+            or not isinstance(release_truth.get("artifactHandoff"), dict)
+            or set(release_truth["artifactHandoff"])
+            != REVIEW_REQUIRED_ARTIFACT_HANDOFF_KEYS
+        ):
+            raise ValueError(
+                f"{path} did not enforce the review-required install denial"
+            )
+        release_truth_sha256 = _canonical_object_sha256(release_truth)
+        if (
+            install_route_release_truth_sha256 is not None
+            and install_route_release_truth_sha256
+            != release_truth_sha256
+        ):
+            raise ValueError(
+                "install denial routes disagree on releaseTruth"
+            )
+        install_route_release_truth_sha256 = release_truth_sha256
+        if (
+            response.status_code != 409
+            or _media_type(response.headers) != "application/json"
+            or response.headers.get("Cache-Control")
+            != "private, no-store, max-age=0"
+            or response.headers.get("Pragma") != "no-cache"
+            or response.headers.get("Expires") != "0"
+            or payload.get("status") != "review_required"
+            or not str(payload.get("message") or "").strip()
+            or release_truth.get("contractName")
+            != "chummer.release-truth-projection/v1"
+            or release_truth.get("channel") != "preview"
+            or release_truth.get("supportabilityState") != "review_required"
+            or release_truth.get("rolloutState")
+            != "public_release_review_required"
+            or release_truth.get("downloadAccessPosture") != "open_public"
+            or release_truth.get("releaseStatus") != "published"
+            or release_truth.get("releaseDecisionStatus")
+            != "review_required"
+            or release_truth.get("availablePlatforms") != ["windows"]
+            or release_truth.get("artifactCount") != 1
+            or not str(release_truth.get("releaseVersion") or "").strip()
+            or not str(release_truth.get("knownIssueSummary") or "").strip()
+        ):
+            raise ValueError(
+                f"{path} did not enforce the review-required install denial"
+            )
     return {
         "servingReadiness": serving_payload,
         "unavailableReadinessStatuses": readiness_statuses,
         "privateBoundaryStatuses": private_statuses,
+        "installRouteDenialStatuses": install_route_denial_statuses,
+        "installRouteReleaseTruthSha256": (
+            install_route_release_truth_sha256
+        ),
     }
 
 
@@ -1177,6 +2071,17 @@ def main(argv: list[str] | None = None) -> int:
                 local_canonical_manifest_path=args.local_canonical_manifest,
                 timeout=args.timeout,
             )
+            if (
+                args.delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW
+                and control_plane.get(
+                    "installRouteReleaseTruthSha256"
+                )
+                != strict_downloads.get("releaseTruthSha256")
+            ):
+                raise ValueError(
+                    "install denial releaseTruth disagrees with the "
+                    "authenticated manifests"
+                )
         payload = {
             "contractName": CONTRACT_NAME,
             "status": "pass",

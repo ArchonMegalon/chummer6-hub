@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -53,11 +54,26 @@ public sealed class InstallLinkingStoreActivationTests
 
         context.Response.Body.Position = 0;
         string body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+        using JsonDocument problem = JsonDocument.Parse(body);
         Assert.False(nextInvoked);
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
-        Assert.Contains("Install-linking is temporarily unavailable.", body, StringComparison.Ordinal);
+        Assert.Equal("application/problem+json; charset=utf-8", context.Response.ContentType);
+        Assert.Equal(
+            "https://chummer.run/problems/install-linking-unavailable",
+            problem.RootElement.GetProperty("type").GetString());
+        Assert.Equal(
+            "Install-linking unavailable.",
+            problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            StatusCodes.Status503ServiceUnavailable,
+            problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(
+            "Install-linking is temporarily unavailable.",
+            problem.RootElement.GetProperty("detail").GetString());
         Assert.DoesNotContain("secret-internal-code", body, StringComparison.Ordinal);
         Assert.Equal("private, no-store, max-age=0", context.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", context.Response.Headers.Pragma.ToString());
+        Assert.Equal("0", context.Response.Headers.Expires.ToString());
     }
 
     [Fact]
