@@ -2154,8 +2154,12 @@ public sealed class ReleaseBundlePromotionService
                 artifact.PayloadSizeBytes,
                 artifactId,
                 "compatibility payload");
-            string immutablePayloadUrl =
-                $"/downloads/g/{generationId}/install/{Uri.EscapeDataString(artifactId)}/payload";
+            string immutablePayloadUrl = string.Equals(
+                artifact.InstallAccessClass,
+                "open_public",
+                StringComparison.OrdinalIgnoreCase)
+                ? $"/downloads/g/{generationId}/files/{Uri.EscapeDataString(payloadFileName)}"
+                : $"/downloads/g/{generationId}/install/{Uri.EscapeDataString(artifactId)}/payload";
             string sidecarPath = Path.Combine(filesRoot, payloadFileName + ".json");
             if (!File.Exists(sidecarPath))
             {
@@ -3002,6 +3006,14 @@ public sealed class ReleaseBundlePromotionService
                     $"manifest role route references missing payload bytes for '{normalizedArtifactId}'.");
             }
 
+            if (route.IsOpenPublic)
+            {
+                string fileName = role == ArtifactDeliveryRoles.Payload
+                    ? route.PayloadFileName
+                    : route.PayloadFileName + ".json";
+                return generationPrefix + "files/" + Uri.EscapeDataString(fileName);
+            }
+
             string suffix = role == ArtifactDeliveryRoles.Payload ? "payload" : "metadata";
             return generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/" + suffix;
         }
@@ -3039,13 +3051,17 @@ public sealed class ReleaseBundlePromotionService
         GenerationArtifactRoute route = matches[0];
         if (string.Equals(route.PayloadFileName, fileName, StringComparison.Ordinal))
         {
-            return generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/payload";
+            return route.IsOpenPublic
+                ? generationPrefix + "files/" + Uri.EscapeDataString(fileName)
+                : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/payload";
         }
 
         if (!string.IsNullOrWhiteSpace(route.PayloadFileName)
             && string.Equals(route.PayloadFileName + ".json", fileName, StringComparison.Ordinal))
         {
-            return generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/metadata";
+            return route.IsOpenPublic
+                ? generationPrefix + "files/" + Uri.EscapeDataString(fileName)
+                : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/metadata";
         }
 
         return route.IsOpenPublic

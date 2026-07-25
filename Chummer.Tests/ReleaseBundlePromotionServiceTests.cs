@@ -162,6 +162,29 @@ public sealed class ReleaseBundlePromotionServiceTests
             {
                 Assert.False(File.Exists(Path.Combine(stagedRoot, "files", fileName)));
             }
+            foreach (PublicReleaseArtifactDto artifact in manifest.Downloads)
+            {
+                if (string.IsNullOrWhiteSpace(artifact.PayloadFileName))
+                {
+                    continue;
+                }
+
+                JsonObject sidecar = JsonNode.Parse(
+                    File.ReadAllBytes(
+                        Path.Combine(
+                            stagedRoot,
+                            "files",
+                            artifact.PayloadFileName + ".json")))!.AsObject();
+                string expectedPayloadUrl = string.Equals(
+                    artifact.InstallAccessClass,
+                    "open_public",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? $"/downloads/g/gen-unsigned-windows-profile-aur-policy/files/{artifact.PayloadFileName}"
+                    : $"/downloads/g/gen-unsigned-windows-profile-aur-policy/install/{artifact.Id}/payload";
+                Assert.Equal(
+                    expectedPayloadUrl,
+                    sidecar["downloadUrl"]?.GetValue<string>());
+            }
 
             IConfiguration stagedConfiguration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -716,7 +739,9 @@ public sealed class ReleaseBundlePromotionServiceTests
                   "id": "open",
                   "fileName": "open.bin",
                   "url": "/downloads/files/open.bin",
-                  "installAccessClass": "open_public"
+                  "installAccessClass": "open_public",
+                  "payloadFileName": "open.zip",
+                  "payloadDownloadUrl": "/downloads/files/open.zip"
                 },
                 {
                   "id": "protected",
@@ -778,7 +803,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             "generation-parity",
             compatibility);
 
-        const string expected = "{\"artifactIdentityRegistry\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/g/generation-parity/install/protected\"}],\"artifactPublicationBindings\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"channel\":\"preview\",\"desktopSurfaceRefs\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"desktopTupleCoverage\":{\"desktopRouteTruth\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/install/missing\"}]},\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"extension\":{\"publicInstallRoute\":\"/downloads/g/generation-parity/files/open.bin\"},\"generationId\":\"generation-parity\",\"installAwareArtifactRegistry\":[{\"conciergeAssetRefs\":{\"publicTrustWrapper\":\"/downloads/install/open\"},\"recoveryProofRefs\":[\"/downloads/install/open\",\"startup-smoke/startup-smoke-open.receipt.json\"]}],\"publicTrustMetrics\":{\"revocationFacts\":{\"activeRevocations\":[{\"publicInstallRoute\":\"/downloads/install/open\"}]}},\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
+        const string expected = "{\"artifactIdentityRegistry\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/g/generation-parity/install/protected\"}],\"artifactPublicationBindings\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"channel\":\"preview\",\"desktopSurfaceRefs\":[{\"publicInstallRoute\":\"/downloads/install/open\"}],\"desktopTupleCoverage\":{\"desktopRouteTruth\":[{\"publicInstallRoute\":\"/downloads/install/open\"},{\"publicInstallRoute\":\"/downloads/install/missing\"}]},\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/files/open.zip\",\"payloadFileName\":\"open.zip\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"extension\":{\"publicInstallRoute\":\"/downloads/g/generation-parity/files/open.bin\"},\"generationId\":\"generation-parity\",\"installAwareArtifactRegistry\":[{\"conciergeAssetRefs\":{\"publicTrustWrapper\":\"/downloads/install/open\"},\"recoveryProofRefs\":[\"/downloads/install/open\",\"startup-smoke/startup-smoke-open.receipt.json\"]}],\"publicTrustMetrics\":{\"revocationFacts\":{\"activeRevocations\":[{\"publicInstallRoute\":\"/downloads/install/open\"}]}},\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
         Assert.Equal(expected, Encoding.UTF8.GetString(projected));
     }
 

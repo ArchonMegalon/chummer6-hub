@@ -90,7 +90,8 @@ class DeliveryFixture:
         self.payload_name = "chummer-avalonia-win-x64-payload.zip"
         self.installer_url = f"{self.base_url}/downloads/files/{self.installer_name}"
         self.payload_url = (
-            f"{self.base_url}/downloads/files/{self.payload_name}"
+            f"{self.base_url}/downloads/g/{self.generation}/files/"
+            f"{self.payload_name}"
         )
         self.manifest_payload_url = (
             f"{self.base_url}/downloads/g/{self.generation}/install/"
@@ -1020,19 +1021,23 @@ def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
         fixture.verify()
 
 
-def test_strict_delivery_uses_sidecar_raw_url_for_semantic_manifest_payload_route(
+def test_strict_delivery_rejects_unroutable_semantic_manifest_payload_route(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
     calls = fixture.install(monkeypatch)
 
-    result = fixture.verify()
+    with pytest.raises(
+        ValueError,
+        match="open_public payload URL must be the generation-bound files route",
+    ):
+        fixture.verify()
 
     requested_urls = [url for url, _stream in calls]
-    assert result["status"] == "pass"
     assert fixture.manifest_payload_url != fixture.payload_url
-    assert fixture.payload_url in requested_urls
+    assert fixture.payload_url in fixture.responses
+    assert fixture.payload_url not in requested_urls
     assert fixture.manifest_payload_url not in requested_urls
 
 
@@ -1041,7 +1046,6 @@ def test_www_delivery_accepts_canonical_apex_sidecar_url(
 ) -> None:
     fixture = DeliveryFixture(
         tmp_path,
-        semantic_payload_route=True,
     )
 
     _canonical, _generation, expectations = (
@@ -1052,15 +1056,39 @@ def test_www_delivery_accepts_canonical_apex_sidecar_url(
         )
     )
 
-    assert expectations[0].payload_url == fixture.payload_url
+    assert expectations[0].payload_url == (
+        "https://www.chummer.run/downloads/g/generation-a/files/"
+        f"{fixture.payload_name}"
+    )
     assert expectations[0].payload_probe_url == (
-        "https://www.chummer.run/downloads/files/"
+        "https://www.chummer.run/downloads/g/generation-a/files/"
         f"{fixture.payload_name}"
     )
     assert expectations[0].sidecar_probe_url == (
-        "https://www.chummer.run/downloads/files/"
+        "https://www.chummer.run/downloads/g/generation-a/files/"
         f"{fixture.payload_name}.json"
     )
+
+
+def test_delivery_accepts_generation_bound_site_relative_sidecar_url(
+    tmp_path: Path,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.sidecar["downloadUrl"] = fixture.payload_url.removeprefix(
+        fixture.base_url
+    )
+    fixture.rewrite()
+
+    _canonical, _generation, expectations = (
+        postdeploy.derive_download_expectations(
+            base_url=fixture.base_url,
+            local_manifest_path=fixture.local_manifest,
+            local_canonical_manifest_path=fixture.local_canonical,
+        )
+    )
+
+    assert expectations[0].payload_url == fixture.payload_url
+    assert expectations[0].payload_probe_url == fixture.payload_url
 
 
 def test_strict_delivery_accepts_generation_scoped_sidecar_and_evidence(
@@ -1069,7 +1097,6 @@ def test_strict_delivery_accepts_generation_scoped_sidecar_and_evidence(
 ) -> None:
     fixture = DeliveryFixture(
         tmp_path,
-        semantic_payload_route=True,
     )
     generation_root = (
         fixture.root / "generations" / fixture.generation
@@ -1217,11 +1244,11 @@ def test_sidecar_lookup_rejects_unsafe_generation_segment(
         )
 
 
-def test_strict_delivery_rejects_cross_generation_semantic_payload_route(
+def test_strict_delivery_rejects_cross_generation_payload_file_route(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
+    fixture = DeliveryFixture(tmp_path)
     drifted = fixture.manifest_payload_url.replace(
         fixture.generation,
         "generation-b",
@@ -1237,7 +1264,7 @@ def test_strict_delivery_rejects_cross_generation_semantic_payload_route(
 
     with pytest.raises(
         ValueError,
-        match="not filename- or generation-bound",
+        match="open_public payload URL must be the generation-bound files route",
     ):
         fixture.verify()
 

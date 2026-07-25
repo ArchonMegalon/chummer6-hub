@@ -653,12 +653,20 @@ def _artifact_routes(
                 "payload_file_name": payload_name,
                 "primary": primary_route,
                 "payload": (
-                    f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/payload"
+                    (
+                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='')}"
+                        if access_class == "open_public"
+                        else f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/payload"
+                    )
                     if payload_name is not None
                     else None
                 ),
                 "metadata": (
-                    f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/metadata"
+                    (
+                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='')}.json"
+                        if access_class == "open_public"
+                        else f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/metadata"
+                    )
                     if payload_name is not None
                     else None
                 ),

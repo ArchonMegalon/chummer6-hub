@@ -1673,16 +1673,24 @@ def test_manifest_normalizer_projects_artifact_routes_by_access_and_omits_mutabl
                         "fileName": "open.bin",
                         "installAccessClass": "open_public",
                         "downloadUrl": "/downloads/files/open.bin",
+                        "payloadFileName": "open-payload.zip",
+                        "payloadDownloadUrl": "/downloads/files/open-payload.zip",
                     },
                     {
                         "artifactId": "protected-installer",
                         "fileName": "protected.bin",
                         "installAccessClass": "account_required",
                         "downloadUrl": "/downloads/install/protected-installer",
+                        "payloadFileName": "protected-payload.zip",
+                        "payloadDownloadUrl": "/downloads/files/protected-payload.zip",
                     },
                 ],
                 "openFact": "/downloads/get/open-installer",
+                "openPayloadFact": "/downloads/files/open-payload.zip",
+                "openMetadataFact": "/downloads/files/open-payload.zip.json",
                 "protectedFact": "/downloads/file/protected-installer",
+                "protectedPayloadFact": "/downloads/files/protected-payload.zip",
+                "protectedMetadataFact": "/downloads/files/protected-payload.zip.json",
                 "absentFact": "/downloads/install/missing-installer",
                 "mutableContinuation": "/downloads/install/protected-installer/claim",
                 "proofRoutes": [
@@ -1705,12 +1713,30 @@ def test_manifest_normalizer_projects_artifact_routes_by_access_and_omits_mutabl
     assert normalized["artifacts"][0]["downloadUrl"] == (
         "/downloads/g/generation-routes/files/open.bin"
     )
+    assert normalized["artifacts"][0]["payloadDownloadUrl"] == (
+        "/downloads/g/generation-routes/files/open-payload.zip"
+    )
     assert normalized["artifacts"][1]["downloadUrl"] == (
         "/downloads/g/generation-routes/install/protected-installer"
     )
+    assert normalized["artifacts"][1]["payloadDownloadUrl"] == (
+        "/downloads/g/generation-routes/install/protected-installer/payload"
+    )
     assert normalized["openFact"] == "/downloads/g/generation-routes/files/open.bin"
+    assert normalized["openPayloadFact"] == (
+        "/downloads/g/generation-routes/files/open-payload.zip"
+    )
+    assert normalized["openMetadataFact"] == (
+        "/downloads/g/generation-routes/files/open-payload.zip.json"
+    )
     assert normalized["protectedFact"] == (
         "/downloads/g/generation-routes/install/protected-installer"
+    )
+    assert normalized["protectedPayloadFact"] == (
+        "/downloads/g/generation-routes/install/protected-installer/payload"
+    )
+    assert normalized["protectedMetadataFact"] == (
+        "/downloads/g/generation-routes/install/protected-installer/metadata"
     )
     assert "absentFact" not in normalized
     assert "mutableContinuation" not in normalized
@@ -1737,6 +1763,8 @@ def test_registry_generation_projection_matches_cross_language_golden_bytes(
                 "fileName": "open.bin",
                 "url": "/downloads/files/open.bin",
                 "installAccessClass": "open_public",
+                "payloadFileName": "open.zip",
+                "payloadDownloadUrl": "/downloads/files/open.zip",
             },
             {
                 "id": "protected",
@@ -1800,7 +1828,9 @@ def test_registry_generation_projection_matches_cross_language_golden_bytes(
         b'"desktopTupleCoverage":{"desktopRouteTruth":[{"publicInstallRoute":"/downloads/install/open"},'
         b'{"publicInstallRoute":"/downloads/install/missing"}]},'
         b'"downloads":[{"fileName":"open.bin","id":"open",'
-        b'"installAccessClass":"open_public","url":"/downloads/g/generation-parity/files/open.bin"},'
+        b'"installAccessClass":"open_public",'
+        b'"payloadDownloadUrl":"/downloads/g/generation-parity/files/open.zip",'
+        b'"payloadFileName":"open.zip","url":"/downloads/g/generation-parity/files/open.bin"},'
         b'{"fileName":"protected.bin","id":"protected","installAccessClass":"account_required",'
         b'"payloadDownloadUrl":"/downloads/g/generation-parity/install/protected/payload",'
         b'"payloadFileName":"protected.zip","url":"/downloads/g/generation-parity/install/protected"}],'

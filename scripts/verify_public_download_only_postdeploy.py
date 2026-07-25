@@ -696,14 +696,15 @@ def _validate_sidecar(payload: Mapping[str, Any], expected: DownloadExpectation)
     if str(payload.get("payloadAcquisitionMode") or "").strip().lower() != "download":
         raise ValueError("bootstrap sidecar payload acquisition is not download")
     raw_download_url = str(payload.get("downloadUrl") or "").strip()
-    parsed_download_url = urlparse(raw_download_url)
-    if parsed_download_url.scheme.lower() != "https" or not parsed_download_url.hostname:
-        raise ValueError("bootstrap sidecar downloadUrl is not absolute HTTPS")
-    if _canonical_payload_url(
+    normalized_download_url = _canonical_payload_url(
         expected.installer_url,
         raw_download_url,
         "bootstrap sidecar payload",
-    ) != expected.payload_url:
+    )
+    if _host_local_mirror_url(
+        expected.installer_url,
+        normalized_download_url,
+    ) != _host_local_mirror_url(expected.installer_url, expected.payload_url):
         raise ValueError("bootstrap sidecar downloadUrl disagrees with manifest")
     if str(payload.get("sha256") or "").strip().lower() != expected.payload_sha256:
         raise ValueError("bootstrap sidecar sha256 disagrees with manifest")
@@ -777,18 +778,16 @@ def derive_download_expectations(
         if Path(urlparse(installer_url).path).name != installer_file_name:
             raise ValueError(f"{artifact_id} installer URL filename disagrees with manifest")
         payload_path = urlparse(manifest_payload_url).path
-        semantic_payload_path = (
-            f"/downloads/g/{expected_generation}/install/"
-            f"{artifact_id}/payload"
-            if expected_generation
-            else None
-        )
-        if (
-            Path(payload_path).name != payload_file_name
-            and payload_path != semantic_payload_path
-        ):
+        if not expected_generation:
             raise ValueError(
-                f"{artifact_id} payload URL is not filename- or generation-bound"
+                f"{artifact_id} payload URL cannot be generation-bound without a generation id"
+            )
+        expected_payload_path = (
+            f"/downloads/g/{expected_generation}/files/{payload_file_name}"
+        )
+        if payload_path != expected_payload_path:
+            raise ValueError(
+                f"{artifact_id} open_public payload URL must be the generation-bound files route"
             )
 
         installer_sha256 = _required_sha256(artifact, "sha256", artifact_id)
@@ -842,15 +841,19 @@ def derive_download_expectations(
             sidecar_bytes,
             f"local {sidecar_file_name}",
         )
-        payload_url = _canonical_payload_url(
+        sidecar_payload_url = _canonical_payload_url(
             base,
             sidecar_payload.get("downloadUrl"),
             f"{artifact_id} sidecar payload",
         )
-        if Path(urlparse(payload_url).path).name != payload_file_name:
+        if _host_local_mirror_url(
+            base,
+            sidecar_payload_url,
+        ) != _host_local_mirror_url(base, manifest_payload_url):
             raise ValueError(
-                f"{artifact_id} sidecar payload URL filename disagrees"
+                f"{artifact_id} sidecar payload URL disagrees with manifest"
             )
+        payload_url = manifest_payload_url
         expectation = DownloadExpectation(
             artifact_id=artifact_id,
             release_version=version,
