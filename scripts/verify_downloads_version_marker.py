@@ -58,6 +58,37 @@ RELEASE_CHANNEL_RECOGNIZED_ROLLOUT_STATES = (
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 RELEASE_CHANNEL_STABLE_CHANNELS = {"public_stable", "stable", "docker"}
 VERSION_MARKER_PATTERN = re.compile(r"Version [^\s]+")
+VISIBLE_RELEASE_VERSION_LABEL_PATTERN = re.compile(
+    r"^Version\s+(?:"
+    r"Preview|unavailable|"
+    r"run-[^\s()]+|"
+    r"(?=[^\s()]*[0-9])[^\s()]+"
+    r")(?:\s+\(Preview\))?$",
+    re.IGNORECASE,
+)
+HTML_VOID_ELEMENTS = frozenset(
+    {
+        "area",
+        "base",
+        "basefont",
+        "bgsound",
+        "br",
+        "col",
+        "command",
+        "embed",
+        "frame",
+        "hr",
+        "img",
+        "input",
+        "keygen",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+)
 DOWNLOADS_MARKER_ATTRIBUTES = (
     "data-downloads-release-version",
     "data-downloads-release-generation",
@@ -891,55 +922,117 @@ class VisibleTextParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
         self.version_texts: list[str] = []
-        self._hidden_stack: list[bool] = []
-        self._version_capture_depth = 0
-        self._current_version_parts: list[str] = []
+        self.styled_version_texts: list[str] = []
+        self._element_stack: list[dict[str, Any]] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def _start_element(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+        *,
+        self_closing: bool,
+    ) -> None:
+        normalized_tag = tag.lower()
         attr_map = {name.lower(): value or "" for name, value in attrs}
         class_tokens = {
             token.strip().lower()
             for token in attr_map.get("class", "").split()
             if token.strip()
         }
-        parent_hidden = self._hidden_stack[-1] if self._hidden_stack else False
+        parent_hidden = (
+            bool(self._element_stack[-1]["hidden"])
+            if self._element_stack
+            else False
+        )
         current_hidden = (
-            tag.lower() in {"script", "style", "svg", "template"}
+            normalized_tag in {"script", "style", "svg", "template"}
             or "hidden" in attr_map
             or attr_map.get("aria-hidden", "").lower() == "true"
             or "sr-only" in class_tokens
         )
-        effective_hidden = parent_hidden or current_hidden
-        self._hidden_stack.append(effective_hidden)
-
-        if self._version_capture_depth > 0:
-            self._version_capture_depth += 1
+        if self_closing or normalized_tag in HTML_VOID_ELEMENTS:
             return
 
-        if not effective_hidden and "downloads-version" in class_tokens:
-            self._version_capture_depth = 1
-            self._current_version_parts = []
+        self._element_stack.append(
+            {
+                "tag": normalized_tag,
+                "hidden": parent_hidden or current_hidden,
+                "styled_version": "downloads-version" in class_tokens,
+                "text_parts": [],
+            }
+        )
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._start_element(tag, attrs, self_closing=False)
+
+    def handle_startendtag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._start_element(tag, attrs, self_closing=True)
+
+    def _record_version_text(self, text: str, *, styled: bool) -> None:
+        if styled and text not in self.styled_version_texts:
+            self.styled_version_texts.append(text)
+        if (
+            styled
+            or VISIBLE_RELEASE_VERSION_LABEL_PATTERN.fullmatch(text) is not None
+        ) and text not in self.version_texts:
+            self.version_texts.append(text)
+
+    def _finish_element(self, element: dict[str, Any]) -> None:
+        if element["hidden"]:
+            return
+        text = " ".join(
+            part.strip()
+            for part in element["text_parts"]
+            if part.strip()
+        ).strip()
+        if text:
+            self._record_version_text(
+                text,
+                styled=bool(element["styled_version"]),
+            )
 
     def handle_endtag(self, tag: str) -> None:
-        if self._version_capture_depth > 0:
-            self._version_capture_depth -= 1
-            if self._version_capture_depth == 0:
-                text = " ".join(part.strip() for part in self._current_version_parts if part.strip()).strip()
-                if text:
-                    self.version_texts.append(text)
-                self._current_version_parts = []
+        normalized_tag = tag.lower()
+        matching_index = next(
+            (
+                index
+                for index in range(len(self._element_stack) - 1, -1, -1)
+                if self._element_stack[index]["tag"] == normalized_tag
+            ),
+            None,
+        )
+        if matching_index is None:
+            return
 
-        if self._hidden_stack:
-            self._hidden_stack.pop()
+        closing_elements = self._element_stack[matching_index:]
+        del self._element_stack[matching_index:]
+        for element in reversed(closing_elements):
+            self._finish_element(element)
 
     def handle_data(self, data: str) -> None:
-        hidden = self._hidden_stack[-1] if self._hidden_stack else False
+        hidden = (
+            bool(self._element_stack[-1]["hidden"])
+            if self._element_stack
+            else False
+        )
         normalized = " ".join(data.split()).strip()
         if hidden or not normalized:
             return
         self.parts.append(normalized)
-        if self._version_capture_depth > 0:
-            self._current_version_parts.append(normalized)
+        for element in self._element_stack:
+            if not element["hidden"]:
+                element["text_parts"].append(normalized)
+
+    def close(self) -> None:
+        super().close()
+        closing_elements = self._element_stack
+        self._element_stack = []
+        for element in reversed(closing_elements):
+            self._finish_element(element)
 
     @property
     def text(self) -> str:
@@ -1025,14 +1118,6 @@ def extract_visible_version_text(html_text: str) -> str | None:
         if candidate.startswith("Version "):
             return candidate
 
-    for candidate in parser.parts:
-        if candidate.startswith("Version "):
-            return candidate
-
-    match = re.search(r"\bVersion\s+[^\r\n<]+?(?:\s+\([^)]*\))?(?=$)", parser.text)
-    if match is not None:
-        return match.group(0).strip()
-
     return None
 
 
@@ -1069,6 +1154,9 @@ def extract_version_marker(html_text: str) -> dict[str, Any]:
             for marker_text_value in parser.marker_texts
         ],
         "visible_version_texts": list(visible_labels_parser.version_texts),
+        "styled_version_texts": list(
+            visible_labels_parser.styled_version_texts
+        ),
         "expected_marker_text": expected_marker_text,
         "marker_text_matches_identity": (
             parser.marker_count == 1
@@ -1491,6 +1579,12 @@ def verify_live(
     status_visible_version_texts = list(
         status_marker["visible_version_texts"]
     )
+    downloads_styled_version_texts = list(
+        downloads_marker["styled_version_texts"]
+    )
+    status_styled_version_texts = list(
+        status_marker["styled_version_texts"]
+    )
     downloads_version_text = downloads_marker["visible_version_text"]
     status_visible_version_text = status_marker["visible_version_text"]
     status_version_text = status_visible_version_text or status_marker_version_text
@@ -1516,7 +1610,7 @@ def verify_live(
         require(bool(re.fullmatch(r"[0-9]+", status_public_count_value)), failures, "/status data-downloads-public-count is not a non-negative integer")
     require(downloads_version_text is not None, failures, "/downloads missing visible Version text")
     require(
-        bool(downloads_visible_version_texts),
+        bool(downloads_styled_version_texts),
         failures,
         "/downloads missing visible .downloads-version label",
     )
@@ -2099,12 +2193,12 @@ def verify_live(
         )
         if not downloads_visible_labels_match_marker:
             failures.append(
-                "/downloads visible .downloads-version labels do not agree "
+                "/downloads visible Version labels do not agree "
                 "with the unique release marker"
             )
         if status_visible_labels_match_marker is False:
             failures.append(
-                "/status visible .downloads-version labels do not agree with "
+                "/status visible Version labels do not agree with "
                 "the unique release marker"
             )
 
@@ -2282,6 +2376,8 @@ def verify_live(
         "status_redirect_generation_matches_served_manifest": status_generation_matches_served_manifest,
         "downloads_visible_version_texts": downloads_visible_version_texts,
         "status_redirect_visible_version_texts": status_visible_version_texts,
+        "downloads_styled_version_texts": downloads_styled_version_texts,
+        "status_redirect_styled_version_texts": status_styled_version_texts,
         "downloads_visible_labels_match_marker": downloads_visible_labels_match_marker,
         "status_redirect_visible_labels_match_marker": status_visible_labels_match_marker,
         "surface_public_download_counts_match": surface_public_counts_match,

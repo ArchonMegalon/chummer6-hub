@@ -805,10 +805,118 @@ def test_live_contract_rejects_any_stale_visible_downloads_version_label() -> No
     ]
     assert result["downloads_visible_labels_match_marker"] is False
     assert (
-        "/downloads visible .downloads-version labels do not agree with the "
+        "/downloads visible Version labels do not agree with the "
         "unique release marker"
         in failures
     )
+
+
+def test_live_contract_rejects_stale_ordinary_visible_version_label() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_marker_html=(
+            release_marker_html(
+                "Version run-20260630",
+                "g-20260630-test",
+                "1",
+            )
+            + "<p>Version 2026.06.29</p>"
+        ),
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_visible_version_texts"] == [
+        "Version 2026.06.30",
+        "Version 2026.06.29",
+    ]
+    assert result["downloads_styled_version_texts"] == [
+        "Version 2026.06.30",
+    ]
+    assert result["downloads_visible_labels_match_marker"] is False
+    assert (
+        "/downloads visible Version labels do not agree with the unique "
+        "release marker"
+        in failures
+    )
+
+
+def test_live_contract_hidden_void_element_does_not_hide_stale_status_label() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        status_marker_html=(
+            release_marker_html(
+                "Version run-20260630",
+                "g-20260630-test",
+                "1",
+            )
+            + '<input hidden><p>Version 2026.06.29</p>'
+        ),
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["status_redirect_visible_version_texts"] == [
+        "Version 2026.06.29",
+    ]
+    assert result["status_redirect_visible_labels_match_marker"] is False
+    assert (
+        "/status visible Version labels do not agree with the unique release "
+        "marker"
+        in failures
+    )
+
+
+def test_live_contract_ignores_unrelated_visible_version_prose() -> None:
+    module = load_module()
+    unrelated_prose = (
+        "<p>Version history is available in the release notes.</p>"
+        "<p>Version 2026.06.29 was retired after verification.</p>"
+    )
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_marker_html=(
+            release_marker_html(
+                "Version run-20260630",
+                "g-20260630-test",
+                "1",
+            )
+            + unrelated_prose
+        ),
+        status_marker_html=(
+            release_marker_html(
+                "Version run-20260630",
+                "g-20260630-test",
+                "1",
+            )
+            + unrelated_prose
+        ),
+    )
+    try:
+        result, failures = module.verify_live(
+            base_url,
+            timeout=5,
+            expected_release_status="published",
+            expected_release_version="run-20260630",
+            expected_release_channel="public_stable",
+            expected_supportability_state="gold_supported",
+            expected_rollout_state="public_stable",
+        )
+    finally:
+        close_server(server, thread)
+
+    assert failures == []
+    assert result["downloads_visible_version_texts"] == [
+        "Version 2026.06.30",
+    ]
+    assert result["status_redirect_visible_version_texts"] == []
+    assert result["status_redirect_version_text"] == "Version run-20260630"
 
 
 def test_live_contract_rejects_stale_and_current_duplicate_markers() -> None:
