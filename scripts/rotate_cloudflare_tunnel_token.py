@@ -67,6 +67,14 @@ MIGRATION_CANARY_CONTAINERS = (
 # The actual legacy container occupies the future canonical primary name.
 LEGACY_CONTAINER = PRIMARY_SERVICE
 TOKEN_TARGET = "/run/secrets/chummer-run-cloudflared.token"
+CLOUDFLARED_READY_COMMAND = (
+    "cloudflared",
+    "tunnel",
+    "--metrics",
+    "127.0.0.1:2000",
+    "ready",
+)
+CLOUDFLARED_COMPOSE_HEALTH_TEST = ("CMD", *CLOUDFLARED_READY_COMMAND)
 DEFAULT_NETWORK = "chummer5a_default"
 MINIMUM_ACTIVE_CONNECTORS = 2
 MINIMUM_EDGE_CONNECTIONS = 4
@@ -1233,11 +1241,7 @@ class DockerClient:
                 if isinstance(healthcheck, dict)
                 else None
             )
-            if (
-                not isinstance(health_test, list)
-                or "ready" not in health_test
-                or "127.0.0.1:2000" not in health_test
-            ):
+            if health_test != list(CLOUDFLARED_COMPOSE_HEALTH_TEST):
                 raise RotationError("compose_connector_healthcheck_invalid")
             environment = service.get("environment") or {}
             if any(
@@ -1322,6 +1326,7 @@ class DockerClient:
         *,
         expected_source: Path,
         expected_service: str | None = None,
+        require_compose_healthcheck: bool = True,
     ) -> None:
         config = payload.get("Config") or {}
         host_config = payload.get("HostConfig") or {}
@@ -1369,13 +1374,15 @@ class DockerClient:
             raise RotationError("docker_connector_security_options_invalid")
         health = state.get("Health")
         health_test = (config.get("Healthcheck") or {}).get("Test")
-        if (
-            not isinstance(health, dict)
-            or health.get("Status") != "healthy"
-            or not isinstance(health_test, list)
-            or "ready" not in health_test
-        ):
-            raise RotationError("docker_connector_healthcheck_invalid")
+        if require_compose_healthcheck:
+            if (
+                not isinstance(health, dict)
+                or health.get("Status") != "healthy"
+                or health_test != list(CLOUDFLARED_COMPOSE_HEALTH_TEST)
+            ):
+                raise RotationError("docker_connector_healthcheck_invalid")
+        elif health is not None or health_test is not None:
+            raise RotationError("docker_canary_healthcheck_forbidden")
         labels = config.get("Labels") or {}
         if expected_service is not None and (
             labels.get("com.docker.compose.service") != expected_service
@@ -1525,18 +1532,6 @@ class DockerClient:
                 "ALL",
                 "--security-opt",
                 "no-new-privileges:true",
-                "--health-cmd",
-                (
-                    "cloudflared tunnel --metrics 127.0.0.1:2000 ready"
-                ),
-                "--health-interval",
-                "15s",
-                "--health-timeout",
-                "5s",
-                "--health-retries",
-                "3",
-                "--health-start-period",
-                "15s",
                 "--mount",
                 (
                     "type=bind,source="
@@ -1592,7 +1587,9 @@ class DockerClient:
         self._verify_token_file_container(
             payload,
             expected_source=token_file,
+            require_compose_healthcheck=False,
         )
+        self.runner.run(("docker", "exec", name, *CLOUDFLARED_READY_COMMAND))
 
     def verify_canary_running(self) -> None:
         self._verify_canary_running(

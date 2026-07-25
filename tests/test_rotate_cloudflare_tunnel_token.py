@@ -889,6 +889,109 @@ def test_docker_runtime_contract_binds_image_health_identity_and_mount(
             expected_source=current,
             expected_service=module.PRIMARY_SERVICE,
         )
+    payload["HostConfig"]["CapDrop"] = ["ALL"]
+    payload["Config"].pop("Healthcheck")
+    payload["State"] = {"Status": "running"}
+    client._verify_token_file_container(
+        payload,
+        expected_source=current,
+        require_compose_healthcheck=False,
+    )
+    payload["Config"]["Healthcheck"] = {
+        "Test": [
+            "CMD-SHELL",
+            "cloudflared tunnel --metrics 127.0.0.1:2000 ready",
+        ]
+    }
+    payload["State"]["Health"] = {"Status": "unhealthy"}
+    with pytest.raises(
+        module.RotationError,
+        match="canary_healthcheck_forbidden",
+    ):
+        client._verify_token_file_container(
+            payload,
+            expected_source=current,
+            require_compose_healthcheck=False,
+        )
+
+
+def test_distroless_canary_uses_shell_free_exec_readiness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = owner_only_directory(tmp_path / "safe")
+    current = token_file(root)
+    inputs = module.RotationInputs(
+        repository_root=ROOT,
+        compose_file=ROOT / "docker-compose.public-edge.yml",
+        compose_env_file=compose_env_file(root, current),
+        credentials_file=credentials_file(root),
+        token_file=current,
+        receipt_file=root / "receipt.json",
+        tunnel_id=TUNNEL_ID,
+        tunnel_name="chummer-run",
+    )
+
+    class RecordingRunner(FakeRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.commands: list[tuple[str, ...]] = []
+
+        def run(self, argv: Any, **kwargs: Any) -> Any:
+            command = tuple(argv)
+            self.commands.append(command)
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+    runner = RecordingRunner()
+    client = module.DockerClient(
+        runner=runner,
+        inputs=inputs,
+        environment=module.ComposeEnvironment(
+            token_file=current,
+            runtime_uid=os.geteuid(),
+            runtime_gid=os.getegid(),
+            network="chummer5a_default",
+        ),
+        run_id="run",
+    )
+    canary = module.MIGRATION_CANARY_CONTAINERS[0]
+    client.start_migration_canary(canary, current)
+    start_command = runner.commands[-1]
+    assert start_command[:3] == ("docker", "run", "--detach")
+    assert not any(value.startswith("--health") for value in start_command)
+
+    monkeypatch.setattr(
+        client,
+        "_inspect_raw",
+        lambda *args, **kwargs: {
+            "Config": {
+                "Labels": {
+                    "run.chummer.cloudflare-migration": "run",
+                }
+            },
+            "State": {"Status": "running"},
+        },
+    )
+    validation_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        client,
+        "_verify_token_file_container",
+        lambda *args, **kwargs: validation_calls.append(kwargs),
+    )
+    client.verify_migration_canary_running(canary)
+
+    assert validation_calls == [
+        {
+            "expected_source": current,
+            "require_compose_healthcheck": False,
+        }
+    ]
+    assert runner.commands[-1] == (
+        "docker",
+        "exec",
+        canary,
+        *module.CLOUDFLARED_READY_COMMAND,
+    )
 
 
 def test_every_compose_command_uses_stable_project_and_authority(

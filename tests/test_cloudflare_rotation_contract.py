@@ -71,8 +71,14 @@ def test_compose_defines_two_independent_hardened_token_file_connectors() -> Non
         assert "--token" not in command
         assert TOKEN_TARGET in command
         health = service["healthcheck"]["test"]
-        assert "ready" in health
-        assert "127.0.0.1:2000" in health
+        assert health == [
+            "CMD",
+            "cloudflared",
+            "tunnel",
+            "--metrics",
+            "127.0.0.1:2000",
+            "ready",
+        ]
         mounts = [
             mount
             for mount in service["volumes"]
