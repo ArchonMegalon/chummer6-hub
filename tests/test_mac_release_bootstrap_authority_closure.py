@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 from pathlib import Path
+import stat
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,20 +135,33 @@ def test_private_probe_token_is_separated_from_redacted_handoff() -> None:
     assert (
         '--desktop-executable-receipt "$staged_desktop_executable_receipt"' in main
     )
-    presentation_pin = main.index(
-        'log "pinning external Presentation visual, workflow, and executable candidate receipts"'
+    presentation_request = main.index(
+        'log "materializing the exact candidate-bound Presentation receipt request before any upload"'
     )
-    assert capture < presentation_pin < delete < handoff
-    assert 'getattr(os, "O_NOFOLLOW", 0)' in main[presentation_pin:delete]
-    assert 'os.O_EXCL' in main[presentation_pin:delete]
-    assert 'before.st_uid != os.geteuid()' in main[presentation_pin:delete]
-    assert 'before.st_nlink != 1' in main[presentation_pin:delete]
-    assert 'before.st_mode & 0o022' in main[presentation_pin:delete]
+    presentation_wait = main.index(
+        "wait_for_presentation_candidate_receipts",
+        presentation_request,
+    )
+    presentation_pin = main.index(
+        'log "validating and pinning exact Presentation receipts before any upload"'
+    )
+    upload = main.index('upload_release_bundle_http \\\n', presentation_pin)
+    assert presentation_request < presentation_wait < presentation_pin < upload < capture
+    assert capture < delete < handoff
+    pin_start = source.index("pin_presentation_candidate_receipts() {")
+    pin_end = source.index("\nmain() {", pin_start)
+    pin = source[pin_start:pin_end]
+    assert 'getattr(os, "O_NOFOLLOW", 0)' in pin
+    assert 'os.O_EXCL' in pin
+    assert 'before.st_uid != os.geteuid()' in pin
+    assert 'before.st_nlink != 1' in pin
+    assert 'before.st_mode & 0o022' in pin
+    assert "campaign_operability_candidate_binding" in pin
     assert '--stage-response "$ui_repo/$durable_stage_response"' in main
     assert 'STAGED_RELEASE_FINALIZER_HANDOFF.generated.json' in main
 
 
-def test_http_bootstrap_requires_external_presentation_candidate_receipts() -> None:
+def test_http_bootstrap_materializes_presentation_request_after_candidate_before_upload() -> None:
     source = load_bootstrap()
     main = staging_main_segment(source)
     for variable in (
@@ -153,9 +171,270 @@ def test_http_bootstrap_requires_external_presentation_candidate_receipts() -> N
     ):
         assert f'local {variable.lower()}=' not in main
         assert variable in main
-        requirement = main.index(f'{variable} must name an absolute caller-owned')
-        first_clone = main.index("clone_or_update")
-        assert requirement < first_clone
+        assert f"{variable} must name an absolute caller-owned" not in main
+
+    authority = main.index(
+        'log "materializing review-required Registry authority for the exact generation-projected nightly"'
+    )
+    request = main.index(
+        'log "materializing the exact candidate-bound Presentation receipt request before any upload"'
+    )
+    wait = main.index("wait_for_presentation_candidate_receipts", request)
+    pin = main.index(
+        'log "validating and pinning exact Presentation receipts before any upload"',
+        wait,
+    )
+    upload = main.index('upload_release_bundle_http \\\n', pin)
+    assert authority < request < wait < pin < upload
+    assert (
+        'local presentation_receipt_intake_dir="$work_root/.c/presentation-candidate-receipts"'
+        in main
+    )
+    assert 'CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS:-1800' in main
+    assert 'CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS:-5' in main
+    assert "PRESENTATION_CANDIDATE_RECEIPT_REQUEST.generated.json" in main
+
+
+def run_sourced(command: str, *arguments: str) -> subprocess.CompletedProcess[str]:
+    environment = dict(os.environ)
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            f'source "$1"; RELEASE_PYTHON_BIN=python3; {command}',
+            "presentation-receipt-test",
+            str(BOOTSTRAP),
+            *arguments,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+
+def presentation_fixture(tmp_path: Path) -> dict[str, object]:
+    release_version = "run-candidate-proof"
+    registry_commit = "a" * 40
+    support_owner = "chummer-release-operations"
+    scope = {
+        "releaseVersion": release_version,
+        "supportOwner": support_owner,
+        "platforms": [
+            {
+                "platform": "macos",
+                "rid": "osx-arm64",
+                "primaryHead": "avalonia",
+                "fallbackHeads": ["blazor-desktop"],
+            }
+        ],
+    }
+    scope_path = tmp_path / "scope.json"
+    scope_raw = (json.dumps(scope, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    scope_path.write_bytes(scope_raw)
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_bytes(
+        (json.dumps({"version": release_version}, sort_keys=True) + "\n").encode()
+    )
+    decision_path = tmp_path / "decision.json"
+    decision_path.write_bytes(b'{"status":"review_required"}\n')
+    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    decision_sha256 = hashlib.sha256(decision_path.read_bytes()).hexdigest()
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "manifestSha256": manifest_sha256,
+                "releaseDecisionSha256": decision_sha256,
+                "registryCommit": registry_commit,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    binding = {
+        "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+        "contract_version": 1,
+        "release_version": release_version,
+        "release_scope_decision_sha256": hashlib.sha256(scope_raw).hexdigest(),
+        "manifest_sha256": manifest_sha256,
+        "authority_snapshot_sha256": hashlib.sha256(
+            snapshot_path.read_bytes()
+        ).hexdigest(),
+        "release_decision_sha256": decision_sha256,
+        "registry_commit": registry_commit,
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "primary_head": "avalonia",
+        "required_heads": ["avalonia", "blazor-desktop"],
+    }
+    sources: list[Path] = []
+    for evidence_id in ("desktop_visual", "desktop_workflow", "desktop_executable"):
+        path = tmp_path / f"{evidence_id}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "contract_name": f"fixture.{evidence_id}",
+                    "status": "pass",
+                    "releaseVersion": release_version,
+                    "campaign_operability_candidate_binding": binding,
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        path.chmod(0o600)
+        sources.append(path)
+    return {
+        "release_version": release_version,
+        "registry_commit": registry_commit,
+        "support_owner": support_owner,
+        "scope_path": scope_path,
+        "scope_sha256": hashlib.sha256(scope_raw).hexdigest(),
+        "manifest_path": manifest_path,
+        "snapshot_path": snapshot_path,
+        "decision_path": decision_path,
+        "binding": binding,
+        "sources": sources,
+    }
+
+
+def test_presentation_request_exposes_exact_post_build_binding_without_release_mutation(
+    tmp_path: Path,
+) -> None:
+    fixture = presentation_fixture(tmp_path)
+    request = tmp_path / "request.json"
+    presentation_repo = tmp_path / "presentation"
+    presentation_repo.mkdir(mode=0o700)
+    outputs = [tmp_path / f"output-{index}.json" for index in range(3)]
+    result = run_sourced(
+        'write_presentation_candidate_receipt_request "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}"',
+        str(request),
+        str(fixture["scope_path"]),
+        str(fixture["scope_sha256"]),
+        str(fixture["manifest_path"]),
+        str(fixture["snapshot_path"]),
+        str(fixture["decision_path"]),
+        str(fixture["release_version"]),
+        str(fixture["registry_commit"]),
+        str(fixture["support_owner"]),
+        str(presentation_repo),
+        *(str(path) for path in outputs),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert stat.S_IMODE(request.stat().st_mode) == 0o600
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    assert payload["status"] == "action_required"
+    assert payload["countsAsBuildEvidence"] is False
+    assert payload["countsAsPublicationEvidence"] is False
+    assert payload["candidateBinding"] == fixture["binding"]
+    assert [row["outputPath"] for row in payload["producers"]] == [
+        str(path) for path in outputs
+    ]
+    assert "ticket" not in request.read_text(encoding="utf-8").lower()
+
+
+def test_presentation_wait_is_bounded_and_rejects_unsafe_paths(
+    tmp_path: Path,
+) -> None:
+    request = tmp_path / "request.json"
+    request.write_text("{}\n", encoding="utf-8")
+    receipts = [tmp_path / f"receipt-{index}.json" for index in range(3)]
+    command = (
+        'wait_for_presentation_candidate_receipts '
+        '"$2" 0 1 "$3" "$4" "$5"'
+    )
+    missing = run_sourced(
+        command,
+        str(request),
+        *(str(path) for path in receipts),
+    )
+
+    assert missing.returncode != 0
+    assert str(request) in missing.stderr
+    assert "before timeout" in missing.stderr
+
+    for path in receipts:
+        path.write_text("{}\n", encoding="utf-8")
+    accepted = run_sourced(
+        command,
+        str(request),
+        *(str(path) for path in receipts),
+    )
+    assert accepted.returncode == 0, accepted.stderr
+
+    receipts[1].unlink()
+    receipts[1].symlink_to(receipts[0])
+    unsafe = run_sourced(
+        command,
+        str(request),
+        *(str(path) for path in receipts),
+    )
+    assert unsafe.returncode != 0
+    assert "became unsafe" in unsafe.stderr
+
+
+def test_presentation_receipts_are_exactly_validated_before_atomic_pin(
+    tmp_path: Path,
+) -> None:
+    fixture = presentation_fixture(tmp_path)
+    sources = list(fixture["sources"])
+    target_dir = tmp_path / "pinned"
+    target_dir.mkdir(mode=0o700)
+    targets = [target_dir / path.name for path in sources]
+    command = (
+        'pin_presentation_candidate_receipts '
+        '"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" '
+        '"${10}" "${11}" "${12}" "${13}" "${14}"'
+    )
+    arguments = [
+        str(sources[0]),
+        str(targets[0]),
+        str(sources[1]),
+        str(targets[1]),
+        str(sources[2]),
+        str(targets[2]),
+        str(fixture["scope_path"]),
+        str(fixture["scope_sha256"]),
+        str(fixture["manifest_path"]),
+        str(fixture["snapshot_path"]),
+        str(fixture["decision_path"]),
+        str(fixture["release_version"]),
+        str(fixture["registry_commit"]),
+    ]
+    accepted = run_sourced(command, *arguments)
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert [path.read_bytes() for path in targets] == [
+        path.read_bytes() for path in sources
+    ]
+    assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in targets)
+
+    tampered_payload = json.loads(sources[1].read_text(encoding="utf-8"))
+    tampered_payload["campaign_operability_candidate_binding"][
+        "manifest_sha256"
+    ] = "0" * 64
+    sources[1].write_text(
+        json.dumps(tampered_payload, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    sources[1].chmod(0o600)
+    rejected_dir = tmp_path / "rejected"
+    rejected_dir.mkdir(mode=0o700)
+    rejected_targets = [rejected_dir / path.name for path in sources]
+    rejected_arguments = arguments.copy()
+    rejected_arguments[1] = str(rejected_targets[0])
+    rejected_arguments[3] = str(rejected_targets[1])
+    rejected_arguments[5] = str(rejected_targets[2])
+    rejected = run_sourced(command, *rejected_arguments)
+
+    assert rejected.returncode != 0
+    assert "does not bind the exact passing candidate" in rejected.stderr
+    assert not any(path.exists() for path in rejected_targets)
 
 
 def test_exact_executing_bootstrap_bytes_are_pinned_into_handoff_workspace() -> None:

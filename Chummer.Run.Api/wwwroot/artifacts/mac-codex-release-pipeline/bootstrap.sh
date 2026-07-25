@@ -5313,6 +5313,386 @@ PY
   printf 'release_stage_only_path=%s\n' "$output_path"
 }
 
+write_presentation_candidate_receipt_request() {
+  local output_path="$1"
+  local release_scope_path="$2"
+  local release_scope_sha256="$3"
+  local manifest_path="$4"
+  local snapshot_path="$5"
+  local decision_path="$6"
+  local release_version="$7"
+  local registry_commit="$8"
+  local support_owner="$9"
+  local presentation_repo="${10}"
+  local visual_output="${11}"
+  local workflow_output="${12}"
+  local executable_output="${13}"
+
+  command "$RELEASE_PYTHON_BIN" - \
+    "$output_path" \
+    "$release_scope_path" \
+    "$release_scope_sha256" \
+    "$manifest_path" \
+    "$snapshot_path" \
+    "$decision_path" \
+    "$release_version" \
+    "$registry_commit" \
+    "$support_owner" \
+    "$presentation_repo" \
+    "$visual_output" \
+    "$workflow_output" \
+    "$executable_output" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+
+(
+    output_path,
+    release_scope_path,
+    release_scope_sha256,
+    manifest_path,
+    snapshot_path,
+    decision_path,
+    release_version,
+    registry_commit,
+    support_owner,
+    presentation_repo,
+    visual_output,
+    workflow_output,
+    executable_output,
+) = (Path(value) if index in {0, 1, 3, 4, 5, 9, 10, 11, 12} else value
+     for index, value in enumerate(sys.argv[1:]))
+
+sha256 = re.compile(r"^[0-9a-f]{64}$")
+git_sha = re.compile(r"^[0-9a-f]{40}$")
+if not sha256.fullmatch(release_scope_sha256):
+    raise SystemExit("Presentation request release-scope SHA-256 is invalid")
+if not git_sha.fullmatch(registry_commit):
+    raise SystemExit("Presentation request Registry commit is invalid")
+if any(not path.is_absolute() for path in (visual_output, workflow_output, executable_output)):
+    raise SystemExit("Presentation receipt output paths must be absolute")
+if len({visual_output, workflow_output, executable_output}) != 3:
+    raise SystemExit("Presentation receipt output paths must be distinct")
+
+scope_raw = release_scope_path.read_bytes()
+if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
+    raise SystemExit("Presentation request release-scope bytes do not match authority")
+scope = json.loads(scope_raw)
+manifest_raw = manifest_path.read_bytes()
+snapshot_raw = snapshot_path.read_bytes()
+decision_raw = decision_path.read_bytes()
+manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
+snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
+decision_sha256 = hashlib.sha256(decision_raw).hexdigest()
+snapshot = json.loads(snapshot_raw)
+platforms = scope.get("platforms") if isinstance(scope, dict) else None
+if (
+    not isinstance(platforms, list)
+    or len(platforms) != 1
+    or not isinstance(platforms[0], dict)
+):
+    raise SystemExit("Presentation request requires one exact approved platform")
+platform = platforms[0]
+required_heads = [platform.get("primaryHead"), *(platform.get("fallbackHeads") or [])]
+binding = {
+    "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+    "contract_version": 1,
+    "release_version": release_version,
+    "release_scope_decision_sha256": release_scope_sha256,
+    "manifest_sha256": manifest_sha256,
+    "authority_snapshot_sha256": snapshot_sha256,
+    "release_decision_sha256": decision_sha256,
+    "registry_commit": registry_commit,
+    "platform": platform.get("platform"),
+    "rid": platform.get("rid"),
+    "primary_head": platform.get("primaryHead"),
+    "required_heads": required_heads,
+}
+if (
+    scope.get("releaseVersion") != release_version
+    or scope.get("supportOwner") != support_owner
+    or snapshot.get("manifestSha256") != manifest_sha256
+    or snapshot.get("releaseDecisionSha256") != decision_sha256
+    or snapshot.get("registryCommit") != registry_commit
+):
+    raise SystemExit("Presentation request inputs do not bind one exact candidate")
+
+common_environment = {
+    "CHUMMER_CAMPAIGN_OPERABILITY_PREVIEW_MODE": "1",
+    "CHUMMER_CAMPAIGN_OPERABILITY_APPROVED_SCOPE_PATH": str(release_scope_path),
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_SCOPE_SHA256": release_scope_sha256,
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_RELEASE_VERSION": release_version,
+    "CHUMMER_CAMPAIGN_OPERABILITY_REGISTRY_REVIEW_SEED_PATH": str(snapshot_path),
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_REGISTRY_REVIEW_SEED_SHA256": snapshot_sha256,
+    "CHUMMER_CAMPAIGN_OPERABILITY_BOUNDED_OWNER": support_owner,
+    "CHUMMER_CAMPAIGN_OPERABILITY_NEXT_ACTIONS_JSON": json.dumps(
+        ["Complete owner-only review, Registry CAS, activation, and public convergence for these exact bytes."],
+        separators=(",", ":"),
+    ),
+    "CHUMMER_CAMPAIGN_OPERABILITY_ALLOW_RAW_FAIL_DECLARATION": "0",
+}
+payload = {
+    "contractName": "chummer.presentation-candidate-receipt-request/v1",
+    "contractVersion": 1,
+    "status": "action_required",
+    "releaseVersion": release_version,
+    "candidateBinding": binding,
+    "commonEnvironment": common_environment,
+    "presentationRepository": str(presentation_repo),
+    "proofInputRoot": str(presentation_repo / ".codex-studio" / "published"),
+    "producers": [
+        {
+            "evidenceId": "desktop_visual",
+            "script": "scripts/ai/milestones/materialize-desktop-visual-familiarity-exit-gate.sh",
+            "outputPath": str(visual_output),
+            "environment": {
+                "CHUMMER_DESKTOP_VISUAL_OUTPUT_PATH": str(visual_output),
+                "CHUMMER_DESKTOP_VISUAL_RELEASE_CHANNEL_PATH": str(manifest_path),
+            },
+        },
+        {
+            "evidenceId": "desktop_workflow",
+            "script": "scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh",
+            "outputPath": str(workflow_output),
+            "environment": {
+                "CHUMMER_DESKTOP_WORKFLOW_OUTPUT_PATH": str(workflow_output),
+                "CHUMMER_DESKTOP_WORKFLOW_EXTERNAL_RELEASE_CHANNEL_PATH": str(manifest_path),
+                "CHUMMER_DESKTOP_WORKFLOW_PROOF_INPUT_ROOT": str(
+                    presentation_repo / ".codex-studio" / "published"
+                ),
+            },
+        },
+        {
+            "evidenceId": "desktop_executable",
+            "script": "scripts/ai/milestones/materialize-desktop-executable-exit-gate.sh",
+            "outputPath": str(executable_output),
+            "environment": {
+                "CHUMMER_DESKTOP_EXECUTABLE_GATE_PATH": str(executable_output),
+                "CHUMMER_DESKTOP_EXECUTABLE_RELEASE_CHANNEL_PATH": str(manifest_path),
+            },
+        },
+    ],
+    "countsAsBuildEvidence": False,
+    "countsAsPublicationEvidence": False,
+    "operatorAction": (
+        "Run all three reviewed Presentation producers with the common and producer-specific "
+        "environment, then leave their distinct passing receipts at the declared output paths."
+    ),
+}
+output_path.parent.mkdir(parents=True, exist_ok=True)
+raw = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+descriptor = os.open(
+    output_path,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+    0o600,
+)
+with os.fdopen(descriptor, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+}
+
+wait_for_presentation_candidate_receipts() {
+  local request_path="$1"
+  local wait_seconds="$2"
+  local poll_seconds="$3"
+  shift 3
+  local receipt_paths=("$@")
+
+  [[ "$wait_seconds" =~ ^[0-9]+$ ]] \
+    && (( wait_seconds >= 0 && wait_seconds <= 86400 )) \
+    || die "CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS must be an integer from 0 through 86400"
+  [[ "$poll_seconds" =~ ^[0-9]+$ ]] \
+    && (( poll_seconds >= 1 && poll_seconds <= 60 )) \
+    || die "CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS must be an integer from 1 through 60"
+
+  local deadline=$(( SECONDS + wait_seconds ))
+  local receipt_path
+  log "waiting up to ${wait_seconds}s for exact candidate-bound Presentation receipts; request: $request_path"
+  while true; do
+    local ready=1
+    for receipt_path in "${receipt_paths[@]}"; do
+      if [[ -L "$receipt_path" || ( -e "$receipt_path" && ! -f "$receipt_path" ) ]]; then
+        die "Presentation candidate receipt path became unsafe: $receipt_path"
+      fi
+      [[ -f "$receipt_path" ]] || ready=0
+    done
+    if (( ready == 1 )); then
+      return 0
+    fi
+    (( SECONDS < deadline )) \
+      || die "Presentation candidate receipts were not materialized before timeout. Request: $request_path"
+    sleep "$poll_seconds"
+  done
+}
+
+pin_presentation_candidate_receipts() {
+  local visual_source="$1"
+  local visual_target="$2"
+  local workflow_source="$3"
+  local workflow_target="$4"
+  local executable_source="$5"
+  local executable_target="$6"
+  local release_scope_path="$7"
+  local release_scope_sha256="$8"
+  local manifest_path="$9"
+  local snapshot_path="${10}"
+  local decision_path="${11}"
+  local release_version="${12}"
+  local registry_commit="${13}"
+
+  command "$RELEASE_PYTHON_BIN" - \
+    "$visual_source" "$visual_target" \
+    "$workflow_source" "$workflow_target" \
+    "$executable_source" "$executable_target" \
+    "$release_scope_path" "$release_scope_sha256" \
+    "$manifest_path" "$snapshot_path" "$decision_path" \
+    "$release_version" "$registry_commit" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+
+pairs = [
+    (Path(sys.argv[1]), Path(sys.argv[2]), "desktop_visual"),
+    (Path(sys.argv[3]), Path(sys.argv[4]), "desktop_workflow"),
+    (Path(sys.argv[5]), Path(sys.argv[6]), "desktop_executable"),
+]
+release_scope_path = Path(sys.argv[7])
+release_scope_sha256 = sys.argv[8]
+manifest_path = Path(sys.argv[9])
+snapshot_path = Path(sys.argv[10])
+decision_path = Path(sys.argv[11])
+release_version = sys.argv[12]
+registry_commit = sys.argv[13]
+
+scope_raw = release_scope_path.read_bytes()
+if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
+    raise SystemExit("Presentation release-scope bytes do not match authority")
+scope = json.loads(scope_raw)
+platforms = scope.get("platforms") if isinstance(scope, dict) else None
+if (
+    not isinstance(platforms, list)
+    or len(platforms) != 1
+    or not isinstance(platforms[0], dict)
+):
+    raise SystemExit("Presentation receipts require one exact approved platform")
+platform = platforms[0]
+expected_binding = {
+    "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+    "contract_version": 1,
+    "release_version": release_version,
+    "release_scope_decision_sha256": release_scope_sha256,
+    "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    "authority_snapshot_sha256": hashlib.sha256(snapshot_path.read_bytes()).hexdigest(),
+    "release_decision_sha256": hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+    "registry_commit": registry_commit,
+    "platform": platform.get("platform"),
+    "rid": platform.get("rid"),
+    "primary_head": platform.get("primaryHead"),
+    "required_heads": [platform.get("primaryHead"), *(platform.get("fallbackHeads") or [])],
+}
+
+validated: list[tuple[Path, bytes]] = []
+digests: set[str] = set()
+for source, target, evidence_id in pairs:
+    before = source.lstat()
+    if (
+        not source.is_absolute()
+        or not stat.S_ISREG(before.st_mode)
+        or stat.S_ISLNK(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or before.st_nlink != 1
+        or before.st_mode & 0o022
+        or not 1 <= before.st_size <= 8 * 1024 * 1024
+    ):
+        raise SystemExit(f"unsafe Presentation candidate receipt: {source.name}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(source, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+        ):
+            raise SystemExit(f"Presentation candidate receipt changed before read: {source.name}")
+        chunks: list[bytes] = []
+        remaining = 8 * 1024 * 1024 + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (
+        len(raw) != before.st_size
+        or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+        != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+    ):
+        raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SystemExit(f"{evidence_id} Presentation receipt is not valid JSON") from error
+    release_aliases = [
+        payload[name]
+        for name in ("releaseVersion", "release_version")
+        if name in payload
+    ] if isinstance(payload, dict) else []
+    if (
+        not isinstance(payload, dict)
+        or payload.get("status") != "pass"
+        or not release_aliases
+        or any(value != release_version for value in release_aliases)
+        or payload.get("campaign_operability_candidate_binding") != expected_binding
+    ):
+        raise SystemExit(
+            f"{evidence_id} Presentation receipt does not bind the exact passing candidate"
+        )
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest in digests:
+        raise SystemExit("Presentation visual, workflow, and executable receipts must be distinct")
+    digests.add(digest)
+    validated.append((target, raw))
+
+created: list[Path] = []
+try:
+    for target, raw in validated:
+        output = os.open(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+            0o600,
+        )
+        created.append(target)
+        with os.fdopen(output, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+except BaseException:
+    for target in created:
+        try:
+            target.unlink()
+        except FileNotFoundError:
+            pass
+    raise
+PY
+}
+
 main() {
   install_bootstrap_cleanup_traps
 
@@ -5394,12 +5774,6 @@ main() {
     fi
     [[ "$publish_mode" == "http" ]] \
       || die "same-generation release-authority closure requires staged HTTP publication"
-    [[ "$presentation_desktop_visual_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
-    [[ "$presentation_desktop_workflow_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
-    [[ "$presentation_desktop_executable_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
   fi
 
   require_all_reviewed_commit_pins
@@ -5427,6 +5801,35 @@ main() {
   require_cmd ditto
 
   local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
+  local presentation_receipt_intake_dir="$work_root/.c/presentation-candidate-receipts"
+  local presentation_receipt_wait_seconds="${CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS:-1800}"
+  local presentation_receipt_poll_seconds="${CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS:-5}"
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    presentation_desktop_visual_source="${presentation_desktop_visual_source:-$presentation_receipt_intake_dir/DESKTOP_VISUAL_CANDIDATE.generated.json}"
+    presentation_desktop_workflow_source="${presentation_desktop_workflow_source:-$presentation_receipt_intake_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json}"
+    presentation_desktop_executable_source="${presentation_desktop_executable_source:-$presentation_receipt_intake_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json}"
+    local presentation_source_path
+    for presentation_source_path in \
+      "$presentation_desktop_visual_source" \
+      "$presentation_desktop_workflow_source" \
+      "$presentation_desktop_executable_source"; do
+      [[ "$presentation_source_path" == /* ]] \
+        || die "Presentation candidate receipt paths must be absolute"
+      [[ ! -L "$presentation_source_path" \
+          && ( ! -e "$presentation_source_path" || -f "$presentation_source_path" ) ]] \
+        || die "Presentation candidate receipt path is unsafe: $presentation_source_path"
+    done
+    [[ "$presentation_desktop_visual_source" != "$presentation_desktop_workflow_source" \
+        && "$presentation_desktop_visual_source" != "$presentation_desktop_executable_source" \
+        && "$presentation_desktop_workflow_source" != "$presentation_desktop_executable_source" ]] \
+      || die "Presentation candidate receipt paths must be distinct"
+    [[ "$presentation_receipt_wait_seconds" =~ ^[0-9]+$ ]] \
+      && (( presentation_receipt_wait_seconds >= 0 && presentation_receipt_wait_seconds <= 86400 )) \
+      || die "CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS must be an integer from 0 through 86400"
+    [[ "$presentation_receipt_poll_seconds" =~ ^[0-9]+$ ]] \
+      && (( presentation_receipt_poll_seconds >= 1 && presentation_receipt_poll_seconds <= 60 )) \
+      || die "CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS must be an integer from 1 through 60"
+  fi
   local ui_ref="${CHUMMER_UI_REF:-main}"
   local core_ref="${CHUMMER_CORE_REF:-main}"
   local hub_ref="${CHUMMER_HUB_REF:-main}"
@@ -5543,6 +5946,9 @@ main() {
 
   mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos" "$temp_root"
   chmod 700 "$work_root" "$work_root/.c" 2>/dev/null || true
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    mkdir -m 700 "$presentation_receipt_intake_dir"
+  fi
   local pinned_executed_bootstrap="$work_root/.c/mac-release-bootstrap.executed.sh"
   command "$RELEASE_PYTHON_BIN" - "$executed_bootstrap_path" "$pinned_executed_bootstrap" <<'PY'
 from __future__ import annotations
@@ -6472,6 +6878,62 @@ PY
     return 0
   fi
 
+  local expected_manifest_sha256
+  local expected_release_decision_sha256
+  local expected_authority_snapshot_sha256
+  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
+  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  expected_authority_snapshot_sha256="$(file_sha256 "$ui_repo/$release_evidence_dir/SNAPSHOT.json")"
+  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_authority_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "candidate identity lacks immutable manifest, authority snapshot, or review-decision bindings"
+
+  local presentation_receipt_request="$ui_repo/$release_evidence_dir/PRESENTATION_CANDIDATE_RECEIPT_REQUEST.generated.json"
+  log "materializing the exact candidate-bound Presentation receipt request before any upload"
+  write_presentation_candidate_receipt_request \
+    "$presentation_receipt_request" \
+    "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    "$release_scope_expected_sha256" \
+    "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    "$release_version" \
+    "$release_authority_registry_commit" \
+    "$approved_release_support_owner" \
+    "$ui_repo" \
+    "$presentation_desktop_visual_source" \
+    "$presentation_desktop_workflow_source" \
+    "$presentation_desktop_executable_source"
+  wait_for_presentation_candidate_receipts \
+    "$presentation_receipt_request" \
+    "$presentation_receipt_wait_seconds" \
+    "$presentation_receipt_poll_seconds" \
+    "$presentation_desktop_visual_source" \
+    "$presentation_desktop_workflow_source" \
+    "$presentation_desktop_executable_source"
+
+  local staged_presentation_dir="$ui_repo/$release_evidence_dir/presentation/$release_version"
+  local staged_desktop_visual_receipt="$staged_presentation_dir/DESKTOP_VISUAL_CANDIDATE.generated.json"
+  local staged_desktop_workflow_receipt="$staged_presentation_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
+  local staged_desktop_executable_receipt="$staged_presentation_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
+  [[ ! -e "$staged_presentation_dir" && ! -L "$staged_presentation_dir" ]] \
+    || die "staged Presentation receipt directory already exists: $staged_presentation_dir"
+  mkdir -p "$(dirname "$staged_presentation_dir")"
+  mkdir -m 700 "$staged_presentation_dir"
+  log "validating and pinning exact Presentation receipts before any upload"
+  pin_presentation_candidate_receipts \
+    "$presentation_desktop_visual_source" "$staged_desktop_visual_receipt" \
+    "$presentation_desktop_workflow_source" "$staged_desktop_workflow_receipt" \
+    "$presentation_desktop_executable_source" "$staged_desktop_executable_receipt" \
+    "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    "$release_scope_expected_sha256" \
+    "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    "$release_version" \
+    "$release_authority_registry_commit"
+
   case "$publish_mode" in
     http)
       log "uploading release bundle via staged HTTP session"
@@ -6567,14 +7029,6 @@ PY
     || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS must be an integer from 1 through 10"
   [[ -f "$live_convergence_verifier" && ! -L "$live_convergence_verifier" ]] \
     || die "live release convergence verifier is missing or unsafe: $live_convergence_verifier"
-  local expected_manifest_sha256
-  local expected_release_decision_sha256
-  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
-  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
-  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
-      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "staged release identity lacks immutable manifest or review-decision bindings"
-
   local staged_probe_token_path
   staged_probe_token_path="$(mktemp "$TMPDIR/chummer-staged-probe-token.XXXXXX")"
   chmod 600 "$staged_probe_token_path"
@@ -6627,10 +7081,6 @@ PY
   require_cmd node
   require_cmd npm
   require_cmd npx
-  local expected_authority_snapshot_sha256
-  expected_authority_snapshot_sha256="$(file_sha256 "$ui_repo/$release_evidence_dir/SNAPSHOT.json")"
-  [[ "$expected_authority_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "staged release identity lacks the exact predecessor authority snapshot digest"
   local staged_ui_frame_output_dir="$ui_repo/$release_evidence_dir/ui-frame/$release_version"
   local staged_ui_frame_receipt="$staged_ui_frame_output_dir/UI_FRAME_INTEGRITY.generated.json"
   [[ ! -e "$staged_ui_frame_output_dir" && ! -L "$staged_ui_frame_output_dir" ]] \
@@ -6660,83 +7110,6 @@ PY
   [[ "$(jq -r '.status // empty' "$staged_ui_frame_receipt")" == "pass" \
       && "$(jq -r '.verdict // empty' "$staged_ui_frame_receipt")" == "READY" ]] \
     || die "candidate-bound staged UI-frame receipt did not pass"
-  local staged_presentation_dir="$ui_repo/$release_evidence_dir/presentation/$release_version"
-  local staged_desktop_visual_receipt="$staged_presentation_dir/DESKTOP_VISUAL_CANDIDATE.generated.json"
-  local staged_desktop_workflow_receipt="$staged_presentation_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
-  local staged_desktop_executable_receipt="$staged_presentation_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
-  [[ ! -e "$staged_presentation_dir" && ! -L "$staged_presentation_dir" ]] \
-    || die "staged Presentation receipt directory already exists: $staged_presentation_dir"
-  mkdir -p "$(dirname "$staged_presentation_dir")"
-  mkdir -m 700 "$staged_presentation_dir"
-  log "pinning external Presentation visual, workflow, and executable candidate receipts"
-  command "$RELEASE_PYTHON_BIN" - \
-    "$presentation_desktop_visual_source" "$staged_desktop_visual_receipt" \
-    "$presentation_desktop_workflow_source" "$staged_desktop_workflow_receipt" \
-    "$presentation_desktop_executable_source" "$staged_desktop_executable_receipt" <<'PY'
-from __future__ import annotations
-
-import os
-from pathlib import Path
-import stat
-import sys
-
-if len(sys.argv) != 7:
-    raise SystemExit("exactly three Presentation source/target pairs are required")
-
-for source_text, target_text in zip(sys.argv[1::2], sys.argv[2::2], strict=True):
-    source = Path(source_text)
-    target = Path(target_text)
-    before = source.lstat()
-    if (
-        not stat.S_ISREG(before.st_mode)
-        or stat.S_ISLNK(before.st_mode)
-        or before.st_uid != os.geteuid()
-        or before.st_nlink != 1
-        or before.st_mode & 0o022
-        or not 1 <= before.st_size <= 8 * 1024 * 1024
-    ):
-        raise SystemExit(f"unsafe Presentation candidate receipt: {source.name}")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(source, flags)
-    try:
-        opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino, opened.st_size) != (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-        ):
-            raise SystemExit(f"Presentation candidate receipt changed before read: {source.name}")
-        chunks: list[bytes] = []
-        remaining = 8 * 1024 * 1024 + 1
-        while remaining > 0:
-            chunk = os.read(descriptor, min(65536, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        raw = b"".join(chunks)
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    if (
-        len(raw) != before.st_size
-        or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-    ):
-        raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
-    output = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(output, "wb") as handle:
-            handle.write(raw)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except BaseException:
-        try:
-            target.unlink()
-        except FileNotFoundError:
-            pass
-        raise
-PY
   rm -f "$staged_probe_token_path"
 
   local durable_stage_response="$release_evidence_dir/RELEASE_STAGE_RESPONSE.generated.json"
