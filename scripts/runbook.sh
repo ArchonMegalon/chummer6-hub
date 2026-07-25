@@ -34,8 +34,60 @@ print_release_shelf_cutover_runbook() {
   echo "  7. If automatic transition cannot finish, retain the receipt and run ordinary governed deploy from the safe handoff."
 }
 
+print_cloudflare_rotation_runbook() {
+  cat <<'EOF'
+Guarded Cloudflare Tunnel migration and token rotation
+
+Prerequisites:
+  - Use absolute paths. The compose environment must be the live hub's canonical .env.
+  - The token and receipt parents must already exist, be owner-only directories, and be outside the repository.
+  - Receipt targets must not already exist. The mutex is derived automatically from the live .env authority and tunnel UUID.
+
+Audit only (no Docker or Cloudflare mutation):
+  python3 /absolute/path/to/live-hub/scripts/rotate_cloudflare_tunnel_token.py \
+    --bootstrap-legacy \
+    --credentials-file /absolute/private/cloudflare-credentials.env \
+    --token-file /absolute/private/chummer-run/cloudflared.token \
+    --compose-env-file /absolute/path/to/live-hub/.env \
+    --receipt /absolute/private/chummer-run/audit.receipt.json \
+    --tunnel-id 00000000-0000-4000-8000-000000000000 \
+    --tunnel-name chummer-run
+
+Execute only after audit_passed:
+  python3 /absolute/path/to/live-hub/scripts/rotate_cloudflare_tunnel_token.py \
+    --bootstrap-legacy \
+    --execute \
+    --confirm ROTATE_CHUMMER_RUN_CLOUDFLARE_TOKEN_ZERO_DOWNTIME \
+    --credentials-file /absolute/private/cloudflare-credentials.env \
+    --token-file /absolute/private/chummer-run/cloudflared.token \
+    --compose-env-file /absolute/path/to/live-hub/.env \
+    --receipt /absolute/private/chummer-run/execute.receipt.json \
+    --tunnel-id 00000000-0000-4000-8000-000000000000 \
+    --tunnel-name chummer-run
+
+The legacy migration has three mandatory 600-second overlap dwells. Rotation
+has three additional mandatory 600-second dwells. Allow roughly 62-70 minutes
+including connector convergence. Subsequent token-only rotations omit
+--bootstrap-legacy.
+
+If legacyMigrationCommitStarted or rotationCommitStarted is true, preserve the
+remaining connectors, canary, token files, and receipt; do not blindly retry.
+Reconcile the recorded phase and live topology first. Before either commit
+marker, the tool restores the prior local state and remote token or reports an
+explicit rollback failure.
+
+The tool never calls the Cloudflare connection DELETE endpoint. Tokens and API
+credentials never enter subprocess argv, logs, stdout/stderr JSON, or receipts.
+EOF
+}
+
 if [[ "$RUNBOOK_MODE" == "release-shelf-cutover-help" ]]; then
   print_release_shelf_cutover_runbook
+  exit 0
+fi
+
+if [[ "$RUNBOOK_MODE" == "cloudflare-rotation-help" ]]; then
+  print_cloudflare_rotation_runbook
   exit 0
 fi
 
@@ -100,31 +152,164 @@ run_compose_with_optional_env_file() {
 ensure_hub_cloudflare_tunnel() {
   local env_file="$REPO_ROOT/.env"
   local log_file="${1:-/dev/null}"
-  local token_available=0
-  if [[ -f "$env_file" ]] && rg -q '^CHUMMER_RUN_CF_TUNNEL_TOKEN=.+' "$env_file"; then
-    token_available=1
-  elif [[ -n "${CHUMMER_RUN_CF_TUNNEL_TOKEN:-}" ]]; then
-    token_available=1
+  unset CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE CHUMMER_RUN_CF_TUNNEL_TOKEN
+  if [[ ! -f "$env_file" ]]; then
+    echo "hub live audit: canonical owner-only .env is missing; refusing tunnel lifecycle mutation." | tee -a "$log_file" >/dev/null
+    return 1
   fi
 
-  if [[ "$token_available" -ne 1 ]]; then
-    echo "hub live audit: CHUMMER_RUN_CF_TUNNEL_TOKEN is unavailable; skipping tunnel bootstrap." | tee -a "$log_file" >/dev/null
-    return 0
-  fi
+  python3 - "$env_file" "$REPO_ROOT" <<'PY'
+from __future__ import annotations
 
-  local compose_file="$REPO_ROOT/legacy/tooling/docker/docker-compose.yml"
-  local tunnel_log
-  tunnel_log="$(mktemp)"
-  set +e
-  run_compose_with_optional_env_file -f "$compose_file" --profile portal up -d chummer-run-cloudflared 2>&1 | tee "$tunnel_log"
-  local status=${PIPESTATUS[0]}
-  set -e
-  cat "$tunnel_log" >> "$log_file" 2>/dev/null || true
-  if [[ "$status" -ne 0 ]]; then
-    rm -f "$tunnel_log"
-    return "$status"
-  fi
-  rm -f "$tunnel_log"
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+env_file = Path(sys.argv[1])
+repo_root = Path(sys.argv[2]).resolve(strict=True)
+pinned_image = (
+    "cloudflare/cloudflared:2026.7.0@"
+    "sha256:8c70a8c2d373e93caac1ee79fcc615908a49ccf3f3975775d1e10d24e41327af"
+)
+compose_project = "chummer6-hub"
+target = "/run/secrets/chummer-run-cloudflared.token"
+services = (
+    "chummer-run-cloudflared",
+    "chummer-run-cloudflared-replica",
+)
+
+def fail(code: str) -> None:
+    raise SystemExit(f"hub live audit: {code}")
+
+metadata = env_file.lstat()
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or stat.S_ISLNK(metadata.st_mode)
+    or metadata.st_uid != os.geteuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o600
+    or metadata.st_nlink != 1
+):
+    fail("compose_env_not_owner_only")
+
+values: dict[str, str] = {}
+for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+    if not raw_line or raw_line.startswith("#") or "=" not in raw_line:
+        continue
+    key, value = raw_line.split("=", 1)
+    if key in {
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN",
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE",
+        "CHUMMER_CLOUDFLARED_RUNTIME_UID",
+        "CHUMMER_CLOUDFLARED_RUNTIME_GID",
+        "CHUMMER_RUN_TUNNEL_NETWORK",
+    }:
+        if key in values:
+            fail("duplicate_tunnel_setting")
+        values[key] = value
+if "CHUMMER_RUN_CF_TUNNEL_TOKEN" in values:
+    fail("legacy_raw_token_requires_guarded_migration")
+
+token_text = values.get("CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE", "")
+token_file = Path(token_text)
+if not token_file.is_absolute():
+    fail("token_file_path_not_absolute")
+try:
+    token_file.resolve(strict=True).relative_to(repo_root)
+except ValueError:
+    pass
+else:
+    fail("token_file_inside_repository")
+parent = token_file.parent.resolve(strict=True)
+parent_metadata = parent.stat()
+token_metadata = token_file.lstat()
+if (
+    parent != token_file.parent
+    or parent_metadata.st_uid != os.geteuid()
+    or stat.S_IMODE(parent_metadata.st_mode) & 0o022
+    or not stat.S_ISREG(token_metadata.st_mode)
+    or stat.S_ISLNK(token_metadata.st_mode)
+    or token_metadata.st_uid != os.geteuid()
+    or stat.S_IMODE(token_metadata.st_mode) != 0o600
+    or token_metadata.st_nlink != 1
+):
+    fail("token_file_not_owner_only")
+
+try:
+    runtime_uid = int(values["CHUMMER_CLOUDFLARED_RUNTIME_UID"])
+    runtime_gid = int(values["CHUMMER_CLOUDFLARED_RUNTIME_GID"])
+except (KeyError, ValueError):
+    fail("runtime_identity_missing")
+if (runtime_uid, runtime_gid) != (token_metadata.st_uid, token_metadata.st_gid):
+    fail("runtime_identity_mismatch")
+network = values.get("CHUMMER_RUN_TUNNEL_NETWORK", "chummer5a_default")
+
+completed = subprocess.run(
+    ["docker", "inspect", *services],
+    check=False,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+if completed.returncode != 0:
+    fail("canonical_connectors_missing")
+try:
+    containers = json.loads(completed.stdout)
+except json.JSONDecodeError:
+    fail("canonical_connector_inspect_invalid")
+if not isinstance(containers, list) or len(containers) != 2:
+    fail("canonical_connector_inspect_invalid")
+
+projects: set[str] = set()
+for expected_service, container in zip(services, containers, strict=True):
+    config = container.get("Config") or {}
+    host = container.get("HostConfig") or {}
+    state = container.get("State") or {}
+    command = [str(value) for value in config.get("Cmd") or []]
+    environment = [str(value) for value in config.get("Env") or []]
+    labels = config.get("Labels") or {}
+    mounts = [
+        mount
+        for mount in container.get("Mounts") or []
+        if mount.get("Destination") == target
+    ]
+    if (
+        state.get("Status") != "running"
+        or (state.get("Health") or {}).get("Status") != "healthy"
+        or config.get("Image") != pinned_image
+        or "--token-file" not in command
+        or "--token" in command
+        or target not in command
+        or any("TOKEN" in item.partition("=")[0].upper() for item in environment)
+        or str(config.get("User") or "") != f"{runtime_uid}:{runtime_gid}"
+        or host.get("ReadonlyRootfs") is not True
+        or (host.get("RestartPolicy") or {}).get("Name") != "unless-stopped"
+        or "ALL" not in {str(item).upper() for item in host.get("CapDrop") or []}
+        or not any(
+            str(item).startswith("no-new-privileges")
+            for item in host.get("SecurityOpt") or []
+        )
+        or labels.get("com.docker.compose.service") != expected_service
+        or labels.get("com.docker.compose.project") != compose_project
+        or labels.get("com.docker.compose.project.working_dir")
+        != str(repo_root)
+        or labels.get("com.docker.compose.project.config_files")
+        != str(repo_root / "docker-compose.public-edge.yml")
+        or network not in ((container.get("NetworkSettings") or {}).get("Networks") or {})
+        or len(mounts) != 1
+        or mounts[0].get("Type") != "bind"
+        or mounts[0].get("RW") is not False
+        or Path(str(mounts[0].get("Source") or "")).resolve(strict=True)
+        != token_file.resolve(strict=True)
+    ):
+        fail("canonical_connector_contract_failed")
+    projects.add(str(labels.get("com.docker.compose.project") or ""))
+if len(projects) != 1:
+    fail("canonical_connector_project_mismatch")
+PY
+
+  echo "hub live audit: token-file HA tunnel is already healthy; no lifecycle mutation performed." | tee -a "$log_file" >/dev/null
   TUNNEL_CONTAINER="chummer-run-cloudflared"
   export TUNNEL_CONTAINER
 }
