@@ -143,6 +143,9 @@ CONTRACT_NAME = "chummer.install_linking_postgres_cutover_run.v1"
 CANDIDATE_BUILD_INFO_CONTRACT = (
     "chummer.install_linking_postgres_candidate_build_info.v1"
 )
+SOURCE_REPLAY_PREFLIGHT_CONTRACT = (
+    "chummer.install_linking_postgres_source_replay_preflight.v1"
+)
 JOB_RECEIPT_CONTRACT = "chummer.install_linking_postgres_operator_job.v1"
 START_INTENT_CONTRACT = "chummer.install_linking_postgres_start_intent.v1"
 JOB_TIMEOUT_SECONDS = 180
@@ -3739,6 +3742,47 @@ class GovernedCutoverRunner:
         write_private_json(output, payload, replace=replace)
         return output
 
+    def verify_source_replay(
+        self,
+        *,
+        active_build_info: Path,
+        expected_active_build_info_sha256: str,
+        expected_candidate_image_id: str,
+        expected_candidate_tool_image_id: str,
+    ) -> dict[str, Any]:
+        """Reprove exact build sources without mutating Docker or PostgreSQL."""
+
+        bound_path, bound_sha256, build_info = bind_active_build_info(
+            active_build_info,
+            cutover_id=self.inputs.cutover_id,
+            candidate_image_id=expected_candidate_image_id,
+            candidate_tool_image_id=expected_candidate_tool_image_id,
+        )
+        self._validate_source()
+        observed_provenance = self._capture_build_source_provenance()
+        if (
+            bound_path != active_build_info
+            or bound_sha256 != expected_active_build_info_sha256
+            or observed_provenance != build_info.get(
+                "buildSourceProvenance"
+            )
+        ):
+            raise CutoverError(
+                "candidate build-source replay binding drifted"
+            )
+        return {
+            "activeBuildInfoSha256": bound_sha256,
+            "buildSourceProvenanceSha256": sha256_bytes(
+                canonical_json_bytes(
+                    observed_provenance,
+                    label="build-source replay provenance",
+                )
+            ),
+            "contractName": SOURCE_REPLAY_PREFLIGHT_CONTRACT,
+            "sourceHead": self.inputs.expected_head,
+            "status": "pass",
+        }
+
     def run_postquiesce_reproof(
         self,
         *,
@@ -4007,6 +4051,7 @@ class GovernedCutoverRunner:
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--post-quiesce-reproof", action="store_true")
+    parser.add_argument("--source-replay-preflight", action="store_true")
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--synthetic-workspace-root", type=Path)
     parser.add_argument("--build-context-root", type=Path)
@@ -4039,11 +4084,17 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--reproof-attempt-id")
     parser.add_argument("--volume-inventory-receipt", type=Path)
     parser.add_argument("--expected-volume-inventory-sha256")
+    parser.add_argument("--active-build-info", type=Path)
+    parser.add_argument("--expected-active-build-info-sha256")
     parser.add_argument("--output", type=Path)
     return parser.parse_args(argv)
 
 
 def validate_args(args: argparse.Namespace) -> CutoverInputs:
+    if args.post_quiesce_reproof and args.source_replay_preflight:
+        raise CutoverError(
+            "source replay preflight and post-quiesce reproof are exclusive"
+        )
     if (
         HEAD_PATTERN.fullmatch(args.expected_head) is None
         or HEX_SHA256_PATTERN.fullmatch(args.expected_compose_sha256) is None
@@ -4121,7 +4172,53 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
     boundary_output = Path(os.path.abspath(args.boundary_output))
     if env_file != CANONICAL_ENV_FILE:
         raise CutoverError("cutover requires the canonical public-edge environment file")
-    if args.post_quiesce_reproof:
+    if args.source_replay_preflight:
+        if (
+            args.active_build_info is None
+            or args.expected_active_build_info_sha256 is None
+            or args.expected_candidate_image_id is None
+            or args.expected_candidate_tool_image_id is None
+            or HEX_SHA256_PATTERN.fullmatch(
+                args.expected_active_build_info_sha256
+            )
+            is None
+            or IMAGE_ID_PATTERN.fullmatch(
+                args.expected_candidate_image_id
+            )
+            is None
+            or IMAGE_ID_PATTERN.fullmatch(
+                args.expected_candidate_tool_image_id
+            )
+            is None
+            or any(
+                value is not None
+                for value in (
+                    args.expected_boundary_sha256,
+                    args.shared_mutation_lock_token,
+                    args.reproof_attempt_id,
+                    args.volume_inventory_receipt,
+                    args.expected_volume_inventory_sha256,
+                    args.output,
+                )
+            )
+        ):
+            raise CutoverError(
+                "source replay preflight requires exact build-info and image "
+                "pins without post-quiesce inputs"
+            )
+        active_build_info = Path(
+            os.path.abspath(args.active_build_info)
+        )
+        if (
+            boundary_output.parent != receipt_root
+            or active_build_info.parent != receipt_root
+            or active_build_info.is_symlink()
+        ):
+            raise CutoverError(
+                "source replay preflight inputs escaped the receipt root"
+            )
+        args.active_build_info = active_build_info
+    elif args.post_quiesce_reproof:
         if (
             args.output is None
             or args.expected_boundary_sha256 is None
@@ -4178,6 +4275,8 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
             )
             or output.exists()
             or output.is_symlink()
+            or args.active_build_info is not None
+            or args.expected_active_build_info_sha256 is not None
         ):
             raise CutoverError(
                 "post-quiesce outputs must be new files in the boundary receipt root"
@@ -4192,6 +4291,8 @@ def validate_args(args: argparse.Namespace) -> CutoverInputs:
             args.reproof_attempt_id,
             args.volume_inventory_receipt,
             args.expected_volume_inventory_sha256,
+            args.active_build_info,
+            args.expected_active_build_info_sha256,
             args.output,
         )
     ):
@@ -4258,7 +4359,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 routing_environment=build_routing_environment(inputs),
             ),
         )
-        if args.post_quiesce_reproof:
+        if args.source_replay_preflight:
+            replay_verification = runner.verify_source_replay(
+                active_build_info=args.active_build_info,
+                expected_active_build_info_sha256=(
+                    args.expected_active_build_info_sha256
+                ),
+                expected_candidate_image_id=(
+                    args.expected_candidate_image_id
+                ),
+                expected_candidate_tool_image_id=(
+                    args.expected_candidate_tool_image_id
+                ),
+            )
+            receipt = None
+            output_contract = SOURCE_REPLAY_PREFLIGHT_CONTRACT
+        elif args.post_quiesce_reproof:
             receipt = runner.run_postquiesce_reproof(
                 attempt_id=args.reproof_attempt_id,
                 expected_boundary_sha256=args.expected_boundary_sha256,
@@ -4290,6 +4406,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) as exc:
         print(f"InstallLinking cutover failed closed: {exc}", file=sys.stderr)
         return 1
+    if args.source_replay_preflight:
+        print(
+            json.dumps(
+                replay_verification,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
     print(
         json.dumps(
             {

@@ -29,6 +29,10 @@ CANDIDATE_PORTAL_CONTAINER_ID = "b" * 64
 PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
 POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
 ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
+TOPOLOGY_B_GUARD_MESSAGE = (
+    "canonical public edge mutation is blocked while topology-B downloads "
+    "authority exists"
+)
 
 
 def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
@@ -159,6 +163,7 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
         "  *verify_install_linking_cutover_boundary.py*\"--expected-phase public_acceptance_completed\"*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_FINAL_VERIFICATION_JSON\"; exit 0;;\n"
         "  *verify_install_linking_cutover_boundary.py*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_BOUNDARY_VERIFICATION_JSON\"; exit \"${FAKE_INSTALL_LINKING_BOUNDARY_VERIFY_EXIT:-0}\";;\n"
+        "  *run_install_linking_postgres_cutover.py*\"--source-replay-preflight\"*) exit \"${FAKE_SOURCE_REPLAY_PREFLIGHT_EXIT:-0}\";;\n"
         "  *run_install_linking_postgres_cutover.py*\"--post-quiesce-reproof\"*) output=\"$(arg_value --output \"$@\")\"; attempt=\"$(arg_value --reproof-attempt-id \"$@\")\"; inventory=\"$(arg_value --volume-inventory-receipt \"$@\")\"; expected_inventory_sha256=\"$(arg_value --expected-volume-inventory-sha256 \"$@\")\"; actual_inventory_sha256=\"$(/usr/bin/sha256sum -- \"$inventory\" | /usr/bin/awk '{print $1}')\"; [ \"$actual_inventory_sha256\" = \"$expected_inventory_sha256\" ] || exit 84; reproof_exit=\"${FAKE_POSTQUIESCE_EXIT:-}\"; reproof_mode=\"${FAKE_POSTQUIESCE_MODE:-}\"; if [ -z \"$reproof_mode\" ]; then if [ -z \"$reproof_exit\" ] || [ \"$reproof_exit\" = 0 ]; then reproof_mode=pass; else reproof_mode=unknown; fi; fi; case \"$reproof_mode\" in sigkill) /usr/bin/kill -KILL \"$$\";; missing) exit \"${reproof_exit:-1}\";; malformed) printf '%s\\n' '{malformed' > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"${reproof_exit:-1}\";; safe_fail) reproof_status=fail; start_intent=false; start_may=false; reproof_exit=\"${reproof_exit:-1}\";; pass) reproof_status=pass; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-0}\"; printf '%s\\n' \"$attempt\" > \"$FAKE_POSTQUIESCE_COMPLETED_STATE\";; oom) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-137}\";; unknown) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-70}\";; *) exit 85;; esac; printf '{\"containerStartMayHaveBeenInvoked\":%s,\"mode\":\"%s\",\"reason\":\"%s\",\"startIntentWritten\":%s,\"status\":\"%s\"}\\n' \"$start_may\" \"$reproof_mode\" \"${FAKE_POSTQUIESCE_REASON:-none}\" \"$start_intent\" \"$reproof_status\" > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"$reproof_exit\";;\n"
         "  *materialize_install_linking_cutover_boundary.py*\"--phase public_acceptance_completed\"*) /usr/bin/cp \"$FAKE_INSTALL_LINKING_FINAL_BOUNDARY\" \"$(arg_value --output \"$@\")\"; /usr/bin/chmod 0600 \"$(arg_value --output \"$@\")\"; exit \"${FAKE_INSTALL_LINKING_MATERIALIZER_EXIT:-0}\";;\n"
         "  *verify_public_projection.py*) exec /usr/bin/python3 \"$@\";;\n"
@@ -168,7 +173,7 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "  *secrets.token_hex*|*hmac.compare_digest*) exec /usr/bin/python3 \"$@\";;\n"
         "  *matches\\ =\\ \\[\\]*) exec /usr/bin/python3 \"$@\";;\n"
         "  *\"InstallLinking verified boundary binding parser\"*) exec /usr/bin/python3 \"$@\";;\n"
-        "  *\"InstallLinking candidate build-source provenance parser\"*) printf '%s|%s|%s|%s' \"$FAKE_HUB_REGISTRY_HEAD\" \"$FAKE_DESIGN_PRODUCT_HEAD\" \"$FAKE_FLEET_MEDIA_FACTORY_HEAD\" \"$FAKE_BUILD_CONTEXT_DOCKERIGNORE_SHA256\"; exit 0;;\n"
+        "  *\"InstallLinking candidate build-source provenance parser\"*) printf '%s|%s|%s|%s|canonical-build-context|-|-|-|-|-|-|-|-|-|-' \"$FAKE_HUB_REGISTRY_HEAD\" \"$FAKE_DESIGN_PRODUCT_HEAD\" \"$FAKE_FLEET_MEDIA_FACTORY_HEAD\" \"$FAKE_BUILD_CONTEXT_DOCKERIGNORE_SHA256\"; exit 0;;\n"
         "  *\"InstallLinking state-volume consumer ID parser\"*) exec /usr/bin/python3 \"$@\";;\n"
         "  *\"InstallLinking state-volume consumer parser\"*) exec /usr/bin/python3 \"$@\";;\n"
         "  *\"InstallLinking state-volume inventory publisher\"*) exec /usr/bin/python3 \"$@\";;\n"
@@ -857,6 +862,190 @@ def test_fake_daemon_rejects_restart_policy_for_auto_remove_candidate(
     assert create.stdout.strip() == CANDIDATE_PORTAL_CONTAINER_ID
     assert Path(env["FAKE_AUTO_REMOVE_STATE"]).read_text(encoding="utf-8") == "true\n"
     assert promote.returncode == 64
+
+
+def test_source_replay_preflight_failure_stops_before_quiesce(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "FAKE_SOURCE_REPLAY_PREFLIGHT_EXIT": "1",
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert (
+        "candidate build-source replay preflight failed"
+        in result.stderr
+    )
+    trusted_commands = trusted_python_log.read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert any("--source-replay-preflight" in command for command in trusted_commands)
+    assert not any("--post-quiesce-reproof" in command for command in trusted_commands)
+    docker_commands = (
+        docker_log.read_text(encoding="utf-8").splitlines()
+        if docker_log.exists()
+        else []
+    )
+    assert not any("container stop" in command for command in docker_commands)
+    assert not any(command.startswith("image tag ") for command in docker_commands)
+
+
+@pytest.mark.parametrize(
+    ("operation", "authority_kind"),
+    [
+        ("deploy", "file"),
+        ("deploy", "broken_symlink"),
+        ("initial-release-shelf-cutover", "file"),
+        ("initial-release-shelf-cutover", "broken_symlink"),
+    ],
+)
+def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_quiesce(
+    tmp_path: Path,
+    operation: str,
+    authority_kind: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    authority = receipt_root / "public-download-active-runtime-authority.json"
+    if authority_kind == "file":
+        authority.write_text("{}\n", encoding="utf-8")
+    else:
+        authority.symlink_to(tmp_path / "missing-topology-b-authority.json")
+    docker_log = tmp_path / "docker.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    env = os.environ.copy()
+    env.update(
+        {
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE in result.stderr
+    assert (
+        "initial-release-shelf-public-download-cutover-recover"
+        in result.stderr
+    )
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+    assert set(receipt_root.iterdir()) == {authority}
+    assert not Path(env["FAKE_EVENT_LOG"]).exists()
+    assert not docker_log.exists()
+    trusted_commands = trusted_python_log.read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert not any("--source-replay-preflight" in command for command in trusted_commands)
+    assert not any("--post-quiesce-reproof" in command for command in trusted_commands)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "recover",
+        "initial-release-shelf-cutover-recover",
+        "initial-release-shelf-public-download-cutover",
+        "initial-release-shelf-public-download-cutover-recover",
+    ],
+)
+def test_topology_b_guard_allows_supported_recovery_and_download_routes(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    (
+        receipt_root / "public-download-active-runtime-authority.json"
+    ).write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["CHUMMER_PUBLIC_EDGE_COMPOSE_FILE"] = str(
+        tmp_path / "deliberately-missing-compose.yml"
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE not in result.stderr
+    assert "requires the exact owner-controlled single-link Compose input" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["deploy", "initial-release-shelf-cutover"],
+)
+def test_topology_b_guard_allows_canonical_transaction_recovery(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True)
+    (
+        receipt_root / "public-download-active-runtime-authority.json"
+    ).write_text("{}\n", encoding="utf-8")
+    (
+        receipt_root / "active-overlay-transaction.json"
+    ).write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["CHUMMER_PUBLIC_EDGE_COMPOSE_FILE"] = str(
+        tmp_path / "deliberately-missing-compose.yml"
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY), operation],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert TOPOLOGY_B_GUARD_MESSAGE not in result.stderr
+    assert "requires the exact owner-controlled single-link Compose input" in result.stderr
 
 
 def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up(

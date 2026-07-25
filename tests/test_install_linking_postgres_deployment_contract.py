@@ -13,6 +13,7 @@ SECURITY_DOC_PATH = ROOT / "docs" / "INSTALL_LINKING_STORE_SECURITY.md"
 RUNBOOK_PATH = ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
 DOCKERFILE_PATH = ROOT / "Chummer.Run.Api" / "Dockerfile"
 DOCKERIGNORE_PATH = ROOT / ".dockerignore"
+DEPLOY_PATH = ROOT / "scripts" / "deploy_public_edge_portal.sh"
 
 
 class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
@@ -90,6 +91,107 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
                     ["/tmp:rw,noexec,nosuid,nodev,mode=1777"],
                     service["tmpfs"],
                 )
+
+    def test_activation_parser_uses_the_exact_validated_build_context(self) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        parser_start = deploy.index(
+            "# InstallLinking candidate build-source provenance parser."
+        )
+        parser_end = deploy.index(
+            '  echo "InstallLinking candidate build-source provenance is invalid"',
+            parser_start,
+        )
+        parser = deploy[parser_start:parser_end]
+
+        self.assertIn(
+            "select_exact_build_context_provenance",
+            parser,
+        )
+        self.assertIn(
+            "bind_exact_build_source_replay",
+            parser,
+        )
+        self.assertIn(
+            "build_context.get(\"dockerignoreSha256\")",
+            parser,
+        )
+        self.assertNotIn(
+            'provenance.get("canonical-build-context")',
+            parser,
+        )
+
+    def test_synthetic_replay_is_preflighted_and_forwarded_before_quiesce(
+        self,
+    ) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        preflight = deploy.index("--source-replay-preflight")
+        quiesce = deploy.index(
+            "compose_cli stop chummer-run-cloudflared"
+        )
+        postquiesce = deploy.index("--post-quiesce-reproof")
+
+        self.assertLess(preflight, quiesce)
+        self.assertLess(quiesce, postquiesce)
+        self.assertIn(
+            '--source-root "$INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT"',
+            deploy,
+        )
+        self.assertGreaterEqual(
+            deploy.count('"${install_linking_source_replay_args[@]}"'),
+            2,
+        )
+        for option in (
+            "--synthetic-workspace-root",
+            "--build-context-root",
+            "--hub-registry-root",
+            "--design-product-root",
+            "--fleet-media-factory-root",
+            "--expected-run-services-content-sha256",
+            "--expected-hub-registry-content-sha256",
+            "--expected-design-product-content-sha256",
+            "--expected-fleet-media-factory-content-sha256",
+        ):
+            self.assertIn(option, deploy)
+
+    def test_topology_b_authority_blocks_only_fresh_canonical_mutation(
+        self,
+    ) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        guard = deploy.index(
+            "canonical public edge mutation is blocked while topology-B "
+            "downloads authority exists"
+        )
+        guard_start = deploy.rfind(
+            'if [[ "$DEPLOY_OPERATION" == deploy',
+            0,
+            guard,
+        )
+        guard_condition_end = deploy.index("then", guard_start)
+        condition = deploy[guard_start:guard_condition_end]
+
+        self.assertIn(
+            '"$DEPLOY_OPERATION" == initial-release-shelf-cutover',
+            condition,
+        )
+        self.assertIn("RECOVERY_ROUTE_REQUESTED == 0", condition)
+        self.assertIn(
+            '-e "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY"',
+            condition,
+        )
+        self.assertIn(
+            '-L "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY"',
+            condition,
+        )
+        self.assertNotIn(
+            "initial-release-shelf-public-download-cutover",
+            condition,
+        )
+        self.assertLess(guard, deploy.index("deploy_lock_active=1"))
+        self.assertLess(guard, deploy.index("--source-replay-preflight"))
+        self.assertLess(
+            guard,
+            deploy.index("compose_cli stop chummer-run-cloudflared"),
+        )
 
     def test_docker_context_includes_every_named_context_input(self) -> None:
         dockerignore = DOCKERIGNORE_PATH.read_text(encoding="utf-8")

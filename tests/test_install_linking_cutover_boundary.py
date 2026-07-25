@@ -187,6 +187,12 @@ def build_info(tmp_path: Path) -> Path:
                         "effectiveDockerignoreSha256": None,
                         "repositoryContained": True,
                     },
+                    "hub-registry-source": {
+                        "contextBoundary": "exact-clean-repository",
+                        "dockerignoreSha256": None,
+                        "effectiveDockerignoreSha256": None,
+                        "repositoryContained": True,
+                    },
                     "run-services-source": {
                         "contextBoundary": "exact-clean-repository",
                         "dockerignoreSha256": "d" * 64,
@@ -276,6 +282,84 @@ def build_info(tmp_path: Path) -> Path:
     )
     path.chmod(0o600)
     return path
+
+
+def synthetic_build_info(tmp_path: Path) -> Path:
+    path = build_info(tmp_path)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    provenance = payload["buildSourceProvenance"]
+    provenance["synthetic-build-context"] = provenance.pop(
+        "canonical-build-context"
+    )
+    for source_name in (
+        "run-services-source",
+        "hub-registry",
+        "design-product",
+        "fleet-media-factory-contracts",
+    ):
+        source = provenance[source_name]
+        source["contentSha256"] = source["contextFileSetSha256"]
+        source["sourceKind"] = "standalone-git-repository"
+    policies = provenance["build-dependency-contract"]["contextPolicies"]
+    synthetic_policy = policies.pop("canonical-build-context")
+    synthetic_policy["contextBoundary"] = (
+        "synthetic-root-with-explicit-allowlist"
+    )
+    policies["synthetic-build-context"] = synthetic_policy
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+    return path
+
+
+def synthetic_replay_arguments(
+    tmp_path: Path,
+    payload: dict,
+) -> dict[str, str]:
+    workspace = tmp_path / "synthetic-workspace"
+    build_context = workspace
+    roots = {
+        "run-services-source": workspace / "run-services",
+        "hub-registry": workspace / "hub-registry",
+        "design-product": workspace / "design-product",
+        "fleet-media-factory-contracts": workspace
+        / "fleet-media-factory",
+    }
+    provenance = payload["buildSourceProvenance"]
+    provenance["synthetic-build-context"]["consumedPathSha256"] = (
+        hashlib.sha256(str(build_context).encode("utf-8")).hexdigest()
+    )
+    consumed = {
+        "run-services-source": roots["run-services-source"],
+        "hub-registry": roots["hub-registry"],
+        "design-product": roots["design-product"]
+        / "products"
+        / "chummer",
+        "fleet-media-factory-contracts": roots[
+            "fleet-media-factory-contracts"
+        ]
+        / "src"
+        / "Chummer.Media.Contracts",
+    }
+    for name, root in roots.items():
+        provenance[name]["repositoryRootSha256"] = hashlib.sha256(
+            str(root).encode("utf-8")
+        ).hexdigest()
+        provenance[name]["consumedPathSha256"] = hashlib.sha256(
+            str(consumed[name]).encode("utf-8")
+        ).hexdigest()
+    return {
+        "synthetic_workspace_root": str(workspace),
+        "build_context_root": str(build_context),
+        "run_services_root": str(roots["run-services-source"]),
+        "hub_registry_root": str(roots["hub-registry"]),
+        "design_product_root": str(roots["design-product"]),
+        "fleet_media_factory_root": str(
+            roots["fleet-media-factory-contracts"]
+        ),
+    }
 
 
 def write_canonical(module, path: Path, payload: dict) -> str:
@@ -1807,6 +1891,179 @@ def test_candidate_build_info_is_closed_and_identity_bound(
         )
 
 
+def test_candidate_build_info_accepts_runner_shaped_synthetic_provenance(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+
+    bound_path, digest, payload = module.bind_active_build_info(
+        path,
+        cutover_id="2026-07-17T12:00:00Z",
+        candidate_image_id=CANDIDATE_IMAGE,
+        candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+    )
+    context_name, context = (
+        module.select_exact_build_context_provenance(
+            payload["buildSourceProvenance"]
+        )
+    )
+
+    assert bound_path == path
+    assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert context_name == "synthetic-build-context"
+    assert context["dockerignoreSha256"] == "a" * 64
+
+
+def test_synthetic_replay_binds_explicit_paths_and_exact_content_pins(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+    payload = read_json(path)
+    replay_arguments = synthetic_replay_arguments(tmp_path, payload)
+
+    replay = module.bind_exact_build_source_replay(
+        payload["buildSourceProvenance"],
+        **replay_arguments,
+    )
+
+    assert replay["buildContextName"] == "synthetic-build-context"
+    assert (
+        replay["syntheticWorkspaceRoot"]
+        == replay_arguments["synthetic_workspace_root"]
+    )
+    for name in module.SYNTHETIC_REPLAY_SOURCE_NAMES:
+        assert (
+            replay["contentSha256"][name]
+            == payload["buildSourceProvenance"][name]["contentSha256"]
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "missing-path",
+        "mismatched-path",
+        "outside-workspace",
+        "nested-repositories",
+    ),
+)
+def test_synthetic_replay_rejects_missing_mismatched_or_mixed_paths(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+    payload = read_json(path)
+    arguments = synthetic_replay_arguments(tmp_path, payload)
+    provenance = payload["buildSourceProvenance"]
+    if mutation == "missing-path":
+        arguments["hub_registry_root"] = None
+    elif mutation == "mismatched-path":
+        arguments["run_services_root"] += "-other"
+    elif mutation == "outside-workspace":
+        outside = tmp_path / "outside-design"
+        arguments["design_product_root"] = str(outside)
+        provenance["design-product"]["repositoryRootSha256"] = (
+            hashlib.sha256(str(outside).encode("utf-8")).hexdigest()
+        )
+        provenance["design-product"]["consumedPathSha256"] = (
+            hashlib.sha256(
+                str(outside / "products" / "chummer").encode("utf-8")
+            ).hexdigest()
+        )
+    elif mutation == "nested-repositories":
+        nested = (
+            Path(arguments["run_services_root"]) / "nested-hub-registry"
+        )
+        arguments["hub_registry_root"] = str(nested)
+        provenance["hub-registry"]["repositoryRootSha256"] = (
+            hashlib.sha256(str(nested).encode("utf-8")).hexdigest()
+        )
+        provenance["hub-registry"]["consumedPathSha256"] = (
+            hashlib.sha256(str(nested).encode("utf-8")).hexdigest()
+        )
+    else:  # pragma: no cover - the parameter list is closed.
+        raise AssertionError(mutation)
+
+    with pytest.raises(ValueError, match="synthetic InstallLinking"):
+        module.bind_exact_build_source_replay(
+            provenance,
+            **arguments,
+        )
+
+
+def test_canonical_replay_rejects_any_synthetic_path_binding(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    payload = read_json(build_info(tmp_path))
+
+    with pytest.raises(ValueError, match="rejects synthetic replay"):
+        module.bind_exact_build_source_replay(
+            payload["buildSourceProvenance"],
+            synthetic_workspace_root=str(tmp_path),
+            build_context_root=None,
+            run_services_root=None,
+            hub_registry_root=None,
+            design_product_root=None,
+            fleet_media_factory_root=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "mixed-contexts",
+        "open-git-schema",
+        "wrong-source-kind",
+        "content-digest",
+        "policy-name",
+        "policy-boundary",
+    ),
+)
+def test_candidate_build_info_rejects_adversarial_synthetic_provenance(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    module = load_module()
+    path = synthetic_build_info(tmp_path)
+    payload = read_json(path)
+    provenance = payload["buildSourceProvenance"]
+    dependency = provenance["build-dependency-contract"]
+    if mutation == "mixed-contexts":
+        provenance["canonical-build-context"] = dict(
+            provenance["synthetic-build-context"]
+        )
+    elif mutation == "open-git-schema":
+        provenance["hub-registry"]["unreviewedField"] = "0" * 64
+    elif mutation == "wrong-source-kind":
+        provenance["hub-registry"]["sourceKind"] = "linked-worktree"
+    elif mutation == "content-digest":
+        provenance["hub-registry"]["contentSha256"] = "0" * 63
+    elif mutation == "policy-name":
+        policies = dependency["contextPolicies"]
+        policies["canonical-build-context"] = policies.pop(
+            "synthetic-build-context"
+        )
+    elif mutation == "policy-boundary":
+        dependency["contextPolicies"]["synthetic-build-context"][
+            "contextBoundary"
+        ] = "canonical-root-with-explicit-allowlist"
+    else:  # pragma: no cover - the parameter list is closed.
+        raise AssertionError(mutation)
+    write_canonical(module, path, payload)
+
+    with pytest.raises(ValueError, match="build-info contract"):
+        module.bind_active_build_info(
+            path,
+            cutover_id="2026-07-17T12:00:00Z",
+            candidate_image_id=CANDIDATE_IMAGE,
+            candidate_tool_image_id=CANDIDATE_TOOL_IMAGE,
+        )
+
+
 @pytest.mark.parametrize(
     "mutation",
     (
@@ -1819,6 +2076,9 @@ def test_candidate_build_info_is_closed_and_identity_bound(
         "sensitive-context-path",
         "context-policy-opened",
         "root-ignore-disagrees",
+        "run-ignore-disagrees",
+        "hub-ignored-input",
+        "fleet-ignored-input",
         "external-restore-not-sdk-only",
         "loopback-probe-not-sdk-only",
         "loopback-probe-program-drift",
@@ -1857,6 +2117,16 @@ def test_candidate_build_info_rejects_dependency_provenance_drift(
         dependency["contextPolicies"]["canonical-build-context"][
             "dockerignoreSha256"
         ] = "0" * 64
+    elif mutation == "run-ignore-disagrees":
+        dependency["contextPolicies"]["run-services-source"][
+            "effectiveDockerignoreSha256"
+        ] = "0" * 64
+    elif mutation == "hub-ignored-input":
+        provenance["hub-registry"]["ignoredInputCount"] = 1
+    elif mutation == "fleet-ignored-input":
+        provenance["fleet-media-factory-contracts"][
+            "ignoredInputCount"
+        ] = 1
     elif mutation == "external-restore-not-sdk-only":
         dependency["externalMediaRestoreIsSdkOnly"] = False
     elif mutation == "loopback-probe-not-sdk-only":
