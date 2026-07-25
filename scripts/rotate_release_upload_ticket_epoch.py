@@ -11,9 +11,10 @@ fail-forward-required.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 import hashlib
+import hmac
 import http.client
 import importlib.util
 import json
@@ -32,6 +33,15 @@ from urllib.parse import urlsplit
 
 
 CONTRACT_NAME = "chummer.release-upload-ticket-epoch-rotation/v1"
+EPOCH_HISTORY_CONTRACT = "chummer.release-upload-ticket-epoch-history/v1"
+EPOCH_HISTORY_BOOTSTRAP_AUTHORITY_CONTRACT = (
+    "chummer.release-upload-ticket-epoch-history-bootstrap-authority/v1"
+)
+EPOCH_HISTORY_BOOTSTRAP_MARKER_CONTRACT = (
+    "chummer.release-upload-ticket-epoch-history-bootstrap-marker/v1"
+)
+EPOCH_HISTORY_ABSENT_PIN = "absent"
+ZERO_SHA256 = "0" * 64
 EPOCH_KEY = "CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_EPOCH"
 SESSION_ROOT_KEY = "CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"
 DIRECT_UPLOAD_KEY = "CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED"
@@ -68,14 +78,28 @@ OLD_TICKET_PROOF_NONCE_HEADER = (
 OLD_TICKET_PROOF_CONTRACT = (
     "chummer.release-upload-ticket-revocation-proof/v1"
 )
+OLD_TICKET_DIGEST_AUTHORITY_CONTRACT = (
+    "chummer.release-upload-incident-ticket-materialization-authority/v1"
+)
 LOWER_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 SAFE_CONTAINER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 SAFE_EPOCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+SAFE_TRANSACTION_ID = re.compile(r"^[0-9a-f]{32}$")
+RFC3339_UTC = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
+    r"[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z$"
+)
+CANONICAL_PROJECT_NAME = "chummer6-hub"
+CANONICAL_IMAGE_TAG = "chummer-run-api:local"
 MAX_ENV_BYTES = 1024 * 1024
 MAX_TICKET_BYTES = 16 * 1024
+MAX_TICKET_DIGEST_AUTHORITY_BYTES = 8192
 MAX_PUBLIC_BODY_BYTES = 4 * 1024 * 1024
+MAX_HISTORY_BYTES = 4 * 1024 * 1024
+MAX_BOOTSTRAP_AUTHORITY_BYTES = 256 * 1024
+MAX_EDGE_WAF_CONTROL_PLANE_BYTES = 4 * 1024 * 1024
 ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
     "contractName",
     "generatedAtUtc",
@@ -94,6 +118,40 @@ ACTIVE_RUNTIME_PORTAL_FIELDS = {
     "proofAuthorityMountSha256",
     "proofPublicMountSha256",
     "wasRunning",
+}
+EPOCH_HISTORY_FIELDS = {
+    "contractName",
+    "status",
+    "updatedAtUtc",
+    "generation",
+    "headEventSha256",
+    "events",
+}
+EPOCH_HISTORY_EVENT_FIELDS = {
+    "sequence",
+    "eventType",
+    "epochSha256",
+    "rotationIntentSha256",
+    "previousEventSha256",
+    "recordedAtUtc",
+    "sourceHead",
+    "imageId",
+    "eventSha256",
+}
+EPOCH_HISTORY_BOOTSTRAP_AUTHORITY_FIELDS = {
+    "contractName",
+    "status",
+    "generatedAtUtc",
+    "knownLegacyEpochSha256",
+}
+EPOCH_HISTORY_BOOTSTRAP_MARKER_FIELDS = {
+    "contractName",
+    "status",
+    "generatedAtUtc",
+    "bootstrapAuthoritySha256",
+    "knownLegacyEpochSha256",
+    "initialRotationIntentSha256",
+    "epochHistoryPathSha256",
 }
 
 
@@ -122,6 +180,21 @@ class RotationError(RuntimeError):
             code = "invalid_failure_code"
         self.code = code
         super().__init__(code)
+
+
+@dataclass(frozen=True)
+class TicketMaterializationAuthority:
+    fd: int
+    canonical_bytes: bytes = field(repr=False)
+    ticket_path_sha256: str
+    ticket_sha256: str
+    ticket_size_bytes: int
+    envelope_sha256: str
+    inventory_commitment_sha256: str
+    recipient_certificate_sha256: str
+    signer_certificate_sha256: str
+    openssl_executable_sha256: str
+    materialization_transaction_id: str
 
 
 @dataclass(frozen=True)
@@ -201,6 +274,19 @@ class RuntimeAuthority(Protocol):
     ) -> StorageProbeEvidence: ...
 
     def verify_loopback(self, container_id: str, route: str) -> str: ...
+
+    def quiesce_portals(self, container_ids: tuple[str, ...]) -> None: ...
+
+    def assert_portals_stopped(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None: ...
+
+    def restart_portals(self, container_ids: tuple[str, ...]) -> None: ...
+
+    def quiesce_public_connectors(self) -> None: ...
+
+    def assert_public_connectors_stopped(self) -> None: ...
 
     def recreate_all_portals(
         self,
@@ -541,25 +627,36 @@ def replace_epoch_environment(
     return before_sha256, after_sha256
 
 
-def load_ticket(path: Path, expected_sha256: str) -> tuple[str, str]:
-    if LOWER_SHA256.fullmatch(expected_sha256) is None:
-        raise RotationError("old_ticket_sha256_invalid")
+def load_ticket(
+    path: Path,
+    authority: TicketMaterializationAuthority,
+) -> tuple[str, str]:
+    if sha256_text(str(path)) != authority.ticket_path_sha256:
+        raise RotationError("old_ticket_path_authority_mismatch")
     payload = read_owner_only_file(
         path,
         label="old_ticket",
         maximum_bytes=MAX_TICKET_BYTES,
     )
     actual_sha256 = sha256_bytes(payload)
-    if actual_sha256 != expected_sha256:
+    if (
+        len(payload) != authority.ticket_size_bytes
+        or actual_sha256 != authority.ticket_sha256
+    ):
         raise RotationError("old_ticket_sha256_mismatch")
     try:
-        ticket = payload.decode("ascii", errors="strict").strip()
+        rendered = payload.decode("ascii", errors="strict")
     except UnicodeError as exc:
         raise RotationError("old_ticket_not_ascii") from exc
+    ticket = rendered[:-1] if rendered.endswith("\n") else rendered
     if (
         not ticket
         or len(ticket) > MAX_TICKET_BYTES
-        or any(character.isspace() for character in ticket)
+        or rendered not in {ticket, ticket + "\n"}
+        or any(
+            ord(character) < 0x21 or ord(character) > 0x7E
+            for character in ticket
+        )
     ):
         raise RotationError("old_ticket_invalid")
     return ticket, actual_sha256
@@ -573,6 +670,22 @@ def verify_proof_bind_source(request: RotationRequest) -> None:
     )
     if sha256_bytes(payload) != request.expected_proof_sha256:
         raise RotationError("proof_bind_source_sha256_mismatch")
+
+
+def verify_edge_waf_control_plane_source(
+    request: RotationRequest,
+) -> str:
+    payload = read_trusted_regular_file(
+        request.edge_waf_control_plane_source,
+        label="edge_waf_control_plane_source",
+        maximum_bytes=MAX_EDGE_WAF_CONTROL_PLANE_BYTES,
+    )
+    actual_sha256 = sha256_bytes(payload)
+    if actual_sha256 != request.expected_edge_waf_control_plane_sha256:
+        raise RotationError(
+            "edge_waf_control_plane_fingerprint_mismatch"
+        )
+    return actual_sha256
 
 
 def verify_committed_environment(
@@ -817,7 +930,6 @@ def verify_old_ticket_revocation(
     runtime: RuntimeAuthority,
     *,
     ticket: str,
-    ticket_sha256: str,
     expected_epoch_sha256: str,
 ) -> dict[str, Any]:
     nonce = secrets.token_hex(32)
@@ -869,7 +981,6 @@ def verify_old_ticket_revocation(
         raise RotationError("old_ticket_revocation_proof_invalid")
     return {
         "supplied": True,
-        "ticketSha256": ticket_sha256,
         "httpStatus": status,
         "status": "pass",
         "contractName": OLD_TICKET_PROOF_CONTRACT,
@@ -983,6 +1094,560 @@ def active_runtime_portal_matches(
     }
 
 
+def canonical_json_sha256(value: Any) -> str:
+    return sha256_bytes(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    )
+
+
+def incident_ticket_commitment_sha256(
+    request: RotationRequest,
+    ticket: str,
+) -> str:
+    context = json.dumps(
+        {
+            "contractName": (
+                "chummer.release-upload-ticket-incident-commitment/v1"
+            ),
+            "sourceHead": request.expected_source_head,
+            "imageId": request.expected_image_id,
+            "newEpochSha256": sha256_text(request.new_epoch),
+            "proofBindSourceSha256": request.expected_proof_sha256,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    ticket_bytes = bytearray(ticket.encode("ascii"))
+    try:
+        return hmac.new(
+            bytes(ticket_bytes),
+            context,
+            digestmod=hashlib.sha256,
+        ).hexdigest()
+    finally:
+        for index in range(len(ticket_bytes)):
+            ticket_bytes[index] = 0
+
+
+def rotation_intent_sha256(
+    request: RotationRequest,
+    *,
+    incident_ticket_commitment: str,
+) -> str:
+    if LOWER_SHA256.fullmatch(incident_ticket_commitment) is None:
+        raise RotationError("incident_ticket_commitment_invalid")
+    return canonical_json_sha256(
+        {
+            "contractName": CONTRACT_NAME,
+            "sourceHead": request.expected_source_head,
+            "imageId": request.expected_image_id,
+            "proofBindSourceSha256": request.expected_proof_sha256,
+            "environmentSha256Before": request.expected_env_sha256_before,
+            "newEpochSha256": sha256_text(request.new_epoch),
+            "receiptPath": str(request.output),
+            "activeRuntimeAuthorityPath": str(
+                request.active_runtime_authority
+            ),
+            "epochHistoryPath": str(request.epoch_history_path),
+            "epochHistoryBootstrapAuthoritySha256": (
+                request.expected_epoch_history_bootstrap_authority_sha256
+            ),
+            "epochHistoryBootstrapMarkerPath": str(
+                request.epoch_history_bootstrap_marker
+            ),
+            "edgeWafControlPlaneFingerprintSha256": (
+                request.expected_edge_waf_control_plane_sha256
+            ),
+            "incidentTicketCommitmentSha256": (
+                incident_ticket_commitment
+            ),
+        }
+    )
+
+
+def _validate_timestamp(value: Any, *, code: str) -> None:
+    if type(value) is not str:
+        raise RotationError(code)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise RotationError(code) from exc
+    if parsed.tzinfo is None:
+        raise RotationError(code)
+
+
+def load_epoch_history_bootstrap_authority(
+    path: Path,
+    *,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], str, tuple[str, ...]]:
+    if LOWER_SHA256.fullmatch(expected_sha256) is None:
+        raise RotationError(
+            "epoch_history_bootstrap_authority_sha256_invalid"
+        )
+    payload = read_owner_only_file(
+        path,
+        label="epoch_history_bootstrap_authority",
+        maximum_bytes=MAX_BOOTSTRAP_AUTHORITY_BYTES,
+    )
+    actual_sha256 = sha256_bytes(payload)
+    if actual_sha256 != expected_sha256:
+        raise RotationError(
+            "epoch_history_bootstrap_authority_sha256_mismatch"
+        )
+    authority = strict_json_object(
+        payload,
+        label="epoch_history_bootstrap_authority",
+    )
+    known_legacy = authority.get("knownLegacyEpochSha256")
+    if (
+        set(authority) != EPOCH_HISTORY_BOOTSTRAP_AUTHORITY_FIELDS
+        or authority.get("contractName")
+        != EPOCH_HISTORY_BOOTSTRAP_AUTHORITY_CONTRACT
+        or authority.get("status") != "approved"
+        or not isinstance(known_legacy, list)
+        or not known_legacy
+        or any(
+            type(epoch_sha256) is not str
+            or LOWER_SHA256.fullmatch(epoch_sha256) is None
+            for epoch_sha256 in known_legacy
+        )
+        or len(set(known_legacy)) != len(known_legacy)
+    ):
+        raise RotationError(
+            "epoch_history_bootstrap_authority_contract_invalid"
+        )
+    _validate_timestamp(
+        authority.get("generatedAtUtc"),
+        code="epoch_history_bootstrap_authority_contract_invalid",
+    )
+    return authority, actual_sha256, tuple(known_legacy)
+
+
+def validate_epoch_history_bootstrap_marker(
+    marker: dict[str, Any],
+    *,
+    expected_bootstrap_authority_sha256: str,
+) -> None:
+    known_legacy = marker.get("knownLegacyEpochSha256")
+    if (
+        set(marker) != EPOCH_HISTORY_BOOTSTRAP_MARKER_FIELDS
+        or marker.get("contractName")
+        != EPOCH_HISTORY_BOOTSTRAP_MARKER_CONTRACT
+        or marker.get("status") != "initialized"
+        or marker.get("bootstrapAuthoritySha256")
+        != expected_bootstrap_authority_sha256
+        or not isinstance(known_legacy, list)
+        or not known_legacy
+        or any(
+            type(epoch_sha256) is not str
+            or LOWER_SHA256.fullmatch(epoch_sha256) is None
+            for epoch_sha256 in known_legacy
+        )
+        or len(set(known_legacy)) != len(known_legacy)
+        or type(marker.get("initialRotationIntentSha256")) is not str
+        or LOWER_SHA256.fullmatch(
+            marker["initialRotationIntentSha256"]
+        )
+        is None
+        or type(marker.get("epochHistoryPathSha256")) is not str
+        or LOWER_SHA256.fullmatch(marker["epochHistoryPathSha256"])
+        is None
+    ):
+        raise RotationError(
+            "epoch_history_bootstrap_marker_contract_invalid"
+        )
+    _validate_timestamp(
+        marker.get("generatedAtUtc"),
+        code="epoch_history_bootstrap_marker_contract_invalid",
+    )
+
+
+def load_epoch_history_bootstrap_marker(
+    path: Path,
+    *,
+    expected_sha256: str,
+    expected_bootstrap_authority_sha256: str,
+) -> tuple[dict[str, Any] | None, str]:
+    require_owner_only_directory(
+        path.parent,
+        label="epoch_history_bootstrap_marker_root",
+    )
+    if path.is_symlink():
+        raise RotationError("epoch_history_bootstrap_marker_path_invalid")
+    if expected_sha256 == EPOCH_HISTORY_ABSENT_PIN:
+        if os.path.lexists(path):
+            raise RotationError(
+                "epoch_history_bootstrap_marker_expected_absent"
+            )
+        return None, EPOCH_HISTORY_ABSENT_PIN
+    if LOWER_SHA256.fullmatch(expected_sha256) is None:
+        raise RotationError(
+            "epoch_history_bootstrap_marker_expected_sha256_invalid"
+        )
+    payload = read_owner_only_file(
+        path,
+        label="epoch_history_bootstrap_marker",
+        maximum_bytes=MAX_BOOTSTRAP_AUTHORITY_BYTES,
+    )
+    actual_sha256 = sha256_bytes(payload)
+    if actual_sha256 != expected_sha256:
+        raise RotationError(
+            "epoch_history_bootstrap_marker_sha256_mismatch"
+        )
+    marker = strict_json_object(
+        payload,
+        label="epoch_history_bootstrap_marker",
+    )
+    validate_epoch_history_bootstrap_marker(
+        marker,
+        expected_bootstrap_authority_sha256=(
+            expected_bootstrap_authority_sha256
+        ),
+    )
+    return marker, actual_sha256
+
+
+def publish_epoch_history_bootstrap_marker(
+    request: RotationRequest,
+    *,
+    bootstrap_authority_sha256: str,
+    known_legacy_epoch_sha256: tuple[str, ...],
+    intent_sha256: str,
+) -> str:
+    marker = {
+        "contractName": EPOCH_HISTORY_BOOTSTRAP_MARKER_CONTRACT,
+        "status": "initialized",
+        "generatedAtUtc": now_iso(),
+        "bootstrapAuthoritySha256": bootstrap_authority_sha256,
+        "knownLegacyEpochSha256": list(known_legacy_epoch_sha256),
+        "initialRotationIntentSha256": intent_sha256,
+        "epochHistoryPathSha256": sha256_text(
+            str(request.epoch_history_path)
+        ),
+    }
+    validate_epoch_history_bootstrap_marker(
+        marker,
+        expected_bootstrap_authority_sha256=bootstrap_authority_sha256,
+    )
+    _prior, prior_sha256 = load_epoch_history_bootstrap_marker(
+        request.epoch_history_bootstrap_marker,
+        expected_sha256=EPOCH_HISTORY_ABSENT_PIN,
+        expected_bootstrap_authority_sha256=bootstrap_authority_sha256,
+    )
+    assert prior_sha256 == EPOCH_HISTORY_ABSENT_PIN
+    marker_sha256 = atomic_write_private_json(
+        request.epoch_history_bootstrap_marker,
+        marker,
+    )
+    _verified, verified_sha256 = load_epoch_history_bootstrap_marker(
+        request.epoch_history_bootstrap_marker,
+        expected_sha256=marker_sha256,
+        expected_bootstrap_authority_sha256=bootstrap_authority_sha256,
+    )
+    return verified_sha256
+
+
+def _history_event_sha256(event: dict[str, Any]) -> str:
+    return canonical_json_sha256(
+        {key: value for key, value in event.items() if key != "eventSha256"}
+    )
+
+
+def validate_epoch_history(history: dict[str, Any]) -> None:
+    events = history.get("events")
+    generation = history.get("generation")
+    updated_at = history.get("updatedAtUtc")
+    head_event_sha256 = history.get("headEventSha256")
+    if (
+        set(history) != EPOCH_HISTORY_FIELDS
+        or history.get("contractName") != EPOCH_HISTORY_CONTRACT
+        or history.get("status") != "active"
+        or not isinstance(events, list)
+        or not events
+        or type(generation) is not int
+        or generation != len(events)
+        or not isinstance(updated_at, str)
+        or not isinstance(head_event_sha256, str)
+        or LOWER_SHA256.fullmatch(head_event_sha256) is None
+    ):
+        raise RotationError("epoch_history_contract_invalid")
+    try:
+        updated = datetime.fromisoformat(
+            updated_at.replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise RotationError("epoch_history_contract_invalid") from exc
+    if updated.tzinfo is None:
+        raise RotationError("epoch_history_contract_invalid")
+
+    seen_epochs: dict[str, str] = {}
+    prior_event_sha256 = ZERO_SHA256
+    for sequence, raw_event in enumerate(history["events"]):
+        if not isinstance(raw_event, dict) or set(raw_event) != (
+            EPOCH_HISTORY_EVENT_FIELDS
+        ):
+            raise RotationError("epoch_history_event_invalid")
+        event = raw_event
+        event_sequence = event.get("sequence")
+        event_type = event.get("eventType")
+        epoch_sha256 = event.get("epochSha256")
+        intent_sha256 = event.get("rotationIntentSha256")
+        previous_event_sha256 = event.get("previousEventSha256")
+        recorded_at = event.get("recordedAtUtc")
+        source_head = event.get("sourceHead")
+        image_id = event.get("imageId")
+        event_sha256 = event.get("eventSha256")
+        if (
+            type(event_sequence) is not int
+            or event_sequence != sequence
+            or not isinstance(event_type, str)
+            or event_type
+            not in {
+                "legacy_observed",
+                "rotation_reserved",
+                "rotation_committed",
+            }
+            or not isinstance(epoch_sha256, str)
+            or LOWER_SHA256.fullmatch(epoch_sha256) is None
+            or not isinstance(intent_sha256, str)
+            or LOWER_SHA256.fullmatch(intent_sha256) is None
+            or not isinstance(previous_event_sha256, str)
+            or previous_event_sha256 != prior_event_sha256
+            or not isinstance(recorded_at, str)
+            or not isinstance(source_head, str)
+            or re.fullmatch(r"[0-9a-f]{40}", source_head) is None
+            or not isinstance(image_id, str)
+            or IMAGE_ID.fullmatch(image_id) is None
+            or not isinstance(event_sha256, str)
+            or LOWER_SHA256.fullmatch(event_sha256) is None
+            or _history_event_sha256(event) != event_sha256
+        ):
+            raise RotationError("epoch_history_event_invalid")
+        try:
+            recorded = datetime.fromisoformat(
+                recorded_at.replace("Z", "+00:00")
+            )
+        except ValueError as exc:
+            raise RotationError("epoch_history_event_invalid") from exc
+        if recorded.tzinfo is None:
+            raise RotationError("epoch_history_event_invalid")
+
+        if event_type == "legacy_observed":
+            if (
+                intent_sha256 != ZERO_SHA256
+                or any(
+                    prior.get("eventType") != "legacy_observed"
+                    for prior in history["events"][:sequence]
+                )
+            ):
+                raise RotationError("epoch_history_legacy_invalid")
+            if epoch_sha256 in seen_epochs:
+                raise RotationError("epoch_history_epoch_reused")
+            seen_epochs[epoch_sha256] = ZERO_SHA256
+        elif event_type == "rotation_reserved":
+            if intent_sha256 == ZERO_SHA256 or epoch_sha256 in seen_epochs:
+                raise RotationError("epoch_history_epoch_reused")
+            seen_epochs[epoch_sha256] = intent_sha256
+        else:
+            if (
+                sequence == 0
+                or history["events"][sequence - 1].get("eventType")
+                != "rotation_reserved"
+                or history["events"][sequence - 1].get("epochSha256")
+                != epoch_sha256
+                or history["events"][sequence - 1].get(
+                    "rotationIntentSha256"
+                )
+                != intent_sha256
+                or seen_epochs.get(epoch_sha256) != intent_sha256
+            ):
+                raise RotationError("epoch_history_commit_invalid")
+        prior_event_sha256 = event_sha256
+    if history["headEventSha256"] != prior_event_sha256:
+        raise RotationError("epoch_history_head_invalid")
+
+
+def load_epoch_history(
+    path: Path,
+    *,
+    expected_sha256: str,
+) -> tuple[dict[str, Any] | None, str]:
+    require_owner_only_directory(path.parent, label="epoch_history_root")
+    if path.is_symlink():
+        raise RotationError("epoch_history_path_invalid")
+    if expected_sha256 == EPOCH_HISTORY_ABSENT_PIN:
+        if os.path.lexists(path):
+            raise RotationError("epoch_history_expected_absent")
+        return None, EPOCH_HISTORY_ABSENT_PIN
+    if LOWER_SHA256.fullmatch(expected_sha256) is None:
+        raise RotationError("epoch_history_expected_sha256_invalid")
+    payload = read_owner_only_file(
+        path,
+        label="epoch_history",
+        maximum_bytes=MAX_HISTORY_BYTES,
+    )
+    actual_sha256 = sha256_bytes(payload)
+    if actual_sha256 != expected_sha256:
+        raise RotationError("epoch_history_sha256_mismatch")
+    history = strict_json_object(payload, label="epoch_history")
+    validate_epoch_history(history)
+    return history, actual_sha256
+
+
+def _new_history_event(
+    *,
+    sequence: int,
+    event_type: str,
+    epoch_sha256: str,
+    intent_sha256: str,
+    previous_event_sha256: str,
+    request: RotationRequest,
+) -> dict[str, Any]:
+    event = {
+        "sequence": sequence,
+        "eventType": event_type,
+        "epochSha256": epoch_sha256,
+        "rotationIntentSha256": intent_sha256,
+        "previousEventSha256": previous_event_sha256,
+        "recordedAtUtc": now_iso(),
+        "sourceHead": request.expected_source_head,
+        "imageId": request.expected_image_id,
+    }
+    event["eventSha256"] = _history_event_sha256(event)
+    return event
+
+
+def _history_with_events(events: list[dict[str, Any]]) -> dict[str, Any]:
+    history = {
+        "contractName": EPOCH_HISTORY_CONTRACT,
+        "status": "active",
+        "updatedAtUtc": now_iso(),
+        "generation": len(events),
+        "headEventSha256": events[-1]["eventSha256"],
+        "events": events,
+    }
+    validate_epoch_history(history)
+    return history
+
+
+def reserve_epoch_history(
+    history: dict[str, Any] | None,
+    *,
+    current_epoch_sha256: str,
+    new_epoch_sha256: str,
+    intent_sha256: str,
+    known_legacy_epoch_sha256: tuple[str, ...],
+    request: RotationRequest,
+) -> tuple[dict[str, Any], bool]:
+    events = [] if history is None else list(history["events"])
+    if not events:
+        if (
+            current_epoch_sha256 not in known_legacy_epoch_sha256
+            or new_epoch_sha256 in known_legacy_epoch_sha256
+        ):
+            raise RotationError(
+                "epoch_history_bootstrap_legacy_epochs_invalid"
+            )
+        for legacy_epoch_sha256 in known_legacy_epoch_sha256:
+            events.append(
+                _new_history_event(
+                    sequence=len(events),
+                    event_type="legacy_observed",
+                    epoch_sha256=legacy_epoch_sha256,
+                    intent_sha256=ZERO_SHA256,
+                    previous_event_sha256=(
+                        events[-1]["eventSha256"]
+                        if events
+                        else ZERO_SHA256
+                    ),
+                    request=request,
+                )
+            )
+    elif not any(
+        event["epochSha256"] == current_epoch_sha256 for event in events
+    ):
+        raise RotationError("epoch_history_current_epoch_missing")
+
+    matching = [
+        event for event in events if event["epochSha256"] == new_epoch_sha256
+    ]
+    if matching:
+        if any(
+            event["eventType"] in {"rotation_reserved", "rotation_committed"}
+            and event["rotationIntentSha256"] == intent_sha256
+            for event in matching
+        ):
+            assert history is not None
+            return history, False
+        raise RotationError("epoch_history_epoch_reused")
+    events.append(
+        _new_history_event(
+            sequence=len(events),
+            event_type="rotation_reserved",
+            epoch_sha256=new_epoch_sha256,
+            intent_sha256=intent_sha256,
+            previous_event_sha256=events[-1]["eventSha256"],
+            request=request,
+        )
+    )
+    return _history_with_events(events), True
+
+
+def commit_epoch_history(
+    history: dict[str, Any],
+    *,
+    new_epoch_sha256: str,
+    intent_sha256: str,
+    request: RotationRequest,
+) -> tuple[dict[str, Any], bool]:
+    events = list(history["events"])
+    if (
+        events[-1]["eventType"] == "rotation_committed"
+        and events[-1]["epochSha256"] == new_epoch_sha256
+        and events[-1]["rotationIntentSha256"] == intent_sha256
+    ):
+        return history, False
+    if (
+        events[-1]["eventType"] != "rotation_reserved"
+        or events[-1]["epochSha256"] != new_epoch_sha256
+        or events[-1]["rotationIntentSha256"] != intent_sha256
+    ):
+        raise RotationError("epoch_history_reservation_missing")
+    events.append(
+        _new_history_event(
+            sequence=len(events),
+            event_type="rotation_committed",
+            epoch_sha256=new_epoch_sha256,
+            intent_sha256=intent_sha256,
+            previous_event_sha256=events[-1]["eventSha256"],
+            request=request,
+        )
+    )
+    return _history_with_events(events), True
+
+
+def publish_epoch_history(
+    path: Path,
+    history: dict[str, Any],
+    *,
+    expected_current_sha256: str,
+) -> str:
+    load_epoch_history(path, expected_sha256=expected_current_sha256)
+    history_sha256 = atomic_write_private_json(path, history)
+    _history, verified_sha256 = load_epoch_history(
+        path,
+        expected_sha256=history_sha256,
+    )
+    return verified_sha256
+
+
 def publish_active_runtime_authority(
     path: Path,
     *,
@@ -1006,11 +1671,16 @@ def publish_active_runtime_authority(
 def publish_epoch_authority(
     request: RotationRequest,
     *,
+    incident_ticket_commitment: str,
     rotation_receipt_sha256: str,
     active_runtime_authority_sha256: str,
     portal: PortalEvidence,
     storage_authority: dict[str, Any],
     environment_sha256_after: str,
+    epoch_history_sha256: str,
+    epoch_history_head_event_sha256: str,
+    epoch_history_bootstrap_marker_sha256: str,
+    edge_waf_control_plane_fingerprint_sha256: str,
 ) -> str:
     storage_sha256 = sha256_bytes(
         json.dumps(
@@ -1029,6 +1699,27 @@ def publish_epoch_authority(
         "proofBindSourceSha256": request.expected_proof_sha256,
         "newEpochSha256": sha256_text(request.new_epoch),
         "environmentSha256After": environment_sha256_after,
+        "epochHistoryPath": str(request.epoch_history_path),
+        "epochHistorySha256": epoch_history_sha256,
+        "epochHistoryHeadEventSha256": (
+            epoch_history_head_event_sha256
+        ),
+        "rotationIntentSha256": rotation_intent_sha256(
+            request,
+            incident_ticket_commitment=incident_ticket_commitment,
+        ),
+        "epochHistoryBootstrapAuthoritySha256": (
+            request.expected_epoch_history_bootstrap_authority_sha256
+        ),
+        "epochHistoryBootstrapMarkerPath": str(
+            request.epoch_history_bootstrap_marker
+        ),
+        "epochHistoryBootstrapMarkerSha256": (
+            epoch_history_bootstrap_marker_sha256
+        ),
+        "edgeWafControlPlaneFingerprintSha256": (
+            edge_waf_control_plane_fingerprint_sha256
+        ),
         "portalContainerId": portal.container_id,
         "portalContainerName": portal.container_name,
         "portalRuntimeContractSha256": portal.runtime_contract_sha256,
@@ -1057,13 +1748,25 @@ class RotationRequest:
     expected_portal_replicas: int
     shared_mutation_lock_token: str
     old_ticket_path: Path | None
-    old_ticket_sha256: str
+    old_ticket_authority: TicketMaterializationAuthority
     proof_bind_source: Path
     expected_existing_receipt_sha256: str
     epoch_authority_output: Path
+    epoch_history_path: Path
+    expected_epoch_history_sha256: str
+    epoch_history_bootstrap_authority: Path
+    expected_epoch_history_bootstrap_authority_sha256: str
+    epoch_history_bootstrap_marker: Path
+    expected_epoch_history_bootstrap_marker_sha256: str
+    edge_waf_control_plane_source: Path
+    expected_edge_waf_control_plane_sha256: str
 
 
-def _base_receipt(request: RotationRequest) -> dict[str, Any]:
+def _base_receipt(
+    request: RotationRequest,
+    *,
+    incident_ticket_commitment: str,
+) -> dict[str, Any]:
     return {
         "contractName": CONTRACT_NAME,
         "status": "in_progress",
@@ -1075,6 +1778,22 @@ def _base_receipt(request: RotationRequest) -> dict[str, Any]:
         "imageId": request.expected_image_id,
         "proofBindSourceSha256": request.expected_proof_sha256,
         "epochAuthorityPath": str(request.epoch_authority_output),
+        "epochHistoryPath": str(request.epoch_history_path),
+        "epochHistoryExpectedSha256": (
+            request.expected_epoch_history_sha256
+        ),
+        "epochHistorySha256Before": "",
+        "epochHistorySha256AfterReservation": "",
+        "epochHistorySha256AfterCommit": "",
+        "epochHistoryHeadEventSha256": "",
+        "epochHistoryBootstrapAuthoritySha256": (
+            request.expected_epoch_history_bootstrap_authority_sha256
+        ),
+        "epochHistoryBootstrapMarkerSha256": "",
+        "rotationIntentSha256": rotation_intent_sha256(
+            request,
+            incident_ticket_commitment=incident_ticket_commitment,
+        ),
         "portalReplicaCount": request.expected_portal_replicas,
         "newEpochSha256": sha256_text(request.new_epoch),
         "environmentSha256Before": request.expected_env_sha256_before,
@@ -1095,7 +1814,6 @@ def _base_receipt(request: RotationRequest) -> dict[str, Any]:
         "publicGetChecksAfter": [],
         "oldTicketRevocationProof": {
             "supplied": request.old_ticket_path is not None,
-            "ticketSha256": request.old_ticket_sha256,
             "httpStatus": None,
             "status": "pending" if request.old_ticket_path is not None else "not_supplied",
         },
@@ -1103,6 +1821,15 @@ def _base_receipt(request: RotationRequest) -> dict[str, Any]:
             "mutationAuthorized": False,
             "mutationPerformed": False,
             "preservedThroughPostVerification": False,
+            "controlPlaneFingerprintSha256Before": (
+                request.expected_edge_waf_control_plane_sha256
+            ),
+            "controlPlaneFingerprintSha256After": "",
+        },
+        "recreated": False,
+        "failureContainment": {
+            "portalQuiescenceProven": False,
+            "publicConnectorsStopped": False,
         },
         "rollbackPolicy": "old_epoch_rollback_permanently_forbidden_after_epoch_commit",
         "recreationPolicy": "all_prior_replicas_stopped_and_removed_before_any_recreate",
@@ -1111,30 +1838,80 @@ def _base_receipt(request: RotationRequest) -> dict[str, Any]:
 
 
 def _validate_request(request: RotationRequest) -> None:
+    canonical_paths = {
+        "environment": request.env_file,
+        "active_runtime_authority": request.active_runtime_authority,
+        "receipt": request.output,
+        "proof_bind_source": request.proof_bind_source,
+        "epoch_authority": request.epoch_authority_output,
+        "epoch_history": request.epoch_history_path,
+        "epoch_history_bootstrap_authority": (
+            request.epoch_history_bootstrap_authority
+        ),
+        "epoch_history_bootstrap_marker": (
+            request.epoch_history_bootstrap_marker
+        ),
+        "edge_waf_control_plane_source": (
+            request.edge_waf_control_plane_source
+        ),
+    }
+    if request.old_ticket_path is not None:
+        canonical_paths["old_ticket"] = request.old_ticket_path
+    for label, path in canonical_paths.items():
+        if (
+            not path.is_absolute()
+            or overlay.normalized_absolute_path(path) != path
+        ):
+            raise RotationError(f"{label}_path_invalid")
+    mutation_outputs = {
+        request.output,
+        request.epoch_authority_output,
+        request.epoch_history_path,
+        request.epoch_history_bootstrap_marker,
+    }
+    if len(mutation_outputs) != 4 or mutation_outputs & {
+        request.env_file,
+        request.active_runtime_authority,
+        request.proof_bind_source,
+        request.epoch_history_bootstrap_authority,
+        request.edge_waf_control_plane_source,
+        request.old_ticket_path,
+    }:
+        raise RotationError("rotation_authority_paths_overlap")
     if LOWER_SHA256.fullmatch(request.expected_env_sha256_before) is None:
         raise RotationError("expected_environment_sha256_invalid")
     if IMAGE_ID.fullmatch(request.expected_image_id) is None:
         raise RotationError("expected_image_id_invalid")
     if LOWER_SHA256.fullmatch(request.expected_proof_sha256) is None:
         raise RotationError("expected_proof_sha256_invalid")
-    if (
-        not request.proof_bind_source.is_absolute()
-        or overlay.normalized_absolute_path(request.proof_bind_source)
-        != request.proof_bind_source
-    ):
-        raise RotationError("proof_bind_source_path_invalid")
+    if request.image_tag != CANONICAL_IMAGE_TAG:
+        raise RotationError("image_tag_not_canonical")
     if request.expected_existing_receipt_sha256 and LOWER_SHA256.fullmatch(
         request.expected_existing_receipt_sha256
     ) is None:
         raise RotationError("expected_existing_receipt_sha256_invalid")
     if (
-        not request.epoch_authority_output.is_absolute()
-        or overlay.normalized_absolute_path(request.epoch_authority_output)
-        != request.epoch_authority_output
-        or request.epoch_authority_output
+        request.epoch_authority_output
         in {request.output, request.active_runtime_authority}
     ):
         raise RotationError("epoch_authority_output_invalid")
+    if (
+        request.epoch_history_path
+        in {
+            request.output,
+            request.active_runtime_authority,
+            request.epoch_authority_output,
+        }
+        or (
+            request.expected_epoch_history_sha256
+            != EPOCH_HISTORY_ABSENT_PIN
+            and LOWER_SHA256.fullmatch(
+                request.expected_epoch_history_sha256
+            )
+            is None
+        )
+    ):
+        raise RotationError("epoch_history_authority_invalid")
     if re.fullmatch(r"[0-9a-f]{40}", request.expected_source_head) is None:
         raise RotationError("expected_source_head_invalid")
     if SAFE_EPOCH.fullmatch(request.new_epoch) is None:
@@ -1145,18 +1922,480 @@ def _validate_request(request: RotationRequest) -> None:
         raise RotationError("portal_replica_count_must_be_one")
     if re.fullmatch(r"[0-9a-f]{64}", request.shared_mutation_lock_token) is None:
         raise RotationError("shared_mutation_lock_token_invalid")
-    if (request.old_ticket_path is None) != (not request.old_ticket_sha256):
-        raise RotationError("old_ticket_proof_arguments_incomplete")
-    if request.old_ticket_sha256 and LOWER_SHA256.fullmatch(
-        request.old_ticket_sha256
+    if request.old_ticket_path is None:
+        raise RotationError("old_ticket_proof_required")
+    ticket_authority = request.old_ticket_authority
+    if (
+        not isinstance(
+            ticket_authority,
+            TicketMaterializationAuthority,
+        )
+        or type(ticket_authority.fd) is not int
+        or ticket_authority.fd < 3
+        or ticket_authority.fd > 255
+        or type(ticket_authority.ticket_size_bytes) is not int
+        or ticket_authority.ticket_size_bytes < 1
+        or ticket_authority.ticket_size_bytes > MAX_TICKET_BYTES
+        or any(
+            LOWER_SHA256.fullmatch(value) is None
+            for value in (
+                ticket_authority.ticket_path_sha256,
+                ticket_authority.ticket_sha256,
+                ticket_authority.envelope_sha256,
+                ticket_authority.inventory_commitment_sha256,
+                ticket_authority.recipient_certificate_sha256,
+                ticket_authority.signer_certificate_sha256,
+                ticket_authority.openssl_executable_sha256,
+            )
+        )
+        or SAFE_TRANSACTION_ID.fullmatch(
+            ticket_authority.materialization_transaction_id
+        )
+        is None
+    ):
+        raise RotationError("old_ticket_authority_invalid")
+    if LOWER_SHA256.fullmatch(
+        request.expected_epoch_history_bootstrap_authority_sha256
     ) is None:
-        raise RotationError("old_ticket_sha256_invalid")
+        raise RotationError(
+            "epoch_history_bootstrap_authority_sha256_invalid"
+        )
+    if (
+        request.expected_epoch_history_bootstrap_marker_sha256
+        != EPOCH_HISTORY_ABSENT_PIN
+        and LOWER_SHA256.fullmatch(
+            request.expected_epoch_history_bootstrap_marker_sha256
+        )
+        is None
+    ):
+        raise RotationError(
+            "epoch_history_bootstrap_marker_sha256_invalid"
+        )
+    if LOWER_SHA256.fullmatch(
+        request.expected_edge_waf_control_plane_sha256
+    ) is None:
+        raise RotationError(
+            "edge_waf_control_plane_fingerprint_invalid"
+        )
+
+
+ROTATION_RECEIPT_FIELDS = {
+    "contractName",
+    "status",
+    "phase",
+    "generatedAtUtc",
+    "updatedAtUtc",
+    "sourceHead",
+    "imageTag",
+    "imageId",
+    "proofBindSourceSha256",
+    "epochAuthorityPath",
+    "epochHistoryPath",
+    "epochHistoryExpectedSha256",
+    "epochHistorySha256Before",
+    "epochHistorySha256AfterReservation",
+    "epochHistorySha256AfterCommit",
+    "epochHistoryHeadEventSha256",
+    "epochHistoryBootstrapAuthoritySha256",
+    "epochHistoryBootstrapMarkerSha256",
+    "rotationIntentSha256",
+    "portalReplicaCount",
+    "newEpochSha256",
+    "environmentSha256Before",
+    "environmentSha256After",
+    "activeRuntimeAuthoritySha256Before",
+    "activeRuntimeAuthoritySha256After",
+    "activeRuntimeAuthorityStaticSha256",
+    "oldEpochSha256",
+    "preRotationPortals",
+    "postRotationPortals",
+    "canonicalTunnelsBefore",
+    "canonicalTunnelsAfter",
+    "storageAuthorityBefore",
+    "storageAuthorityAfter",
+    "loopbackChecksBefore",
+    "loopbackChecksAfter",
+    "publicGetChecksBefore",
+    "publicGetChecksAfter",
+    "oldTicketRevocationProof",
+    "edgeWaf",
+    "recreated",
+    "failureContainment",
+    "rollbackPolicy",
+    "recreationPolicy",
+    "failureCode",
+}
+PORTAL_RECEIPT_FIELDS = {
+    "containerId",
+    "containerName",
+    "imageId",
+    "running",
+    "health",
+    "restartPolicy",
+    "epochSha256",
+    "binarySha256",
+    "proofAuthoritySha256",
+    "proofPublicSha256",
+    "mounts",
+    "releaseUploadSessionRoot",
+    "dataProtectionRoot",
+    "directBundleUploadEnabled",
+    "runtimeContractSha256",
+}
+MOUNT_RECEIPT_FIELDS = {"destination", "volume_name", "read_write"}
+TUNNEL_RECEIPT_FIELDS = {
+    "service",
+    "containerId",
+    "imageId",
+    "running",
+    "health",
+}
+
+
+def _require_receipt_string(
+    value: Any,
+    *,
+    code: str = "receipt_types_invalid",
+    pattern: re.Pattern[str] | None = None,
+    allow_empty: bool = False,
+) -> str:
+    if (
+        type(value) is not str
+        or (not allow_empty and not value)
+        or (value and pattern is not None and pattern.fullmatch(value) is None)
+    ):
+        raise RotationError(code)
+    return value
+
+
+def _validate_portal_receipt_payload(value: Any) -> None:
+    if not isinstance(value, dict) or set(value) != PORTAL_RECEIPT_FIELDS:
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(value["containerId"], pattern=CONTAINER_ID)
+    _require_receipt_string(value["containerName"], pattern=SAFE_CONTAINER_NAME)
+    _require_receipt_string(value["imageId"], pattern=IMAGE_ID)
+    if type(value["running"]) is not bool:
+        raise RotationError("receipt_types_invalid")
+    for key in (
+        "health",
+        "restartPolicy",
+        "releaseUploadSessionRoot",
+        "dataProtectionRoot",
+        "directBundleUploadEnabled",
+    ):
+        _require_receipt_string(value[key])
+    for key in (
+        "epochSha256",
+        "binarySha256",
+        "proofAuthoritySha256",
+        "proofPublicSha256",
+        "runtimeContractSha256",
+    ):
+        _require_receipt_string(value[key], pattern=LOWER_SHA256)
+    mounts = value["mounts"]
+    if not isinstance(mounts, dict) or set(mounts) != {
+        "state",
+        "releaseUploadSessions",
+    }:
+        raise RotationError("receipt_types_invalid")
+    for mount in mounts.values():
+        if not isinstance(mount, dict) or set(mount) != MOUNT_RECEIPT_FIELDS:
+            raise RotationError("receipt_types_invalid")
+        _require_receipt_string(mount["destination"])
+        _require_receipt_string(mount["volume_name"])
+        if type(mount["read_write"]) is not bool:
+            raise RotationError("receipt_types_invalid")
+
+
+def _validate_tunnel_receipt_payload(value: Any) -> None:
+    if not isinstance(value, dict) or set(value) != TUNNEL_RECEIPT_FIELDS:
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(value["service"])
+    _require_receipt_string(value["containerId"], pattern=CONTAINER_ID)
+    _require_receipt_string(value["imageId"], pattern=IMAGE_ID)
+    if type(value["running"]) is not bool:
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(value["health"])
+
+
+def _validate_storage_receipt_payload(value: Any) -> None:
+    if value == {}:
+        return
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"volumes", "probes", "localFallbackAbsent"}
+        or value.get("localFallbackAbsent") is not True
+    ):
+        raise RotationError("receipt_types_invalid")
+    volumes = value["volumes"]
+    probes = value["probes"]
+    if (
+        not isinstance(volumes, dict)
+        or set(volumes) != {"state", "releaseUploadSessions"}
+        or not isinstance(probes, dict)
+        or set(probes)
+        != {"dataProtectionKeyring", "releaseUploadSessions"}
+    ):
+        raise RotationError("receipt_types_invalid")
+    volume_fields = {
+        "name",
+        "driver",
+        "scope",
+        "mountpoint",
+        "created_at",
+        "options_sha256",
+        "labels_sha256",
+    }
+    for volume in volumes.values():
+        if not isinstance(volume, dict) or set(volume) != volume_fields:
+            raise RotationError("receipt_types_invalid")
+        for key in ("name", "driver", "scope", "mountpoint", "created_at"):
+            _require_receipt_string(volume[key])
+        for key in ("options_sha256", "labels_sha256"):
+            _require_receipt_string(volume[key], pattern=LOWER_SHA256)
+    probe_fields = {
+        "path",
+        "uid",
+        "gid",
+        "mode",
+        "key_file_count",
+        "encrypted_key_file_count",
+    }
+    for probe in probes.values():
+        if not isinstance(probe, dict) or set(probe) != probe_fields:
+            raise RotationError("receipt_types_invalid")
+        _require_receipt_string(probe["path"])
+        _require_receipt_string(probe["mode"])
+        for key in (
+            "uid",
+            "gid",
+            "key_file_count",
+            "encrypted_key_file_count",
+        ):
+            if type(probe[key]) is not int or probe[key] < 0:
+                raise RotationError("receipt_types_invalid")
+
+
+def validate_rotation_receipt_types(receipt: dict[str, Any]) -> None:
+    if set(receipt) != ROTATION_RECEIPT_FIELDS:
+        raise RotationError("receipt_contract_invalid")
+    for key in (
+        "contractName",
+        "status",
+        "phase",
+        "imageTag",
+        "epochAuthorityPath",
+        "epochHistoryPath",
+        "rollbackPolicy",
+        "recreationPolicy",
+    ):
+        _require_receipt_string(receipt[key])
+    for key in ("generatedAtUtc", "updatedAtUtc"):
+        _validate_timestamp(receipt[key], code="receipt_types_invalid")
+    _require_receipt_string(receipt["sourceHead"])
+    if re.fullmatch(r"[0-9a-f]{40}", receipt["sourceHead"]) is None:
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(receipt["imageId"], pattern=IMAGE_ID)
+    for key in (
+        "proofBindSourceSha256",
+        "epochHistoryBootstrapAuthoritySha256",
+        "rotationIntentSha256",
+        "newEpochSha256",
+        "environmentSha256Before",
+    ):
+        _require_receipt_string(receipt[key], pattern=LOWER_SHA256)
+    for key in (
+        "epochHistorySha256AfterReservation",
+        "epochHistorySha256AfterCommit",
+        "epochHistoryHeadEventSha256",
+        "epochHistoryBootstrapMarkerSha256",
+        "environmentSha256After",
+        "activeRuntimeAuthoritySha256Before",
+        "activeRuntimeAuthoritySha256After",
+        "activeRuntimeAuthorityStaticSha256",
+        "oldEpochSha256",
+    ):
+        _require_receipt_string(
+            receipt[key],
+            pattern=LOWER_SHA256,
+            allow_empty=True,
+        )
+    history_before = receipt["epochHistorySha256Before"]
+    if (
+        history_before not in {"", EPOCH_HISTORY_ABSENT_PIN}
+        and (
+            type(history_before) is not str
+            or LOWER_SHA256.fullmatch(history_before) is None
+        )
+    ):
+        raise RotationError("receipt_types_invalid")
+    history_expected = receipt["epochHistoryExpectedSha256"]
+    if (
+        history_expected != EPOCH_HISTORY_ABSENT_PIN
+        and (
+            type(history_expected) is not str
+            or LOWER_SHA256.fullmatch(history_expected) is None
+        )
+    ):
+        raise RotationError("receipt_types_invalid")
+    if (
+        type(receipt["portalReplicaCount"]) is not int
+        or receipt["portalReplicaCount"] != 1
+        or type(receipt["recreated"]) is not bool
+        or type(receipt["failureCode"]) is not str
+    ):
+        raise RotationError("receipt_types_invalid")
+    for key in ("preRotationPortals", "postRotationPortals"):
+        value = receipt[key]
+        if not isinstance(value, list):
+            raise RotationError("receipt_types_invalid")
+        for portal in value:
+            _validate_portal_receipt_payload(portal)
+    for key in ("canonicalTunnelsBefore", "canonicalTunnelsAfter"):
+        value = receipt[key]
+        if not isinstance(value, list):
+            raise RotationError("receipt_types_invalid")
+        for tunnel in value:
+            _validate_tunnel_receipt_payload(tunnel)
+    for key in ("storageAuthorityBefore", "storageAuthorityAfter"):
+        _validate_storage_receipt_payload(receipt[key])
+    for key in ("loopbackChecksBefore", "loopbackChecksAfter"):
+        value = receipt[key]
+        if not isinstance(value, list):
+            raise RotationError("receipt_types_invalid")
+        for check in value:
+            if (
+                not isinstance(check, dict)
+                or set(check)
+                != {
+                    "containerId",
+                    "route",
+                    "httpStatus",
+                    "responseSha256",
+                }
+                or type(check["httpStatus"]) is not int
+                or check["httpStatus"] != 200
+            ):
+                raise RotationError("receipt_types_invalid")
+            _require_receipt_string(
+                check["containerId"],
+                pattern=CONTAINER_ID,
+            )
+            _require_receipt_string(check["route"])
+            _require_receipt_string(
+                check["responseSha256"],
+                pattern=LOWER_SHA256,
+            )
+    for key in ("publicGetChecksBefore", "publicGetChecksAfter"):
+        value = receipt[key]
+        if not isinstance(value, list):
+            raise RotationError("receipt_types_invalid")
+        for check in value:
+            if (
+                not isinstance(check, dict)
+                or set(check)
+                != {"method", "path", "httpStatus", "responseSha256"}
+                or check.get("method") != "GET"
+                or type(check.get("httpStatus")) is not int
+                or check["httpStatus"] != 200
+            ):
+                raise RotationError("receipt_types_invalid")
+            _require_receipt_string(check["path"])
+            _require_receipt_string(
+                check["responseSha256"],
+                pattern=LOWER_SHA256,
+            )
+    proof = receipt["oldTicketRevocationProof"]
+    if not isinstance(proof, dict) or frozenset(proof) not in {
+        frozenset({"supplied", "httpStatus", "status"}),
+        frozenset(
+            {
+                "supplied",
+                "httpStatus",
+                "status",
+                "contractName",
+                "responseSha256",
+                "nonceSha256",
+                "revocationEpochSha256",
+                "cacheControl",
+            }
+        ),
+    }:
+        raise RotationError("receipt_types_invalid")
+    if (
+        proof.get("supplied") is not True
+        or (
+            proof.get("httpStatus") is not None
+            and type(proof.get("httpStatus")) is not int
+        )
+    ):
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(proof.get("status"))
+    for key in (
+        "contractName",
+        "responseSha256",
+        "nonceSha256",
+        "revocationEpochSha256",
+        "cacheControl",
+    ):
+        if key in proof:
+            pattern = (
+                LOWER_SHA256
+                if key
+                in {
+                    "responseSha256",
+                    "nonceSha256",
+                    "revocationEpochSha256",
+                }
+                else None
+            )
+            _require_receipt_string(proof[key], pattern=pattern)
+    edge_waf = receipt["edgeWaf"]
+    if (
+        not isinstance(edge_waf, dict)
+        or set(edge_waf)
+        != {
+            "mutationAuthorized",
+            "mutationPerformed",
+            "preservedThroughPostVerification",
+            "controlPlaneFingerprintSha256Before",
+            "controlPlaneFingerprintSha256After",
+        }
+        or type(edge_waf["mutationAuthorized"]) is not bool
+        or type(edge_waf["mutationPerformed"]) is not bool
+        or type(edge_waf["preservedThroughPostVerification"]) is not bool
+    ):
+        raise RotationError("receipt_types_invalid")
+    _require_receipt_string(
+        edge_waf["controlPlaneFingerprintSha256Before"],
+        pattern=LOWER_SHA256,
+    )
+    _require_receipt_string(
+        edge_waf["controlPlaneFingerprintSha256After"],
+        pattern=LOWER_SHA256,
+        allow_empty=True,
+    )
+    containment = receipt["failureContainment"]
+    if (
+        not isinstance(containment, dict)
+        or set(containment)
+        != {
+            "portalQuiescenceProven",
+            "publicConnectorsStopped",
+        }
+        or type(containment["portalQuiescenceProven"]) is not bool
+        or type(containment["publicConnectorsStopped"]) is not bool
+    ):
+        raise RotationError("receipt_types_invalid")
 
 
 def _validate_resume_receipt(
     receipt: dict[str, Any],
     request: RotationRequest,
+    *,
+    incident_ticket_commitment: str,
 ) -> None:
+    validate_rotation_receipt_types(receipt)
     expected = {
         "contractName": CONTRACT_NAME,
         "sourceHead": request.expected_source_head,
@@ -1164,17 +2403,31 @@ def _validate_resume_receipt(
         "imageId": request.expected_image_id,
         "proofBindSourceSha256": request.expected_proof_sha256,
         "epochAuthorityPath": str(request.epoch_authority_output),
+        "epochHistoryPath": str(request.epoch_history_path),
+        "epochHistoryBootstrapAuthoritySha256": (
+            request.expected_epoch_history_bootstrap_authority_sha256
+        ),
+        "rotationIntentSha256": rotation_intent_sha256(
+            request,
+            incident_ticket_commitment=incident_ticket_commitment,
+        ),
         "portalReplicaCount": request.expected_portal_replicas,
         "newEpochSha256": sha256_text(request.new_epoch),
         "environmentSha256Before": request.expected_env_sha256_before,
     }
     if any(receipt.get(key) != value for key, value in expected.items()):
         raise RotationError("resume_receipt_authority_mismatch")
+    edge_waf = receipt.get("edgeWaf")
+    if (
+        not isinstance(edge_waf, dict)
+        or edge_waf.get("controlPlaneFingerprintSha256Before")
+        != request.expected_edge_waf_control_plane_sha256
+    ):
+        raise RotationError("resume_waf_authority_mismatch")
     proof = receipt.get("oldTicketRevocationProof")
     if (
         not isinstance(proof, dict)
-        or proof.get("supplied") != (request.old_ticket_path is not None)
-        or proof.get("ticketSha256") != request.old_ticket_sha256
+        or proof.get("supplied") is not True
     ):
         raise RotationError("resume_ticket_proof_authority_mismatch")
 
@@ -1186,17 +2439,57 @@ def observe_epoch_boundary(request: RotationRequest) -> tuple[int, str]:
             label="environment",
             maximum_bytes=MAX_ENV_BYTES,
         )
-        observed_epoch, _ = parse_epoch_environment(environment)
+        parse_epoch_environment(environment)
     except Exception:
         # An unreadable environment makes the commit boundary uncertain.
         return 76, ""
     environment_sha256 = sha256_bytes(environment)
     if environment_sha256 == request.expected_env_sha256_before:
         return 75, environment_sha256
-    return (
-        76 if observed_epoch == request.new_epoch else 75,
-        environment_sha256,
-    )
+    return 76, environment_sha256
+
+
+def fail_closed_contain_precommit_portals(
+    runtime: RuntimeAuthority,
+) -> dict[str, bool]:
+    last_error: Exception | None = None
+    for _attempt in range(3):
+        try:
+            identities = runtime.portal_container_ids()
+            if not identities:
+                return {
+                    "portalQuiescenceProven": True,
+                    "publicConnectorsStopped": False,
+                }
+            try:
+                runtime.quiesce_portals(identities)
+            except Exception as exc:
+                last_error = exc
+            observed = runtime.portal_container_ids()
+            if set(observed) != set(identities):
+                last_error = RotationError(
+                    "portal_requiescence_identity_drift"
+                )
+                continue
+            runtime.assert_portals_stopped(observed)
+            return {
+                "portalQuiescenceProven": True,
+                "publicConnectorsStopped": False,
+            }
+        except Exception as exc:
+            last_error = exc
+    try:
+        runtime.quiesce_public_connectors()
+        runtime.assert_public_connectors_stopped()
+        return {
+            "portalQuiescenceProven": False,
+            "publicConnectorsStopped": True,
+        }
+    except Exception as exc:
+        cause = last_error or exc
+        raise RotationError(
+            "precommit_emergency_containment_not_proven"
+        ) from cause
 
 
 def run_rotation(
@@ -1214,20 +2507,47 @@ def run_rotation(
     current_epoch, _ = parse_epoch_environment(env_payload)
     current_env_sha256 = sha256_bytes(env_payload)
     new_epoch_sha256 = sha256_text(request.new_epoch)
+    ticket, _ticket_sha256 = load_ticket(
+        request.old_ticket_path,
+        request.old_ticket_authority,
+    )
+    incident_ticket_commitment = incident_ticket_commitment_sha256(
+        request,
+        ticket,
+    )
+    (
+        _bootstrap_authority,
+        bootstrap_authority_sha256,
+        known_legacy_epoch_sha256,
+    ) = load_epoch_history_bootstrap_authority(
+        request.epoch_history_bootstrap_authority,
+        expected_sha256=(
+            request.expected_epoch_history_bootstrap_authority_sha256
+        ),
+    )
+    edge_waf_control_plane_fingerprint_sha256 = (
+        verify_edge_waf_control_plane_source(request)
+    )
 
     existing_receipt = request.output.exists() or request.output.is_symlink()
     if existing_receipt:
         receipt, receipt_sha256 = strict_receipt(request.output)
-        if (
-            request.expected_existing_receipt_sha256
-            and receipt_sha256 != request.expected_existing_receipt_sha256
-        ):
+        if not request.expected_existing_receipt_sha256:
+            raise RotationError("existing_receipt_sha256_required")
+        if receipt_sha256 != request.expected_existing_receipt_sha256:
             raise RotationError("existing_receipt_sha256_mismatch")
-        _validate_resume_receipt(receipt, request)
+        _validate_resume_receipt(
+            receipt,
+            request,
+            incident_ticket_commitment=incident_ticket_commitment,
+        )
     else:
         if request.expected_existing_receipt_sha256:
             raise RotationError("expected_existing_receipt_missing")
-        receipt = _base_receipt(request)
+        receipt = _base_receipt(
+            request,
+            incident_ticket_commitment=incident_ticket_commitment,
+        )
 
     committed = current_epoch == request.new_epoch
     if committed and not existing_receipt:
@@ -1246,18 +2566,191 @@ def run_rotation(
         receipt["environmentSha256After"] = current_env_sha256
         receipt["phase"] = "epoch_committed"
 
+    prior_ids_for_recovery: tuple[str, ...] = tuple()
+    old_epoch_sha256_for_recovery = str(
+        receipt.get("oldEpochSha256") or ""
+    )
+    prior_receipt_portals = receipt.get("preRotationPortals")
+    if (
+        existing_receipt
+        and isinstance(prior_receipt_portals, list)
+        and prior_receipt_portals
+    ):
+        prior_ids_for_recovery = tuple(
+            str(item.get("containerId") or "")
+            for item in prior_receipt_portals
+            if isinstance(item, dict)
+        )
     try:
         with overlay.public_edge_mutation_lock(
             activate=True,
             inherited_token=request.shared_mutation_lock_token,
         ):
+            if (
+                verify_edge_waf_control_plane_source(request)
+                != edge_waf_control_plane_fingerprint_sha256
+            ):
+                raise RotationError(
+                    "edge_waf_control_plane_fingerprint_drift"
+                )
             if runtime.resolve_image_id(request.image_tag) != request.expected_image_id:
                 raise RotationError("pinned_image_tag_drift")
 
+            held_ticket_authority = revalidate_old_ticket_authority(
+                request.old_ticket_authority
+            )
+            held_ticket, _held_ticket_sha256 = load_ticket(
+                request.old_ticket_path,
+                held_ticket_authority,
+            )
+            if not hmac.compare_digest(
+                incident_ticket_commitment_sha256(
+                    request,
+                    held_ticket,
+                ),
+                incident_ticket_commitment,
+            ):
+                raise RotationError(
+                    "incident_ticket_commitment_changed"
+                )
+            ticket = held_ticket
+            (
+                _held_bootstrap_authority,
+                held_bootstrap_authority_sha256,
+                held_known_legacy_epoch_sha256,
+            ) = load_epoch_history_bootstrap_authority(
+                request.epoch_history_bootstrap_authority,
+                expected_sha256=(
+                    request.expected_epoch_history_bootstrap_authority_sha256
+                ),
+            )
+            if (
+                held_bootstrap_authority_sha256
+                != bootstrap_authority_sha256
+                or held_known_legacy_epoch_sha256
+                != known_legacy_epoch_sha256
+            ):
+                raise RotationError(
+                    "epoch_history_bootstrap_authority_changed"
+                )
+            bootstrap_marker, bootstrap_marker_sha256 = (
+                load_epoch_history_bootstrap_marker(
+                    request.epoch_history_bootstrap_marker,
+                    expected_sha256=(
+                        request
+                        .expected_epoch_history_bootstrap_marker_sha256
+                    ),
+                    expected_bootstrap_authority_sha256=(
+                        bootstrap_authority_sha256
+                    ),
+                )
+            )
+            history, history_sha256 = load_epoch_history(
+                request.epoch_history_path,
+                expected_sha256=request.expected_epoch_history_sha256,
+            )
+            intent_sha256 = rotation_intent_sha256(
+                request,
+                incident_ticket_commitment=incident_ticket_commitment,
+            )
+            if history is None:
+                prior_epoch_authority_exists = os.path.lexists(
+                    request.epoch_authority_output
+                )
+                if bootstrap_marker is None:
+                    if prior_epoch_authority_exists:
+                        raise RotationError(
+                            "epoch_history_missing_with_prior_authority"
+                        )
+                elif (
+                    not existing_receipt
+                    or bootstrap_marker.get(
+                        "initialRotationIntentSha256"
+                    )
+                    != intent_sha256
+                    or bootstrap_marker.get(
+                        "epochHistoryPathSha256"
+                    )
+                    != sha256_text(str(request.epoch_history_path))
+                ):
+                    raise RotationError(
+                        "epoch_history_missing_after_bootstrap"
+                    )
+            elif bootstrap_marker is None:
+                raise RotationError(
+                    "epoch_history_bootstrap_marker_missing"
+                )
+            else:
+                marker_legacy = tuple(
+                    bootstrap_marker["knownLegacyEpochSha256"]
+                )
+                history_legacy = tuple(
+                    event["epochSha256"]
+                    for event in history["events"]
+                    if event["eventType"] == "legacy_observed"
+                )
+                if (
+                    marker_legacy != known_legacy_epoch_sha256
+                    or history_legacy != known_legacy_epoch_sha256
+                ):
+                    raise RotationError(
+                        "epoch_history_bootstrap_legacy_authority_drift"
+                    )
+            history_after_reservation, reservation_required = (
+                reserve_epoch_history(
+                    history,
+                    current_epoch_sha256=sha256_text(current_epoch),
+                    new_epoch_sha256=new_epoch_sha256,
+                    intent_sha256=intent_sha256,
+                    known_legacy_epoch_sha256=(
+                        known_legacy_epoch_sha256
+                    ),
+                    request=request,
+                )
+            )
+            matching_history_events = [
+                event
+                for event in history_after_reservation["events"]
+                if event["epochSha256"] == new_epoch_sha256
+                and event["rotationIntentSha256"] == intent_sha256
+            ]
+            if committed and reservation_required:
+                raise RotationError(
+                    "epoch_history_committed_epoch_untracked"
+                )
+            if not committed and any(
+                event["eventType"] == "rotation_committed"
+                for event in matching_history_events
+            ):
+                raise RotationError(
+                    "epoch_history_commit_environment_mismatch"
+                )
+            if not receipt.get("epochHistorySha256Before"):
+                receipt["epochHistorySha256Before"] = history_sha256
+
             if not committed:
                 old_epoch_sha256 = sha256_text(current_epoch)
+                old_epoch_sha256_for_recovery = old_epoch_sha256
                 if old_epoch_sha256 == new_epoch_sha256:
                     raise RotationError("new_epoch_does_not_change_authority")
+                prior_portal_payload = receipt.get("preRotationPortals")
+                if (
+                    existing_receipt
+                    and isinstance(prior_portal_payload, list)
+                    and prior_portal_payload
+                ):
+                    prior_ids_for_recovery = tuple(
+                        str(item.get("containerId") or "")
+                        for item in prior_portal_payload
+                        if isinstance(item, dict)
+                    )
+                    if len(prior_ids_for_recovery) != (
+                        request.expected_portal_replicas
+                    ):
+                        raise RotationError(
+                            "precommit_resume_portal_evidence_invalid"
+                        )
+                    runtime.restart_portals(prior_ids_for_recovery)
                 portals_before = inspect_exact_portals(
                     runtime,
                     expected_count=request.expected_portal_replicas,
@@ -1316,9 +2809,88 @@ def run_rotation(
                             portals_before,
                         ),
                         "publicGetChecksBefore": verify_public_gets(runtime),
+                        "edgeWaf": {
+                            "mutationAuthorized": False,
+                            "mutationPerformed": False,
+                            "preservedThroughPostVerification": False,
+                            "controlPlaneFingerprintSha256Before": (
+                                edge_waf_control_plane_fingerprint_sha256
+                            ),
+                            "controlPlaneFingerprintSha256After": "",
+                        },
                     }
                 )
                 atomic_write_private_json(request.output, receipt)
+                if bootstrap_marker is None:
+                    bootstrap_marker_sha256 = (
+                        publish_epoch_history_bootstrap_marker(
+                            request,
+                            bootstrap_authority_sha256=(
+                                bootstrap_authority_sha256
+                            ),
+                            known_legacy_epoch_sha256=(
+                                known_legacy_epoch_sha256
+                            ),
+                            intent_sha256=intent_sha256,
+                        )
+                    )
+                    bootstrap_marker, verified_marker_sha256 = (
+                        load_epoch_history_bootstrap_marker(
+                            request.epoch_history_bootstrap_marker,
+                            expected_sha256=bootstrap_marker_sha256,
+                            expected_bootstrap_authority_sha256=(
+                                bootstrap_authority_sha256
+                            ),
+                        )
+                    )
+                    assert bootstrap_marker is not None
+                    assert (
+                        verified_marker_sha256
+                        == bootstrap_marker_sha256
+                    )
+                receipt[
+                    "epochHistoryBootstrapMarkerSha256"
+                ] = bootstrap_marker_sha256
+                atomic_write_private_json(request.output, receipt)
+                prior_ids_for_recovery = tuple(
+                    item.container_id for item in portals_before
+                )
+                runtime.quiesce_portals(prior_ids_for_recovery)
+                runtime.assert_portals_stopped(prior_ids_for_recovery)
+                receipt.update(
+                    {
+                        "phase": "old_epoch_portals_quiesced",
+                        "updatedAtUtc": now_iso(),
+                    }
+                )
+                atomic_write_private_json(request.output, receipt)
+
+                if reservation_required:
+                    history_sha256 = publish_epoch_history(
+                        request.epoch_history_path,
+                        history_after_reservation,
+                        expected_current_sha256=history_sha256,
+                    )
+                receipt.update(
+                    {
+                        "phase": "epoch_reserved",
+                        "updatedAtUtc": now_iso(),
+                        "epochHistorySha256AfterReservation": (
+                            history_sha256
+                        ),
+                        "epochHistoryHeadEventSha256": (
+                            history_after_reservation[
+                                "headEventSha256"
+                            ]
+                        ),
+                    }
+                )
+                atomic_write_private_json(request.output, receipt)
+                load_epoch_history(
+                    request.epoch_history_path,
+                    expected_sha256=history_sha256,
+                )
+                runtime.assert_portals_stopped(prior_ids_for_recovery)
                 before_sha256, after_sha256 = replace_epoch_environment(
                     path=request.env_file,
                     prior_payload=env_payload,
@@ -1361,8 +2933,10 @@ def run_rotation(
                     is None
                 ):
                     raise RotationError("committed_resume_evidence_incomplete")
-                portals_before = tuple()
-                tunnels_before = tuple()
+                prior_ids_for_recovery = tuple(
+                    str(item["containerId"])
+                    for item in portals_before_payload
+                )
                 authority_before, authority_before_sha256 = (
                     read_active_runtime_authority(
                         request.active_runtime_authority
@@ -1375,6 +2949,61 @@ def run_rotation(
                     raise RotationError(
                         "active_runtime_authority_static_contract_drift"
                     )
+                current_ids = runtime.portal_container_ids()
+                if current_ids:
+                    runtime.quiesce_portals(current_ids)
+                    runtime.assert_portals_stopped(current_ids)
+                receipt.update(
+                    {
+                        "phase": "committed_portals_quiesced",
+                        "updatedAtUtc": now_iso(),
+                    }
+                )
+                atomic_write_private_json(request.output, receipt)
+                if not receipt.get(
+                    "epochHistorySha256AfterReservation"
+                ):
+                    receipt[
+                        "epochHistorySha256AfterReservation"
+                    ] = history_sha256
+                if (
+                    receipt.get(
+                        "epochHistoryBootstrapMarkerSha256"
+                    )
+                    != bootstrap_marker_sha256
+                ):
+                    raise RotationError(
+                        "epoch_history_bootstrap_marker_receipt_drift"
+                    )
+
+            history_after_commit, history_commit_required = (
+                commit_epoch_history(
+                    history_after_reservation,
+                    new_epoch_sha256=new_epoch_sha256,
+                    intent_sha256=intent_sha256,
+                    request=request,
+                )
+            )
+            if history_commit_required:
+                history_sha256 = publish_epoch_history(
+                    request.epoch_history_path,
+                    history_after_commit,
+                    expected_current_sha256=history_sha256,
+                )
+            history_head_event_sha256 = history_after_commit[
+                "headEventSha256"
+            ]
+            receipt.update(
+                {
+                    "phase": "epoch_history_committed",
+                    "updatedAtUtc": now_iso(),
+                    "epochHistorySha256AfterCommit": history_sha256,
+                    "epochHistoryHeadEventSha256": (
+                        history_head_event_sha256
+                    ),
+                }
+            )
+            atomic_write_private_json(request.output, receipt)
 
             committed_env_sha256 = str(receipt["environmentSha256After"])
             if LOWER_SHA256.fullmatch(committed_env_sha256) is None:
@@ -1389,28 +3018,13 @@ def run_rotation(
                 str(item["containerName"]) for item in prior_portal_payload
             )
             current_ids = runtime.portal_container_ids()
-            recreated = False
-            try:
-                current_portals = tuple(
-                    runtime.inspect_portal(identity) for identity in current_ids
-                )
-                if len(current_portals) != request.expected_portal_replicas:
-                    raise RotationError("portal_recreate_required")
-                for item in current_portals:
-                    validate_portal(
-                        item,
-                        expected_image_id=request.expected_image_id,
-                        expected_epoch_sha256=new_epoch_sha256,
-                        expected_proof_sha256=request.expected_proof_sha256,
-                    )
-                if tuple(item.container_name for item in current_portals) != prior_names:
-                    raise RotationError("portal_recreate_required")
-            except RotationError:
-                runtime.recreate_all_portals(
-                    prior_container_ids=current_ids,
-                    container_names=prior_names,
-                )
-                recreated = True
+            if current_ids:
+                runtime.assert_portals_stopped(current_ids)
+            runtime.recreate_all_portals(
+                prior_container_ids=current_ids,
+                container_names=prior_names,
+            )
+            recreated = True
 
             verify_committed_environment(
                 request,
@@ -1481,7 +3095,7 @@ def run_rotation(
                     str(item["service"]),
                     str(item["containerId"]),
                     str(item["imageId"]),
-                    bool(item["running"]),
+                    item["running"],
                     str(item["health"]),
                 )
                 for item in receipt["canonicalTunnelsBefore"]
@@ -1527,26 +3141,85 @@ def run_rotation(
                 }
             )
             atomic_write_private_json(request.output, receipt)
-            old_ticket_proof = dict(receipt["oldTicketRevocationProof"])
-            if request.old_ticket_path is not None:
-                ticket, ticket_sha256 = load_ticket(
-                    request.old_ticket_path,
-                    request.old_ticket_sha256,
+            final_waf_control_plane_fingerprint_sha256 = (
+                verify_edge_waf_control_plane_source(request)
+            )
+            if (
+                final_waf_control_plane_fingerprint_sha256
+                != edge_waf_control_plane_fingerprint_sha256
+            ):
+                raise RotationError(
+                    "edge_waf_control_plane_fingerprint_drift"
                 )
-                try:
-                    old_ticket_proof = verify_old_ticket_revocation(
-                        runtime,
-                        ticket=ticket,
-                        ticket_sha256=ticket_sha256,
-                        expected_epoch_sha256=new_epoch_sha256,
-                    )
-                finally:
-                    del ticket
+            receipt["edgeWaf"] = {
+                "mutationAuthorized": False,
+                "mutationPerformed": False,
+                "preservedThroughPostVerification": True,
+                "controlPlaneFingerprintSha256Before": (
+                    edge_waf_control_plane_fingerprint_sha256
+                ),
+                "controlPlaneFingerprintSha256After": (
+                    final_waf_control_plane_fingerprint_sha256
+                ),
+            }
+            atomic_write_private_json(request.output, receipt)
+            proof_ticket_authority = revalidate_old_ticket_authority(
+                request.old_ticket_authority
+            )
+            proof_ticket, _proof_ticket_sha256 = load_ticket(
+                request.old_ticket_path,
+                proof_ticket_authority,
+            )
+            if not hmac.compare_digest(
+                incident_ticket_commitment_sha256(
+                    request,
+                    proof_ticket,
+                ),
+                incident_ticket_commitment,
+            ):
+                raise RotationError(
+                    "incident_ticket_commitment_changed"
+                )
+            ticket = proof_ticket
+            old_ticket_proof = dict(receipt["oldTicketRevocationProof"])
+            old_ticket_proof = verify_old_ticket_revocation(
+                runtime,
+                ticket=ticket,
+                expected_epoch_sha256=new_epoch_sha256,
+            )
             verify_proof_bind_source(request)
             verify_committed_environment(
                 request,
                 expected_sha256=committed_env_sha256,
             )
+            final_history, verified_history_sha256 = load_epoch_history(
+                request.epoch_history_path,
+                expected_sha256=history_sha256,
+            )
+            assert final_history is not None
+            if (
+                verified_history_sha256
+                != receipt["epochHistorySha256AfterCommit"]
+                or final_history["headEventSha256"]
+                != history_head_event_sha256
+            ):
+                raise RotationError("epoch_history_final_drift")
+            _final_bootstrap_marker, verified_marker_sha256 = (
+                load_epoch_history_bootstrap_marker(
+                    request.epoch_history_bootstrap_marker,
+                    expected_sha256=bootstrap_marker_sha256,
+                    expected_bootstrap_authority_sha256=(
+                        bootstrap_authority_sha256
+                    ),
+                )
+            )
+            if (
+                verified_marker_sha256
+                != receipt["epochHistoryBootstrapMarkerSha256"]
+            ):
+                raise RotationError(
+                    "epoch_history_bootstrap_marker_final_drift"
+                )
             receipt.update(
                 {
                     "status": "pass",
@@ -1557,6 +3230,12 @@ def run_rotation(
                         "mutationAuthorized": False,
                         "mutationPerformed": False,
                         "preservedThroughPostVerification": True,
+                        "controlPlaneFingerprintSha256Before": (
+                            edge_waf_control_plane_fingerprint_sha256
+                        ),
+                        "controlPlaneFingerprintSha256After": (
+                            final_waf_control_plane_fingerprint_sha256
+                        ),
                     },
                     "failureCode": "",
                 }
@@ -1567,11 +3246,22 @@ def run_rotation(
             )
             publish_epoch_authority(
                 request,
+                incident_ticket_commitment=incident_ticket_commitment,
                 rotation_receipt_sha256=rotation_receipt_sha256,
                 active_runtime_authority_sha256=authority_after_sha256,
                 portal=portals_after[0],
                 storage_authority=storage_after,
                 environment_sha256_after=committed_env_sha256,
+                epoch_history_sha256=verified_history_sha256,
+                epoch_history_head_event_sha256=(
+                    history_head_event_sha256
+                ),
+                epoch_history_bootstrap_marker_sha256=(
+                    verified_marker_sha256
+                ),
+                edge_waf_control_plane_fingerprint_sha256=(
+                    final_waf_control_plane_fingerprint_sha256
+                ),
             )
             return 0, receipt
     except Exception as exc:
@@ -1579,28 +3269,75 @@ def run_rotation(
         failure_status, observed_environment_sha256 = observe_epoch_boundary(
             request
         )
+        if failure_status == 75 and prior_ids_for_recovery:
+            try:
+                runtime.restart_portals(prior_ids_for_recovery)
+                inspect_exact_portals(
+                    runtime,
+                    expected_count=request.expected_portal_replicas,
+                    expected_image_id=request.expected_image_id,
+                    expected_epoch_sha256=old_epoch_sha256_for_recovery,
+                    expected_proof_sha256=request.expected_proof_sha256,
+                )
+            except Exception:
+                failure_status = 76
+                code = "precommit_portal_restart_failed"
+                try:
+                    receipt["failureContainment"] = (
+                        fail_closed_contain_precommit_portals(runtime)
+                    )
+                except Exception:
+                    failure_status = 70
+                    code = (
+                        "precommit_emergency_containment_not_proven"
+                    )
         fail_forward_required = failure_status == 76
         if fail_forward_required and observed_environment_sha256:
             receipt["environmentSha256After"] = observed_environment_sha256
-        waf_preserved_through_postverification = receipt.get("phase") in {
-            "post_rotation_runtime_verified",
-            "post_rotation_verified",
-        }
+        recorded_waf = receipt.get("edgeWaf")
+        waf_preserved_through_postverification = (
+            isinstance(recorded_waf, dict)
+            and recorded_waf.get(
+                "controlPlaneFingerprintSha256Before"
+            )
+            == edge_waf_control_plane_fingerprint_sha256
+            and recorded_waf.get(
+                "controlPlaneFingerprintSha256After"
+            )
+            == edge_waf_control_plane_fingerprint_sha256
+            and recorded_waf.get(
+                "preservedThroughPostVerification"
+            )
+            is True
+        )
         prior_phase = str(receipt.get("phase") or "")
         if fail_forward_required:
             failure_phase = (
                 "epoch_commit_outcome_uncertain"
-                if prior_phase in {"", "initializing", "old_epoch_verified"}
+                if prior_phase
+                in {
+                    "",
+                    "initializing",
+                    "old_epoch_verified",
+                    "old_epoch_portals_quiesced",
+                    "epoch_reserved",
+                }
                 else prior_phase
             )
-        else:
+        elif failure_status == 75:
             failure_phase = "precommit_failed"
+        else:
+            failure_phase = "precommit_emergency_containment_unproven"
         receipt.update(
             {
                 "status": (
                     "fail_forward_required"
                     if fail_forward_required
-                    else "failed_before_epoch_commit"
+                    else (
+                        "failed_before_epoch_commit"
+                        if failure_status == 75
+                        else "emergency_containment_unproven"
+                    )
                 ),
                 "phase": failure_phase,
                 "updatedAtUtc": now_iso(),
@@ -1611,10 +3348,20 @@ def run_rotation(
                     "preservedThroughPostVerification": (
                         waf_preserved_through_postverification
                     ),
+                    "controlPlaneFingerprintSha256Before": (
+                        edge_waf_control_plane_fingerprint_sha256
+                    ),
+                    "controlPlaneFingerprintSha256After": (
+                        edge_waf_control_plane_fingerprint_sha256
+                        if waf_preserved_through_postverification
+                        else ""
+                    ),
                 },
             }
         )
         atomic_write_private_json(request.output, receipt)
+        if ticket:
+            del ticket
         return failure_status, receipt
 
 
@@ -1635,6 +3382,26 @@ class DockerRuntime:
         published_port: int,
         base_url: str,
     ) -> None:
+        canonical_constructor_paths = (
+            docker_config_root,
+            compose_file,
+            env_file,
+            source_root,
+            build_context,
+            overlay_root,
+            projection_root,
+            proof_bind_source,
+        )
+        if any(
+            not path.is_absolute()
+            or overlay.normalized_absolute_path(path) != path
+            for path in canonical_constructor_paths
+        ):
+            raise RotationError("runtime_path_alias_not_canonical")
+        if project_name != CANONICAL_PROJECT_NAME:
+            raise RotationError("compose_project_not_canonical")
+        if docker_context != "default":
+            raise RotationError("docker_context_not_canonical")
         self.environment = {
             "PATH": "/usr/bin:/bin",
             "HOME": str(docker_config_root / "home"),
@@ -1789,6 +3556,9 @@ class DockerRuntime:
         ):
             raise RotationError("portal_inspect_contract_invalid")
         inspected = decoded[0]
+        container_name = str(inspected.get("Name") or "").removeprefix("/")
+        if SAFE_CONTAINER_NAME.fullmatch(container_name) is None:
+            raise RotationError("portal_container_name_invalid")
         config = inspected.get("Config")
         host = inspected.get("HostConfig")
         network_settings = inspected.get("NetworkSettings")
@@ -1840,12 +3610,19 @@ class DockerRuntime:
         for name, network in raw_networks.items():
             if not isinstance(name, str) or not isinstance(network, dict):
                 raise RotationError("portal_network_contract_invalid")
+            raw_aliases = network.get("Aliases") or []
+            if (
+                not isinstance(raw_aliases, list)
+                or any(type(alias) is not str for alias in raw_aliases)
+            ):
+                raise RotationError("portal_network_aliases_invalid")
             aliases = [
                 alias
-                for alias in (network.get("Aliases") or [])
-                if isinstance(alias, str)
-                and alias not in {container_id, container_id[:12]}
+                for alias in raw_aliases
+                if alias not in {container_id, container_id[:12]}
             ]
+            if set(aliases) != {PORTAL_SERVICE, container_name}:
+                raise RotationError("portal_network_aliases_not_canonical")
             networks[name] = {
                 "aliases": sorted(aliases),
                 "driverOpts": network.get("DriverOpts") or {},
@@ -1948,10 +3725,12 @@ class DockerRuntime:
             item = selected[0]
             if item.get("Type") != "volume":
                 raise RotationError("portal_required_mount_not_volume")
+            if type(item.get("RW")) is not bool:
+                raise RotationError("portal_required_mount_rw_invalid")
             return MountEvidence(
                 destination=destination,
                 volume_name=str(item.get("Name") or ""),
-                read_write=bool(item.get("RW")),
+                read_write=item["RW"],
             )
 
         epoch = self._container_env(container_id, EPOCH_KEY)
@@ -2093,8 +3872,10 @@ printf '%s|%s|%s|%s\n' "$target" "$metadata" "$key_count" "$encrypted_count"
         except ValueError as exc:
             raise RotationError("storage_probe_output_invalid") from exc
 
-    def tunnel_evidence(self) -> tuple[TunnelEvidence, ...]:
-        results: list[TunnelEvidence] = []
+    def _canonical_tunnel_container_ids(
+        self,
+    ) -> tuple[tuple[str, str], ...]:
+        results: list[tuple[str, str]] = []
         for service in CANONICAL_TUNNEL_SERVICES:
             output = self._docker(
                 "container",
@@ -2111,6 +3892,14 @@ printf '%s|%s|%s|%s\n' "$target" "$metadata" "$key_count" "$encrypted_count"
             if len(identities) != 1:
                 raise RotationError("canonical_tunnel_container_count_invalid")
             identity = identities[0]
+            if CONTAINER_ID.fullmatch(identity) is None:
+                raise RotationError("canonical_tunnel_container_id_invalid")
+            results.append((service, identity))
+        return tuple(results)
+
+    def tunnel_evidence(self) -> tuple[TunnelEvidence, ...]:
+        results: list[TunnelEvidence] = []
+        for service, identity in self._canonical_tunnel_container_ids():
             results.append(
                 TunnelEvidence(
                     service=service,
@@ -2128,6 +3917,37 @@ printf '%s|%s|%s|%s\n' "$target" "$metadata" "$key_count" "$encrypted_count"
             )
         return tuple(results)
 
+    def quiesce_public_connectors(self) -> None:
+        identities = self._canonical_tunnel_container_ids()
+        for _service, container_id in identities:
+            running = self._inspect_text(
+                container_id,
+                "{{.State.Running}}",
+            )
+            if running == "true":
+                self._docker("container", "stop", container_id, timeout=90)
+            elif running != "false":
+                raise RotationError(
+                    "public_connector_quiescence_state_invalid"
+                )
+        self.assert_public_connectors_stopped()
+
+    def assert_public_connectors_stopped(self) -> None:
+        identities = self._canonical_tunnel_container_ids()
+        for _service, container_id in identities:
+            if (
+                self._inspect_text(container_id, "{{.Id}}")
+                != container_id
+                or self._inspect_text(
+                    container_id,
+                    "{{.State.Running}}",
+                )
+                != "false"
+            ):
+                raise RotationError(
+                    "public_connector_quiescence_not_proven"
+                )
+
     def verify_loopback(self, container_id: str, route: str) -> str:
         if route not in LOOPBACK_ROUTES:
             raise RotationError("loopback_route_not_authorized")
@@ -2141,6 +3961,87 @@ printf '%s|%s|%s|%s\n' "$target" "$metadata" "$key_count" "$encrypted_count"
             timeout=45,
         )
         return sha256_bytes(body)
+
+    def assert_portals_stopped(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None:
+        if (
+            not container_ids
+            or len(set(container_ids)) != len(container_ids)
+            or any(CONTAINER_ID.fullmatch(value) is None for value in container_ids)
+            or set(self.portal_container_ids()) != set(container_ids)
+        ):
+            raise RotationError("portal_quiescence_identity_drift")
+        for container_id in container_ids:
+            if (
+                self._inspect_text(container_id, "{{.Id}}") != container_id
+                or self._inspect_text(
+                    container_id,
+                    "{{.State.Running}}",
+                )
+                != "false"
+            ):
+                raise RotationError("portal_quiescence_not_proven")
+
+    def quiesce_portals(self, container_ids: tuple[str, ...]) -> None:
+        if (
+            not container_ids
+            or len(set(container_ids)) != len(container_ids)
+            or any(CONTAINER_ID.fullmatch(value) is None for value in container_ids)
+            or set(self.portal_container_ids()) != set(container_ids)
+        ):
+            raise RotationError("portal_quiescence_identity_drift")
+        for container_id in container_ids:
+            running = self._inspect_text(
+                container_id,
+                "{{.State.Running}}",
+            )
+            if running == "true":
+                self._docker("container", "stop", container_id, timeout=90)
+            elif running != "false":
+                raise RotationError("portal_quiescence_state_invalid")
+        self.assert_portals_stopped(container_ids)
+
+    def restart_portals(self, container_ids: tuple[str, ...]) -> None:
+        if (
+            not container_ids
+            or len(set(container_ids)) != len(container_ids)
+            or any(CONTAINER_ID.fullmatch(value) is None for value in container_ids)
+            or set(self.portal_container_ids()) != set(container_ids)
+        ):
+            raise RotationError("portal_restart_identity_drift")
+        for container_id in container_ids:
+            running = self._inspect_text(
+                container_id,
+                "{{.State.Running}}",
+            )
+            if running == "false":
+                self._docker("container", "start", container_id, timeout=90)
+            elif running != "true":
+                raise RotationError("portal_restart_state_invalid")
+        deadline = time.monotonic() + 180
+        while time.monotonic() < deadline:
+            states = [
+                (
+                    self._inspect_text(identity, "{{.State.Running}}"),
+                    self._inspect_text(
+                        identity,
+                        "{{if .State.Health}}{{.State.Health.Status}}"
+                        "{{else}}none{{end}}",
+                    ),
+                )
+                for identity in container_ids
+            ]
+            if all(state == ("true", "healthy") for state in states):
+                return
+            if any(
+                running != "true" or health == "unhealthy"
+                for running, health in states
+            ):
+                raise RotationError("portal_restart_unhealthy")
+            time.sleep(1)
+        raise RotationError("portal_restart_timeout")
 
     def recreate_all_portals(
         self,
@@ -2290,6 +4191,172 @@ def read_shared_mutation_lock_token(fd: int) -> str:
     return token
 
 
+def read_old_ticket_authority(
+    fd: int,
+) -> TicketMaterializationAuthority:
+    if type(fd) is not int or fd < 3 or fd > 255:
+        raise RotationError("old_ticket_authority_fd_invalid")
+    try:
+        before = os.fstat(fd)
+    except OSError as exc:
+        raise RotationError(
+            "old_ticket_authority_fd_invalid"
+        ) from exc
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or before.st_size < 1
+        or before.st_size > MAX_TICKET_DIGEST_AUTHORITY_BYTES
+    ):
+        raise RotationError(
+            "old_ticket_authority_not_owner_only"
+        )
+    try:
+        os.lseek(fd, 0, os.SEEK_SET)
+        payload = os.read(fd, MAX_TICKET_DIGEST_AUTHORITY_BYTES + 1)
+        after = os.fstat(fd)
+    except OSError as exc:
+        raise RotationError(
+            "old_ticket_authority_read_failed"
+        ) from exc
+    if (
+        len(payload) > MAX_TICKET_DIGEST_AUTHORITY_BYTES
+        or (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+            before.st_mode,
+            before.st_nlink,
+            before.st_uid,
+            before.st_gid,
+        )
+        != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+            after.st_mode,
+            after.st_nlink,
+            after.st_uid,
+            after.st_gid,
+        )
+        or len(payload) != before.st_size
+    ):
+        raise RotationError(
+            "old_ticket_authority_changed_during_read"
+        )
+    authority = strict_json_object(
+        payload,
+        label="old_ticket_authority",
+    )
+    expected_fields = {
+        "contractName",
+        "generatedAtUtc",
+        "status",
+        "ticketPathSha256",
+        "ticketSha256",
+        "ticketSizeBytes",
+        "envelopeSha256",
+        "inventoryCommitmentSha256",
+        "recipientCertificateSha256",
+        "signerCertificateSha256",
+        "opensslExecutableSha256",
+        "materializationTransactionId",
+        "quarantineStatus",
+        "revocationStatus",
+    }
+    digest_fields = (
+        "ticketPathSha256",
+        "ticketSha256",
+        "envelopeSha256",
+        "inventoryCommitmentSha256",
+        "recipientCertificateSha256",
+        "signerCertificateSha256",
+        "opensslExecutableSha256",
+    )
+    if (
+        set(authority) != expected_fields
+        or authority.get("contractName")
+        != OLD_TICKET_DIGEST_AUTHORITY_CONTRACT
+        or authority.get("status") != "materialized_pending_revocation"
+        or authority.get("quarantineStatus") != "pending"
+        or authority.get("revocationStatus") != "pending"
+        or any(
+            type(authority.get(key)) is not str
+            or LOWER_SHA256.fullmatch(authority[key]) is None
+            for key in digest_fields
+        )
+        or type(authority.get("ticketSizeBytes")) is not int
+        or authority["ticketSizeBytes"] < 1
+        or authority["ticketSizeBytes"] > MAX_TICKET_BYTES
+        or type(authority.get("materializationTransactionId")) is not str
+        or SAFE_TRANSACTION_ID.fullmatch(
+            authority["materializationTransactionId"]
+        )
+        is None
+        or type(authority.get("generatedAtUtc")) is not str
+        or RFC3339_UTC.fullmatch(authority["generatedAtUtc"]) is None
+    ):
+        raise RotationError(
+            "old_ticket_authority_contract_invalid"
+        )
+    _validate_timestamp(
+        authority.get("generatedAtUtc"),
+        code="old_ticket_authority_contract_invalid",
+    )
+    canonical = (
+        json.dumps(
+            authority,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    if not hmac.compare_digest(payload, canonical):
+        raise RotationError("old_ticket_authority_not_canonical")
+    return TicketMaterializationAuthority(
+        fd=fd,
+        canonical_bytes=canonical,
+        ticket_path_sha256=authority["ticketPathSha256"],
+        ticket_sha256=authority["ticketSha256"],
+        ticket_size_bytes=authority["ticketSizeBytes"],
+        envelope_sha256=authority["envelopeSha256"],
+        inventory_commitment_sha256=authority[
+            "inventoryCommitmentSha256"
+        ],
+        recipient_certificate_sha256=authority[
+            "recipientCertificateSha256"
+        ],
+        signer_certificate_sha256=authority[
+            "signerCertificateSha256"
+        ],
+        openssl_executable_sha256=authority[
+            "opensslExecutableSha256"
+        ],
+        materialization_transaction_id=authority[
+            "materializationTransactionId"
+        ],
+    )
+
+
+def revalidate_old_ticket_authority(
+    authority: TicketMaterializationAuthority,
+) -> TicketMaterializationAuthority:
+    observed = read_old_ticket_authority(authority.fd)
+    if not hmac.compare_digest(
+        observed.canonical_bytes,
+        authority.canonical_bytes,
+    ):
+        raise RotationError("old_ticket_authority_changed")
+    return observed
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Rotate release-upload ticket epoch under an inherited mutation lease."
@@ -2297,6 +4364,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--active-runtime-authority", type=Path, required=True)
     parser.add_argument("--epoch-authority-output", type=Path, required=True)
+    parser.add_argument("--epoch-history-path", type=Path, required=True)
+    parser.add_argument("--expected-epoch-history-sha256", required=True)
+    parser.add_argument(
+        "--epoch-history-bootstrap-authority",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--expected-epoch-history-bootstrap-authority-sha256",
+        required=True,
+    )
+    parser.add_argument(
+        "--epoch-history-bootstrap-marker",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--expected-epoch-history-bootstrap-marker-sha256",
+        required=True,
+    )
+    parser.add_argument(
+        "--edge-waf-control-plane-source",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--expected-edge-waf-control-plane-sha256",
+        required=True,
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected-env-sha256-before", required=True)
     parser.add_argument("--expected-image-id", required=True)
@@ -2308,7 +4404,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--expected-portal-replicas", type=int, default=1)
     parser.add_argument("--shared-mutation-lock-fd", type=int, required=True)
     parser.add_argument("--old-ticket-path", type=Path)
-    parser.add_argument("--old-ticket-sha256", default="")
+    parser.add_argument(
+        "--old-ticket-authority-fd",
+        type=int,
+        required=True,
+    )
     parser.add_argument("--docker-config-root", type=Path, required=True)
     parser.add_argument("--docker-context", required=True)
     parser.add_argument("--compose-file", type=Path, required=True)
@@ -2323,6 +4423,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def canonical_cli_path(path: Path, *, label: str) -> Path:
+    if (
+        not path.is_absolute()
+        or overlay.normalized_absolute_path(path) != path
+    ):
+        raise RotationError(f"{label}_path_alias_not_canonical")
+    return path
+
+
 def classify_unhandled_failure(request: RotationRequest | None) -> int:
     if request is None:
         return 70
@@ -2335,11 +4444,15 @@ def main(argv: list[str] | None = None) -> int:
     request: RotationRequest | None = None
     try:
         request = RotationRequest(
-            env_file=overlay.normalized_absolute_path(args.env_file),
-            active_runtime_authority=overlay.normalized_absolute_path(
-                args.active_runtime_authority
+            env_file=canonical_cli_path(
+                args.env_file,
+                label="environment",
             ),
-            output=overlay.normalized_absolute_path(args.output),
+            active_runtime_authority=canonical_cli_path(
+                args.active_runtime_authority,
+                label="active_runtime_authority",
+            ),
+            output=canonical_cli_path(args.output, label="receipt"),
             expected_env_sha256_before=args.expected_env_sha256_before,
             expected_image_id=args.expected_image_id,
             expected_proof_sha256=args.expected_proof_sha256,
@@ -2351,33 +4464,84 @@ def main(argv: list[str] | None = None) -> int:
                 args.shared_mutation_lock_fd
             ),
             old_ticket_path=(
-                overlay.normalized_absolute_path(args.old_ticket_path)
+                canonical_cli_path(
+                    args.old_ticket_path,
+                    label="old_ticket",
+                )
                 if args.old_ticket_path is not None
                 else None
             ),
-            old_ticket_sha256=args.old_ticket_sha256,
-            proof_bind_source=overlay.normalized_absolute_path(
-                args.proof_bind_source
+            old_ticket_authority=read_old_ticket_authority(
+                args.old_ticket_authority_fd
+            ),
+            proof_bind_source=canonical_cli_path(
+                args.proof_bind_source,
+                label="proof_bind_source",
             ),
             expected_existing_receipt_sha256=(
                 args.expected_existing_receipt_sha256
             ),
-            epoch_authority_output=overlay.normalized_absolute_path(
-                args.epoch_authority_output
+            epoch_authority_output=canonical_cli_path(
+                args.epoch_authority_output,
+                label="epoch_authority",
+            ),
+            epoch_history_path=canonical_cli_path(
+                args.epoch_history_path,
+                label="epoch_history",
+            ),
+            expected_epoch_history_sha256=(
+                args.expected_epoch_history_sha256
+            ),
+            epoch_history_bootstrap_authority=canonical_cli_path(
+                args.epoch_history_bootstrap_authority,
+                label="epoch_history_bootstrap_authority",
+            ),
+            expected_epoch_history_bootstrap_authority_sha256=(
+                args.expected_epoch_history_bootstrap_authority_sha256
+            ),
+            epoch_history_bootstrap_marker=canonical_cli_path(
+                args.epoch_history_bootstrap_marker,
+                label="epoch_history_bootstrap_marker",
+            ),
+            expected_epoch_history_bootstrap_marker_sha256=(
+                args.expected_epoch_history_bootstrap_marker_sha256
+            ),
+            edge_waf_control_plane_source=canonical_cli_path(
+                args.edge_waf_control_plane_source,
+                label="edge_waf_control_plane_source",
+            ),
+            expected_edge_waf_control_plane_sha256=(
+                args.expected_edge_waf_control_plane_sha256
             ),
         )
         runtime = DockerRuntime(
-            docker_config_root=overlay.normalized_absolute_path(
-                args.docker_config_root
+            docker_config_root=canonical_cli_path(
+                args.docker_config_root,
+                label="docker_config_root",
             ),
             docker_context=args.docker_context,
-            compose_file=overlay.normalized_absolute_path(args.compose_file),
+            compose_file=canonical_cli_path(
+                args.compose_file,
+                label="compose_file",
+            ),
             env_file=request.env_file,
             project_name=args.project_name,
-            source_root=overlay.normalized_absolute_path(args.source_root),
-            build_context=overlay.normalized_absolute_path(args.build_context),
-            overlay_root=overlay.normalized_absolute_path(args.overlay_root),
-            projection_root=overlay.normalized_absolute_path(args.projection_root),
+            source_root=canonical_cli_path(
+                args.source_root,
+                label="source_root",
+            ),
+            build_context=canonical_cli_path(
+                args.build_context,
+                label="build_context",
+            ),
+            overlay_root=canonical_cli_path(
+                args.overlay_root,
+                label="overlay_root",
+            ),
+            projection_root=canonical_cli_path(
+                args.projection_root,
+                label="projection_root",
+            ),
             proof_bind_source=request.proof_bind_source,
             published_port=args.published_port,
             base_url=args.base_url,

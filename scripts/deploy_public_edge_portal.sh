@@ -15,12 +15,12 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
   deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2; exit 2 ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
@@ -203,19 +203,27 @@ PORTAL_READY_TIMEOUT_SECONDS="${CHUMMER_PUBLIC_EDGE_PORTAL_READY_TIMEOUT_SECONDS
 PUBLIC_EDGE_PORT="${CHUMMER_PUBLIC_EDGE_PORT:-$CANONICAL_PUBLIC_EDGE_PORT}"
 RELEASE_UPLOAD_TICKET_NEXT_EPOCH="${CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_NEXT_EPOCH-}"
 RELEASE_UPLOAD_OLD_TICKET_PATH="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_PATH-}"
-RELEASE_UPLOAD_OLD_TICKET_SHA256="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_SHA256-}"
+RELEASE_UPLOAD_OLD_TICKET_AUTHORITY_INPUT="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_AUTHORITY-}"
 RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT-}"
 RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256-}"
 RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE="${CHUMMER_RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE-}"
 RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID="${CHUMMER_RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID-}"
 RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE-}"
 RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256-}"
+RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256-}"
+RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY-}"
+RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_SHA256-}"
+RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_SHA256-}"
+RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE-}"
+RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_SHA256-}"
 DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"
 DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"
 CANONICAL_DEPLOY_LOCK_AUTH_ROOT="$DEPLOY_LOCK_ROOT/public-edge-lock-recovery-receipts"
 CANONICAL_DEPLOY_RECEIPT_ROOT="$DEPLOY_LOCK_ROOT/public-edge-deploy-receipts"
 CANONICAL_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-runtime-authority.json"
 CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/release-upload-ticket-epoch-authority.json"
+CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY="$CANONICAL_DEPLOY_RECEIPT_ROOT/release-upload-ticket-epoch-history.json"
+CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER="$CANONICAL_DEPLOY_RECEIPT_ROOT/release-upload-ticket-epoch-bootstrap-marker.json"
 PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/public-download-active-runtime-authority.json"
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
 CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-cutover"
@@ -237,13 +245,31 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1 \
     echo "CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_NEXT_EPOCH must be an explicit safe epoch literal" >&2
     exit 2
   fi
-  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" \
-    || -n "$RELEASE_UPLOAD_OLD_TICKET_SHA256" ]]; then
-    if [[ "$RELEASE_UPLOAD_OLD_TICKET_PATH" != /* \
-      || ! "$RELEASE_UPLOAD_OLD_TICKET_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-      echo "hidden old-ticket proof requires an absolute owner-only path and exact SHA-256" >&2
-      exit 2
-    fi
+  if [[ "$RELEASE_UPLOAD_OLD_TICKET_PATH" != /* \
+    || "$RELEASE_UPLOAD_OLD_TICKET_AUTHORITY_INPUT" != /* ]]; then
+    echo "epoch rotation requires absolute owner-only old-ticket and materialization-authority paths" >&2
+    exit 2
+  fi
+  if [[ "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256" != absent \
+    && ! "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256" \
+      =~ ^[0-9a-f]{64}$ ]]; then
+    echo "epoch rotation requires an exact current history SHA-256 or the literal absent pin" >&2
+    exit 2
+  fi
+  if [[ "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_INPUT" != /* \
+    || ! "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_SHA256" \
+      =~ ^[0-9a-f]{64}$ \
+    || ( "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256" != absent \
+      && ! "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256" \
+        =~ ^[0-9a-f]{64}$ ) ]]; then
+    echo "epoch rotation requires an absolute pinned bootstrap authority and an exact bootstrap marker SHA-256 or the literal absent pin" >&2
+    exit 2
+  fi
+  if [[ "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_INPUT" != /* \
+    || ! "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_SHA256" \
+      =~ ^[0-9a-f]{64}$ ]]; then
+    echo "epoch rotation requires an absolute exact WAF control-plane fingerprint source and SHA-256" >&2
+    exit 2
   fi
 fi
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
@@ -1625,6 +1651,65 @@ trusted_source_python() {
     "$TRUSTED_PYTHON" -I "$@"
 }
 
+capture_release_upload_ticket_epoch_history_sha256() {
+  local history_metadata
+  local history_sha256
+  if [[ -f "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    && ! -L "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    && -O "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" ]]; then
+    history_metadata="$(
+      "$TRUSTED_STAT" -c '%a|%h' -- \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY"
+    )" || return 1
+    [[ "$history_metadata" == '600|1' ]] || return 1
+    history_sha256="$(
+      "$TRUSTED_SHA256SUM" -- \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY"
+    )" || return 1
+    history_sha256="${history_sha256%% *}"
+    [[ "$history_sha256" =~ ^[0-9a-f]{64}$ ]] || return 1
+    printf '%s\n' "$history_sha256"
+    return 0
+  fi
+  if [[ ! -e "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    && ! -L "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    && "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256" == absent ]]; then
+    printf '%s\n' absent
+    return 0
+  fi
+  return 1
+}
+
+capture_release_upload_ticket_epoch_bootstrap_marker_sha256() {
+  local marker_metadata
+  local marker_sha256
+  if [[ -f "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    && ! -L "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    && -O "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" ]]; then
+    marker_metadata="$(
+      "$TRUSTED_STAT" -c '%a|%h' -- \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER"
+    )" || return 1
+    [[ "$marker_metadata" == '600|1' ]] || return 1
+    marker_sha256="$(
+      "$TRUSTED_SHA256SUM" -- \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER"
+    )" || return 1
+    marker_sha256="${marker_sha256%% *}"
+    [[ "$marker_sha256" =~ ^[0-9a-f]{64}$ ]] || return 1
+    printf '%s\n' "$marker_sha256"
+    return 0
+  fi
+  if [[ ! -e "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    && ! -L "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    && "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256" \
+      == absent ]]; then
+    printf '%s\n' absent
+    return 0
+  fi
+  return 1
+}
+
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
   if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" verify \
     --source "$COMPOSE_FILE" \
@@ -1642,13 +1727,6 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
     echo "epoch-rotation resume receipt does not match its external pin" >&2
     exit 76
   fi
-  old_ticket_proof_args=()
-  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" ]]; then
-    old_ticket_proof_args=(
-      --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH"
-      --old-ticket-sha256 "$RELEASE_UPLOAD_OLD_TICKET_SHA256"
-    )
-  fi
   epoch_rotation_status=0
   printf '%s\n' "$deploy_lock_owner_token" \
     | trusted_source_python \
@@ -1657,6 +1735,22 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
       --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
       --epoch-authority-output \
         "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY" \
+      --epoch-history-path \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+      --expected-epoch-history-sha256 \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256" \
+      --epoch-history-bootstrap-authority \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_INPUT" \
+      --expected-epoch-history-bootstrap-authority-sha256 \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_SHA256" \
+      --epoch-history-bootstrap-marker \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+      --expected-epoch-history-bootstrap-marker-sha256 \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256" \
+      --edge-waf-control-plane-source \
+        "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_INPUT" \
+      --expected-edge-waf-control-plane-sha256 \
+        "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_SHA256" \
       --output "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
       --expected-existing-receipt-sha256 \
         "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256" \
@@ -1681,8 +1775,16 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
       --proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
       --published-port "$PUBLIC_EDGE_PORT" \
       --base-url "$BASE_URL" \
-      "${old_ticket_proof_args[@]}" \
+      --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH" \
+      --old-ticket-authority-fd 3 \
+      3<"$RELEASE_UPLOAD_OLD_TICKET_AUTHORITY_INPUT" \
       >/dev/null || epoch_rotation_status=$?
+  RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256="$(
+    capture_release_upload_ticket_epoch_history_sha256
+  )" || exit 76
+  RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256="$(
+    capture_release_upload_ticket_epoch_bootstrap_marker_sha256
+  )" || exit 76
   RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="$(
     "$TRUSTED_SHA256SUM" -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT"
   )" || exit 76
@@ -1699,16 +1801,24 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
     fi
     trap - EXIT HUP INT TERM
     printf \
-      'release_upload_ticket_epoch_refused_before_commit receipt=%s receipt_sha256=%s\n' \
+      'release_upload_ticket_epoch_refused_before_commit receipt=%s receipt_sha256=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
       "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
-      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" >&2
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256" >&2
     exit 75
   fi
   if ((epoch_rotation_status != 0)); then
     printf \
-      'release_upload_ticket_epoch_resume_incomplete receipt=%s receipt_sha256=%s\n' \
+      'release_upload_ticket_epoch_resume_incomplete receipt=%s receipt_sha256=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
       "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
-      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" >&2
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256" >&2
     exit "$epoch_rotation_status"
   fi
   epoch_rotation_fail_forward_required=0
@@ -1718,9 +1828,11 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
   fi
   trap - EXIT HUP INT TERM
   printf \
-    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s\n' \
+    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s history=%s history_sha256=%s\n' \
     "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
-    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256"
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+    "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256"
   exit 0
 fi
 
@@ -5284,13 +5396,6 @@ if ((prior_portal_existed == 1)) \
   fi
 fi
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
-  old_ticket_proof_args=()
-  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" ]]; then
-    old_ticket_proof_args=(
-      --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH"
-      --old-ticket-sha256 "$RELEASE_UPLOAD_OLD_TICKET_SHA256"
-    )
-  fi
   epoch_rotation_status=0
   # From this point an interrupt must retain the authenticated mutation lease.
   # The child is the only authority that can distinguish a safe precommit
@@ -5303,6 +5408,22 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
     --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
     --epoch-authority-output \
       "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY" \
+    --epoch-history-path \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    --expected-epoch-history-sha256 \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_EXPECTED_SHA256" \
+    --epoch-history-bootstrap-authority \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_INPUT" \
+    --expected-epoch-history-bootstrap-authority-sha256 \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_AUTHORITY_SHA256" \
+    --epoch-history-bootstrap-marker \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    --expected-epoch-history-bootstrap-marker-sha256 \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_EXPECTED_SHA256" \
+    --edge-waf-control-plane-source \
+      "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_INPUT" \
+    --expected-edge-waf-control-plane-sha256 \
+      "$RELEASE_UPLOAD_TICKET_EDGE_WAF_CONTROL_PLANE_SOURCE_SHA256" \
     --output "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
     --expected-env-sha256-before "$INSTALL_LINKING_ENV_SHA256" \
     --expected-image-id "$image_id" \
@@ -5323,9 +5444,17 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
     --proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
     --published-port "$PUBLIC_EDGE_PORT" \
     --base-url "$BASE_URL" \
-    "${old_ticket_proof_args[@]}" \
+    --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH" \
+    --old-ticket-authority-fd 3 \
+    3<"$RELEASE_UPLOAD_OLD_TICKET_AUTHORITY_INPUT" \
     >/dev/null \
     || epoch_rotation_status=$?
+  RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256="$(
+    capture_release_upload_ticket_epoch_history_sha256
+  )" || exit 76
+  RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256="$(
+    capture_release_upload_ticket_epoch_bootstrap_marker_sha256
+  )" || exit 76
   case "$epoch_rotation_status" in
     0)
       RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="$(
@@ -5339,6 +5468,13 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
       epoch_rotation_fail_forward_required=0
       ;;
     76)
+      printf \
+        'release_upload_ticket_epoch_fail_forward_required receipt=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256" >&2
       exit 76
       ;;
     75)
@@ -5346,7 +5482,13 @@ if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
       epoch_rotation_precommit_refused=1
       ;;
     *)
-      echo "release-upload ticket epoch rotation outcome requires authenticated fail-forward resume; inspect the private receipt" >&2
+      printf \
+        'release-upload ticket epoch rotation outcome requires authenticated fail-forward resume; receipt=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256" >&2
       exit "$epoch_rotation_status"
       ;;
   esac
@@ -5360,14 +5502,22 @@ trap - EXIT HUP INT TERM
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1 \
   && epoch_rotation_precommit_refused == 1)); then
   printf \
-    'release_upload_ticket_epoch_refused_before_commit receipt=%s\n' \
-    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" >&2
+    'release_upload_ticket_epoch_refused_before_commit receipt=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+    "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+    "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256" >&2
   exit 75
 fi
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
   printf \
-    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s\n' \
+    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s history=%s history_sha256=%s bootstrap_marker=%s bootstrap_marker_sha256=%s\n' \
     "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
-    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256"
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+    "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_HISTORY" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_HISTORY_OBSERVED_SHA256" \
+    "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_BOOTSTRAP_MARKER_OBSERVED_SHA256"
 fi
 printf 'public_edge_portal_deployed %s\n' "$image_id"
