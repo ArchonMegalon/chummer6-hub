@@ -270,13 +270,18 @@ def presentation_fixture(tmp_path: Path) -> dict[str, object]:
         "primary_head": "avalonia",
         "required_heads": ["avalonia", "blazor-desktop"],
     }
+    contracts = {
+        "desktop_visual": "chummer6-ui.desktop_visual_familiarity_exit_gate",
+        "desktop_workflow": "chummer6-ui.desktop_workflow_execution_gate",
+        "desktop_executable": "chummer6-ui.desktop_executable_exit_gate",
+    }
     sources: list[Path] = []
-    for evidence_id in ("desktop_visual", "desktop_workflow", "desktop_executable"):
+    for evidence_id, contract_name in contracts.items():
         path = tmp_path / f"{evidence_id}.json"
         path.write_text(
             json.dumps(
                 {
-                    "contract_name": f"fixture.{evidence_id}",
+                    "contract_name": contract_name,
                     "status": "pass",
                     "releaseVersion": release_version,
                     "campaign_operability_candidate_binding": binding,
@@ -389,7 +394,7 @@ def test_presentation_receipts_are_exactly_validated_before_atomic_pin(
     command = (
         'pin_presentation_candidate_receipts '
         '"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" '
-        '"${10}" "${11}" "${12}" "${13}" "${14}"'
+        '"${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}"'
     )
     arguments = [
         str(sources[0]),
@@ -405,6 +410,9 @@ def test_presentation_receipts_are_exactly_validated_before_atomic_pin(
         str(fixture["decision_path"]),
         str(fixture["release_version"]),
         str(fixture["registry_commit"]),
+        str(fixture["binding"]["manifest_sha256"]),
+        str(fixture["binding"]["authority_snapshot_sha256"]),
+        str(fixture["binding"]["release_decision_sha256"]),
     ]
     accepted = run_sourced(command, *arguments)
 
@@ -435,6 +443,87 @@ def test_presentation_receipts_are_exactly_validated_before_atomic_pin(
     assert rejected.returncode != 0
     assert "does not bind the exact passing candidate" in rejected.stderr
     assert not any(path.exists() for path in rejected_targets)
+
+
+def test_presentation_receipts_reject_wrong_producer_contract(
+    tmp_path: Path,
+) -> None:
+    fixture = presentation_fixture(tmp_path)
+    sources = list(fixture["sources"])
+    payload = json.loads(sources[0].read_text(encoding="utf-8"))
+    payload["contract_name"] = "fixture.generic_pass"
+    sources[0].write_text(
+        json.dumps(payload, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    sources[0].chmod(0o600)
+    target_dir = tmp_path / "wrong-contract-targets"
+    target_dir.mkdir(mode=0o700)
+    targets = [target_dir / path.name for path in sources]
+    result = run_sourced(
+        'pin_presentation_candidate_receipts '
+        '"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" '
+        '"${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}"',
+        str(sources[0]),
+        str(targets[0]),
+        str(sources[1]),
+        str(targets[1]),
+        str(sources[2]),
+        str(targets[2]),
+        str(fixture["scope_path"]),
+        str(fixture["scope_sha256"]),
+        str(fixture["manifest_path"]),
+        str(fixture["snapshot_path"]),
+        str(fixture["decision_path"]),
+        str(fixture["release_version"]),
+        str(fixture["registry_commit"]),
+        str(fixture["binding"]["manifest_sha256"]),
+        str(fixture["binding"]["authority_snapshot_sha256"]),
+        str(fixture["binding"]["release_decision_sha256"]),
+    )
+
+    assert result.returncode != 0
+    assert "does not bind the exact passing candidate" in result.stderr
+    assert not any(path.exists() for path in targets)
+
+
+def test_presentation_receipts_reject_candidate_changed_during_wait(
+    tmp_path: Path,
+) -> None:
+    fixture = presentation_fixture(tmp_path)
+    sources = list(fixture["sources"])
+    target_dir = tmp_path / "changed-candidate-targets"
+    target_dir.mkdir(mode=0o700)
+    targets = [target_dir / path.name for path in sources]
+    fixture["manifest_path"].write_text(
+        json.dumps({"version": fixture["release_version"], "changed": True}) + "\n",
+        encoding="utf-8",
+    )
+    result = run_sourced(
+        'pin_presentation_candidate_receipts '
+        '"$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" '
+        '"${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}"',
+        str(sources[0]),
+        str(targets[0]),
+        str(sources[1]),
+        str(targets[1]),
+        str(sources[2]),
+        str(targets[2]),
+        str(fixture["scope_path"]),
+        str(fixture["scope_sha256"]),
+        str(fixture["manifest_path"]),
+        str(fixture["snapshot_path"]),
+        str(fixture["decision_path"]),
+        str(fixture["release_version"]),
+        str(fixture["registry_commit"]),
+        str(fixture["binding"]["manifest_sha256"]),
+        str(fixture["binding"]["authority_snapshot_sha256"]),
+        str(fixture["binding"]["release_decision_sha256"]),
+    )
+
+    assert result.returncode != 0
+    assert "changed while awaiting external receipts" in result.stderr
+    assert not any(path.exists() for path in targets)
 
 
 def test_exact_executing_bootstrap_bytes_are_pinned_into_handoff_workspace() -> None:

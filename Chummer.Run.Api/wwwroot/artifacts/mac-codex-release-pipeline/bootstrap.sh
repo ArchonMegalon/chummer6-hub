@@ -5370,6 +5370,25 @@ import sys
 
 sha256 = re.compile(r"^[0-9a-f]{64}$")
 git_sha = re.compile(r"^[0-9a-f]{40}$")
+
+def reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def reject_non_finite(value):
+    raise ValueError(f"non-finite JSON value: {value}")
+
+def load_json(raw):
+    return json.loads(
+        raw,
+        object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_non_finite,
+    )
+
 if not sha256.fullmatch(release_scope_sha256):
     raise SystemExit("Presentation request release-scope SHA-256 is invalid")
 if not git_sha.fullmatch(registry_commit):
@@ -5382,14 +5401,16 @@ if len({visual_output, workflow_output, executable_output}) != 3:
 scope_raw = release_scope_path.read_bytes()
 if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
     raise SystemExit("Presentation request release-scope bytes do not match authority")
-scope = json.loads(scope_raw)
+scope = load_json(scope_raw)
 manifest_raw = manifest_path.read_bytes()
 snapshot_raw = snapshot_path.read_bytes()
 decision_raw = decision_path.read_bytes()
 manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
 snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
 decision_sha256 = hashlib.sha256(decision_raw).hexdigest()
-snapshot = json.loads(snapshot_raw)
+manifest = load_json(manifest_raw)
+snapshot = load_json(snapshot_raw)
+decision = load_json(decision_raw)
 platforms = scope.get("platforms") if isinstance(scope, dict) else None
 if (
     not isinstance(platforms, list)
@@ -5398,7 +5419,16 @@ if (
 ):
     raise SystemExit("Presentation request requires one exact approved platform")
 platform = platforms[0]
-required_heads = [platform.get("primaryHead"), *(platform.get("fallbackHeads") or [])]
+fallback_heads = platform.get("fallbackHeads")
+if (
+    type(platform.get("platform")) is not str
+    or type(platform.get("rid")) is not str
+    or type(platform.get("primaryHead")) is not str
+    or not isinstance(fallback_heads, list)
+    or any(type(value) is not str for value in fallback_heads)
+):
+    raise SystemExit("Presentation request platform binding is malformed")
+required_heads = [platform["primaryHead"], *fallback_heads]
 binding = {
     "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
     "contract_version": 1,
@@ -5416,6 +5446,9 @@ binding = {
 if (
     scope.get("releaseVersion") != release_version
     or scope.get("supportOwner") != support_owner
+    or not isinstance(manifest, dict)
+    or manifest.get("version") != release_version
+    or not isinstance(decision, dict)
     or snapshot.get("manifestSha256") != manifest_sha256
     or snapshot.get("releaseDecisionSha256") != decision_sha256
     or snapshot.get("registryCommit") != registry_commit
@@ -5546,6 +5579,9 @@ pin_presentation_candidate_receipts() {
   local decision_path="${11}"
   local release_version="${12}"
   local registry_commit="${13}"
+  local expected_manifest_sha256="${14}"
+  local expected_authority_snapshot_sha256="${15}"
+  local expected_release_decision_sha256="${16}"
 
   command "$RELEASE_PYTHON_BIN" - \
     "$visual_source" "$visual_target" \
@@ -5553,7 +5589,9 @@ pin_presentation_candidate_receipts() {
     "$executable_source" "$executable_target" \
     "$release_scope_path" "$release_scope_sha256" \
     "$manifest_path" "$snapshot_path" "$decision_path" \
-    "$release_version" "$registry_commit" <<'PY'
+    "$release_version" "$registry_commit" \
+    "$expected_manifest_sha256" "$expected_authority_snapshot_sha256" \
+    "$expected_release_decision_sha256" <<'PY'
 from __future__ import annotations
 
 import hashlib
@@ -5564,9 +5602,24 @@ import stat
 import sys
 
 pairs = [
-    (Path(sys.argv[1]), Path(sys.argv[2]), "desktop_visual"),
-    (Path(sys.argv[3]), Path(sys.argv[4]), "desktop_workflow"),
-    (Path(sys.argv[5]), Path(sys.argv[6]), "desktop_executable"),
+    (
+        Path(sys.argv[1]),
+        Path(sys.argv[2]),
+        "desktop_visual",
+        "chummer6-ui.desktop_visual_familiarity_exit_gate",
+    ),
+    (
+        Path(sys.argv[3]),
+        Path(sys.argv[4]),
+        "desktop_workflow",
+        "chummer6-ui.desktop_workflow_execution_gate",
+    ),
+    (
+        Path(sys.argv[5]),
+        Path(sys.argv[6]),
+        "desktop_executable",
+        "chummer6-ui.desktop_executable_exit_gate",
+    ),
 ]
 release_scope_path = Path(sys.argv[7])
 release_scope_sha256 = sys.argv[8]
@@ -5575,11 +5628,57 @@ snapshot_path = Path(sys.argv[10])
 decision_path = Path(sys.argv[11])
 release_version = sys.argv[12]
 registry_commit = sys.argv[13]
+expected_manifest_sha256 = sys.argv[14]
+expected_authority_snapshot_sha256 = sys.argv[15]
+expected_release_decision_sha256 = sys.argv[16]
+
+def reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def reject_non_finite(value):
+    raise ValueError(f"non-finite JSON value: {value}")
+
+def load_json(raw):
+    return json.loads(
+        raw,
+        object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_non_finite,
+    )
+
+def exact_json_equal(actual, expected):
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return (
+            set(actual) == set(expected)
+            and all(exact_json_equal(actual[key], expected[key]) for key in expected)
+        )
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            exact_json_equal(left, right) for left, right in zip(actual, expected)
+        )
+    return actual == expected
+
+if any(
+    len(value) != 64 or any(character not in "0123456789abcdef" for character in value)
+    for value in (
+        release_scope_sha256,
+        expected_manifest_sha256,
+        expected_authority_snapshot_sha256,
+        expected_release_decision_sha256,
+    )
+):
+    raise SystemExit("Presentation candidate digest authority is invalid")
 
 scope_raw = release_scope_path.read_bytes()
 if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
     raise SystemExit("Presentation release-scope bytes do not match authority")
-scope = json.loads(scope_raw)
+scope = load_json(scope_raw)
 platforms = scope.get("platforms") if isinstance(scope, dict) else None
 if (
     not isinstance(platforms, list)
@@ -5588,24 +5687,55 @@ if (
 ):
     raise SystemExit("Presentation receipts require one exact approved platform")
 platform = platforms[0]
+fallback_heads = platform.get("fallbackHeads")
+if (
+    type(platform.get("platform")) is not str
+    or type(platform.get("rid")) is not str
+    or type(platform.get("primaryHead")) is not str
+    or not isinstance(fallback_heads, list)
+    or any(type(value) is not str for value in fallback_heads)
+):
+    raise SystemExit("Presentation receipt platform binding is malformed")
+manifest_raw = manifest_path.read_bytes()
+snapshot_raw = snapshot_path.read_bytes()
+decision_raw = decision_path.read_bytes()
+if (
+    hashlib.sha256(manifest_raw).hexdigest() != expected_manifest_sha256
+    or hashlib.sha256(snapshot_raw).hexdigest() != expected_authority_snapshot_sha256
+    or hashlib.sha256(decision_raw).hexdigest() != expected_release_decision_sha256
+):
+    raise SystemExit("Presentation candidate changed while awaiting external receipts")
+manifest = load_json(manifest_raw)
+snapshot = load_json(snapshot_raw)
+decision = load_json(decision_raw)
+if (
+    not isinstance(manifest, dict)
+    or manifest.get("version") != release_version
+    or not isinstance(snapshot, dict)
+    or snapshot.get("manifestSha256") != expected_manifest_sha256
+    or snapshot.get("releaseDecisionSha256") != expected_release_decision_sha256
+    or snapshot.get("registryCommit") != registry_commit
+    or not isinstance(decision, dict)
+):
+    raise SystemExit("Presentation candidate authority documents are inconsistent")
 expected_binding = {
     "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
     "contract_version": 1,
     "release_version": release_version,
     "release_scope_decision_sha256": release_scope_sha256,
-    "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
-    "authority_snapshot_sha256": hashlib.sha256(snapshot_path.read_bytes()).hexdigest(),
-    "release_decision_sha256": hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+    "manifest_sha256": expected_manifest_sha256,
+    "authority_snapshot_sha256": expected_authority_snapshot_sha256,
+    "release_decision_sha256": expected_release_decision_sha256,
     "registry_commit": registry_commit,
     "platform": platform.get("platform"),
     "rid": platform.get("rid"),
     "primary_head": platform.get("primaryHead"),
-    "required_heads": [platform.get("primaryHead"), *(platform.get("fallbackHeads") or [])],
+    "required_heads": [platform["primaryHead"], *fallback_heads],
 }
 
 validated: list[tuple[Path, bytes]] = []
 digests: set[str] = set()
-for source, target, evidence_id in pairs:
+for source, target, evidence_id, expected_contract in pairs:
     before = source.lstat()
     if (
         not source.is_absolute()
@@ -5646,8 +5776,8 @@ for source, target, evidence_id in pairs:
     ):
         raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
     try:
-        payload = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        payload = load_json(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         raise SystemExit(f"{evidence_id} Presentation receipt is not valid JSON") from error
     release_aliases = [
         payload[name]
@@ -5657,9 +5787,17 @@ for source, target, evidence_id in pairs:
     if (
         not isinstance(payload, dict)
         or payload.get("status") != "pass"
+        or payload.get("contract_name") != expected_contract
+        or (
+            "contractName" in payload
+            and payload.get("contractName") != expected_contract
+        )
         or not release_aliases
-        or any(value != release_version for value in release_aliases)
-        or payload.get("campaign_operability_candidate_binding") != expected_binding
+        or any(type(value) is not str or value != release_version for value in release_aliases)
+        or not exact_json_equal(
+            payload.get("campaign_operability_candidate_binding"),
+            expected_binding,
+        )
     ):
         raise SystemExit(
             f"{evidence_id} Presentation receipt does not bind the exact passing candidate"
@@ -6932,7 +7070,10 @@ PY
     "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
     "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
     "$release_version" \
-    "$release_authority_registry_commit"
+    "$release_authority_registry_commit" \
+    "$expected_manifest_sha256" \
+    "$expected_authority_snapshot_sha256" \
+    "$expected_release_decision_sha256"
 
   case "$publish_mode" in
     http)
