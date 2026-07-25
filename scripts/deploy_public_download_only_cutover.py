@@ -5680,9 +5680,6 @@ class TopologyBActionsProtocol(Protocol):
     def retire_active_authority(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
-    def adopt_terminal_committed_retirement(
-        self, config: Any, *args: Any
-    ) -> dict[str, Any] | None: ...
     def verify_retired_authority_connectors(
         self, config: Any, *args: Any
     ) -> dict[str, Any]: ...
@@ -9064,60 +9061,6 @@ class TopologyBActions:
         )
         return receipt
 
-    def adopt_terminal_committed_retirement(
-        self,
-        config: SidecarConfig,
-        authorization: Mapping[str, Any],
-        restoration: Mapping[str, Any],
-        retirement_evidence: Mapping[str, Any],
-        retired_authority: Mapping[str, Any],
-        incumbent: Mapping[str, Any],
-        *_args: Any,
-    ) -> dict[str, Any] | None:
-        if not (
-            config.retirement_receipt.exists()
-            or config.retirement_receipt.is_symlink()
-        ):
-            return None
-        receipts = self._state.get("receipts")
-        cleanup = (
-            receipts.get("cleanup")
-            if isinstance(receipts, dict)
-            else None
-        )
-        latest_connector_gate = (
-            receipts.get(
-                "retirementConnectorResumeGate",
-                receipts.get("retirementPostMarkerConnectorGate"),
-            )
-            if isinstance(receipts, dict)
-            else None
-        )
-        if not isinstance(cleanup, dict) or not isinstance(
-            latest_connector_gate,
-            dict,
-        ):
-            raise RecoveryUncertain(
-                "terminal topology-B retirement lacks its durable boundary "
-                "receipts"
-            )
-        terminal = self.finalize_committed_retirement(
-            config,
-            authorization,
-            restoration,
-            retirement_evidence,
-            retired_authority,
-            incumbent,
-            cleanup,
-        )
-        return {
-            "cleanup": copy.deepcopy(cleanup),
-            "postMarkerConnectors": copy.deepcopy(
-                latest_connector_gate
-            ),
-            "terminalReceipt": copy.deepcopy(terminal),
-        }
-
     def _validated_retirement_connector_boundary(
         self,
         value: Any,
@@ -12080,6 +12023,600 @@ def recover_topology_b(
         ) from exc
 
 
+def _adopt_terminal_committed_retirement(
+    config: SidecarConfig,
+) -> dict[str, Any] | None:
+    """Adopt a completed retirement using only immutable local authority.
+
+    The terminal receipt is written only after restoration, connector gates,
+    marker retirement, and cleanup are durable.  If its journal append was
+    interrupted, no provider observation may supersede those completed
+    bindings before the exact receipt is adopted.
+    """
+
+    terminal_path = getattr(config, "retirement_receipt", None)
+    if not isinstance(terminal_path, Path) or not (
+        terminal_path.exists() or terminal_path.is_symlink()
+    ):
+        return None
+    if getattr(config, "operation", None) != RETIRE_OPERATION:
+        raise RecoveryUncertain(
+            "terminal topology-B retirement requires explicit retirement"
+        )
+
+    try:
+        terminal_raw = stable_regular_bytes(
+            terminal_path,
+            label="terminal topology-B retirement receipt",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        terminal = _strict_json_object_bytes(
+            terminal_raw,
+            label="terminal topology-B retirement receipt",
+        )
+        journal_raw = stable_regular_bytes(
+            config.operation_journal,
+            label="topology-B operation journal",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        state = _strict_json_object_bytes(
+            journal_raw,
+            label="topology-B operation journal",
+        )
+        if (
+            state.get("schema") != TOPOLOGY_B_OPERATION_SCHEMA
+            or state.get("operation") != CUTOVER_OPERATION
+            or state.get("projectName") != config.project_name
+            or state.get("operationRoot") != str(config.operation_root)
+            or state.get("sourceHead") != config.source_head
+            or state.get("volumes") != config.volume_names
+            or state.get("phase") not in {"cleaned", "retired"}
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement journal authority drifted"
+            )
+        receipts = state.get("receipts")
+        required_receipts = {
+            "activeAuthority",
+            "retirementAuthorization",
+            "cloudflareRetirement",
+            "incumbentAfterRetirement",
+            "retirementEvidence",
+            "retiredAuthority",
+            "retirementConnectorGate",
+            "retirementPostMarkerConnectorGate",
+            "cleanup",
+        }
+        if (
+            not isinstance(receipts, dict)
+            or any(
+                not isinstance(receipts.get(name), dict)
+                for name in required_receipts
+            )
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement lacks durable boundary receipts"
+            )
+
+        cloudflare = load_module(
+            config.source_root
+            / "scripts/cloudflare_public_download_transaction.py",
+            f"topology_b_terminal_cloudflare_{secrets.token_hex(6)}",
+        )
+
+        baseline = state.get("incumbentBaseline")
+        expected_paths = {
+            "/downloads/RELEASE_CHANNEL.generated.json",
+            "/downloads/releases.json",
+        }
+        if (
+            not isinstance(baseline, dict)
+            or set(baseline) != set(SIDECAR_HOSTS)
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement baseline is incomplete"
+            )
+        for hostname in SIDECAR_HOSTS:
+            observations = baseline.get(hostname)
+            if (
+                not isinstance(observations, dict)
+                or set(observations) != expected_paths
+            ):
+                raise RecoveryUncertain(
+                    "terminal topology-B retirement baseline drifted"
+                )
+            for path in sorted(expected_paths):
+                observation = observations.get(path)
+                if (
+                    not isinstance(observation, dict)
+                    or set(observation)
+                    != {"httpStatus", "bodySha256", "sizeBytes"}
+                    or type(observation.get("httpStatus")) is not int
+                    or observation["httpStatus"] != 200
+                    or SHA256.fullmatch(
+                        str(observation.get("bodySha256") or "")
+                    )
+                    is None
+                    or type(observation.get("sizeBytes")) is not int
+                    or observation["sizeBytes"] <= 0
+                ):
+                    raise RecoveryUncertain(
+                        "terminal topology-B retirement baseline is invalid"
+                    )
+
+        if (
+            config.active_runtime_authority.exists()
+            or config.active_runtime_authority.is_symlink()
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement retains active authority"
+            )
+        retired_raw = stable_regular_bytes(
+            config.retired_active_authority,
+            label="retired topology-B runtime authority",
+            maximum_bytes=1024 * 1024,
+            owner_only=True,
+        )
+        active_authority = _strict_json_object_bytes(
+            retired_raw,
+            label="retired topology-B runtime authority",
+        )
+        if not _json_semantically_equal(
+            receipts["activeAuthority"],
+            active_authority,
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retired authority journal drifted"
+            )
+        committed_raw = stable_regular_bytes(
+            config.cloudflare_committed_evidence,
+            label="committed Cloudflare evidence",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        evidence_raw = stable_regular_bytes(
+            config.cloudflare_retirement_evidence,
+            label="Cloudflare retirement evidence",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        evidence = _strict_json_object_bytes(
+            evidence_raw,
+            label="Cloudflare retirement evidence",
+        )
+
+        canonical_sha256 = cloudflare.canonical_sha256
+        baseline_sha256 = canonical_sha256(baseline)
+        retired_authority_sha256 = sha256_bytes(retired_raw)
+        authorization = receipts["retirementAuthorization"]
+        durable_controller_source_head = authorization.get(
+            "controllerSourceHead"
+        )
+        authorization_expected = {
+            "contractName": (
+                "chummer.public-download-committed-retirement-"
+                "authorization/v1"
+            ),
+            "operation": RETIRE_OPERATION,
+            "operationRoot": str(config.operation_root),
+            "projectName": config.project_name,
+            "operationSourceHead": config.source_head,
+            "controllerSourceHead": durable_controller_source_head,
+            "activeAuthorityPath": str(config.active_runtime_authority),
+            "activeAuthoritySha256": retired_authority_sha256,
+            "committedEvidencePath": str(
+                config.cloudflare_committed_evidence
+            ),
+            "committedEvidenceSha256": sha256_bytes(committed_raw),
+            "targetConfigSha256": authorization.get(
+                "targetConfigSha256"
+            ),
+            "targetVersion": authorization.get("targetVersion"),
+            "priorConfigSha256": authorization.get("priorConfigSha256"),
+            "priorVersion": authorization.get("priorVersion"),
+            "incumbentBaselineSha256": baseline_sha256,
+        }
+        if (
+            set(authorization)
+            != {*authorization_expected, "authorizedAtUtc"}
+            or any(
+                authorization.get(key) != value
+                for key, value in authorization_expected.items()
+            )
+            or SHA256.fullmatch(
+                str(authorization.get("targetConfigSha256") or "")
+            )
+            is None
+            or type(authorization.get("targetVersion")) is not int
+            or authorization["targetVersion"] < 0
+            or SHA256.fullmatch(
+                str(authorization.get("priorConfigSha256") or "")
+            )
+            is None
+            or type(authorization.get("priorVersion")) is not int
+            or authorization["priorVersion"] < 0
+            or not isinstance(durable_controller_source_head, str)
+            or COMMIT.fullmatch(durable_controller_source_head) is None
+            or not isinstance(authorization.get("authorizedAtUtc"), str)
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement authorization drifted"
+            )
+
+        restoration = receipts["cloudflareRetirement"]
+        restoration_fields = {
+            "contractName",
+            "phase",
+            "operationRoot",
+            "targetConfigSha256",
+            "targetVersion",
+            "priorConfigSha256",
+            "restoredVersion",
+            "restoredResponseSha256",
+            "connectorConvergence",
+            "restoredAtUtc",
+            "connectorsVerifiedAtUtc",
+        }
+        try:
+            restoration_connectors = (
+                cloudflare.validate_current_connector_convergence_receipt(
+                    restoration.get("connectorConvergence")
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "terminal topology-B restoration connectors drifted"
+            ) from exc
+        if (
+            set(restoration) != restoration_fields
+            or restoration.get("contractName")
+            != "chummer.public-download-cloudflare-retirement/v1"
+            or restoration.get("phase") != "restored"
+            or restoration.get("operationRoot")
+            != str(config.operation_root)
+            or restoration.get("targetConfigSha256")
+            != authorization["targetConfigSha256"]
+            or restoration.get("targetVersion")
+            != authorization["targetVersion"]
+            or restoration.get("priorConfigSha256")
+            != authorization["priorConfigSha256"]
+            or type(restoration.get("restoredVersion")) is not int
+            or restoration["restoredVersion"] < 0
+            or restoration_connectors.get("targetVersion")
+            != restoration["restoredVersion"]
+            or SHA256.fullmatch(
+                str(restoration.get("restoredResponseSha256") or "")
+            )
+            is None
+            or not isinstance(restoration.get("restoredAtUtc"), str)
+            or not isinstance(
+                restoration.get("connectorsVerifiedAtUtc"),
+                str,
+            )
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement restoration drifted"
+            )
+
+        incumbent = receipts["incumbentAfterRetirement"]
+        if not _json_semantically_equal(incumbent, baseline):
+            raise RecoveryUncertain(
+                "terminal topology-B incumbent observation drifted"
+            )
+        connector_convergence_sha256 = canonical_sha256(
+            restoration_connectors
+        )
+        evidence_expected = {
+            "contractName": (
+                "chummer.public-download-committed-retirement-evidence/v1"
+            ),
+            "status": "committed",
+            "operation": RETIRE_OPERATION,
+            "operationRoot": str(config.operation_root),
+            "projectName": config.project_name,
+            "operationSourceHead": config.source_head,
+            "controllerSourceHead": durable_controller_source_head,
+            "authorizationSha256": canonical_sha256(authorization),
+            "restorationSha256": canonical_sha256(restoration),
+            "connectorConvergenceSha256": (
+                connector_convergence_sha256
+            ),
+            "targetConfigSha256": authorization["targetConfigSha256"],
+            "targetVersion": authorization["targetVersion"],
+            "priorConfigSha256": restoration["priorConfigSha256"],
+            "restoredVersion": restoration["restoredVersion"],
+            "incumbentBaselineSha256": baseline_sha256,
+            "incumbentObservationSha256": canonical_sha256(incumbent),
+            "incumbent": copy.deepcopy(incumbent),
+        }
+        if (
+            set(evidence) != {*evidence_expected, "committedAtUtc"}
+            or any(
+                not _json_semantically_equal(evidence.get(key), value)
+                for key, value in evidence_expected.items()
+            )
+            or not isinstance(evidence.get("committedAtUtc"), str)
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement evidence drifted"
+            )
+        retirement_evidence = receipts["retirementEvidence"]
+        retirement_evidence_expected = {
+            "contractName": (
+                "chummer.public-download-retirement-evidence-summary/v1"
+            ),
+            "status": "committed",
+            "evidencePath": str(config.cloudflare_retirement_evidence),
+            "evidenceSha256": sha256_bytes(evidence_raw),
+            "priorConfigSha256": restoration["priorConfigSha256"],
+            "restoredVersion": restoration["restoredVersion"],
+            "connectorConvergenceSha256": (
+                connector_convergence_sha256
+            ),
+            "incumbentBaselineSha256": baseline_sha256,
+        }
+        if retirement_evidence != retirement_evidence_expected:
+            raise RecoveryUncertain(
+                "terminal topology-B retirement evidence summary drifted"
+            )
+
+        try:
+            marker_connector_gate = (
+                cloudflare.validate_current_connector_convergence_receipt(
+                    receipts["retirementConnectorGate"]
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "terminal topology-B marker connector gate drifted"
+            ) from exc
+        restored_version = restoration["restoredVersion"]
+        marker_connector_gate_sha256 = canonical_sha256(
+            marker_connector_gate
+        )
+        if marker_connector_gate.get("targetVersion") != restored_version:
+            raise RecoveryUncertain(
+                "terminal topology-B marker connector version drifted"
+            )
+
+        def validate_boundary(
+            value: Any,
+            *,
+            boundary: str,
+        ) -> dict[str, Any]:
+            fields = {
+                "contractName",
+                "status",
+                "boundary",
+                "operationRoot",
+                "restoredVersion",
+                "retiredAuthoritySha256",
+                "markerConnectorGateSha256",
+                "connectorConvergence",
+                "connectorConvergenceSha256",
+                "verifiedAtUtc",
+            }
+            if (
+                not isinstance(value, dict)
+                or set(value) != fields
+                or value.get("contractName")
+                != (
+                    "chummer.public-download-retirement-"
+                    "connector-boundary/v1"
+                )
+                or value.get("status") != "pass"
+                or value.get("boundary") != boundary
+                or value.get("operationRoot") != str(config.operation_root)
+                or value.get("restoredVersion") != restored_version
+                or value.get("retiredAuthoritySha256")
+                != retired_authority_sha256
+                or value.get("markerConnectorGateSha256")
+                != marker_connector_gate_sha256
+                or not isinstance(value.get("verifiedAtUtc"), str)
+            ):
+                raise RecoveryUncertain(
+                    "terminal topology-B connector boundary drifted"
+                )
+            try:
+                convergence = (
+                    cloudflare
+                    .validate_current_connector_convergence_receipt(
+                        value.get("connectorConvergence")
+                    )
+                )
+            except Exception as exc:
+                raise RecoveryUncertain(
+                    "terminal topology-B connector convergence drifted"
+                ) from exc
+            if (
+                convergence.get("targetVersion") != restored_version
+                or canonical_sha256(convergence)
+                != value.get("connectorConvergenceSha256")
+            ):
+                raise RecoveryUncertain(
+                    "terminal topology-B connector boundary version drifted"
+                )
+            return value
+
+        post_marker_connector_gate = validate_boundary(
+            receipts["retirementPostMarkerConnectorGate"],
+            boundary="post-marker",
+        )
+        resume_present = "retirementConnectorResumeGate" in receipts
+        latest_connector_gate = (
+            validate_boundary(
+                receipts["retirementConnectorResumeGate"],
+                boundary="resume-post-marker",
+            )
+            if resume_present
+            else post_marker_connector_gate
+        )
+        post_marker_connector_gate_sha256 = canonical_sha256(
+            post_marker_connector_gate
+        )
+        latest_connector_gate_sha256 = canonical_sha256(
+            latest_connector_gate
+        )
+
+        retired_authority = receipts["retiredAuthority"]
+        retired_authority_expected = {
+            "contractName": (
+                "chummer.public-download-retired-authority/v1"
+            ),
+            "status": "retired",
+            "activeAuthorityPath": str(config.active_runtime_authority),
+            "retiredAuthorityPath": str(
+                config.retired_active_authority
+            ),
+            "activeAuthoritySha256": retired_authority_sha256,
+            "retirementEvidenceSha256": sha256_bytes(evidence_raw),
+            "connectorGateSha256": marker_connector_gate_sha256,
+        }
+        if (
+            set(retired_authority)
+            != {
+                *retired_authority_expected,
+                "disposition",
+                "retiredAtUtc",
+            }
+            or any(
+                retired_authority.get(key) != value
+                for key, value in retired_authority_expected.items()
+            )
+            or retired_authority.get("disposition")
+            not in {
+                "atomically-retired",
+                "already-atomically-retired",
+            }
+            or not isinstance(retired_authority.get("retiredAtUtc"), str)
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retired authority receipt drifted"
+            )
+
+        cleanup = receipts["cleanup"]
+        terminal_expected = {
+            "contractName": (
+                "chummer.public-download-committed-retirement/v1"
+            ),
+            "status": "retired",
+            "operation": RETIRE_OPERATION,
+            "operationRoot": str(config.operation_root),
+            "projectName": config.project_name,
+            "operationSourceHead": config.source_head,
+            "controllerSourceHead": durable_controller_source_head,
+            "retiredAuthorityPath": str(
+                config.retired_active_authority
+            ),
+            "retiredAuthoritySha256": retired_authority_sha256,
+            "retirementEvidencePath": str(
+                config.cloudflare_retirement_evidence
+            ),
+            "retirementEvidenceSha256": sha256_bytes(evidence_raw),
+            "connectorGateSha256": marker_connector_gate_sha256,
+            "postMarkerConnectorGateSha256": (
+                post_marker_connector_gate_sha256
+            ),
+            "latestConnectorGateSha256": (
+                latest_connector_gate_sha256
+            ),
+            "priorConfigSha256": restoration["priorConfigSha256"],
+            "restoredVersion": restored_version,
+            "incumbentBaselineSha256": baseline_sha256,
+            "incumbentObservationSha256": canonical_sha256(incumbent),
+            "cleanupSha256": canonical_sha256(cleanup),
+        }
+        if (
+            set(terminal) != {*terminal_expected, "completedAtUtc"}
+            or any(
+                terminal.get(key) != value
+                for key, value in terminal_expected.items()
+            )
+            or not isinstance(terminal.get("completedAtUtc"), str)
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement receipt drifted"
+            )
+
+        existing_terminal = receipts.get("retirement")
+        if existing_terminal is None:
+            if state.get("phase") != "cleaned":
+                raise RecoveryUncertain(
+                    "terminal topology-B retirement journal is incomplete"
+                )
+            adopted = copy.deepcopy(state)
+            adopted["phase"] = "retired"
+            adopted["updatedAtUtc"] = utc_now()
+            adopted_receipts = adopted.get("receipts")
+            if not isinstance(adopted_receipts, dict):
+                raise RecoveryUncertain(
+                    "terminal topology-B retirement receipts are malformed"
+                )
+            adopted_receipts["retirement"] = copy.deepcopy(terminal)
+            write_private_json(
+                config.operation_journal,
+                adopted,
+                replace=True,
+            )
+            adopted_raw = stable_regular_bytes(
+                config.operation_journal,
+                label="adopted topology-B operation journal",
+                maximum_bytes=16 * 1024 * 1024,
+                owner_only=True,
+            )
+            if _strict_json_object_bytes(
+                adopted_raw,
+                label="adopted topology-B operation journal",
+            ) != adopted:
+                raise RecoveryUncertain(
+                    "terminal topology-B retirement adoption was not durable"
+                )
+            state = adopted
+            receipts = adopted_receipts
+        elif (
+            existing_terminal != terminal
+            or state.get("phase") != "retired"
+        ):
+            raise RecoveryUncertain(
+                "terminal topology-B retirement journal drifted"
+            )
+        if stable_regular_bytes(
+            terminal_path,
+            label="terminal topology-B retirement receipt",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        ) != terminal_raw:
+            raise RecoveryUncertain(
+                "terminal topology-B retirement receipt changed during adoption"
+            )
+
+        return {
+            "contractName": TOPOLOGY_B_CONTRACT,
+            "status": "pass",
+            "operation": config.operation,
+            "disposition": "committed-sidecar-retired-to-incumbent",
+            "operationSourceHead": config.source_head,
+            "controllerSourceHead": durable_controller_source_head,
+            "cloudflareRestoration": copy.deepcopy(restoration),
+            "incumbent": copy.deepcopy(incumbent),
+            "retirementEvidence": copy.deepcopy(retirement_evidence),
+            "retiredAuthority": copy.deepcopy(retired_authority),
+            "postMarkerConnectors": copy.deepcopy(
+                latest_connector_gate
+            ),
+            "cleanup": copy.deepcopy(cleanup),
+            "terminalReceipt": copy.deepcopy(terminal),
+        }
+    except RecoveryUncertain:
+        raise
+    except BaseException as exc:
+        raise RecoveryUncertain(
+            "terminal topology-B retirement could not be adopted locally"
+        ) from exc
+
+
 def retire_topology_b(
     config: SidecarConfig,
     actions: TopologyBActionsProtocol | None = None,
@@ -12105,6 +12642,9 @@ def retire_topology_b(
                 signal_number
             )
             signal.signal(signal_number, interrupt_retirement)
+        adopted_terminal = _adopt_terminal_committed_retirement(config)
+        if adopted_terminal is not None:
+            return adopted_terminal
         action_boundary = (
             actions if actions is not None else TopologyBActions(config)
         )
@@ -12134,62 +12674,25 @@ def retire_topology_b(
             restoration,
             retirement_evidence,
         )
-        adopted_terminal = (
-            action_boundary.adopt_terminal_committed_retirement(
+        post_marker_connectors = (
+            action_boundary.verify_retired_authority_connectors(
                 config,
                 authorization,
                 restoration,
                 retirement_evidence,
                 retired_authority,
-                incumbent,
             )
         )
-        if adopted_terminal is not None:
-            if (
-                not isinstance(adopted_terminal, dict)
-                or set(adopted_terminal)
-                != {
-                    "cleanup",
-                    "postMarkerConnectors",
-                    "terminalReceipt",
-                }
-                or not all(
-                    isinstance(adopted_terminal.get(name), dict)
-                    for name in (
-                        "cleanup",
-                        "postMarkerConnectors",
-                        "terminalReceipt",
-                    )
-                )
-            ):
-                raise RecoveryUncertain(
-                    "terminal topology-B retirement adoption is malformed"
-                )
-            post_marker_connectors = adopted_terminal[
-                "postMarkerConnectors"
-            ]
-            cleanup = adopted_terminal["cleanup"]
-            terminal = adopted_terminal["terminalReceipt"]
-        else:
-            post_marker_connectors = (
-                action_boundary.verify_retired_authority_connectors(
-                    config,
-                    authorization,
-                    restoration,
-                    retirement_evidence,
-                    retired_authority,
-                )
-            )
-            cleanup = action_boundary.cleanup_sidecar_resources(config)
-            terminal = action_boundary.finalize_committed_retirement(
-                config,
-                authorization,
-                restoration,
-                retirement_evidence,
-                retired_authority,
-                incumbent,
-                cleanup,
-            )
+        cleanup = action_boundary.cleanup_sidecar_resources(config)
+        terminal = action_boundary.finalize_committed_retirement(
+            config,
+            authorization,
+            restoration,
+            retirement_evidence,
+            retired_authority,
+            incumbent,
+            cleanup,
+        )
         return {
             "contractName": TOPOLOGY_B_CONTRACT,
             "status": "pass",

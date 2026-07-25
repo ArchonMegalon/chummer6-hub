@@ -1088,12 +1088,6 @@ class RecordingActions:
     ) -> dict[str, Any]:
         return self.record("retire_active_authority")
 
-    def adopt_terminal_committed_retirement(
-        self, _config: Any, *_args: Any
-    ) -> dict[str, Any] | None:
-        self.record("adopt_terminal_committed_retirement", False)
-        return None
-
     def verify_retired_authority_connectors(
         self, _config: Any, *_args: Any
     ) -> dict[str, Any]:
@@ -3314,7 +3308,6 @@ def test_explicit_retirement_restores_proves_retires_then_cleans(
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
-        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3341,7 +3334,6 @@ class FatalRetirementBoundary(BaseException):
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
-        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3414,7 +3406,6 @@ def test_keyboard_interrupt_outside_retirement_keeps_normal_semantics(
     (
         "restore_committed_prior",
         "retire_active_authority",
-        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
     ),
 )
@@ -3462,9 +3453,6 @@ class Actions:
         return maybe_block("commit_retirement_evidence")
     def retire_active_authority(self, *_args):
         return maybe_block("retire_active_authority")
-    def adopt_terminal_committed_retirement(self, *_args):
-        maybe_block("adopt_terminal_committed_retirement")
-        return None
     def verify_retired_authority_connectors(self, *_args):
         return maybe_block("verify_retired_authority_connectors")
     def cleanup_sidecar_resources(self, *_args):
@@ -3538,7 +3526,6 @@ raise SystemExit(0)
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
         "commit_retirement_evidence",
         "retire_active_authority",
-        "adopt_terminal_committed_retirement",
         "verify_retired_authority_connectors",
         "cleanup_sidecar",
         "finalize_committed_retirement",
@@ -3572,10 +3559,7 @@ def test_retirement_partial_failure_is_uncertain_and_never_reapplies_target(
     }:
         assert "retire_active_authority" not in actions.events
         assert "cleanup_sidecar" not in actions.events
-    if failure_event in {
-        "adopt_terminal_committed_retirement",
-        "verify_retired_authority_connectors",
-    }:
+    if failure_event == "verify_retired_authority_connectors":
         assert "retire_active_authority" in actions.events
         assert "cleanup_sidecar" not in actions.events
 
@@ -4095,92 +4079,251 @@ def post_marker_connector_actions(
     )
 
 
-def terminal_adoption_actions(
+def terminal_adoption_fixture(
     tmp_path: Path,
-) -> tuple[
-    Any,
-    SimpleNamespace,
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-    dict[str, Any],
-]:
-    (
-        actions,
-        config,
-        authorization,
-        restoration,
-        retirement_evidence,
-        retired_authority,
-    ) = post_marker_connector_actions(tmp_path)
-    evidence_path = config.operation_root / "retirement-evidence.json"
-    evidence_path.write_text(
-        '{"evidence":"committed"}\n',
-        encoding="utf-8",
+) -> tuple[SimpleNamespace, dict[str, Any], dict[str, Any]]:
+    operation_root = tmp_path / "operation"
+    authority_root = tmp_path / "authority"
+    receipt_root = tmp_path / "receipts"
+    operation_root.mkdir(mode=0o700)
+    authority_root.mkdir(mode=0o700)
+    receipt_root.mkdir(mode=0o700)
+    active_path = authority_root / "active.json"
+    retired_path = operation_root / "retired.json"
+    committed_path = operation_root / "cloudflare-committed.json"
+    evidence_path = operation_root / "retirement-evidence.json"
+    terminal_path = operation_root / "retirement.json"
+    operation_journal = receipt_root / "operation.json"
+    source_head = "a" * 40
+    controller_source_head = "b" * 40
+    project_name = "retirement-adoption-test"
+    volumes = {"public-download-app": "retirement-adoption-app"}
+    config = SimpleNamespace(
+        operation=controller.RETIRE_OPERATION,
+        source_root=ROOT,
+        source_head=source_head,
+        controller_source_head=controller_source_head,
+        operation_root=operation_root,
+        operation_journal=operation_journal,
+        project_name=project_name,
+        volume_names=volumes,
+        active_runtime_authority=active_path,
+        retired_active_authority=retired_path,
+        cloudflare_committed_evidence=committed_path,
+        cloudflare_retirement_evidence=evidence_path,
+        retirement_receipt=terminal_path,
     )
-    evidence_path.chmod(0o600)
-    config.operation = controller.RETIRE_OPERATION
-    config.cloudflare_retirement_evidence = evidence_path
-    config.retirement_receipt = (
-        config.operation_root / "retirement.json"
-    )
-    config.project_name = "retirement-adoption-test"
-    config.source_head = "a" * 40
-    config.controller_source_head = "b" * 40
-    incumbent = {"incumbent": "exact"}
-    cleanup = {"cleanup": "exact"}
-    post_marker_convergence = retirement_connector_gate(
+
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    active_authority = {
+        "schema": "test-only-retired-authority",
+        "status": "active",
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "sourceHead": source_head,
+    }
+    controller.write_private_json(retired_path, active_authority)
+    retired_raw = retired_path.read_bytes()
+    retired_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    committed = {"phase": "committed", "authority": "test-only"}
+    controller.write_private_json(committed_path, committed)
+    committed_raw = committed_path.read_bytes()
+    baseline = {
+        hostname: {
+            path: {
+                "httpStatus": 200,
+                "bodySha256": hashlib.sha256(
+                    f"{hostname}:{path}".encode()
+                ).hexdigest(),
+                "sizeBytes": 1,
+            }
+            for path in (
+                "/downloads/RELEASE_CHANNEL.generated.json",
+                "/downloads/releases.json",
+            )
+        }
+        for hostname in HOSTS
+    }
+    marker_gate = retirement_connector_gate(
         13,
-        "connector-post-marker",
+        "connector-at-marker",
     )
+    authorization = {
+        "contractName": (
+            "chummer.public-download-committed-retirement-"
+            "authorization/v1"
+        ),
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "activeAuthorityPath": str(active_path),
+        "activeAuthoritySha256": retired_sha256,
+        "committedEvidencePath": str(committed_path),
+        "committedEvidenceSha256": hashlib.sha256(
+            committed_raw
+        ).hexdigest(),
+        "targetConfigSha256": "1" * 64,
+        "targetVersion": 12,
+        "priorConfigSha256": "2" * 64,
+        "priorVersion": 11,
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "authorizedAtUtc": "2026-07-25T00:00:00Z",
+    }
+    restoration = {
+        "contractName": (
+            "chummer.public-download-cloudflare-retirement/v1"
+        ),
+        "phase": "restored",
+        "operationRoot": str(operation_root),
+        "targetConfigSha256": authorization["targetConfigSha256"],
+        "targetVersion": authorization["targetVersion"],
+        "priorConfigSha256": authorization["priorConfigSha256"],
+        "restoredVersion": 13,
+        "restoredResponseSha256": "3" * 64,
+        "connectorConvergence": retirement_connector_gate(
+            13,
+            "connector-restored",
+        ),
+        "restoredAtUtc": "2026-07-25T00:01:00Z",
+        "connectorsVerifiedAtUtc": "2026-07-25T00:01:01Z",
+    }
+    evidence = {
+        "contractName": (
+            "chummer.public-download-committed-retirement-evidence/v1"
+        ),
+        "status": "committed",
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "authorizationSha256": canonical_sha256(authorization),
+        "restorationSha256": canonical_sha256(restoration),
+        "connectorConvergenceSha256": canonical_sha256(
+            restoration["connectorConvergence"]
+        ),
+        "targetConfigSha256": authorization["targetConfigSha256"],
+        "targetVersion": authorization["targetVersion"],
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "incumbentObservationSha256": canonical_sha256(baseline),
+        "incumbent": baseline,
+        "committedAtUtc": "2026-07-25T00:02:00Z",
+    }
+    controller.write_private_json(evidence_path, evidence)
+    evidence_raw = evidence_path.read_bytes()
+    retirement_evidence = {
+        "contractName": (
+            "chummer.public-download-retirement-evidence-summary/v1"
+        ),
+        "status": "committed",
+        "evidencePath": str(evidence_path),
+        "evidenceSha256": hashlib.sha256(evidence_raw).hexdigest(),
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "connectorConvergenceSha256": canonical_sha256(
+            restoration["connectorConvergence"]
+        ),
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+    }
+    retired_authority = {
+        "contractName": (
+            "chummer.public-download-retired-authority/v1"
+        ),
+        "status": "retired",
+        "activeAuthorityPath": str(active_path),
+        "retiredAuthorityPath": str(retired_path),
+        "activeAuthoritySha256": retired_sha256,
+        "retirementEvidenceSha256": hashlib.sha256(
+            evidence_raw
+        ).hexdigest(),
+        "connectorGateSha256": canonical_sha256(marker_gate),
+        "disposition": "atomically-retired",
+        "retiredAtUtc": "2026-07-25T00:03:00Z",
+    }
     post_marker_gate = retirement_connector_boundary(
-        operation_root=config.operation_root,
+        operation_root=operation_root,
         boundary="post-marker",
         version=13,
-        retired_authority_sha256=authorization[
-            "activeAuthoritySha256"
-        ],
-        marker_gate=actions._state["receipts"][
-            "retirementConnectorGate"
-        ],
-        convergence=post_marker_convergence,
+        retired_authority_sha256=retired_sha256,
+        marker_gate=marker_gate,
+        convergence=retirement_connector_gate(
+            13,
+            "connector-post-marker",
+        ),
     )
-    actions._state["receipts"].update(
-        {
-            "cleanup": cleanup,
-            "retirementPostMarkerConnectorGate": post_marker_gate,
-        }
-    )
-    actions._validated_retirement_baseline = lambda: incumbent
-    actions.authorize_committed_retirement = (
-        lambda *_args: authorization
-    )
-    actions.restore_committed_prior = lambda *_args: restoration
-    actions.probe_public_incumbent = (
-        lambda *_args, **_kwargs: incumbent
-    )
-    actions.commit_retirement_evidence = (
-        lambda *_args: retirement_evidence
-    )
-    actions.retire_active_authority = (
-        lambda *_args: retired_authority
-    )
-    actions.verify_retired_authority_connectors = (
-        lambda *_args: post_marker_gate
-    )
-    actions.cleanup_sidecar_resources = lambda *_args: cleanup
-    return (
-        actions,
-        config,
-        authorization,
-        restoration,
-        retirement_evidence,
-        retired_authority,
-        incumbent,
-        cleanup,
-    )
+    cleanup = {
+        "contractName": "test-only-cleanup/v1",
+        "status": "pass",
+    }
+    receipts = {
+        "activeAuthority": active_authority,
+        "retirementAuthorization": authorization,
+        "cloudflareRetirement": restoration,
+        "incumbentAfterRetirement": baseline,
+        "retirementEvidence": retirement_evidence,
+        "retiredAuthority": retired_authority,
+        "retirementConnectorGate": marker_gate,
+        "retirementPostMarkerConnectorGate": post_marker_gate,
+        "cleanup": cleanup,
+    }
+    state = {
+        "schema": controller.TOPOLOGY_B_OPERATION_SCHEMA,
+        "phase": "cleaned",
+        "operation": controller.CUTOVER_OPERATION,
+        "projectName": project_name,
+        "operationRoot": str(operation_root),
+        "sourceHead": source_head,
+        "volumes": volumes,
+        "createdAtUtc": "2026-07-25T00:00:00Z",
+        "updatedAtUtc": "2026-07-25T00:04:00Z",
+        "receipts": receipts,
+        "incumbentBaseline": baseline,
+    }
+    controller.write_private_json(operation_journal, state)
+    terminal = {
+        "contractName": (
+            "chummer.public-download-committed-retirement/v1"
+        ),
+        "status": "retired",
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "retiredAuthorityPath": str(retired_path),
+        "retiredAuthoritySha256": retired_sha256,
+        "retirementEvidencePath": str(evidence_path),
+        "retirementEvidenceSha256": hashlib.sha256(
+            evidence_raw
+        ).hexdigest(),
+        "connectorGateSha256": canonical_sha256(marker_gate),
+        "postMarkerConnectorGateSha256": canonical_sha256(
+            post_marker_gate
+        ),
+        "latestConnectorGateSha256": canonical_sha256(
+            post_marker_gate
+        ),
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "incumbentObservationSha256": canonical_sha256(baseline),
+        "cleanupSha256": canonical_sha256(cleanup),
+        "completedAtUtc": "2026-07-25T00:05:00Z",
+    }
+    controller.write_private_json(terminal_path, terminal)
+    return config, terminal, state
 
 
 def test_post_marker_connector_gate_precedes_cleanup_and_is_immutable(
@@ -4580,112 +4723,111 @@ def test_terminal_retirement_binds_marker_post_marker_and_latest_gates(
 
 def test_terminal_receipt_write_interruption_is_adopted_before_reverify(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    (
-        actions,
-        config,
-        _authorization,
-        _restoration,
-        _retirement_evidence,
-        _retired_authority,
-        _incumbent,
-        _cleanup,
-    ) = terminal_adoption_actions(tmp_path)
-    durable_record = actions._record
-
-    def interrupt_after_terminal_write(
-        _phase: str,
-        name: str,
-        _receipt: dict[str, Any],
-    ) -> None:
-        assert name == "retirement"
-        assert config.retirement_receipt.is_file()
-        raise OSError("simulated interruption after terminal write")
-
-    actions._record = interrupt_after_terminal_write
-
-    with pytest.raises(controller.RecoveryUncertain) as raised:
-        controller.retire_topology_b(config, actions=actions)
-
-    assert isinstance(raised.value.__cause__, OSError)
+    config, terminal, _state = terminal_adoption_fixture(tmp_path)
+    config.controller_source_head = "c" * 40
     terminal_raw = config.retirement_receipt.read_bytes()
-    terminal = json.loads(terminal_raw)
-    assert "retirement" not in actions._state["receipts"]
-    assert (
-        "retirementConnectorResumeGate"
-        not in actions._state["receipts"]
-    )
 
-    def unexpected(*_args: Any, **_kwargs: Any) -> Any:
+    def unexpected_action_construction(*_args: Any, **_kwargs: Any) -> Any:
         raise AssertionError(
-            "terminal adoption must precede re-verification and cleanup"
+            "terminal adoption must precede provider action construction"
         )
 
-    actions._record = durable_record
-    actions.verify_retired_authority_connectors = unexpected
-    actions.cleanup_sidecar_resources = unexpected
+    monkeypatch.setattr(
+        controller,
+        "TopologyBActions",
+        unexpected_action_construction,
+    )
 
-    resumed = controller.retire_topology_b(config, actions=actions)
-    repeated = controller.retire_topology_b(config, actions=actions)
+    resumed = controller.retire_topology_b(config)
+    adopted_journal_raw = config.operation_journal.read_bytes()
+    repeated = controller.retire_topology_b(config)
 
     assert resumed["terminalReceipt"] == terminal
+    assert resumed["controllerSourceHead"] == "b" * 40
     assert repeated == resumed
-    assert actions._state["receipts"]["retirement"] == terminal
     assert config.retirement_receipt.read_bytes() == terminal_raw
+    assert config.operation_journal.read_bytes() == adopted_journal_raw
+    adopted = json.loads(adopted_journal_raw)
+    assert adopted["phase"] == "retired"
+    assert adopted["receipts"]["retirement"] == terminal
     assert (
-        "retirementConnectorResumeGate"
-        not in actions._state["receipts"]
+        "retirementRestorationConnectorResumeGate"
+        not in adopted["receipts"]
+    )
+    assert (
+        "retirementConnectorResumeGate" not in adopted["receipts"]
     )
 
 
-def test_terminal_receipt_adoption_rejects_tampering(
-    tmp_path: Path,
-) -> None:
+@pytest.mark.parametrize(
+    "mutation,match",
     (
-        actions,
-        config,
-        _authorization,
-        _restoration,
-        _retirement_evidence,
-        _retired_authority,
-        _incumbent,
-        _cleanup,
-    ) = terminal_adoption_actions(tmp_path)
-    durable_record = actions._record
+        ("terminal", "terminal topology-B retirement receipt drifted"),
+        (
+            "missing-cleanup",
+            "terminal topology-B retirement lacks durable boundary receipts",
+        ),
+        (
+            "retired-authority",
+            "terminal topology-B retired authority journal drifted",
+        ),
+    ),
+)
+def test_terminal_receipt_adoption_rejects_tampering_or_incomplete_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    match: str,
+) -> None:
+    config, _terminal, _state = terminal_adoption_fixture(tmp_path)
+    if mutation == "terminal":
+        tampered = json.loads(
+            config.retirement_receipt.read_text(encoding="utf-8")
+        )
+        tampered["latestConnectorGateSha256"] = "0" * 64
+        controller.write_private_json(
+            config.retirement_receipt,
+            tampered,
+            replace=True,
+        )
+    elif mutation == "missing-cleanup":
+        incomplete = json.loads(
+            config.operation_journal.read_text(encoding="utf-8")
+        )
+        del incomplete["receipts"]["cleanup"]
+        controller.write_private_json(
+            config.operation_journal,
+            incomplete,
+            replace=True,
+        )
+    else:
+        config.retired_active_authority.write_text(
+            '{"tampered":true}\n',
+            encoding="utf-8",
+        )
+        config.retired_active_authority.chmod(0o600)
+    journal_raw = config.operation_journal.read_bytes()
 
-    def interrupt_after_terminal_write(
-        _phase: str,
-        _name: str,
-        _receipt: dict[str, Any],
-    ) -> None:
-        raise OSError("simulated interruption after terminal write")
+    def unexpected_action_construction(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError(
+            "invalid terminal authority must fail before live actions"
+        )
 
-    actions._record = interrupt_after_terminal_write
-    with pytest.raises(controller.RecoveryUncertain):
-        controller.retire_topology_b(config, actions=actions)
-
-    tampered = json.loads(
-        config.retirement_receipt.read_text(encoding="utf-8")
+    monkeypatch.setattr(
+        controller,
+        "TopologyBActions",
+        unexpected_action_construction,
     )
-    tampered["latestConnectorGateSha256"] = "0" * 64
-    config.retirement_receipt.write_text(
-        json.dumps(tampered, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    config.retirement_receipt.chmod(0o600)
-    actions._record = durable_record
 
     with pytest.raises(
         controller.RecoveryUncertain,
-        match="terminal topology-B retirement receipt drifted",
+        match=match,
     ):
-        controller.retire_topology_b(config, actions=actions)
+        controller.retire_topology_b(config)
 
-    assert "retirement" not in actions._state["receipts"]
-    assert (
-        "retirementConnectorResumeGate"
-        not in actions._state["receipts"]
-    )
+    assert config.operation_journal.read_bytes() == journal_raw
 
 
 def test_retirement_cleanup_reconstructs_original_runtime_inputs(
