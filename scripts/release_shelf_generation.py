@@ -39,6 +39,8 @@ WRITER_POLICY = ".release-shelf-writer-policy.json"
 SERVER_WRITER_POLICY_SCHEMA = "chummer.release-shelf.writer-policy/v1"
 SERVER_WRITER_POLICY_MODE = "server-journal-v1"
 SIDECAR_WRITER_POLICY_MODE = "sidecar-readonly-v1"
+CANONICAL_PUBLIC_ORIGIN = "https://chummer.run"
+PAYLOAD_SIDECAR_CONTRACT = "chummer6-ui.windows_bootstrap_payload"
 CANONICAL_MANIFEST = "RELEASE_CHANNEL.generated.json"
 COMPATIBILITY_MANIFEST = "releases.json"
 PUBLICATION_SCOPE = "PUBLICATION_SCOPE.generated.json"
@@ -654,7 +656,7 @@ def _artifact_routes(
                 "primary": primary_route,
                 "payload": (
                     (
-                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='')}"
+                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='+')}"
                         if access_class == "open_public"
                         else f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/payload"
                     )
@@ -663,7 +665,7 @@ def _artifact_routes(
                 ),
                 "metadata": (
                     (
-                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='')}.json"
+                        f"/downloads/g/{generation_id}/files/{quote(payload_name, safe='+')}.json"
                         if access_class == "open_public"
                         else f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/metadata"
                     )
@@ -700,6 +702,169 @@ def _project_artifact_download_urls(
                 row["url"] = route["primary"]
             if "payloadDownloadUrl" in row and route["payload"] is not None:
                 row["payloadDownloadUrl"] = route["payload"]
+
+
+def _incoming_payload_sidecar_url_matches(
+    actual_url: str,
+    manifest_url: str,
+    payload_file_name: str,
+) -> bool:
+    if actual_url == manifest_url:
+        return True
+    try:
+        parsed = urlsplit(actual_url)
+        parsed_port = parsed.port
+    except ValueError:
+        return False
+    stable_path = (
+        f"/downloads/files/{quote(payload_file_name, safe='+')}"
+    )
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname is not None
+        and parsed.hostname.lower() == "chummer.run"
+        and parsed.username is None
+        and parsed.password is None
+        and parsed_port in (None, 443)
+        and not parsed.query
+        and not parsed.fragment
+        and parsed.path == stable_path
+    )
+
+
+def rewrite_payload_sidecars_for_generation(
+    generation_root: Path,
+    compatibility_source: dict[str, Any],
+    artifact_routes: dict[str, dict[str, str | None]],
+) -> None:
+    release_version = str(compatibility_source.get("version") or "").strip()
+    if not release_version:
+        raise ReleaseShelfError(
+            "compatibility manifest release version is required for payload sidecars"
+        )
+    rows = compatibility_source.get("downloads") or []
+    if not isinstance(rows, list):
+        raise ReleaseShelfError(
+            "compatibility manifest downloads must be a list"
+        )
+
+    required_properties = {
+        "contractName",
+        "fileName",
+        "downloadUrl",
+        "sha256",
+        "sizeBytes",
+        "installerFileName",
+        "releaseVersion",
+    }
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ReleaseShelfError(
+                "compatibility manifest artifact rows must be objects"
+            )
+        payload_file_name = str(row.get("payloadFileName") or "").strip()
+        if not payload_file_name:
+            continue
+        artifact_id = str(row.get("id") or row.get("artifactId") or "").strip()
+        route = artifact_routes.get(artifact_id)
+        if route is None or route.get("payload") is None:
+            raise ReleaseShelfError(
+                f"payload sidecar has no generation route for {artifact_id}"
+            )
+        access_class = str(
+            row.get("installAccessClass")
+            or row.get("install_access_class")
+            or ""
+        ).strip().lower()
+        if access_class != "open_public":
+            # Protected payload metadata continues to be served through its
+            # authenticated semantic route and remains byte-for-byte unchanged.
+            continue
+
+        installer_file_name = str(row.get("fileName") or "").strip()
+        payload_sha256 = str(row.get("payloadSha256") or "").strip().lower()
+        raw_payload_size = row.get("payloadSizeBytes")
+        if (
+            not installer_file_name
+            or not SHA256_PATTERN.fullmatch(payload_sha256)
+            or isinstance(raw_payload_size, bool)
+            or not isinstance(raw_payload_size, int)
+            or raw_payload_size < 0
+        ):
+            raise ReleaseShelfError(
+                f"payload sidecar identity is incomplete for {artifact_id}"
+            )
+
+        sidecar_path = generation_root / "files" / f"{payload_file_name}.json"
+        try:
+            sidecar_size = sidecar_path.stat().st_size
+        except OSError as exc:
+            raise ReleaseShelfError(
+                f"payload sidecar is missing for {artifact_id}: {sidecar_path}"
+            ) from exc
+        if sidecar_size <= 0 or sidecar_size > 64 * 1024:
+            raise ReleaseShelfError(
+                f"payload sidecar size is invalid for {artifact_id}"
+            )
+        incoming = read_json_object(
+            sidecar_path,
+            f"payload sidecar for {artifact_id}",
+        )
+        incoming_properties = set(incoming)
+        if incoming_properties not in (
+            required_properties,
+            required_properties | {"payloadAcquisitionMode"},
+        ):
+            raise ReleaseShelfError(
+                f"payload sidecar property set is noncanonical for {artifact_id}"
+            )
+
+        incoming_mode = incoming.get("payloadAcquisitionMode")
+        incoming_manifest_url = str(
+            row.get("payloadDownloadUrl") or ""
+        ).strip()
+        incoming_url = str(incoming.get("downloadUrl") or "").strip()
+        if (
+            str(incoming.get("contractName") or "").strip()
+            != PAYLOAD_SIDECAR_CONTRACT
+            or str(incoming.get("fileName") or "").strip()
+            != payload_file_name
+            or str(incoming.get("installerFileName") or "").strip()
+            != installer_file_name
+            or str(incoming.get("releaseVersion") or "").strip()
+            != release_version
+            or str(incoming.get("sha256") or "").strip().lower()
+            != payload_sha256
+            or isinstance(incoming.get("sizeBytes"), bool)
+            or incoming.get("sizeBytes") != raw_payload_size
+            or (
+                incoming_mode is not None
+                and incoming_mode != "download"
+            )
+            or not _incoming_payload_sidecar_url_matches(
+                incoming_url,
+                incoming_manifest_url,
+                payload_file_name,
+            )
+        ):
+            raise ReleaseShelfError(
+                f"payload sidecar identity does not match manifests for {artifact_id}"
+            )
+
+        normalized = {
+            "contractName": PAYLOAD_SIDECAR_CONTRACT,
+            "fileName": payload_file_name,
+            "downloadUrl": CANONICAL_PUBLIC_ORIGIN + str(route["payload"]),
+            "sha256": payload_sha256,
+            "sizeBytes": raw_payload_size,
+            "installerFileName": installer_file_name,
+            "releaseVersion": release_version,
+            "payloadAcquisitionMode": "download",
+        }
+        normalized_bytes = (
+            json.dumps(normalized, indent=2, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
+        _atomic_replace_bytes(sidecar_path, normalized_bytes)
 
 
 def _release_path(value: str) -> str | None:
@@ -2247,6 +2412,11 @@ def materialize_generation(
     )
     validate_manifest_routes(canonical, generation_id, CANONICAL_MANIFEST)
     validate_manifest_routes(compatibility, generation_id, COMPATIBILITY_MANIFEST)
+    rewrite_payload_sidecars_for_generation(
+        generation_root,
+        compatibility_source,
+        artifact_routes,
+    )
     canonical_identity = _manifest_identity(canonical, CANONICAL_MANIFEST)
     compatibility_identity = _manifest_identity(
         compatibility, COMPATIBILITY_MANIFEST, require_published_at=False

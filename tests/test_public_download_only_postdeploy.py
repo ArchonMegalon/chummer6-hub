@@ -81,13 +81,14 @@ class DeliveryFixture:
         *,
         embed_metadata: bool = True,
         semantic_payload_route: bool = False,
+        payload_name: str = "chummer-avalonia-win-x64-payload.zip",
     ) -> None:
         self.base_url = "https://chummer.run"
         self.generation = "generation-a"
         self.version = "run-test"
         self.artifact_id = "avalonia-win-x64-installer"
         self.installer_name = "chummer-avalonia-win-x64-installer.exe"
-        self.payload_name = "chummer-avalonia-win-x64-payload.zip"
+        self.payload_name = payload_name
         self.installer_url = f"{self.base_url}/downloads/files/{self.installer_name}"
         self.payload_url = (
             f"{self.base_url}/downloads/g/{self.generation}/files/"
@@ -1070,7 +1071,7 @@ def test_www_delivery_accepts_canonical_apex_sidecar_url(
     )
 
 
-def test_delivery_accepts_generation_bound_site_relative_sidecar_url(
+def test_delivery_rejects_generation_bound_site_relative_sidecar_url(
     tmp_path: Path,
 ) -> None:
     fixture = DeliveryFixture(tmp_path)
@@ -1078,6 +1079,36 @@ def test_delivery_accepts_generation_bound_site_relative_sidecar_url(
         fixture.base_url
     )
     fixture.rewrite()
+
+    with pytest.raises(
+        ValueError,
+        match="absolute HTTPS URL",
+    ):
+        postdeploy.derive_download_expectations(
+            base_url=fixture.base_url,
+            local_manifest_path=fixture.local_manifest,
+            local_canonical_manifest_path=fixture.local_canonical,
+        )
+
+
+@pytest.mark.parametrize("percent_encoded", [False, True])
+def test_delivery_preserves_plus_in_payload_path_segments(
+    tmp_path: Path,
+    percent_encoded: bool,
+) -> None:
+    fixture = DeliveryFixture(
+        tmp_path,
+        payload_name="chummer-avalonia-win+x64-payload.zip",
+    )
+    if percent_encoded:
+        encoded = fixture.manifest_payload_url.replace("+", "%2B")
+        fixture.artifact["payloadDownloadUrl"] = encoded.removeprefix(
+            fixture.base_url
+        )
+        fixture.compatibility["downloads"][0]["payloadDownloadUrl"] = (
+            encoded.removeprefix(fixture.base_url)
+        )
+        fixture.rewrite()
 
     _canonical, _generation, expectations = (
         postdeploy.derive_download_expectations(
@@ -1087,8 +1118,10 @@ def test_delivery_accepts_generation_bound_site_relative_sidecar_url(
         )
     )
 
-    assert expectations[0].payload_url == fixture.payload_url
-    assert expectations[0].payload_probe_url == fixture.payload_url
+    assert expectations[0].payload_file_name == fixture.payload_name
+    assert postdeploy.unquote(
+        postdeploy.urlparse(expectations[0].payload_url).path
+    ).endswith(f"/{fixture.payload_name}")
 
 
 def test_strict_delivery_accepts_generation_scoped_sidecar_and_evidence(

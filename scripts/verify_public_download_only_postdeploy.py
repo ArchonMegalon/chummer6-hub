@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 import tempfile
 from typing import Any, Mapping, NamedTuple
-from urllib.parse import ParseResult, urljoin, urlparse
+from urllib.parse import ParseResult, unquote, urljoin, urlparse
 
 import requests
 
@@ -337,7 +337,10 @@ def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
     raw = str(value or "").strip()
     if not raw:
         raise ValueError(f"{label} URL is missing")
-    resolved = urljoin(base_url.rstrip("/") + "/", raw)
+    raw_parsed = urlparse(raw)
+    if not raw_parsed.scheme or not raw_parsed.netloc:
+        raise ValueError(f"{label} URL must be an absolute HTTPS URL")
+    resolved = raw
     parsed = urlparse(resolved)
     base = urlparse(base_url)
     same_origin = _origin(parsed) == _origin(base)
@@ -364,12 +367,30 @@ def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
     return resolved
 
 
+def _decoded_payload_path(url: str) -> str:
+    path = urlparse(url).path
+    offset = 0
+    while offset < len(path):
+        if path[offset] != "%":
+            offset += 1
+            continue
+        escape = path[offset : offset + 3]
+        if len(escape) != 3 or escape[1:].lower() != "2b":
+            raise ValueError(
+                "payload URL contains noncanonical percent encoding"
+            )
+        offset += 3
+    # Deliberately not unquote_plus: '+' is a literal path character.
+    return unquote(path)
+
+
 def _host_local_mirror_url(base_url: str, canonical_url: str) -> str:
     base = urlparse(base_url)
     canonical = urlparse(canonical_url)
     return canonical._replace(
         scheme=base.scheme,
         netloc=base.netloc,
+        path=_decoded_payload_path(canonical_url),
     ).geturl()
 
 
@@ -777,7 +798,9 @@ def derive_download_expectations(
         )
         if Path(urlparse(installer_url).path).name != installer_file_name:
             raise ValueError(f"{artifact_id} installer URL filename disagrees with manifest")
-        payload_path = urlparse(manifest_payload_url).path
+        # URL paths preserve literal '+'. Decode percent escapes without applying
+        # form/query semantics, where '+' would incorrectly become a space.
+        payload_path = _decoded_payload_path(manifest_payload_url)
         if not expected_generation:
             raise ValueError(
                 f"{artifact_id} payload URL cannot be generation-bound without a generation id"

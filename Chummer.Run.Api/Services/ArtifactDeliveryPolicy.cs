@@ -737,7 +737,7 @@ public sealed class ArtifactDeliveryPolicy
 
 internal static class PayloadSidecarContractValidator
 {
-    private const string CanonicalPublicOrigin = "https://chummer.run";
+    internal const string CanonicalPublicOrigin = "https://chummer.run";
 
     private static readonly string[] RequiredProperties =
     [
@@ -1077,7 +1077,7 @@ internal static class PayloadSidecarContractValidator
                character is >= 'A' and <= 'Z'
                    or >= 'a' and <= 'z'
                    or >= '0' and <= '9'
-                   or '-' or '_' or '.');
+                   or '-' or '_' or '.' or '+');
 
     private static bool TryString(JsonElement root, string property, out string? value)
     {

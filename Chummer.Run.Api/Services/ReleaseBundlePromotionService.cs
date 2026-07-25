@@ -2154,12 +2154,19 @@ public sealed class ReleaseBundlePromotionService
                 artifact.PayloadSizeBytes,
                 artifactId,
                 "compatibility payload");
-            string immutablePayloadUrl = string.Equals(
+            bool isOpenPublic = string.Equals(
                 artifact.InstallAccessClass,
                 "open_public",
-                StringComparison.OrdinalIgnoreCase)
-                ? $"/downloads/g/{generationId}/files/{Uri.EscapeDataString(payloadFileName)}"
-                : $"/downloads/g/{generationId}/install/{Uri.EscapeDataString(artifactId)}/payload";
+                StringComparison.OrdinalIgnoreCase);
+            string immutablePayloadRoute = BuildGenerationPayloadRoute(
+                generationId,
+                artifactId,
+                payloadFileName,
+                artifact.InstallAccessClass);
+            string immutablePayloadUrl = isOpenPublic
+                ? PayloadSidecarContractValidator.CanonicalPublicOrigin
+                  + immutablePayloadRoute
+                : immutablePayloadRoute;
             string sidecarPath = Path.Combine(filesRoot, payloadFileName + ".json");
             if (!File.Exists(sidecarPath))
             {
@@ -2202,6 +2209,10 @@ public sealed class ReleaseBundlePromotionService
                 ["installerFileName"] = installerFileName,
                 ["releaseVersion"] = compatibilityManifest.Version
             };
+            if (isOpenPublic)
+            {
+                normalizedSidecar["payloadAcquisitionMode"] = "download";
+            }
             WriteJsonFile(
                 sidecarPath,
                 normalizedSidecar);
@@ -2301,12 +2312,20 @@ public sealed class ReleaseBundlePromotionService
                 artifactId,
                 fileName,
                 payloadFileName,
-                $"/downloads/g/{generationId}/install/{Uri.EscapeDataString(artifactId)}/payload",
+                BuildGenerationPayloadRoute(
+                    generationId,
+                    artifactId,
+                    payloadFileName,
+                    artifact.InstallAccessClass),
                 payloadSha256,
                 payloadSizeBytes,
                 manifest.Version,
                 allowMutableIncomingUrl: false,
-                requirePayloadAcquisitionMode: false);
+                requirePayloadAcquisitionMode: string.Equals(
+                    artifact.InstallAccessClass,
+                    "open_public",
+                    StringComparison.OrdinalIgnoreCase),
+                installAccessClass: artifact.InstallAccessClass);
         }
     }
 
@@ -3011,7 +3030,7 @@ public sealed class ReleaseBundlePromotionService
                 string fileName = role == ArtifactDeliveryRoles.Payload
                     ? route.PayloadFileName
                     : route.PayloadFileName + ".json";
-                return generationPrefix + "files/" + Uri.EscapeDataString(fileName);
+                return generationPrefix + "files/" + EncodePortableFileRouteSegment(fileName);
             }
 
             string suffix = role == ArtifactDeliveryRoles.Payload ? "payload" : "metadata";
@@ -3019,7 +3038,7 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return route.IsOpenPublic
-            ? generationPrefix + "files/" + Uri.EscapeDataString(route.FileName)
+            ? generationPrefix + "files/" + EncodePortableFileRouteSegment(route.FileName)
             : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId);
     }
 
@@ -3052,7 +3071,7 @@ public sealed class ReleaseBundlePromotionService
         if (string.Equals(route.PayloadFileName, fileName, StringComparison.Ordinal))
         {
             return route.IsOpenPublic
-                ? generationPrefix + "files/" + Uri.EscapeDataString(fileName)
+                ? generationPrefix + "files/" + EncodePortableFileRouteSegment(fileName)
                 : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/payload";
         }
 
@@ -3060,13 +3079,34 @@ public sealed class ReleaseBundlePromotionService
             && string.Equals(route.PayloadFileName + ".json", fileName, StringComparison.Ordinal))
         {
             return route.IsOpenPublic
-                ? generationPrefix + "files/" + Uri.EscapeDataString(fileName)
+                ? generationPrefix + "files/" + EncodePortableFileRouteSegment(fileName)
                 : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/metadata";
         }
 
         return route.IsOpenPublic
-            ? generationPrefix + "files/" + Uri.EscapeDataString(fileName)
+            ? generationPrefix + "files/" + EncodePortableFileRouteSegment(fileName)
             : generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId);
+    }
+
+    private static string BuildGenerationPayloadRoute(
+        string generationId,
+        string artifactId,
+        string payloadFileName,
+        string? installAccessClass)
+        => string.Equals(
+                installAccessClass,
+                "open_public",
+                StringComparison.OrdinalIgnoreCase)
+            ? $"/downloads/g/{generationId}/files/{EncodePortableFileRouteSegment(payloadFileName)}"
+            : $"/downloads/g/{generationId}/install/{Uri.EscapeDataString(artifactId)}/payload";
+
+    private static string EncodePortableFileRouteSegment(string fileName)
+    {
+        // '+' is valid in the portable inventory contract and is an RFC 3986 path
+        // sub-delimiter. Keep it literal so canonical site paths need not admit
+        // general percent encoding, including encoded path separators.
+        return Uri.EscapeDataString(fileName)
+            .Replace("%2B", "+", StringComparison.Ordinal);
     }
 
     private static bool TryGetReleasePath(string value, out string path)
@@ -3545,7 +3585,7 @@ public sealed class ReleaseBundlePromotionService
                 artifact.InstallAccessClass?.Trim(),
                 "open_public",
                 StringComparison.OrdinalIgnoreCase)
-            ? $"{generationPrefix}/files/{Uri.EscapeDataString(ResolveDownloadFileName(artifact))}"
+            ? $"{generationPrefix}/files/{EncodePortableFileRouteSegment(ResolveDownloadFileName(artifact))}"
             : $"{generationPrefix}/install/{Uri.EscapeDataString(artifact.Id)}";
     }
 
@@ -7247,7 +7287,8 @@ public sealed class ReleaseBundlePromotionService
             artifact.PayloadSizeBytes,
             releaseVersion,
             allowMutableIncomingUrl,
-            requirePayloadAcquisitionMode);
+            requirePayloadAcquisitionMode,
+            artifact.InstallAccessClass);
 
     private static void ValidatePayloadSidecar(
         string filesRoot,
@@ -7259,7 +7300,8 @@ public sealed class ReleaseBundlePromotionService
         long? payloadSizeBytes,
         string releaseVersion,
         bool allowMutableIncomingUrl,
-        bool requirePayloadAcquisitionMode)
+        bool requirePayloadAcquisitionMode,
+        string? installAccessClass = null)
     {
         string sidecarFileName = payloadFileName + ".json";
         string sidecarPath = Path.Combine(filesRoot, sidecarFileName);
@@ -7288,7 +7330,9 @@ public sealed class ReleaseBundlePromotionService
                 releaseVersion,
                 allowMutableIncomingUrl,
                 requirePayloadAcquisitionMode,
-                out string? failure))
+                out string? failure,
+                installAccessClass,
+                artifactId))
         {
             throw new InvalidDataException(
                 $"payload metadata contract is invalid for {artifactId}: {failure}");

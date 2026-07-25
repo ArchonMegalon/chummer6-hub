@@ -1231,14 +1231,29 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
     files = candidate / "files"
     files.mkdir(parents=True)
     installer_name = "chummer-avalonia-win-x64-installer.exe"
-    payload_name = "chummer-avalonia-win-x64-payload.zip"
+    payload_name = "chummer-avalonia-win+x64-payload.zip"
     metadata_name = f"{payload_name}.json"
     installer = files / installer_name
     payload = files / payload_name
     metadata = files / metadata_name
     installer.write_bytes(b"fixture installer")
     payload.write_bytes(b"fixture payload")
-    metadata.write_bytes(b'{"payload":"fixture"}\n')
+    source_sidecar = {
+        "contractName": MODULE.PAYLOAD_SIDECAR_CONTRACT,
+        "fileName": payload_name,
+        "downloadUrl": (
+            f"https://chummer.run/downloads/files/{payload_name}"
+        ),
+        "sha256": MODULE.sha256_file(payload),
+        "sizeBytes": payload.stat().st_size,
+        "installerFileName": installer_name,
+        "releaseVersion": "run-read-only-five-file",
+        "payloadAcquisitionMode": "download",
+    }
+    metadata.write_text(
+        json.dumps(source_sidecar, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
     artifact = {
         "artifactId": "avalonia-win-x64-installer",
@@ -1338,8 +1353,48 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
     assert MODULE.sha256_file(generation / "files" / payload_name) == MODULE.sha256_file(
         payload
     )
-    assert MODULE.sha256_file(generation / "files" / metadata_name) == MODULE.sha256_file(
-        metadata
+    generation_sidecar = generation / "files" / metadata_name
+    expected_payload_url = (
+        "https://chummer.run/downloads/g/"
+        f"generation-read-only-five-file/files/{payload_name}"
+    )
+    expected_sidecar = {
+        **source_sidecar,
+        "downloadUrl": expected_payload_url,
+    }
+    assert generation_sidecar.read_bytes() == (
+        json.dumps(expected_sidecar, indent=2, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    assert MODULE.sha256_file(generation_sidecar) != MODULE.sha256_file(metadata)
+
+    projected_canonical = json.loads(
+        (generation / MODULE.CANONICAL_MANIFEST).read_text(encoding="utf-8")
+    )
+    projected_compatibility = json.loads(
+        (generation / MODULE.COMPATIBILITY_MANIFEST).read_text(encoding="utf-8")
+    )
+    expected_relative_payload_url = expected_payload_url.removeprefix(
+        MODULE.CANONICAL_PUBLIC_ORIGIN
+    )
+    assert (
+        projected_canonical["artifacts"][0]["payloadDownloadUrl"]
+        == expected_relative_payload_url
+    )
+    assert (
+        projected_compatibility["downloads"][0]["payloadDownloadUrl"]
+        == expected_relative_payload_url
+    )
+
+    activation_candidate = json.loads(
+        (generation / MODULE.ACTIVATION_CANDIDATE).read_text(encoding="utf-8")
+    )
+    sidecar_inventory = next(
+        row
+        for row in activation_candidate["inventory"]
+        if row["path"] == f"files/{metadata_name}"
+    )
+    assert sidecar_inventory["sha256"] == MODULE.sha256_file(
+        generation_sidecar
     )
 
     assert stat.S_IMODE(candidate.stat().st_mode) == 0o700
@@ -1379,6 +1434,48 @@ def test_prepare_sidecar_accepts_exact_owner_read_only_five_file_candidate_witho
     assert receipt["compatibilityMirrorSha256"] == MODULE.sha256_file(
         candidate / MODULE.COMPATIBILITY_MANIFEST
     )
+
+
+def test_generation_rewrite_keeps_account_required_sidecar_bytes_unchanged(
+    tmp_path: Path,
+) -> None:
+    generation = tmp_path / "generation"
+    files = generation / "files"
+    files.mkdir(parents=True)
+    payload_name = "protected-payload.zip"
+    sidecar_path = files / f"{payload_name}.json"
+    original = (
+        b'{"contractName":"protected-sidecar","opaque":"unchanged"}\n'
+    )
+    sidecar_path.write_bytes(original)
+    compatibility = {
+        "version": "run-protected-sidecar",
+        "downloads": [
+            {
+                "id": "protected-installer",
+                "fileName": "protected-installer.exe",
+                "installAccessClass": "account_required",
+                "payloadFileName": payload_name,
+                "payloadDownloadUrl": (
+                    "/downloads/files/protected-payload.zip"
+                ),
+                "payloadSha256": "a" * 64,
+                "payloadSizeBytes": 10,
+            }
+        ],
+    }
+    routes = MODULE._artifact_routes(
+        compatibility,
+        "generation-protected",
+    )
+
+    MODULE.rewrite_payload_sidecars_for_generation(
+        generation,
+        compatibility,
+        routes,
+    )
+
+    assert sidecar_path.read_bytes() == original
 
 
 def test_manifest_normalization_replace_failure_preserves_original_and_cleans_temp(
