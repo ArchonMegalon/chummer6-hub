@@ -45,6 +45,7 @@ MANAGED_HOSTS = ("chummer.run", "www.chummer.run")
 # Go/RE2-compatible: capturing groups only; no lookaround or backreferences.
 GENERATION_ID_RE2 = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 PORTABLE_FILE_LEAF_RE2 = r"[A-Za-z0-9][A-Za-z0-9._+-]{0,254}"
+PUBLIC_INSTALL_ARTIFACT_ID_RE2 = r"[a-z0-9][a-z0-9-]{0,127}"
 MANAGED_CONTROL_PATHS = (
     "/api/ready/public-downloads",
     "/api/ready",
@@ -58,6 +59,8 @@ MANAGED_CONTROL_PATH_RE2 = "|".join(MANAGED_CONTROL_PATHS)
 MANAGED_PATH_RE2 = (
     r"^("
     + MANAGED_CONTROL_PATH_RE2
+    + r"|/downloads/install/"
+    + PUBLIC_INSTALL_ARTIFACT_ID_RE2
     + r"|/downloads/"
     r"(releases\.json|RELEASE_CHANNEL\.generated\.json|g/"
     + GENERATION_ID_RE2
@@ -66,6 +69,10 @@ MANAGED_PATH_RE2 = (
     + r")|files/"
     + PORTABLE_FILE_LEAF_RE2
     + r"))$"
+)
+PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2 = (
+    r"^/[dD][oO][wW][nN][lL][oO][aA][dD][sS]"
+    r"/[iI][nN][sS][tT][aA][lL][lL]/[^/]+/?$"
 )
 SAFE_GENERATION_ID = re.compile(r"^" + GENERATION_ID_RE2 + r"$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -339,19 +346,32 @@ def _managed_rule(hostname: str, origin: str) -> dict[str, str]:
     }
 
 
+def _install_fail_closed_rule(hostname: str) -> dict[str, str]:
+    return {
+        "hostname": hostname,
+        "path": PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+        "service": "http_status:404",
+    }
+
+
 def plan_public_download_config(
     prior_config: Mapping[str, Any], origin: str
 ) -> dict[str, Any]:
-    """Prepend the two exact managed rules without changing prior rules."""
+    """Prepend governed and fail-closed rules without changing prior rules."""
 
     validate_re2_pattern(MANAGED_PATH_RE2)
+    validate_re2_pattern(PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2)
     normalized_origin = validate_origin(origin)
     prior = validate_tunnel_config(copy.deepcopy(prior_config))
     existing_managed: list[str] = []
     for rule in prior["ingress"]:
         if (
             rule.get("hostname") in MANAGED_HOSTS
-            and rule.get("path") == MANAGED_PATH_RE2
+            and rule.get("path")
+            in {
+                MANAGED_PATH_RE2,
+                PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+            }
         ):
             existing_managed.append(str(rule["hostname"]))
     if existing_managed:
@@ -362,6 +382,8 @@ def plan_public_download_config(
     target = copy.deepcopy(prior)
     target["ingress"] = [
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
+    ] + [
+        _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
     ] + copy.deepcopy(prior["ingress"])
     validate_planned_config(prior, target, normalized_origin)
     return target
@@ -379,9 +401,13 @@ def validate_planned_config(
     target = validate_tunnel_config(copy.deepcopy(target_config))
     expected_prefix = [
         _managed_rule(hostname, normalized_origin) for hostname in MANAGED_HOSTS
+    ] + [
+        _install_fail_closed_rule(hostname) for hostname in MANAGED_HOSTS
     ]
     if target["ingress"][: len(expected_prefix)] != expected_prefix:
-        raise ValidationError("managed rules are missing or not first")
+        raise ValidationError(
+            "managed and fail-closed rules are missing or not first"
+        )
     if target["ingress"][len(expected_prefix) :] != prior["ingress"]:
         raise ValidationError("a preexisting ingress rule changed")
     non_ingress_prior = copy.deepcopy(prior)
@@ -392,7 +418,9 @@ def validate_planned_config(
         raise ValidationError("non-ingress tunnel configuration changed")
     for rule in target["ingress"][: len(expected_prefix)]:
         if "originRequest" in rule or "httpHostHeader" in rule:
-            raise ValidationError("managed rules must preserve the request Host header")
+            raise ValidationError(
+                "managed rules must preserve the request Host header"
+            )
 
 
 class ConfigurationSnapshot:

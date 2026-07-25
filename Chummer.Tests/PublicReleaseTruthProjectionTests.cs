@@ -767,6 +767,7 @@ public sealed class PublicReleaseTruthProjectionTests
     [InlineData("/downloads/get/example-installer")]
     [InlineData("/downloads/file/example-installer")]
     [InlineData("/downloads/files/example-installer.exe")]
+    [InlineData("/downloads/install/example-installer")]
     [InlineData("/downloads/install/example-installer/bootstrap.sh")]
     [InlineData("/downloads/g/candidate-42/install/example-installer")]
     [InlineData("/downloads/g/candidate-42/files/example-installer.exe")]

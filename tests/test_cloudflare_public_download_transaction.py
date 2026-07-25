@@ -72,6 +72,30 @@ def base_config() -> dict[str, Any]:
     }
 
 
+def resolve_ingress_service(
+    config: Mapping[str, Any],
+    hostname: str,
+    path: str,
+) -> str:
+    for rule in config["ingress"]:
+        rule_hostname = str(rule.get("hostname") or "")
+        if rule_hostname:
+            hostname_matches = (
+                hostname == rule_hostname
+                or (
+                    rule_hostname.startswith("*.")
+                    and hostname.endswith(rule_hostname[1:])
+                )
+            )
+            if not hostname_matches:
+                continue
+        rule_path = str(rule.get("path") or "")
+        if rule_path and re.fullmatch(rule_path, path) is None:
+            continue
+        return str(rule["service"])
+    raise AssertionError("validated ingress must end with a catch-all")
+
+
 class FakeApi:
     def __init__(
         self,
@@ -300,11 +324,113 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         }
         assert "originRequest" not in rule
         assert "httpHostHeader" not in rule
-    assert target["ingress"][2:] == prior["ingress"]
+    assert [rule["hostname"] for rule in target["ingress"][2:4]] == [
+        "chummer.run",
+        "www.chummer.run",
+    ]
+    for rule in target["ingress"][2:4]:
+        assert rule == {
+            "hostname": rule["hostname"],
+            "path": (
+                transaction.PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2
+            ),
+            "service": "http_status:404",
+        }
+        assert "originRequest" not in rule
+        assert "httpHostHeader" not in rule
+    assert target["ingress"][4:] == prior["ingress"]
     assert target["originRequest"] == prior["originRequest"]
-    assert transaction.canonical_json_bytes(target["ingress"][2:]) == (
+    assert transaction.canonical_json_bytes(target["ingress"][4:]) == (
         transaction.canonical_json_bytes(prior["ingress"])
     )
+
+
+@pytest.mark.parametrize(
+    ("hostname", "path", "expected_service"),
+    [
+        (
+            "chummer.run",
+            "/downloads/install/avalonia-win-x64-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/unknown-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/AVALONIA-WIN-X64-INSTALLER",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/INSTALL/avalonia-win-x64-installer",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/-invalid",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/..",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/bootstrap.sh",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            "/unrelated",
+            "http://incumbent:8080",
+        ),
+        (
+            "private.chummer.run",
+            "/preserved/value",
+            "http://legacy:8123",
+        ),
+    ],
+)
+def test_composed_ingress_routes_canonical_installs_and_denies_fallthrough(
+    hostname: str,
+    path: str,
+    expected_service: str,
+) -> None:
+    target = transaction.plan_public_download_config(
+        base_config(),
+        "http://host.docker.internal:8123/",
+    )
+
+    assert resolve_ingress_service(target, hostname, path) == expected_service
+
+
+def test_fail_closed_rules_cannot_move_behind_preserved_incumbent() -> None:
+    prior = base_config()
+    target = transaction.plan_public_download_config(
+        prior,
+        "http://host.docker.internal:8123",
+    )
+    displaced = target["ingress"].pop(2)
+    target["ingress"].insert(-1, displaced)
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="fail-closed rules are missing or not first",
+    ):
+        transaction.validate_planned_config(
+            prior,
+            target,
+            "http://host.docker.internal:8123",
+        )
 
 
 @pytest.mark.parametrize(
@@ -317,6 +443,7 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         "/api/v1/install-linking/me",
         "/account/access/install-link",
         "/downloads/install/public-download-only-probe",
+        "/downloads/install/avalonia-win-x64-installer",
         f"/downloads/g/{GENERATION_ID}/releases.json",
         f"/downloads/g/{GENERATION_ID}/RELEASE_CHANNEL.generated.json",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-installer.msi",
@@ -342,6 +469,13 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         "/downloads/current.json",
         "/downloads/PUBLICATION_SCOPE.generated.json",
         "/downloads/install",
+        "/downloads/install/-invalid",
+        "/DOWNLOADS/INSTALL/avalonia-win-x64-installer",
+        "/downloads/install/AVALONIA-WIN-X64-INSTALLER",
+        "/downloads/install/../admin",
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/avalonia-win-x64-installer/extra",
+        "/downloads/install/avalonia-win-x64-installer?next=/admin",
         "/downloads/claim/token",
         "/downloads/upload/file",
         "/downloads/personalized/alice",
@@ -377,6 +511,23 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
 )
 def test_managed_regex_excludes_all_unapproved_surfaces(path: str) -> None:
     assert not transaction.managed_path_matches(path)
+
+
+@pytest.mark.parametrize(
+    "artifact_id",
+    [
+        "avalonia-win-x64-installer",
+        "unknown-installer",
+        "disabled-installer",
+        "revoked-installer",
+    ],
+)
+def test_safe_install_ids_reach_the_governed_runtime_for_authority_decision(
+    artifact_id: str,
+) -> None:
+    assert transaction.managed_path_matches(
+        f"/downloads/install/{artifact_id}"
+    )
 
 
 def test_managed_regex_uses_no_known_non_re2_constructs() -> None:
@@ -417,13 +568,22 @@ def test_malformed_tunnel_configs_fail_closed(bad_config: Any) -> None:
         transaction.validate_tunnel_config(bad_config)
 
 
-def test_existing_managed_rule_is_rejected_instead_of_duplicated() -> None:
+@pytest.mark.parametrize(
+    "path",
+    [
+        transaction.MANAGED_PATH_RE2,
+        transaction.PUBLIC_INSTALL_SINGLE_SEGMENT_FAIL_CLOSED_RE2,
+    ],
+)
+def test_existing_managed_rule_is_rejected_instead_of_duplicated(
+    path: str,
+) -> None:
     prior = base_config()
     prior["ingress"].insert(
         0,
         {
             "hostname": "chummer.run",
-            "path": transaction.MANAGED_PATH_RE2,
+            "path": path,
             "service": "http://old:8080",
         },
     )

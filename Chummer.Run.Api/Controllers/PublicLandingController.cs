@@ -23,6 +23,7 @@ using Chummer.Run.Api.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
@@ -1696,14 +1697,47 @@ public sealed class PublicLandingController : Controller
         return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
+    private static bool IsCanonicalPublicInstallArtifactId(string artifactId)
+        => artifactId.Length is > 0 and <= 128
+           && artifactId[0] is >= 'a' and <= 'z' or >= '0' and <= '9'
+           && artifactId.All(static character =>
+               character is >= 'a' and <= 'z'
+                   or >= '0' and <= '9'
+                   or '-');
+
     [HttpGet("/downloads/install/{artifactId}")]
     [HttpHead("/downloads/install/{artifactId}")]
     [Produces("text/html")]
     public async Task<IActionResult> DownloadDispatchPage([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
+        string canonicalPath = $"/downloads/install/{artifactId}";
+        string? rawTarget = HttpContext.Features
+            .Get<IHttpRequestFeature>()?
+            .RawTarget;
+        if (!IsCanonicalPublicInstallArtifactId(artifactId)
+            || !string.Equals(
+                Request.Path.Value,
+                canonicalPath,
+                StringComparison.Ordinal)
+            || Request.QueryString.HasValue
+            || (!string.IsNullOrEmpty(rawTarget)
+                && !string.Equals(
+                    rawTarget,
+                    canonicalPath,
+                    StringComparison.Ordinal)))
+        {
+            return NotFound();
+        }
+
         var (manifest, artifact) = ResolveInstallDispatchArtifact(artifactId);
         var releaseTruth = ResolveReleaseTruthProjection();
         var releaseTruthGate = BuildReleaseTruthPresentationGate(manifest, releaseTruth);
+        if (artifact is not null
+            && !string.Equals(artifact.Id, artifactId, StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
         if (artifact is null)
         {
             ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(

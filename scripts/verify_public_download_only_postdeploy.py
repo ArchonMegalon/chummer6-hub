@@ -1967,7 +1967,11 @@ def verify_control_plane(
 
     install_route_denial_statuses: dict[str, int] = {}
     install_route_release_truth_sha256: str | None = None
-    for path in INSTALL_ROUTE_DENIAL_PATHS:
+    install_route_paths = list(INSTALL_ROUTE_DENIAL_PATHS)
+    route_index = 0
+    while route_index < len(install_route_paths):
+        path = install_route_paths[route_index]
+        route_index += 1
         response = get(session, base_url, path, timeout)
         _reject_credential_headers(response, path)
         install_route_denial_statuses[path] = response.status_code
@@ -1984,6 +1988,42 @@ def verify_control_plane(
             raise ValueError(
                 f"{path} did not enforce the review-required install denial"
             )
+        artifact_handoff = release_truth["artifactHandoff"]
+        artifact_id = str(
+            artifact_handoff.get("artifactId") or ""
+        ).strip()
+        advertised_install_route = str(
+            artifact_handoff.get("publicInstallRoute") or ""
+        ).strip()
+        if (
+            not artifact_id
+            or len(artifact_id) > 128
+            or not (
+                artifact_id[0].isascii()
+                and (
+                    artifact_id[0].islower()
+                    or artifact_id[0].isdigit()
+                )
+            )
+            or any(
+                not (
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "-"
+                    )
+                )
+                for character in artifact_id
+            )
+            or advertised_install_route
+            != f"/downloads/install/{artifact_id}"
+        ):
+            raise ValueError(
+                f"{path} advertised an unsafe or unbound publicInstallRoute"
+            )
+        if advertised_install_route not in install_route_paths:
+            install_route_paths.append(advertised_install_route)
         release_truth_sha256 = _canonical_object_sha256(release_truth)
         if (
             install_route_release_truth_sha256 is not None

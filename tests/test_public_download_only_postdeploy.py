@@ -443,6 +443,17 @@ def control_release_truth() -> dict[str, object]:
     }
 
 
+def install_route_denial_paths() -> tuple[str, ...]:
+    advertised = str(
+        control_release_truth()["artifactHandoff"]["publicInstallRoute"]
+    )
+    return tuple(
+        dict.fromkeys(
+            (*postdeploy.INSTALL_ROUTE_DENIAL_PATHS, advertised)
+        )
+    )
+
+
 def responses() -> dict[str, Response]:
     serving = {
         "contractName": postdeploy.READINESS_CONTRACT,
@@ -481,7 +492,7 @@ def responses() -> dict[str, Response]:
                 private=True,
                 content_type="application/json; charset=utf-8",
             )
-            for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
+            for path in install_route_denial_paths()
         },
     }
     return result
@@ -506,7 +517,7 @@ def test_control_plane_accepts_serving_only_and_private_fail_closed(
         path: 503 for path in postdeploy.PRIVATE_PATHS
     }
     assert result["installRouteDenialStatuses"] == {
-        path: 409 for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
+        path: 409 for path in install_route_denial_paths()
     }
     assert result["installRouteReleaseTruthSha256"] == (
         postdeploy._canonical_object_sha256(control_release_truth())
@@ -549,6 +560,95 @@ def test_control_plane_rejects_install_route_without_review_denial(
     )
     with postdeploy.anonymous_session() as session:
         with pytest.raises(ValueError, match="review-required install denial"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_advertised_install_route_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    advertised = str(
+        control_release_truth()["artifactHandoff"]["publicInstallRoute"]
+    )
+    fixture[advertised] = Response(
+        404,
+        {"status": 404},
+        private=True,
+        content_type="application/problem+json; charset=utf-8",
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="review-required install denial",
+        ):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_advertised_install_route_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    advertised = str(
+        control_release_truth()["artifactHandoff"]["publicInstallRoute"]
+    )
+    fixture[advertised].headers["Location"] = (
+        "https://evil.example/installer"
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="forbidden response header"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+@pytest.mark.parametrize(
+    "advertised_route",
+    [
+        "/downloads/install/../admin",
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/unrelated-installer",
+        "https://evil.example/installer",
+    ],
+)
+def test_control_plane_rejects_unsafe_or_unbound_advertised_install_route(
+    monkeypatch: pytest.MonkeyPatch,
+    advertised_route: str,
+) -> None:
+    fixture = responses()
+    probe = fixture["/downloads/install/public-download-only-probe"]
+    probe._payload["releaseTruth"]["artifactHandoff"][
+        "publicInstallRoute"
+    ] = advertised_route
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="unsafe or unbound"):
             postdeploy.verify_control_plane(
                 session,
                 "https://chummer.run",
