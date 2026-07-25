@@ -1,0 +1,65 @@
+name: Topology-B committed retirement proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: topology-b-committed-retirement-proof
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: Capture protected retirement proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: topology-b-committed-retirement-proof
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact protected main source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up exact Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Capture exact public terminal-retirement bytes
+        shell: bash
+        env:
+          PROOF_ROOT: ${{ runner.temp }}/topology-b-committed-retirement-proof
+        run: |
+          set -euo pipefail
+          test "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_RUN_ATTEMPT}" = "1"
+          test "${GITHUB_ACTOR}" = "${GITHUB_TRIGGERING_ACTOR}"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 scripts/verify_topology_b_committed_retirement_proof.py \
+            --source-sha "${GITHUB_SHA}" \
+            --output-dir "${PROOF_ROOT}"
+          test "$(find "${PROOF_ROOT}" -mindepth 1 -maxdepth 1 -type f | wc -l)" = "3"
+          test "$(stat -c '%a' "${PROOF_ROOT}"/* | sort -u)" = "444"
+          test -f "${PROOF_ROOT}/TOPOLOGY_B_RETIREMENT.generated.json"
+          test -f "${PROOF_ROOT}/committed-boundary-receipt.json"
+          test -f "${PROOF_ROOT}/post-marker-convergence-receipt.json"
+
+      - name: Upload immutable three-file provider proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: topology-b-committed-retirement-proof-${{ github.run_id }}-1
+          path: |
+            ${{ runner.temp }}/topology-b-committed-retirement-proof/TOPOLOGY_B_RETIREMENT.generated.json
+            ${{ runner.temp }}/topology-b-committed-retirement-proof/committed-boundary-receipt.json
+            ${{ runner.temp }}/topology-b-committed-retirement-proof/post-marker-convergence-receipt.json
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+          retention-days: 30

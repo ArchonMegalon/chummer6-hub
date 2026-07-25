@@ -517,6 +517,14 @@ def configure_fake_public_download_retirement(
         "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID",
         "11111111-1111-1111-1111-111111111111",
     )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF",
+        "refs/remotes/origin/main",
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256",
+        "9" * 64,
+    )
 
 
 def make_fake_authority_source(

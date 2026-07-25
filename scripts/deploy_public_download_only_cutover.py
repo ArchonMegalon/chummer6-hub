@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import copy
 from dataclasses import dataclass, replace as dataclass_replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 import hashlib
 import http.client
@@ -2691,6 +2691,25 @@ def _retired_topology_a_parse_args(argv: list[str] | None = None) -> Config:
 TOPOLOGY_B_CONTRACT = "chummer.public-download-only-topology-b/v1"
 TOPOLOGY_B_OPERATION_SCHEMA = "chummer.public-download-only-operation/v1"
 TOPOLOGY_B_ACTIVE_SCHEMA = "chummer.public-download-only-active-runtime/v1"
+TOPOLOGY_B_PUBLIC_RETIREMENT_CONTRACT = (
+    "chummer6-hub.topology-b-committed-retirement.v1"
+)
+TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME = (
+    "TOPOLOGY_B_RETIREMENT.generated.json"
+)
+TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT = (
+    "chummer.public-download-topology-b-retirement-proof-materialization/v1"
+)
+TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY = "topology-b-retirement"
+TOPOLOGY_B_SOURCE_REPOSITORY = "ArchonMegalon/chummer6-hub"
+TOPOLOGY_B_SOURCE_REF = "refs/heads/main"
+CANONICAL_DOWNLOADS_BASE_URL = "https://chummer.run/downloads"
+CANONICAL_DOWNLOADS_MANIFEST_URL = (
+    f"{CANONICAL_DOWNLOADS_BASE_URL}/RELEASE_CHANNEL.generated.json"
+)
+CANONICAL_DOWNLOADS_PUBLISHER_PATH = (
+    "scripts/publish-download-bundle-http.sh"
+)
 SCOPE_BOUND_EXISTING_BYTES_PROFILE = (
     "v3_scope_bound_existing_windows_bytes"
 )
@@ -2935,6 +2954,7 @@ class SidecarConfig:
     delivery_phase: str
     ready_timeout_seconds: int
     controller_source_head: str = ""
+    canonical_publisher_sha256: str = ""
 
     @property
     def project_name(self) -> str:
@@ -3035,6 +3055,20 @@ class SidecarConfig:
     @property
     def retirement_receipt(self) -> Path:
         return self.operation_root / "topology-b-retirement.json"
+
+    @property
+    def public_retirement_proof(self) -> Path:
+        return (
+            self.operation_root
+            / "topology-b-public-retirement-proof.json"
+        )
+
+    @property
+    def public_retirement_materialization_receipt(self) -> Path:
+        return (
+            self.operation_root
+            / "topology-b-public-retirement-proof-materialization.json"
+        )
 
     @property
     def external_probe_receipt(self) -> Path:
@@ -5716,6 +5750,16 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
         raise CutoverError("portal readiness timeout is outside the audited range")
     if config.delivery_phase not in {"bootstrap", "windows-preview"}:
         raise CutoverError("public download delivery phase is invalid")
+    if (
+        config.operation == RETIRE_OPERATION
+        and SHA256.fullmatch(
+            getattr(config, "canonical_publisher_sha256", "")
+        )
+        is None
+    ):
+        raise CutoverError(
+            "canonical flagship publisher SHA-256 is required for retirement"
+        )
     try:
         observed_head = subprocess.run(
             [
@@ -12023,6 +12067,843 @@ def recover_topology_b(
         ) from exc
 
 
+def _topology_b_json_bytes(value: Mapping[str, Any]) -> bytes:
+    return (
+        json.dumps(
+            value,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
+def _topology_b_canonical_sha256(value: Any) -> str:
+    return sha256_bytes(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    )
+
+
+def _topology_b_utc_timestamp(value: Any, *, label: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise RecoveryUncertain(f"{label} is not canonical UTC")
+    try:
+        parsed = datetime.fromisoformat(
+            value.removesuffix("Z") + "+00:00"
+        )
+    except ValueError as exc:
+        raise RecoveryUncertain(f"{label} is malformed") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() != timedelta(0):
+        raise RecoveryUncertain(f"{label} is not UTC")
+    return parsed.astimezone(UTC)
+
+
+def _topology_b_public_directory(path: Path, *, create: bool) -> Path:
+    if create and not (path.exists() or path.is_symlink()):
+        try:
+            path.mkdir(mode=0o755)
+        except FileExistsError:
+            pass
+        path.chmod(0o755)
+        descriptor = os.open(
+            path.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    try:
+        metadata = path.lstat()
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise RecoveryUncertain(
+            f"public retirement proof directory is unavailable: {path}"
+        ) from exc
+    if (
+        resolved != path
+        or not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) & 0o022
+        or (create and stat.S_IMODE(metadata.st_mode) != 0o755)
+    ):
+        raise RecoveryUncertain(
+            f"public retirement proof directory is unsafe: {path}"
+        )
+    return path
+
+
+def _atomic_public_retirement_write(
+    path: Path,
+    value: bytes,
+    *,
+    replace: bool,
+) -> None:
+    _topology_b_public_directory(path.parent, create=False)
+    if path.exists() or path.is_symlink():
+        existing = stable_regular_bytes(
+            path,
+            label=f"public retirement proof file {path.name}",
+            maximum_bytes=16 * 1024 * 1024,
+        )
+        metadata = path.lstat()
+        if stat.S_IMODE(metadata.st_mode) != 0o444:
+            raise RecoveryUncertain(
+                f"public retirement proof file mode drifted: {path.name}"
+            )
+        if not replace:
+            if existing != value:
+                raise RecoveryUncertain(
+                    f"content-addressed public retirement proof drifted: "
+                    f"{path.name}"
+                )
+            return
+    descriptor, raw_temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary = Path(raw_temporary)
+    published = False
+    try:
+        with os.fdopen(descriptor, "wb", closefd=True) as handle:
+            handle.write(value)
+            handle.flush()
+            os.fsync(handle.fileno())
+            os.fchmod(handle.fileno(), 0o444)
+        if replace:
+            if path.is_symlink():
+                raise RecoveryUncertain(
+                    f"public retirement proof target is a symlink: "
+                    f"{path.name}"
+                )
+            os.replace(temporary, path)
+        else:
+            try:
+                os.link(temporary, path, follow_symlinks=False)
+            except FileExistsError:
+                existing = stable_regular_bytes(
+                    path,
+                    label=(
+                        "raced content-addressed public retirement proof "
+                        f"{path.name}"
+                    ),
+                    maximum_bytes=16 * 1024 * 1024,
+                )
+                if (
+                    existing != value
+                    or stat.S_IMODE(path.lstat().st_mode) != 0o444
+                ):
+                    raise RecoveryUncertain(
+                        "content-addressed public retirement proof race "
+                        "did not preserve exact bytes"
+                    )
+        published = True
+    finally:
+        temporary.unlink(missing_ok=True)
+    if published:
+        descriptor = os.open(
+            path.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def strict_public_retirement_get(
+    url: str,
+    *,
+    maximum_bytes: int = 16 * 1024 * 1024,
+) -> bytes:
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != "chummer.run"
+        or parsed.hostname != "chummer.run"
+        or parsed.port is not None
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.startswith("/downloads/")
+        or ".." in PurePosixPath(parsed.path).parts
+    ):
+        raise RecoveryUncertain(
+            "public retirement proof readback URL is not canonical"
+        )
+    connection = http.client.HTTPSConnection(
+        "chummer.run",
+        443,
+        timeout=30,
+        context=ssl.create_default_context(),
+    )
+    try:
+        connection.request(
+            "GET",
+            parsed.path,
+            headers={
+                "Accept": "application/json",
+                "Accept-Encoding": "identity",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "User-Agent": "chummer-topology-b-retirement-proof/1",
+            },
+        )
+        response = connection.getresponse()
+        if (
+            response.status != 200
+            or response.getheader("Location") is not None
+            or response.getheader("Content-Encoding") not in (None, "identity")
+        ):
+            response.read(64 * 1024)
+            raise RecoveryUncertain(
+                "public retirement proof readback was not a direct "
+                "identity-encoded HTTP 200"
+            )
+        value = response.read(maximum_bytes + 1)
+        if not value or len(value) > maximum_bytes:
+            raise RecoveryUncertain(
+                "public retirement proof readback size is invalid"
+            )
+        declared = response.getheader("Content-Length")
+        if declared is not None and (
+            not declared.isascii()
+            or not declared.isdigit()
+            or int(declared) != len(value)
+        ):
+            raise RecoveryUncertain(
+                "public retirement proof Content-Length drifted"
+            )
+        return value
+    except (OSError, http.client.HTTPException) as exc:
+        raise RecoveryUncertain(
+            "public retirement proof readback failed"
+        ) from exc
+    finally:
+        connection.close()
+
+
+def validate_topology_b_public_retirement_bundle(
+    *,
+    proof_bytes: bytes,
+    committed_boundary_bytes: bytes,
+    post_marker_bytes: bytes,
+    expected_source_head: str,
+    expected_publisher_sha256: str,
+    cloudflare: Any,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if COMMIT.fullmatch(expected_source_head) is None:
+        raise RecoveryUncertain(
+            "public retirement proof source authority is invalid"
+        )
+    if SHA256.fullmatch(expected_publisher_sha256) is None:
+        raise RecoveryUncertain(
+            "public retirement proof publisher authority is invalid"
+        )
+    proof = _strict_json_object_bytes(
+        proof_bytes,
+        label="public topology-B retirement proof",
+    )
+    proof_fields = {
+        "contractName",
+        "contractVersion",
+        "generatedAt",
+        "status",
+        "source",
+        "sidecarAuthorityRetired",
+        "activeSidecarMarkerCount",
+        "activeSidecarMarkers",
+        "retiredAuthoritySha256",
+        "committedBoundaryReceipt",
+        "postMarkerConvergenceReceipt",
+        "canonicalAuthority",
+    }
+    if set(proof) != proof_fields:
+        raise RecoveryUncertain(
+            "public topology-B retirement proof fields drifted"
+        )
+    generated = _topology_b_utc_timestamp(
+        proof.get("generatedAt"),
+        label="public topology-B retirement generatedAt",
+    )
+    observed_now = (now or datetime.now(UTC)).astimezone(UTC)
+    if generated > observed_now + timedelta(minutes=5) or (
+        observed_now - generated > timedelta(hours=24)
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement proof is stale or future-dated"
+        )
+    source = proof.get("source")
+    if (
+        proof.get("contractName")
+        != TOPOLOGY_B_PUBLIC_RETIREMENT_CONTRACT
+        or type(proof.get("contractVersion")) is not int
+        or proof.get("contractVersion") != 1
+        or proof.get("status") != "passed"
+        or not isinstance(source, dict)
+        or set(source) != {"repository", "ref", "commit"}
+        or source.get("repository") != TOPOLOGY_B_SOURCE_REPOSITORY
+        or source.get("ref") != TOPOLOGY_B_SOURCE_REF
+        or source.get("commit") != expected_source_head
+        or proof.get("sidecarAuthorityRetired") is not True
+        or type(proof.get("activeSidecarMarkerCount")) is not int
+        or proof.get("activeSidecarMarkerCount") != 0
+        or proof.get("activeSidecarMarkers") != []
+        or SHA256.fullmatch(
+            str(proof.get("retiredAuthoritySha256") or "")
+        )
+        is None
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement authority drifted"
+        )
+
+    def validate_binding(
+        value: Any,
+        raw: bytes,
+        *,
+        label: str,
+    ) -> None:
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"sha256", "sizeBytes"}
+            or value.get("sha256") != sha256_bytes(raw)
+            or type(value.get("sizeBytes")) is not int
+            or value["sizeBytes"] != len(raw)
+            or value["sizeBytes"] <= 0
+        ):
+            raise RecoveryUncertain(
+                f"public topology-B {label} binding drifted"
+            )
+
+    validate_binding(
+        proof.get("committedBoundaryReceipt"),
+        committed_boundary_bytes,
+        label="committed boundary",
+    )
+    validate_binding(
+        proof.get("postMarkerConvergenceReceipt"),
+        post_marker_bytes,
+        label="post-marker convergence",
+    )
+    terminal = _strict_json_object_bytes(
+        committed_boundary_bytes,
+        label="committed topology-B retirement boundary",
+    )
+    terminal_fields = {
+        "contractName",
+        "status",
+        "operation",
+        "operationRoot",
+        "projectName",
+        "operationSourceHead",
+        "controllerSourceHead",
+        "retiredAuthorityPath",
+        "retiredAuthoritySha256",
+        "retirementEvidencePath",
+        "retirementEvidenceSha256",
+        "connectorGateSha256",
+        "postMarkerConnectorGateSha256",
+        "latestConnectorGateSha256",
+        "priorConfigSha256",
+        "restoredVersion",
+        "incumbentBaselineSha256",
+        "incumbentObservationSha256",
+        "cleanupSha256",
+        "completedAtUtc",
+    }
+    if (
+        set(terminal) != terminal_fields
+        or terminal.get("contractName")
+        != "chummer.public-download-committed-retirement/v1"
+        or terminal.get("status") != "retired"
+        or terminal.get("operation") != RETIRE_OPERATION
+        or terminal.get("controllerSourceHead") != expected_source_head
+        or COMMIT.fullmatch(
+            str(terminal.get("operationSourceHead") or "")
+        )
+        is None
+        or terminal.get("retiredAuthoritySha256")
+        != proof.get("retiredAuthoritySha256")
+        or type(terminal.get("restoredVersion")) is not int
+        or terminal["restoredVersion"] < 0
+        or any(
+            SHA256.fullmatch(str(terminal.get(field) or "")) is None
+            for field in (
+                "retiredAuthoritySha256",
+                "retirementEvidenceSha256",
+                "connectorGateSha256",
+                "postMarkerConnectorGateSha256",
+                "latestConnectorGateSha256",
+                "priorConfigSha256",
+                "incumbentBaselineSha256",
+                "incumbentObservationSha256",
+                "cleanupSha256",
+            )
+        )
+    ):
+        raise RecoveryUncertain(
+            "committed topology-B retirement boundary drifted"
+        )
+    completed = _topology_b_utc_timestamp(
+        terminal.get("completedAtUtc"),
+        label="committed topology-B retirement completedAtUtc",
+    )
+    if completed != generated:
+        raise RecoveryUncertain(
+            "public topology-B retirement timestamp is not terminal-bound"
+        )
+    post_marker = _strict_json_object_bytes(
+        post_marker_bytes,
+        label="post-marker connector convergence receipt",
+    )
+    post_marker_fields = {
+        "contractName",
+        "status",
+        "boundary",
+        "operationRoot",
+        "restoredVersion",
+        "retiredAuthoritySha256",
+        "markerConnectorGateSha256",
+        "connectorConvergence",
+        "connectorConvergenceSha256",
+        "verifiedAtUtc",
+    }
+    if (
+        set(post_marker) != post_marker_fields
+        or post_marker.get("contractName")
+        != "chummer.public-download-retirement-connector-boundary/v1"
+        or post_marker.get("status") != "pass"
+        or post_marker.get("boundary")
+        not in {"post-marker", "resume-post-marker"}
+        or post_marker.get("operationRoot")
+        != terminal.get("operationRoot")
+        or post_marker.get("restoredVersion")
+        != terminal.get("restoredVersion")
+        or post_marker.get("retiredAuthoritySha256")
+        != terminal.get("retiredAuthoritySha256")
+        or post_marker.get("markerConnectorGateSha256")
+        != terminal.get("connectorGateSha256")
+        or SHA256.fullmatch(
+            str(post_marker.get("connectorConvergenceSha256") or "")
+        )
+        is None
+        or not isinstance(post_marker.get("verifiedAtUtc"), str)
+        or _topology_b_canonical_sha256(post_marker)
+        != terminal.get("latestConnectorGateSha256")
+    ):
+        raise RecoveryUncertain(
+            "post-marker connector convergence boundary drifted"
+        )
+    try:
+        convergence = (
+            cloudflare.validate_current_connector_convergence_receipt(
+                post_marker.get("connectorConvergence")
+            )
+        )
+    except Exception as exc:
+        raise RecoveryUncertain(
+            "post-marker connector convergence authority is invalid"
+        ) from exc
+    if (
+        convergence.get("targetVersion")
+        != terminal.get("restoredVersion")
+        or _topology_b_canonical_sha256(convergence)
+        != post_marker.get("connectorConvergenceSha256")
+    ):
+        raise RecoveryUncertain(
+            "post-marker connector convergence digest drifted"
+        )
+    post_marker_verified = _topology_b_utc_timestamp(
+        post_marker.get("verifiedAtUtc"),
+        label="post-marker connector convergence verifiedAtUtc",
+    )
+    if post_marker_verified > completed:
+        raise RecoveryUncertain(
+            "post-marker connector convergence is later than completion"
+        )
+    canonical = proof.get("canonicalAuthority")
+    if (
+        not isinstance(canonical, dict)
+        or set(canonical)
+        != {
+            "baseUrl",
+            "manifestUrl",
+            "publisherPath",
+            "publisherSha256",
+        }
+        or canonical.get("baseUrl") != CANONICAL_DOWNLOADS_BASE_URL
+        or canonical.get("manifestUrl")
+        != CANONICAL_DOWNLOADS_MANIFEST_URL
+        or canonical.get("publisherPath")
+        != CANONICAL_DOWNLOADS_PUBLISHER_PATH
+        or canonical.get("publisherSha256")
+        != expected_publisher_sha256
+    ):
+        raise RecoveryUncertain(
+            "public topology-B canonical publisher authority drifted"
+        )
+    return proof
+
+
+def materialize_topology_b_public_retirement_proof(
+    config: SidecarConfig,
+    retirement_result: Mapping[str, Any],
+    *,
+    public_reader: Callable[[str], bytes] | None = None,
+    attempts: int = 30,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    interval_seconds: float = 2.0,
+) -> dict[str, Any]:
+    if config.operation != RETIRE_OPERATION:
+        raise RecoveryUncertain(
+            "public topology-B retirement proof requires retirement"
+        )
+    controller_source_head = (
+        config.controller_source_head or config.source_head
+    )
+    if (
+        COMMIT.fullmatch(controller_source_head) is None
+        or SHA256.fullmatch(config.canonical_publisher_sha256) is None
+        or config.base_url.rstrip("/") != "https://chummer.run"
+        or not isinstance(retirement_result, Mapping)
+        or retirement_result.get("status") != "pass"
+        or retirement_result.get("operation") != RETIRE_OPERATION
+        or retirement_result.get("disposition")
+        != "committed-sidecar-retired-to-incumbent"
+        or retirement_result.get("controllerSourceHead")
+        != controller_source_head
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement proof inputs are invalid"
+        )
+    try:
+        observed_source_head = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(config.source_root),
+                "rev-parse",
+                "--verify",
+                "HEAD^{commit}",
+            ],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RecoveryUncertain(
+            "public topology-B retirement source could not be verified"
+        ) from exc
+    if observed_source_head != controller_source_head:
+        raise RecoveryUncertain(
+            "public topology-B retirement source HEAD drifted"
+        )
+    if (
+        config.active_runtime_authority.exists()
+        or config.active_runtime_authority.is_symlink()
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement proof found an active sidecar marker"
+        )
+    terminal_bytes = stable_regular_bytes(
+        config.retirement_receipt,
+        label="terminal topology-B retirement receipt",
+        maximum_bytes=16 * 1024 * 1024,
+        owner_only=True,
+    )
+    terminal = _strict_json_object_bytes(
+        terminal_bytes,
+        label="terminal topology-B retirement receipt",
+    )
+    if not _json_semantically_equal(
+        retirement_result.get("terminalReceipt"),
+        terminal,
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement result is not terminal-bound"
+        )
+    journal_bytes = stable_regular_bytes(
+        config.operation_journal,
+        label="terminal topology-B operation journal",
+        maximum_bytes=16 * 1024 * 1024,
+        owner_only=True,
+    )
+    journal = _strict_json_object_bytes(
+        journal_bytes,
+        label="terminal topology-B operation journal",
+    )
+    receipts = journal.get("receipts")
+    post_marker = None
+    if isinstance(receipts, dict):
+        post_marker = receipts.get(
+            "retirementConnectorResumeGate",
+            receipts.get("retirementPostMarkerConnectorGate"),
+        )
+    if (
+        journal.get("schema") != TOPOLOGY_B_OPERATION_SCHEMA
+        or journal.get("phase") != "retired"
+        or journal.get("operation") != CUTOVER_OPERATION
+        or not isinstance(receipts, dict)
+        or not _json_semantically_equal(
+            receipts.get("retirement"),
+            terminal,
+        )
+        or not isinstance(post_marker, dict)
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retirement journal authority drifted"
+        )
+    retired_authority_bytes = stable_regular_bytes(
+        config.retired_active_authority,
+        label="retired topology-B runtime authority",
+        maximum_bytes=1024 * 1024,
+        owner_only=True,
+    )
+    if sha256_bytes(retired_authority_bytes) != terminal.get(
+        "retiredAuthoritySha256"
+    ):
+        raise RecoveryUncertain(
+            "public topology-B retired authority digest drifted"
+        )
+    post_marker_bytes = _topology_b_json_bytes(post_marker)
+    proof_payload = {
+        "contractName": TOPOLOGY_B_PUBLIC_RETIREMENT_CONTRACT,
+        "contractVersion": 1,
+        "generatedAt": terminal.get("completedAtUtc"),
+        "status": "passed",
+        "source": {
+            "repository": TOPOLOGY_B_SOURCE_REPOSITORY,
+            "ref": TOPOLOGY_B_SOURCE_REF,
+            "commit": controller_source_head,
+        },
+        "sidecarAuthorityRetired": True,
+        "activeSidecarMarkerCount": 0,
+        "activeSidecarMarkers": [],
+        "retiredAuthoritySha256": terminal.get(
+            "retiredAuthoritySha256"
+        ),
+        "committedBoundaryReceipt": {
+            "sha256": sha256_bytes(terminal_bytes),
+            "sizeBytes": len(terminal_bytes),
+        },
+        "postMarkerConvergenceReceipt": {
+            "sha256": sha256_bytes(post_marker_bytes),
+            "sizeBytes": len(post_marker_bytes),
+        },
+        "canonicalAuthority": {
+            "baseUrl": CANONICAL_DOWNLOADS_BASE_URL,
+            "manifestUrl": CANONICAL_DOWNLOADS_MANIFEST_URL,
+            "publisherPath": CANONICAL_DOWNLOADS_PUBLISHER_PATH,
+            "publisherSha256": config.canonical_publisher_sha256,
+        },
+    }
+    proof_bytes = _topology_b_json_bytes(proof_payload)
+    cloudflare = load_module(
+        config.source_root
+        / "scripts/cloudflare_public_download_transaction.py",
+        f"topology_b_public_proof_cloudflare_{secrets.token_hex(6)}",
+    )
+    validate_topology_b_public_retirement_bundle(
+        proof_bytes=proof_bytes,
+        committed_boundary_bytes=terminal_bytes,
+        post_marker_bytes=post_marker_bytes,
+        expected_source_head=controller_source_head,
+        expected_publisher_sha256=config.canonical_publisher_sha256,
+        cloudflare=cloudflare,
+    )
+    if (
+        config.public_retirement_proof.exists()
+        or config.public_retirement_proof.is_symlink()
+    ):
+        staged = stable_regular_bytes(
+            config.public_retirement_proof,
+            label="staged public topology-B retirement proof",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        if staged != proof_bytes:
+            raise RecoveryUncertain(
+                "staged public topology-B retirement proof drifted"
+            )
+    else:
+        write_private_json(
+            config.public_retirement_proof,
+            proof_payload,
+        )
+
+    _topology_b_public_directory(config.shelf_root, create=False)
+    content_root = _topology_b_public_directory(
+        config.shelf_root / TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY,
+        create=True,
+    )
+    committed_name = (
+        "committed-boundary-"
+        f"{sha256_bytes(terminal_bytes)}.json"
+    )
+    post_marker_name = (
+        "post-marker-convergence-"
+        f"{sha256_bytes(post_marker_bytes)}.json"
+    )
+    committed_path = content_root / committed_name
+    post_marker_path = content_root / post_marker_name
+    proof_path = (
+        config.shelf_root / TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME
+    )
+    _atomic_public_retirement_write(
+        committed_path,
+        terminal_bytes,
+        replace=False,
+    )
+    _atomic_public_retirement_write(
+        post_marker_path,
+        post_marker_bytes,
+        replace=False,
+    )
+    # The fixed proof is the commit marker. Content-addressed dependencies are
+    # durable first, so an interrupted replacement leaves either the complete
+    # prior proof or the complete new proof.
+    _atomic_public_retirement_write(
+        proof_path,
+        proof_bytes,
+        replace=True,
+    )
+
+    proof_url = (
+        f"{CANONICAL_DOWNLOADS_BASE_URL}/"
+        f"{TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME}"
+    )
+    committed_url = (
+        f"{CANONICAL_DOWNLOADS_BASE_URL}/"
+        f"{TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY}/{committed_name}"
+    )
+    post_marker_url = (
+        f"{CANONICAL_DOWNLOADS_BASE_URL}/"
+        f"{TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY}/{post_marker_name}"
+    )
+    expected_readback = {
+        committed_url: terminal_bytes,
+        post_marker_url: post_marker_bytes,
+        proof_url: proof_bytes,
+    }
+    if (
+        type(attempts) is not int
+        or not 1 <= attempts <= 60
+        or interval_seconds < 0
+        or interval_seconds > 10
+    ):
+        raise RecoveryUncertain(
+            "public topology-B readback bounds are invalid"
+        )
+    reader = public_reader or strict_public_retirement_get
+    last_error: BaseException | None = None
+    for attempt in range(attempts):
+        try:
+            for url, expected in expected_readback.items():
+                observed = reader(url)
+                if not isinstance(observed, bytes) or observed != expected:
+                    raise RecoveryUncertain(
+                        "public topology-B retirement bytes did not "
+                        f"converge: {url}"
+                    )
+            last_error = None
+            break
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                sleep_fn(interval_seconds)
+    if last_error is not None:
+        raise RecoveryUncertain(
+            "public topology-B retirement proof did not converge"
+        ) from last_error
+
+    receipt_expected = {
+        "contractName": (
+            TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT
+        ),
+        "status": "pass",
+        "operationRoot": str(config.operation_root),
+        "sourceHead": controller_source_head,
+        "proof": {
+            "path": str(proof_path),
+            "url": proof_url,
+            "sha256": sha256_bytes(proof_bytes),
+            "sizeBytes": len(proof_bytes),
+        },
+        "committedBoundary": {
+            "path": str(committed_path),
+            "url": committed_url,
+            "sha256": sha256_bytes(terminal_bytes),
+            "sizeBytes": len(terminal_bytes),
+        },
+        "postMarkerConvergence": {
+            "path": str(post_marker_path),
+            "url": post_marker_url,
+            "sha256": sha256_bytes(post_marker_bytes),
+            "sizeBytes": len(post_marker_bytes),
+        },
+        "publisherSha256": config.canonical_publisher_sha256,
+    }
+    materialization_path = (
+        config.public_retirement_materialization_receipt
+    )
+    if materialization_path.exists() or materialization_path.is_symlink():
+        raw = stable_regular_bytes(
+            materialization_path,
+            label="public topology-B retirement materialization receipt",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        materialization = _strict_json_object_bytes(
+            raw,
+            label="public topology-B retirement materialization receipt",
+        )
+        if (
+            set(materialization)
+            != {*receipt_expected, "verifiedAtUtc"}
+            or any(
+                not _json_semantically_equal(
+                    materialization.get(key),
+                    value,
+                )
+                for key, value in receipt_expected.items()
+            )
+            or not isinstance(
+                materialization.get("verifiedAtUtc"),
+                str,
+            )
+        ):
+            raise RecoveryUncertain(
+                "public topology-B retirement materialization drifted"
+            )
+    else:
+        materialization = {
+            **receipt_expected,
+            "verifiedAtUtc": utc_now(),
+        }
+        write_private_json(
+            materialization_path,
+            materialization,
+        )
+    return materialization
+
+
 def _adopt_terminal_committed_retirement(
     config: SidecarConfig,
 ) -> dict[str, Any] | None:
@@ -12795,6 +13676,14 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
     )
     parser.add_argument("--receipt-root", type=Path, required=True)
     parser.add_argument("--base-url", required=True)
+    parser.add_argument(
+        "--canonical-publisher-sha256",
+        default="",
+        help=(
+            "independent SHA-256 of the canonical flagship HTTP publisher; "
+            "mandatory for committed topology-B retirement"
+        ),
+    )
     parser.add_argument("--build-context", type=Path, required=True)
     parser.add_argument("--fleet-media-contracts", type=Path, required=True)
     parser.add_argument("--design-product-root", type=Path, required=True)
@@ -13001,6 +13890,7 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
         delivery_phase=args.delivery_phase,
         ready_timeout_seconds=args.ready_timeout_seconds,
         controller_source_head=args.source_head,
+        canonical_publisher_sha256=args.canonical_publisher_sha256,
     )
 
 
@@ -13011,6 +13901,14 @@ def main(argv: list[str] | None = None) -> int:
             result = recover_topology_b(config)
         elif config.operation == RETIRE_OPERATION:
             result = retire_topology_b(config)
+            public_proof = materialize_topology_b_public_retirement_proof(
+                config,
+                result,
+            )
+            result = {
+                **result,
+                "publicRetirementProof": public_proof,
+            }
         else:
             result = execute(config)
     except RecoveryUncertain as exc:

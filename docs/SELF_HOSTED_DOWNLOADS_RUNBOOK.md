@@ -146,6 +146,14 @@ retirement receipts print credential content. If that governed credential path i
 retirement is blocked until an operator restores or supplies it through the approved secret lane.
 Do not search arbitrary secret roots or copy credentials into a release workspace.
 
+The retirement clean launcher must additionally use
+`CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF=refs/remotes/origin/main` and supply
+`CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256` as the independently
+computed SHA-256 of the exact UI
+`scripts/publish-download-bundle-http.sh` that the flagship transaction will
+use. This digest is public binding data, not a credential. A branch commit,
+missing digest, or malformed digest blocks before the controller starts.
+
 The retirement controller first binds the active authority to terminal `cloudflare-committed.json`
 evidence and re-reads the live tunnel configuration at the exact committed target version and hash.
 It then durably authorizes retirement, re-reads immediately before the PUT, restores the captured
@@ -183,6 +191,27 @@ authenticated stale-lock procedure below only after every child has stopped, and
 retirement operation ID. A resumed retirement accepts only the exact committed target or the exact
 restored prior config and never silently reapplies the sidecar target. Never delete, rename, or edit
 the active-authority marker by hand.
+
+After terminal adoption, the same locked controller writes two immutable,
+content-addressed receipt files and then atomically replaces
+`/downloads/TOPOLOGY_B_RETIREMENT.generated.json` as the commit marker. It
+performs redirect-free, identity-encoded public readback of all three exact
+byte streams before recording success. An interruption before the fixed proof
+write leaves the previous complete proof authoritative; a retry adopts the
+terminal local receipt and completes the public proof without contacting or
+mutating Cloudflare again.
+
+Once those bytes are live, dispatch
+`.github/workflows/topology-b-committed-retirement-proof.yml` from protected
+Hub `main`. Provision its
+`topology-b-committed-retirement-proof` environment for independent human
+review, prevent self-review and administrator bypass, and allow only `main`.
+The workflow has no secret and read-only repository permission. Its first
+attempt snapshots exactly three read-only files into the artifact
+`topology-b-committed-retirement-proof-<run-id>-1`; the later UI publication
+transaction authenticates that workflow run, current Hub main, artifact
+metadata, archive digest, and exact bytes through a Hub-scoped read-only
+Actions token. Do not manually create, edit, or re-upload this artifact.
 
 ### Authenticated manual stale-lock recovery
 

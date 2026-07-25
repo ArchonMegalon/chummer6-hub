@@ -889,9 +889,18 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
   PUBLIC_DOWNLOAD_FLEET_SOURCE_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE:-$CANONICAL_PUBLIC_DOWNLOAD_FLEET_SOURCE}"
   PUBLIC_DOWNLOAD_FLEET_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256-}"
   PUBLIC_DOWNLOAD_DELIVERY_PHASE="${CHUMMER_PUBLIC_DOWNLOAD_DELIVERY_PHASE-}"
+  PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256-}"
   if [[ ! "$PUBLIC_DOWNLOAD_OPERATION_ID" \
     =~ ^[a-z0-9][a-z0-9-]{7,63}$ ]]; then
     echo "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID must be the exact governed topology-B operation identifier" >&2
+    exit 2
+  fi
+  if [[ "$DEPLOY_OPERATION" \
+      == initial-release-shelf-public-download-cutover-retire ]] \
+    && { [[ "$EXPECTED_UPSTREAM_REF" != refs/remotes/origin/main ]] \
+      || [[ ! "$PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256" \
+        =~ ^[0-9a-f]{64}$ ]]; }; then
+    echo "topology-B retirement requires exact Hub main and the independently pinned canonical flagship publisher SHA-256" >&2
     exit 2
   fi
   if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
@@ -1115,6 +1124,7 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     --cloudflare-tunnel-id "$PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID"
     --receipt-root "$CANONICAL_DEPLOY_RECEIPT_ROOT"
     --base-url "$BASE_URL"
+    --canonical-publisher-sha256 "$PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256"
     --build-context "$BUILD_CONTEXT"
     --fleet-media-contracts "$FLEET_MEDIA_CONTRACTS"
     --design-product-root "$DESIGN_PRODUCT_ROOT"
