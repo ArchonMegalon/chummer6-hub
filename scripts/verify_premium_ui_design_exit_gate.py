@@ -210,7 +210,7 @@ STATE_AND_RECOVERY_REQUIREMENTS = {
         "job": "When a build is missing or under review, the user gets a useful next step.",
         "required_markers": [
             "minimal-empty",
-            "No build is available right now",
+            "No public build is available right now",
             "href=\"/help\"",
             "Current note",
         ],

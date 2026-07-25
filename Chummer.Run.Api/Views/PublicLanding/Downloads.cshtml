@@ -78,6 +78,11 @@
         return string.IsNullOrWhiteSpace(version) ? "Version unavailable" : $"Version {version}";
     }
 
+    static string ManifestGenerationId(PublicReleaseManifestDto manifest)
+        => string.IsNullOrWhiteSpace(manifest.GenerationId)
+            ? "legacy"
+            : manifest.GenerationId.Trim();
+
     static string PublicReleaseVersionLabel(PublicReleaseManifestDto manifest, bool stableClaimsAllowed)
     {
         var version = !string.IsNullOrWhiteSpace(manifest.Version)
@@ -134,9 +139,16 @@
     <div>
         <h1>Downloads</h1>
         <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
-        <p class="muted-copy">@(Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true ? "Current public installer" : "Installer listed for review")</p>
+        <p class="muted-copy">@(Model.Manifest.Downloads.Count == 0
+            ? "No public installer listed"
+            : Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true
+                ? "Current public installer"
+                : "Installer listed for review")</p>
         <p class="muted-copy downloads-version">@VersionText(recommended, Model.Manifest, isStableRelease)</p>
-        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" hidden>@ManifestVersionText(Model.Manifest)</span>
+        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)"
+              data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)"
+              data-downloads-public-count="@Model.Manifest.Downloads.Count"
+              hidden>@ManifestVersionText(Model.Manifest) | Generation @ManifestGenerationId(Model.Manifest) | Public downloads @Model.Manifest.Downloads.Count</span>
         <p class="muted-copy"><a class="inline-link" href="/now">Release notes and known issues</a></p>
         <p class="muted-copy">
             Claim your copy only if you want this install attached to your account.
@@ -148,7 +160,7 @@
 @if (Model.Manifest.Downloads.Count == 0)
 {
     <section class="minimal-empty">
-        <h2>No build is available right now</h2>
+        <h2>No public build is available right now</h2>
         <p>@PublicDownloadText(string.IsNullOrWhiteSpace(Model.Manifest.Message) ? emptyDownloadMessage : Model.Manifest.Message)</p>
         <a class="button-like button-like--primary" href="/help">Help</a>
     </section>

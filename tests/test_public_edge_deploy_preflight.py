@@ -3538,6 +3538,11 @@ def test_stale_source_marker_check_fails_closed(tmp_path: Path) -> None:
     }
     assert "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml" in missing
     assert 'data-downloads-release-version="@ManifestVersionText(Model.Manifest)"' in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
+    assert 'data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)"' in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
+    assert 'data-downloads-public-count="@Model.Manifest.Downloads.Count"' in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
+    assert "Public downloads @Model.Manifest.Downloads.Count</span>" in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
+    assert "No public installer listed" in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
+    assert "No public build is available right now" in missing["Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"]
 
 
 def test_source_marker_check_requires_public_signal_and_doc_mirror_bundle(tmp_path: Path) -> None:

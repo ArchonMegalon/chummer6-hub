@@ -26,6 +26,7 @@ SOURCE_FILES = [
 CONTRACT_NAME = "chummer.downloads_version_marker.v1"
 BOUND_CONTRACT_NAME = "chummer.downloads_version_marker.bound.v1"
 RELEASE_CHANNEL_AUTHORITY_CONTRACT_NAME = "Chummer.Hub.Registry.Contracts"
+RELEASE_CHANNEL_SCHEMA = "chummer.release-channel/v1"
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RELEASE_CHANNEL_RECEIPT = WORKSPACE_ROOT / "chummer-hub-registry" / ".codex-studio" / "published" / "RELEASE_CHANNEL.generated.json"
@@ -56,7 +57,12 @@ RELEASE_CHANNEL_RECOGNIZED_ROLLOUT_STATES = (
 )
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 RELEASE_CHANNEL_STABLE_CHANNELS = {"public_stable", "stable", "docker"}
-VERSION_TEXT_PATTERN = re.compile(r"\bVersion\s+\S+", re.IGNORECASE)
+VERSION_MARKER_PATTERN = re.compile(r"Version [^\s]+")
+DOWNLOADS_MARKER_ATTRIBUTES = (
+    "data-downloads-release-version",
+    "data-downloads-release-generation",
+    "data-downloads-public-count",
+)
 STATUS_DECISION_HEADINGS = {
     "Downloads under review",
     "Preview downloads",
@@ -165,10 +171,27 @@ def verify_source(root: Path) -> tuple[dict[str, Any], list[str]]:
     require("static string ManifestVersionText(PublicReleaseManifestDto manifest)" in downloads_view, failures, "Downloads view must define ManifestVersionText")
     require("!string.IsNullOrWhiteSpace(manifest.Version)" in downloads_view, failures, "Downloads page-level version marker must prefer manifest.Version")
     valued_marker = 'data-downloads-release-version="@ManifestVersionText(Model.Manifest)"'
+    generation_marker = 'data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)"'
+    public_count_marker = 'data-downloads-public-count="@Model.Manifest.Downloads.Count"'
+    marker_identity_text = (
+        "hidden>@ManifestVersionText(Model.Manifest) | Generation "
+        "@ManifestGenerationId(Model.Manifest) | Public downloads "
+        "@Model.Manifest.Downloads.Count</span>"
+    )
     require(valued_marker in downloads_view, failures, "Downloads view must expose a valued data-downloads-release-version attribute")
+    require(downloads_view.count(valued_marker) == 1, failures, "Downloads view must expose exactly one release identity marker")
     require("@ManifestVersionText(Model.Manifest)" in downloads_view, failures, "Downloads view must render ManifestVersionText(Model.Manifest)")
+    require(generation_marker in downloads_view, failures, "Downloads view must expose its release-shelf generation")
+    require(public_count_marker in downloads_view, failures, "Downloads view must expose its filtered public download count")
+    require(marker_identity_text in downloads_view, failures, "Downloads marker text must repeat its version, generation, and public count")
+    require("No public installer listed" in downloads_view, failures, "Downloads empty shelf must not claim a current public installer")
+    require("No public build is available right now" in downloads_view, failures, "Downloads empty state must describe public availability")
     require(valued_marker in status_view, failures, "Status view must expose a valued data-downloads-release-version attribute")
+    require(status_view.count(valued_marker) == 1, failures, "Status view must expose exactly one release identity marker")
     require("@ManifestVersionText(Model.Manifest)" in status_view, failures, "Status view must render ManifestVersionText(Model.Manifest)")
+    require(generation_marker in status_view, failures, "Status view must expose its release-shelf generation")
+    require(public_count_marker in status_view, failures, "Status view must expose its filtered public download count")
+    require(marker_identity_text in status_view, failures, "Status marker text must repeat its version, generation, and public count")
     require("downloads-version" in downloads_view, failures, "Downloads view must style the version marker with downloads-version")
     require(".surface-downloads .downloads-version" in css, failures, "site.css must style the downloads version marker")
     require("overflow-wrap: anywhere" in css, failures, "downloads version marker must wrap long versions")
@@ -184,7 +207,17 @@ def verify_source(root: Path) -> tuple[dict[str, Any], list[str]]:
         "mode": "source",
         "files": SOURCE_FILES,
         "marker_in_view": valued_marker in downloads_view,
+        "marker_count_in_view": downloads_view.count(valued_marker),
+        "generation_marker_in_view": generation_marker in downloads_view,
+        "public_count_marker_in_view": public_count_marker in downloads_view,
+        "marker_identity_text_in_view": marker_identity_text in downloads_view,
+        "honest_empty_shelf_label": "No public installer listed" in downloads_view,
+        "honest_empty_state_copy": "No public build is available right now" in downloads_view,
         "status_marker_in_view": valued_marker in status_view,
+        "status_marker_count_in_view": status_view.count(valued_marker),
+        "status_generation_marker_in_view": generation_marker in status_view,
+        "status_public_count_marker_in_view": public_count_marker in status_view,
+        "status_marker_identity_text_in_view": marker_identity_text in status_view,
         "manifest_version_marker_prefers_release_version": "!string.IsNullOrWhiteSpace(manifest.Version)" in downloads_view,
         "status_manifest_version_marker_prefers_release_version": "!string.IsNullOrWhiteSpace(manifest.Version)" in status_view,
         "status_uses_marker_contract": valued_marker in status_view and "@ManifestVersionText(Model.Manifest)" in status_view,
@@ -229,6 +262,40 @@ def release_alias_values(
         if str(payload.get(key) or "").strip()
     }
     return {value.lower() for value in values} if lowercase else values
+
+
+def release_channel_schema_contract(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    aliases: dict[str, str] = {}
+    for key in ("schema", "schemaVersion", "schema_version"):
+        if key not in payload:
+            continue
+        value = payload[key]
+        raw_value = "" if value is None else str(value)
+        aliases[key] = raw_value
+
+    normalized_aliases = {
+        key: (
+            RELEASE_CHANNEL_SCHEMA
+            if value in {RELEASE_CHANNEL_SCHEMA, "1"}
+            else value
+        )
+        for key, value in aliases.items()
+    }
+    normalized_values = set(normalized_aliases.values())
+    aliases_consistent = len(normalized_values) <= 1
+    schema = (
+        next(iter(normalized_values))
+        if len(normalized_values) == 1
+        else ""
+    )
+    return {
+        "schema": schema,
+        "aliases": aliases,
+        "normalized_aliases": normalized_aliases,
+        "aliases_consistent": aliases_consistent,
+    }
 
 
 def is_timezone_aware_iso8601(value: str) -> bool:
@@ -692,39 +759,131 @@ def expected_status_heading(
 class VersionMarkerParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.has_marker = False
-        self.marker_value: str | None = None
-        self._capture_depth = 0
-        self._text_parts: list[str] = []
+        self.markers: list[dict[str, Any]] = []
+        self.attribute_counts = {
+            attribute: 0 for attribute in DOWNLOADS_MARKER_ATTRIBUTES
+        }
+        self._element_stack: list[tuple[str, int | None]] = []
+        self._active_marker_indices: list[int] = []
+
+    def _record_marker(
+        self,
+        attrs: list[tuple[str, str | None]],
+    ) -> int | None:
+        normalized_attrs = [
+            (name.lower(), value)
+            for name, value in attrs
+        ]
+        if not any(
+            name in DOWNLOADS_MARKER_ATTRIBUTES
+            for name, _value in normalized_attrs
+        ):
+            return None
+
+        marker_attribute_counts = {
+            attribute: sum(
+                1
+                for name, _value in normalized_attrs
+                if name == attribute
+            )
+            for attribute in DOWNLOADS_MARKER_ATTRIBUTES
+        }
+        marker_values = {
+            attribute: next(
+                (
+                    value
+                    for name, value in normalized_attrs
+                    if name == attribute
+                ),
+                None,
+            )
+            for attribute in DOWNLOADS_MARKER_ATTRIBUTES
+        }
+        for attribute, count in marker_attribute_counts.items():
+            self.attribute_counts[attribute] += count
+
+        marker_index = len(self.markers)
+        self.markers.append(
+            {
+                "attribute_counts": marker_attribute_counts,
+                "values": marker_values,
+                "text_parts": [],
+            }
+        )
+        return marker_index
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if self._capture_depth > 0:
-            self._capture_depth += 1
-            return
-        attr_map = {name.lower(): value for name, value in attrs}
-        if "data-downloads-release-version" not in attr_map:
-            return
-        self.has_marker = True
-        self.marker_value = attr_map.get("data-downloads-release-version")
-        self._capture_depth = 1
+        marker_index = self._record_marker(attrs)
+        self._element_stack.append((tag.lower(), marker_index))
+        if marker_index is not None:
+            self._active_marker_indices.append(marker_index)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attr_map = {name.lower(): value for name, value in attrs}
-        if "data-downloads-release-version" in attr_map and not self.has_marker:
-            self.has_marker = True
-            self.marker_value = attr_map.get("data-downloads-release-version")
+        self._record_marker(attrs)
 
     def handle_endtag(self, tag: str) -> None:
-        if self._capture_depth > 0:
-            self._capture_depth -= 1
+        normalized_tag = tag.lower()
+        matching_index = next(
+            (
+                index
+                for index in range(len(self._element_stack) - 1, -1, -1)
+                if self._element_stack[index][0] == normalized_tag
+            ),
+            None,
+        )
+        if matching_index is None:
+            return
+
+        closing_elements = self._element_stack[matching_index:]
+        del self._element_stack[matching_index:]
+        for _tag, marker_index in reversed(closing_elements):
+            if (
+                marker_index is not None
+                and marker_index in self._active_marker_indices
+            ):
+                self._active_marker_indices.remove(marker_index)
 
     def handle_data(self, data: str) -> None:
-        if self._capture_depth > 0:
-            self._text_parts.append(data)
+        for marker_index in self._active_marker_indices:
+            self.markers[marker_index]["text_parts"].append(data)
+
+    @property
+    def has_marker(self) -> bool:
+        return bool(self.markers)
+
+    @property
+    def marker_count(self) -> int:
+        return len(self.markers)
+
+    def _first_marker_value(self, attribute: str) -> str | None:
+        if not self.markers:
+            return None
+        return self.markers[0]["values"].get(attribute)
+
+    @property
+    def marker_value(self) -> str | None:
+        return self._first_marker_value("data-downloads-release-version")
+
+    @property
+    def generation_value(self) -> str | None:
+        return self._first_marker_value("data-downloads-release-generation")
+
+    @property
+    def public_count_value(self) -> str | None:
+        return self._first_marker_value("data-downloads-public-count")
 
     @property
     def marker_text(self) -> str:
-        return " ".join(part.strip() for part in self._text_parts if part.strip()).strip()
+        if not self.markers:
+            return ""
+        return "".join(self.markers[0]["text_parts"])
+
+    @property
+    def marker_texts(self) -> list[str]:
+        return [
+            "".join(marker["text_parts"])
+            for marker in self.markers
+        ]
 
 
 class VisibleTextParser(HTMLParser):
@@ -775,7 +934,7 @@ class VisibleTextParser(HTMLParser):
 
     def handle_data(self, data: str) -> None:
         hidden = self._hidden_stack[-1] if self._hidden_stack else False
-        normalized = " ".join(html.unescape(data).split()).strip()
+        normalized = " ".join(data.split()).strip()
         if hidden or not normalized:
             return
         self.parts.append(normalized)
@@ -881,18 +1040,77 @@ def extract_version_marker(html_text: str) -> dict[str, Any]:
     parser = VersionMarkerParser()
     parser.feed(html_text)
     parser.close()
-    marker_value = html.unescape(parser.marker_value or "").strip()
-    marker_text = html.unescape(parser.marker_text).strip()
-    marker_version_match = VERSION_TEXT_PATTERN.search(marker_value)
+    marker_value = parser.marker_value or ""
+    generation_value = parser.generation_value or ""
+    public_count_value = parser.public_count_value or ""
+    marker_text = parser.marker_text
+    expected_marker_text = (
+        f"{marker_value} | Generation {generation_value} | "
+        f"Public downloads {public_count_value}"
+    )
+    marker_version_match = VERSION_MARKER_PATTERN.fullmatch(marker_value)
     visible_version_text = extract_visible_version_text(html_text)
-    marker_version_text = html.unescape(marker_version_match.group(0)).strip() if marker_version_match else None
+    marker_version_text = marker_value if marker_version_match else None
+    visible_labels_parser = VisibleTextParser()
+    visible_labels_parser.feed(html_text)
+    visible_labels_parser.close()
     return {
         "has_marker": parser.has_marker,
+        "marker_count": parser.marker_count,
+        "required_attribute_counts": dict(parser.attribute_counts),
         "marker_value": marker_value,
+        "generation_value": generation_value,
+        "public_count_value": public_count_value,
         "marker_version_text": marker_version_text,
         "visible_version_text": visible_version_text,
         "marker_text": marker_text,
+        "marker_texts": [
+            marker_text_value
+            for marker_text_value in parser.marker_texts
+        ],
+        "visible_version_texts": list(visible_labels_parser.version_texts),
+        "expected_marker_text": expected_marker_text,
+        "marker_text_matches_identity": (
+            parser.marker_count == 1
+            and marker_text == expected_marker_text
+        ),
     }
+
+
+def validate_version_marker(
+    marker: dict[str, Any],
+    surface: str,
+    failures: list[str],
+) -> None:
+    marker_count = int(marker.get("marker_count") or 0)
+    require(
+        marker_count == 1,
+        failures,
+        f"{surface} must contain exactly one downloads release marker; found {marker_count}",
+    )
+    attribute_counts = marker.get("required_attribute_counts")
+    attribute_counts = (
+        attribute_counts
+        if isinstance(attribute_counts, dict)
+        else {}
+    )
+    required_attributes_are_unique = True
+    for attribute in DOWNLOADS_MARKER_ATTRIBUTES:
+        count = int(attribute_counts.get(attribute) or 0)
+        if count != 1:
+            required_attributes_are_unique = False
+            failures.append(
+                f"{surface} downloads release marker must contain exactly one "
+                f"{attribute} attribute; found {count}"
+            )
+
+    if marker_count == 1 and required_attributes_are_unique:
+        require(
+            marker.get("marker_text_matches_identity") is True,
+            failures,
+            f"{surface} downloads release marker text does not match its "
+            "version, generation, and public count attributes",
+        )
 
 
 def extract_first_heading_text(html_text: str, tag_name: str = "h1") -> str:
@@ -1249,10 +1467,30 @@ def verify_live(
     status_marker = extract_version_marker(status_html)
     downloads_has_marker = downloads_marker["has_marker"]
     status_has_marker = status_marker["has_marker"]
-    downloads_marker_value = str(downloads_marker["marker_value"] or "").strip()
-    status_marker_value = str(status_marker["marker_value"] or "").strip()
+    downloads_marker_value = str(downloads_marker["marker_value"] or "")
+    status_marker_value = str(status_marker["marker_value"] or "")
+    downloads_generation_value = str(downloads_marker["generation_value"] or "")
+    status_generation_value = str(status_marker["generation_value"] or "")
+    downloads_public_count_value = str(downloads_marker["public_count_value"] or "")
+    status_public_count_value = str(status_marker["public_count_value"] or "")
+    downloads_public_count = (
+        int(downloads_public_count_value)
+        if re.fullmatch(r"[0-9]+", downloads_public_count_value)
+        else None
+    )
+    status_public_count = (
+        int(status_public_count_value)
+        if re.fullmatch(r"[0-9]+", status_public_count_value)
+        else None
+    )
     downloads_marker_version_text = downloads_marker["marker_version_text"]
     status_marker_version_text = status_marker["marker_version_text"]
+    downloads_visible_version_texts = list(
+        downloads_marker["visible_version_texts"]
+    )
+    status_visible_version_texts = list(
+        status_marker["visible_version_texts"]
+    )
     downloads_version_text = downloads_marker["visible_version_text"]
     status_visible_version_text = status_marker["visible_version_text"]
     status_version_text = status_visible_version_text or status_marker_version_text
@@ -1264,13 +1502,24 @@ def verify_live(
     require(status_status == 200, failures, f"/status expected 200, got {status_status}")
     require(downloads_has_marker, failures, "/downloads missing data-downloads-release-version")
     require(status_has_marker, failures, "/status missing data-downloads-release-version")
+    validate_version_marker(downloads_marker, "/downloads", failures)
+    validate_version_marker(status_marker, "/status", failures)
     if downloads_has_marker:
         require(bool(downloads_marker_value), failures, "/downloads data-downloads-release-version is empty")
         require(downloads_marker_version_text is not None, failures, "/downloads data-downloads-release-version is not a Version value")
+        require(bool(downloads_generation_value), failures, "/downloads data-downloads-release-generation is empty")
+        require(bool(re.fullmatch(r"[0-9]+", downloads_public_count_value)), failures, "/downloads data-downloads-public-count is not a non-negative integer")
     if status_has_marker:
         require(bool(status_marker_value), failures, "/status data-downloads-release-version is empty")
         require(status_marker_version_text is not None, failures, "/status data-downloads-release-version is not a Version value")
+        require(bool(status_generation_value), failures, "/status data-downloads-release-generation is empty")
+        require(bool(re.fullmatch(r"[0-9]+", status_public_count_value)), failures, "/status data-downloads-public-count is not a non-negative integer")
     require(downloads_version_text is not None, failures, "/downloads missing visible Version text")
+    require(
+        bool(downloads_visible_version_texts),
+        failures,
+        "/downloads missing visible .downloads-version label",
+    )
     expected_release_version = str(expected_release_version or "").strip()
     expected_marker_version = f"Version {expected_release_version}" if expected_release_version else ""
     expected_visible_versions = expected_visible_version_candidates_for_posture(
@@ -1309,7 +1558,13 @@ def verify_live(
         status_marker_version_text == expected_marker_version if expected_release_version else None
     )
     downloads_visible_matches_release_channel = (
-        downloads_version_text in expected_visible_versions if expected_release_version else None
+        bool(downloads_visible_version_texts)
+        and all(
+            visible_version in expected_visible_versions
+            for visible_version in downloads_visible_version_texts
+        )
+        if expected_release_version
+        else None
     )
     status_visible_matches_release_channel = (
         status_version_text in expected_visible_versions if expected_release_version else None
@@ -1361,6 +1616,30 @@ def verify_live(
     release_manifest_conservative_review_floor_applied = False
     release_manifest_internal_supportability_consistent = None
     release_manifest_public_installer_available: bool | None = None
+    release_manifest_schema = ""
+    release_manifest_schema_aliases: dict[str, str] = {}
+    release_manifest_schema_normalized_aliases: dict[str, str] = {}
+    release_manifest_schema_aliases_consistent: bool | None = None
+    release_manifest_artifact_count: int | None = None
+    release_manifest_generation = ""
+    compatibility_manifest: dict[str, Any] = {}
+    compatibility_manifest_http_status: int | None = None
+    compatibility_manifest_parse_error: str | None = None
+    compatibility_manifest_version = ""
+    compatibility_manifest_generation = ""
+    compatibility_manifest_effective_generation = ""
+    compatibility_manifest_public_download_count: int | None = None
+    compatibility_manifest_version_matches_canonical: bool | None = None
+    compatibility_manifest_generation_matches_canonical: bool | None = None
+    downloads_public_count_matches_compatibility_manifest: bool | None = None
+    status_public_count_matches_compatibility_manifest: bool | None = None
+    downloads_version_matches_served_manifest: bool | None = None
+    status_version_matches_served_manifest: bool | None = None
+    downloads_generation_matches_served_manifest: bool | None = None
+    status_generation_matches_served_manifest: bool | None = None
+    downloads_visible_labels_match_marker: bool | None = None
+    status_visible_labels_match_marker: bool | None = None
+    surface_public_counts_match: bool | None = None
     live_authority_contract = {
         "contract_name": "",
         "contract_name_matches_expected": None,
@@ -1386,21 +1665,10 @@ def verify_live(
     expected_registry_rollout_state = str(
         expected_registry_rollout_state or ""
     ).strip().lower()
-    should_check_release_manifest = bool(
-        expected_release_status
-        or expected_release_version
-        or expected_release_channel
-        or expected_supportability_state
-        or expected_rollout_state
-        or expected_published_at
-        or expected_proof_freshness_status
-        or expected_public_trust_supportability_state
-        or expected_public_trust_rollout_state
-        or expected_registry_supportability_state
-        or expected_registry_rollout_state
-        or expected_contract_name
-        or expected_public_installer_available is not None
-    )
+    # The served manifest is the live shelf authority even when a caller does not
+    # supply a local release-channel receipt. Always compare the rendered page
+    # identity and filtered count to that authority.
+    should_check_release_manifest = True
     if should_check_release_manifest:
         release_manifest_http_status, _release_headers, release_body = fetch(base_url, "/downloads/RELEASE_CHANNEL.generated.json", timeout)
         require(
@@ -1420,7 +1688,68 @@ def verify_live(
             failures.append(f"/downloads/RELEASE_CHANNEL.generated.json parse failed: {release_manifest_parse_error}")
 
         live_release_status = release_text(live_release_manifest, "status").lower()
-        live_release_version = release_text(live_release_manifest, "version")
+        canonical_version_value = live_release_manifest.get("version")
+        live_release_version = (
+            canonical_version_value
+            if isinstance(canonical_version_value, str)
+            else ""
+        )
+        release_schema_contract = release_channel_schema_contract(
+            live_release_manifest
+        )
+        release_manifest_schema = release_schema_contract["schema"]
+        release_manifest_schema_aliases = release_schema_contract["aliases"]
+        release_manifest_schema_normalized_aliases = release_schema_contract[
+            "normalized_aliases"
+        ]
+        release_manifest_schema_aliases_consistent = release_schema_contract[
+            "aliases_consistent"
+        ]
+        canonical_generation_value = live_release_manifest.get("generationId")
+        release_manifest_generation = (
+            canonical_generation_value
+            if isinstance(canonical_generation_value, str)
+            else ""
+        )
+        require(
+            release_manifest_schema_aliases_consistent is True,
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json schema aliases conflict",
+        )
+        require(
+            release_manifest_schema == RELEASE_CHANNEL_SCHEMA,
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json schema must be "
+            f"{RELEASE_CHANNEL_SCHEMA}",
+        )
+        require(
+            bool(live_release_version.strip()),
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json version is empty",
+        )
+        require(
+            live_release_version == live_release_version.strip(),
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json version has surrounding whitespace",
+        )
+        require(
+            bool(release_manifest_generation.strip()),
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json generationId is empty",
+        )
+        require(
+            release_manifest_generation == release_manifest_generation.strip(),
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json generationId has surrounding whitespace",
+        )
+        canonical_artifacts = live_release_manifest.get("artifacts")
+        require(
+            isinstance(canonical_artifacts, list),
+            failures,
+            "/downloads/RELEASE_CHANNEL.generated.json must expose canonical artifacts",
+        )
+        if isinstance(canonical_artifacts, list):
+            release_manifest_artifact_count = len(canonical_artifacts)
         live_release_channel = release_text(live_release_manifest, "channel", "channelId", "channel_id").lower()
         live_supportability_state = release_text(live_release_manifest, "supportabilityState", "supportability_state").lower()
         live_rollout_state = release_text(live_release_manifest, "rolloutState", "rollout_state").lower()
@@ -1553,6 +1882,261 @@ def verify_live(
             "has_preview_or_review_caveat": None,
         }
 
+    (
+        compatibility_manifest_http_status,
+        _compatibility_headers,
+        compatibility_body,
+    ) = fetch(base_url, "/downloads/releases.json", timeout)
+    require(
+        compatibility_manifest_http_status == 200,
+        failures,
+        "/downloads/releases.json expected 200, got "
+        f"{compatibility_manifest_http_status}",
+    )
+    try:
+        parsed_compatibility_manifest = json.loads(compatibility_body)
+        if isinstance(parsed_compatibility_manifest, dict):
+            compatibility_manifest = parsed_compatibility_manifest
+        else:
+            compatibility_manifest_parse_error = (
+                "compatibility manifest is not a JSON object"
+            )
+    except json.JSONDecodeError as exc:
+        compatibility_manifest_parse_error = str(exc)
+    if compatibility_manifest_parse_error:
+        failures.append(
+            "/downloads/releases.json parse failed: "
+            f"{compatibility_manifest_parse_error}"
+        )
+
+    compatibility_version_value = compatibility_manifest.get("version")
+    compatibility_manifest_version = (
+        compatibility_version_value
+        if isinstance(compatibility_version_value, str)
+        else ""
+    )
+    compatibility_generation_value = compatibility_manifest.get("generationId")
+    compatibility_manifest_generation = (
+        compatibility_generation_value
+        if isinstance(compatibility_generation_value, str)
+        else ""
+    )
+    compatibility_manifest_effective_generation = compatibility_manifest_generation
+    require(
+        bool(compatibility_manifest_version.strip()),
+        failures,
+        "/downloads/releases.json version is empty",
+    )
+    require(
+        compatibility_manifest_version
+        == compatibility_manifest_version.strip(),
+        failures,
+        "/downloads/releases.json version has surrounding whitespace",
+    )
+    require(
+        bool(compatibility_manifest_generation.strip()),
+        failures,
+        "/downloads/releases.json generationId is empty",
+    )
+    require(
+        compatibility_manifest_generation
+        == compatibility_manifest_generation.strip(),
+        failures,
+        "/downloads/releases.json generationId has surrounding whitespace",
+    )
+    compatibility_downloads = compatibility_manifest.get("downloads")
+    require(
+        isinstance(compatibility_downloads, list),
+        failures,
+        "/downloads/releases.json must expose the anonymous filtered downloads array",
+    )
+    if isinstance(compatibility_downloads, list):
+        compatibility_manifest_public_download_count = len(
+            compatibility_downloads
+        )
+        require(
+            all(
+                isinstance(download, dict)
+                for download in compatibility_downloads
+            ),
+            failures,
+            "/downloads/releases.json downloads must contain JSON objects",
+        )
+
+    if live_release_manifest and release_manifest_parse_error is None:
+        compatibility_manifest_version_matches_canonical = (
+            bool(compatibility_manifest_version.strip())
+            and bool(live_release_version.strip())
+            and compatibility_manifest_version == live_release_version
+        )
+        compatibility_manifest_generation_matches_canonical = (
+            bool(compatibility_manifest_generation.strip())
+            and bool(release_manifest_generation.strip())
+            and compatibility_manifest_generation == release_manifest_generation
+        )
+        if not compatibility_manifest_version_matches_canonical:
+            failures.append(
+                "/downloads/releases.json version does not match served "
+                "RELEASE_CHANNEL"
+            )
+        if not compatibility_manifest_generation_matches_canonical:
+            failures.append(
+                "/downloads/releases.json generationId does not match served "
+                "RELEASE_CHANNEL"
+            )
+
+    if compatibility_manifest_public_download_count is not None:
+        release_manifest_public_installer_available = (
+            compatibility_manifest_public_download_count > 0
+        )
+        downloads_public_count_matches_compatibility_manifest = (
+            downloads_public_count
+            == compatibility_manifest_public_download_count
+        )
+        status_public_count_matches_compatibility_manifest = (
+            status_public_count
+            == compatibility_manifest_public_download_count
+        )
+        if not downloads_public_count_matches_compatibility_manifest:
+            failures.append(
+                "/downloads data-downloads-public-count does not match "
+                "anonymous /downloads/releases.json"
+            )
+        if not status_public_count_matches_compatibility_manifest:
+            failures.append(
+                "/status data-downloads-public-count does not match anonymous "
+                "/downloads/releases.json"
+            )
+
+    if live_release_manifest and release_manifest_parse_error is None:
+        expected_served_version = (
+            f"Version {live_release_version}" if live_release_version else ""
+        )
+        expected_served_generation = release_manifest_generation
+        downloads_version_matches_served_manifest = (
+            downloads_marker_version_text == expected_served_version
+            if expected_served_version
+            else None
+        )
+        status_version_matches_served_manifest = (
+            status_marker_version_text == expected_served_version
+            if expected_served_version
+            else None
+        )
+        downloads_generation_matches_served_manifest = (
+            bool(expected_served_generation)
+            and downloads_generation_value == expected_served_generation
+        )
+        status_generation_matches_served_manifest = (
+            bool(expected_served_generation)
+            and status_generation_value == expected_served_generation
+        )
+        if downloads_version_matches_served_manifest is False:
+            failures.append(
+                "/downloads data-downloads-release-version does not match served RELEASE_CHANNEL"
+            )
+        if status_version_matches_served_manifest is False:
+            failures.append(
+                "/status data-downloads-release-version does not match served RELEASE_CHANNEL"
+            )
+        if not downloads_generation_matches_served_manifest:
+            failures.append(
+                "/downloads data-downloads-release-generation does not match served RELEASE_CHANNEL"
+            )
+        if not status_generation_matches_served_manifest:
+            failures.append(
+                "/status data-downloads-release-generation does not match served RELEASE_CHANNEL"
+            )
+
+        downloads_marker_release_version = (
+            downloads_marker_version_text.removeprefix("Version ")
+            if downloads_marker_version_text
+            else ""
+        )
+        status_marker_release_version = (
+            status_marker_version_text.removeprefix("Version ")
+            if status_marker_version_text
+            else ""
+        )
+        downloads_visible_candidates = (
+            expected_visible_version_candidates_for_posture(
+                downloads_marker_release_version,
+                live_release_status,
+                live_release_channel,
+                live_supportability_state,
+                live_rollout_state,
+            )
+            if downloads_marker_release_version
+            else []
+        )
+        status_visible_candidates = (
+            expected_visible_version_candidates_for_posture(
+                status_marker_release_version,
+                live_release_status,
+                live_release_channel,
+                live_supportability_state,
+                live_rollout_state,
+            )
+            if status_marker_release_version
+            else []
+        )
+        downloads_visible_labels_match_marker = (
+            bool(downloads_visible_version_texts)
+            and bool(downloads_visible_candidates)
+            and all(
+                visible_version in downloads_visible_candidates
+                for visible_version in downloads_visible_version_texts
+            )
+        )
+        status_visible_labels_match_marker = (
+            bool(status_visible_candidates)
+            and all(
+                visible_version in status_visible_candidates
+                for visible_version in status_visible_version_texts
+            )
+            if status_visible_version_texts
+            else None
+        )
+        if not downloads_visible_labels_match_marker:
+            failures.append(
+                "/downloads visible .downloads-version labels do not agree "
+                "with the unique release marker"
+            )
+        if status_visible_labels_match_marker is False:
+            failures.append(
+                "/status visible .downloads-version labels do not agree with "
+                "the unique release marker"
+            )
+
+    downloads_visible_parser = VisibleTextParser()
+    downloads_visible_parser.feed(downloads_html)
+    downloads_visible_parser.close()
+    downloads_visible_text = downloads_visible_parser.text
+    empty_state_copy = "No public build is available right now"
+    if "No build is available right now" in downloads_visible_text:
+        failures.append(
+            "/downloads empty state is ambiguous about public visibility"
+        )
+    if downloads_public_count is not None and status_public_count is not None:
+        surface_public_counts_match = downloads_public_count == status_public_count
+        if not surface_public_counts_match:
+            failures.append(
+                "/downloads and /status filtered public download counts disagree"
+            )
+    if downloads_public_count == 0:
+        if empty_state_copy not in downloads_visible_text:
+            failures.append(
+                "/downloads missing public-only empty-state copy for a filtered empty shelf"
+            )
+        if "Current public installer" in downloads_visible_text:
+            failures.append(
+                "/downloads claims a current public installer while its filtered public shelf is empty"
+            )
+    elif downloads_public_count is not None and empty_state_copy in downloads_visible_text:
+        failures.append(
+            "/downloads renders an empty public shelf while its filtered count is nonzero"
+        )
+
     if live_release_manifest and release_manifest_parse_error is None:
         status_heading_expectation_source = "live_release_manifest"
         expected_status_decision_heading = expected_status_heading(
@@ -1622,8 +2206,14 @@ def verify_live(
         ],
         "release_manifest_status": live_release_status,
         "release_manifest_status_matches_release_channel": release_manifest_status_matches,
+        "release_manifest_schema": release_manifest_schema,
+        "release_manifest_schema_aliases": release_manifest_schema_aliases,
+        "release_manifest_schema_normalized_aliases": release_manifest_schema_normalized_aliases,
+        "release_manifest_schema_aliases_consistent": release_manifest_schema_aliases_consistent,
+        "release_manifest_artifact_count": release_manifest_artifact_count,
         "release_manifest_version": live_release_version,
         "release_manifest_version_matches_release_channel": release_manifest_version_matches,
+        "release_manifest_generation": release_manifest_generation,
         "release_manifest_channel": live_release_channel,
         "release_manifest_channel_matches_release_channel": release_manifest_channel_matches,
         "release_manifest_supportability_state": live_supportability_state,
@@ -1654,16 +2244,49 @@ def verify_live(
         "release_manifest_copy_safe": live_copy_safety["copy_safe"],
         "release_manifest_unsafe_copy_markers": live_copy_safety["unsafe_copy_markers"],
         "release_manifest_has_preview_or_review_caveat": live_copy_safety["has_preview_or_review_caveat"],
+        "compatibility_manifest_http_status": compatibility_manifest_http_status,
+        "compatibility_manifest_parse_error": compatibility_manifest_parse_error,
+        "compatibility_manifest_version": compatibility_manifest_version,
+        "compatibility_manifest_generation": compatibility_manifest_generation,
+        "compatibility_manifest_effective_generation": compatibility_manifest_effective_generation,
+        "compatibility_manifest_public_download_count": compatibility_manifest_public_download_count,
+        "compatibility_manifest_version_matches_canonical": compatibility_manifest_version_matches_canonical,
+        "compatibility_manifest_generation_matches_canonical": compatibility_manifest_generation_matches_canonical,
         "downloads_status": downloads_status,
         "status_status": status_status,
         "downloads_content_type": downloads_headers.get("content-type"),
         "status_content_type": status_headers.get("content-type"),
         "downloads_marker": downloads_has_marker,
         "status_redirect_marker": status_has_marker,
+        "downloads_marker_count": downloads_marker["marker_count"],
+        "status_redirect_marker_count": status_marker["marker_count"],
+        "downloads_marker_required_attribute_counts": downloads_marker["required_attribute_counts"],
+        "status_redirect_marker_required_attribute_counts": status_marker["required_attribute_counts"],
+        "downloads_marker_text": downloads_marker["marker_text"],
+        "status_redirect_marker_text": status_marker["marker_text"],
+        "downloads_marker_text_matches_identity": downloads_marker["marker_text_matches_identity"],
+        "status_redirect_marker_text_matches_identity": status_marker["marker_text_matches_identity"],
         "downloads_version_marker_value": downloads_marker_value,
         "status_redirect_version_marker_value": status_marker_value,
+        "downloads_generation_marker_value": downloads_generation_value,
+        "status_redirect_generation_marker_value": status_generation_value,
+        "downloads_public_count_marker_value": downloads_public_count_value,
+        "status_redirect_public_count_marker_value": status_public_count_value,
+        "downloads_public_download_count": downloads_public_count,
+        "status_redirect_public_download_count": status_public_count,
         "downloads_version_marker_matches_release_channel": downloads_marker_matches_release_channel,
         "status_redirect_version_marker_matches_release_channel": status_marker_matches_release_channel,
+        "downloads_version_marker_matches_served_manifest": downloads_version_matches_served_manifest,
+        "status_redirect_version_marker_matches_served_manifest": status_version_matches_served_manifest,
+        "downloads_generation_matches_served_manifest": downloads_generation_matches_served_manifest,
+        "status_redirect_generation_matches_served_manifest": status_generation_matches_served_manifest,
+        "downloads_visible_version_texts": downloads_visible_version_texts,
+        "status_redirect_visible_version_texts": status_visible_version_texts,
+        "downloads_visible_labels_match_marker": downloads_visible_labels_match_marker,
+        "status_redirect_visible_labels_match_marker": status_visible_labels_match_marker,
+        "surface_public_download_counts_match": surface_public_counts_match,
+        "downloads_public_count_matches_compatibility_manifest": downloads_public_count_matches_compatibility_manifest,
+        "status_redirect_public_count_matches_compatibility_manifest": status_public_count_matches_compatibility_manifest,
         "status_redirect_heading": status_heading,
         "status_redirect_heading_recognized": status_heading_recognized,
         "status_redirect_heading_expected": expected_status_decision_heading,
@@ -1684,6 +2307,12 @@ def summarize_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
 
     summary: dict[str, Any] = {
         "source_marker_in_view": source_check.get("marker_in_view"),
+        "source_marker_count_in_view": source_check.get("marker_count_in_view"),
+        "source_generation_marker_in_view": source_check.get("generation_marker_in_view"),
+        "source_public_count_marker_in_view": source_check.get("public_count_marker_in_view"),
+        "source_marker_identity_text_in_view": source_check.get("marker_identity_text_in_view"),
+        "source_honest_empty_shelf_label": source_check.get("honest_empty_shelf_label"),
+        "source_honest_empty_state_copy": source_check.get("honest_empty_state_copy"),
         "source_manifest_version_marker_prefers_release_version": source_check.get("manifest_version_marker_prefers_release_version"),
         "source_styled_marker": source_check.get("styled_marker"),
         "source_playwright_records_version_text": source_check.get("playwright_records_version_text"),
@@ -1737,10 +2366,40 @@ def summarize_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
                 "status_status": live_check.get("status_status"),
                 "downloads_has_marker": live_check.get("downloads_marker"),
                 "status_redirect_has_marker": live_check.get("status_redirect_marker"),
+                "downloads_marker_count": live_check.get("downloads_marker_count"),
+                "status_redirect_marker_count": live_check.get("status_redirect_marker_count"),
+                "downloads_marker_required_attribute_counts": live_check.get("downloads_marker_required_attribute_counts"),
+                "status_redirect_marker_required_attribute_counts": live_check.get("status_redirect_marker_required_attribute_counts"),
+                "downloads_marker_text_matches_identity": live_check.get("downloads_marker_text_matches_identity"),
+                "status_redirect_marker_text_matches_identity": live_check.get("status_redirect_marker_text_matches_identity"),
                 "downloads_version_marker_value": live_check.get("downloads_version_marker_value"),
                 "status_redirect_version_marker_value": live_check.get("status_redirect_version_marker_value"),
+                "downloads_generation_marker_value": live_check.get("downloads_generation_marker_value"),
+                "status_redirect_generation_marker_value": live_check.get("status_redirect_generation_marker_value"),
+                "downloads_public_count_marker_value": live_check.get("downloads_public_count_marker_value"),
+                "status_redirect_public_count_marker_value": live_check.get("status_redirect_public_count_marker_value"),
                 "downloads_version_marker_matches_release_channel": live_check.get("downloads_version_marker_matches_release_channel"),
                 "status_redirect_version_marker_matches_release_channel": live_check.get("status_redirect_version_marker_matches_release_channel"),
+                "downloads_version_marker_matches_served_manifest": live_check.get("downloads_version_marker_matches_served_manifest"),
+                "status_redirect_version_marker_matches_served_manifest": live_check.get("status_redirect_version_marker_matches_served_manifest"),
+                "downloads_generation_matches_served_manifest": live_check.get("downloads_generation_matches_served_manifest"),
+                "status_redirect_generation_matches_served_manifest": live_check.get("status_redirect_generation_matches_served_manifest"),
+                "downloads_visible_version_texts": live_check.get("downloads_visible_version_texts"),
+                "status_redirect_visible_version_texts": live_check.get("status_redirect_visible_version_texts"),
+                "downloads_visible_labels_match_marker": live_check.get("downloads_visible_labels_match_marker"),
+                "status_redirect_visible_labels_match_marker": live_check.get("status_redirect_visible_labels_match_marker"),
+                "downloads_public_download_count": live_check.get("downloads_public_download_count"),
+                "status_redirect_public_download_count": live_check.get("status_redirect_public_download_count"),
+                "surface_public_download_counts_match": live_check.get("surface_public_download_counts_match"),
+                "downloads_public_count_matches_compatibility_manifest": live_check.get("downloads_public_count_matches_compatibility_manifest"),
+                "status_redirect_public_count_matches_compatibility_manifest": live_check.get("status_redirect_public_count_matches_compatibility_manifest"),
+                "compatibility_manifest_http_status": live_check.get("compatibility_manifest_http_status"),
+                "compatibility_manifest_version": live_check.get("compatibility_manifest_version"),
+                "compatibility_manifest_generation": live_check.get("compatibility_manifest_generation"),
+                "compatibility_manifest_public_download_count": live_check.get("compatibility_manifest_public_download_count"),
+                "compatibility_manifest_version_matches_canonical": live_check.get("compatibility_manifest_version_matches_canonical"),
+                "compatibility_manifest_generation_matches_canonical": live_check.get("compatibility_manifest_generation_matches_canonical"),
+                "compatibility_manifest_parse_error": live_check.get("compatibility_manifest_parse_error"),
                 "status_redirect_heading": live_check.get("status_redirect_heading"),
                 "status_redirect_heading_recognized": live_check.get("status_redirect_heading_recognized"),
                 "status_redirect_heading_expected": live_check.get("status_redirect_heading_expected"),
@@ -1763,8 +2422,14 @@ def summarize_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
                 "release_manifest_conflicting_aliases": live_check.get("release_manifest_conflicting_aliases"),
                 "release_manifest_status": live_check.get("release_manifest_status"),
                 "release_manifest_status_matches_release_channel": live_check.get("release_manifest_status_matches_release_channel"),
+                "release_manifest_schema": live_check.get("release_manifest_schema"),
+                "release_manifest_schema_aliases": live_check.get("release_manifest_schema_aliases"),
+                "release_manifest_schema_normalized_aliases": live_check.get("release_manifest_schema_normalized_aliases"),
+                "release_manifest_schema_aliases_consistent": live_check.get("release_manifest_schema_aliases_consistent"),
+                "release_manifest_artifact_count": live_check.get("release_manifest_artifact_count"),
                 "release_manifest_version": live_check.get("release_manifest_version"),
                 "release_manifest_version_matches_release_channel": live_check.get("release_manifest_version_matches_release_channel"),
+                "release_manifest_generation": live_check.get("release_manifest_generation"),
                 "release_manifest_channel": live_check.get("release_manifest_channel"),
                 "release_manifest_channel_matches_release_channel": live_check.get("release_manifest_channel_matches_release_channel"),
                 "release_manifest_supportability_state": live_check.get("release_manifest_supportability_state"),

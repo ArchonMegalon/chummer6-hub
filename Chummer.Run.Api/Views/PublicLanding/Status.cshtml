@@ -48,6 +48,11 @@
         return string.IsNullOrWhiteSpace(version) ? "Version unavailable" : $"Version {version}";
     }
 
+    static string ManifestGenerationId(PublicReleaseManifestDto manifest)
+        => string.IsNullOrWhiteSpace(manifest.GenerationId)
+            ? "legacy"
+            : manifest.GenerationId.Trim();
+
 }
 
 <partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
@@ -59,7 +64,10 @@
         <p>@PublicStatusText(statusLine)</p>
         <p class="muted-copy">@PublicStatusText(Model.ReleaseSummary)</p>
         <p class="muted-copy">@PublicStatusText(Model.CautionSummary)</p>
-        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" hidden>@ManifestVersionText(Model.Manifest)</span>
+        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)"
+              data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)"
+              data-downloads-public-count="@Model.Manifest.Downloads.Count"
+              hidden>@ManifestVersionText(Model.Manifest) | Generation @ManifestGenerationId(Model.Manifest) | Public downloads @Model.Manifest.Downloads.Count</span>
         <div class="minimal-actions" aria-label="Status next actions">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
             <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>

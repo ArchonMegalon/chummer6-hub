@@ -100,7 +100,7 @@ def build_downloads_surface(
     if downloads_paused:
         required_texts.extend(
             [
-                "No build is available right now",
+                "No public build is available right now",
                 "Help",
             ]
         )

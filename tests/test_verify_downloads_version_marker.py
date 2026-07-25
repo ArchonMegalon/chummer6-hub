@@ -51,14 +51,79 @@ def visible_version_for_release_posture(
     return version if version.startswith("Version ") else f"Version {version}"
 
 
+def canonical_public_installer(index: int) -> dict[str, Any]:
+    artifact_id = f"windows-installer-{index}"
+    return {
+        "artifactId": artifact_id,
+        "platform": "windows",
+        "platformLabel": "Windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "kind": "installer",
+        "head": "avalonia",
+        "fileName": f"Chummer-{index}.exe",
+        "downloadUrl": f"https://downloads.example.test/{artifact_id}",
+        "sha256": f"{index + 1:064x}",
+        "sizeBytes": 1024 + index,
+        "installAccessClass": "open_public",
+    }
+
+
+def compatibility_public_installer(index: int) -> dict[str, Any]:
+    canonical = canonical_public_installer(index)
+    return {
+        "id": canonical["artifactId"],
+        "artifactId": canonical["artifactId"],
+        "platform": canonical["platformLabel"],
+        "platformId": canonical["platform"],
+        "rid": canonical["rid"],
+        "arch": canonical["arch"],
+        "kind": canonical["kind"],
+        "head": canonical["head"],
+        "fileName": canonical["fileName"],
+        "url": canonical["downloadUrl"],
+        "sha256": canonical["sha256"],
+        "sizeBytes": canonical["sizeBytes"],
+        "installAccessClass": canonical["installAccessClass"],
+    }
+
+
+def marker_identity_text(version: str, generation: str, count: str) -> str:
+    return (
+        f"{version} | Generation {generation} | "
+        f"Public downloads {count}"
+    )
+
+
+def release_marker_html(
+    version: str,
+    generation: str,
+    count: str,
+    *,
+    text: str | None = None,
+) -> str:
+    return (
+        f'<span data-downloads-release-version="{version}" '
+        f'data-downloads-release-generation="{generation}" '
+        f'data-downloads-public-count="{count}" hidden>'
+        f"{text if text is not None else marker_identity_text(version, generation, count)}"
+        "</span>"
+    )
+
+
 class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
     include_marker = True
     marker_value: str | None = None
+    marker_generation_value: str | None = None
+    marker_public_count_value: str | None = None
     downloads_visible_version_text = visible_version_for_release_posture("run-20260630")
+    downloads_visible_version_texts: tuple[str, ...] | None = None
     status_visible_version_text: str | None = None
     status_heading = "Stable downloads"
     release_contract_name: str | None = "Chummer.Hub.Registry.Contracts"
     release_version = "run-20260630"
+    release_generation = "g-20260630-test"
+    release_public_download_count = 1
     release_status = "published"
     release_channel = "public_stable"
     release_supportability_state = "gold_supported"
@@ -74,28 +139,69 @@ class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
     release_registry_supportability_state: str | None = None
     release_registry_rollout_state: str | None = None
     release_manifest_overrides: dict[str, Any] | None = None
+    compatibility_manifest_overrides: dict[str, Any] | None = None
+    downloads_marker_html: str | None = None
+    status_marker_html: str | None = None
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/downloads":
             resolved_marker_value = (
                 f"Version {self.release_version}" if self.marker_value is None else self.marker_value
             )
+            resolved_generation_value = (
+                self.release_generation
+                if self.marker_generation_value is None
+                else self.marker_generation_value
+            )
+            resolved_public_count_value = (
+                str(self.release_public_download_count)
+                if self.marker_public_count_value is None
+                else self.marker_public_count_value
+            )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             parts = ["<main>"]
-            if self.downloads_visible_version_text:
-                parts.append(f'<p class="downloads-version">{self.downloads_visible_version_text}</p>')
+            visible_version_texts = (
+                self.downloads_visible_version_texts
+                if self.downloads_visible_version_texts is not None
+                else (self.downloads_visible_version_text,)
+            )
+            for visible_version_text in visible_version_texts:
+                if visible_version_text:
+                    parts.append(
+                        '<p class="downloads-version">'
+                        f"{visible_version_text}</p>"
+                    )
             if self.include_marker:
                 parts.append(
-                    f'<span data-downloads-release-version="{resolved_marker_value}" hidden>{resolved_marker_value}</span>'
+                    self.downloads_marker_html
+                    if self.downloads_marker_html is not None
+                    else (
+                        f'<span data-downloads-release-version="{resolved_marker_value}" '
+                        f'data-downloads-release-generation="{resolved_generation_value}" '
+                        f'data-downloads-public-count="{resolved_public_count_value}" '
+                        f'hidden>{marker_identity_text(resolved_marker_value, resolved_generation_value, resolved_public_count_value)}</span>'
+                    )
                 )
+            if self.release_public_download_count == 0:
+                parts.append("<h2>No public build is available right now</h2>")
             parts.append("</main>")
             self.wfile.write("".join(parts).encode("utf-8"))
             return
         if self.path == "/status":
             resolved_marker_value = (
                 f"Version {self.release_version}" if self.marker_value is None else self.marker_value
+            )
+            resolved_generation_value = (
+                self.release_generation
+                if self.marker_generation_value is None
+                else self.marker_generation_value
+            )
+            resolved_public_count_value = (
+                str(self.release_public_download_count)
+                if self.marker_public_count_value is None
+                else self.marker_public_count_value
             )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -105,7 +211,14 @@ class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
                 parts.append(f"<p>{self.status_visible_version_text}</p>")
             if self.include_marker:
                 parts.append(
-                    f'<span data-downloads-release-version="{resolved_marker_value}" hidden>{resolved_marker_value}</span>'
+                    self.status_marker_html
+                    if self.status_marker_html is not None
+                    else (
+                        f'<span data-downloads-release-version="{resolved_marker_value}" '
+                        f'data-downloads-release-generation="{resolved_generation_value}" '
+                        f'data-downloads-public-count="{resolved_public_count_value}" '
+                        f'hidden>{marker_identity_text(resolved_marker_value, resolved_generation_value, resolved_public_count_value)}</span>'
+                    )
                 )
             parts.append("</main>")
             self.wfile.write("".join(parts).encode("utf-8"))
@@ -115,8 +228,14 @@ class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.end_headers()
             payload = {
+                "schemaVersion": "chummer.release-channel/v1",
                 "status": self.release_status,
                 "version": self.release_version,
+                "generationId": self.release_generation,
+                "artifacts": [
+                    canonical_public_installer(index)
+                    for index in range(self.release_public_download_count)
+                ],
                 "channel": self.release_channel,
                 "supportabilityState": self.release_supportability_state,
                 "rolloutState": self.release_rollout_state,
@@ -161,6 +280,27 @@ class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
                 payload.update(self.release_manifest_overrides)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
+        if self.path == "/downloads/releases.json":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            payload = {
+                "contractName": "Chummer.Hub.Registry.Contracts",
+                "status": self.release_status,
+                "version": self.release_version,
+                "generationId": self.release_generation,
+                "channel": self.release_channel,
+                "supportabilityState": self.release_supportability_state,
+                "rolloutState": self.release_rollout_state,
+                "downloads": [
+                    compatibility_public_installer(index)
+                    for index in range(self.release_public_download_count)
+                ],
+            }
+            if self.compatibility_manifest_overrides:
+                payload.update(self.compatibility_manifest_overrides)
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
         self.send_response(404)
         self.end_headers()
 
@@ -171,11 +311,16 @@ class _DownloadsMarkerHandler(BaseHTTPRequestHandler):
 def with_server(
     include_marker: bool,
     downloads_visible_version_text: str | None = None,
+    downloads_visible_version_texts: tuple[str, ...] | None = None,
     status_visible_version_text: str | None = None,
     marker_value: str | None = None,
+    marker_generation_value: str | None = None,
+    marker_public_count_value: str | None = None,
     status_heading: str = "Stable downloads",
     release_contract_name: str | None = "Chummer.Hub.Registry.Contracts",
     release_version: str = "run-20260630",
+    release_generation: str = "g-20260630-test",
+    release_public_download_count: int | None = None,
     release_status: str = "published",
     release_channel: str = "public_stable",
     release_supportability_state: str = "gold_supported",
@@ -191,13 +336,26 @@ def with_server(
     release_registry_supportability_state: str | None = None,
     release_registry_rollout_state: str | None = None,
     release_manifest_overrides: dict[str, Any] | None = None,
+    compatibility_manifest_overrides: dict[str, Any] | None = None,
+    downloads_marker_html: str | None = None,
+    status_marker_html: str | None = None,
 ):
+    resolved_public_download_count = (
+        release_public_install_count
+        if release_public_download_count is None
+        and release_public_install_count is not None
+        else 1
+        if release_public_download_count is None
+        else release_public_download_count
+    )
     handler = type(
         "ConfiguredDownloadsMarkerHandler",
         (_DownloadsMarkerHandler,),
         {
             "include_marker": include_marker,
             "marker_value": marker_value,
+            "marker_generation_value": marker_generation_value,
+            "marker_public_count_value": marker_public_count_value,
             "downloads_visible_version_text": downloads_visible_version_text or visible_version_for_release_posture(
                 release_version,
                 release_status=release_status,
@@ -205,10 +363,13 @@ def with_server(
                 release_supportability_state=release_supportability_state,
                 release_rollout_state=release_rollout_state,
             ),
+            "downloads_visible_version_texts": downloads_visible_version_texts,
             "status_visible_version_text": status_visible_version_text,
             "status_heading": status_heading,
             "release_contract_name": release_contract_name,
             "release_version": release_version,
+            "release_generation": release_generation,
+            "release_public_download_count": resolved_public_download_count,
             "release_status": release_status,
             "release_channel": release_channel,
             "release_supportability_state": release_supportability_state,
@@ -224,6 +385,9 @@ def with_server(
             "release_registry_supportability_state": release_registry_supportability_state,
             "release_registry_rollout_state": release_registry_rollout_state,
             "release_manifest_overrides": release_manifest_overrides,
+            "compatibility_manifest_overrides": compatibility_manifest_overrides,
+            "downloads_marker_html": downloads_marker_html,
+            "status_marker_html": status_marker_html,
         },
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -294,7 +458,12 @@ def write_bound_preview_manifest(
 
 def write_source_contract_fixture(module, root: Path, *, valued_marker: bool) -> None:
     marker = (
-        '<span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" hidden>@ManifestVersionText(Model.Manifest)</span>'
+        '<span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" '
+        'data-downloads-release-generation="@ManifestGenerationId(Model.Manifest)" '
+        'data-downloads-public-count="@Model.Manifest.Downloads.Count" '
+        'hidden>@ManifestVersionText(Model.Manifest) | Generation '
+        '@ManifestGenerationId(Model.Manifest) | Public downloads '
+        '@Model.Manifest.Downloads.Count</span>'
         if valued_marker
         else '<span data-downloads-release-version hidden>@ManifestVersionText(Model.Manifest)</span>'
     )
@@ -304,6 +473,8 @@ def write_source_contract_fixture(module, root: Path, *, valued_marker: bool) ->
             "!string.IsNullOrWhiteSpace(manifest.Version)",
             marker,
             "downloads-version",
+            "No public installer listed",
+            "No public build is available right now",
         ]
     )
     status = "\n".join(
@@ -342,8 +513,16 @@ def test_source_contract_tracks_downloads_version_marker_and_artifact_fields() -
 
     assert failures == []
     assert result["marker_in_view"] is True
+    assert result["marker_count_in_view"] == 1
+    assert result["generation_marker_in_view"] is True
+    assert result["public_count_marker_in_view"] is True
+    assert result["marker_identity_text_in_view"] is True
+    assert result["honest_empty_shelf_label"] is True
+    assert result["honest_empty_state_copy"] is True
     assert result["manifest_version_marker_prefers_release_version"] is True
     assert result["status_uses_marker_contract"] is True
+    assert result["status_marker_count_in_view"] == 1
+    assert result["status_marker_identity_text_in_view"] is True
     assert result["styled_marker"] is True
     assert result["playwright_records_version_text"] is True
     assert result["playwright_records_status_heading"] is True
@@ -372,15 +551,391 @@ def test_live_contract_passes_when_downloads_and_status_have_marker() -> None:
     assert failures == []
     assert result["downloads_marker"] is True
     assert result["status_redirect_marker"] is True
+    assert result["downloads_marker_count"] == 1
+    assert result["status_redirect_marker_count"] == 1
+    assert result["downloads_marker_required_attribute_counts"] == {
+        "data-downloads-release-version": 1,
+        "data-downloads-release-generation": 1,
+        "data-downloads-public-count": 1,
+    }
+    assert result["downloads_marker_text_matches_identity"] is True
+    assert result["status_redirect_marker_text_matches_identity"] is True
     assert result["downloads_version_marker_value"] == "Version run-20260630"
     assert result["status_redirect_version_marker_value"] == "Version run-20260630"
+    assert result["downloads_generation_marker_value"] == "g-20260630-test"
+    assert result["status_redirect_generation_marker_value"] == "g-20260630-test"
+    assert result["downloads_public_count_marker_value"] == "1"
+    assert result["status_redirect_public_count_marker_value"] == "1"
+    assert result["downloads_version_marker_matches_served_manifest"] is True
+    assert result["status_redirect_version_marker_matches_served_manifest"] is True
+    assert result["downloads_generation_matches_served_manifest"] is True
+    assert result["status_redirect_generation_matches_served_manifest"] is True
+    assert result["downloads_public_download_count"] == 1
+    assert result["status_redirect_public_download_count"] == 1
+    assert result["surface_public_download_counts_match"] is True
+    assert result["release_manifest_schema"] == "chummer.release-channel/v1"
+    assert result["release_manifest_schema_aliases_consistent"] is True
+    assert result["release_manifest_artifact_count"] == 1
+    assert result["compatibility_manifest_public_download_count"] == 1
+    assert result["compatibility_manifest_version_matches_canonical"] is True
+    assert result["compatibility_manifest_generation_matches_canonical"] is True
+    assert result["downloads_public_count_matches_compatibility_manifest"] is True
+    assert result["status_redirect_public_count_matches_compatibility_manifest"] is True
+    assert result["downloads_visible_version_texts"] == [
+        "Version 2026.06.30"
+    ]
+    assert result["downloads_visible_labels_match_marker"] is True
     assert result["downloads_version_text"] == "Version 2026.06.30"
     assert result["status_redirect_version_text"] == "Version run-20260630"
     assert result["status_redirect_heading"] == "Stable downloads"
     assert result["status_redirect_heading_recognized"] is True
-    assert result["status_redirect_heading_expected"] is None
-    assert result["status_redirect_heading_matches_release_channel"] is None
+    assert result["status_redirect_heading_expected"] == "Stable downloads"
+    assert result["status_redirect_heading_matches_release_channel"] is True
     assert result["status_redirect_heading_uses_generic_updated_copy"] is False
+
+
+def test_live_contract_rejects_generation_drift_from_served_manifest() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        marker_generation_value="g-stale",
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["release_manifest_generation"] == "g-20260630-test"
+    assert result["downloads_generation_matches_served_manifest"] is False
+    assert result["status_redirect_generation_matches_served_manifest"] is False
+    assert (
+        "/downloads data-downloads-release-generation does not match served RELEASE_CHANNEL"
+        in failures
+    )
+    assert (
+        "/status data-downloads-release-generation does not match served RELEASE_CHANNEL"
+        in failures
+    )
+
+
+def test_live_contract_rejects_html_count_that_only_matches_other_html_surface() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        release_public_download_count=2,
+        marker_public_count_value="1",
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["release_manifest_schema"] == "chummer.release-channel/v1"
+    assert result["release_manifest_artifact_count"] == 2
+    assert result["compatibility_manifest_public_download_count"] == 2
+    assert result["surface_public_download_counts_match"] is True
+    assert result["downloads_public_count_matches_compatibility_manifest"] is False
+    assert result["status_redirect_public_count_matches_compatibility_manifest"] is False
+    assert (
+        "/downloads data-downloads-public-count does not match anonymous "
+        "/downloads/releases.json"
+        in failures
+    )
+    assert (
+        "/status data-downloads-public-count does not match anonymous "
+        "/downloads/releases.json"
+        in failures
+    )
+
+
+def test_live_contract_rejects_compatibility_manifest_identity_drift() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        compatibility_manifest_overrides={
+            "version": "run-stale",
+            "generationId": "g-stale",
+        },
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["compatibility_manifest_version_matches_canonical"] is False
+    assert result["compatibility_manifest_generation_matches_canonical"] is False
+    assert (
+        "/downloads/releases.json version does not match served RELEASE_CHANNEL"
+        in failures
+    )
+    assert (
+        "/downloads/releases.json generationId does not match served "
+        "RELEASE_CHANNEL"
+        in failures
+    )
+
+
+def test_live_contract_rejects_empty_v1_identity_and_legacy_marker() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_visible_version_text="Version legacy",
+        marker_value="Version legacy",
+        marker_generation_value="legacy",
+        release_manifest_overrides={
+            "version": "",
+            "generationId": "",
+        },
+        compatibility_manifest_overrides={
+            "version": "",
+            "generationId": "",
+        },
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["release_manifest_version"] == ""
+    assert result["release_manifest_generation"] == ""
+    assert result["compatibility_manifest_version"] == ""
+    assert result["compatibility_manifest_generation"] == ""
+    assert result["compatibility_manifest_version_matches_canonical"] is False
+    assert result["compatibility_manifest_generation_matches_canonical"] is False
+    assert (
+        "/downloads/RELEASE_CHANNEL.generated.json version is empty"
+        in failures
+    )
+    assert (
+        "/downloads/RELEASE_CHANNEL.generated.json generationId is empty"
+        in failures
+    )
+    assert "/downloads/releases.json version is empty" in failures
+    assert "/downloads/releases.json generationId is empty" in failures
+
+
+def test_live_contract_rejects_conflicting_canonical_schema_aliases() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        release_manifest_overrides={
+            "schema": "chummer.release-channel/v2",
+        },
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["release_manifest_schema"] == ""
+    assert result["release_manifest_schema_aliases"] == {
+        "schema": "chummer.release-channel/v2",
+        "schemaVersion": "chummer.release-channel/v1",
+    }
+    assert result["release_manifest_schema_aliases_consistent"] is False
+    assert (
+        "/downloads/RELEASE_CHANNEL.generated.json schema aliases conflict"
+        in failures
+    )
+
+
+def test_live_contract_rejects_marker_version_suffix() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        marker_value="Version run-20260630 stale",
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert (
+        result["downloads_version_marker_value"]
+        == "Version run-20260630 stale"
+    )
+    assert result["downloads_version_marker_matches_served_manifest"] is False
+    assert (
+        "/downloads data-downloads-release-version is not a Version value"
+        in failures
+    )
+
+
+def test_live_contract_single_decodes_and_rejects_double_encoded_marker() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        marker_value="Version run-20260630&amp;#x20;stale",
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert (
+        result["downloads_version_marker_value"]
+        == "Version run-20260630&#x20;stale"
+    )
+    assert result["downloads_marker_text_matches_identity"] is True
+    assert result["downloads_version_marker_matches_served_manifest"] is False
+    assert (
+        "/downloads data-downloads-release-version does not match served "
+        "RELEASE_CHANNEL"
+        in failures
+    )
+
+
+def test_live_contract_rejects_any_stale_visible_downloads_version_label() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_visible_version_texts=(
+            "Version 2026.06.30",
+            "Version 2026.06.29",
+        ),
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_visible_version_texts"] == [
+        "Version 2026.06.30",
+        "Version 2026.06.29",
+    ]
+    assert result["downloads_visible_labels_match_marker"] is False
+    assert (
+        "/downloads visible .downloads-version labels do not agree with the "
+        "unique release marker"
+        in failures
+    )
+
+
+def test_live_contract_rejects_stale_and_current_duplicate_markers() -> None:
+    module = load_module()
+    stale_marker = release_marker_html(
+        "Version run-20260629",
+        "g-stale",
+        "1",
+    )
+    current_marker = release_marker_html(
+        "Version run-20260630",
+        "g-20260630-test",
+        "1",
+    )
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_marker_html=stale_marker + current_marker,
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_marker_count"] == 2
+    assert result["downloads_marker_required_attribute_counts"] == {
+        "data-downloads-release-version": 2,
+        "data-downloads-release-generation": 2,
+        "data-downloads-public-count": 2,
+    }
+    assert (
+        "/downloads must contain exactly one downloads release marker; found 2"
+        in failures
+    )
+
+
+def test_live_contract_rejects_duplicate_required_marker_attribute() -> None:
+    module = load_module()
+    duplicate_attribute_marker = (
+        '<span data-downloads-release-version="Version run-20260630" '
+        'data-downloads-release-version="Version run-20260630" '
+        'data-downloads-release-generation="g-20260630-test" '
+        'data-downloads-public-count="1" hidden>'
+        "Version run-20260630 | Generation g-20260630-test | "
+        "Public downloads 1</span>"
+    )
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_marker_html=duplicate_attribute_marker,
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_marker_count"] == 1
+    assert result["downloads_marker_required_attribute_counts"][
+        "data-downloads-release-version"
+    ] == 2
+    assert (
+        "/downloads downloads release marker must contain exactly one "
+        "data-downloads-release-version attribute; found 2"
+        in failures
+    )
+
+
+def test_live_contract_rejects_marker_text_that_disagrees_with_attributes() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        downloads_marker_html=release_marker_html(
+            "Version run-20260630",
+            "g-20260630-test",
+            "1",
+            text=(
+                "Version run-stale | Generation g-stale | "
+                "Public downloads 99"
+            ),
+        ),
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_marker_count"] == 1
+    assert result["downloads_marker_text_matches_identity"] is False
+    assert (
+        "/downloads downloads release marker text does not match its "
+        "version, generation, and public count attributes"
+        in failures
+    )
+
+
+def test_live_contract_accepts_public_only_empty_state_for_filtered_shelf() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        status_heading="Downloads paused",
+        release_public_download_count=0,
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert failures == []
+    assert result["downloads_public_count_marker_value"] == "0"
+    assert result["downloads_public_download_count"] == 0
+    assert result["surface_public_download_counts_match"] is True
+
+
+def test_live_contract_rejects_empty_marker_without_empty_state_copy() -> None:
+    module = load_module()
+    server, thread, base_url = with_server(
+        include_marker=True,
+        marker_public_count_value="0",
+    )
+    try:
+        result, failures = module.verify_live(base_url, timeout=5)
+    finally:
+        close_server(server, thread)
+
+    assert result["downloads_public_download_count"] == 0
+    assert (
+        "/downloads missing public-only empty-state copy for a filtered empty shelf"
+        in failures
+    )
 
 
 def test_expected_status_heading_requires_full_stable_public_tuple() -> None:
