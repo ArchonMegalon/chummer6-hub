@@ -99,7 +99,7 @@ MAX_TICKET_DIGEST_AUTHORITY_BYTES = 8192
 MAX_PUBLIC_BODY_BYTES = 4 * 1024 * 1024
 MAX_HISTORY_BYTES = 4 * 1024 * 1024
 MAX_BOOTSTRAP_AUTHORITY_BYTES = 256 * 1024
-MAX_EDGE_WAF_CONTROL_PLANE_BYTES = 4 * 1024 * 1024
+MAX_EDGE_WAF_LOCAL_EVIDENCE_BYTES = 4 * 1024 * 1024
 ACTIVE_RUNTIME_AUTHORITY_FIELDS = {
     "contractName",
     "generatedAtUtc",
@@ -194,6 +194,7 @@ class TicketMaterializationAuthority:
     recipient_certificate_sha256: str
     signer_certificate_sha256: str
     openssl_executable_sha256: str
+    materialization_openssl_executable_sha256: str
     materialization_transaction_id: str
 
 
@@ -259,6 +260,10 @@ class RuntimeAuthority(Protocol):
 
     def portal_container_ids(self) -> tuple[str, ...]: ...
 
+    def independently_enumerated_portal_container_ids(
+        self,
+    ) -> tuple[str, ...]: ...
+
     def inspect_portal(self, container_id: str) -> PortalEvidence: ...
 
     def tunnel_evidence(self) -> tuple[TunnelEvidence, ...]: ...
@@ -277,7 +282,17 @@ class RuntimeAuthority(Protocol):
 
     def quiesce_portals(self, container_ids: tuple[str, ...]) -> None: ...
 
+    def quiesce_known_portals(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None: ...
+
     def assert_portals_stopped(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None: ...
+
+    def assert_known_portals_stopped(
         self,
         container_ids: tuple[str, ...],
     ) -> None: ...
@@ -672,18 +687,18 @@ def verify_proof_bind_source(request: RotationRequest) -> None:
         raise RotationError("proof_bind_source_sha256_mismatch")
 
 
-def verify_edge_waf_control_plane_source(
+def verify_edge_waf_local_evidence_source(
     request: RotationRequest,
 ) -> str:
     payload = read_trusted_regular_file(
-        request.edge_waf_control_plane_source,
-        label="edge_waf_control_plane_source",
-        maximum_bytes=MAX_EDGE_WAF_CONTROL_PLANE_BYTES,
+        request.edge_waf_local_evidence_source,
+        label="edge_waf_local_evidence_source",
+        maximum_bytes=MAX_EDGE_WAF_LOCAL_EVIDENCE_BYTES,
     )
     actual_sha256 = sha256_bytes(payload)
-    if actual_sha256 != request.expected_edge_waf_control_plane_sha256:
+    if actual_sha256 != request.expected_edge_waf_local_evidence_sha256:
         raise RotationError(
-            "edge_waf_control_plane_fingerprint_mismatch"
+            "edge_waf_local_evidence_sha256_mismatch"
         )
     return actual_sha256
 
@@ -1027,19 +1042,18 @@ def read_active_runtime_authority(
         or set(portal) != ACTIVE_RUNTIME_PORTAL_FIELDS
         or portal.get("existed") is not True
         or portal.get("wasRunning") is not True
-        or CONTAINER_ID.fullmatch(str(portal.get("containerId") or "")) is None
-        or SAFE_CONTAINER_NAME.fullmatch(
-            str(portal.get("containerName") or "")
-        )
+        or type(portal.get("containerId")) is not str
+        or CONTAINER_ID.fullmatch(portal["containerId"]) is None
+        or type(portal.get("containerName")) is not str
+        or SAFE_CONTAINER_NAME.fullmatch(portal["containerName"])
         is None
-        or IMAGE_ID.fullmatch(str(portal.get("imageId") or "")) is None
-        or LOWER_SHA256.fullmatch(
-            str(portal.get("proofAuthorityMountSha256") or "")
-        )
+        or type(portal.get("imageId")) is not str
+        or IMAGE_ID.fullmatch(portal["imageId"]) is None
+        or type(portal.get("proofAuthorityMountSha256")) is not str
+        or LOWER_SHA256.fullmatch(portal["proofAuthorityMountSha256"])
         is None
-        or LOWER_SHA256.fullmatch(
-            str(portal.get("proofPublicMountSha256") or "")
-        )
+        or type(portal.get("proofPublicMountSha256")) is not str
+        or LOWER_SHA256.fullmatch(portal["proofPublicMountSha256"])
         is None
     ):
         raise RotationError("active_runtime_authority_contract_invalid")
@@ -1057,7 +1071,8 @@ def read_active_runtime_authority(
         if (
             not isinstance(readiness_path, str)
             or not Path(readiness_path).is_absolute()
-            or LOWER_SHA256.fullmatch(str(readiness_sha256 or "")) is None
+            or type(readiness_sha256) is not str
+            or LOWER_SHA256.fullmatch(readiness_sha256) is None
         ):
             raise RotationError("active_runtime_authority_contract_invalid")
     return parsed, sha256_bytes(payload)
@@ -1118,6 +1133,13 @@ def incident_ticket_commitment_sha256(
             "imageId": request.expected_image_id,
             "newEpochSha256": sha256_text(request.new_epoch),
             "proofBindSourceSha256": request.expected_proof_sha256,
+            "opensslExecutableSha256": (
+                request.old_ticket_authority.openssl_executable_sha256
+            ),
+            "materializationOpensslExecutableSha256": (
+                request.old_ticket_authority
+                .materialization_openssl_executable_sha256
+            ),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -1161,8 +1183,8 @@ def rotation_intent_sha256(
             "epochHistoryBootstrapMarkerPath": str(
                 request.epoch_history_bootstrap_marker
             ),
-            "edgeWafControlPlaneFingerprintSha256": (
-                request.expected_edge_waf_control_plane_sha256
+            "edgeWafLocalEvidenceSha256": (
+                request.expected_edge_waf_local_evidence_sha256
             ),
             "incidentTicketCommitmentSha256": (
                 incident_ticket_commitment
@@ -1680,7 +1702,7 @@ def publish_epoch_authority(
     epoch_history_sha256: str,
     epoch_history_head_event_sha256: str,
     epoch_history_bootstrap_marker_sha256: str,
-    edge_waf_control_plane_fingerprint_sha256: str,
+    edge_waf_local_evidence_sha256: str,
 ) -> str:
     storage_sha256 = sha256_bytes(
         json.dumps(
@@ -1717,8 +1739,8 @@ def publish_epoch_authority(
         "epochHistoryBootstrapMarkerSha256": (
             epoch_history_bootstrap_marker_sha256
         ),
-        "edgeWafControlPlaneFingerprintSha256": (
-            edge_waf_control_plane_fingerprint_sha256
+        "edgeWafLocalEvidenceSha256": (
+            edge_waf_local_evidence_sha256
         ),
         "portalContainerId": portal.container_id,
         "portalContainerName": portal.container_name,
@@ -1729,7 +1751,8 @@ def publish_epoch_authority(
         "rotationReceiptPath": str(request.output),
         "rotationReceiptSha256": rotation_receipt_sha256,
         "edgeWafMutationPerformed": False,
-        "edgeWafPreservedThroughPostVerification": True,
+        "edgeWafLocalEvidenceStableThroughPostVerification": True,
+        "edgeWafLiveControlPlaneVerified": False,
     }
     return atomic_write_private_json(request.epoch_authority_output, payload)
 
@@ -1758,8 +1781,8 @@ class RotationRequest:
     expected_epoch_history_bootstrap_authority_sha256: str
     epoch_history_bootstrap_marker: Path
     expected_epoch_history_bootstrap_marker_sha256: str
-    edge_waf_control_plane_source: Path
-    expected_edge_waf_control_plane_sha256: str
+    edge_waf_local_evidence_source: Path
+    expected_edge_waf_local_evidence_sha256: str
 
 
 def _base_receipt(
@@ -1817,14 +1840,16 @@ def _base_receipt(
             "httpStatus": None,
             "status": "pending" if request.old_ticket_path is not None else "not_supplied",
         },
-        "edgeWaf": {
+        "edgeWafLocalEvidence": {
+            "evidenceScope": "pinned_local_evidence_only",
             "mutationAuthorized": False,
             "mutationPerformed": False,
-            "preservedThroughPostVerification": False,
-            "controlPlaneFingerprintSha256Before": (
-                request.expected_edge_waf_control_plane_sha256
+            "stableThroughPostVerification": False,
+            "sha256Before": (
+                request.expected_edge_waf_local_evidence_sha256
             ),
-            "controlPlaneFingerprintSha256After": "",
+            "sha256After": "",
+            "liveControlPlaneVerified": False,
         },
         "recreated": False,
         "failureContainment": {
@@ -1851,8 +1876,8 @@ def _validate_request(request: RotationRequest) -> None:
         "epoch_history_bootstrap_marker": (
             request.epoch_history_bootstrap_marker
         ),
-        "edge_waf_control_plane_source": (
-            request.edge_waf_control_plane_source
+        "edge_waf_local_evidence_source": (
+            request.edge_waf_local_evidence_source
         ),
     }
     if request.old_ticket_path is not None:
@@ -1874,7 +1899,7 @@ def _validate_request(request: RotationRequest) -> None:
         request.active_runtime_authority,
         request.proof_bind_source,
         request.epoch_history_bootstrap_authority,
-        request.edge_waf_control_plane_source,
+        request.edge_waf_local_evidence_source,
         request.old_ticket_path,
     }:
         raise RotationError("rotation_authority_paths_overlap")
@@ -1937,7 +1962,8 @@ def _validate_request(request: RotationRequest) -> None:
         or ticket_authority.ticket_size_bytes < 1
         or ticket_authority.ticket_size_bytes > MAX_TICKET_BYTES
         or any(
-            LOWER_SHA256.fullmatch(value) is None
+            type(value) is not str
+            or LOWER_SHA256.fullmatch(value) is None
             for value in (
                 ticket_authority.ticket_path_sha256,
                 ticket_authority.ticket_sha256,
@@ -1946,8 +1972,10 @@ def _validate_request(request: RotationRequest) -> None:
                 ticket_authority.recipient_certificate_sha256,
                 ticket_authority.signer_certificate_sha256,
                 ticket_authority.openssl_executable_sha256,
+                ticket_authority.materialization_openssl_executable_sha256,
             )
         )
+        or type(ticket_authority.materialization_transaction_id) is not str
         or SAFE_TRANSACTION_ID.fullmatch(
             ticket_authority.materialization_transaction_id
         )
@@ -1972,10 +2000,10 @@ def _validate_request(request: RotationRequest) -> None:
             "epoch_history_bootstrap_marker_sha256_invalid"
         )
     if LOWER_SHA256.fullmatch(
-        request.expected_edge_waf_control_plane_sha256
+        request.expected_edge_waf_local_evidence_sha256
     ) is None:
         raise RotationError(
-            "edge_waf_control_plane_fingerprint_invalid"
+            "edge_waf_local_evidence_sha256_invalid"
         )
 
 
@@ -2018,7 +2046,7 @@ ROTATION_RECEIPT_FIELDS = {
     "publicGetChecksBefore",
     "publicGetChecksAfter",
     "oldTicketRevocationProof",
-    "edgeWaf",
+    "edgeWafLocalEvidence",
     "recreated",
     "failureContainment",
     "rollbackPolicy",
@@ -2350,28 +2378,32 @@ def validate_rotation_receipt_types(receipt: dict[str, Any]) -> None:
                 else None
             )
             _require_receipt_string(proof[key], pattern=pattern)
-    edge_waf = receipt["edgeWaf"]
+    edge_waf = receipt["edgeWafLocalEvidence"]
     if (
         not isinstance(edge_waf, dict)
         or set(edge_waf)
         != {
+            "evidenceScope",
             "mutationAuthorized",
             "mutationPerformed",
-            "preservedThroughPostVerification",
-            "controlPlaneFingerprintSha256Before",
-            "controlPlaneFingerprintSha256After",
+            "stableThroughPostVerification",
+            "sha256Before",
+            "sha256After",
+            "liveControlPlaneVerified",
         }
-        or type(edge_waf["mutationAuthorized"]) is not bool
-        or type(edge_waf["mutationPerformed"]) is not bool
-        or type(edge_waf["preservedThroughPostVerification"]) is not bool
+        or edge_waf["evidenceScope"] != "pinned_local_evidence_only"
+        or edge_waf["mutationAuthorized"] is not False
+        or edge_waf["mutationPerformed"] is not False
+        or type(edge_waf["stableThroughPostVerification"]) is not bool
+        or edge_waf["liveControlPlaneVerified"] is not False
     ):
         raise RotationError("receipt_types_invalid")
     _require_receipt_string(
-        edge_waf["controlPlaneFingerprintSha256Before"],
+        edge_waf["sha256Before"],
         pattern=LOWER_SHA256,
     )
     _require_receipt_string(
-        edge_waf["controlPlaneFingerprintSha256After"],
+        edge_waf["sha256After"],
         pattern=LOWER_SHA256,
         allow_empty=True,
     )
@@ -2417,11 +2449,14 @@ def _validate_resume_receipt(
     }
     if any(receipt.get(key) != value for key, value in expected.items()):
         raise RotationError("resume_receipt_authority_mismatch")
-    edge_waf = receipt.get("edgeWaf")
+    edge_waf = receipt.get("edgeWafLocalEvidence")
     if (
         not isinstance(edge_waf, dict)
-        or edge_waf.get("controlPlaneFingerprintSha256Before")
-        != request.expected_edge_waf_control_plane_sha256
+        or edge_waf.get("sha256Before")
+        != request.expected_edge_waf_local_evidence_sha256
+        or edge_waf.get("evidenceScope")
+        != "pinned_local_evidence_only"
+        or edge_waf.get("liveControlPlaneVerified") is not False
     ):
         raise RotationError("resume_waf_authority_mismatch")
     proof = receipt.get("oldTicketRevocationProof")
@@ -2451,27 +2486,65 @@ def observe_epoch_boundary(request: RotationRequest) -> tuple[int, str]:
 
 def fail_closed_contain_precommit_portals(
     runtime: RuntimeAuthority,
+    *,
+    durable_prior_ids: tuple[str, ...],
 ) -> dict[str, bool]:
+    durable_prior_ids_valid = not (
+        not durable_prior_ids
+        or len(set(durable_prior_ids)) != len(durable_prior_ids)
+        or any(
+            CONTAINER_ID.fullmatch(identity) is None
+            for identity in durable_prior_ids
+        )
+    )
+    relevant_identities = set(durable_prior_ids)
     last_error: Exception | None = None
     for _attempt in range(3):
+        if not durable_prior_ids_valid:
+            last_error = RotationError(
+                "precommit_durable_portal_identities_invalid"
+            )
+            break
         try:
-            identities = runtime.portal_container_ids()
-            if not identities:
-                return {
-                    "portalQuiescenceProven": True,
-                    "publicConnectorsStopped": False,
-                }
-            try:
-                runtime.quiesce_portals(identities)
-            except Exception as exc:
-                last_error = exc
-            observed = runtime.portal_container_ids()
-            if set(observed) != set(identities):
-                last_error = RotationError(
-                    "portal_requiescence_identity_drift"
+            project_identities = runtime.portal_container_ids()
+            independent_identities = (
+                runtime.independently_enumerated_portal_container_ids()
+            )
+            observed_identities = (
+                *project_identities,
+                *independent_identities,
+            )
+            if any(
+                CONTAINER_ID.fullmatch(identity) is None
+                for identity in observed_identities
+            ):
+                raise RotationError(
+                    "portal_requiescence_identity_invalid"
                 )
+            relevant_identities.update(observed_identities)
+            ordered_identities = tuple(sorted(relevant_identities))
+            runtime.quiesce_known_portals(ordered_identities)
+            runtime.assert_known_portals_stopped(ordered_identities)
+
+            project_after = runtime.portal_container_ids()
+            independent_after = (
+                runtime.independently_enumerated_portal_container_ids()
+            )
+            after_identities = set((*project_after, *independent_after))
+            if any(
+                CONTAINER_ID.fullmatch(identity) is None
+                for identity in after_identities
+            ):
+                raise RotationError(
+                    "portal_requiescence_identity_invalid"
+                )
+            newly_observed = after_identities - relevant_identities
+            if newly_observed:
+                relevant_identities.update(newly_observed)
                 continue
-            runtime.assert_portals_stopped(observed)
+            runtime.assert_known_portals_stopped(
+                tuple(sorted(relevant_identities))
+            )
             return {
                 "portalQuiescenceProven": True,
                 "publicConnectorsStopped": False,
@@ -2525,8 +2598,8 @@ def run_rotation(
             request.expected_epoch_history_bootstrap_authority_sha256
         ),
     )
-    edge_waf_control_plane_fingerprint_sha256 = (
-        verify_edge_waf_control_plane_source(request)
+    edge_waf_local_evidence_sha256 = (
+        verify_edge_waf_local_evidence_source(request)
     )
 
     existing_receipt = request.output.exists() or request.output.is_symlink()
@@ -2587,11 +2660,11 @@ def run_rotation(
             inherited_token=request.shared_mutation_lock_token,
         ):
             if (
-                verify_edge_waf_control_plane_source(request)
-                != edge_waf_control_plane_fingerprint_sha256
+                verify_edge_waf_local_evidence_source(request)
+                != edge_waf_local_evidence_sha256
             ):
                 raise RotationError(
-                    "edge_waf_control_plane_fingerprint_drift"
+                    "edge_waf_local_evidence_drift"
                 )
             if runtime.resolve_image_id(request.image_tag) != request.expected_image_id:
                 raise RotationError("pinned_image_tag_drift")
@@ -2809,14 +2882,18 @@ def run_rotation(
                             portals_before,
                         ),
                         "publicGetChecksBefore": verify_public_gets(runtime),
-                        "edgeWaf": {
+                        "edgeWafLocalEvidence": {
+                            "evidenceScope": (
+                                "pinned_local_evidence_only"
+                            ),
                             "mutationAuthorized": False,
                             "mutationPerformed": False,
-                            "preservedThroughPostVerification": False,
-                            "controlPlaneFingerprintSha256Before": (
-                                edge_waf_control_plane_fingerprint_sha256
+                            "stableThroughPostVerification": False,
+                            "sha256Before": (
+                                edge_waf_local_evidence_sha256
                             ),
-                            "controlPlaneFingerprintSha256After": "",
+                            "sha256After": "",
+                            "liveControlPlaneVerified": False,
                         },
                     }
                 )
@@ -3141,26 +3218,28 @@ def run_rotation(
                 }
             )
             atomic_write_private_json(request.output, receipt)
-            final_waf_control_plane_fingerprint_sha256 = (
-                verify_edge_waf_control_plane_source(request)
+            final_waf_local_evidence_sha256 = (
+                verify_edge_waf_local_evidence_source(request)
             )
             if (
-                final_waf_control_plane_fingerprint_sha256
-                != edge_waf_control_plane_fingerprint_sha256
+                final_waf_local_evidence_sha256
+                != edge_waf_local_evidence_sha256
             ):
                 raise RotationError(
-                    "edge_waf_control_plane_fingerprint_drift"
+                    "edge_waf_local_evidence_drift"
                 )
-            receipt["edgeWaf"] = {
+            receipt["edgeWafLocalEvidence"] = {
+                "evidenceScope": "pinned_local_evidence_only",
                 "mutationAuthorized": False,
                 "mutationPerformed": False,
-                "preservedThroughPostVerification": True,
-                "controlPlaneFingerprintSha256Before": (
-                    edge_waf_control_plane_fingerprint_sha256
+                "stableThroughPostVerification": True,
+                "sha256Before": (
+                    edge_waf_local_evidence_sha256
                 ),
-                "controlPlaneFingerprintSha256After": (
-                    final_waf_control_plane_fingerprint_sha256
+                "sha256After": (
+                    final_waf_local_evidence_sha256
                 ),
+                "liveControlPlaneVerified": False,
             }
             atomic_write_private_json(request.output, receipt)
             proof_ticket_authority = revalidate_old_ticket_authority(
@@ -3226,16 +3305,20 @@ def run_rotation(
                     "phase": "post_rotation_verified",
                     "updatedAtUtc": now_iso(),
                     "oldTicketRevocationProof": old_ticket_proof,
-                    "edgeWaf": {
+                    "edgeWafLocalEvidence": {
+                        "evidenceScope": (
+                            "pinned_local_evidence_only"
+                        ),
                         "mutationAuthorized": False,
                         "mutationPerformed": False,
-                        "preservedThroughPostVerification": True,
-                        "controlPlaneFingerprintSha256Before": (
-                            edge_waf_control_plane_fingerprint_sha256
+                        "stableThroughPostVerification": True,
+                        "sha256Before": (
+                            edge_waf_local_evidence_sha256
                         ),
-                        "controlPlaneFingerprintSha256After": (
-                            final_waf_control_plane_fingerprint_sha256
+                        "sha256After": (
+                            final_waf_local_evidence_sha256
                         ),
+                        "liveControlPlaneVerified": False,
                     },
                     "failureCode": "",
                 }
@@ -3259,8 +3342,8 @@ def run_rotation(
                 epoch_history_bootstrap_marker_sha256=(
                     verified_marker_sha256
                 ),
-                edge_waf_control_plane_fingerprint_sha256=(
-                    final_waf_control_plane_fingerprint_sha256
+                edge_waf_local_evidence_sha256=(
+                    final_waf_local_evidence_sha256
                 ),
             )
             return 0, receipt
@@ -3284,8 +3367,19 @@ def run_rotation(
                 code = "precommit_portal_restart_failed"
                 try:
                     receipt["failureContainment"] = (
-                        fail_closed_contain_precommit_portals(runtime)
+                        fail_closed_contain_precommit_portals(
+                            runtime,
+                            durable_prior_ids=prior_ids_for_recovery,
+                        )
                     )
+                    if not receipt["failureContainment"][
+                        "portalQuiescenceProven"
+                    ]:
+                        failure_status = 70
+                        code = (
+                            "precommit_portal_quiescence_unproven_"
+                            "connectors_stopped"
+                        )
                 except Exception:
                     failure_status = 70
                     code = (
@@ -3294,21 +3388,22 @@ def run_rotation(
         fail_forward_required = failure_status == 76
         if fail_forward_required and observed_environment_sha256:
             receipt["environmentSha256After"] = observed_environment_sha256
-        recorded_waf = receipt.get("edgeWaf")
-        waf_preserved_through_postverification = (
+        recorded_waf = receipt.get("edgeWafLocalEvidence")
+        waf_local_evidence_stable = (
             isinstance(recorded_waf, dict)
-            and recorded_waf.get(
-                "controlPlaneFingerprintSha256Before"
-            )
-            == edge_waf_control_plane_fingerprint_sha256
-            and recorded_waf.get(
-                "controlPlaneFingerprintSha256After"
-            )
-            == edge_waf_control_plane_fingerprint_sha256
-            and recorded_waf.get(
-                "preservedThroughPostVerification"
-            )
+            and recorded_waf.get("sha256Before")
+            == edge_waf_local_evidence_sha256
+            and recorded_waf.get("sha256After")
+            == edge_waf_local_evidence_sha256
+            and recorded_waf.get("stableThroughPostVerification")
             is True
+            and recorded_waf.get("liveControlPlaneVerified") is False
+        )
+        failure_containment = receipt.get("failureContainment")
+        connectors_stopped_containment = (
+            isinstance(failure_containment, dict)
+            and failure_containment.get("portalQuiescenceProven") is False
+            and failure_containment.get("publicConnectorsStopped") is True
         )
         prior_phase = str(receipt.get("phase") or "")
         if fail_forward_required:
@@ -3326,6 +3421,8 @@ def run_rotation(
             )
         elif failure_status == 75:
             failure_phase = "precommit_failed"
+        elif connectors_stopped_containment:
+            failure_phase = "precommit_public_connectors_stopped"
         else:
             failure_phase = "precommit_emergency_containment_unproven"
         receipt.update(
@@ -3336,26 +3433,32 @@ def run_rotation(
                     else (
                         "failed_before_epoch_commit"
                         if failure_status == 75
-                        else "emergency_containment_unproven"
+                        else (
+                            "emergency_public_connectors_stopped"
+                            if connectors_stopped_containment
+                            else "emergency_containment_unproven"
+                        )
                     )
                 ),
                 "phase": failure_phase,
                 "updatedAtUtc": now_iso(),
                 "failureCode": code,
-                "edgeWaf": {
+                "edgeWafLocalEvidence": {
+                    "evidenceScope": "pinned_local_evidence_only",
                     "mutationAuthorized": False,
                     "mutationPerformed": False,
-                    "preservedThroughPostVerification": (
-                        waf_preserved_through_postverification
+                    "stableThroughPostVerification": (
+                        waf_local_evidence_stable
                     ),
-                    "controlPlaneFingerprintSha256Before": (
-                        edge_waf_control_plane_fingerprint_sha256
+                    "sha256Before": (
+                        edge_waf_local_evidence_sha256
                     ),
-                    "controlPlaneFingerprintSha256After": (
-                        edge_waf_control_plane_fingerprint_sha256
-                        if waf_preserved_through_postverification
+                    "sha256After": (
+                        edge_waf_local_evidence_sha256
+                        if waf_local_evidence_stable
                         else ""
                     ),
+                    "liveControlPlaneVerified": False,
                 },
             }
         )
@@ -3502,6 +3605,28 @@ class DockerRuntime:
             f"label=com.docker.compose.service={PORTAL_SERVICE}",
         ).decode("ascii", errors="strict")
         return tuple(line for line in output.splitlines() if line)
+
+    def independently_enumerated_portal_container_ids(
+        self,
+    ) -> tuple[str, ...]:
+        output = self._compose(
+            "ps",
+            "--all",
+            "--quiet",
+            PORTAL_SERVICE,
+        ).decode("ascii", errors="strict")
+        identities = tuple(line for line in output.splitlines() if line)
+        if (
+            len(set(identities)) != len(identities)
+            or any(
+                CONTAINER_ID.fullmatch(identity) is None
+                for identity in identities
+            )
+        ):
+            raise RotationError(
+                "independent_portal_enumeration_invalid"
+            )
+        return identities
 
     def _inspect_text(self, container_id: str, template: str) -> str:
         return self._docker(
@@ -3984,6 +4109,67 @@ printf '%s|%s|%s|%s\n' "$target" "$metadata" "$key_count" "$encrypted_count"
             ):
                 raise RotationError("portal_quiescence_not_proven")
 
+    def assert_known_portals_stopped(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None:
+        if (
+            not container_ids
+            or len(set(container_ids)) != len(container_ids)
+            or any(
+                CONTAINER_ID.fullmatch(value) is None
+                for value in container_ids
+            )
+        ):
+            raise RotationError(
+                "known_portal_quiescence_identity_invalid"
+            )
+        for container_id in container_ids:
+            if (
+                self._inspect_text(container_id, "{{.Id}}")
+                != container_id
+                or self._inspect_text(
+                    container_id,
+                    "{{.State.Running}}",
+                )
+                != "false"
+            ):
+                raise RotationError(
+                    "known_portal_quiescence_not_proven"
+                )
+
+    def quiesce_known_portals(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None:
+        if (
+            not container_ids
+            or len(set(container_ids)) != len(container_ids)
+            or any(
+                CONTAINER_ID.fullmatch(value) is None
+                for value in container_ids
+            )
+        ):
+            raise RotationError(
+                "known_portal_quiescence_identity_invalid"
+            )
+        for container_id in container_ids:
+            if self._inspect_text(container_id, "{{.Id}}") != container_id:
+                raise RotationError(
+                    "known_portal_quiescence_identity_drift"
+                )
+            running = self._inspect_text(
+                container_id,
+                "{{.State.Running}}",
+            )
+            if running == "true":
+                self._docker("container", "stop", container_id, timeout=90)
+            elif running != "false":
+                raise RotationError(
+                    "known_portal_quiescence_state_invalid"
+                )
+        self.assert_known_portals_stopped(container_ids)
+
     def quiesce_portals(self, container_ids: tuple[str, ...]) -> None:
         if (
             not container_ids
@@ -4266,6 +4452,7 @@ def read_old_ticket_authority(
         "recipientCertificateSha256",
         "signerCertificateSha256",
         "opensslExecutableSha256",
+        "materializationOpensslExecutableSha256",
         "materializationTransactionId",
         "quarantineStatus",
         "revocationStatus",
@@ -4278,6 +4465,7 @@ def read_old_ticket_authority(
         "recipientCertificateSha256",
         "signerCertificateSha256",
         "opensslExecutableSha256",
+        "materializationOpensslExecutableSha256",
     )
     if (
         set(authority) != expected_fields
@@ -4339,6 +4527,9 @@ def read_old_ticket_authority(
         openssl_executable_sha256=authority[
             "opensslExecutableSha256"
         ],
+        materialization_openssl_executable_sha256=authority[
+            "materializationOpensslExecutableSha256"
+        ],
         materialization_transaction_id=authority[
             "materializationTransactionId"
         ],
@@ -4385,12 +4576,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
     )
     parser.add_argument(
-        "--edge-waf-control-plane-source",
+        "--edge-waf-local-evidence-source",
         type=Path,
         required=True,
     )
     parser.add_argument(
-        "--expected-edge-waf-control-plane-sha256",
+        "--expected-edge-waf-local-evidence-sha256",
         required=True,
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -4506,12 +4697,12 @@ def main(argv: list[str] | None = None) -> int:
             expected_epoch_history_bootstrap_marker_sha256=(
                 args.expected_epoch_history_bootstrap_marker_sha256
             ),
-            edge_waf_control_plane_source=canonical_cli_path(
-                args.edge_waf_control_plane_source,
-                label="edge_waf_control_plane_source",
+            edge_waf_local_evidence_source=canonical_cli_path(
+                args.edge_waf_local_evidence_source,
+                label="edge_waf_local_evidence_source",
             ),
-            expected_edge_waf_control_plane_sha256=(
-                args.expected_edge_waf_control_plane_sha256
+            expected_edge_waf_local_evidence_sha256=(
+                args.expected_edge_waf_local_evidence_sha256
             ),
         )
         runtime = DockerRuntime(

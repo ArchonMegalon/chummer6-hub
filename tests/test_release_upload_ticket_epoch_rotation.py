@@ -63,6 +63,7 @@ def materialize_ticket_authority(
         "recipientCertificateSha256": "a" * 64,
         "signerCertificateSha256": "b" * 64,
         "opensslExecutableSha256": "c" * 64,
+        "materializationOpensslExecutableSha256": "e" * 64,
         "materializationTransactionId": "d" * 32,
         "quarantineStatus": "pending",
         "revocationStatus": "pending",
@@ -98,6 +99,11 @@ class FakeRuntime:
         self.fail_restart_health = False
         self.portal_health_override = ""
         self.block_requiesce_after_restart = False
+        self.hide_project_enumeration = False
+        self.hide_independent_enumeration = False
+        self.rogue_portal_id = "e" * 64
+        self.rogue_portal_exists = False
+        self.rogue_portal_running = False
         self.fail_connector_quiesce = False
         self.connectors_running = True
         self.replace_state_volume_on_recreate = False
@@ -112,7 +118,23 @@ class FakeRuntime:
         return IMAGE_ID
 
     def portal_container_ids(self) -> tuple[str, ...]:
+        if self.hide_project_enumeration and any(
+            action[0] == "restart" for action in self.actions
+        ):
+            return ()
         return (self.portal_id,)
+
+    def independently_enumerated_portal_container_ids(
+        self,
+    ) -> tuple[str, ...]:
+        if self.hide_independent_enumeration and any(
+            action[0] == "restart" for action in self.actions
+        ):
+            return ()
+        identities = [self.portal_id]
+        if self.rogue_portal_exists:
+            identities.append(self.rogue_portal_id)
+        return tuple(identities)
 
     def inspect_portal(self, container_id: str):
         assert container_id == self.portal_id
@@ -212,6 +234,36 @@ class FakeRuntime:
         self.actions.append(("assert-stopped", container_ids))
         if self.portal_running:
             raise self.module.RotationError("portal_quiescence_not_proven")
+
+    def assert_known_portals_stopped(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None:
+        self.actions.append(("assert-known-stopped", container_ids))
+        if self.portal_id in container_ids and self.portal_running:
+            raise self.module.RotationError(
+                "known_portal_quiescence_not_proven"
+            )
+        if (
+            self.rogue_portal_id in container_ids
+            and self.rogue_portal_running
+        ):
+            raise self.module.RotationError(
+                "known_portal_quiescence_not_proven"
+            )
+
+    def quiesce_known_portals(
+        self,
+        container_ids: tuple[str, ...],
+    ) -> None:
+        self.actions.append(("quiesce-known", container_ids))
+        if self.block_requiesce_after_restart:
+            raise self.module.RotationError("injected_requiesce_blocked")
+        if self.portal_id in container_ids:
+            self.portal_running = False
+        if self.rogue_portal_id in container_ids:
+            self.rogue_portal_running = False
+        self.assert_known_portals_stopped(container_ids)
 
     def quiesce_portals(self, container_ids: tuple[str, ...]) -> None:
         assert container_ids == (self.portal_id,)
@@ -386,12 +438,12 @@ def rotation_fixture(tmp_path: Path):
         encoding="utf-8",
     )
     bootstrap_authority.chmod(0o600)
-    waf_control_plane = root / "edge-waf-control-plane.json"
-    waf_control_plane.write_text(
+    waf_local_evidence = root / "edge-waf-local-evidence.json"
+    waf_local_evidence.write_text(
         '{"ruleset":"pinned-release-upload-containment"}\n',
         encoding="utf-8",
     )
-    waf_control_plane.chmod(0o600)
+    waf_local_evidence.chmod(0o600)
     request = module.RotationRequest(
         env_file=env_file,
         active_runtime_authority=active_runtime,
@@ -419,9 +471,9 @@ def rotation_fixture(tmp_path: Path):
             root / "release-upload-ticket-epoch-bootstrap-marker.json"
         ),
         expected_epoch_history_bootstrap_marker_sha256="absent",
-        edge_waf_control_plane_source=waf_control_plane,
-        expected_edge_waf_control_plane_sha256=hashlib.sha256(
-            waf_control_plane.read_bytes()
+        edge_waf_local_evidence_source=waf_local_evidence,
+        expected_edge_waf_local_evidence_sha256=hashlib.sha256(
+            waf_local_evidence.read_bytes()
         ).hexdigest(),
     )
     runtime = FakeRuntime(module, old_epoch=old_epoch, new_epoch=new_epoch)
@@ -475,16 +527,18 @@ def test_rotation_is_atomic_secret_free_and_updates_runtime_authority(
     assert receipt["oldTicketRevocationProof"]["revocationEpochSha256"] == (
         hashlib.sha256(request.new_epoch.encode("utf-8")).hexdigest()
     )
-    assert receipt["edgeWaf"] == {
+    assert receipt["edgeWafLocalEvidence"] == {
+        "evidenceScope": "pinned_local_evidence_only",
         "mutationAuthorized": False,
         "mutationPerformed": False,
-        "preservedThroughPostVerification": True,
-        "controlPlaneFingerprintSha256Before": (
-            request.expected_edge_waf_control_plane_sha256
+        "stableThroughPostVerification": True,
+        "sha256Before": (
+            request.expected_edge_waf_local_evidence_sha256
         ),
-        "controlPlaneFingerprintSha256After": (
-            request.expected_edge_waf_control_plane_sha256
+        "sha256After": (
+            request.expected_edge_waf_local_evidence_sha256
         ),
+        "liveControlPlaneVerified": False,
     }
     assert module.parse_epoch_environment(request.env_file.read_bytes())[0] == (
         request.new_epoch
@@ -515,6 +569,16 @@ def test_rotation_is_atomic_secret_free_and_updates_runtime_authority(
     assert epoch_authority["rotationReceiptSha256"] == hashlib.sha256(
         request.output.read_bytes()
     ).hexdigest()
+    assert epoch_authority["edgeWafLocalEvidenceSha256"] == (
+        request.expected_edge_waf_local_evidence_sha256
+    )
+    assert (
+        epoch_authority[
+            "edgeWafLocalEvidenceStableThroughPostVerification"
+        ]
+        is True
+    )
+    assert epoch_authority["edgeWafLiveControlPlaneVerified"] is False
     assert request.epoch_authority_output.stat().st_mode & 0o777 == 0o600
     history = json.loads(
         request.epoch_history_path.read_text(encoding="utf-8")
@@ -643,7 +707,16 @@ def test_invalid_old_ticket_proof_fails_forward_without_leaking_ticket(
     assert receipt["failureCode"] == "old_ticket_not_revoked"
     assert receipt["status"] == "fail_forward_required"
     assert "hidden-old-ticket" not in request.output.read_text(encoding="utf-8")
-    assert receipt["edgeWaf"]["preservedThroughPostVerification"] is True
+    assert (
+        receipt["edgeWafLocalEvidence"][
+            "stableThroughPostVerification"
+        ]
+        is True
+    )
+    assert (
+        receipt["edgeWafLocalEvidence"]["liveControlPlaneVerified"]
+        is False
+    )
     assert json.loads(
         request.active_runtime_authority.read_text(encoding="utf-8")
     )["portal"]["containerId"] == NEW_PORTAL_ID
@@ -1061,6 +1134,113 @@ def test_ticket_materialization_authority_rejects_bool_size(
         os.close(descriptor)
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "opensslExecutableSha256",
+        "materializationOpensslExecutableSha256",
+    ],
+)
+def test_ticket_materialization_authority_rejects_non_string_openssl_pins(
+    rotation_fixture,
+    field: str,
+) -> None:
+    module, request, _runtime = rotation_fixture
+    invalid_path = (
+        request.output.parent / f"invalid-{field}.json"
+    )
+    authority = json.loads(
+        request.old_ticket_authority.canonical_bytes.decode("utf-8")
+    )
+    authority[field] = int("1" * 64)
+    invalid_path.write_bytes(
+        (
+            json.dumps(
+                authority,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode("utf-8")
+    )
+    invalid_path.chmod(0o600)
+    descriptor = os.open(invalid_path, os.O_RDONLY)
+    try:
+        with pytest.raises(
+            module.RotationError,
+            match="old_ticket_authority_contract_invalid",
+        ):
+            module.read_old_ticket_authority(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def test_ticket_materialization_authority_requires_linux_openssl_pin(
+    rotation_fixture,
+) -> None:
+    module, request, _runtime = rotation_fixture
+    invalid_path = request.output.parent / "missing-materializer-pin.json"
+    authority = json.loads(
+        request.old_ticket_authority.canonical_bytes.decode("utf-8")
+    )
+    del authority["materializationOpensslExecutableSha256"]
+    invalid_path.write_bytes(
+        (
+            json.dumps(
+                authority,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n"
+        ).encode("utf-8")
+    )
+    invalid_path.chmod(0o600)
+    descriptor = os.open(invalid_path, os.O_RDONLY)
+    try:
+        with pytest.raises(
+            module.RotationError,
+            match="old_ticket_authority_contract_invalid",
+        ):
+            module.read_old_ticket_authority(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+@pytest.mark.parametrize(
+    "authority_field",
+    [
+        "openssl_executable_sha256",
+        "materialization_openssl_executable_sha256",
+    ],
+)
+def test_incident_commitment_binds_both_openssl_authorities(
+    rotation_fixture,
+    authority_field: str,
+) -> None:
+    module, request, _runtime = rotation_fixture
+    assert request.old_ticket_path is not None
+    ticket = request.old_ticket_path.read_text(
+        encoding="ascii"
+    ).rstrip("\n")
+    baseline = module.incident_ticket_commitment_sha256(
+        request,
+        ticket,
+    )
+    substituted_authority = replace(
+        request.old_ticket_authority,
+        **{authority_field: "f" * 64},
+    )
+    substituted_request = replace(
+        request,
+        old_ticket_authority=substituted_authority,
+    )
+
+    assert module.incident_ticket_commitment_sha256(
+        substituted_request,
+        ticket,
+    ) != baseline
+
+
 def test_ticket_authority_binds_normalized_absolute_ticket_path(
     rotation_fixture,
 ) -> None:
@@ -1213,7 +1393,7 @@ def test_precommit_restart_health_failure_is_requiesced_before_76(
     assert receipt["failureCode"] == "precommit_portal_restart_failed"
     restart_index = runtime.actions.index(("restart", (OLD_PORTAL_ID,)))
     requiesce_index = runtime.actions.index(
-        ("quiesce", (OLD_PORTAL_ID,)),
+        ("quiesce-known", (OLD_PORTAL_ID,)),
         restart_index,
     )
     assert restart_index < requiesce_index
@@ -1223,7 +1403,86 @@ def test_precommit_restart_health_failure_is_requiesced_before_76(
     )
 
 
-def test_precommit_requiesce_failure_cuts_connectors_before_76(
+def test_empty_enumerations_do_not_replace_durable_prior_identity_proof(
+    rotation_fixture,
+) -> None:
+    module, request, runtime = rotation_fixture
+    runtime.fail_quiesce_after_stop = True
+    runtime.fail_restart_health = True
+    runtime.hide_project_enumeration = True
+    runtime.hide_independent_enumeration = True
+
+    status, receipt = module.run_rotation(request, runtime)
+
+    assert status == 76
+    assert receipt["failureContainment"] == {
+        "portalQuiescenceProven": True,
+        "publicConnectorsStopped": False,
+    }
+    assert ("quiesce-known", (OLD_PORTAL_ID,)) in runtime.actions
+    assert runtime.portal_running is False
+
+
+def test_empty_enumerations_and_unproven_prior_stop_require_connector_cut_70(
+    rotation_fixture,
+) -> None:
+    module, request, runtime = rotation_fixture
+    runtime.fail_quiesce_after_stop = True
+    runtime.fail_restart_health = True
+    runtime.hide_project_enumeration = True
+    runtime.hide_independent_enumeration = True
+    runtime.block_requiesce_after_restart = True
+
+    status, receipt = module.run_rotation(request, runtime)
+
+    assert status == 70
+    assert receipt["failureContainment"] == {
+        "portalQuiescenceProven": False,
+        "publicConnectorsStopped": True,
+    }
+    assert runtime.portal_running is True
+    assert runtime.connectors_running is False
+
+
+def test_invalid_durable_prior_identity_always_cuts_connectors(
+    rotation_fixture,
+) -> None:
+    module, _request, runtime = rotation_fixture
+
+    containment = module.fail_closed_contain_precommit_portals(
+        runtime,
+        durable_prior_ids=(),
+    )
+
+    assert containment == {
+        "portalQuiescenceProven": False,
+        "publicConnectorsStopped": True,
+    }
+    assert runtime.connectors_running is False
+
+
+def test_independent_enumeration_adds_and_stops_unrecorded_portal(
+    rotation_fixture,
+) -> None:
+    module, request, runtime = rotation_fixture
+    runtime.fail_quiesce_after_stop = True
+    runtime.fail_restart_health = True
+    runtime.rogue_portal_exists = True
+    runtime.rogue_portal_running = True
+
+    status, receipt = module.run_rotation(request, runtime)
+
+    assert status == 76
+    assert receipt["failureContainment"]["portalQuiescenceProven"] is True
+    assert (
+        "quiesce-known",
+        (OLD_PORTAL_ID, runtime.rogue_portal_id),
+    ) in runtime.actions
+    assert runtime.portal_running is False
+    assert runtime.rogue_portal_running is False
+
+
+def test_precommit_requiesce_failure_cuts_connectors_and_returns_70(
     rotation_fixture,
 ) -> None:
     module, request, runtime = rotation_fixture
@@ -1233,8 +1492,11 @@ def test_precommit_requiesce_failure_cuts_connectors_before_76(
 
     status, receipt = module.run_rotation(request, runtime)
 
-    assert status == 76
-    assert receipt["failureCode"] == "precommit_portal_restart_failed"
+    assert status == 70
+    assert receipt["status"] == "emergency_public_connectors_stopped"
+    assert receipt["failureCode"] == (
+        "precommit_portal_quiescence_unproven_connectors_stopped"
+    )
     assert receipt["failureContainment"] == {
         "portalQuiescenceProven": False,
         "publicConnectorsStopped": True,
@@ -1453,7 +1715,7 @@ def test_resume_is_bound_to_exact_held_incident_ticket(
     [
         (("portalReplicaCount",), True),
         (("canonicalTunnelsBefore", 0, "running"), 1),
-        (("edgeWaf", "mutationPerformed"), 0),
+        (("edgeWafLocalEvidence", "mutationPerformed"), 0),
         (("oldTicketRevocationProof", "supplied"), 1),
     ],
 )
@@ -1489,32 +1751,43 @@ def test_resume_receipt_rejects_bool_integer_and_coercion_confusion(
     assert runtime.portal_id == OLD_PORTAL_ID
 
 
-def test_waf_control_plane_fingerprint_drift_fails_forward(
+def test_waf_local_evidence_drift_fails_forward(
     rotation_fixture,
 ) -> None:
     module, request, runtime = rotation_fixture
-    verify_waf = module.verify_edge_waf_control_plane_source
+    verify_waf = module.verify_edge_waf_local_evidence_source
     calls = 0
 
     def drift_on_postverification(current_request):
         nonlocal calls
         calls += 1
         if calls == 3:
-            current_request.edge_waf_control_plane_source.write_text(
+            current_request.edge_waf_local_evidence_source.write_text(
                 '{"ruleset":"substituted"}\n',
                 encoding="utf-8",
             )
-            current_request.edge_waf_control_plane_source.chmod(0o600)
+            current_request.edge_waf_local_evidence_source.chmod(0o600)
         return verify_waf(current_request)
 
-    module.verify_edge_waf_control_plane_source = drift_on_postverification
+    module.verify_edge_waf_local_evidence_source = (
+        drift_on_postverification
+    )
     status, receipt = module.run_rotation(request, runtime)
 
     assert status == 76
     assert receipt["failureCode"] == (
-        "edge_waf_control_plane_fingerprint_mismatch"
+        "edge_waf_local_evidence_sha256_mismatch"
     )
-    assert receipt["edgeWaf"]["preservedThroughPostVerification"] is False
+    assert (
+        receipt["edgeWafLocalEvidence"][
+            "stableThroughPostVerification"
+        ]
+        is False
+    )
+    assert (
+        receipt["edgeWafLocalEvidence"]["liveControlPlaneVerified"]
+        is False
+    )
     assert module.parse_epoch_environment(request.env_file.read_bytes())[0] == (
         request.new_epoch
     )
@@ -1524,7 +1797,7 @@ def test_ticket_authority_is_refstat_and_reread_before_revocation_proof(
     rotation_fixture,
 ) -> None:
     module, request, runtime = rotation_fixture
-    verify_waf = module.verify_edge_waf_control_plane_source
+    verify_waf = module.verify_edge_waf_local_evidence_source
     authority_path = request.output.parent / "old-ticket-authority.json"
     calls = 0
 
@@ -1549,7 +1822,7 @@ def test_ticket_authority_is_refstat_and_reread_before_revocation_proof(
             authority_path.chmod(0o600)
         return verify_waf(current_request)
 
-    module.verify_edge_waf_control_plane_source = (
+    module.verify_edge_waf_local_evidence_source = (
         mutate_authority_before_proof
     )
     status, receipt = module.run_rotation(request, runtime)
@@ -1654,6 +1927,54 @@ def test_active_authority_proof_drift_fails_before_epoch_commit(
     )
 
 
+@pytest.mark.parametrize(
+    ("field_path", "invalid_value"),
+    [
+        (("portal", "containerId"), int("1" * 64)),
+        (("portal", "containerName"), int("1" * 64)),
+        (("portal", "imageId"), 1),
+        (
+            ("portal", "proofAuthorityMountSha256"),
+            int("1" * 64),
+        ),
+        (
+            ("portal", "proofPublicMountSha256"),
+            int("1" * 64),
+        ),
+        (
+            ("installLinkingAuthorityReadinessSha256",),
+            int("1" * 64),
+        ),
+    ],
+)
+def test_active_runtime_authority_rejects_json_type_confusion(
+    rotation_fixture,
+    field_path,
+    invalid_value,
+) -> None:
+    module, request, _runtime = rotation_fixture
+    active = json.loads(
+        request.active_runtime_authority.read_text(encoding="utf-8")
+    )
+    target = active
+    for component in field_path[:-1]:
+        target = target[component]
+    target[field_path[-1]] = invalid_value
+    request.active_runtime_authority.write_text(
+        json.dumps(active, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    request.active_runtime_authority.chmod(0o600)
+
+    with pytest.raises(
+        module.RotationError,
+        match="active_runtime_authority_contract_invalid",
+    ):
+        module.read_active_runtime_authority(
+            request.active_runtime_authority
+        )
+
+
 def test_deploy_invokes_rotation_only_after_irreversible_acceptance_and_cleanup() -> None:
     source = DEPLOY.read_text(encoding="utf-8")
     acceptance = source.rindex("deployment_transaction_active=0")
@@ -1685,8 +2006,11 @@ def test_deploy_invokes_rotation_only_after_irreversible_acceptance_and_cleanup(
     assert "75)" in source[rotation:release]
     assert "epoch_rotation_fail_forward_required=0" in source[rotation:release]
     assert "epoch_rotation_precommit_refused=1" in source[rotation:release]
-    assert "--edge-waf-control-plane-source" in source[rotation:release]
-    assert "--expected-edge-waf-control-plane-sha256" in source[rotation:release]
+    assert "--edge-waf-local-evidence-source" in source[rotation:release]
+    assert (
+        "--expected-edge-waf-local-evidence-sha256"
+        in source[rotation:release]
+    )
     assert "cloudflare" not in source[rotation:release].lower()
     rotation_source = SCRIPT.read_text(encoding="utf-8")
     assert '"--pull",\n                "never"' in rotation_source
@@ -1694,6 +2018,28 @@ def test_deploy_invokes_rotation_only_after_irreversible_acceptance_and_cleanup(
     usage = source.splitlines()[17]
     assert usage.index("initial-release-shelf") < usage.index(
         "release-upload-ticket-epoch-rotate"
+    )
+
+
+def test_waf_contract_names_only_pinned_local_evidence() -> None:
+    rotation_source = SCRIPT.read_text(encoding="utf-8")
+    deploy_source = DEPLOY.read_text(encoding="utf-8")
+    combined = rotation_source + deploy_source
+
+    for misleading_contract_fragment in (
+        "edge_waf_control_plane",
+        "EDGE_WAF_CONTROL_PLANE",
+        "--edge-waf-control-plane",
+        '"edgeWaf":',
+        "ControlPlaneFingerprint",
+        "PreservedThroughPostVerification",
+    ):
+        assert misleading_contract_fragment not in combined
+    assert '"evidenceScope": "pinned_local_evidence_only"' in rotation_source
+    assert '"edgeWafLiveControlPlaneVerified": False' in rotation_source
+    assert (
+        "this is not live control-plane verification"
+        in deploy_source
     )
 
 
