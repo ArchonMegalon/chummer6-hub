@@ -133,13 +133,27 @@ def copy_contract_fixture(tmp_path: Path) -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
 
-    copy_file(source_api / "play-pwa-mirrors.json", target_api / "play-pwa-mirrors.json")
     for item in inventory["assets"]:
         copy_file(source_api / item["projection"], target_api / item["projection"])
-        copy_file(
-            ROOT.parent / "chummer-play" / item["source"],
-            fixture.parent / "chummer-play" / item["source"],
-        )
+        source_target = fixture.parent / "chummer-play" / item["source"]
+        if item["kind"] == "exact":
+            copy_file(source_api / item["projection"], source_target)
+        else:
+            source_target.parent.mkdir(parents=True, exist_ok=True)
+            source_target.write_text(
+                'const CACHE_VERSION = "v21";\n'
+                'const CACHE_CONTRACT = "play-source-v2";\n'
+                "const CRITICAL_SHELL_ASSETS = [\n"
+                '  "/mobile-install-shell.js",\n'
+                '  "/manifest.webmanifest",\n'
+                '  "/manifest.observer.webmanifest"\n'
+                "];\n"
+                "async function precacheCriticalShell() { return true; }\n"
+                'self.addEventListener("install", (event) => {\n'
+                "  event.waitUntil(precacheCriticalShell());\n"
+                "});\n",
+                encoding="utf-8",
+            )
     for dependency in inventory["generatorDependencies"]:
         copy_file(ROOT / dependency["path"], fixture / dependency["path"])
     copy_file(ROOT / "docker-compose.public-edge.yml", fixture / "docker-compose.public-edge.yml")
@@ -147,13 +161,108 @@ def copy_contract_fixture(tmp_path: Path) -> Path:
         source_api / "Services/PublicPlayProxyGateway.cs",
         target_api / "Services/PublicPlayProxyGateway.cs",
     )
+    copy_file(
+        source_api / "wwwroot/js/mobile-app-handoff.js",
+        target_api / "wwwroot/js/mobile-app-handoff.js",
+    )
+    copy_file(
+        source_api / "wwwroot/manifest.webmanifest",
+        target_api / "wwwroot/manifest.webmanifest",
+    )
+
+    source_worker = (
+        fixture.parent
+        / "chummer-play"
+        / "src/Chummer.Play.Web/wwwroot/service-worker.js"
+    )
+    projection_config_path = target_api / "play-worker-projection.json"
+    projection_config = json.loads(
+        projection_config_path.read_text(encoding="utf-8")
+    )
+    projection_config["sourceSha256"] = hashlib.sha256(
+        source_worker.read_bytes()
+    ).hexdigest()
+    projection_config_path.write_text(
+        json.dumps(projection_config, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    generator_path = fixture / "scripts/generate_public_play_worker_projection.py"
+    generator_name = (
+        "public_pwa_contract_fixture_generator_"
+        + hashlib.sha256(str(fixture).encode("utf-8")).hexdigest()
+    )
+    generator_spec = importlib.util.spec_from_file_location(
+        generator_name,
+        generator_path,
+    )
+    assert generator_spec is not None and generator_spec.loader is not None
+    generator = importlib.util.module_from_spec(generator_spec)
+    sys.modules[generator_name] = generator
+    generator_spec.loader.exec_module(generator)
+    generator_receipt = generator.run(
+        root=fixture,
+        config_path=projection_config_path,
+    )
+    assert generator_receipt["status"] == "pass"
     return fixture
 
 
-def test_current_source_satisfies_local_install_only_digest_closed_contract() -> None:
+def test_current_source_satisfies_local_install_only_digest_closed_contract(
+    tmp_path: Path,
+) -> None:
     module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
 
-    result = module.verify_source(ROOT)
+    current_config = json.loads(
+        (ROOT / "Chummer.Run.Api/play-worker-projection.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    fixture_config = json.loads(
+        (fixture / "Chummer.Run.Api/play-worker-projection.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert all(
+        len(config["sourceSha256"]) == 64
+        for config in (current_config, fixture_config)
+    )
+    current_config["sourceSha256"] = "<fixture-source-sha256>"
+    fixture_config["sourceSha256"] = "<fixture-source-sha256>"
+    assert fixture_config == current_config
+
+    def normalize_fixture_source_binding(contract: dict[str, object]) -> None:
+        transforms = contract["executableTransforms"]
+        assert isinstance(transforms, list) and len(transforms) == 1
+        transforms[0]["sourceSha256"] = "<fixture-source-sha256>"
+        generator = contract["generator"]
+        assert isinstance(generator, dict)
+        generator["configSha256"] = "<fixture-config-sha256>"
+        dependencies = generator["dependencies"]
+        assert isinstance(dependencies, list)
+        config_dependency = next(
+            item
+            for item in dependencies
+            if item["role"] == "projection_config"
+        )
+        config_dependency["sha256"] = "<fixture-config-sha256>"
+
+    current_mirror = json.loads(
+        (ROOT / "Chummer.Run.Api/play-pwa-mirrors.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    fixture_mirror = json.loads(
+        (fixture / "Chummer.Run.Api/play-pwa-mirrors.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    normalize_fixture_source_binding(current_mirror)
+    normalize_fixture_source_binding(fixture_mirror)
+    assert fixture_mirror == current_mirror
+
+    result = module.verify_source(fixture)
 
     assert result["contractName"] == "chummer.public_play_install_assets.v2"
     assert result["status"] == "pass", result["failures"]

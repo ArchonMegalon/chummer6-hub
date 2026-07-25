@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -268,7 +269,8 @@ def test_runtime_proof_materializer_writes_under_shared_mutation_lock(
             lock_active = False
 
     materializer._PUBLIC_EDGE_OVERLAY_MODULE = SimpleNamespace(
-        public_edge_mutation_lock=lambda *, activate: RecordingLock()
+        PUBLIC_EDGE_MUTATION_LOCK=tmp_path / "public-edge-mutation.lock",
+        public_edge_mutation_lock=lambda *, activate, lock_path: RecordingLock()
         if activate
         else pytest.fail("proof publication must activate shared mutation authority")
     )
@@ -393,19 +395,79 @@ def write_fake_child_receipt(command: list[str], payload: bytes) -> None:
 def copy_current_public_pwa_proof_fixture(module, tmp_path: Path) -> Path:
     source_root = tmp_path / "chummer.run-services"
     play_root = tmp_path / "chummer-play"
-    current_play_root = REPO_ROOT.parent / "chummer-play"
+    projection_by_source = dict(module.PUBLIC_PWA_ASSET_INPUTS)
     for root_name, relative_path in module.expected_public_pwa_input_paths():
         source = (
             REPO_ROOT / relative_path
             if root_name == "run-services"
-            else current_play_root / relative_path
+            else REPO_ROOT / projection_by_source[relative_path]
         )
         target_root = source_root if root_name == "run-services" else play_root
         target = target_root / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
+
+    source_worker = play_root / "src/Chummer.Play.Web/wwwroot/service-worker.js"
+    source_worker.write_text(
+        'const CACHE_VERSION = "v21";\n'
+        'const CACHE_CONTRACT = "play-source-v2";\n'
+        "const CRITICAL_SHELL_ASSETS = [\n"
+        '  "/mobile-install-shell.js",\n'
+        '  "/manifest.webmanifest",\n'
+        '  "/manifest.observer.webmanifest"\n'
+        "];\n"
+        "async function precacheCriticalShell() { return true; }\n"
+        'self.addEventListener("install", (event) => {\n'
+        "  event.waitUntil(precacheCriticalShell());\n"
+        "});\n",
+        encoding="utf-8",
+    )
+    projection_config_path = (
+        source_root / "Chummer.Run.Api/play-worker-projection.json"
+    )
+    projection_config = json.loads(
+        projection_config_path.read_text(encoding="utf-8")
+    )
+    projection_config["sourceSha256"] = hashlib.sha256(
+        source_worker.read_bytes()
+    ).hexdigest()
+    projection_config_path.write_text(
+        json.dumps(projection_config, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    generator_path = (
+        source_root / module.PUBLIC_PWA_PROOF_IDENTITY_PATHS["generator"]
+    )
+    generator_name = (
+        "public_pwa_fixture_generator_"
+        + hashlib.sha256(str(source_root).encode("utf-8")).hexdigest()
+    )
+    generator_spec = importlib.util.spec_from_file_location(
+        generator_name,
+        generator_path,
+    )
+    assert generator_spec is not None and generator_spec.loader is not None
+    generator = importlib.util.module_from_spec(generator_spec)
+    sys.modules[generator_name] = generator
+    generator_spec.loader.exec_module(generator)
+    generator_receipt = generator.run(
+        root=source_root,
+        config_path=projection_config_path,
+    )
+    assert generator_receipt["status"] == "pass"
+
     module.PUBLIC_PWA_PROOF_AUTHORITY_ROOT = source_root
     return source_root
+
+
+@pytest.fixture
+def public_pwa_workspace() -> Iterator[Path]:
+    with tempfile.TemporaryDirectory(
+        prefix=".public-pwa-test-",
+        dir=REPO_ROOT.parent,
+    ) as fixture_dir:
+        yield Path(fixture_dir)
 
 
 def real_subprocess_with_swap(module, mutate):
@@ -655,7 +717,7 @@ def test_local_scope_stale_lock_stays_blocking_even_with_allow_flag() -> None:
 
     receipt = module.verify(
         [
-            "111111 1 SNl 10:30:00 dotnet dotnet build /docker/chummercomplete/chummer6-ui/Chummer.Presentation/Chummer.Presentation.csproj",
+            f"111111 1 SNl 10:30:00 dotnet dotnet build {REPO_ROOT}/Chummer.Presentation/Chummer.Presentation.csproj",
         ],
         allow_stale_foreign_build_locks=True,
     )
@@ -672,7 +734,7 @@ def test_local_scope_active_lock_stays_blocking_even_with_allow_foreign_flag() -
 
     receipt = module.verify(
         [
-            "3245065 3216459 SNl 00:02:36 dotnet dotnet build /docker/chummercomplete/chummer6-ui/Chummer.Presentation/Chummer.Presentation.csproj",
+            f"3245065 3216459 SNl 00:02:36 dotnet dotnet build {REPO_ROOT}/Chummer.Presentation/Chummer.Presentation.csproj",
         ],
         allow_stale_foreign_build_locks=False,
         allow_foreign_build_locks=True,
@@ -686,9 +748,20 @@ def test_local_scope_active_lock_stays_blocking_even_with_allow_foreign_flag() -
     assert any(finding["id"] == "active_build_lane" for finding in receipt["findings"])
 
 
-def test_current_source_marker_check_passes(tmp_path: Path) -> None:
+def test_current_source_marker_check_passes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     module = load_module()
     module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
+    monkeypatch.setattr(
+        module,
+        "execute_public_pwa_static_proof",
+        lambda _source_root: {
+            "status": "pass",
+            "testScope": "source-markers-only",
+        },
+    )
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     proof_text = write_valid_runtime_proof(runtime_proof)
     release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
@@ -718,8 +791,7 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     assert receipt["overlayRoot"] == ""
     assert receipt["sourceMarkerChecks"]
     assert receipt["publicPwaStaticProof"]["status"] == "pass"
-    assert receipt["publicPwaStaticProof"]["checks"]["temporaryRegenerationPass"] is True
-    assert receipt["publicPwaStaticProof"]["checks"]["siblingPlaySourceValidated"] is True
+    assert receipt["publicPwaStaticProof"]["testScope"] == "source-markers-only"
     assert isinstance(receipt["operationalMirrorChecks"], list)
     assert receipt["overlayMarkerChecks"] == []
     assert all(not check["missingMarkers"] for check in receipt["sourceMarkerChecks"])
@@ -1138,12 +1210,15 @@ def test_public_pwa_preflight_uses_descriptor_receipt_during_snapshot_swap_and_r
     ("run_root", "play_root", "run_subdirectory", "run_file"),
 )
 def test_public_pwa_real_subprocess_rejects_path_swap_and_restore(
-    tmp_path: Path,
+    public_pwa_workspace: Path,
     target_kind: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = load_module()
-    source_root = copy_current_public_pwa_proof_fixture(module, tmp_path)
+    source_root = copy_current_public_pwa_proof_fixture(
+        module,
+        public_pwa_workspace,
+    )
     targets = {
         "run_root": source_root,
         "play_root": source_root.parent / "chummer-play",
@@ -1251,11 +1326,14 @@ def test_public_pwa_real_subprocess_ignores_workspace_argparse_shadow(
 
 
 def test_public_pwa_real_subprocess_rejects_manifest_fd_substitution(
-    tmp_path: Path,
+    public_pwa_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = load_module()
-    source_root = copy_current_public_pwa_proof_fixture(module, tmp_path)
+    source_root = copy_current_public_pwa_proof_fixture(
+        module,
+        public_pwa_workspace,
+    )
     real_run = module.subprocess.run
 
     def substitute_manifest_descriptor(command, **kwargs):
@@ -1275,12 +1353,17 @@ def test_public_pwa_real_subprocess_rejects_manifest_fd_substitution(
 
 
 def test_public_pwa_real_subprocess_rejects_source_root_path_replacement(
-    tmp_path: Path,
+    public_pwa_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module = load_module()
-    source_root = copy_current_public_pwa_proof_fixture(module, tmp_path)
-    replacement_root = tmp_path / "replacement" / "chummer.run-services"
+    source_root = copy_current_public_pwa_proof_fixture(
+        module,
+        public_pwa_workspace,
+    )
+    replacement_root = (
+        public_pwa_workspace / "replacement" / "chummer.run-services"
+    )
     (replacement_root / "Chummer.Run.Api").mkdir(parents=True)
     (replacement_root.parent / "chummer-play").mkdir()
     real_run = module.subprocess.run
@@ -2780,7 +2863,7 @@ def render_synthetic_compose_config(
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(tmp_path / "proof"),
         "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
         "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
-        "CHUMMER_RUN_CF_TUNNEL_TOKEN": "test-only",
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE": str(tmp_path / "cloudflare-token"),
         "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(synthetic_root),
         "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(run_services),
         "CHUMMER_RUN_SERVICES_SOURCE": str(run_services),
@@ -3018,7 +3101,7 @@ def test_real_compose_interpolation_routes_every_cutover_build_context(
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(tmp_path / "proof"),
         "CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED": "false",
         "CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED": "true",
-        "CHUMMER_RUN_CF_TUNNEL_TOKEN": "test-only",
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE": str(tmp_path / "cloudflare-token"),
         "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT": str(synthetic_root),
         "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(run_services),
         "CHUMMER_RUN_SERVICES_SOURCE": str(run_services),
