@@ -800,6 +800,60 @@ def test_direct_activation_owns_shared_mutation_lock_and_cleans_it(tmp_path: Pat
     assert not lock_path.exists()
 
 
+def test_shared_mutation_lock_serializes_competing_processes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import importlib.util, sys\n"
+                "from pathlib import Path\n"
+                "script = Path(sys.argv[1])\n"
+                "lock_path = Path(sys.argv[2])\n"
+                "spec = importlib.util.spec_from_file_location("
+                "'publish_public_edge_portal_overlay_mutation_holder', script)\n"
+                "module = importlib.util.module_from_spec(spec)\n"
+                "sys.modules[spec.name] = module\n"
+                "spec.loader.exec_module(module)\n"
+                "with module.public_edge_mutation_lock("
+                "activate=True, lock_path=lock_path):\n"
+                "    print('locked', flush=True)\n"
+                "    sys.stdin.readline()\n"
+            ),
+            str(SCRIPT),
+            str(lock_path),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout is not None
+        assert holder.stdout.readline().strip() == "locked"
+        with pytest.raises(
+            module.PublicEdgeMutationLockUnavailable,
+            match="another public-edge mutation",
+        ):
+            with module.public_edge_mutation_lock(
+                activate=True,
+                lock_path=lock_path,
+            ):
+                pass
+    finally:
+        if holder.stdin is not None:
+            holder.stdin.write("\n")
+            holder.stdin.flush()
+        _stdout, stderr = holder.communicate(timeout=10)
+        assert holder.returncode == 0, stderr
+
+    assert not lock_path.exists()
+
+
 def test_inherited_shared_mutation_lock_requires_exact_safe_owner_token(
     tmp_path: Path,
 ) -> None:
