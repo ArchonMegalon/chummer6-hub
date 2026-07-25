@@ -29,9 +29,9 @@
 
     var publicationPostureTitle = "Why this publication is live";
     var publicationPostureCopy = publicationRouteReviewRequired
-        ? "This page keeps the useful parts together while broader comparison copy stays short."
+        ? "Some desktop work is still open, so this page stays short."
         : "This page keeps the publication, its status, and the next useful links together.";
-    var routeStateLabel = HumanizeStatus(Model.RouteState, "Limited");
+    var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
         ?? "No visible publication history is attached to this public page yet.";
@@ -174,25 +174,21 @@
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@PublicPublicationText(Model.TrustPulse.RouteGuardSummary)</p>
-            <p class="muted-copy">Some desktop work is still open, so this page stays short.</p>
+            <p class="muted-copy">Current direct route records are incomplete, so broader comparisons stay unavailable.</p>
         }
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
-            <span class="tag">Type</span>
+            <span class="tag">Status</span>
             <p>@HumanizeStatus(Model.Publication.Kind, "Publication")</p>
         </article>
         <article class="trust-rail">
-            <span class="tag">Review</span>
+            <span class="tag">Confidence</span>
             <p>@PublicPublicationText(Model.Publication.TrustSummary, "Trust posture is still forming.")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Origin</span>
             <p>@PublicPublicationText(Model.Publication.ProvenanceSummary)</p>
-        </article>
-        <article class="trust-rail">
-            <span class="tag">Status</span>
-            <p>@PublicPublicationText(Model.Publication.TrustSummary, "Status is not available yet.")</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Discovery</span>
@@ -204,10 +200,11 @@
             @if (Model.RouteReceipt is not null)
             {
                 <p class="muted-copy">This page is linked to the current publication history.</p>
+                <p class="muted-copy">Receipt @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute</p>
             }
             else
             {
-                <p class="muted-copy">This publication stays brief until a current public update is attached.</p>
+                <p class="muted-copy">This publication stays bounded until a current outward-facing receipt is attached.</p>
             }
         </article>
         <article class="trust-rail">

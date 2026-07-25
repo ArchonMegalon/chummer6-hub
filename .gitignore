@@ -267,6 +267,18 @@ WORK_QUEUE.md
 /Chummer.Portal/downloads-backups/
 /Chummer.Portal/downloads/startup-smoke/
 
+# Runtime-only layout-v1 shelf authority and recovery state. These files must
+# remain on the locally hosted shelf, but they are never source-controlled.
+/Chummer.Portal/downloads/current.json
+/Chummer.Portal/downloads/generations/
+/Chummer.Portal/downloads/.release-shelf-layout-v1
+/Chummer.Portal/downloads/.release-shelf-promotion.lock
+/Chummer.Portal/downloads/.release-shelf-writer-policy.json
+/Chummer.Portal/downloads/.release-shelf-activation-intent.json
+/Chummer.Portal/downloads/.release-shelf-activation-journal/
+/Chummer.Portal/downloads/.release-shelf-mirror-repair-*
+/Chummer.Portal/downloads/.release-shelf-compatibility-quarantine-*
+
 # Generated installer payloads
 /Chummer.Portal/downloads/chummer6_full_product_reaudit_*.zip
 /Chummer.Portal/downloads/files/*.deb

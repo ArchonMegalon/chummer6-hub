@@ -8900,7 +8900,7 @@ body {
 }
 
 .surface-minimal.route-landing .site-main {
-  width: min(820px, calc(100% - 2rem));
+  width: min(980px, calc(100% - 2rem));
   padding-top: clamp(1.15rem, 9svh, 5rem);
 }
 
@@ -8912,7 +8912,7 @@ body {
 
 .surface-minimal.route-landing .site-header__inner,
 .surface-minimal.route-landing .site-footer__inner {
-  width: min(820px, calc(100% - 2rem));
+  width: min(980px, calc(100% - 2rem));
 }
 
 .surface-minimal .button-like,
@@ -9196,6 +9196,18 @@ body {
   font-size: 0.76rem;
 }
 
+.minimal-release-status {
+  display: grid;
+  gap: 0.14rem;
+  margin-top: 0.5rem;
+  padding: 0.12rem 0 0.12rem 0.62rem;
+  border-left: 2px solid color-mix(in srgb, var(--minimal-accent) 58%, var(--minimal-line));
+}
+
+.minimal-release-status .minimal-meta {
+  margin: 0;
+}
+
 .minimal-hero__points {
   display: flex;
   flex-wrap: wrap;
@@ -9451,8 +9463,8 @@ body {
 }
 
 .route-landing .minimal-hero {
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 188px);
-  gap: clamp(0.7rem, 2vw, 1.05rem);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
   align-items: center;
   min-height: 0;
 }
@@ -9461,19 +9473,19 @@ body {
   display: grid;
   gap: 0.08rem;
   align-content: end;
-  max-width: 27rem;
+  max-width: 34rem;
 }
 
 .route-landing .minimal-hero h1 {
   max-width: 9ch;
-  font-size: clamp(1.4rem, 1.9vw, 1.75rem);
+  font-size: clamp(1.8rem, 2.4vw, 2.2rem);
 }
 
 .route-landing .minimal-hero__lead {
-  max-width: 25rem;
-  margin-top: 0.14rem;
-  font-size: 0.8rem;
-  line-height: 1.34;
+  max-width: 31rem;
+  margin-top: 0.22rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .route-landing .minimal-meta {
@@ -9509,7 +9521,7 @@ body {
 .route-landing .minimal-hero__visual--preview {
   justify-self: stretch;
   width: 100%;
-  max-width: 220px;
+  max-width: 300px;
   min-height: 120px;
   border-color: color-mix(in srgb, var(--minimal-line) 62%, transparent);
 }
@@ -10832,7 +10844,38 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .route-landing .minimal-hero__visual {
+  .route-landing .minimal-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .route-landing .minimal-hero__visual--preview {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.44fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    gap: 0.32rem 0.78rem;
+    width: 100%;
+    max-width: none;
+    margin-top: 1.2rem;
+    padding: 0.78rem;
+  }
+
+  .route-landing .minimal-hero__preview-image {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    height: 100%;
+    min-height: 104px;
+    aspect-ratio: auto;
+  }
+
+  .route-landing .minimal-hero__preview-kicker,
+  .route-landing .minimal-hero__visual--preview h2,
+  .route-landing .minimal-hero__preview-video-link {
+    grid-column: 2;
+  }
+
+  .route-landing .minimal-hero__preview-copy,
+  .route-landing .minimal-hero__preview-points {
     display: none;
   }
 

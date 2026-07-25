@@ -1,155 +1,880 @@
 {
-  "contract_name": "chummer.mobile_pwa_public_projection",
+  "contractName": "chummer.mobile_pwa_public_projection.v2",
+  "mode": "live",
+  "baseUrl": "https://chummer.run",
+  "generatedAt": "2026-07-30T03:13:35.805457Z",
   "status": "pass",
-  "generated_at_utc": "2026-06-29T10:32:33.564668Z",
-  "base_url": "https://chummer.run",
-  "route_results": [
-    {
-      "route": "/mobile",
-      "status_code": 200,
-      "final_url": "https://chummer.run/mobile",
-      "final_route": "/mobile",
-      "expected_final_route": "/mobile"
+  "readiness": {
+    "httpStatus": 200,
+    "payload": {
+      "ready": true,
+      "status": "ready",
+      "generatedAt": "2026-07-30T03:13:33.8684858+00:00",
+      "hub": {
+        "contractName": "chummer.run.api.deep_readiness.v2",
+        "service": "chummer.run.api",
+        "ready": true,
+        "status": "pass",
+        "servingReady": true,
+        "publicationReady": false,
+        "publicationChecksConfigured": true,
+        "generatedAt": "2026-07-30T03:13:33.3810177+00:00",
+        "checks": [
+          {
+            "name": "data_protection_storage",
+            "passed": true,
+            "status": "pass",
+            "code": "durable_storage_writable"
+          },
+          {
+            "name": "install_linking_store",
+            "passed": true,
+            "status": "pass",
+            "code": "postgres_authority_bound"
+          },
+          {
+            "name": "release_shelf",
+            "passed": true,
+            "status": "pass",
+            "code": "generation_shelf_verified"
+          },
+          {
+            "name": "canonical_release_manifest",
+            "passed": true,
+            "status": "pass",
+            "code": "published_manifest_loaded"
+          }
+        ],
+        "releaseShelf": {
+          "mode": "generation",
+          "servingReady": true,
+          "publicationReady": false,
+          "publicationChecksConfigured": true,
+          "status": "serving",
+          "code": "generation_shelf_verified",
+          "generationId": "g-20260727T205345Z-19e9c4d1afb64dd5",
+          "activationReceiptId": "activation-9466c7a9517642d8af3f9979061dc726",
+          "inventoryDigest": "deb3a3050fffbacdd005cd4dde37a315577aa7b2f6275451a73c33819c506ac0",
+          "releaseVersion": "run-20260712-174412",
+          "channel": "preview",
+          "publishedAt": "2026-07-12T18:46:26+00:00",
+          "publicationChecks": [
+            {
+              "name": "release_shelf_serving",
+              "ready": true,
+              "status": "ready",
+              "code": "verified_shelf_serving"
+            },
+            {
+              "name": "publication_probe_contract",
+              "ready": true,
+              "status": "ready",
+              "code": "required_probes_configured"
+            },
+            {
+              "name": "activation_protocol",
+              "ready": true,
+              "status": "ready",
+              "code": "ready"
+            },
+            {
+              "name": "release_storage_admission",
+              "ready": false,
+              "status": "blocked",
+              "code": "publication_destination_capacity_exhausted"
+            }
+          ]
+        }
+      },
+      "playProjection": {
+        "status": "disabled",
+        "ready": true,
+        "enabled": false,
+        "detail": "Remote Play projection is off; local digest-pinned install mirrors are authoritative."
+      },
+      "deploymentIdentity": {
+        "ready": true,
+        "code": "overlay_identity_bound",
+        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
+        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b"
+      }
     },
-    {
-      "route": "/pwa",
-      "status_code": 200,
-      "final_url": "https://chummer.run/mobile",
-      "final_route": "/mobile",
-      "expected_final_route": "/mobile"
-    },
-    {
-      "route": "/play",
-      "status_code": 200,
-      "final_url": "https://chummer.run/play",
-      "final_route": "/play",
-      "expected_final_route": "/play"
-    },
-    {
-      "route": "/player",
-      "status_code": 200,
-      "final_url": "https://chummer.run/play?role=player",
-      "final_route": "/play?role=player",
-      "expected_final_route": "/play?role=player"
-    },
-    {
-      "route": "/gm",
-      "status_code": 200,
-      "final_url": "https://chummer.run/play?role=gm",
-      "final_route": "/play?role=gm",
-      "expected_final_route": "/play?role=gm"
-    },
-    {
-      "route": "/observer",
-      "status_code": 200,
-      "final_url": "https://chummer.run/play?role=observer",
-      "final_route": "/play?role=observer",
-      "expected_final_route": "/play?role=observer"
-    },
-    {
-      "route": "/session",
-      "status_code": 200,
-      "final_url": "https://chummer.run/play",
-      "final_route": "/play",
-      "expected_final_route": "/play"
+    "checks": {
+      "http200": true,
+      "bodyReady": true,
+      "bodyStatus": true,
+      "hubObject": true,
+      "hubReady": true,
+      "hubStatus": true,
+      "projectionObject": true,
+      "projectionDisabled": true,
+      "projectionReady": true,
+      "projectionStatus": true,
+      "deploymentIdentityObject": true,
+      "deploymentIdentityReady": true,
+      "deploymentIdentityCode": true,
+      "deploymentIdentityFingerprint": true,
+      "combinedConsistent": true
     }
-  ],
-  "manifest": {
-    "id": "/mobile",
-    "start_url": "/mobile",
-    "display": "standalone",
-    "display_override": [
-      "window-controls-overlay",
-      "standalone",
-      "minimal-ui",
-      "browser"
-    ],
-    "shortcut_count": 4,
-    "icon_count": 2,
-    "screenshot_count": 2,
-    "shortcut_urls": [
-      "/mobile",
-      "/packages",
-      "/play",
-      "/play/continuity"
-    ]
   },
-  "service_worker": {
-    "path": "/service-worker.js?v=1782719395",
-    "status_code": 200,
-    "has_fetch_handler": true,
-    "has_navigation_preload": true,
-    "has_runtime_cache": true,
-    "has_expected_shell_cache_paths": true,
-    "ledger_stream_not_precached": true,
-    "ledger_stream_denied_by_service_worker": true,
-    "has_push_handler": true,
-    "has_notification_click_handler": true,
-    "has_notification_close_handler": true,
-    "has_notification_route_bounds": true,
-    "has_notification_asset_bounds": true,
-    "notification_route_paths": [
-      "/account",
-      "/account/ledger",
-      "/account/ledger/advisory",
-      "/account/ledger/notifications",
-      "/account/ledger/onboarding",
-      "/account/ledger/worldtick/validation",
-      "/account/passport",
-      "/account/passport/open",
-      "/ledger",
-      "/ledger/map",
-      "/ledger/newsroom",
-      "/mobile",
-      "/passport",
-      "/passport/identity-network",
-      "/play",
-      "/play/continuity"
-    ],
-    "notification_route_prefixes": [
-      "/account/ledger/factions/",
-      "/ledger/newsroom/",
-      "/ledger/turns/",
-      "/passport/",
-      "/passport/receipts/"
-    ],
-    "notification_asset_paths": [
-      "/apple-touch-icon.png",
-      "/favicon.ico",
-      "/favicon.svg",
-      "/pwa-icon.svg",
-      "/pwa-maskable.svg"
-    ],
-    "notification_asset_suffixes": [
-      ".ico",
-      ".jpeg",
-      ".jpg",
-      ".png",
-      ".svg",
-      ".webp"
-    ]
+  "roleShells": {
+    "player": {
+      "status": true,
+      "exactlyOneRedirect": true,
+      "temporaryRedirect": true,
+      "cleanRedirectLocations": true,
+      "cleanFinalUrl": true,
+      "role": true,
+      "manifest": true,
+      "title": true,
+      "purpose": true,
+      "capability": true,
+      "cleanOpenTarget": true,
+      "roleQr": true,
+      "privacyBoundary": true,
+      "authorityBoundary": true,
+      "installOnly": true,
+      "noBlazor": true,
+      "noPrivateScript": true,
+      "noStore": true,
+      "closedCsp": true
+    },
+    "gm": {
+      "status": true,
+      "exactlyOneRedirect": true,
+      "temporaryRedirect": true,
+      "cleanRedirectLocations": true,
+      "cleanFinalUrl": true,
+      "role": true,
+      "manifest": true,
+      "title": true,
+      "purpose": true,
+      "capability": true,
+      "cleanOpenTarget": true,
+      "roleQr": true,
+      "privacyBoundary": true,
+      "authorityBoundary": true,
+      "installOnly": true,
+      "noBlazor": true,
+      "noPrivateScript": true,
+      "noStore": true,
+      "closedCsp": true
+    },
+    "observer": {
+      "status": true,
+      "exactlyOneRedirect": true,
+      "temporaryRedirect": true,
+      "cleanRedirectLocations": true,
+      "cleanFinalUrl": true,
+      "role": true,
+      "manifest": true,
+      "title": true,
+      "purpose": true,
+      "capability": true,
+      "cleanOpenTarget": true,
+      "roleQr": true,
+      "privacyBoundary": true,
+      "authorityBoundary": true,
+      "installOnly": true,
+      "noBlazor": true,
+      "noPrivateScript": true,
+      "noStore": true,
+      "closedCsp": true
+    }
   },
-  "page_assertions": {
-    "has_manifest_link": true,
-    "has_service_worker_registration": true,
-    "has_install_button": true,
-    "has_continuity_action": true,
-    "role_routes_hold": true,
-    "continuity_page_status_code": 200
+  "roleProbes": {
+    "player": {
+      "path": "/play?role=player",
+      "expectedRole": "player",
+      "expectedTarget": "/mobile/player",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/player"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "gm": {
+      "path": "/play?role=gm",
+      "expectedRole": "gm",
+      "expectedTarget": "/mobile/gm",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/gm"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "observer": {
+      "path": "/play?role=observer",
+      "expectedRole": "observer",
+      "expectedTarget": "/mobile/observer",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/observer"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "gm_secret_extra": {
+      "path": "/play?role=gm&secret=must-not-survive&extra=1",
+      "expectedRole": "gm",
+      "expectedTarget": "/mobile/gm",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/gm"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "repeated_roles": {
+      "path": "/play?role=gm&role=observer&token=must-not-survive",
+      "expectedRole": "player",
+      "expectedTarget": "/mobile/player",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/player"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "unknown_role": {
+      "path": "/play?role=owner&access_token=must-not-survive",
+      "expectedRole": "player",
+      "expectedTarget": "/mobile/player",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/player"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "mixed_case_alias": {
+      "path": "/play?role=GaMe-MaStEr&api_key=must-not-survive",
+      "expectedRole": "gm",
+      "expectedTarget": "/mobile/gm",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/gm"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    },
+    "missing_role_with_secret": {
+      "path": "/play?secret=must-not-survive&extra=1",
+      "expectedRole": "player",
+      "expectedTarget": "/mobile/player",
+      "historyCount": 1,
+      "redirectLocations": [
+        "/mobile/player"
+      ],
+      "checks": {
+        "status": true,
+        "exactlyOneRedirect": true,
+        "temporaryRedirect": true,
+        "cleanRedirectLocations": true,
+        "cleanFinalUrl": true,
+        "role": true,
+        "manifest": true,
+        "title": true,
+        "purpose": true,
+        "capability": true,
+        "cleanOpenTarget": true,
+        "roleQr": true,
+        "privacyBoundary": true,
+        "authorityBoundary": true,
+        "installOnly": true,
+        "noBlazor": true,
+        "noPrivateScript": true,
+        "noStore": true,
+        "closedCsp": true
+      }
+    }
   },
-  "continuity": {
-    "receipt_count": 3,
-    "has_boundary": true,
-    "mobile_json_has_routes": true,
-    "receipt_index_route": "/play/continuity/history"
+  "staticAssets": {
+    "contractName": "chummer.public_pwa_static_assets.v1",
+    "assetContractName": "chummer.public_play_install_assets.v2",
+    "generatedAt": "2026-07-30T03:13:33.223728+00:00",
+    "mode": "live",
+    "status": "pass",
+    "deploymentIdentity": {
+      "status": 200,
+      "ready": true,
+      "code": "overlay_identity_bound",
+      "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
+      "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+      "matchesExpectedFullDeploymentDigest": true,
+      "before": {
+        "status": 200,
+        "ready": true,
+        "code": "overlay_identity_bound",
+        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
+        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+        "matchesExpectedFullDeploymentDigest": true
+      },
+      "after": {
+        "status": 200,
+        "ready": true,
+        "code": "overlay_identity_bound",
+        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
+        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+        "matchesExpectedFullDeploymentDigest": true
+      },
+      "stable": true
+    },
+    "manifests": [
+      {
+        "path": "/manifest.webmanifest",
+        "valid": true,
+        "id": "/mobile",
+        "startUrl": "/mobile/player",
+        "display": "standalone",
+        "shortcutCount": 3,
+        "iconCount": 4
+      },
+      {
+        "path": "/manifest.play.webmanifest",
+        "valid": true,
+        "id": "/mobile",
+        "startUrl": "/mobile/player",
+        "display": "standalone",
+        "shortcutCount": 3,
+        "iconCount": 4
+      },
+      {
+        "path": "/manifest.player.webmanifest",
+        "valid": true,
+        "id": "/mobile/player",
+        "startUrl": "/mobile/player",
+        "display": "standalone",
+        "shortcutCount": 2,
+        "iconCount": 4
+      },
+      {
+        "path": "/manifest.gm.webmanifest",
+        "valid": true,
+        "id": "/mobile/gm",
+        "startUrl": "/mobile/gm",
+        "display": "standalone",
+        "shortcutCount": 2,
+        "iconCount": 4
+      },
+      {
+        "path": "/manifest.observer.webmanifest",
+        "valid": true,
+        "id": "/mobile/observer",
+        "startUrl": "/mobile/observer",
+        "display": "standalone",
+        "shortcutCount": 2,
+        "iconCount": 4
+      }
+    ],
+    "role_manifests": [
+      {
+        "role": "Player",
+        "path": "/manifest.player.webmanifest",
+        "id": "/mobile/player",
+        "start_url": "/mobile/player",
+        "display": "standalone"
+      },
+      {
+        "role": "GameMaster",
+        "path": "/manifest.gm.webmanifest",
+        "id": "/mobile/gm",
+        "start_url": "/mobile/gm",
+        "display": "standalone"
+      },
+      {
+        "role": "Observer",
+        "path": "/manifest.observer.webmanifest",
+        "id": "/mobile/observer",
+        "start_url": "/mobile/observer",
+        "display": "standalone"
+      }
+    ],
+    "assets": [
+      {
+        "path": "/js/mobile-app-handoff.js",
+        "status": 200,
+        "contentType": "application/javascript",
+        "sizeBytes": 19966,
+        "sha256": "7805db1505901a81dfcc58a338b6830e4f35e4174e82dd83188e13e166207a92",
+        "expectedSha256": "7805db1505901a81dfcc58a338b6830e4f35e4174e82dd83188e13e166207a92",
+        "digestMatches": true
+      },
+      {
+        "path": "/mobile.css",
+        "status": 200,
+        "contentType": "text/css",
+        "sizeBytes": 11304,
+        "sha256": "5ebc665a90355e837a5b0bea28470ef32937c76146250df350d88022ed798082",
+        "expectedSha256": "5ebc665a90355e837a5b0bea28470ef32937c76146250df350d88022ed798082",
+        "digestMatches": true
+      },
+      {
+        "path": "/mobile-install-shell.js",
+        "status": 200,
+        "contentType": "application/javascript",
+        "sizeBytes": 3993,
+        "sha256": "bd691178430f3feb36113686a8c665e356ede6cce39194918f52cef8fe6b2cdb",
+        "expectedSha256": "bd691178430f3feb36113686a8c665e356ede6cce39194918f52cef8fe6b2cdb",
+        "digestMatches": true
+      },
+      {
+        "path": "/service-worker.js",
+        "status": 200,
+        "contentType": "application/javascript",
+        "sizeBytes": 23415,
+        "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+        "expectedSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+        "digestMatches": true
+      },
+      {
+        "path": "/mobile/service-worker.js",
+        "status": 200,
+        "contentType": "application/javascript",
+        "sizeBytes": 197,
+        "sha256": "79581bcacc231b8d8c211a8cef14cbc7354991c6449448b02847fc07b6c204fe",
+        "expectedSha256": "79581bcacc231b8d8c211a8cef14cbc7354991c6449448b02847fc07b6c204fe",
+        "digestMatches": true
+      },
+      {
+        "path": "/icons/icon-192.png",
+        "status": 200,
+        "contentType": "image/png",
+        "sizeBytes": 6496,
+        "sha256": "af68b4d5060e42efe982ebc404bf15d2e16042dacd3388f4cfafc39298aa14b0",
+        "expectedSha256": "af68b4d5060e42efe982ebc404bf15d2e16042dacd3388f4cfafc39298aa14b0",
+        "digestMatches": true
+      },
+      {
+        "path": "/icons/icon-512.png",
+        "status": 200,
+        "contentType": "image/png",
+        "sizeBytes": 20091,
+        "sha256": "b0ac06bc1c869084c8c445dadbf465c28a1a1877fe8fd905154a6e14c95516c6",
+        "expectedSha256": "b0ac06bc1c869084c8c445dadbf465c28a1a1877fe8fd905154a6e14c95516c6",
+        "digestMatches": true
+      },
+      {
+        "path": "/icons/icon-192.svg",
+        "status": 200,
+        "contentType": "image/svg+xml",
+        "sizeBytes": 271,
+        "sha256": "0d7b9fe1d527ceca3291e5025e6de00988a4f077d26570b9eb794f9a942f810e",
+        "expectedSha256": "0d7b9fe1d527ceca3291e5025e6de00988a4f077d26570b9eb794f9a942f810e",
+        "digestMatches": true
+      },
+      {
+        "path": "/icons/icon-512.svg",
+        "status": 200,
+        "contentType": "image/svg+xml",
+        "sizeBytes": 281,
+        "sha256": "1e0134a8c2dcc849934c62c856fa65c63acf8e7f43e07e82be85fc42296c6dde",
+        "expectedSha256": "1e0134a8c2dcc849934c62c856fa65c63acf8e7f43e07e82be85fc42296c6dde",
+        "digestMatches": true
+      },
+      {
+        "path": "/manifest.webmanifest",
+        "status": 200,
+        "contentType": "application/manifest+json",
+        "sizeBytes": 2245,
+        "sha256": "81aa63312aac260670eddcaaffca2c26a50fc255711b6ca188c2bdf23b6fad07",
+        "expectedSha256": "81aa63312aac260670eddcaaffca2c26a50fc255711b6ca188c2bdf23b6fad07",
+        "digestMatches": true
+      },
+      {
+        "path": "/manifest.play.webmanifest",
+        "status": 200,
+        "contentType": "application/manifest+json",
+        "sizeBytes": 1556,
+        "sha256": "7411b100fa3cd6ddb905d5e0beac2ad2977aa495de65c8031a70cdb5e1bcf797",
+        "expectedSha256": "7411b100fa3cd6ddb905d5e0beac2ad2977aa495de65c8031a70cdb5e1bcf797",
+        "digestMatches": true
+      },
+      {
+        "path": "/manifest.player.webmanifest",
+        "status": 200,
+        "contentType": "application/manifest+json",
+        "sizeBytes": 1351,
+        "sha256": "8da984961dd2d50bdcfb92b1be0af8228f9bd9d6dcdad38889e7916e69843b40",
+        "expectedSha256": "8da984961dd2d50bdcfb92b1be0af8228f9bd9d6dcdad38889e7916e69843b40",
+        "digestMatches": true
+      },
+      {
+        "path": "/manifest.gm.webmanifest",
+        "status": 200,
+        "contentType": "application/manifest+json",
+        "sizeBytes": 1341,
+        "sha256": "eda6bf766e595e4dd490494d8da3ade15d469641b6a08dee1619ad93871c2b26",
+        "expectedSha256": "eda6bf766e595e4dd490494d8da3ade15d469641b6a08dee1619ad93871c2b26",
+        "digestMatches": true
+      },
+      {
+        "path": "/manifest.observer.webmanifest",
+        "status": 200,
+        "contentType": "application/manifest+json",
+        "sizeBytes": 1385,
+        "sha256": "d1006f14a0d159e0eb40c18675b518638c8f07fa6017a4a019d7e34cb0d72d7d",
+        "expectedSha256": "d1006f14a0d159e0eb40c18675b518638c8f07fa6017a4a019d7e34cb0d72d7d",
+        "digestMatches": true
+      }
+    ],
+    "assetDigestInventory": {
+      "contractName": "chummer.public_pwa_asset_digest_inventory.v1",
+      "algorithm": "sha256-canonical-json-v1",
+      "assetCount": 14,
+      "expectedSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
+      "sealedExpectedSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
+      "actualSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
+      "matchesExpected": true,
+      "sourceStable": true,
+      "assets": [
+        {
+          "path": "/js/mobile-app-handoff.js",
+          "contentType": "application/javascript",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": false,
+          "sha256": "7805db1505901a81dfcc58a338b6830e4f35e4174e82dd83188e13e166207a92",
+          "sizeBytes": 19966,
+          "matchesExpected": true
+        },
+        {
+          "path": "/mobile.css",
+          "contentType": "text/css",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "5ebc665a90355e837a5b0bea28470ef32937c76146250df350d88022ed798082",
+          "sizeBytes": 11304,
+          "matchesExpected": true
+        },
+        {
+          "path": "/mobile-install-shell.js",
+          "contentType": "application/javascript",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "bd691178430f3feb36113686a8c665e356ede6cce39194918f52cef8fe6b2cdb",
+          "sizeBytes": 3993,
+          "matchesExpected": true
+        },
+        {
+          "path": "/service-worker.js",
+          "contentType": "application/javascript",
+          "cacheControl": "no-cache, no-store, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+          "sizeBytes": 23415,
+          "matchesExpected": true
+        },
+        {
+          "path": "/mobile/service-worker.js",
+          "contentType": "application/javascript",
+          "cacheControl": "no-cache, no-store, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "79581bcacc231b8d8c211a8cef14cbc7354991c6449448b02847fc07b6c204fe",
+          "sizeBytes": 197,
+          "matchesExpected": true
+        },
+        {
+          "path": "/icons/icon-192.png",
+          "contentType": "image/png",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "af68b4d5060e42efe982ebc404bf15d2e16042dacd3388f4cfafc39298aa14b0",
+          "sizeBytes": 6496,
+          "matchesExpected": true
+        },
+        {
+          "path": "/icons/icon-512.png",
+          "contentType": "image/png",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "b0ac06bc1c869084c8c445dadbf465c28a1a1877fe8fd905154a6e14c95516c6",
+          "sizeBytes": 20091,
+          "matchesExpected": true
+        },
+        {
+          "path": "/icons/icon-192.svg",
+          "contentType": "image/svg+xml",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "0d7b9fe1d527ceca3291e5025e6de00988a4f077d26570b9eb794f9a942f810e",
+          "sizeBytes": 271,
+          "matchesExpected": true
+        },
+        {
+          "path": "/icons/icon-512.svg",
+          "contentType": "image/svg+xml",
+          "cacheControl": "public, max-age=14400, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "1e0134a8c2dcc849934c62c856fa65c63acf8e7f43e07e82be85fc42296c6dde",
+          "sizeBytes": 281,
+          "matchesExpected": true
+        },
+        {
+          "path": "/manifest.webmanifest",
+          "contentType": "application/manifest+json",
+          "cacheControl": "public, max-age=300, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": false,
+          "sha256": "81aa63312aac260670eddcaaffca2c26a50fc255711b6ca188c2bdf23b6fad07",
+          "sizeBytes": 2245,
+          "matchesExpected": true
+        },
+        {
+          "path": "/manifest.play.webmanifest",
+          "contentType": "application/manifest+json",
+          "cacheControl": "public, max-age=300, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "7411b100fa3cd6ddb905d5e0beac2ad2977aa495de65c8031a70cdb5e1bcf797",
+          "sizeBytes": 1556,
+          "matchesExpected": true
+        },
+        {
+          "path": "/manifest.player.webmanifest",
+          "contentType": "application/manifest+json",
+          "cacheControl": "public, max-age=300, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "8da984961dd2d50bdcfb92b1be0af8228f9bd9d6dcdad38889e7916e69843b40",
+          "sizeBytes": 1351,
+          "matchesExpected": true
+        },
+        {
+          "path": "/manifest.gm.webmanifest",
+          "contentType": "application/manifest+json",
+          "cacheControl": "public, max-age=300, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "eda6bf766e595e4dd490494d8da3ade15d469641b6a08dee1619ad93871c2b26",
+          "sizeBytes": 1341,
+          "matchesExpected": true
+        },
+        {
+          "path": "/manifest.observer.webmanifest",
+          "contentType": "application/manifest+json",
+          "cacheControl": "public, max-age=300, must-revalidate",
+          "nosniff": true,
+          "mirrorBound": true,
+          "sha256": "d1006f14a0d159e0eb40c18675b518638c8f07fa6017a4a019d7e34cb0d72d7d",
+          "sizeBytes": 1385,
+          "matchesExpected": true
+        }
+      ]
+    },
+    "worker": {
+      "cacheVersion": "v19",
+      "cacheContract": "run-api-projection-v2",
+      "passiveActivation": true,
+      "criticalAssets": [
+        "/icons/icon-192.svg",
+        "/icons/icon-512.svg",
+        "/manifest.gm.webmanifest",
+        "/manifest.observer.webmanifest",
+        "/manifest.play.webmanifest",
+        "/manifest.player.webmanifest",
+        "/mobile-install-shell.js"
+      ],
+      "privateApiNetworkOnly": true
+    },
+    "service_worker": {
+      "ledger_stream_non_cacheable": true,
+      "ledger_stream_precached": false,
+      "worker_kind": "play",
+      "cache_version": "v19"
+    },
+    "cleanMobilePlayerShell": {
+      "path": "/mobile/player",
+      "status": 200,
+      "contentType": "text/html",
+      "finalPath": "/mobile/player",
+      "redirectRejected": false,
+      "queryFree": true,
+      "cleanFinalRoute": true,
+      "installOnly": true,
+      "liveSessionUnavailable": true,
+      "authorityNone": true,
+      "privateIdentityAbsent": true,
+      "privateIdentityKeyFindings": []
+    },
+    "documents": [
+      {
+        "path": "/mobile/player",
+        "role": "player",
+        "manifest": "/manifest.player.webmanifest",
+        "target": "/mobile/player",
+        "status": 200,
+        "privateIdentityKeysAbsent": true,
+        "privateIdentityKeyFindings": []
+      },
+      {
+        "path": "/mobile/gm",
+        "role": "gm",
+        "manifest": "/manifest.gm.webmanifest",
+        "target": "/mobile/gm",
+        "status": 200,
+        "privateIdentityKeysAbsent": true,
+        "privateIdentityKeyFindings": []
+      },
+      {
+        "path": "/mobile/observer",
+        "role": "observer",
+        "manifest": "/manifest.observer.webmanifest",
+        "target": "/mobile/observer",
+        "status": 200,
+        "privateIdentityKeysAbsent": true,
+        "privateIdentityKeyFindings": []
+      }
+    ],
+    "failures": []
   },
-  "ledger_stream": {
-    "status": "opt_in_required",
-    "mode": "mobile_pwa_living_world",
-    "has_contract": true,
-    "cache_control": "private, no-store, no-cache, max-age=0",
-    "vary": "Cookie, Authorization",
-    "has_no_store_header": true,
-    "has_personalized_vary": true
+  "failures": [],
+  "legacyMobileReleaseProof": {
+    "path": "",
+    "gating": false,
+    "reason": "The public edge now verifies its local install-only contract directly."
   }
 }

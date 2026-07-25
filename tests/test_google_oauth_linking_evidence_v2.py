@@ -9,6 +9,8 @@ import zlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "google_oauth_linking_evidence_v2.py"
 
@@ -185,6 +187,46 @@ def build_evidence(module, tmp_path: Path, now: datetime, request_path: Path, po
 def test_code_owned_operator_identity_map_is_empty() -> None:
     module = load_module()
     assert module.TRUSTED_OPERATOR_IDENTITIES == {}
+
+
+def test_release_binding_resolves_the_active_atomic_shelf_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    shelf_root = tmp_path / "downloads"
+    legacy = shelf_root / "RELEASE_CHANNEL.generated.json"
+    generation_root = shelf_root / "generations" / "g-current"
+    current = generation_root / legacy.name
+    write_release(legacy, version="run-stale-legacy")
+    write_release(current, version="run-current-generation")
+    monkeypatch.setattr(
+        module,
+        "resolve_shelf_root",
+        lambda root: ("generation", generation_root, {"generationId": "g-current"}),
+    )
+
+    binding = module.release_binding(legacy)
+
+    assert binding["version"] == "run-current-generation"
+    assert binding["manifest_path"] == str(current.resolve())
+
+
+def test_release_binding_does_not_fall_back_when_atomic_shelf_resolution_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    legacy = tmp_path / "downloads" / "RELEASE_CHANNEL.generated.json"
+    write_release(legacy, version="run-stale-legacy")
+
+    def fail_closed(_root: Path):
+        raise module.ReleaseShelfError("current generation is malformed")
+
+    monkeypatch.setattr(module, "resolve_shelf_root", fail_closed)
+
+    with pytest.raises(module.ContractError, match="release shelf resolution failed"):
+        module.release_binding(legacy)
 
 
 def test_two_byte_ok_files_are_rejected_as_images_and_as_duplicate_proof(

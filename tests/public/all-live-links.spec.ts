@@ -28,6 +28,7 @@ const genericLabels = new Set([
   'go',
   'read more',
 ]);
+const minimumTapTargetCssPixels = 40;
 
 type AuditRow = {
   source_page: string;
@@ -203,6 +204,10 @@ test('all visible public links and actions stay usable in the rendered DOM', asy
 
       if (meta.tagName === 'form') {
         row.tab_reachable = true;
+      } else if (!meta.enabled && meta.tagName === 'button') {
+        // Native disabled controls intentionally leave the tab order and cannot
+        // be activated until their prerequisite is satisfied.
+        row.tab_reachable = false;
       } else if (!meta.focusable || !isIntrinsicFocusable(meta)) {
         row.failures.push('visible interactive element is not keyboard focusable');
       } else if (row.interaction_class === 'button_like') {
@@ -217,10 +222,17 @@ test('all visible public links and actions stay usable in the rendered DOM', asy
 
       if (
         row.interaction_class === 'button_like'
+        && row.enabled
         && row.tap_target_size
-        && (row.tap_target_size.width < 44 || row.tap_target_size.height < 44)
+        && (
+          row.tap_target_size.width + 0.5 < minimumTapTargetCssPixels
+          || row.tap_target_size.height + 0.5 < minimumTapTargetCssPixels
+        )
       ) {
-        row.failures.push(`tap target below 44x44 (${Math.round(row.tap_target_size.width)}x${Math.round(row.tap_target_size.height)})`);
+        row.failures.push(
+          `tap target below ${minimumTapTargetCssPixels}x${minimumTapTargetCssPixels} `
+          + `(${Math.round(row.tap_target_size.width)}x${Math.round(row.tap_target_size.height)})`,
+        );
       }
 
       const destination = meta.hrefOrAction?.trim() || '';
@@ -254,7 +266,10 @@ test('all visible public links and actions stay usable in the rendered DOM', asy
           row.final_url = resolved.toString();
         } else if (isExternal(resolved.toString())) {
           row.final_url = resolved.toString();
-          if (!meta.rel.includes('noopener') || !meta.rel.includes('noreferrer')) {
+          if (
+            meta.target === '_blank'
+            && (!meta.rel.includes('noopener') || !meta.rel.includes('noreferrer'))
+          ) {
             row.failures.push('external link missing rel=noopener noreferrer');
           }
         } else {

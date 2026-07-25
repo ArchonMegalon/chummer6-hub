@@ -20,9 +20,23 @@ HEALTHCHECK_CONTRACTS: dict[str, tuple[str, ...]] = {
     "chummer-run-identity": ("curl", "http://127.0.0.1:8080/health"),
     "chummer-portal": ("curl", "http://127.0.0.1:8080/api/ready"),
     "chummer-run-cloudflared": ("cloudflared", "tunnel", "127.0.0.1:2000", "ready"),
+    "chummer-run-cloudflared-replica": (
+        "cloudflared",
+        "tunnel",
+        "127.0.0.1:2000",
+        "ready",
+    ),
 }
 
-CLOUDFLARED_DEFAULT_IMAGE = "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2026.7.0}"
+CLOUDFLARED_PINNED_IMAGE = (
+    "cloudflare/cloudflared:2026.7.0"
+    "@sha256:8c70a8c2d373e93caac1ee79fcc615908a49ccf3f3975775d1e10d24e41327af"
+)
+CLOUDFLARED_PLATFORM = "linux/amd64"
+CLOUDFLARED_SERVICE_NAMES = (
+    "chummer-run-cloudflared",
+    "chummer-run-cloudflared-replica",
+)
 CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS = ("--metrics", "0.0.0.0:2000", "run")
 
 DEPENDENCY_CONTRACTS = {
@@ -33,6 +47,7 @@ DEPENDENCY_CONTRACTS = {
         "support-progress-mock",
     },
     "chummer-run-cloudflared": {"chummer-portal"},
+    "chummer-run-cloudflared-replica": {"chummer-portal"},
 }
 
 MEMORY_LIMIT_CONTRACTS = {
@@ -43,6 +58,7 @@ MEMORY_LIMIT_CONTRACTS = {
     "chummer-run-identity": "${CHUMMER_IDENTITY_MEMORY_LIMIT:-512m}",
     "chummer-portal": "${CHUMMER_PORTAL_MEMORY_LIMIT:-1536m}",
     "chummer-run-cloudflared": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
+    "chummer-run-cloudflared-replica": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
 }
 
 CURL_RUNTIME_DOCKERFILES = (
@@ -149,21 +165,57 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 f"{service_name} mem_limit must be overrideable with default {expected_limit}"
             )
 
-    cloudflared = services.get("chummer-run-cloudflared")
-    if isinstance(cloudflared, dict):
-        if cloudflared.get("image") != CLOUDFLARED_DEFAULT_IMAGE:
+    storage_init = services.get("chummer-release-storage-init")
+    if not isinstance(storage_init, dict):
+        failures.append("required service is missing: chummer-release-storage-init")
+    else:
+        if storage_init.get("network_mode") != "none":
             failures.append(
-                "chummer-run-cloudflared image must use the current versioned default "
-                f"{CLOUDFLARED_DEFAULT_IMAGE}"
+                "chummer-release-storage-init network_mode must be none"
+            )
+        if "networks" in storage_init:
+            failures.append(
+                "chummer-release-storage-init must not join compose networks"
+            )
+
+    portal = services.get("chummer-portal")
+    if isinstance(portal, dict):
+        dependencies = portal.get("depends_on")
+        storage_dependency = (
+            dependencies.get("chummer-release-storage-init")
+            if isinstance(dependencies, dict)
+            else None
+        )
+        if not isinstance(storage_dependency, dict) or storage_dependency.get(
+            "condition"
+        ) != "service_completed_successfully":
+            failures.append(
+                "chummer-portal dependency chummer-release-storage-init must "
+                "require service_completed_successfully"
+            )
+
+    for service_name in CLOUDFLARED_SERVICE_NAMES:
+        cloudflared = services.get(service_name)
+        if not isinstance(cloudflared, dict):
+            continue
+        if cloudflared.get("image") != CLOUDFLARED_PINNED_IMAGE:
+            failures.append(
+                f"{service_name} image must use the immutable current runtime pin "
+                f"{CLOUDFLARED_PINNED_IMAGE}"
+            )
+        if cloudflared.get("platform") != CLOUDFLARED_PLATFORM:
+            failures.append(
+                f"{service_name} platform must match the pinned manifest "
+                f"{CLOUDFLARED_PLATFORM}"
             )
         runtime_command = cloudflared.get("command")
         if not isinstance(runtime_command, list):
-            failures.append("chummer-run-cloudflared command must use exec-list syntax")
+            failures.append(f"{service_name} command must use exec-list syntax")
         else:
             for fragment in CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS:
                 if fragment not in runtime_command:
                     failures.append(
-                        "chummer-run-cloudflared runtime command is missing required fragment: "
+                        f"{service_name} runtime command is missing required fragment: "
                         f"{fragment}"
                     )
 

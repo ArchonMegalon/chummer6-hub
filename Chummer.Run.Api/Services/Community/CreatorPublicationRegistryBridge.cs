@@ -22,6 +22,13 @@ public sealed class CreatorPublicationRegistryBridge
         HubUserDto user,
         CreatorPublicationProjection publication,
         CampaignWorkspaceProjection? workspace)
+        => GetOrCreatePublicationLaneCore(user, publication, workspace, allowRejectedReviewRefresh: false);
+
+    private CreatorPublicationRegistryProjection GetOrCreatePublicationLaneCore(
+        HubUserDto user,
+        CreatorPublicationProjection publication,
+        CampaignWorkspaceProjection? workspace,
+        bool allowRejectedReviewRefresh)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(publication);
@@ -33,7 +40,7 @@ public sealed class CreatorPublicationRegistryBridge
             _drafts.CreateDraft(desiredDraft, user.UserId, preferredDraftId: publication.PublicationId);
             detail = _drafts.GetDraftDetail(publication.PublicationId);
         }
-        else if (NeedsRefresh(detail, desiredDraft))
+        else if (NeedsRefresh(detail, desiredDraft, allowRejectedReviewRefresh))
         {
             _drafts.UpdateDraft(
                 publication.PublicationId,
@@ -58,7 +65,7 @@ public sealed class CreatorPublicationRegistryBridge
         string? notes = null)
     {
         EnsureManifestAuthority(publication, workspace);
-        GetOrCreatePublicationLane(user, publication, workspace);
+        GetOrCreatePublicationLaneCore(user, publication, workspace, allowRejectedReviewRefresh: true);
         _drafts.SubmitProject(
             publication.PublicationId,
             user.UserId,
@@ -117,10 +124,19 @@ public sealed class CreatorPublicationRegistryBridge
         return GetOrCreatePublicationLane(user, publication, workspace);
     }
 
-    private static bool NeedsRefresh(HubDraftDetailProjection detail, HubPublishDraftRequest desired)
+    private static bool NeedsRefresh(
+        HubDraftDetailProjection detail,
+        HubPublishDraftRequest desired,
+        bool allowRejectedReviewRefresh)
     {
         HubPublishDraftReceipt draft = detail.Draft;
         if (!string.Equals(draft.State, HubPublicationStates.Draft, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (!allowRejectedReviewRefresh
+            && string.Equals(detail.Moderation?.State, HubModerationStates.Rejected, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

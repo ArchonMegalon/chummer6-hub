@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-29T18:35:09Z",
+  "generated_at_utc": "2026-07-30T03:14:05Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -14,7 +14,7 @@
     "public_route_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "status": "pass",
-      "route_count": 183,
+      "route_count": 189,
       "failed_count": 0,
       "pass": true
     },
@@ -22,6 +22,35 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "status": "pass",
       "failure_count": 0,
+      "semantic_failures": [],
+      "release_posture": {
+        "url": "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
+        "final_url": "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
+        "status_code": 200,
+        "redirect_location": null,
+        "redirect_chain": [],
+        "fetch_error": null,
+        "parse_error": null,
+        "status": "published",
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "review_required": true,
+        "public_installer_available": false,
+        "downloads_paused": true,
+        "expected_status": "published",
+        "expected_version": "run-20260712-174412",
+        "expected_channel": "preview",
+        "expected_supportability_state": "review_required",
+        "expected_rollout_state": "coverage_incomplete",
+        "status_matches_expected": true,
+        "version_matches_expected": true,
+        "channel_matches_expected": true,
+        "supportability_matches_expected": true,
+        "rollout_matches_expected": true,
+        "expected_failures": []
+      },
       "pass": true
     },
     "ltd_optimization_stack": {
@@ -44,13 +73,15 @@
       "status": "pass",
       "base_url": "https://chummer.run",
       "checked_pages": 66,
+      "required_checked_pages": 66,
       "failure_count": 0,
+      "missing_route_viewports": {},
       "pass": true
     },
     "screenshot_qa": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
       "status": "pass",
-      "base_url": "http://127.0.0.1:8091",
+      "base_url": "https://chummer.run",
       "homepage_viewports": [
         "1366x768",
         "1440x900",

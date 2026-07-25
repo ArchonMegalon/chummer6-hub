@@ -390,6 +390,10 @@ def passing_browser_redirect() -> dict[str, object]:
     }
 
 
+def passing_landing_body(module) -> str:
+    return "\n".join(module.REQUIRED_LANDING_MARKERS.values())
+
+
 def passing_live_surface_parity(
     program_binding: dict[str, object] | None = None,
 ) -> dict[str, object]:
@@ -491,6 +495,28 @@ def write_release_channel_receipt(root: Path) -> tuple[Path, str]:
     return path, hashlib.sha256(raw_bytes).hexdigest()
 
 
+def test_materialize_bound_release_channel_shelf_uses_exact_selected_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    receipt_path, receipt_sha256 = write_release_channel_receipt(tmp_path)
+    shelf_root = tmp_path / "runtime" / "release-shelf"
+
+    binding = module.materialize_bound_release_channel_shelf(
+        receipt_path,
+        receipt_sha256,
+        shelf_root,
+    )
+
+    canonical_path = shelf_root / module.RUNTIME_RELEASE_CHANNEL_MANIFEST_NAME
+    assert canonical_path.read_bytes() == receipt_path.read_bytes()
+    assert binding["canonicalManifestPath"] == str(canonical_path)
+    assert binding["canonicalManifestSha256"] == receipt_sha256
+    assert binding["selectedReceiptSha256"] == receipt_sha256
+    assert binding["matchesSelectedReceipt"] is True
+    assert binding["status"] == "pass"
+
+
 def child_binding_fields(receipt_path: Path, sha256: str) -> dict[str, object]:
     return {
         "release_channel_receipt": str(receipt_path),
@@ -536,6 +562,7 @@ def write_child_verification_receipt(
         "release_manifest_version_matches_release_channel": True,
         "release_manifest_published_at_matches_release_channel": True,
         "release_manifest_proof_freshness_matches_release_channel": True,
+        "release_manifest_proof_freshness_compatible_with_release_channel": True,
         "release_manifest_supportability_compatible_with_release_channel": True,
         "release_manifest_rollout_compatible_with_release_channel": True,
         "release_manifest_internal_supportability_consistent": True,
@@ -553,6 +580,7 @@ def materialize_with_binding(module, output: Path, *, binding_root: Path, **kwar
     release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(
         binding_root
     )
+    kwargs.setdefault("minimum_free_disk_bytes", 0)
     original_verify = kwargs.get("verify_overlay_fn")
     if original_verify is not None:
         def bound_verify(
@@ -643,6 +671,203 @@ def test_overlay_publish_lock_rejects_competing_publisher(tmp_path: Path) -> Non
         holder.communicate(timeout=10)
 
 
+def test_direct_activation_owns_shared_mutation_lock_and_cleans_it(tmp_path: Path) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+
+    with module.public_edge_mutation_lock(activate=True) as acquired:
+        assert acquired == lock_path
+        token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+        assert token_path.is_file()
+        assert token_path.stat().st_mode & 0o777 == 0o600
+        assert lock_path.stat().st_mode & 0o777 == 0o700
+        with pytest.raises(
+            module.PublicEdgeMutationLockUnavailable,
+            match="another public-edge mutation",
+        ):
+            with module.public_edge_mutation_lock(activate=True):
+                pass
+
+    assert not lock_path.exists()
+
+
+def test_shared_mutation_lock_serializes_competing_processes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    holder = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import importlib.util, sys\n"
+                "from pathlib import Path\n"
+                "script = Path(sys.argv[1])\n"
+                "lock_path = Path(sys.argv[2])\n"
+                "spec = importlib.util.spec_from_file_location("
+                "'publish_public_edge_portal_overlay_mutation_holder', script)\n"
+                "module = importlib.util.module_from_spec(spec)\n"
+                "sys.modules[spec.name] = module\n"
+                "spec.loader.exec_module(module)\n"
+                "with module.public_edge_mutation_lock("
+                "activate=True, lock_path=lock_path):\n"
+                "    print('locked', flush=True)\n"
+                "    sys.stdin.readline()\n"
+            ),
+            str(SCRIPT),
+            str(lock_path),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout is not None
+        assert holder.stdout.readline().strip() == "locked"
+        with pytest.raises(
+            module.PublicEdgeMutationLockUnavailable,
+            match="another public-edge mutation",
+        ):
+            with module.public_edge_mutation_lock(
+                activate=True,
+                lock_path=lock_path,
+            ):
+                pass
+    finally:
+        if holder.stdin is not None:
+            holder.stdin.write("\n")
+            holder.stdin.flush()
+        _stdout, stderr = holder.communicate(timeout=10)
+        assert holder.returncode == 0, stderr
+
+    assert not lock_path.exists()
+
+
+def test_inherited_shared_mutation_lock_requires_exact_safe_owner_token(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    lock_path.parent.mkdir(mode=0o700)
+    lock_path.mkdir(mode=0o700)
+    token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    token = "a" * 64
+    token_path.write_text(token + "\n", encoding="ascii")
+    token_path.chmod(0o600)
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+
+    with module.public_edge_mutation_lock(activate=True, inherited_token=token) as acquired:
+        assert acquired == lock_path
+    assert lock_path.is_dir()
+    assert token_path.is_file()
+
+    with pytest.raises(module.PublicEdgeMutationLockUnavailable, match="does not own"):
+        with module.public_edge_mutation_lock(
+            activate=True,
+            inherited_token="b" * 64,
+        ):
+            pass
+    token_path.chmod(0o644)
+    with pytest.raises(module.PublicEdgeMutationLockUnavailable, match="unsafe identity"):
+        with module.public_edge_mutation_lock(activate=True, inherited_token=token):
+            pass
+
+
+def test_shared_mutation_lock_rejects_unsafe_root_without_repairing_it(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_root = tmp_path / ".state"
+    lock_root.mkdir(mode=0o755)
+    lock_root.chmod(0o755)
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_root / "public-edge-mutation.lock"
+
+    with pytest.raises(
+        module.PublicEdgeMutationLockUnavailable,
+        match="mode-0700",
+    ):
+        with module.public_edge_mutation_lock(activate=True):
+            pass
+
+    assert lock_root.stat().st_mode & 0o777 == 0o755
+    assert not module.PUBLIC_EDGE_MUTATION_LOCK.exists()
+
+
+def test_shared_mutation_lock_cleanup_never_unlinks_replaced_token_target(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+    victim = tmp_path / "victim"
+    victim.write_text("preserve\n", encoding="utf-8")
+
+    with pytest.raises(
+        module.PublicEdgeMutationLockUnavailable,
+        match="owner token changed identity",
+    ):
+        with module.public_edge_mutation_lock(activate=True):
+            token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+            token_path.unlink()
+            token_path.symlink_to(victim)
+
+    assert victim.read_text(encoding="utf-8") == "preserve\n"
+    assert (lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE).is_symlink()
+
+
+def test_main_persists_shared_mutation_lock_receipt_while_both_locks_are_held(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    output = tmp_path / "receipt.json"
+    release_channel_receipt = tmp_path / "release.json"
+    release_channel_receipt.write_text("{}\n", encoding="utf-8")
+    args = publisher_args(
+        output=output,
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256="0" * 64,
+        source_root=source_root,
+        staging_root=tmp_path / "staging" / "app",
+        active_root=tmp_path / "active" / "app",
+        backup_root=tmp_path / "backups",
+        build_root=tmp_path / "build",
+    )
+    args.activate = True
+    module.PUBLIC_EDGE_MUTATION_LOCK = tmp_path / ".state" / "public-edge-mutation.lock"
+    monkeypatch.setattr(module, "parse_args", lambda: args)
+    monkeypatch.setattr(
+        module,
+        "require_disk_capacity",
+        lambda **_kwargs: {"status": "pass"},
+    )
+    monkeypatch.setattr(module, "invalidate_prior_publisher_outputs", lambda _plan: [])
+
+    def fake_materialize(path: Path, **_kwargs):
+        payload = {"contractName": module.CONTRACT_NAME, "status": "pass"}
+        module.atomic_write_json(path, payload)
+        return payload
+
+    monkeypatch.setattr(module, "materialize", fake_materialize)
+
+    assert module.main() == 0
+    capsys.readouterr()
+
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert persisted["sharedMutationLock"] == {
+        "required": True,
+        "status": "held",
+        "path": str(module.PUBLIC_EDGE_MUTATION_LOCK),
+        "inherited": False,
+        "acquiredBeforeOverlayPublishLock": True,
+    }
+    assert not module.PUBLIC_EDGE_MUTATION_LOCK.exists()
 def publisher_args(
     *,
     output: Path,
@@ -670,6 +895,8 @@ def publisher_args(
         reuse_staging=False,
         skip_backup_on_activate=False,
         activation_mode="copy",
+        minimum_free_disk_bytes=0,
+        allow_low_disk_capacity=False,
     )
 
 
@@ -2094,6 +2321,7 @@ def test_materialize_rejects_mismatched_release_channel_digest_before_cleanup_or
             active_root=tmp_path / "overlay" / "app",
             backup_root=tmp_path / "backups",
             build_root=build_root,
+            minimum_free_disk_bytes=0,
             run_command_fn=fail_if_called,
         )
 
@@ -2158,6 +2386,7 @@ def test_materialize_rejects_forged_verification_program_envelope(
         active_root=active_root,
         backup_root=tmp_path / "backups",
         build_root=build_root,
+        minimum_free_disk_bytes=0,
         run_command_fn=fake_run,
         verify_overlay_fn=forged_verify,
     )
@@ -2543,7 +2772,7 @@ def test_materialize_does_not_activate_when_verification_fails(tmp_path: Path) -
             "landingMissingMarkers": [
                 "#turn-runsite-card",
                 'const normalizedHash = window.location.hash.split("?")[0];',
-                "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
+                "window.location.replace(`/mobile/player${normalizedHash}`);",
             ],
             "landingBrowserRedirect": {
                 "status": "fail",
@@ -3354,15 +3583,44 @@ def test_build_overlay_verification_env_keeps_play_projection_absent() -> None:
     env = module.build_overlay_verification_env(
         "http://127.0.0.1:5010",
         "http://127.0.0.1:6123/",
+        runtime_state_root=Path("/overlay/app/state"),
+        runtime_release_shelf_root=Path("/proof/release-shelf"),
     )
 
     assert "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" not in env
     assert "CHUMMER_PUBLIC_PLAY_PROXY_URL" not in env
+    assert (
+        env["CHUMMER_DATA_PROTECTION_KEYS_PATH"]
+        == "/overlay/app/state/data-protection-keys"
+    )
+    assert env["CHUMMER_DOWNLOADS_SOURCE_ROOT"] == "/proof/release-shelf"
     assert env["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] == "http://127.0.0.1:6123/feedback"
     assert env["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] == "http://127.0.0.1:6123/roadmap"
     assert env["GOOGLE_OIDC_CLIENT_ID"] == "local-overlay-proof-client"
     assert env["GOOGLE_OIDC_CLIENT_SECRET"] == "local-overlay-proof-secret"
     assert env["GOOGLE_OIDC_REDIRECT_URI"] == "http://127.0.0.1:5010/auth/google/callback"
+
+
+def test_landing_marker_contract_requires_direct_play_and_forbids_stale_disabled_control() -> None:
+    module = load_module()
+
+    assert module.REQUIRED_LANDING_MARKERS["playDirectTarget"] == 'href="/mobile/player"'
+    assert (
+        module.REQUIRED_LANDING_MARKERS["turnAnchorRedirect"]
+        == "window.location.replace(`/mobile/player${normalizedHash}`);"
+    )
+    assert (
+        module.FORBIDDEN_LANDING_MARKERS["playDisabledTarget"]
+        == 'data-disabled-target="/mobile/player"'
+    )
+    assert (
+        module.FORBIDDEN_LANDING_MARKERS["playSignInRoute"]
+        == 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"'
+    )
+    assert (
+        module.FORBIDDEN_LANDING_MARKERS["turnAnchorQueryReplay"]
+        == "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);"
+    )
 
 
 def test_isolated_overlay_process_env_scrubs_every_inherited_retired_play_transport_name(tmp_path: Path) -> None:
@@ -3490,15 +3748,7 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3515,11 +3765,22 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
     monkeypatch.setattr(module.subprocess, "Popen", fake_popen)
     captured_command: list[str] = []
     captured_child_timeout: list[float] = []
+    runtime_manifest_sha256 = ""
 
     def fake_run(command, *, cwd, check, text, stdout, stderr, pass_fds, timeout):
+        nonlocal runtime_manifest_sha256
         captured_command.extend(command)
         captured_child_timeout.append(timeout)
         assert len(pass_fds) == 1
+        runtime_manifest_path = Path(
+            command[command.index("--public-release-manifest") + 1]
+        )
+        assert runtime_manifest_path.parent == Path(
+            captured_env["CHUMMER_DOWNLOADS_SOURCE_ROOT"]
+        )
+        runtime_manifest_sha256 = hashlib.sha256(
+            runtime_manifest_path.read_bytes()
+        ).hexdigest()
         write_child_verification_receipt(
             verification_receipt_path,
             release_channel_receipt,
@@ -3542,6 +3803,11 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
     assert receipt["status"] == "pass"
     assert captured_env["ASPNETCORE_URLS"] == "http://127.0.0.1:5015"
     assert captured_env["URLS"] == "http://127.0.0.1:5015"
+    assert (
+        captured_env["CHUMMER_DATA_PROTECTION_KEYS_PATH"]
+        == str(staging_root / "state" / "data-protection-keys")
+    )
+    assert runtime_manifest_sha256 == release_channel_receipt_sha256
     assert "HTTP_PORTS" not in captured_env
     assert "HTTPS_PORTS" not in captured_env
     assert "ASPNETCORE_HTTP_PORTS" not in captured_env
@@ -3553,6 +3819,10 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
     invocation_arg_index = captured_command.index("--invocation-id")
     assert captured_command[receipt_arg_index + 1] == str(release_channel_receipt)
     assert captured_command[digest_arg_index + 1] == release_channel_receipt_sha256
+    public_manifest_arg_index = captured_command.index("--public-release-manifest")
+    assert captured_command[public_manifest_arg_index + 1].endswith(
+        "/release-shelf/RELEASE_CHANNEL.generated.json"
+    )
     assert len(captured_command[invocation_arg_index + 1]) == 32
     assert len(captured_child_timeout) == 1
     assert 0 < captured_child_timeout[0] <= 5.0
@@ -3565,6 +3835,11 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
     assert receipt["receiptProcessResultConsistent"] is True
     assert receipt["passReceiptContractSatisfied"] is True
     assert receipt["releaseChannelReceiptSha256Actual"] == release_channel_receipt_sha256
+    assert receipt["runtimeReleaseShelf"]["matchesSelectedReceipt"] is True
+    assert (
+        receipt["runtimeReleaseShelf"]["canonicalManifestSha256"]
+        == release_channel_receipt_sha256
+    )
     assert receipt["verificationProgramsMatch"] is True
     assert receipt["receiptProgramBindingsMatch"] is True
     assert receipt["verifierProgramExecutionMode"] == "sealed_memfd_from_content_addressed_snapshot"
@@ -3746,15 +4021,7 @@ def test_verify_published_overlay_requires_landing_anchor_redirect_markers(tmp_p
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3789,6 +4056,8 @@ def test_verify_published_overlay_requires_landing_anchor_redirect_markers(tmp_p
     assert receipt["status"] == "pass"
     assert receipt["landingMarkerStatus"] == "pass"
     assert receipt["landingMissingMarkers"] == []
+    assert receipt["landingForbiddenMarkers"] == []
+    assert all(receipt["landingForbiddenMarkerChecks"].values())
     assert receipt["landingMarkerChecks"]["turnAnchorNormalizedHash"] is True
     assert receipt["landingMarkerChecks"]["turnAnchorRedirect"] is True
     assert receipt["landingBrowserRedirect"]["status"] == "pass"
@@ -3813,15 +4082,7 @@ def test_verify_published_overlay_allows_release_posture_only_receipt_failures(t
         if path == "/status":
             return "<h1>Preview downloads</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3860,7 +4121,8 @@ def test_verify_published_overlay_allows_release_posture_only_receipt_failures(t
             "release_manifest_status_matches_release_channel": True,
             "release_manifest_version_matches_release_channel": True,
             "release_manifest_published_at_matches_release_channel": True,
-            "release_manifest_proof_freshness_matches_release_channel": True,
+            "release_manifest_proof_freshness_matches_release_channel": False,
+            "release_manifest_proof_freshness_compatible_with_release_channel": True,
             "release_manifest_supportability_compatible_with_release_channel": True,
             "release_manifest_rollout_compatible_with_release_channel": True,
             "release_manifest_internal_supportability_consistent": True,
@@ -3918,11 +4180,9 @@ def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_m
             return "<h1>Status</h1>"
         if path == "/":
             return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                ]
+                marker
+                for name, marker in module.REQUIRED_LANDING_MARKERS.items()
+                if name != "turnAnchorRedirect"
             )
         raise AssertionError(f"unexpected path {path}")
 
@@ -3952,9 +4212,12 @@ def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_m
     )
 
     assert receipt["status"] == "fail"
-    assert receipt["reason"] == "landing_marker_missing"
+    assert receipt["reason"] == "landing_marker_invalid"
     assert receipt["landingMarkerStatus"] == "fail"
-    assert "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);" in receipt["landingMissingMarkers"]
+    assert (
+        "window.location.replace(`/mobile/player${normalizedHash}`);"
+        in receipt["landingMissingMarkers"]
+    )
     assert receipt["receiptSummary"]["landingHasTurnAnchorRedirect"] is False
 
 
@@ -3974,15 +4237,7 @@ def test_verify_published_overlay_fails_when_browser_redirect_does_not_canonical
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -4050,15 +4305,7 @@ def test_verify_published_overlay_fails_when_local_live_surface_parity_fails(tmp
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)

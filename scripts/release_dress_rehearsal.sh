@@ -38,7 +38,7 @@ python3 scripts/verify_ea_operator_readiness.py
 python3 scripts/materialize_mymedia_public_surface.py
 python3 scripts/verify_mymedia_public_surface.py
 python3 scripts/sync_important_work_to_teable.py --sync
-python3 scripts/materialize_release_ready_receipt.py --force-global-verifier
+env -u PYTHONPATH PATH=/usr/bin:/bin python3 scripts/materialize_release_ready_receipt.py --force-global-verifier
 python3 scripts/materialize_operator_release_dashboard.py
 dotnet test Chummer.Tests/Chummer.Tests.csproj --filter ParticipantNotification
 python3 -m pytest -q tests/test_ea_operator_notification_delivery.py

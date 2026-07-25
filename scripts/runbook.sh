@@ -23,6 +23,38 @@ UPSTREAM_LEGACY="${UPSTREAM_LEGACY:-http://chummer-web:8080}"
 UPSTREAM_UI_SERVICE="${UPSTREAM_UI_SERVICE:-http://chummer-blazor:8080}"
 UPSTREAM_HOST_INTERNAL="${UPSTREAM_HOST_INTERNAL:-http://host.docker.internal:8088}"
 
+print_release_shelf_cutover_runbook() {
+  echo "Controlled first release-shelf activation:"
+  echo "  1. Explicitly set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=false."
+  echo "  2. Explicitly set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true."
+  echo "  3. Perform exactly one governed activation; do not retry an unknown outcome."
+  echo "  4. Verify current.json, .release-shelf-layout-v1, and the matching committed activation receipt."
+  echo "  5. Permanently set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=true."
+  echo "  6. Permanently set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false."
+  echo "  7. Restart the public edge and verify /api/ready/publication before serving downloads."
+}
+
+if [[ "$RUNBOOK_MODE" == "release-shelf-cutover-help" ]]; then
+  print_release_shelf_cutover_runbook
+  exit 0
+fi
+
+assert_legacy_release_shelf_target() {
+  local target_root="${1:-}"
+  if [[ -z "$target_root" ]]; then
+    echo "legacy release shelf target is required" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "Refusing runbook mutation into server-journal-owned release shelf: $target_root" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-layout-v1" || -e "$target_root/current.json" ]]; then
+    echo "Refusing legacy runbook manifest mutation into generation-aware shelf: $target_root" >&2
+    return 1
+  fi
+}
+
 if ! command -v rg >/dev/null 2>&1; then
   echo "ripgrep (rg) is required for this runbook." >&2
   exit 1
@@ -80,11 +112,11 @@ ensure_hub_cloudflare_tunnel() {
     return 0
   fi
 
-  local compose_file="$REPO_ROOT/legacy/tooling/docker/docker-compose.yml"
+  local compose_file="$REPO_ROOT/docker-compose.public-edge.yml"
   local tunnel_log
   tunnel_log="$(mktemp)"
   set +e
-  run_compose_with_optional_env_file -f "$compose_file" --profile portal up -d chummer-run-cloudflared 2>&1 | tee "$tunnel_log"
+  run_compose_with_optional_env_file -f "$compose_file" up -d chummer-run-cloudflared 2>&1 | tee "$tunnel_log"
   local status=${PIPESTATUS[0]}
   set -e
   cat "$tunnel_log" >> "$log_file" 2>/dev/null || true
@@ -213,6 +245,15 @@ if [[ "$RUNBOOK_MODE" == "local-tests" ]]; then
     else
       TEST_NUGET_SOFT_FAIL=1
     fi
+  fi
+  if [[ -z "$TEST_FRAMEWORK" && "$TEST_PROJECT" == *"Chummer.Tests/Chummer.Tests.csproj"* ]]; then
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+      MINGW*|MSYS*|CYGWIN*|Windows_NT)
+        ;;
+      *)
+        TEST_FRAMEWORK=net10.0
+        ;;
+    esac
   fi
   if [[ -n "$TEST_FRAMEWORK" ]]; then
     framework_args=(-f "$TEST_FRAMEWORK")
@@ -469,6 +510,12 @@ if [[ "$RUNBOOK_MODE" == "parity-checklist" ]]; then
 fi
 
 if [[ "$RUNBOOK_MODE" == "downloads-manifest" ]]; then
+  RUNBOOK_MANIFEST_PATH="${MANIFEST_PATH:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/releases.json}"
+  RUNBOOK_PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-$REPO_ROOT/Chummer.Portal/downloads/releases.json}"
+  RUNBOOK_AUTHORITATIVE_PUBLISHED_ROOT="${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISHED_ROOT:-${CHUMMER_HUB_REGISTRY_ROOT:-$REPO_ROOT/../chummer-hub-registry}/.codex-studio/published}"
+  assert_legacy_release_shelf_target "$(dirname "$RUNBOOK_MANIFEST_PATH")"
+  assert_legacy_release_shelf_target "$(dirname "$RUNBOOK_PORTAL_MANIFEST_PATH")"
+  assert_legacy_release_shelf_target "$RUNBOOK_AUTHORITATIVE_PUBLISHED_ROOT"
   MANIFEST_LOG_FILE="${MANIFEST_LOG_FILE:-$(resolve_runbook_log_file chummer-downloads-manifest)}"
   set +e
   bash scripts/generate-releases-manifest.sh 2>&1 | tee "$MANIFEST_LOG_FILE"

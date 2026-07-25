@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-import hashlib
 import json
 import os
 import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -33,6 +33,8 @@ DISCOVERY_MAX_DEPTH = 6
 STALE_DIRECTORY_SAMPLE_LIMIT = 5
 STAGE_VISUAL_PROOF_RECEIPT_NAME = "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json"
 PASS_STATUSES = {"pass", "passed", "ready"}
+AUTO_IMPORT_CONTRACT_NAME_V1 = "chummer.windows_installer_visual_audit_auto_import.v1"
+AUTO_IMPORT_CONTRACT_NAME = "chummer.windows_installer_visual_audit_auto_import.v2"
 
 configure_process_tmpdir(workspace_root=ROOT.parent)
 
@@ -71,6 +73,11 @@ def program_bindings_for_receipt() -> dict[str, Any]:
 
 def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+AUTO_IMPORT_RUNTIME_STARTED_AT_UTC = now_iso()
+AUTO_IMPORT_WATCHER_INSTANCE_ID = ""
+AUTO_IMPORT_WATCHER_STARTED_AT_UTC = ""
 
 
 SENSITIVE_WAITING_RECEIPT_KEYS = {
@@ -116,23 +123,58 @@ SENSITIVE_WAITING_RECEIPT_KEY_MARKERS = (
     "token",
 )
 
+REDACTED_VALUE_KINDS = {
+    "boolean",
+    "mapping",
+    "null",
+    "number",
+    "other",
+    "sequence",
+    "text",
+}
+IMPORT_FAILURE_TYPE_ALLOWLIST = {
+    "BadZipFile": ("BadZipFile", "artifact_bundle_invalid"),
+    "FileNotFoundError": ("FileNotFoundError", "artifact_file_missing"),
+    "JSONDecodeError": ("JSONDecodeError", "artifact_metadata_invalid"),
+    "OSError": ("OSError", "artifact_io_failed"),
+    "PermissionError": ("PermissionError", "artifact_access_denied"),
+    "SystemExit": ("SystemExit", "artifact_validation_failed"),
+}
+
+
+def redacted_value_kind(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (str, bytes, bytearray)):
+        return "text"
+    if isinstance(value, dict):
+        return "mapping"
+    if isinstance(value, (list, tuple)):
+        return "sequence"
+    if isinstance(value, (int, float)):
+        return "number"
+    return "other"
+
+
+def redacted_value_present(value: Any, kind: str) -> bool:
+    if kind == "null":
+        return False
+    if kind in {"text", "mapping", "sequence"}:
+        return len(value) > 0
+    return True
+
 
 def redacted_value_receipt(value: Any) -> dict[str, Any]:
-    try:
-        encoded = json.dumps(
-            value,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    except (TypeError, ValueError):
-        encoded = str(value).encode("utf-8", errors="replace")
+    value_kind = redacted_value_kind(value)
+    if value_kind not in REDACTED_VALUE_KINDS:
+        value_kind = "other"
     return {
         "redacted": True,
-        "value_type": type(value).__name__,
-        "byte_count": len(encoded),
-        "sha256": hashlib.sha256(encoded).hexdigest().lower(),
-        "present": bool(value),
+        "value_type": value_kind,
+        "value_kind": value_kind,
+        "present": redacted_value_present(value, value_kind),
     }
 
 
@@ -159,6 +201,70 @@ def redact_waiting_receipt_value(value: Any, *, key: str = "") -> Any:
     return value
 
 
+def auto_import_contract_fields() -> dict[str, Any]:
+    return {
+        "contract_name": AUTO_IMPORT_CONTRACT_NAME,
+        "contract_version": 2,
+        "supersedes_contract_name": AUTO_IMPORT_CONTRACT_NAME_V1,
+    }
+
+
+def runtime_binding_for_receipt(
+    intake_request: Path,
+    *,
+    path_free: bool = False,
+) -> dict[str, Any]:
+    return {
+        "pid": os.getpid(),
+        "started_at_utc": AUTO_IMPORT_RUNTIME_STARTED_AT_UTC,
+        "watcher_instance_id": AUTO_IMPORT_WATCHER_INSTANCE_ID,
+        "watcher_started_at_utc": AUTO_IMPORT_WATCHER_STARTED_AT_UTC,
+        "intake_request": (
+            intake_request.name
+            if path_free
+            else str(intake_request)
+        ),
+    }
+
+
+def configure_runtime_watcher_binding(
+    watcher_instance_id: Any,
+    watcher_started_at_utc: Any,
+) -> None:
+    global AUTO_IMPORT_WATCHER_INSTANCE_ID, AUTO_IMPORT_WATCHER_STARTED_AT_UTC
+    instance_text = str(watcher_instance_id or "").strip()
+    if (
+        len(instance_text) > 128
+        or any(not (character.isalnum() or character in {"-", "_"}) for character in instance_text)
+    ):
+        instance_text = ""
+    started_text = str(watcher_started_at_utc or "").strip()
+    if len(started_text) > 64:
+        started_text = ""
+    AUTO_IMPORT_WATCHER_INSTANCE_ID = instance_text
+    AUTO_IMPORT_WATCHER_STARTED_AT_UTC = started_text
+
+
+def path_free_receipt_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): path_free_receipt_value(child_value)
+            for key, child_value in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [path_free_receipt_value(item) for item in value]
+    if isinstance(value, Path):
+        return value.name or "."
+    if isinstance(value, str):
+        try:
+            candidate = Path(value)
+        except (TypeError, ValueError):
+            return value
+        if candidate.is_absolute():
+            return candidate.name or "."
+    return value
+
+
 def auto_import_side_effects_paused() -> bool:
     return AUTO_IMPORT_SIDE_EFFECTS_PAUSE_FLAG.is_file()
 
@@ -173,9 +279,78 @@ def load_json(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def fsync_directory(path: Path) -> None:
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_descriptor = os.open(path, directory_flags)
+    try:
+        os.fsync(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
+
+
+def ensure_durable_parent(path: Path) -> None:
+    missing: list[Path] = []
+    cursor = path.parent
+    while True:
+        try:
+            cursor_mode = cursor.lstat().st_mode
+        except FileNotFoundError:
+            missing.append(cursor)
+            parent = cursor.parent
+            if parent == cursor:
+                raise OSError("durable receipt parent has no existing ancestor")
+            cursor = parent
+            continue
+        if stat.S_ISLNK(cursor_mode) or not stat.S_ISDIR(cursor_mode):
+            raise ValueError("durable receipt parent must be a real directory")
+        break
+
+    for directory in reversed(missing):
+        os.mkdir(directory, mode=0o755)
+        created_mode = directory.lstat().st_mode
+        if stat.S_ISLNK(created_mode) or not stat.S_ISDIR(created_mode):
+            raise ValueError("durable receipt parent must be a real directory")
+        fsync_directory(directory.parent)
+
+
+def durable_replace_text(path: Path, text: str) -> None:
+    ensure_durable_parent(path)
+    try:
+        target_stat = path.lstat()
+    except FileNotFoundError:
+        target_mode = 0o644
+    else:
+        if stat.S_ISLNK(target_stat.st_mode) or not stat.S_ISREG(target_stat.st_mode):
+            raise ValueError("durable write target must be a regular file")
+        target_mode = stat.S_IMODE(target_stat.st_mode)
+
+    file_descriptor, temp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temp_path = Path(temp_name)
+    try:
+        os.fchmod(file_descriptor, target_mode)
+        handle = os.fdopen(file_descriptor, "w", encoding="utf-8", newline="\n")
+        file_descriptor = -1
+        with handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        fsync_directory(path.parent)
+    finally:
+        if file_descriptor >= 0:
+            os.close(file_descriptor)
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    durable_replace_text(path, json.dumps(payload, indent=2) + "\n")
 
 
 def materialize_intake_request(path: Path, downloads_root: Path) -> dict[str, Any]:
@@ -213,17 +388,18 @@ def materialize_intake_request(path: Path, downloads_root: Path) -> dict[str, An
     ):
         raise SystemExit("intake materializer program bytes drifted during refresh")
     if completed.returncode != 0:
-        stdout_receipt = proof_importer.redacted_stream_receipt(completed.stdout)
-        stderr_receipt = proof_importer.redacted_stream_receipt(completed.stderr)
-        raise SystemExit(
-            "failed to materialize windows installer intake request: "
-            f"returncode={completed.returncode}; "
-            f"stdout_receipt={json.dumps(stdout_receipt, sort_keys=True)}; "
-            f"stderr_receipt={json.dumps(stderr_receipt, sort_keys=True)}"
+        returncode = (
+            completed.returncode
+            if isinstance(completed.returncode, int)
+            and not isinstance(completed.returncode, bool)
+            else 1
         )
+        raise SystemExit(
+            f"intake_materializer_failed:returncode={returncode}"
+        ) from None
     payload = load_json(path)
     if not payload:
-        raise SystemExit(f"materialized intake request is unreadable: {path}")
+        raise SystemExit("intake_materializer_output_unreadable") from None
     return payload
 
 
@@ -393,7 +569,7 @@ def startup_receipt_candidate_path(candidate_root: Path) -> Path:
     return candidate_root / "Chummer.Portal" / "downloads" / "startup-smoke" / proof_importer.STARTUP_RECEIPT_NAME
 
 
-def startup_receipt_bundle_required(intake: dict[str, Any]) -> bool:
+def intake_requests_visual_only_directory_hint(intake: dict[str, Any]) -> bool:
     artifact_intake = intake.get("artifact_intake") if isinstance(intake.get("artifact_intake"), dict) else {}
     operator_request = intake.get("operator_request") if isinstance(intake.get("operator_request"), dict) else {}
     for value in (
@@ -402,7 +578,11 @@ def startup_receipt_bundle_required(intake: dict[str, Any]) -> bool:
         intake.get("startup_receipt_bundle_required"),
     ):
         if isinstance(value, bool):
-            return value
+            return not value
+    return False
+
+
+def startup_receipt_bundle_required(_intake: dict[str, Any]) -> bool:
     return True
 
 
@@ -410,7 +590,7 @@ def resolved_visual_source_candidate_path(candidate_root: Path, intake: dict[str
     standard_path = visual_source_candidate_path(candidate_root)
     if standard_path.is_file():
         return standard_path
-    if startup_receipt_bundle_required(intake):
+    if not intake_requests_visual_only_directory_hint(intake):
         return None
     portable_path = portable_visual_source_candidate_path(candidate_root)
     if portable_path.is_file():
@@ -423,9 +603,9 @@ def directory_candidate_complete(candidate_root: Path, intake: dict[str, Any], *
         visual_source = resolved_visual_source_candidate_path(candidate_root, intake)
     if visual_source is None or not visual_source.is_file():
         return False
-    if startup_receipt_bundle_required(intake):
-        return startup_receipt_candidate_path(candidate_root).is_file()
-    return True
+    if startup_receipt_candidate_path(candidate_root).is_file():
+        return True
+    return intake_requests_visual_only_directory_hint(intake)
 
 
 def file_row(path: Path, discovery_kind: str, priority: int) -> dict[str, Any]:
@@ -1093,8 +1273,9 @@ def build_waiting_payload(
             normalized_row["manual_import_command"] = manual_import_command(Path(path_text), intake_request)
         matching_directory_rows.append(normalized_row)
     payload = {
-        "contract_name": "chummer.windows_installer_visual_audit_auto_import.v1",
+        **auto_import_contract_fields(),
         "program_bindings": program_bindings_for_receipt(),
+        "runtime_binding": runtime_binding_for_receipt(intake_request),
         "generated_at_utc": now_iso(),
         "status": "waiting_for_artifact",
         "artifact": str(artifact) if artifact else None,
@@ -1291,8 +1472,9 @@ def build_result_payload(
     else:
         status = "fail"
     payload = {
-        "contract_name": "chummer.windows_installer_visual_audit_auto_import.v1",
+        **auto_import_contract_fields(),
         "program_bindings": program_bindings_for_receipt(),
+        "runtime_binding": runtime_binding_for_receipt(intake_request),
         "generated_at_utc": now_iso(),
         "status": status,
         "artifact": str(artifact),
@@ -1313,11 +1495,22 @@ def build_result_payload(
 
 
 def import_failure_details(exc: BaseException) -> dict[str, Any]:
+    safe_type, error_code = IMPORT_FAILURE_TYPE_ALLOWLIST.get(
+        type(exc).__name__,
+        ("Exception", "unexpected_failure"),
+    )
+    message_receipt = {
+        "redacted": True,
+        "value_type": "text",
+        "value_kind": "text",
+        "present": bool(getattr(exc, "args", ())),
+    }
     if isinstance(exc, SystemExit):
-        message = str(exc)
         code = (
             exc.code
-            if isinstance(exc.code, int) and not isinstance(exc.code, bool)
+            if isinstance(exc.code, int)
+            and not isinstance(exc.code, bool)
+            and -255 <= exc.code <= 255
             else None
         )
         code_receipt = (
@@ -1326,14 +1519,16 @@ def import_failure_details(exc: BaseException) -> dict[str, Any]:
             else None
         )
         return {
-            "type": type(exc).__name__,
-            "message_receipt": redacted_value_receipt(message),
+            "type": safe_type,
+            "error_code": error_code,
+            "message_receipt": message_receipt,
             "code": code,
             "code_receipt": code_receipt,
         }
     return {
-        "type": type(exc).__name__,
-        "message_receipt": redacted_value_receipt(str(exc)),
+        "type": safe_type,
+        "error_code": error_code,
+        "message_receipt": message_receipt,
         "code": None,
     }
 
@@ -1348,15 +1543,20 @@ def build_import_failure_payload(
     error: BaseException,
 ) -> dict[str, Any]:
     payload = {
-        "contract_name": "chummer.windows_installer_visual_audit_auto_import.v1",
-        "program_bindings": program_bindings_for_receipt(),
+        **auto_import_contract_fields(),
+        "program_bindings": path_free_receipt_value(program_bindings_for_receipt()),
+        "runtime_binding": runtime_binding_for_receipt(
+            intake_request,
+            path_free=True,
+        ),
         "generated_at_utc": now_iso(),
         "status": "fail",
-        "artifact": str(artifact),
-        "downloads_root": str(downloads_root),
-        "intake_request": str(intake_request),
-        "roots": [portable_path_text(root) for root in roots],
-        "candidates": candidates,
+        "artifact": artifact.name,
+        "downloads_root": downloads_root.name or ".",
+        "intake_request": intake_request.name,
+        "roots": [root.name or "." for root in roots],
+        "candidates": [],
+        "candidate_count": len(candidates),
         "import_failure": import_failure_details(error),
         "post_import_commands": [],
         "failed_command_count": 0,
@@ -1379,8 +1579,9 @@ def build_paused_payload(
     intake: dict[str, Any],
 ) -> dict[str, Any]:
     payload = {
-        "contract_name": "chummer.windows_installer_visual_audit_auto_import.v1",
+        **auto_import_contract_fields(),
         "program_bindings": program_bindings_for_receipt(),
+        "runtime_binding": runtime_binding_for_receipt(intake_request),
         "generated_at_utc": now_iso(),
         "status": "blocked_auto_import_paused",
         "artifact": str(artifact),
@@ -1421,6 +1622,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wait-seconds", type=float, default=0.0, help="Optional wait window for a bundle to appear.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Polling interval while waiting for a bundle.")
     parser.add_argument("--refresh-intake-request", action="store_true", help="Regenerate the intake request before discovery.")
+    parser.add_argument("--watcher-instance-id", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--watcher-started-at-utc", default="", help=argparse.SUPPRESS)
     parser.add_argument(
         "--authorize-external-mutations",
         action="store_true",
@@ -1434,6 +1637,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    configure_runtime_watcher_binding(
+        getattr(args, "watcher_instance_id", ""),
+        getattr(args, "watcher_started_at_utc", ""),
+    )
     intake = ensure_intake_request(
         args.intake_request,
         refresh=args.refresh_intake_request,

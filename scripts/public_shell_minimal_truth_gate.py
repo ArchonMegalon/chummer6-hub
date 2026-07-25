@@ -72,7 +72,8 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         billing_contract,
         RouteContract(
             route="/downloads",
-            required_all=("Stable", "Nightly"),
+            required_all=("Downloads", "Current public installer"),
+            required_any=("Stable", "Nightly", "Preview", "No build is available right now"),
             forbidden=("Released",),
             require_public_meta_urls=True,
         ),

@@ -128,6 +128,7 @@ public sealed class InstallLinkingPostgresConnectionConfigurationTests
         Assert.Equal("runtime", builder.Username);
         Assert.False(builder.IncludeErrorDetail);
         Assert.False(builder.PersistSecurityInfo);
+        Assert.Equal(GssEncryptionMode.Disable, builder.GssEncryptionMode);
         Assert.Equal("chummer-run-install-linking", builder.ApplicationName);
         Assert.Equal(SslMode.VerifyFull, builder.SslMode);
         Assert.Equal(

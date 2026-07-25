@@ -184,6 +184,7 @@ public sealed class AccountsController : Controller
             EntitlementSyncReceiptProjection entitlementSyncReceipts = _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking);
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+            var signedInTrustStatus = _signedInTrustStatus.Build(user, manifest, releaseExperience);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
             if (selectedWorkspace is not null && !string.IsNullOrWhiteSpace(prepQuery))
             {
@@ -228,6 +229,8 @@ public sealed class AccountsController : Controller
                         user,
                         installLinking,
                         campaignSpine,
+                        signedInTrustStatus,
+                        entitlementSyncReceipts,
                         _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
                         _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
                         _participationNotifications.ListReceiptsForUser(user.UserId, 6),
@@ -264,7 +267,7 @@ public sealed class AccountsController : Controller
                 SelectedCreatorPublication: selectedCreatorPublication,
                 SelectedCreatorPublicationDraftDetail: selectedCreatorPublicationRegistry?.DraftDetail,
                 SelectedCreatorPublicationReceipt: selectedCreatorPublicationRegistry?.PublicationReceipt,
-                SignedInTrustStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
+                SignedInTrustStatus: signedInTrustStatus,
                 PrivacyBoundary: _privacyBoundaries.BuildPanel("account"),
                 ParticipationRecognition: _leaderboards.UserRecognitionSummary(user.UserId),
                 ParticipationSession: participationSession,
@@ -505,13 +508,15 @@ public sealed class AccountsController : Controller
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
         AccountCampaignSummary campaignSpine,
+        SignedInTrustStatusPanelViewModel signedInTrustStatus,
+        EntitlementSyncReceiptProjection entitlementSyncReceipts,
         HorizonArtifactAllowanceViewModel? allowance,
         IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
         IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts,
         string? accessNotice)
         => section switch
         {
-            "access" => BuildAccountAccessSectionModel(user, installLinking, accessNotice),
+            "access" => BuildAccountAccessSectionModel(user, installLinking, signedInTrustStatus, entitlementSyncReceipts, accessNotice),
             "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
             "participation" => BuildAccountParticipationSectionModel(user, allowance, participationPackageReceipts, participationActivityReceipts),
             _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
@@ -520,6 +525,8 @@ public sealed class AccountsController : Controller
     private AccountSectionPageViewModel BuildAccountAccessSectionModel(
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
+        SignedInTrustStatusPanelViewModel signedInTrustStatus,
+        EntitlementSyncReceiptProjection entitlementSyncReceipts,
         string? accessNotice)
     {
         List<string> highlights = [];
@@ -573,7 +580,9 @@ public sealed class AccountsController : Controller
                     item.HostLabel ?? item.InstallationId,
                     BuildAccessInstallationSummary(item),
                     activeGrantInstallationIds.Contains(item.InstallationId)))
-                .ToArray());
+                .ToArray(),
+            SignedInTrustStatus: signedInTrustStatus,
+            EntitlementSyncReceipts: entitlementSyncReceipts);
     }
 
     private AccountSectionPageViewModel BuildAccountWorkSectionModel(

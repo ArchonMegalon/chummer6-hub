@@ -199,6 +199,7 @@ def expected_current_proof_routes() -> list[str]:
         "/home/work",
         "/account/access",
         "/account/work",
+        "/account/roster",
         "/account/support",
         "/contact",
         "/downloads",
@@ -3560,11 +3561,11 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
                 path = repo_root / relative_path
                 path.parent.mkdir(parents=True, exist_ok=True)
-                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                if relative_path == Path("Chummer.Run.Api/Services/HubBrowserAuthService.cs"):
                     markers = [
                         marker
                         for marker in markers
-                        if marker != "QueryHelpers.ParseQuery(component[prefix.Length..])"
+                        if marker != "parsed.Fragment.TrimStart('#')"
                     ]
                 path.write_text("\n".join(markers) + "\n", encoding="utf-8")
 
@@ -3572,8 +3573,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier._verify_required_source_markers(errors, repo_root)
 
             self.assertIn(
-                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
-                "QueryHelpers.ParseQuery(component[prefix.Length..])",
+                "Chummer.Run.Api/Services/HubBrowserAuthService.cs missing marker: "
+                "parsed.Fragment.TrimStart('#')",
                 errors,
             )
 
@@ -3585,7 +3586,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
                 path = repo_root / relative_path
                 path.parent.mkdir(parents=True, exist_ok=True)
-                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                if relative_path == Path("Chummer.Run.Api/Services/HubBrowserAuthService.cs"):
                     markers = [
                         marker
                         for marker in markers
@@ -3597,8 +3598,33 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier._verify_required_source_markers(errors, repo_root)
 
             self.assertIn(
-                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                "Chummer.Run.Api/Services/HubBrowserAuthService.cs missing marker: "
                 "string.Equals(parsed.Host, \"install-link\", StringComparison.OrdinalIgnoreCase)",
+                errors,
+            )
+
+    def test_verifier_fail_closes_desktop_callback_sanitizer_delegation_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "=> HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri);"
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                "=> HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri);",
                 errors,
             )
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -12,6 +13,18 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT", DEFAULT_ROOT))
+CAMPAIGN_OS_PROOF_CONTRACT_PATH = DEFAULT_ROOT / "scripts" / "campaign_os_local_proof_v3.py"
+CAMPAIGN_OS_PROOF_CONTRACT_SPEC = importlib.util.spec_from_file_location(
+    "workspace_restore_campaign_os_local_proof_v3",
+    CAMPAIGN_OS_PROOF_CONTRACT_PATH,
+)
+if CAMPAIGN_OS_PROOF_CONTRACT_SPEC is None or CAMPAIGN_OS_PROOF_CONTRACT_SPEC.loader is None:
+    raise RuntimeError("unable to load Campaign OS local proof v3 contract module")
+CAMPAIGN_OS_PROOF_CONTRACT = importlib.util.module_from_spec(
+    CAMPAIGN_OS_PROOF_CONTRACT_SPEC
+)
+sys.modules[CAMPAIGN_OS_PROOF_CONTRACT_SPEC.name] = CAMPAIGN_OS_PROOF_CONTRACT
+CAMPAIGN_OS_PROOF_CONTRACT_SPEC.loader.exec_module(CAMPAIGN_OS_PROOF_CONTRACT)
 PROOF_PATH = Path(
     os.environ.get(
         "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_PROOF",
@@ -506,8 +519,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "@surface.Status.RecoverySummary",
         "surface.Status.RefreshBeforeContinueCount",
         "surface.Status.BlockingConflictCount",
-        "Authority: @HumanizeStatus(receipt.Authority, \"hub\")",
-        "Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString(\"u\")",
+        "Verified by @HumanizeStatus(receipt.Authority, \"Chummer\").",
+        "Last checked @receipt.ObservedAtUtc.UtcDateTime.ToString(\"u\")",
         "@receipt.RecoveryHint",
         "selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault",
         "HumanizeStatus(recovery.StalenessPosture, \"Current receipt\")",
@@ -644,7 +657,7 @@ PROOF_MARKERS = [
     "string.Equals(item.Authority, \"hub_entitlement_ledger\", StringComparison.Ordinal)",
     "!string.IsNullOrWhiteSpace(item.RecoveryHint)",
     "string.Equals(item.Kind, \"entitlement_artifact_drift\", StringComparison.OrdinalIgnoreCase)",
-    "accountSource.Contains(\"Continue is blocked until this receipt is resolved.\"",
+    "accountSource.Contains(\"Finish this item before you continue.\"",
 ]
 
 STANDARD_VERIFY_MARKERS = [
@@ -1295,6 +1308,56 @@ def flatten_required_markers(payload: dict[str, object]) -> set[str]:
     return markers
 
 
+def check_campaign_os_local_proof(missing: list[str]) -> None:
+    if not PROOF_PATH.is_file():
+        missing.append(f"missing local campaign OS proof: {PROOF_PATH}")
+        return
+
+    try:
+        proof_text = PROOF_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        missing.append(f"invalid local campaign OS proof: {PROOF_PATH}: {exc}")
+        return
+
+    reject_forbidden_markers(
+        str(PROOF_PATH),
+        proof_text,
+        FORBIDDEN_PROOF_MARKERS,
+        missing,
+    )
+
+    try:
+        validation = CAMPAIGN_OS_PROOF_CONTRACT.validate_passed_receipt(
+            ROOT,
+            PROOF_PATH,
+        )
+    except OSError:
+        missing.append(
+            f"invalid local campaign OS proof: {PROOF_PATH}: filesystem_error"
+        )
+        return
+
+    if not validation.valid:
+        missing.append(
+            f"invalid local campaign OS proof: {PROOF_PATH}: "
+            f"campaign_os_local_proof_v3:{validation.reason_code}"
+        )
+
+    smoke_source_path = ROOT / "tests" / "RunServicesSmoke" / "Program.cs"
+    try:
+        smoke_source = smoke_source_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        missing.append(f"missing Campaign OS smoke source: {smoke_source_path}: {exc}")
+        return
+
+    require_markers(
+        str(smoke_source_path),
+        smoke_source,
+        PROOF_MARKERS,
+        missing,
+    )
+
+
 def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
     try:
         queue_staging_text = read_absolute_text(path, label)
@@ -1755,26 +1818,7 @@ def main() -> int:
             if marker not in text:
                 missing.append(f"{relative_path}: {marker}")
 
-    if not PROOF_PATH.is_file():
-        missing.append(f"missing local campaign OS proof: {PROOF_PATH}")
-    else:
-        try:
-            proof_text = PROOF_PATH.read_text(encoding="utf-8")
-            reject_forbidden_markers(str(PROOF_PATH), proof_text, FORBIDDEN_PROOF_MARKERS, missing)
-            payload = json.loads(proof_text)
-            if payload.get("status") != "passed":
-                missing.append(f"{PROOF_PATH}: status must be passed")
-            if payload.get("proof_kind") != "source_backed_local_smoke_contract":
-                missing.append(f"{PROOF_PATH}: proof_kind must be source_backed_local_smoke_contract")
-            if payload.get("source_file") != "tests/RunServicesSmoke/Program.cs":
-                missing.append(f"{PROOF_PATH}: source_file must be tests/RunServicesSmoke/Program.cs")
-            proof_markers = flatten_required_markers(payload)
-        except (json.JSONDecodeError, ValueError) as exc:
-            missing.append(f"invalid local campaign OS proof: {PROOF_PATH}: {exc}")
-        else:
-            for marker in PROOF_MARKERS:
-                if marker not in proof_markers:
-                    missing.append(f"{PROOF_PATH}: {marker}")
+    check_campaign_os_local_proof(missing)
 
     try:
         registry_text = read_absolute_text(REGISTRY_PATH, "successor registry")

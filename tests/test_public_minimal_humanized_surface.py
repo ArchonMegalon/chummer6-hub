@@ -28,7 +28,7 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
     assert '@PublicText(Model.Intro)' in trust_page
-    assert 'Pick the next step.' in trust_page
+    assert 'Install, recover access, report a problem, or read quick answers.' in trust_page
     assert 'Start with the closest match.' not in trust_page
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
@@ -164,7 +164,7 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
 
     for expected in (
         "static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
-        "@PublicDownloadText(Model.Manifest.Message)",
+        "@PublicDownloadText(string.IsNullOrWhiteSpace(Model.Manifest.Message) ? emptyDownloadMessage : Model.Manifest.Message)",
         "stableAndNightlyMatch",
         "No newer Nightly right now.",
         'string previewSuffix = IsPublicStableRelease(manifest) ? string.Empty : " (Preview)";',
@@ -269,15 +269,17 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert "Desktop build. Mobile play packet." in landing
     assert 'href="/build"' in landing
     assert 'href="/mobile/player"' in landing
-    assert 'type="button" disabled aria-disabled="true"' in landing
+    assert 'data-mobile-app-handoff="build-mobile-app-handoff"' in landing
+    assert 'data-mobile-app-handoff="mobile-app-handoff"' in landing
     assert "Sign in first" in landing
     assert 'var playAnalyticsEvent = "homepage_open_play";' in landing
     assert 'data-analytics-event="homepage_open_build"' in landing
     assert 'data-analytics-event="@playAnalyticsEvent"' in landing
-    assert 'data-analytics-label="Build">Build</button>' in landing
-    assert 'data-disabled-target="/mobile/player"' in landing
-    assert 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"' in landing
-    assert 'data-analytics-label="Play">Play</button>' in landing
+    assert 'data-analytics-label="Build">Build</a>' in landing
+    assert 'data-analytics-label="Play">Play</a>' in landing
+    assert "site-open-chummer-menu__button--disabled" not in landing
+    assert 'data-disabled-target="/mobile/player"' not in landing
+    assert 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"' not in landing
     assert "/media/product/chummer-desktop-runner.png" in landing
     assert "/media/promo/every-wonder-horizon-promo.mp4" in landing
     assert 'data-homepage-section="runner-roster"' not in landing
@@ -368,7 +370,8 @@ def test_static_receipts_and_proofs_are_never_indexable() -> None:
         )
     )
 
-    assert "app.UseStaticFiles(new StaticFileOptions" in program
+    assert "app.UseWhen(" in program
+    assert "staticFiles => staticFiles.UseStaticFiles(new StaticFileOptions" in program
     assert "OnPrepareResponse = fileContext =>" in program
     assert 'fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy' in program
     assert 'const string NoIndexRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";' in program
@@ -414,8 +417,11 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     ):
         assert forbidden not in combined
 
-    assert "Open mobile view" in mobile
-    assert "Open setup help" in mobile
+    assert 'data-play-surface="install-only"' in mobile
+    assert 'data-live-session="unavailable"' in mobile
+    assert 'data-authority="none"' in mobile
+    assert "No role granted" in mobile
+    assert "How to join" in mobile
     assert "campaign-only details" in ledger_workspace
     assert "Get the app" not in landing
     assert "minimal-inline-links" in landing
@@ -1011,6 +1017,7 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Chummer selects the best installer when it can. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
     assert "No Stable build on this shelf." in downloads
+    assert "Stable and Nightly packages return here once this release is ready." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
@@ -2735,9 +2742,12 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     ):
         assert forbidden not in combined
 
-    assert "offline return path" in mobile
+    assert 'data-play-surface="install-only"' in mobile
+    assert 'data-live-session="unavailable"' in mobile
+    assert 'data-authority="none"' in mobile
+    assert "No role granted" in mobile
     assert "continuity page" not in mobile
-    assert "entry points meet in one shell" in mobile
+    assert "entry points meet in one shell" not in mobile
     assert "This page keeps rule answers short" in knowledge
     assert "Chummer export, not book text" in anarchy
     assert "This page reads Chummer dispatches" in anarchy
@@ -2756,9 +2766,6 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Topic)",
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)",
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Route)",
-        "PublicMobileText(Model.Heading)",
-        "PublicMobileText(Model.InstallabilitySummary)",
-        "PublicMobileText(role.Label)",
         "PublicAnarchyText(Model.Heading)",
         "PublicAnarchyText(Model.ScopeLabel)",
         "PublicAnarchyText(Model.FeaturedProfile.Notes)",
@@ -3294,6 +3301,8 @@ def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
     assert "Social operator focused on negotiation, cover, and team access." not in account
     assert "Restore update:" not in account
     assert "Notes: @PublicFacingCopyHumanizer.Clean(receipt.Proof)" in account
+    assert 'Verified by @HumanizeStatus(receipt.Authority, "Chummer").' in account
+    assert 'Last checked @receipt.ObservedAtUtc.UtcDateTime.ToString("u")' in account
     assert "Observed: @receipt.ObservedAtUtc" not in account
     assert "State: @HumanizeStatus(receipt.StalenessPosture" not in account
     assert "Status: @HumanizeStatus(receipt.ConflictPosture" not in account

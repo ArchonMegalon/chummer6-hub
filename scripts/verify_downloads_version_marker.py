@@ -16,6 +16,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
+
 
 SOURCE_FILES = [
     "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml",
@@ -103,6 +109,20 @@ def load_optional_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def resolve_public_release_manifest_path(path: Path) -> Path:
+    """Resolve the public manifest through an atomic shelf generation.
+
+    A marked shelf never falls back to its legacy root mirror when the pointer
+    is malformed or incomplete.
+    """
+
+    try:
+        mode, active_root, _pointer = resolve_shelf_root(path.parent)
+    except ReleaseShelfError as exc:
+        raise RuntimeError(f"release shelf resolution failed: {exc}") from exc
+    return active_root / path.name if mode == "generation" else path
 
 
 def load_sha256_bound_json(
@@ -415,6 +435,17 @@ def conservative_rollout_floor(expected_rollout_state: str, effective_rollout_st
     return ""
 
 
+def proof_freshness_compatible(expected_status: str, served_status: str) -> bool:
+    expected = str(expected_status or "").strip().lower()
+    served = str(served_status or "").strip().lower()
+    if (
+        expected not in RELEASE_CHANNEL_BOUND_PROOF_STATUSES
+        or served not in RELEASE_CHANNEL_BOUND_PROOF_STATUSES
+    ):
+        return False
+    return served == expected or (expected == "stale" and served == "missing")
+
+
 def served_posture_compatibility(
     manifest: dict[str, Any],
     expected: dict[str, Any],
@@ -468,6 +499,19 @@ def served_posture_compatibility(
         if expected_rollout_state
         else None
     )
+    proof_freshness_exact = (
+        posture["proof_freshness_status"] == expected_proof_freshness_status
+        if expected_proof_freshness_status
+        else None
+    )
+    proof_freshness_is_compatible = (
+        proof_freshness_compatible(
+            expected_proof_freshness_status,
+            posture["proof_freshness_status"],
+        )
+        if expected_proof_freshness_status
+        else None
+    )
     effective_review_rollout = conservative_rollout_floor(
         expected_rollout_state,
         RELEASE_CHANNEL_REVIEW_ROLLOUT_STATE,
@@ -496,7 +540,7 @@ def served_posture_compatibility(
         in RELEASE_CHANNEL_RECOGNIZED_ROLLOUT_STATES
         and expected_registry_rollout_state
         in RELEASE_CHANNEL_RECOGNIZED_ROLLOUT_STATES
-        and posture["proof_freshness_status"] == expected_proof_freshness_status
+        and proof_freshness_is_compatible is True
         and served_supportability_state == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
         and posture["public_trust_supportability_state"]
         == RELEASE_CHANNEL_REVIEW_SUPPORTABILITY_STATE
@@ -519,6 +563,8 @@ def served_posture_compatibility(
         **posture,
         "supportability_exact": supportability_exact,
         "rollout_exact": rollout_exact,
+        "proof_freshness_exact": proof_freshness_exact,
+        "proof_freshness_compatible": proof_freshness_is_compatible,
         "supportability_compatible": supportability_exact is not False or conservative_floor_valid,
         "rollout_compatible": rollout_exact is not False or conservative_floor_valid,
         "conservative_review_floor_valid": conservative_floor_valid,
@@ -1339,6 +1385,7 @@ def verify_live(
     release_manifest_rollout_matches = None
     release_manifest_published_at_matches = None
     release_manifest_proof_freshness_matches = None
+    release_manifest_proof_freshness_compatible = None
     release_manifest_public_trust_supportability_matches = None
     release_manifest_public_trust_rollout_matches = None
     release_manifest_registry_supportability_matches = None
@@ -1445,6 +1492,9 @@ def verify_live(
         )
         release_manifest_supportability_compatible = compatibility["supportability_compatible"]
         release_manifest_rollout_compatible = compatibility["rollout_compatible"]
+        release_manifest_proof_freshness_compatible = compatibility[
+            "proof_freshness_compatible"
+        ]
         release_manifest_conservative_review_floor_applied = compatibility[
             "conservative_review_floor_applied"
         ]
@@ -1481,7 +1531,7 @@ def verify_live(
             release_manifest_proof_freshness_matches = (
                 live_posture["proof_freshness_status"] == expected_proof_freshness_status
             )
-            if not release_manifest_proof_freshness_matches:
+            if not release_manifest_proof_freshness_compatible:
                 failures.append("/downloads RELEASE_CHANNEL proofFreshness.status does not match release channel")
         if expected_public_trust_supportability_state:
             release_manifest_public_trust_supportability_matches = (
@@ -1623,6 +1673,7 @@ def verify_live(
         "release_manifest_published_at_matches_release_channel": release_manifest_published_at_matches,
         "release_manifest_proof_freshness_status": live_posture["proof_freshness_status"],
         "release_manifest_proof_freshness_matches_release_channel": release_manifest_proof_freshness_matches,
+        "release_manifest_proof_freshness_compatible_with_release_channel": release_manifest_proof_freshness_compatible,
         "release_manifest_public_trust_supportability_state": live_posture["public_trust_supportability_state"],
         "release_manifest_public_trust_supportability_matches_release_channel": release_manifest_public_trust_supportability_matches,
         "release_manifest_public_trust_rollout_state": live_posture["public_trust_rollout_state"],
@@ -1764,6 +1815,7 @@ def summarize_checks(checks: list[dict[str, Any]]) -> dict[str, Any]:
                 "release_manifest_published_at_matches_release_channel": live_check.get("release_manifest_published_at_matches_release_channel"),
                 "release_manifest_proof_freshness_status": live_check.get("release_manifest_proof_freshness_status"),
                 "release_manifest_proof_freshness_matches_release_channel": live_check.get("release_manifest_proof_freshness_matches_release_channel"),
+                "release_manifest_proof_freshness_compatible_with_release_channel": live_check.get("release_manifest_proof_freshness_compatible_with_release_channel"),
                 "release_manifest_public_trust_supportability_state": live_check.get("release_manifest_public_trust_supportability_state"),
                 "release_manifest_public_trust_supportability_matches_release_channel": live_check.get("release_manifest_public_trust_supportability_matches_release_channel"),
                 "release_manifest_public_trust_rollout_state": live_check.get("release_manifest_public_trust_rollout_state"),
@@ -1889,18 +1941,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.skip_release_version_match:
         failures.extend(release_channel_failures)
-        public_release_manifest_path = (
+        configured_public_release_manifest_path = (
             Path(args.public_release_manifest)
             if args.public_release_manifest
             else source_root / DEFAULT_PUBLIC_RELEASE_MANIFEST_RELATIVE
         )
-        public_release_result, public_release_failures = verify_public_release_manifest(
-            public_release_manifest_path,
-            release_expectations,
-            release_channel_receipt_sha256_bound=(
-                release_channel_receipt_sha256_bound
-            ),
-        )
+        try:
+            public_release_manifest_path = resolve_public_release_manifest_path(
+                configured_public_release_manifest_path
+            )
+            public_release_result, public_release_failures = verify_public_release_manifest(
+                public_release_manifest_path,
+                release_expectations,
+                release_channel_receipt_sha256_bound=(
+                    release_channel_receipt_sha256_bound
+                ),
+            )
+        except RuntimeError as exc:
+            public_release_result = {
+                "mode": "public_release_manifest",
+                "configured_path": str(configured_public_release_manifest_path),
+                "exists": False,
+                "release_shelf_resolution_failed": True,
+            }
+            public_release_failures = [str(exc)]
         checks.append(public_release_result)
         failures.extend(public_release_failures)
 

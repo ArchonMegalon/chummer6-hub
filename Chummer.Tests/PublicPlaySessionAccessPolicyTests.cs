@@ -15,6 +15,7 @@ public sealed class PublicPlaySessionAccessPolicyTests
     [InlineData("/mobile/gm")]
     [InlineData("/mobile/observer")]
     [InlineData("/mobile/service-worker.js")]
+    [InlineData("/mobile/pwa/ledger.json")]
     public void QueryFreeGetInstallRoutesRemainPublic(string path)
     {
         var context = CreateContext(path);

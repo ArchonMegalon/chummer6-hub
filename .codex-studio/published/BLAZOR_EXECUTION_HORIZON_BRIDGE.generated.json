@@ -1,22 +1,28 @@
 {
   "boundaries": {
+    "does_not_upgrade_full_matrix_to_long_term_browser_parity": true,
     "does_not_upgrade_smoke_to_full": true,
     "full_matrix_requires_current_passing_full_scope_receipt": true,
-    "hub_mobile_pwa_projection_is_not_blazor_full_execution": true
+    "hub_mobile_pwa_projection_is_not_blazor_full_execution": true,
+    "long_term_browser_parity_requires_full_matrix_and_desktop_workflow_parity": true
   },
   "contract_name": "chummer.blazor_execution_horizon_bridge",
   "failures": [],
-  "generated_at_utc": "2026-06-29T11:17:49Z",
+  "generated_at_utc": "2026-07-30T03:13:35Z",
   "notes": [
     "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
     "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",
-    "Living-world opt-in and Black Ledger mobile projection remain Hub-owned; Blazor hosted execution breadth remains presentation-owned."
+    "Living-world opt-in and Black Ledger mobile projection remain Hub-owned; Blazor hosted execution breadth remains presentation-owned.",
+    "Long-term browser parity is only claimed if mid-term execution is proven and desktop workflow parity proof is currently passing."
   ],
   "proofs": {
     "blazor_hosted_execution_horizon": {
       "contract_name": "chummer6-ui.blazor_public_edge_execution_horizon",
-      "mid_term_full_covered_workflow_family_count": 9,
-      "mid_term_full_matrix_status": "not_proven",
+      "long_term_full_browser_parity_path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json",
+      "long_term_full_browser_parity_proof_status": "pass",
+      "long_term_full_browser_parity_status": "proven",
+      "mid_term_full_covered_workflow_family_count": 49,
+      "mid_term_full_matrix_status": "proven",
       "mid_term_full_required_workflow_family_count": 49,
       "near_term_smoke_status": "proven",
       "pass": true,
@@ -31,12 +37,14 @@
       "status": "passed"
     },
     "hub_mobile_pwa_public_projection": {
-      "contract_name": "chummer.mobile_pwa_public_projection",
+      "contract_name": "",
+      "failures": [],
       "pass": true,
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+      "route_drift": [],
       "status": "pass"
     }
   },
   "status": "pass",
-  "verdict": "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven"
+  "verdict": "mobile_pwa_and_blazor_full_matrix_and_long_term_browser_parity_integrated"
 }

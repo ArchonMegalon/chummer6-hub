@@ -15,6 +15,7 @@ SCRIPT = REPO_ROOT / "scripts" / "e2e-portal.cjs"
 class _PortalFixtureHandler(BaseHTTPRequestHandler):
     blazor_mode = "fallback"
     blazor_interaction_mode = "interactive"
+    blazor_root_redirect = False
     blazor_transient_failures_remaining = 0
     billing_mode = "configured"
     auth_mode = "email_and_google"
@@ -30,8 +31,8 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <p>Current public installer: Windows.</p>
                 <p>Current public lane: Preview. Review required.</p>
                 <div class="minimal-open-chummer">
-                <button class="site-open-chummer-menu__button site-open-chummer-menu__button--disabled" disabled data-disabled-target="/build" data-sign-in-href="/login?next=%2Fbuild">Build</button>
-                <button class="site-open-chummer-menu__button site-open-chummer-menu__button--disabled" disabled data-disabled-target="/mobile/player" data-sign-in-href="/login?next=%2Fmobile%2Fplayer">Play</button>
+                <a class="site-open-chummer-menu__button" href="/build">Build</a>
+                <a class="site-open-chummer-menu__button" href="/mobile/player">Play</a>
                 <a href="/login?next=%2Faccount%2Faccess">Sign in first</a>
                 <span>Open Chummer</span>
                 </div>
@@ -52,11 +53,10 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <h1>Downloads</h1>
                 <p>Current public installer</p>
                 <p>Stable</p>
-                <p>Nightly</p>
                 <p>Preview build. Review required.</p>
                 <p>Version run-20260627-005402</p>
                 <p>Build from source</p>
-                <a href="/downloads/source">Download script</a>
+                <a href="/downloads/source/build-chummer6-linux.sh">Download script: build-chummer6-linux.sh</a>
                 <a href="/help">Help</a>
                 </body></html>
                 """
@@ -64,14 +64,14 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/downloads/releases.json":
-            self._send_json('{"version":"0.0.0.1","channel":"stable","downloads":[{"platform":"windows"}]}')
+            self._send_json('{"version":"0.0.0.1","channel":"stable","status":"published","downloads":[{"platform":"windows"}]}')
             return
 
         if path == "/help":
             self._send_html(
                 """
                 <html><body>
-                <h1>What is wrong?</h1>
+                <h1>How can we help?</h1>
                 <p>Pick the next step.</p>
                 <p>Install or update</p>
                 <p>Account recovery</p>
@@ -265,6 +265,11 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             if self.blazor_mode == "ready":
+                if self.blazor_root_redirect:
+                    self.send_response(302)
+                    self.send_header("Location", "/blazor/app?command=character_roster")
+                    self.end_headers()
+                    return
                 self._send_html(
                     """
                     <html>
@@ -292,6 +297,24 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
 
         if path == "/blazor/app":
             if self.blazor_mode == "ready":
+                if (
+                    self.blazor_root_redirect
+                    and "command=character_roster" in self.path
+                ):
+                    self._send_html(
+                        """
+                        <html>
+                        <head><base href="/blazor/"></head>
+                        <body data-route-family="app">
+                        <span>Chummer Online</span>
+                        <h1>Character Roster</h1>
+                        <a href="/blazor/app?command=new_character">New runner</a>
+                        <a href="/blazor/app?command=open_character">Import</a>
+                        </body>
+                        </html>
+                        """
+                    )
+                    return
                 leave_occluding_backdrop = self.blazor_interaction_mode != "interactive"
                 self._send_html(
                     f"""
@@ -402,12 +425,20 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
 
         if path == "/session/":
             self.send_response(302)
-            self.send_header("Location", "/play/")
+            self.send_header("Location", "/mobile/player")
             self.end_headers()
             return
 
-        if path == "/play/":
-            self._send_html("<html><body><h1>Player entry</h1></body></html>")
+        if path == "/mobile/player":
+            self._send_html(
+                """
+                <html><body>
+                <main data-play-surface="install-only" data-install-role="player">
+                <h1>Keep your runner ready at the table.</h1>
+                </main>
+                </body></html>
+                """
+            )
             return
 
         if path == "/coach/":
@@ -457,6 +488,7 @@ class PortalE2EBlazorGateTests(unittest.TestCase):
         require_blazor: bool,
         blazor_mode: str,
         blazor_interaction_mode: str = "interactive",
+        blazor_root_redirect: bool = False,
         blazor_transient_failures: int = 0,
         require_billing_checkout: bool = False,
         billing_mode: str = "configured",
@@ -464,6 +496,7 @@ class PortalE2EBlazorGateTests(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         _PortalFixtureHandler.blazor_mode = blazor_mode
         _PortalFixtureHandler.blazor_interaction_mode = blazor_interaction_mode
+        _PortalFixtureHandler.blazor_root_redirect = blazor_root_redirect
         _PortalFixtureHandler.blazor_transient_failures_remaining = blazor_transient_failures
         _PortalFixtureHandler.billing_mode = billing_mode
         _PortalFixtureHandler.auth_mode = auth_mode
@@ -505,6 +538,19 @@ class PortalE2EBlazorGateTests(unittest.TestCase):
 
     def test_blazor_ready_surface_passes_when_required(self) -> None:
         completed = self.run_script(require_blazor=True, blazor_mode="ready")
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        combined = f"{completed.stdout}\n{completed.stderr}"
+        self.assertIn(f"ok: {self.base_url}/blazor/", combined)
+        self.assertIn(f"ok: {self.base_url}/blazor/app?command=new_character", combined)
+        self.assertIn("portal E2E completed", combined)
+
+    def test_blazor_ready_surface_accepts_canonical_roster_redirect(self) -> None:
+        completed = self.run_script(
+            require_blazor=True,
+            blazor_mode="ready",
+            blazor_root_redirect=True,
+        )
 
         self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
         combined = f"{completed.stdout}\n{completed.stderr}"

@@ -115,7 +115,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [HttpGet("/session")]
     [HttpGet("/session/{**path}")]
     public IActionResult Session()
-        => Redirect("/play");
+        => Redirect("/mobile/player");
 
     [HttpGet("/support")]
     [HttpGet("/support/{**path}")]

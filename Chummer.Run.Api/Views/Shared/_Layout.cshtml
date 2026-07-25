@@ -193,8 +193,11 @@
     var requestQuery = Context?.Request?.QueryString.Value ?? string.Empty;
     var normalizedRequestPath = string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath.TrimEnd('/');
     var requestPathSegments = normalizedRequestPath.AsSpan();
+    var installOnlyMobileSurface = string.Equals(normalizedRequestPath, "/mobile", StringComparison.OrdinalIgnoreCase)
+        || normalizedRequestPath.StartsWith("/mobile/", StringComparison.OrdinalIgnoreCase);
     var clickRankEligible = !authSurface
         && !chrome.Authenticated
+        && !installOnlyMobileSurface
         && !string.IsNullOrWhiteSpace(clickRankSiteId)
         && (
             routeKey is "landing" or "what-is-chummer" or "now" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
@@ -210,6 +213,7 @@
         && requestPathIndexable;
     var rybbitEligible = !authSurface
         && !chrome.Authenticated
+        && !installOnlyMobileSurface
         && !string.IsNullOrWhiteSpace(rybbitSiteId)
         && !string.IsNullOrWhiteSpace(rybbitScriptUrl)
         && (
@@ -334,7 +338,7 @@
                     rybbit.dataset.siteId = "@rybbitSiteId";
                     rybbit.dataset.rybbit = "analytics";
                     rybbit.dataset.tag = "hub_public_shell";
-                    rybbit.dataset.skipPatterns = '["/account/**","/downloads/file/**","/downloads/files/**","/downloads/get/**","/downloads/install/**","/downloads/release-upload/**","/ledger/newsroom/**","/login","/signup"]';
+                    rybbit.dataset.skipPatterns = '["/account/**","/downloads/file/**","/downloads/files/**","/downloads/get/**","/downloads/install/**","/downloads/release-upload/**","/ledger/newsroom/**","/login","/mobile","/mobile/**","/signup"]';
                     rybbit.referrerPolicy = "strict-origin-when-cross-origin";
                     document.head.appendChild(rybbit);
                 };

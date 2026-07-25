@@ -96,6 +96,8 @@ def build_downloads_surface(
             [
                 "Current public installer",
                 "No build is available right now",
+                "Build from source",
+                "Download script",
                 "Help",
             ]
         )
@@ -104,8 +106,6 @@ def build_downloads_surface(
                 "Stable release.",
                 "No Stable build on this shelf.",
                 "Preview build. Review required.",
-                "Build from source",
-                "Download script",
             ]
         )
     else:
@@ -210,6 +210,45 @@ def build_status_surface(
     }
 
 
+def build_mobile_install_surface(
+    path: str,
+    *,
+    role_key: str,
+    role_label: str,
+) -> dict[str, Any]:
+    return {
+        "path": path,
+        "required_texts": [
+            f"Chummer {role_label} · install shell",
+            "Public shell only",
+            "No table data loaded",
+            "No role granted",
+            "Install app",
+            f"{role_label} privacy boundary",
+            f"{role_label} authority boundary",
+        ],
+        "required_html_texts": [
+            'data-play-surface="install-only"',
+            'data-live-session="unavailable"',
+            'data-authority="none"',
+            f'data-install-role="{role_key}"',
+            f'data-role-capabilities="{role_key}"',
+            f'data-role-privacy-warning="{role_key}"',
+            f'data-role-authority-warning="{role_key}"',
+        ],
+        "forbidden_texts": [
+            "Live-session turn companion",
+            "Internal Error",
+            "Authorize Codex access.",
+            "OpenAI account in ChatGPT",
+        ],
+        "forbidden_html_texts": [
+            "data-turn-root",
+            "mobile-turn-companion.js",
+        ],
+    }
+
+
 def build_surfaces(
     require_brilliant_directories_checkout: bool,
     *,
@@ -231,10 +270,10 @@ def build_surfaces(
             "path": "/",
             "required_texts": landing_required_texts,
             "required_html_texts": [
-                "data-disabled-target=\"/build\"",
-                "data-sign-in-href=\"/login?next=%2Fbuild\"",
-                "data-disabled-target=\"/mobile/player\"",
-                "data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\"",
+                'site-open-chummer-menu__button" href="/build"',
+                'data-mobile-app-handoff="build-mobile-app-handoff"',
+                'site-open-chummer-menu__button" href="/mobile/player"',
+                'data-mobile-app-handoff="mobile-app-handoff"',
             ],
             "forbidden_texts": [
                 "Next move",
@@ -250,7 +289,11 @@ def build_surfaces(
                 "Account and quick actions",
             ],
             "forbidden_html_texts": [
-                "site-open-chummer-menu__button\" href=\"/mobile/player\"",
+                "site-open-chummer-menu__button--disabled",
+                'data-disabled-target="/build"',
+                'data-sign-in-href="/login?next=%2Fbuild"',
+                'data-disabled-target="/mobile/player"',
+                'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
             ],
         },
         build_downloads_surface(
@@ -349,109 +392,31 @@ def build_surfaces(
                 "Network error while loading tab configuration",
             ],
         },
-        {
-            "path": "/mobile",
-            "required_texts": [
-                "Live-session turn companion",
-                "Device posture",
-                "Claimed player actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Player\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/player",
-            "required_texts": [
-                "Live-session turn companion",
-                "Claimed player actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Player\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/gm",
-            "required_texts": [
-                "Live-session turn companion",
-                "GM focus actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"GameMaster\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/observer",
-            "required_texts": [
-                "Live-session turn companion",
-                "Observer mirror",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Observer\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/play",
-            "required_texts": [
-                "Player entry",
-                "Open Chummer",
-                "Install this app",
-                "Player, GM, and observer entry points meet in one shell.",
-            ],
-            "required_html_texts": [
-                "data-pwa-ledger-status",
-                "data-pwa-ledger-summary",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
+        build_mobile_install_surface(
+            "/mobile",
+            role_key="player",
+            role_label="Player",
+        ),
+        build_mobile_install_surface(
+            "/mobile/player",
+            role_key="player",
+            role_label="Player",
+        ),
+        build_mobile_install_surface(
+            "/mobile/gm",
+            role_key="gm",
+            role_label="GM",
+        ),
+        build_mobile_install_surface(
+            "/mobile/observer",
+            role_key="observer",
+            role_label="Observer",
+        ),
+        build_mobile_install_surface(
+            "/play",
+            role_key="player",
+            role_label="Player",
+        ),
         {
             "path": "/play/continuity",
             "required_texts": [

@@ -10,7 +10,7 @@ PUBLIC_EDGE_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
     "/manifest.gm.webmanifest",
     "/mobile.css",
-    "/mobile-turn-companion.js",
+    "/mobile-install-shell.js",
 }
 PUBLIC_EDGE_LEGACY_PRIVATE_CACHE_PREFIXES = {
     "chummer-shell-play-shell-",
@@ -304,8 +304,8 @@ def public_edge_v2_offline_failures(payload: dict[str, Any]) -> list[str]:
         return []
 
     failures: list[str] = []
-    if str(payload.get("pwaOfflineCacheCacheVersion") or "").strip() != "v17":
-        failures.append("public-edge postdeploy PWA offline cache version is not v17")
+    if str(payload.get("pwaOfflineCacheCacheVersion") or "").strip() != "v19":
+        failures.append("public-edge postdeploy PWA offline cache version is not v19")
     if str(payload.get("pwaOfflineCacheNavigationPolicy") or "").strip() != "network_only":
         failures.append("public-edge postdeploy PWA offline navigation policy is not network_only")
     if str(payload.get("pwaOfflineCachePrivateStateScope") or "").strip() != "open_tab_only":
@@ -402,31 +402,36 @@ def public_edge_v2_private_identity_failures(payload: dict[str, Any]) -> list[st
     for field, label in (
         ("frontdoorNavigationPrivateIdentityRedacted", "Player artifact private identity redaction"),
         ("frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent", "visible Player URL identity absence"),
-        ("frontdoorNavigationPlayerSessionContextPresent", "Player session context"),
-        ("frontdoorNavigationPlayerDeviceContextPresent", "Player device context"),
         ("frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted", "Player handoff private identity redaction"),
-        ("frontdoorNavigationGmRouteSessionIdPresent", "GM route session context"),
         ("frontdoorNavigationGmRoutePrivateIdentityRedacted", "GM route private identity redaction"),
         ("frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent", "visible GM URL identity absence"),
-        ("frontdoorNavigationGmSessionContextPresent", "GM session context"),
-        ("frontdoorNavigationGmDeviceContextPresent", "GM device context"),
         ("frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted", "GM handoff private identity redaction"),
         ("frontdoorNavigationAnchorPrivateIdentityRedacted", "anchor private identity redaction"),
         ("frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent", "visible anchor URL identity absence"),
-        ("frontdoorNavigationAnchorSessionContextPresent", "anchor session context"),
-        ("frontdoorNavigationAnchorDeviceContextPresent", "anchor device context"),
     ):
         if payload.get(field) is not True:
             failures.append(f"public-edge postdeploy front-door did not prove {label}")
 
-    if not _safe_redacted_handoff(
-        payload.get("frontdoorNavigationPlayerSessionHandoffUrl"), "/mobile/player", "Player"
+    for field, label in (
+        ("frontdoorNavigationPlayerSessionContextPresent", "Player session context"),
+        ("frontdoorNavigationPlayerDeviceContextPresent", "Player device context"),
+        ("frontdoorNavigationLiveTurnCompanionShell", "Player interactive shell"),
+        ("frontdoorNavigationGmRouteSessionIdPresent", "GM route session context"),
+        ("frontdoorNavigationGmSessionContextPresent", "GM session context"),
+        ("frontdoorNavigationGmDeviceContextPresent", "GM device context"),
+        ("frontdoorNavigationGmLiveTurnCompanionShell", "GM interactive shell"),
+        ("frontdoorNavigationAnchorSessionContextPresent", "anchor session context"),
+        ("frontdoorNavigationAnchorDeviceContextPresent", "anchor device context"),
     ):
-        failures.append("public-edge postdeploy front-door Player handoff is not a redacted player route")
-    if not _safe_redacted_handoff(
-        payload.get("frontdoorNavigationGmSessionHandoffUrl"), "/mobile/gm", "GameMaster"
-    ):
-        failures.append("public-edge postdeploy front-door GM handoff is not a redacted GM route")
+        if payload.get(field) is not False:
+            failures.append(
+                f"public-edge postdeploy anonymous front-door unexpectedly exposed {label}"
+            )
+
+    if str(payload.get("frontdoorNavigationPlayerSessionHandoffUrl") or "").strip():
+        failures.append("public-edge postdeploy anonymous Player shell exposed a session handoff")
+    if str(payload.get("frontdoorNavigationGmSessionHandoffUrl") or "").strip():
+        failures.append("public-edge postdeploy anonymous GM shell exposed a session handoff")
     return failures
 
 

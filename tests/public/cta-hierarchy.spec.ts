@@ -35,8 +35,11 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
         .map((item) => (item.textContent || '').replace(/\s+/g, ' ').trim())
         .filter(Boolean),
     );
-    if (nonHeroPrimaryCtas.length > 0) {
-      failures.push(`${viewport.name}: found competing primary CTA(s) outside the hero: ${nonHeroPrimaryCtas.join(', ')}`);
+    const expectedDeviceLaunchCtas = ['Open Build on this device', 'Open Play on this device'];
+    if (JSON.stringify(nonHeroPrimaryCtas) !== JSON.stringify(expectedDeviceLaunchCtas)) {
+      failures.push(
+        `${viewport.name}: device launch CTA set drifted: expected ${expectedDeviceLaunchCtas.join(', ')}, got ${nonHeroPrimaryCtas.join(', ')}`,
+      );
     }
     await expect(page.locator('.site-nav')).toHaveCount(0);
     await expect(page.locator('[data-nav-toggle]')).toHaveCount(0);
@@ -66,6 +69,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '# Homepage Simplification Changelog',
       '',
       '- Hero keeps one primary CTA: `Download Chummer`.',
+      '- The Build and Play handoff cards retain their two explicit on-device launch actions.',
       '- Homepage remains compact: one hero and no repeated support block or download strip.',
       '- Release posture stays off the first screen and lives on Status instead.',
       '- Support paths stay inline in the hero instead of competing as a second CTA block.',

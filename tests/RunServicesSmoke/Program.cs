@@ -47,7 +47,9 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
@@ -91,12 +93,18 @@ using RegistryHubInstallEvent = Chummer.Run.Contracts.Registry.HubInstallEvent;
 using RegistryHubReviewRequest = Chummer.Run.Contracts.Registry.HubReviewRequest;
 using TranscriptionRequest = Chummer.Run.Contracts.Transcription.TranscriptionRequest;
 
+using var campaignProof = CampaignOsRuntimeCheckpointTracker.CreateFromEnvironment();
+
 await VerifyPublicationWorkflowAsync();
 VerifyPublicationControllerHardening();
 VerifyIdentityWorkflow();
 VerifyIdentityEmailDeliveryProviders();
 await VerifyHubCommunitySecurityAndDurabilityAsync();
 await VerifyTeableUserProjectionWorkflowAsync();
+if (campaignProof.Enabled)
+{
+    await VerifyPublicLandingProjectionAsync(campaignProof);
+}
 VerifyRegistryWorkflow();
 VerifyRegistryControllerHardening();
 await VerifyAiGatewayWorkflowAsync();
@@ -111,6 +119,7 @@ await VerifyGmOpsBoardWorkflowAsync();
 VerifyInteropWorkflow();
 await VerifyCreativeWorkflowAsync();
 
+campaignProof.RequireAllCompleted();
 Console.WriteLine("run-services in-process smoke passed");
 
 static bool ContainsLaunchReadinessSignal(string value)
@@ -123,24 +132,9 @@ static bool ContainsLaunchReadinessSignal(string value)
     return value.Contains("route-canary validation", StringComparison.OrdinalIgnoreCase)
         || value.Contains("ready to progress this wave", StringComparison.OrdinalIgnoreCase)
         || value.Contains("launch posture follows current governance signals", StringComparison.OrdinalIgnoreCase)
-        || value.Contains("hold launch expansion", StringComparison.OrdinalIgnoreCase);
-}
-
-static bool ContainsLocalProofLabel(string value)
-{
-    if (string.IsNullOrWhiteSpace(value))
-    {
-        return false;
-    }
-
-    return value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)
-        || value.Contains("Current local release checks", StringComparison.OrdinalIgnoreCase);
-}
-
-static bool ContainsLocalProofPassed(string value)
-{
-    return ContainsLocalProofLabel(value)
-        && value.Contains("passed", StringComparison.OrdinalIgnoreCase);
+        || value.Contains("hold launch expansion", StringComparison.OrdinalIgnoreCase)
+        || (value.Contains("hold parity claims", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("unavailable", StringComparison.OrdinalIgnoreCase));
 }
 
 async Task VerifyPublicationWorkflowAsync()
@@ -406,6 +400,7 @@ void VerifyIdentityWorkflow()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
+            ["IDENTITY_EMAIL_START_ENABLED"] = "true",
             ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
             ["ASPNETCORE_ENVIRONMENT"] = "Development",
             ["IDENTITY_PUBLIC_BASE_URL"] = "http://127.0.0.1:5101"
@@ -453,7 +448,8 @@ void VerifyIdentityWorkflow()
     var secureConfiguration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "secure-identity-store.json")
+            ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "secure-identity-store.json"),
+            ["IDENTITY_EMAIL_START_ENABLED"] = "true"
         })
         .Build();
     var secureIdentity = new IdentityAccessService(secureConfiguration, loggerFactory.CreateLogger<IdentityAccessService>());
@@ -479,6 +475,7 @@ void VerifyIdentityEmailDeliveryProviders()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["IDENTITY_EMAIL_PROVIDER_ORDER"] = "emailit_api",
                 ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
                 ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
                 ["IDENTITY_EMAILIT_FROM_NAME"] = "Chummer Concierge",
@@ -622,7 +619,8 @@ void VerifyIdentityEmailDeliveryProviders()
         var deliveredIdentityConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "delivered-identity-store.json")
+                ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "delivered-identity-store.json"),
+                ["IDENTITY_EMAIL_START_ENABLED"] = "true"
             })
             .Build();
         var deliveredIdentity = new IdentityAccessService(
@@ -658,6 +656,7 @@ void VerifyIdentityEmailDeliveryProviders()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["IDENTITY_PUBLIC_BASE_URL"] = "http://127.0.0.1:5101",
+                ["IDENTITY_EMAIL_PROVIDER_ORDER"] = "emailit_api",
                 ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
                 ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
                 ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
@@ -717,6 +716,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+            ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
             ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
             ["FLEET_RECEIPT_SIGNING_SECRET"] = "smoke-secret",
@@ -2104,16 +2104,66 @@ async Task VerifyTeableUserProjectionWorkflowAsync()
     }
 }
 
-async Task VerifyPublicLandingProjectionAsync()
+async Task VerifyPublicLandingProjectionAsync(CampaignOsRuntimeCheckpointTracker campaignProof)
 {
     var tempRoot = Path.Combine(Path.GetTempPath(), "run-services-smoke", Guid.NewGuid().ToString("N"));
+    string publicCanonRoot = Environment.GetEnvironmentVariable("CHUMMER_CAMPAIGN_OS_CANDIDATE_ROOT") ?? string.Empty;
+    if (!Path.IsPathFullyQualified(publicCanonRoot)
+        || !string.Equals(Path.GetFullPath(publicCanonRoot), publicCanonRoot, StringComparison.Ordinal)
+        || !Directory.Exists(publicCanonRoot)
+        || (File.GetAttributes(publicCanonRoot) & FileAttributes.ReparsePoint) != 0)
+    {
+        throw new InvalidOperationException("Campaign OS proof mode requires an absolute normalized non-symlink candidate root.");
+    }
+
     var storePath = Path.Combine(tempRoot, "community-store.json");
     var downloadsRoot = Path.Combine(tempRoot, "downloads");
     var downloadsFilesRoot = Path.Combine(downloadsRoot, "files");
     var releaseEvidenceRoot = Path.Combine(downloadsRoot, "release-evidence", "browser-lane");
+    var fleetArtifactRoot = Path.Combine(tempRoot, "fleet-artifacts");
+    var proofInputRoot = Path.Combine(tempRoot, "proof-inputs");
+    var localReleaseProofMissingPath = Path.Combine(proofInputRoot, "local-release-proof.missing.json");
+    var flagshipReadinessMissingPath = Path.Combine(proofInputRoot, "flagship-readiness.missing.json");
+    var goldJanitorMissingPath = Path.Combine(proofInputRoot, "gold-janitor.missing.json");
+    var campaignOsProofMissingPath = Path.Combine(proofInputRoot, "campaign-os-local-proof.missing.json");
     Directory.CreateDirectory(downloadsFilesRoot);
     Directory.CreateDirectory(releaseEvidenceRoot);
-    File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
+    Directory.CreateDirectory(fleetArtifactRoot);
+    Directory.CreateDirectory(proofInputRoot);
+    Assert(!Directory.EnumerateFileSystemEntries(fleetArtifactRoot).Any(), "Campaign OS proof fleet-artifact fixture must start empty.");
+
+    string ProofSourcePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathFullyQualified(relativePath))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof source paths must be non-empty relative paths.");
+        }
+
+        string resolvedPath = Path.GetFullPath(Path.Combine(publicCanonRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        string requiredPrefix = publicCanonRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!resolvedPath.StartsWith(requiredPrefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Campaign OS smoke proof source path escapes the staged root: {relativePath}.");
+        }
+
+        return resolvedPath;
+    }
+
+    foreach (string requiredDirectory in new[] { ".codex-design/product", "products/chummer", "Chummer.Run.Api" })
+    {
+        string requiredPath = ProofSourcePath(requiredDirectory);
+        if (!Directory.Exists(requiredPath) || (File.GetAttributes(requiredPath) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException($"Campaign OS candidate root is missing a required non-symlink source tree: {requiredDirectory}.");
+        }
+    }
+
+    string requiredRunbookPath = ProofSourcePath("scripts/runbook.sh");
+    if (!File.Exists(requiredRunbookPath) || (File.GetAttributes(requiredRunbookPath) & FileAttributes.ReparsePoint) != 0)
+    {
+        throw new InvalidOperationException("Campaign OS candidate root is missing the required non-symlink runbook source.");
+    }
+    File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.deb"), "smoke");
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-osx-arm64-installer.dmg"), "smoke-mac");
     File.WriteAllText(
         Path.Combine(releaseEvidenceRoot, "BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json"),
@@ -2166,11 +2216,12 @@ async Task VerifyPublicLandingProjectionAsync()
                         head = "avalonia",
                         platform = "linux",
                         arch = "x64",
-                        kind = "archive",
-                        fileName = "smoke-poc-linux-x64.zip",
-                        downloadUrl = "/downloads/files/smoke-poc-linux-x64.zip",
-                        sha256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                        sizeBytes = 4096,
+                        kind = "installer",
+                        installAccessClass = "open_public",
+                        fileName = "smoke-poc-linux-x64.deb",
+                        downloadUrl = "/downloads/files/smoke-poc-linux-x64.deb",
+                        sha256 = "04d588cb41b8022d1233924f0fe8280d9e2bb92cdc81658eb102ef9c42fc9452",
+                        sizeBytes = 5,
                         platformLabel = "Smoke Linux x64"
                     },
                     new
@@ -2180,10 +2231,11 @@ async Task VerifyPublicLandingProjectionAsync()
                         platform = "macOS",
                         arch = "arm64",
                         kind = "dmg",
+                        installAccessClass = "account_required",
                         fileName = "smoke-poc-osx-arm64-installer.dmg",
                         downloadUrl = "/downloads/files/smoke-poc-osx-arm64-installer.dmg",
-                        sha256 = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-                        sizeBytes = 8192,
+                        sha256 = "a26950b9da03a7b0a81530b5ce733072f4fc4d915795b05aa447606d9756dfd1",
+                        sizeBytes = 9,
                         platformLabel = "Smoke macOS ARM64"
                     }
                 }
@@ -2201,27 +2253,44 @@ async Task VerifyPublicLandingProjectionAsync()
                     new PublicReleaseArtifactDto(
                         Id: "smoke-poc-linux-x64",
                         Platform: "linux-x64",
-                        Url: "/downloads/files/smoke-poc-linux-x64.zip",
-                        Sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                        SizeBytes: 4096),
+                        Url: "/downloads/files/smoke-poc-linux-x64.deb",
+                        Sha256: "04d588cb41b8022d1233924f0fe8280d9e2bb92cdc81658eb102ef9c42fc9452",
+                        SizeBytes: 5,
+                        Head: "avalonia",
+                        PlatformId: "linux",
+                        Arch: "x64",
+                        Kind: "installer",
+                        FileName: "smoke-poc-linux-x64.deb",
+                        InstallAccessClass: "open_public"),
                     new PublicReleaseArtifactDto(
                         Id: "smoke-poc-osx-arm64-installer",
                         Platform: "macOS ARM64",
                         Url: "/downloads/files/smoke-poc-osx-arm64-installer.dmg",
-                        Sha256: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-                        SizeBytes: 8192,
+                        Sha256: "a26950b9da03a7b0a81530b5ce733072f4fc4d915795b05aa447606d9756dfd1",
+                        SizeBytes: 9,
                         Head: "avalonia",
                         PlatformId: "osx-arm64",
                         Arch: "arm64",
                         Kind: "dmg",
-                        FileName: "smoke-poc-osx-arm64-installer.dmg")
+                        FileName: "smoke-poc-osx-arm64-installer.dmg",
+                        InstallAccessClass: "account_required")
                 ]),
             new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
     var configuration = new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
+            ["CHUMMER_PUBLIC_CANON_ROOT"] = publicCanonRoot,
+            ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true",
+            ["CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT"] = fleetArtifactRoot,
+            ["CHUMMER_PUBLIC_PROGRESS_REPORT_FILE"] = ProofSourcePath(".codex-design/product/PROGRESS_REPORT.generated.json"),
+            ["CHUMMER_PUBLIC_PROGRESS_HISTORY_FILE"] = ProofSourcePath(".codex-design/product/PROGRESS_HISTORY.generated.json"),
+            ["CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE"] = localReleaseProofMissingPath,
+            ["CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE"] = localReleaseProofMissingPath,
+            ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = flagshipReadinessMissingPath,
+            ["CHUMMER_PUBLIC_FINAL_GOLD_JANITOR_FILE"] = goldJanitorMissingPath,
+            ["CHUMMER_PUBLIC_GOLD_JANITOR_FILE"] = goldJanitorMissingPath,
+            ["CHUMMER_HUB_CAMPAIGN_OS_LOCAL_PROOF_FILE"] = campaignOsProofMissingPath,
             ["CHUMMER_COMMUNITY_STORE_PATH"] = storePath,
             ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
@@ -2330,13 +2399,13 @@ async Task VerifyPublicLandingProjectionAsync()
         rewards,
         progressEmails,
         loggerFactory.CreateLogger<SupportCaseService>());
-    var robotsPath = Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "robots.txt");
+    var robotsPath = ProofSourcePath("Chummer.Run.Api/wwwroot/robots.txt");
     Assert(File.Exists(robotsPath), "public shell should ship a robots.txt file.");
     var robotsText = File.ReadAllText(robotsPath);
     Assert(robotsText.Contains("Allow: /", StringComparison.Ordinal), "robots.txt should allow crawler access to the public shell.");
     Assert(robotsText.Contains("Disallow: /account/", StringComparison.Ordinal), "robots.txt should keep private account routes blocked.");
     Assert(robotsText.Contains("Sitemap: https://chummer.run/sitemap.xml", StringComparison.Ordinal), "robots.txt should advertise the public sitemap.");
-    var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+    var layoutSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/Shared/_Layout.cshtml"));
     Assert(layoutSource.Contains("<nav class=\"site-nav\" aria-label=\"Primary navigation\">", StringComparison.Ordinal), "layout should expose primary navigation inline in the public shell.");
     Assert(!layoutSource.Contains("data-nav-sheet", StringComparison.Ordinal), "layout should not keep a hidden mobile navigation sheet in the public shell.");
     Assert(!layoutSource.Contains("aria-controls=\"site-nav-sheet\"", StringComparison.Ordinal), "layout should not expose a navigation sheet toggle.");
@@ -2350,10 +2419,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN", StringComparison.Ordinal), "layout should support a Rybbit script origin fallback.");
     Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY", StringComparison.Ordinal), "layout should expose the same-host proxy guard for Rybbit.");
     Assert(layoutSource.Contains("data-rybbit='analytics'", StringComparison.Ordinal), "layout should inject the Rybbit analytics script with a stable marker.");
-    Assert(layoutSource.Contains("data-site-id", StringComparison.Ordinal), "layout should wire the Rybbit script with the configured site id.");
+    Assert(layoutSource.Contains("rybbit.dataset.siteId", StringComparison.Ordinal), "layout should wire the Rybbit script with the configured site id.");
     Assert(layoutSource.Contains("hub_public_shell", StringComparison.Ordinal), "layout should tag public-shell Rybbit traffic distinctly.");
     Assert(layoutSource.Contains("/downloads/install/**", StringComparison.Ordinal), "layout should keep install/download paths out of Rybbit tracking by default.");
-    var programSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Program.cs"));
+    var programSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Program.cs"));
     Assert(programSource.Contains("CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS", StringComparison.Ordinal), "startup should honor trusted forwarded-header networks so tunnelled HTTPS stays stable.");
     Assert(programSource.Contains("hubGoogleAuth.ValidateProductionReadiness();", StringComparison.Ordinal), "startup should hard-fail in production when Google OIDC credentials are missing.");
     Assert(programSource.Contains("if (!hubGoogleAuth.IsConfigured())", StringComparison.Ordinal), "startup should still allow intentionally unconfigured non-production hosts.");
@@ -2363,156 +2432,131 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(programSource.Contains("MapPost(\"/api/desktop-analytics/track\"", StringComparison.Ordinal), "startup should expose the bounded desktop analytics ingest endpoint.");
     Assert(programSource.Contains("DesktopAnalyticsBridgeService", StringComparison.Ordinal), "startup should route desktop analytics through the bounded bridge service.");
     Assert(programSource.Contains("MapGet(\"/downloads/release-evidence/{**path}\"", StringComparison.Ordinal), "startup should expose browser-lane release evidence under the public downloads shelf.");
-    var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
+    var authEntrySource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/Auth/Entry.cshtml"));
     Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
-    var landingSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
+    var landingSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml"));
     Assert(!landingSource.Contains("artifact-gallery", StringComparison.Ordinal), "landing should keep artifact depth off the main conversion spine.");
-    Assert(landingSource.Contains("proofSectionAsset", StringComparison.Ordinal), "landing should use a separate lower proof asset instead of rendering the same proof screenshot twice.");
-    Assert(landingSource.Contains("scene_dossier_desk", StringComparison.Ordinal), "landing should pair the hero proof teaser with a different lower proof asset.");
-    Assert(landingSource.Contains("string.Equals(proofSectionAsset.AssetSlot, heroProofAsset.AssetSlot", StringComparison.Ordinal), "landing should guard against reusing the same proof asset slot in both the hero and lower proof band.");
-    Assert(landingSource.Contains("var proofNotes = Model.Workflows.Take(1).ToArray();", StringComparison.Ordinal), "landing should keep the proof band to one tighter workflow note instead of restating the whole product loop.");
-    Assert(landingSource.Contains("<div class=\"release-footnote\">", StringComparison.Ordinal), "landing proof should reduce the workflow follow-through to one quieter note instead of a second full card grid.");
-    Assert(!landingSource.Contains("role-matrix__grid", StringComparison.Ordinal), "landing proof should not reopen a second mini-grid once the hero already carries the main conversion story.");
-    Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
-    Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
-    Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
-    Assert(landingSource.Contains("workflow-band", StringComparison.Ordinal), "landing should keep one compact three-card product section instead of reopening multiple route families.");
-    Assert(landingSource.Contains("route-choice-grid", StringComparison.Ordinal), "landing should keep one audience strip after the main product story.");
-    Assert(landingSource.Contains("continuity-band", StringComparison.Ordinal), "landing should keep one dedicated install-and-account band.");
-    Assert(!landingSource.Contains("flagship-coverage", StringComparison.Ordinal), "landing should move whole-product frontier material off the front door.");
-    Assert(!landingSource.Contains("trust-claims", StringComparison.Ordinal), "landing should avoid repeating a separate trust-claims grid after the proof block.");
-    Assert(!landingSource.Contains("future-strip", StringComparison.Ordinal), "landing should move future-lane editorial material off the main front-door spine.");
-    Assert(!landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should keep the full weekly trust pulse on deeper status surfaces instead of restating it on the front door.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
-    Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter path from the first playable session truth already attached to the campaign spine.");
-    Assert(landingSource.Contains("Open first session on Home", StringComparison.Ordinal), "landing should keep a direct signed-in first-session route instead of forcing repo knowledge.");
-    Assert(landingSource.Contains("Open first playable session", StringComparison.Ordinal), "landing should keep a direct route from the front door into the first-session detail.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter path should reuse signed-in fix-availability truth instead of tutorial prose.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter path should reuse signed-in caution truth instead of tutorial prose.");
-    Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter path should keep install-support follow-through on the same front-door rail.");
-    var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
+    Assert(landingSource.Contains("surface-minimal", StringComparison.Ordinal), "landing should use the current minimal public-shell surface.");
+    Assert(landingSource.Contains("class=\"minimal-hero\"", StringComparison.Ordinal), "landing should keep one focused minimal hero.");
+    Assert(landingSource.Contains("href=\"/downloads\"", StringComparison.Ordinal), "landing should keep downloads as the primary public action.");
+    Assert(landingSource.Contains("Open Chummer", StringComparison.Ordinal), "landing should expose the current Open Chummer action menu.");
+    Assert(landingSource.Contains("href=\"/build\"", StringComparison.Ordinal), "landing should route build entry through the first-party builder.");
+    Assert(landingSource.Contains("href=\"/mobile/player\"", StringComparison.Ordinal), "landing should route play entry through the first-party mobile player.");
+    Assert(landingSource.Contains("data-mobile-app-device-picker", StringComparison.Ordinal), "landing should keep explicit mobile and desktop handoff choices.");
+    Assert(landingSource.Contains("@publicPlatformSummary", StringComparison.Ordinal), "landing should expose the current public platform posture.");
+    Assert(landingSource.Contains("@publicReleasePostureSummary", StringComparison.Ordinal), "landing should expose the current release posture.");
+    Assert(landingSource.Contains("chummer-desktop-runner.png", StringComparison.Ordinal), "landing should keep a concrete desktop product preview.");
+    Assert(landingSource.Contains("build-mobile-app-handoff", StringComparison.Ordinal), "landing should render a first-party build handoff.");
+    Assert(landingSource.Contains("mobile-app-handoff", StringComparison.Ordinal), "landing should render a first-party play handoff.");
+    var trustPulseBodySource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/Shared/_PublicTrustPulseBody.cshtml"));
     Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
     Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
     Assert(trustPulseBodySource.Contains("@foreach (var row in Model.Rows)", StringComparison.Ordinal), "shared trust pulse body should render every weekly trust row instead of binding a brittle subset.");
-    Assert(trustPulseBodySource.Contains("<span>@row.Label</span>", StringComparison.Ordinal), "shared trust pulse body should project the shared weekly trust labels directly.");
-    Assert(trustPulseBodySource.Contains("<strong>@row.Value</strong>", StringComparison.Ordinal), "shared trust pulse body should project the shared weekly trust values directly.");
-    var storySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml"));
-    Assert(!storySource.Contains("One path from install to session return", StringComparison.Ordinal), "product story should not drift back into a second install/support explainer.");
-    Assert(!storySource.Contains("From first install to next session", StringComparison.Ordinal), "product story should stay focused on differentiation instead of retelling the install path.");
-    Assert(!storySource.Contains("Start from the lane that matches your job", StringComparison.Ordinal), "product story should not fall back to a second lane selector once landing already owns that job.");
-    Assert(!storySource.Contains("product loop", StringComparison.Ordinal), "product story should avoid internal loop phrasing on the customer-facing differentiation page.");
-    Assert(!storySource.Contains("story-guide-tail", StringComparison.Ordinal), "product story should not end in a second landing-style CTA band.");
-    Assert(!storySource.Contains("Go deeper only where you still need proof", StringComparison.Ordinal), "product story should not end with another full-width guidance section after the differentiation grid.");
-    Assert(storySource.Contains("Use this page to decide whether Chummer fits.", StringComparison.Ordinal), "product story should frame itself as a fit-and-differentiation page instead of a second action surface.");
-    Assert(storySource.Contains("Need proof?", StringComparison.Ordinal), "product story should end with a quieter inline route note instead of a second hero-like CTA cluster.");
-    Assert(storySource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "product story should reuse the shared signed-in trust panel instead of inventing a story-only trust surface.");
-    Assert(storySource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "product story should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
-    var nowSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
-    Assert(nowSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "now page should include the unified public status guide.");
-    Assert(nowSource.Contains("Supporting proof around the core loop", StringComparison.Ordinal), "now should keep supporting proof behind a calmer secondary disclosure.");
-    Assert(!nowSource.Contains("Integrity stays visible. Use downloads when you are ready to install", StringComparison.Ordinal), "now should not end with a second generic CTA band after the signed-in return callout.");
-    Assert(!nowSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "now should use the shared public status presenter instead of a local badge mapper.");
-    Assert(!nowSource.Contains("story-guide-tail", StringComparison.Ordinal), "now should end with a quieter release footnote instead of a landing-style CTA band.");
-    var shelfSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
-    Assert(shelfSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "artifact shelf should include the unified public status guide.");
-    Assert(!shelfSource.Contains("static string DisplayStatus", StringComparison.Ordinal), "artifact shelf should use the shared public status presenter instead of a local badge mapper.");
-    Assert(shelfSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared signed-in trust panel instead of inventing a shelf-only trust surface.");
-    Assert(shelfSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "artifact shelf should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
-    Assert(shelfSource.Contains("All views", StringComparison.Ordinal) && shelfSource.Contains("Personal view", StringComparison.Ordinal) && shelfSource.Contains("Campaign view", StringComparison.Ordinal) && shelfSource.Contains("Creator view", StringComparison.Ordinal) && shelfSource.Contains("Public view", StringComparison.Ordinal), "artifact shelf should expose first-class signed-in shelf views instead of one blended overlay title.");
-    Assert(shelfSource.Contains("@item.OwnershipSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact ownership posture directly from the shared recap shelf projection.");
-    Assert(shelfSource.Contains("@item.ProvenanceSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact provenance directly from the shared recap shelf projection.");
-    Assert(shelfSource.Contains("@item.AuditSummary", StringComparison.Ordinal), "artifact shelf should surface signed-in artifact audit posture directly from the shared recap shelf projection.");
-    Assert(shelfSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication discovery posture on the signed-in shelf.");
-    Assert(shelfSource.Contains("@linkedPublication.TrustSummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication trust reasoning on the signed-in shelf.");
-    Assert(shelfSource.Contains("@linkedPublication.ComparisonSummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication comparison guidance on the signed-in shelf.");
-    Assert(shelfSource.Contains("@linkedPublication.ModerationSummary", StringComparison.Ordinal), "artifact shelf should surface linked creator-publication moderation posture on the signed-in shelf.");
-    Assert(shelfSource.Contains("@publication.TrustSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication trust reasoning directly on the signed-in creator cards.");
-    Assert(shelfSource.Contains("@publication.ComparisonSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication comparison guidance directly on the signed-in creator cards.");
-    Assert(shelfSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "artifact shelf should surface creator-publication moderation posture directly on the signed-in creator cards.");
-    Assert(shelfSource.Contains("Governed publication discovery", StringComparison.Ordinal), "artifact shelf should expose a first-class public publication-discovery section once shared publication is live.");
-    Assert(shelfSource.Contains("Published shared publications", StringComparison.Ordinal), "artifact shelf should frame public publication discovery as a governed published shelf instead of creator-only teaser prose.");
-    Assert(shelfSource.Contains("campaign, primer, dossier, recap, replay, and run-module outputs", StringComparison.Ordinal), "artifact shelf should describe primer outputs as part of the same governed shared-publication lane.");
-    Assert(shelfSource.Contains("Compare at a glance", StringComparison.Ordinal), "artifact shelf should add a real compare-at-a-glance rail for public creator discovery instead of forcing card-by-card comparison.");
-    Assert(shelfSource.Contains("How live publications differ", StringComparison.Ordinal), "artifact shelf should explain the public publication comparison lane in customer-facing terms.");
+    Assert(trustPulseBodySource.Contains("<span>@PublicTrustPulseText(row.Label)</span>", StringComparison.Ordinal), "shared trust pulse body should project humanized weekly trust labels.");
+    Assert(trustPulseBodySource.Contains("<strong>@PublicTrustPulseText(row.Value)</strong>", StringComparison.Ordinal), "shared trust pulse body should project humanized weekly trust values.");
+    var storySource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/ProductStory.cshtml"));
+    Assert(storySource.Contains("surface-story surface-minimal", StringComparison.Ordinal), "product story should use the current minimal public surface.");
+    Assert(storySource.Contains("Character tools for Shadowrun.", StringComparison.Ordinal), "product story should state the current product purpose directly.");
+    Assert(storySource.Contains("Downloads first", StringComparison.Ordinal), "product story should keep downloads as the first start lane.");
+    Assert(storySource.Contains("Account optional", StringComparison.Ordinal), "product story should keep account use optional.");
+    Assert(storySource.Contains("<h2>Use it for</h2>", StringComparison.Ordinal), "product story should expose the current use-case summary.");
+    Assert(storySource.Contains("<h3>Characters</h3>", StringComparison.Ordinal), "product story should retain character creation as a core use case.");
+    Assert(storySource.Contains("<h3>Maintenance</h3>", StringComparison.Ordinal), "product story should retain between-session maintenance as a core use case.");
+    Assert(storySource.Contains("<h3>Explanations</h3>", StringComparison.Ordinal), "product story should retain grounded explanations as a core use case.");
+    Assert(storySource.Contains("href=\"/downloads\"", StringComparison.Ordinal) && storySource.Contains("href=\"/help\"", StringComparison.Ordinal), "product story should route users to downloads and help.");
+    var nowSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Now.cshtml"));
+    Assert(nowSource.Contains("surface-now surface-minimal", StringComparison.Ordinal), "now page should use the current minimal release surface.");
+    Assert(nowSource.Contains("Use this page when you want the short answer before you install.", StringComparison.Ordinal), "now page should frame the current release as a concise install decision.");
+    Assert(nowSource.Contains("Start from downloads.", StringComparison.Ordinal), "now page should keep downloads as the primary install lane.");
+    Assert(nowSource.Contains("Use help before you guess.", StringComparison.Ordinal), "now page should keep a direct help lane beside install posture.");
+    Assert(nowSource.Contains("Three things to know first", StringComparison.Ordinal), "now page should expose the bounded current proof modules.");
+    Assert(nowSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "now page should use the shared public status presenter.");
+    Assert(nowSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "now page should reuse signed-in trust status when available.");
+    Assert(nowSource.Contains("Account is optional", StringComparison.Ordinal), "now page should preserve optional account posture.");
+    var shelfSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"));
+    Assert(shelfSource.Contains("surface-artifacts surface-minimal", StringComparison.Ordinal), "artifact shelf should use the current minimal library surface.");
+    Assert(shelfSource.Contains("Use this page for dossiers, recaps, and release details.", StringComparison.Ordinal), "artifact shelf should state its current library purpose directly.");
+    Assert(shelfSource.Contains("Open saved pages for dossiers, recaps, and shared publications.", StringComparison.Ordinal), "artifact shelf should keep saved pages as its primary lane.");
+    Assert(shelfSource.Contains("Go back to downloads when you want the app.", StringComparison.Ordinal), "artifact shelf should preserve the boundary between library pages and installers.");
+    Assert(shelfSource.Contains("Use Chummer help when the next job is support or recovery.", StringComparison.Ordinal), "artifact shelf should preserve the direct support and recovery lane.");
+    Assert(shelfSource.Contains("route-choice-grid", StringComparison.Ordinal), "artifact shelf should expose bounded library, download, account-return, and help choices.");
     Assert(shelfSource.Contains("CreatorPublicationTrustRank", StringComparison.Ordinal), "artifact shelf should order the public creator comparison lane with explicit governed trust posture instead of ad hoc card order.");
     Assert(shelfSource.Contains("rankedPublicCreatorPublications", StringComparison.Ordinal), "artifact shelf should build a ranked public creator comparison set before rendering the compare-at-a-glance lane.");
     Assert(shelfSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "artifact shelf should humanize publication state directly on the public creator-discovery cards.");
     Assert(shelfSource.Contains("Open public publication", StringComparison.Ordinal), "artifact shelf should keep a direct public inspect route on the governed publication cards.");
     Assert(shelfSource.Contains("/artifacts/publications/", StringComparison.Ordinal), "artifact shelf should deep-link public creator discovery into the shared public publication detail route.");
-    Assert(shelfSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "artifact shelf should humanize creator-publication visibility directly on the signed-in shelf.");
     Assert(shelfSource.Contains("static bool IsDiscoverablePublicCreatorPublication", StringComparison.Ordinal), "artifact shelf should decide when a signed-in creator packet is already live enough to stay on the governed public inspect rail.");
     Assert(shelfSource.Contains("CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)", StringComparison.Ordinal), "artifact shelf should route linked signed-in recap items through the public creator packet once publication is live.");
     Assert(shelfSource.Contains("CreatorPublicationHref(publication, publication.PublicationId)", StringComparison.Ordinal), "artifact shelf should route signed-in creator cards through the public creator packet once publication is live.");
     Assert(shelfSource.Contains("CreatorPublicationLinkLabel(linkedPublication)", StringComparison.Ordinal), "artifact shelf should label linked recap creator routes by live public versus private moderation posture.");
     Assert(shelfSource.Contains("CreatorPublicationLinkLabel(publication)", StringComparison.Ordinal), "artifact shelf should label signed-in creator-card routes by live public versus private moderation posture.");
-    Assert(shelfSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "artifact shelf should keep a direct route back to the linked creator-publication build path.");
     Assert(shelfSource.Contains("Open publication status", StringComparison.Ordinal), "artifact shelf should still preserve the private moderation route when a creator packet has not reached public discovery.");
-    var publicCreatorSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"));
+    Assert(shelfSource.Contains("Same return view", StringComparison.Ordinal), "artifact shelf should keep signed-in recap and creator continuity in one bounded return view.");
+    var publicCreatorSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml"));
     Assert(publicCreatorSource.Contains("Why this publication is live", StringComparison.Ordinal), "public creator detail should explain the live governed publication posture on its own page.");
-    Assert(publicCreatorSource.Contains("Publication kind", StringComparison.Ordinal), "public creator detail should surface the shared publication kind instead of collapsing into creator-only framing.");
-    Assert(publicCreatorSource.Contains("Compare by", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");
+    Assert(publicCreatorSource.Contains("<span class=\"tag\">Status</span>", StringComparison.Ordinal), "public creator detail should surface the shared publication status.");
+    Assert(publicCreatorSource.Contains("<span class=\"tag\">Compare</span>", StringComparison.Ordinal), "public creator detail should surface creator-comparison guidance on the public inspect route.");
     Assert(publicCreatorSource.Contains("Back to publication discovery", StringComparison.Ordinal), "public publication detail should keep an explicit route back to the public discovery shelf.");
-    Assert(publicCreatorSource.Contains("Public shared publication", StringComparison.Ordinal), "public publication detail should present the public route as a shared publication lane instead of a creator-only packet.");
-    var campaignSpineServiceSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Services", "Community", "CampaignSpineService.cs"));
+    Assert(publicCreatorSource.Contains("<p class=\"eyebrow\">Shared publication</p>", StringComparison.Ordinal), "public publication detail should present the public route as a shared publication lane instead of a creator-only packet.");
+    Assert(publicCreatorSource.Contains("surface-artifacts surface-minimal", StringComparison.Ordinal), "public publication detail should use the current minimal artifact surface.");
+    var campaignSpineServiceSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Services/Community/CampaignSpineService.cs"));
     Assert(campaignSpineServiceSource.Contains("return \"primer\";", StringComparison.Ordinal), "campaign spine service should normalize primer-like publication kinds onto a first-class shared-publication kind.");
     Assert(campaignSpineServiceSource.Contains("\"primer\" => $\"{workspace.CampaignName} campaign primer\"", StringComparison.Ordinal), "campaign spine service should give primer publications a first-class title instead of generic fallback labeling.");
     Assert(campaignSpineServiceSource.Contains("\"primer\" => \"Primer-safe onboarding, campaign continuity, and governed publication detail stay attached to one shared artifact lane.\"", StringComparison.Ordinal), "campaign spine service should give primer publications first-class shared-publication summary posture.");
-    var horizonsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
-    Assert(horizonsSource.Contains("_PublicStatusGlossary.cshtml", StringComparison.Ordinal), "horizons should include the unified public status guide.");
-    Assert(horizonsSource.Contains("PublicSurfaceStatus.ResearchTrack", StringComparison.Ordinal), "roadmap should use the shared public status presenter for its visible maturity language.");
-    Assert(horizonsSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "horizons should reuse the shared signed-in trust panel instead of inventing a roadmap-only trust surface.");
-    Assert(horizonsSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "horizons should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
+    var horizonsSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Horizons.cshtml"));
+    Assert(horizonsSource.Contains("surface-horizons surface-minimal", StringComparison.Ordinal), "horizons should use the current minimal future-work surface.");
+    Assert(horizonsSource.Contains("Not the front door", StringComparison.Ordinal), "horizons should keep future work behind the main app path.");
+    Assert(horizonsSource.Contains("Downloads first", StringComparison.Ordinal), "horizons should preserve the current download-first posture.");
+    Assert(horizonsSource.Contains("Use the app first", StringComparison.Ordinal), "horizons should direct users to the current app before future lanes.");
+    Assert(horizonsSource.Contains("Working lanes", StringComparison.Ordinal), "horizons should bound current, table, and living-world work explicitly.");
+    Assert(horizonsSource.Contains("href=\"/roadmap\"", StringComparison.Ordinal) && horizonsSource.Contains("href=\"/feedback\"", StringComparison.Ordinal), "horizons should route future detail to roadmap and feedback.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Inspectable"), PublicSurfaceStatus.AvailableToday, StringComparison.Ordinal), "inspectable proof should present as available-today proof on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Preview"), PublicSurfaceStatus.PreviewInProgress, StringComparison.Ordinal), "preview artifact concepts should present as preview-in-progress on the public surface.");
     Assert(string.Equals(PublicSurfaceStatus.DisplayLabel("Designing"), PublicSurfaceStatus.DesigningInPublic, StringComparison.Ordinal), "designing horizons should present with the shared customer-facing roadmap label.");
-    var runbookSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "scripts", "runbook.sh"));
+    var runbookSource = File.ReadAllText(ProofSourcePath("scripts/runbook.sh"));
     Assert(runbookSource.Contains("RUNBOOK_MODE=push bash \"$SCRIPT_DIR/runbook.sh\"", StringComparison.Ordinal), "hub-ship should force push mode explicitly instead of recursively inheriting RUNBOOK_MODE from the parent shell.");
     Assert(!runbookSource.Contains("bash \"$SCRIPT_DIR/runbook.sh\" push", StringComparison.Ordinal), "hub-ship should not recurse back into itself through an inherited RUNBOOK_MODE environment.");
-    var homeSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
+    var homeSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Home.cshtml"));
     Assert(!homeSource.Contains("More in your signed-in shell", StringComparison.Ordinal), "home should not fall back to the old catch-all signed-in shell accordion.");
     Assert(!homeSource.Contains("Account state at a glance", StringComparison.Ordinal), "home should keep the overview route focused instead of adding a second top-level summary disclosure.");
     Assert(!homeSource.Contains("signed-in cockpit", StringComparison.Ordinal), "home access should avoid cockpit phrasing on the customer-facing route.");
     Assert(!homeSource.Contains("signed-in shell", StringComparison.Ordinal), "home should avoid signed-in shell wording on customer-facing routes.");
     Assert(!homeSource.Contains("Campaign workspace context", StringComparison.Ordinal), "home work should avoid internal campaign-workspace phrasing.");
-    Assert(homeSource.Contains("grounded rule answers", StringComparison.OrdinalIgnoreCase), "home work should keep explicit grounded-rule evidence on the signed-in route.");
+    Assert(homeSource.Contains("surface-home surface-minimal", StringComparison.Ordinal), "home should use the current minimal signed-in surface.");
     Assert(homeSource.Contains("Open current release", StringComparison.Ordinal), "home access should point release follow-through to the dedicated now route instead of repeating status noise inline.");
-    Assert(homeSource.Contains("Need product proof before you install or return?", StringComparison.Ordinal), "home access should keep proof follow-through as a calmer note instead of a third equal-weight rail card.");
-    Assert(!homeSource.Contains("Need product proof before you act?", StringComparison.Ordinal), "home access should not revive the louder proof rail copy.");
-    Assert(homeSource.Contains("<summary>Release and device state</summary>", StringComparison.Ordinal), "home access should collapse secondary release and device detail under one calmer disclosure.");
-    Assert(homeSource.Contains("showAccessSection && (!showOnboarding || accessSurfaceReady)", StringComparison.Ordinal), "home access should unlock when the account already has real device or support truth, even if the softer onboarding flag is still incomplete.");
-    Assert(homeSource.Contains("@if (!showAccessSection)\n{\n    <section class=\"home-cockpit-strip\" aria-label=\"Home summary\">", StringComparison.Ordinal), "home access should skip the generic home summary strip instead of rendering it above the return surface.");
-    Assert(homeSource.Contains("@if (!showAccessSection)\n{\n    <section class=\"editorial-block\">", StringComparison.Ordinal), "home access should skip the generic flagship coverage band instead of rendering it above the return surface.");
-    Assert(homeSource.Contains("Device roles", StringComparison.Ordinal), "home access should keep explicit device-role evidence on the signed-in route.");
-    Assert(homeSource.Contains("GM-ready cues", StringComparison.Ordinal), "home work should use customer-facing continuity language instead of internal workspace wording.");
+    Assert(homeSource.Contains("<section class=\"home-cockpit-strip\" aria-label=\"Home summary\">", StringComparison.Ordinal), "home should keep one bounded account summary strip.");
+    Assert(homeSource.Contains("<summary>Release and access</summary>", StringComparison.Ordinal), "home should collapse secondary release and access detail.");
+    Assert(homeSource.Contains("Downloads, access, and support stay together.", StringComparison.Ordinal), "home should keep the primary install and support boundary explicit.");
+    Assert(homeSource.Contains("Return to the last real session", StringComparison.Ordinal), "home work should keep a direct campaign return lane.");
     Assert(homeSource.Contains("showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady)", StringComparison.Ordinal), "home work should unlock when claimed install and return truth already exist, and also when the starter path can be seeded, instead of hiding the route behind a stale onboarding bit.");
     Assert(homeSource.Contains("seedStarterWorkspace", StringComparison.Ordinal), "home work should include starter-lane seeding on the empty workspace first-run path.");
     Assert(homeSource.Contains("/api/v1/campaign-spine/me/workspaces/starter", StringComparison.Ordinal), "home work should wire starter-path seeding to the campaign-spine starter endpoint.");
-    Assert(homeSource.Contains("Shared campaign view", StringComparison.Ordinal), "home work should surface the calmer shared campaign view card instead of hiding workspace return behind the deeper account route.");
-    Assert(homeSource.Contains("Open shared campaign view", StringComparison.Ordinal), "home work should keep an explicit route back into the shared campaign view.");
-    Assert(homeSource.Contains("/account/work/workspaces/", StringComparison.Ordinal), "home work should deep-link the shared campaign view instead of sending every route back to the generic work shell.");
+    Assert(homeSource.Contains("<span class=\"tag\">Campaign workspace</span>", StringComparison.Ordinal), "home work should surface the current campaign workspace card.");
+    Assert(homeSource.Contains(">Open campaign</a>", StringComparison.Ordinal), "home work should keep an explicit route back into the campaign.");
+    Assert(homeSource.Contains("/account/campaigns/", StringComparison.Ordinal), "home work should deep-link campaign return into the current campaign route.");
     Assert(homeSource.Contains("@workspace.ActiveSceneSummary", StringComparison.Ordinal), "home work should surface active-scene change truth directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.NextSafeAction", StringComparison.Ordinal), "home work should surface the next safe action directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface first-session campaign-start proof directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.FirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly on the calmer shared campaign card.");
     Assert(homeSource.Contains("@workspace.FirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should surface campaign-ready proof directly on the calmer shared campaign card.");
-    Assert(homeSource.Contains("What changed for me", StringComparison.Ordinal), "home work should keep the explicit what-changed-for-me packet on the signed-in route.");
+    Assert(homeSource.Contains("What changed for you", StringComparison.Ordinal), "home work should keep the explicit what-changed packet on the signed-in route.");
     Assert(homeSource.Contains("leadWorkspaceState?.Label", StringComparison.Ordinal), "home work should surface the bounded workspace state directly from the server plane.");
     Assert(homeSource.Contains("var leadPortableExchangeNotice =", StringComparison.Ordinal), "home work should derive a dedicated portable-exchange notice from the bounded workspace server plane.");
-    Assert(homeSource.Contains("Portable exchange:", StringComparison.Ordinal), "home work should surface portable exchange explicitly instead of hiding it inside a generic notice lane.");
+    Assert(homeSource.Contains("Local copy:", StringComparison.Ordinal), "home work should surface portable exchange as a clear local-copy notice.");
     Assert(homeSource.Contains("Open first playable session", StringComparison.Ordinal), "home work should keep a direct route into the first-session detail.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignStartSummary", StringComparison.Ordinal), "home work should surface the first-session campaign-start summary directly from the server plane.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should surface legal-runner proof directly from the bounded first-session projection.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly from the bounded first-session projection.");
     Assert(homeSource.Contains("@leadFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should surface campaign-ready proof directly from the bounded first-session projection.");
-    Assert(homeSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "home work should surface a dedicated next-session carry-forward card backed by the shared workspace projection.");
+    Assert(homeSource.Contains("<span class=\"tag\">Next session</span>", StringComparison.Ordinal), "home work should surface a dedicated next-session card backed by the shared workspace projection.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.Summary", StringComparison.Ordinal), "home work should surface the next-session carry-forward summary directly from the server plane.");
     Assert(homeSource.Contains("@leadNextSessionCarryForward.ReturnSummary", StringComparison.Ordinal), "home work should keep return-lane truth attached to the calmer next-session card.");
     Assert(homeSource.Contains("Campaign memory", StringComparison.Ordinal), "home work should surface a dedicated campaign-memory card instead of leaving long-lived follow-through spread across unrelated cards.");
     Assert(homeSource.Contains("@leadCampaignMemory.Summary", StringComparison.Ordinal), "home work should surface the shared campaign-memory summary directly from the server plane.");
-    Assert(homeSource.Contains("@workspace.CampaignMemory.Summary", StringComparison.Ordinal), "home work should surface campaign memory directly on the calmer shared campaign card when it exists.");
+    Assert(homeSource.Contains("workspace.CampaignMemory.Summary", StringComparison.Ordinal), "home work should surface campaign memory directly on the calmer shared campaign card when it exists.");
     Assert(homeSource.Contains("Open campaign memory", StringComparison.Ordinal), "home work should keep a direct route into the bounded campaign-memory detail.");
-    Assert(homeSource.Contains("@leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
-    Assert(homeSource.Contains("@leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
+    Assert(homeSource.Contains("leadWorkspaceServerPlane.ChangePackets[0].Summary", StringComparison.Ordinal), "home work should surface the first server-plane change packet directly on the what-changed card.");
+    Assert(homeSource.Contains("leadWorkspaceServerPlane.NextSafeAction.Summary", StringComparison.Ordinal), "home work should surface the bounded next safe action directly on the what-changed card.");
     Assert(homeSource.Contains("@leadAftermathTag", StringComparison.Ordinal), "home work should label the lead aftermath card from package kind instead of hard-coding recap-only wording.");
     Assert(homeSource.Contains("@leadAftermathPackage.Title", StringComparison.Ordinal), "home work should surface the latest aftermath package title directly from the bounded server plane.");
     Assert(homeSource.Contains("@leadAftermathPackage.Summary", StringComparison.Ordinal), "home work should surface the latest aftermath package summary directly from the bounded server plane.");
@@ -2525,28 +2569,28 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Open downtime brief", StringComparison.Ordinal), "home work should keep a direct route into the downtime brief detail.");
     Assert(homeSource.Contains("PublicSurfaceStatus.AudienceLabel(leadAftermathShelfEntry.Audience)", StringComparison.Ordinal), "home work should humanize artifact shelf audience directly on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.OwnershipSummary", StringComparison.Ordinal), "home work should surface artifact shelf ownership posture directly on the aftermath card.");
-    Assert(homeSource.Contains("@leadAftermathShelfEntry.ProvenanceSummary", StringComparison.Ordinal), "home work should surface artifact shelf provenance directly on the aftermath card.");
-    Assert(homeSource.Contains("@leadAftermathShelfEntry.AuditSummary", StringComparison.Ordinal), "home work should surface artifact shelf audit posture directly on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.ProvenanceSummary", StringComparison.Ordinal), "home work should surface artifact shelf provenance directly on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.AuditSummary", StringComparison.Ordinal), "home work should surface artifact shelf audit posture directly on the aftermath card.");
     Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.PublicationState, \"Ready\")", StringComparison.Ordinal), "home work should humanize artifact publication state directly on the aftermath card.");
     Assert(homeSource.Contains("HumanizeStatus(leadAftermathShelfEntry.TrustBand, \"Draft\")", StringComparison.Ordinal), "home work should humanize artifact trust ranking directly on the aftermath card.");
-    Assert(homeSource.Contains("leadAftermathShelfEntry.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "home work should surface artifact discoverability posture directly on the aftermath card.");
-    Assert(homeSource.Contains("@leadAftermathShelfEntry.PublicationSummary", StringComparison.Ordinal), "home work should surface artifact publication posture directly from the recap-shelf projection on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.Discoverable ? \"Yes\" : \"Not yet\"", StringComparison.Ordinal), "home work should surface artifact discoverability posture directly on the aftermath card.");
+    Assert(homeSource.Contains("leadAftermathShelfEntry.PublicationSummary", StringComparison.Ordinal), "home work should surface artifact publication posture directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.LineageSummary", StringComparison.Ordinal), "home work should surface recap-shelf lineage by following the linked creator publication.");
     Assert(homeSource.Contains("@leadAftermathShelfEntry.NextSafeAction", StringComparison.Ordinal), "home work should surface the next artifact-shelf step directly from the recap-shelf projection on the aftermath card.");
     Assert(homeSource.Contains("CreatorPublicationHref(leadAftermathCreatorPublication, leadAftermathShelfEntry.CreatorPublicationId)", StringComparison.Ordinal), "home work should route linked aftermath publications onto the public creator packet when discovery is live, without losing the account fallback.");
     Assert(homeSource.Contains("Roster move", StringComparison.Ordinal), "home work should surface a dedicated roster-move card instead of collapsing operator actions into one-line campaign summaries.");
     Assert(homeSource.Contains("@leadRosterTransfer.RunnerHandle", StringComparison.Ordinal), "home work should surface the moved runner handle directly from the governed transfer receipt.");
-    Assert(homeSource.Contains("Open governed roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
-    Assert(homeSource.Contains("Operator posture", StringComparison.Ordinal), "home work should surface organizer/operator posture on the same signed-in route instead of burying it behind the deeper account panel.");
-    Assert(homeSource.Contains("@leadCommunityOperation.GroupName", StringComparison.Ordinal), "home work should surface the lead governed operator group directly from the campaign spine.");
-    Assert(homeSource.Contains("@leadCommunityOperation.OperationsSummary", StringComparison.Ordinal), "home work should surface the operator operations pulse directly on the calmer operator card.");
-    Assert(homeSource.Contains("@leadCommunityOperation.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface the operator campaign-return pulse directly on the calmer operator card.");
+    Assert(homeSource.Contains("Open roster moves", StringComparison.Ordinal), "home work should keep a direct route back to the governed roster-move operator rail.");
+    Assert(homeSource.Contains("<span class=\"tag\">Community role</span>", StringComparison.Ordinal), "home work should surface organizer/operator posture on the same signed-in route instead of burying it behind the deeper account panel.");
+    Assert(homeSource.Contains("leadCommunityOperation.GroupName", StringComparison.Ordinal), "home work should surface the lead governed operator group directly from the campaign spine.");
+    Assert(homeSource.Contains("leadCommunityOperation.OperationsSummary", StringComparison.Ordinal), "home work should surface the operator operations pulse directly on the calmer operator card.");
+    Assert(homeSource.Contains("leadCommunityOperation.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface the operator campaign-return pulse directly on the calmer operator card.");
     Assert(homeSource.Contains("Season / event pulse", StringComparison.Ordinal), "home work should surface a first-class season and event pulse on the calmer operator card.");
-    Assert(homeSource.Contains("@leadCommunityOperation.SeasonEventSummary", StringComparison.Ordinal), "home work should surface the operator season-event pulse directly from the shared projection.");
-    Assert(homeSource.Contains("Publication: @leadCommunityOperation.ArtifactPublicationSummary", StringComparison.Ordinal), "home work should surface explicit organizer artifact-publication posture on the same operator card.");
-    Assert(homeSource.Contains("Support: @leadCommunityOperation.SupportEscalationSummary", StringComparison.Ordinal), "home work should surface explicit organizer support-escalation posture on the same operator card.");
-    Assert(homeSource.Contains("Latest event:", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
-    Assert(homeSource.Contains("Board:", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
+    Assert(homeSource.Contains("leadCommunityOperation.SeasonEventSummary", StringComparison.Ordinal), "home work should surface the operator season-event pulse directly from the shared projection.");
+    Assert(homeSource.Contains("Shared: @HomeText(leadCommunityOperation.ArtifactPublicationSummary)", StringComparison.Ordinal), "home work should surface explicit organizer artifact-publication posture on the same operator card.");
+    Assert(homeSource.Contains("Support: @PublicText(leadCommunityOperation.SupportEscalationSummary)", StringComparison.Ordinal), "home work should surface explicit organizer support-escalation posture on the same operator card.");
+    Assert(homeSource.Contains("Latest event: @PublicText(leadCommunityEvent)", StringComparison.Ordinal), "home work should keep one bounded event receipt on the lead operator card.");
+    Assert(homeSource.Contains("Run: @leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface one bounded season-board entry on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignName", StringComparison.Ordinal), "home work should surface the lead season-board campaign directly from the shared operator projection.");
     Assert(homeSource.Contains("@leadCommunityBoard.RecapSummary", StringComparison.Ordinal), "home work should surface the lead season-board recap summary directly from the shared operator projection.");
     Assert(homeSource.Contains("@leadCommunityBoard.ConsequenceSummary", StringComparison.Ordinal), "home work should surface the lead season-board consequence summary directly from the shared operator projection.");
@@ -2554,39 +2598,39 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadCommunityBoard.CampaignMemoryReturnSummary", StringComparison.Ordinal), "home work should surface the lead season-board campaign-memory return cue directly from the shared operator projection.");
     Assert(homeSource.Contains("League:", StringComparison.Ordinal), "home work should surface a bounded league-and-season operations summary on the lead operator card.");
     Assert(homeSource.Contains("@leadCommunityOperation.LeagueOperationsSummary", StringComparison.Ordinal), "home work should surface the shared league-operations summary directly from the operator projection.");
-    Assert(homeSource.Contains("/account/work#community-op-league-", StringComparison.Ordinal), "home work should deep-link the operator card into the league-and-season operations rail.");
-    Assert(homeSource.Contains("Open league rail", StringComparison.Ordinal), "home work should give operators a direct route to the league-and-season operations rail.");
-    Assert(homeSource.Contains("/account/work#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
+    Assert(homeSource.Contains("/account/roster#community-op-league-", StringComparison.Ordinal), "home work should deep-link the operator card into the league-and-season operations rail.");
+    Assert(homeSource.Contains("Open league tools", StringComparison.Ordinal), "home work should give operators a direct route to the league-and-season operations rail.");
+    Assert(homeSource.Contains("/account/roster#community-op-board-", StringComparison.Ordinal), "home work should deep-link the operator card into the exact season-board drawer instead of sending every organizer flow back to the generic operator shell.");
     Assert(homeSource.Contains("Open season board", StringComparison.Ordinal), "home work should keep a direct route back to the governed season board.");
     Assert(homeSource.Contains("Invites:", StringComparison.Ordinal), "home work should keep invite and sponsorship posture attached to the lead operator card.");
     Assert(homeSource.Contains("Sponsors:", StringComparison.Ordinal), "home work should keep a bounded sponsor-session pulse attached to the lead operator card.");
     Assert(homeSource.Contains("@leadCommunitySponsorSession.UserDisplayName", StringComparison.Ordinal), "home work should surface the lead sponsor-session participant directly from the shared operator projection.");
-    Assert(homeSource.Contains("/account/work#community-op-invites-", StringComparison.Ordinal), "home work should deep-link the operator card into the invite and sponsorship rail.");
-    Assert(homeSource.Contains("Open invite rail", StringComparison.Ordinal), "home work should give operators a direct route to the invite and sponsorship rail.");
-    Assert(homeSource.Contains("/account/work#community-op-sponsor-sessions-", StringComparison.Ordinal), "home work should deep-link the operator card into the sponsor-session rail.");
-    Assert(homeSource.Contains("Open sponsor rail", StringComparison.Ordinal), "home work should give operators a direct route to the sponsor-session rail.");
-    Assert(homeSource.Contains("Guide: current public release, downloads, and closure posture stay on the same operator rail.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
+    Assert(homeSource.Contains("/account/roster#community-op-invites-", StringComparison.Ordinal), "home work should deep-link the operator card into the invite and sponsorship rail.");
+    Assert(homeSource.Contains("Open invite tools", StringComparison.Ordinal), "home work should give operators a direct route to the invite and sponsorship rail.");
+    Assert(homeSource.Contains("/account/roster#community-op-sponsor-sessions-", StringComparison.Ordinal), "home work should deep-link the operator card into the sponsor-session rail.");
+    Assert(homeSource.Contains("Open sponsor tools", StringComparison.Ordinal), "home work should give operators a direct route to the sponsor-session rail.");
+    Assert(homeSource.Contains("Guide: release notes, downloads, and support stay together.", StringComparison.Ordinal), "home work should keep bounded organizer guidance attached to the lead operator card.");
     Assert(homeSource.Contains("Model.SignedInStatus", StringComparison.Ordinal), "signed-in home should project the shared signed-in trust panel instead of keeping trust posture trapped on account-only routes.");
     Assert(homeSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "signed-in home should reuse the shared signed-in trust panel instead of inventing a home-only trust surface.");
     Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for current access guidance.");
     Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for fix guidance.");
     Assert(homeSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "home operator guidance should reuse the signed-in trust posture for the caution lane.");
-    Assert(homeSource.Contains("/account/work#community-op-guidance-", StringComparison.Ordinal), "home work should deep-link the operator card into the organizer guidance rail.");
+    Assert(homeSource.Contains("/account/roster#community-op-guidance-", StringComparison.Ordinal), "home work should deep-link the operator card into the organizer guidance rail.");
     Assert(homeSource.Contains("Open member guidance", StringComparison.Ordinal), "home work should give operators a direct route to the member-guidance rail.");
     Assert(homeSource.Contains("Consequence watch", StringComparison.Ordinal), "home work should surface a dedicated consequence card instead of leaving consequence follow-through buried inside summary text.");
     Assert(homeSource.Contains("@leadConsequence.Label", StringComparison.Ordinal), "home work should surface the lead governed consequence directly from the workspace server plane.");
     Assert(homeSource.Contains("@leadConsequenceEvidence", StringComparison.Ordinal), "home work should surface one bounded consequence evidence line on the calmer home card.");
     Assert(homeSource.Contains("Consequence:", StringComparison.Ordinal), "home work should surface one short consequence cue directly on the shared campaign card.");
-    Assert(homeSource.Contains("Build path", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
-    Assert(homeSource.Contains("Grounded rule answer", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
-    Assert(homeSource.Contains("Evidence:", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
-    Assert(homeSource.Contains("@leadPrepLaunch.PacketTitle", StringComparison.Ordinal), "home work should surface the latest governed prep launch directly on the calmer prep card.");
-    Assert(homeSource.Contains("@leadTravelPrefetch.DeviceRole", StringComparison.Ordinal), "home work should surface the latest staged travel-prefetch receipt directly on the calmer prep card.");
-    Assert(homeSource.Contains("@handoff.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface build-path return truth directly on the calmer home card.");
-    Assert(homeSource.Contains("@handoff.PlannerCoverageSummary", StringComparison.Ordinal), "home work should surface build-path planner coverage directly on the calmer home card.");
-    Assert(homeSource.Contains("@handoff.SupportClosureSummary", StringComparison.Ordinal), "home work should surface build-path support closure truth directly on the calmer home card.");
-    Assert(homeSource.Contains("Open build path for @handoff.Title", StringComparison.Ordinal), "home work should keep the build handoff deep link specific to the visible build path instead of a generic CTA.");
-    Assert(homeSource.Contains("@answer.SupportReuseHints[0]", StringComparison.Ordinal), "home work should surface grounded support-reuse hints directly from the shared rules projection.");
+    Assert(homeSource.Contains("<span class=\"tag\">Build setup</span>", StringComparison.Ordinal), "home work should surface a clear build-path follow-through card instead of only roadmap copy.");
+    Assert(homeSource.Contains("<span class=\"tag\">Rule environments</span>", StringComparison.Ordinal), "home work should surface a grounded rule-answer card instead of hiding explain value behind account-only routes.");
+    Assert(homeSource.Contains("Note: @PublicText(answer.EvidenceLines[0])", StringComparison.Ordinal), "home work should surface the first grounded rule evidence line instead of only a generic provenance label.");
+    Assert(homeSource.Contains("leadPrepLaunch.PacketTitle", StringComparison.Ordinal), "home work should surface the latest governed prep launch directly on the calmer prep card.");
+    Assert(homeSource.Contains("leadTravelPrefetch.DeviceRole", StringComparison.Ordinal), "home work should surface the latest staged travel-prefetch receipt directly on the calmer prep card.");
+    Assert(homeSource.Contains("handoff.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface build-path return truth directly on the calmer home card.");
+    Assert(homeSource.Contains("handoff.PlannerCoverageSummary", StringComparison.Ordinal), "home work should surface build-path planner coverage directly on the calmer home card.");
+    Assert(homeSource.Contains("handoff.SupportClosureSummary", StringComparison.Ordinal), "home work should surface build-path support closure truth directly on the calmer home card.");
+    Assert(homeSource.Contains("Open build path for @PublicText(handoff.Title)", StringComparison.Ordinal), "home work should keep the build handoff deep link specific to the visible build path instead of a generic CTA.");
+    Assert(homeSource.Contains("answer.SupportReuseHints[0]", StringComparison.Ordinal), "home work should surface grounded support-reuse hints directly from the shared rules projection.");
     Assert(homeSource.Contains("Next:", StringComparison.Ordinal), "home work should keep a short next-step cue on the calmer build follow-through card.");
     Assert(homeSource.Contains("<summary>Build, explain, and next step</summary>", StringComparison.Ordinal), "home work should collapse the secondary build and rules follow-through under one calmer disclosure.");
     Assert(homeSource.Contains("/account/work/build-handoffs/", StringComparison.Ordinal), "home work should deep-link build follow-through into the signed-in work detail route.");
@@ -2594,19 +2638,19 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("Migration return", StringComparison.Ordinal), "home work should surface migration return instead of leaving legacy carry-forward buried in the deeper work route.");
     Assert(homeSource.Contains("Open migration return", StringComparison.Ordinal), "home work should keep a direct route back into migration return.");
     Assert(homeSource.Contains("Publication status", StringComparison.Ordinal), "home work should surface creator-publication status instead of leaving publication trust buried in the deeper account route.");
-    Assert(homeSource.Contains("@publication.ProvenanceSummary", StringComparison.Ordinal), "home work should surface creator-publication provenance directly from the shared projection.");
+    Assert(homeSource.Contains("publication.ProvenanceSummary", StringComparison.Ordinal), "home work should surface creator-publication provenance directly from the shared projection.");
     Assert(homeSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "home work should humanize creator-publication visibility directly on the signed-in home route.");
-    Assert(homeSource.Contains("@publication.DiscoverySummary", StringComparison.Ordinal), "home work should surface creator-publication discovery posture directly from the shared projection.");
-    Assert(homeSource.Contains("@publication.TrustSummary", StringComparison.Ordinal), "home work should surface creator-publication trust reasoning directly from the shared projection.");
-    Assert(homeSource.Contains("@publication.ComparisonSummary", StringComparison.Ordinal), "home work should surface creator-publication comparison guidance directly from the shared projection.");
-    Assert(homeSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "home work should surface creator-publication moderation posture directly from the shared projection.");
-    Assert(homeSource.Contains("@publication.LineageSummary", StringComparison.Ordinal), "home work should surface creator-publication lineage directly from the shared projection.");
+    Assert(homeSource.Contains("publication.DiscoverySummary", StringComparison.Ordinal), "home work should surface creator-publication discovery posture directly from the shared projection.");
+    Assert(homeSource.Contains("publication.TrustSummary", StringComparison.Ordinal), "home work should surface creator-publication trust reasoning directly from the shared projection.");
+    Assert(homeSource.Contains("publication.ComparisonSummary", StringComparison.Ordinal), "home work should surface creator-publication comparison guidance directly from the shared projection.");
+    Assert(homeSource.Contains("publication.ModerationSummary", StringComparison.Ordinal), "home work should surface creator-publication moderation posture directly from the shared projection.");
+    Assert(homeSource.Contains("publication.LineageSummary", StringComparison.Ordinal), "home work should surface creator-publication lineage directly from the shared projection.");
     Assert(homeSource.Contains("HumanizeStatus(publication.TrustBand, \"Draft\")", StringComparison.Ordinal), "home work should humanize creator-publication trust ranking directly on the signed-in home route.");
-    Assert(homeSource.Contains("publication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "home work should surface creator-publication discoverability posture directly on the signed-in home route.");
+    Assert(homeSource.Contains("publication.Discoverable ? \"Eligible now\" : \"Limited\"", StringComparison.Ordinal), "home work should surface creator-publication discoverability posture directly on the signed-in home route.");
     Assert(homeSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "home work should humanize creator-publication state directly on the signed-in home route.");
-    Assert(homeSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "home work should surface the publication next step directly from the shared creator-publication projection.");
-    Assert(homeSource.Contains("@publication.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface creator-publication return truth directly from the shared projection.");
-    Assert(homeSource.Contains("@publication.SupportClosureSummary", StringComparison.Ordinal), "home work should surface creator-publication support closure directly from the shared projection.");
+    Assert(homeSource.Contains("publication.NextSafeAction", StringComparison.Ordinal), "home work should surface the publication next step directly from the shared creator-publication projection.");
+    Assert(homeSource.Contains("publication.CampaignReturnSummary", StringComparison.Ordinal), "home work should surface creator-publication return truth directly from the shared projection.");
+    Assert(homeSource.Contains("publication.SupportClosureSummary", StringComparison.Ordinal), "home work should surface creator-publication support closure directly from the shared projection.");
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.DiscoverySummary", StringComparison.Ordinal), "home aftermath shelf should surface linked creator-publication discovery posture instead of compressing recap output back to trust-only prose.");
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.TrustSummary", StringComparison.Ordinal), "home aftermath shelf should surface linked creator-publication trust reasoning instead of collapsing it into trust-band shorthand.");
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.ComparisonSummary", StringComparison.Ordinal), "home aftermath shelf should surface linked creator-publication comparison guidance instead of burying it in the detail route.");
@@ -2615,37 +2659,37 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "home aftermath shelf should surface linked creator-publication return truth instead of dropping it outside the publication detail route.");
     Assert(homeSource.Contains("@leadAftermathCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "home aftermath shelf should surface linked creator-publication support closure instead of dropping it outside the publication detail route.");
     Assert(homeSource.Contains("Open public publication", StringComparison.Ordinal), "home work should keep a direct route into the public publication once discovery is live.");
-    Assert(homeSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "home work should keep a title-specific route from publication status back into the related build follow-through.");
-    Assert(homeSource.Contains("Open build path for @leadAftermathCreatorPublication.Title", StringComparison.Ordinal), "home aftermath shelf should keep a direct route back to the linked creator-publication build path.");
+    Assert(homeSource.Contains("Open build path for @PublicText(publication.Title)", StringComparison.Ordinal), "home work should keep a title-specific route from publication status back into the related build follow-through.");
+    Assert(homeSource.Contains("Open build path for @PublicText(leadAftermathCreatorPublication.Title)", StringComparison.Ordinal), "home aftermath shelf should keep a direct route back to the linked creator-publication build path.");
     Assert(homeSource.Contains("/artifacts/publications/", StringComparison.Ordinal), "home work should deep-link discoverable creator packets into the shared public publication detail route.");
-    Assert(homeSource.Contains("Understandable return: @workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly on the shared campaign card instead of compressing it away.");
-    Assert(homeSource.Contains("Legal runner: @leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should carry legal-runner proof onto the calmer lead first-session card.");
-    Assert(homeSource.Contains("Understandable return: @leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should carry understandable-return proof onto the calmer lead first-session card.");
-    Assert(homeSource.Contains("Campaign readiness: @leadFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should carry campaign readiness onto the calmer lead first-session card.");
-    Assert(homeSource.Contains("Device return", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
-    Assert(homeSource.Contains("Open device return", StringComparison.Ordinal), "home work should keep a direct route into the device-return lane when claimed-device continuity already exists.");
-    Assert(homeSource.Contains("@supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
-    Assert(homeSource.Contains("@supportCase.ReleaseProgressSummary", StringComparison.Ordinal), "home access should surface release-progress truth directly from the shared support presenter.");
-    Assert(homeSource.Contains("@supportCase.AffectedInstallSummary", StringComparison.Ordinal), "home access should surface affected-install truth directly from the shared support presenter.");
-    Assert(homeSource.Contains("Watchout:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
+    Assert(homeSource.Contains("Return: @workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should surface understandable-return proof directly on the shared campaign card instead of compressing it away.");
+    Assert(homeSource.Contains("Rules: @leadFirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "home work should carry legal-runner proof onto the calmer lead first-session card.");
+    Assert(homeSource.Contains("Return: @leadFirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "home work should carry understandable-return proof onto the calmer lead first-session card.");
+    Assert(homeSource.Contains("Ready: @leadFirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "home work should carry campaign readiness onto the calmer lead first-session card.");
+    Assert(homeSource.Contains("<span class=\"tag\">Device roles</span>", StringComparison.Ordinal), "home work should surface the calmer device-return card for claimed-device continuity.");
+    Assert(homeSource.Contains("Open install return", StringComparison.Ordinal), "home work should keep a direct route into the device-return lane when claimed-device continuity already exists.");
+    Assert(homeSource.Contains("supportCase.ClosureSummary", StringComparison.Ordinal), "home access should surface support-closure truth directly from the shared support presenter.");
+    Assert(homeSource.Contains("releasedOrNotifiedCases", StringComparison.Ordinal), "home access should derive its support follow-through from released or notified cases.");
+    Assert(homeSource.Contains("supportCase.PrimaryActionHref", StringComparison.Ordinal), "home access should keep the support presenter's primary follow-through action.");
+    Assert(homeSource.Contains("Needs attention:", StringComparison.Ordinal), "home work should keep one concrete watchout instead of a long data-dump summary.");
     Assert(homeSource.Contains("Transfer:", StringComparison.Ordinal), "home work should surface a short roster-transfer cue when campaign ownership or roster placement changes.");
     Assert(!homeSource.Contains("Next safe action:", StringComparison.Ordinal), "home work should not fall back to the older verbose next-safe-action label on the short card.");
     Assert(!homeSource.Contains("Support reuse:", StringComparison.Ordinal), "home work should keep support reuse detail in the deeper work route instead of the short home card.");
     Assert(!homeSource.Contains("story-guide-tail", StringComparison.Ordinal), "home should use quieter release-footnote sections instead of the older full-width CTA band.");
-    var accountsControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "AccountsController.cs"));
-    var publicControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
-    var accountSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
+    var accountsControllerSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Controllers/AccountsController.cs"));
+    var publicControllerSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Controllers/PublicLandingController.cs"));
+    var accountSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/Accounts/Account.cshtml"));
     Assert(!accountSource.Contains("Build Lab handoffs", StringComparison.Ordinal), "account copy should avoid internal Build Lab wording on the customer-facing surface.");
     Assert(!accountSource.Contains("Rules Navigator answers", StringComparison.Ordinal), "account copy should avoid internal Rules Navigator wording on the customer-facing surface.");
-    Assert(accountSource.Contains("Build paths", StringComparison.Ordinal), "account should describe Build Lab follow-through as customer-facing build paths.");
-    Assert(accountSource.Contains("Grounded rule answers", StringComparison.Ordinal), "account should describe Rules Navigator follow-through as grounded rule answers.");
+    Assert(accountSource.Contains("selected-first-playable-session", StringComparison.Ordinal), "account should keep build and campaign follow-through on the selected first-session route.");
+    Assert(accountSource.Contains("Legal runner", StringComparison.Ordinal), "account should describe grounded rule readiness in customer-facing terms.");
     Assert(accountSource.Contains("Model.SignedInTrustStatus", StringComparison.Ordinal), "account should project the signed-in trust panel directly on the account surface.");
     Assert(accountSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "account should reuse the shared signed-in trust panel instead of a link-only trust rail.");
     Assert(accountSource.Contains("current status summary", StringComparison.Ordinal), "account teams and permissions should give organizers a clear current-status summary on the member-guidance rail.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Who can get it now\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current access guidance.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Recommended for this install\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the promoted install path.");
-    Assert(accountSource.Contains("<strong>Release checks:</strong>", StringComparison.Ordinal), "account member guidance should label the signed-in release lane with customer-facing release-check language.");
-    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current release checks.");
+    Assert(accountSource.Contains("<strong>Release status:</strong>", StringComparison.Ordinal), "account member guidance should label the signed-in release lane with customer-facing status language.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release checks\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current release checks.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the caution lane.");
     Assert(accountSource.Contains("#signed-in-trust-status", StringComparison.Ordinal), "account member guidance should deep-link back to the shared signed-in trust panel instead of inventing a second trust page.");
     Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");
@@ -2664,7 +2708,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account work should reuse signed-in caution truth inside the selected first-session drawer.");
     Assert(accountSource.Contains("Open install support", StringComparison.Ordinal), "account work should keep install-support follow-through inside the selected first-session drawer.");
     Assert(accountSource.Contains("@workspace.FirstPlayableSession.RuleReadySummary", StringComparison.Ordinal), "account work should surface legal-runner proof directly on the broader shared campaign list.");
-    Assert(accountSource.Contains("@workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "account work should surface understandable-return proof directly on the broader shared campaign list.");
+    Assert(accountSource.Contains("workspace.FirstPlayableSession.ReturnLaneSummary", StringComparison.Ordinal), "account work should surface understandable-return proof directly on the broader shared campaign list.");
     Assert(accountSource.Contains("@workspace.FirstPlayableSession.CampaignReadySummary", StringComparison.Ordinal), "account work should surface campaign-ready proof directly on the broader shared campaign list.");
     Assert(accountSource.Contains("Understandable return", StringComparison.Ordinal), "account work should label first-session return proof in customer-facing onboarding language.");
     Assert(!accountSource.Contains("Workspaces and continuity", StringComparison.Ordinal), "account should avoid workspace-heavy section titles on the customer-facing route.");
@@ -2673,66 +2717,67 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Claimed second-device restore posture", StringComparison.Ordinal), "account access should avoid internal second-device restore jargon.");
     Assert(!accountSource.Contains("signed-in shell", StringComparison.Ordinal), "account should avoid signed-in shell wording on customer-facing surfaces.");
     Assert(!accountSource.Contains("Campaign workspaces", StringComparison.Ordinal), "account work summary should describe shared campaign views in customer-facing language.");
-    Assert(accountSource.Contains("\"work\" => \"Work\"", StringComparison.Ordinal), "account should use the calmer work section heading.");
-    Assert(accountSource.Contains("Advanced device recovery", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
+    Assert(accountSource.Contains("\"work\" => \"Roster\"", StringComparison.Ordinal), "account should use the current roster section heading.");
+    Assert(accountSource.Contains("Recovery backup", StringComparison.Ordinal), "account access should use customer-facing recovery wording for advanced device details.");
     Assert(accountSource.Contains("Offline-ready return", StringComparison.Ordinal), "account access should describe claimed-device restore details in customer-facing offline-return wording.");
-    Assert(accountSource.Contains("Roster transfer audit", StringComparison.Ordinal), "account work should expose explicit roster-transfer audit language on shared campaign views.");
-    Assert(accountSource.Contains("Move governed roster state", StringComparison.Ordinal), "account work should expose a real roster-transfer action instead of only historical audit receipts.");
-    Assert(accountSource.Contains("Recent governed roster moves", StringComparison.Ordinal), "account work should keep recent roster moves visible on the operator rail after ownership changes.");
-    Assert(accountSource.Contains("Recap files", StringComparison.Ordinal), "account work should give the selected campaign card a first-class recap files drawer.");
+    Assert(accountSource.Contains("Roster moves", StringComparison.Ordinal), "account work should expose explicit roster-transfer audit language on shared campaign views.");
+    Assert(accountSource.Contains("<summary>Move roster</summary>", StringComparison.Ordinal), "account work should expose a real roster-transfer action instead of only historical audit receipts.");
+    Assert(accountSource.Contains("Roster transfer history", StringComparison.Ordinal), "account work should keep recent roster moves visible after ownership changes.");
+    Assert(accountSource.Contains("<summary>Recaps</summary>", StringComparison.Ordinal), "account work should give the selected campaign card a first-class recap drawer.");
     Assert(accountSource.Contains("PublicSurfaceStatus.AudienceLabel(item.Audience)", StringComparison.Ordinal), "account work should humanize artifact shelf audiences directly on the selected campaign card.");
     Assert(accountSource.Contains("PublicText(item.OwnershipSummary)", StringComparison.Ordinal), "account work should surface cleaned item ownership directly from the shared recap projection.");
-    Assert(accountSource.Contains("PublicText(item.ProvenanceSummary)", StringComparison.Ordinal), "account work should surface cleaned item source details directly from the shared recap projection.");
-    Assert(accountSource.Contains("@item.AuditSummary", StringComparison.Ordinal), "account work should surface artifact audit posture directly from the shared recap-shelf projection.");
+    Assert(accountSource.Contains("PublicText(item.Summary)", StringComparison.Ordinal), "account work should surface cleaned item source details directly from the shared recap projection.");
+    Assert(accountSource.Contains("PublicText(item.CompatibilitySummary)", StringComparison.Ordinal), "account work should surface artifact compatibility posture directly from the shared recap-shelf projection.");
     Assert(accountSource.Contains("@HumanizeStatus(item.PublicationState, \"Ready\")", StringComparison.Ordinal), "account work should surface artifact publication state directly from the shared recap-shelf projection.");
     Assert(accountSource.Contains("PublicText(item.PublicationSummary)", StringComparison.Ordinal), "account work should surface cleaned item publication status directly from the shared recap projection.");
     Assert(accountSource.Contains("PublicText(item.NextSafeAction)", StringComparison.Ordinal), "account work should surface the next recap step directly from the shared recap projection.");
     Assert(accountSource.Contains("item.CreatorPublicationId", StringComparison.Ordinal), "account work should deep-link artifact shelf entries back into creator publication status when the same truth is already published.");
     Assert(accountSource.Contains("PublicCreatorPublicationHref", StringComparison.Ordinal), "account work should expose a direct public creator-packet route once the owner is looking at a live discoverable publication.");
     Assert(accountSource.Contains("IsDiscoverablePublicCreatorPublication", StringComparison.Ordinal), "account work should gate the public creator-packet route on actual live discoverable publication posture.");
-    Assert(accountSource.Contains("Transfer governed roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
+    Assert(accountSource.Contains("Transfer roster state", StringComparison.Ordinal), "account work should give operators a direct governed roster-transfer action.");
     Assert(accountSource.Contains("Start prep set", StringComparison.Ordinal), "account work should expose a real prep-start action on the selected campaign card.");
     Assert(accountSource.Contains("Recent prep starts", StringComparison.Ordinal), "account work should keep recent prep-start history visible on the selected campaign card.");
     Assert(accountSource.Contains("Stage travel prefetch", StringComparison.Ordinal), "account work should expose a real claimed-device travel-prefetch action on the selected campaign card.");
-    Assert(accountSource.Contains("Recent travel prefetch receipts", StringComparison.Ordinal), "account work should keep staged travel-prefetch receipts visible on the selected campaign card.");
-    Assert(accountSource.Contains("Generate aftermath or replay package", StringComparison.Ordinal), "account work should expose a real aftermath or replay packaging action on the selected campaign card.");
-    Assert(accountSource.Contains("Recent aftermath and replay packages", StringComparison.Ordinal), "account work should keep generated aftermath and replay packages visible on the selected campaign card.");
+    Assert(accountSource.Contains("Travel prefetch history", StringComparison.Ordinal), "account work should keep staged travel-prefetch receipts visible on the selected campaign card.");
+    Assert(accountSource.Contains("Create recap or replay", StringComparison.Ordinal), "account work should expose a real aftermath or replay packaging action on the selected campaign card.");
+    Assert(accountSource.Contains("Recent aftermath recap packages and replay outputs", StringComparison.Ordinal), "account work should keep generated aftermath and replay packages visible on the selected campaign card.");
     Assert(accountSource.Contains("<option value=\"replay_timeline\">Replay timeline</option>", StringComparison.Ordinal), "account work should let operators generate replay timelines from the same governed package rail.");
-    Assert(shelfSource.Contains("aftermath or replay follow-through", StringComparison.Ordinal), "signed-in artifact shelf should describe the campaign lane with replay-safe follow-through instead of recap-only wording.");
-    Assert(shelfSource.Contains("live aftermath, replay, and linked creator-publication history", StringComparison.Ordinal), "signed-in artifact shelf should describe the all-views lane with replay-safe outputs instead of recap-only wording.");
-    var downloadDispatchSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
-    var supportSubmittedSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
+    Assert(shelfSource.Contains("aftermath, replay, publication", StringComparison.Ordinal), "signed-in artifact shelf should describe the campaign lane with replay-safe follow-through instead of recap-only wording.");
+    Assert(shelfSource.Contains("Table Pulse Aftermath return cues, aftermath, replay", StringComparison.Ordinal), "signed-in artifact shelf should describe the all-views lane with replay-safe outputs instead of recap-only wording.");
+    var downloadDispatchSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml"));
+    var supportSubmittedSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/SupportSubmitted.cshtml"));
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
     Assert(downloadDispatchSource.Contains("Account linking is optional.", StringComparison.Ordinal), "download handoff should keep account linking optional and reserve recovery codes for recovery fallback.");
     Assert(downloadDispatchSource.Contains("Support stays with this install.", StringComparison.Ordinal), "download handoff should keep support recovery attached to the same install instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
-    Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
-    Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
-    Assert(supportSubmittedSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "support confirmation should surface who-can-get-it-now posture directly on the confirmation rail.");
-    Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.InstallReadinessSummary", StringComparison.Ordinal), "support confirmation should surface the linked-install readiness summary directly from the tracked case.");
-    Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.VerificationSummary", StringComparison.Ordinal), "support confirmation should surface fix-verification guidance directly from the tracked case.");
-    Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.ReleaseProgressSummary", StringComparison.Ordinal), "support confirmation should surface the release-lane summary directly from the tracked case.");
-    Assert(accountSource.Contains("Recent installs", StringComparison.Ordinal), "account access should describe recent downloads as recent installs instead of raw receipts.");
-    Assert(accountSource.Contains("Current install rail", StringComparison.Ordinal), "account access should lead with one current install rail instead of only counts and fallback ledgers.");
-    Assert(accountSource.Contains("Recovery codes stay below as a fallback, not the first instruction.", StringComparison.Ordinal), "account access should explicitly demote recovery codes beneath the primary install rail guidance.");
-    Assert(accountSource.Contains("This linked install is your default return rail", StringComparison.Ordinal), "account access should present the linked install as the default return rail when claim and support continuity already exist.");
-    Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
-    Assert(accountSource.Contains("Recovery mode only", StringComparison.Ordinal), "account access should mark pending claim codes as recovery-only fallback instead of the primary install path.");
-    Assert(accountSource.Contains("Do not redeem claim codes in a browser tab.", StringComparison.Ordinal), "account access should steer claim-code use back into in-app recovery instead of browser ritual.");
-    Assert(accountSource.Contains("Account sync history", StringComparison.Ordinal), "account access should expose a dedicated account-sync history drawer instead of leaving recovery posture buried in the API.");
-    Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account access should render the entitlement-sync recovery summary instead of hiding it behind raw counts.");
+    Assert(supportSubmittedSource.Contains("The report is saved.", StringComparison.Ordinal), "support confirmation should lead with an explicit saved-report acknowledgement.");
+    Assert(supportSubmittedSource.Contains("Choose the next step.", StringComparison.Ordinal), "support confirmation should present a bounded next-step chooser.");
+    Assert(supportSubmittedSource.Contains("Open current release for fix status", StringComparison.Ordinal), "support confirmation should route fix-status questions to the current release surface.");
+    Assert(supportSubmittedSource.Contains("helperFacts.Add((\"Install\", Model.TrackedCaseSummary.InstallReadinessSummary))", StringComparison.Ordinal), "support confirmation should surface the linked-install readiness summary directly from the tracked case.");
+    Assert(supportSubmittedSource.Contains("helperFacts.Add((\"Fix\", Model.TrackedCaseSummary.VerificationSummary))", StringComparison.Ordinal), "support confirmation should surface fix-verification guidance directly from the tracked case.");
+    Assert(supportSubmittedSource.Contains("helperFacts.Add((\"Release\", Model.TrackedCaseSummary.ReleaseProgressSummary))", StringComparison.Ordinal), "support confirmation should surface the release-lane summary directly from the tracked case.");
+    Assert(supportSubmittedSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "support confirmation should preserve a compact who-can-get-it-now footnote when signed-in trust status is available.");
+    Assert(accountSource.Contains("<summary>Recent downloads</summary>", StringComparison.Ordinal), "account access should keep recent download receipts in a bounded details drawer.");
+    Assert(accountSource.Contains("<span class=\"tag\">Current install</span>", StringComparison.Ordinal), "account access should lead with one current-install card instead of only counts and fallback ledgers.");
+    Assert(accountSource.Contains("@installRailHeading", StringComparison.Ordinal), "account access should derive the current-install heading from the install rail projection.");
+    Assert(accountSource.Contains("@installRailSummary", StringComparison.Ordinal), "account access should derive the current-install guidance from the install rail projection.");
+    Assert(accountSource.Contains("Recovery codes are only for the already-downloaded app when it asks for one.", StringComparison.Ordinal), "account access should keep recovery codes limited to the in-app fallback path.");
+    Assert(accountSource.Contains("<summary>Pending setup codes</summary>", StringComparison.Ordinal), "account access should describe pending claims as setup codes on the device handoff path.");
+    Assert(accountSource.Contains("Do not use these codes in a browser tab.", StringComparison.Ordinal), "account access should steer setup-code use back into the already-downloaded app instead of browser ritual.");
+    Assert(accountSource.Contains("<summary>Connection details</summary>", StringComparison.Ordinal), "account access should expose bounded connection details instead of leaving recovery posture buried in the API.");
+    Assert(accountSource.Contains("@PublicText(entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint)", StringComparison.Ordinal), "account access should render the entitlement-sync recovery hint instead of hiding it behind raw counts.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account access should render a direct recovery action for the standalone entitlement-sync lead receipt.");
     Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString(\"u\")", StringComparison.Ordinal), "account access should surface the latest entitlement-sync receipt observation timestamp.");
     Assert(accountSource.Contains("Finish this item before you continue.", StringComparison.Ordinal), "account access should make blocking entitlement-sync conflicts explicit on the device surface.");
-    Assert(accountSource.Contains("Restore history", StringComparison.Ordinal), "account work should keep restore history visible on the selected workspace card.");
-    Assert(accountSource.Contains("Restore conflicts", StringComparison.Ordinal), "account work should keep restore conflicts visible on the selected workspace card.");
-    Assert(accountSource.Contains("Restore status summary", StringComparison.Ordinal), "account work should surface one restore status summary on the selected workspace card.");
-    Assert(accountSource.Contains("Restore status", StringComparison.Ordinal), "account work should render a restore status summary in the dedicated restore drawer.");
-    Assert(accountSource.Contains("@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account work should render the restore receipt recovery summary instead of leaving recoverability implicit.");
+    Assert(accountSource.Contains("<summary>Reconnect and conflicts</summary>", StringComparison.Ordinal), "account work should keep reconnect history and conflicts visible on the selected campaign card.");
+    Assert(accountSource.Contains("@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary)", StringComparison.Ordinal), "account work should surface one reconnect status summary on the selected campaign card.");
+    Assert(accountSource.Contains("@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.ProvenanceSummary)", StringComparison.Ordinal), "account work should render reconnect provenance in the dedicated recovery drawer.");
+    Assert(accountSource.Contains("@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.ConflictSummary)", StringComparison.Ordinal), "account work should render the current conflict summary in the dedicated recovery drawer.");
+    Assert(accountSource.Contains("@PublicText(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary)", StringComparison.Ordinal), "account work should render the reconnect recovery summary instead of leaving recoverability implicit.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account work should expose a direct recovery-route action for the lead restore receipt instead of leaving the route as inert text.");
-    Assert(accountSource.Contains("Restore history and conflicts", StringComparison.Ordinal), "account work should expose a dedicated restore history/conflict drawer on the selected workspace card.");
+    Assert(accountSource.Contains("<span>Recent reconnects</span>", StringComparison.Ordinal), "account work should expose reconnect history counts on the selected campaign card.");
     Assert(accountSource.Contains("From @HumanizeStatus(receipt.Authority, \"Chummer\")", StringComparison.Ordinal), "account work should render restore receipt source instead of hiding which Chummer area issued the continuity note.");
     Assert(accountSource.Contains("@receipt.RecoveryHint", StringComparison.Ordinal), "account work should render the concrete restore recovery hint on provenance receipts.");
     Assert(accountSource.Contains("DescribeRecoveryRouteAction(recovery.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each provenance recovery receipt.");
@@ -2748,45 +2793,45 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("selectedBuildLabHandoff.ProgressionOutcomes", StringComparison.Ordinal), "account build-path detail should render progression outcomes directly from the shared projection.");
     Assert(accountSource.Contains("selectedBuildLabHandoff.Outputs.Take(3)", StringComparison.Ordinal), "account build-path detail should render bounded per-output rows so template/foundry/sheet follow-through stays visible.");
     Assert(accountSource.Contains("@output.NextSafeAction", StringComparison.Ordinal), "account build-path detail should surface per-output next-safe actions directly from the shared projection.");
-    Assert(accountSource.Contains("@output.ProvenanceSummary", StringComparison.Ordinal), "account build-path detail should surface per-output provenance summaries directly from the shared projection.");
+    Assert(accountSource.Contains("@PublicText(output.ProvenanceSummary)", StringComparison.Ordinal), "account build-path detail should surface cleaned per-output provenance summaries directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ProvenanceSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication provenance directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(selectedCreatorPublication.Visibility, \"Shared\")", StringComparison.Ordinal), "account publication detail should humanize creator-publication visibility directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.LineageSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication lineage directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(selectedCreatorPublication.TrustBand, \"Draft\")", StringComparison.Ordinal), "account publication detail should humanize creator-publication trust ranking directly from the shared projection.");
-    Assert(accountSource.Contains("@selectedCreatorPublication.TrustSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication trust reasoning directly from the shared projection.");
+    Assert(accountSource.Contains("@PublicText(selectedCreatorPublication.TrustSummary)", StringComparison.Ordinal), "account publication detail should surface cleaned creator-publication trust reasoning directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ComparisonSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication comparison guidance directly from the shared projection.");
-    Assert(accountSource.Contains("selectedCreatorPublication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "account publication detail should surface creator-publication discoverability posture directly from the shared projection.");
+    Assert(accountSource.Contains("selectedCreatorPublication.Discoverable ? \"Available\" : \"Not shared yet\"", StringComparison.Ordinal), "account publication detail should surface creator-publication discoverability posture in customer-facing language.");
     Assert(accountSource.Contains("@selectedCreatorPublication.NextSafeAction", StringComparison.Ordinal), "account publication detail should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.CampaignReturnSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication return truth directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.SupportClosureSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication support closure directly from the shared projection.");
     Assert(accountSource.Contains("@selectedCreatorPublication.ModerationSummary", StringComparison.Ordinal), "account publication detail should surface creator-publication moderation posture directly from the shared projection.");
     Assert(accountSource.Contains("/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish", StringComparison.Ordinal), "account publication detail should keep an explicit publish route on the same governed account rail.");
     Assert(accountSource.Contains("Resubmit corrected packet", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");
-    Assert(accountSource.Contains("Open build path for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
-    Assert(accountSource.Contains("Open public publication", StringComparison.Ordinal), "account publication detail should expose the public inspect route alongside private moderation status once the publication is live.");
+    Assert(accountSource.Contains("Open build details for @selectedCreatorPublication.Title", StringComparison.Ordinal), "account publication detail should give the customer a title-specific path back to the related build follow-through.");
+    Assert(accountSource.Contains("@CreatorPublicationLinkLabel(selectedCreatorPublication)", StringComparison.Ordinal), "account publication detail should expose a customer-facing public inspect action once the publication is live.");
     Assert(accountSource.Contains("Publication kind", StringComparison.Ordinal), "account publication detail should surface the shared publication kind on the governed detail lane.");
     Assert(accountSource.Contains("Draft type", StringComparison.Ordinal), "account publication detail should surface the draft type on the governed detail lane.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(selectedCreatorPublication.PublicationId)", StringComparison.Ordinal), "account publication detail should deep-link live creator packets onto the public inspect route without hiding the private moderation lane.");
-    Assert(accountSource.Contains("@linkedPublication.DiscoverySummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication discovery posture instead of compressing it away.");
-    Assert(accountSource.Contains("@linkedPublication.TrustSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication trust reasoning instead of dropping it on the detail route.");
-    Assert(accountSource.Contains("@linkedPublication.ComparisonSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication comparison guidance instead of compressing it away.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.DiscoverySummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication discovery posture instead of compressing it away.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.TrustSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication trust reasoning instead of dropping it on the detail route.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.ComparisonSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication comparison guidance instead of compressing it away.");
     Assert(accountSource.Contains("HumanizeStatus(linkedPublication.Visibility, \"Shared\")", StringComparison.Ordinal), "account recap shelves should humanize linked creator-publication visibility instead of hiding it behind the publication detail card.");
-    Assert(accountSource.Contains("@linkedPublication.LineageSummary", StringComparison.Ordinal), "account recap shelves should surface lineage by following the linked creator publication.");
-    Assert(accountSource.Contains("@linkedPublication.CampaignReturnSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication return truth instead of dropping it outside the publication detail route.");
-    Assert(accountSource.Contains("@linkedPublication.SupportClosureSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication support closure instead of dropping it outside the publication detail route.");
-    Assert(accountSource.Contains("@linkedPublication.ModerationSummary", StringComparison.Ordinal), "account recap shelves should surface linked creator-publication moderation posture instead of dropping it outside the publication detail route.");
-    Assert(accountSource.Contains("Open build path for @linkedPublication.Title", StringComparison.Ordinal), "account recap shelves should keep a direct route back to the linked creator-publication build path.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.LineageSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned lineage by following the linked creator publication.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.CampaignReturnSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication return truth instead of dropping it outside the publication detail route.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.SupportClosureSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication support closure instead of dropping it outside the publication detail route.");
+    Assert(accountSource.Contains("@PublicText(linkedPublication.ModerationSummary)", StringComparison.Ordinal), "account recap shelves should surface cleaned linked creator-publication moderation posture instead of dropping it outside the publication detail route.");
+    Assert(accountSource.Contains("Open build details for @linkedPublication.Title", StringComparison.Ordinal), "account recap shelves should keep a direct route back to the linked creator-publication build details.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(item.CreatorPublicationId)", StringComparison.Ordinal), "account recap shelves should offer the live public creator-packet inspect route when the linked publication is already discoverable.");
-    Assert(accountSource.Contains("@publication.ProvenanceSummary", StringComparison.Ordinal), "account publication list should surface creator-publication provenance directly from the shared projection.");
+    Assert(accountSource.Contains("@PublicText(publication.ProvenanceSummary)", StringComparison.Ordinal), "account publication list should surface cleaned creator-publication provenance directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(publication.Visibility, \"Shared\")", StringComparison.Ordinal), "account publication list should humanize creator-publication visibility directly from the shared projection.");
     Assert(accountSource.Contains("@publication.LineageSummary", StringComparison.Ordinal), "account publication list should surface creator-publication lineage directly from the shared projection.");
     Assert(accountSource.Contains("HumanizeStatus(publication.TrustBand, \"Draft\")", StringComparison.Ordinal), "account publication list should humanize creator-publication trust ranking directly from the shared projection.");
     Assert(accountSource.Contains("@publication.TrustSummary", StringComparison.Ordinal), "account publication list should surface creator-publication trust reasoning directly from the shared projection.");
     Assert(accountSource.Contains("@publication.ComparisonSummary", StringComparison.Ordinal), "account publication list should surface creator-publication comparison guidance directly from the shared projection.");
-    Assert(accountSource.Contains("publication.Discoverable ? \"Eligible now\" : \"Still bounded\"", StringComparison.Ordinal), "account publication list should surface creator-publication discoverability posture directly from the shared projection.");
+    Assert(accountSource.Contains("publication.Discoverable ? \"Available\" : \"Not shared yet\"", StringComparison.Ordinal), "account publication list should surface creator-publication discoverability posture in customer-facing language.");
     Assert(accountSource.Contains("HumanizeStatus(publication.PublicationStatus, \"Published\")", StringComparison.Ordinal), "account publication list should humanize creator-publication state directly from the shared projection.");
     Assert(accountSource.Contains("@publication.ModerationSummary", StringComparison.Ordinal), "account publication list should surface creator-publication moderation posture directly from the shared projection.");
-    Assert(accountSource.Contains("Open build path for @publication.Title", StringComparison.Ordinal), "account publication list should keep a title-specific route back to the related build follow-through.");
+    Assert(accountSource.Contains("Open build details for @publication.Title", StringComparison.Ordinal), "account publication list should keep a title-specific route back to the related build details.");
     Assert(accountSource.Contains("@PublicCreatorPublicationHref(publication.PublicationId)", StringComparison.Ordinal), "account publication list should expose the public creator-packet inspect route alongside private moderation links once the packet is live.");
     Assert(accountSource.Contains("@publication.NextSafeAction", StringComparison.Ordinal), "account publication list should surface the next creator-publication step directly from the shared projection.");
     Assert(accountSource.Contains("Recent changes", StringComparison.Ordinal), "account work should surface recent changes for the shared campaign view.");
@@ -2795,8 +2840,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Server-plane follow-through", StringComparison.Ordinal), "account work should avoid internal server-plane wording on the customer-facing route.");
     Assert(accountSource.Contains("What changed for me", StringComparison.Ordinal), "account work should keep the explicit what-changed-for-me packet on the selected campaign card.");
     Assert(accountSource.Contains("var selectedWorkspacePortableExchangeNotice =", StringComparison.Ordinal), "account work should derive a dedicated portable-exchange notice from the selected workspace server plane.");
-    Assert(accountSource.Contains("@selectedWorkspacePortableExchangeNotice.Summary", StringComparison.Ordinal), "account work should surface portable exchange directly from the selected workspace decision notice.");
-    Assert(accountSource.Contains("Next-session carry-forward", StringComparison.Ordinal), "account work should surface the shared next-session carry-forward projection on both the selected card and the workspace detail drawer.");
+    Assert(accountSource.Contains("@selectedWorkspacePortableExchangeSummary", StringComparison.Ordinal), "account work should surface the safety-filtered portable-exchange summary derived from the selected campaign decision notice.");
+    Assert(accountSource.Contains("Next session note", StringComparison.Ordinal), "account work should surface shared next-session carry-forward in customer-facing language on the selected card and campaign detail drawer.");
     Assert(accountSource.Contains("@selectedWorkspaceNextSessionCarryForward.Summary", StringComparison.Ordinal), "account work should surface the selected workspace carry-forward summary directly from the shared server-plane projection.");
     Assert(accountSource.Contains("Campaign memory", StringComparison.Ordinal), "account work should surface a first-class campaign-memory drawer on both selected and listed shared campaign views.");
     Assert(accountSource.Contains("@selectedWorkspaceCampaignMemory.Summary", StringComparison.Ordinal), "account work should surface the selected workspace campaign-memory summary directly from the shared projection.");
@@ -2812,11 +2857,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@op.CampaignReturnSummary", StringComparison.Ordinal), "account teams and permissions should surface the campaign-return pulse directly from the shared projection.");
     Assert(accountSource.Contains("Season / event pulse", StringComparison.Ordinal), "account teams and permissions should surface a first-class season and event pulse instead of treating larger organizer work as implicit.");
     Assert(accountSource.Contains("@op.SeasonEventSummary", StringComparison.Ordinal), "account teams and permissions should surface the operator season-event pulse directly from the shared projection.");
-    Assert(accountSource.Contains("Publication status", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer publication posture on the operator rail.");
+    Assert(accountSource.Contains("<span>Publication</span>", StringComparison.Ordinal), "account teams and permissions should surface explicit organizer publication posture on the operator rail.");
     Assert(accountSource.Contains("@op.ArtifactPublicationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer artifact-publication posture directly from the shared projection.");
     Assert(accountSource.Contains("Support path", StringComparison.Ordinal), "account teams and permissions should surface a plain-language support path on the organizer rail.");
     Assert(accountSource.Contains("@op.SupportEscalationSummary", StringComparison.Ordinal), "account teams and permissions should surface organizer support-escalation posture directly from the shared projection.");
-    Assert(accountSource.Contains("<summary>Season &amp; event rail</summary>", StringComparison.Ordinal), "account teams and permissions should give the operator a dedicated auditable season and event rail.");
+    Assert(accountSource.Contains("<summary>Season and event activity</summary>", StringComparison.Ordinal), "account teams and permissions should give the operator a dedicated auditable season-and-event activity drawer.");
     Assert(accountSource.Contains("id=\"community-op-events-@op.GroupId\"", StringComparison.Ordinal), "account teams and permissions should give the season-event rail a stable deep-link target.");
     Assert(accountSource.Contains("Campaign board", StringComparison.Ordinal), "account teams and permissions should surface a first-class campaign board for multi-campaign organizers.");
     Assert(accountSource.Contains("op.SeasonBoardEntries.Count == 0", StringComparison.Ordinal), "account teams and permissions should surface the season-board campaign count directly from the shared projection.");
@@ -2826,19 +2871,19 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@entry.ConsequenceSummary", StringComparison.Ordinal), "account season board should surface the shared consequence summary for each campaign lane.");
     Assert(accountSource.Contains("@entry.CampaignMemorySummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory summary for each campaign lane.");
     Assert(accountSource.Contains("@entry.CampaignMemoryReturnSummary", StringComparison.Ordinal), "account season board should surface the shared campaign-memory return cue for each campaign lane.");
-    Assert(accountSource.Contains("Open shared campaign view", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
+    Assert(accountSource.Contains(">Open campaign</a>", StringComparison.Ordinal), "account season board should give operators a direct route from the board into the governed campaign lane.");
     Assert(accountSource.Contains("Invites and sponsorship", StringComparison.Ordinal), "account teams and permissions should keep invite and sponsorship posture visible on the same organizer surface.");
     Assert(accountSource.Contains("Sponsor activity", StringComparison.Ordinal), "account teams and permissions should keep sponsor activity visible on the organizer summary rail.");
-    Assert(accountSource.Contains("Invite &amp; sponsorship rail", StringComparison.Ordinal), "account teams and permissions should give operators a dedicated invite and sponsorship rail.");
-    Assert(accountSource.Contains("Issue governed join code", StringComparison.Ordinal), "account invite rail should expose a governed join-code issuance flow.");
-    Assert(accountSource.Contains("Issue governed boost code", StringComparison.Ordinal), "account invite rail should expose a governed boost-code issuance flow.");
+    Assert(accountSource.Contains("<summary>Invite &amp; sponsorship</summary>", StringComparison.Ordinal), "account teams and permissions should give operators a dedicated invite-and-sponsorship drawer.");
+    Assert(accountSource.Contains(">Issue join code</button>", StringComparison.Ordinal), "account invite drawer should expose a governed join-code issuance flow.");
+    Assert(accountSource.Contains(">Issue boost code</button>", StringComparison.Ordinal), "account invite drawer should expose a governed boost-code issuance flow.");
     Assert(accountSource.Contains("Recent join codes", StringComparison.Ordinal), "account invite rail should surface recent governed join codes.");
     Assert(accountSource.Contains("Recent boost codes", StringComparison.Ordinal), "account invite rail should surface recent governed boost codes.");
     Assert(accountSource.Contains("Recent sponsor sessions", StringComparison.Ordinal), "account invite rail should surface recent governed sponsor sessions.");
     Assert(accountSource.Contains("id=\"community-op-sponsor-sessions-@op.GroupId\"", StringComparison.Ordinal), "account invite rail should give the sponsor-session drawer a stable deep-link target.");
     Assert(accountSource.Contains("If a member reports a stale join code", StringComparison.Ordinal), "account invite rail should explain stale-code recovery on the same operator surface.");
     Assert(accountSource.Contains("Launch &amp; closure", StringComparison.Ordinal), "account teams and permissions should keep organizer release and closure posture visible on the same operator surface.");
-    Assert(accountSource.Contains("Member guidance rail", StringComparison.Ordinal), "account teams and permissions should provide a bounded member-guidance rail for organizer workflows.");
+    Assert(accountSource.Contains("<summary>Member guidance</summary>", StringComparison.Ordinal), "account teams and permissions should provide bounded member guidance for organizer workflows.");
     Assert(accountSource.Contains("Open current release", StringComparison.Ordinal), "account organizer guidance should link operators to the current release posture.");
     Assert(accountSource.Contains("Open downloads", StringComparison.Ordinal), "account organizer guidance should link operators to the real member download handoff.");
     Assert(accountSource.Contains("Open help and trust", StringComparison.Ordinal), "account organizer guidance should link operators to the help and trust surfaces.");
@@ -2847,7 +2892,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Label", StringComparison.Ordinal), "account work should surface the bounded workspace state directly from the server plane.");
     Assert(accountSource.Contains("@selectedWorkspaceServerPlane.WorkspaceState.Summary", StringComparison.Ordinal), "account work should explain why the bounded workspace state is active on the selected campaign card.");
     Assert(accountSource.Contains("@selectedWorkspace.NextSafeAction", StringComparison.Ordinal), "account work should surface the workspace next safe action directly on the selected campaign card.");
-    Assert(accountSource.Contains("Follow-up lane", StringComparison.Ordinal), "account support detail should surface the follow-up lane instead of assuming the user remembers it.");
+    Assert(accountSource.Contains("<span>Follow-up</span>", StringComparison.Ordinal), "account support detail should surface the follow-up route instead of assuming the user remembers it.");
     Assert(accountSource.Contains("Release progress:", StringComparison.Ordinal), "account support detail should surface reporter-lane release progress instead of only the closure summary.");
     Assert(accountSource.Contains("Affected install", StringComparison.Ordinal), "account support detail should surface the install linked to the tracked case.");
     Assert(accountSource.Contains("Next safe action:", StringComparison.Ordinal), "account support detail should surface the next honest user action for a tracked case.");
@@ -2865,36 +2910,38 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("<summary>Recovery email</summary>", StringComparison.Ordinal), "account profile should keep recovery email inside a calmer drawer instead of stacking it inline on the main profile route.");
     Assert(accountSource.Contains("<summary>Need routing help first?</summary>", StringComparison.Ordinal), "account support should keep the grounded assistant behind a calmer disclosure so case filing stays primary.");
     Assert(!accountsControllerSource.Contains("new SectionLinkViewModel(\"advanced\", \"Advanced\"", StringComparison.Ordinal), "account should not advertise advanced diagnostics as a normal account action.");
-    Assert(accountSource.Contains("Cross-device recovery", StringComparison.Ordinal), "account access should describe restore state as cross-device recovery.");
+    Assert(accountSource.Contains("<summary>Recovery backup</summary>", StringComparison.Ordinal), "account access should keep cross-device restore state in a customer-facing recovery backup drawer.");
     Assert(accountSource.Contains("What stays on this device", StringComparison.Ordinal), "account access should keep install-local notes in customer-facing wording.");
     Assert(accountSource.Contains("Recent recaps", StringComparison.Ordinal), "account work should describe recap counts in customer-facing language.");
     Assert(accountSource.Contains("Open support cases", StringComparison.Ordinal), "account work should describe support counts honestly instead of as blockers.");
     Assert(accountSource.Contains("var sectionTitle = Model.CurrentSection switch", StringComparison.Ordinal), "account routes should expose route-specific headings instead of one generic account title.");
-    var trustSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
-    Assert(trustSource.Contains("supportReleaseChannel", StringComparison.Ordinal), "contact intake should keep release-channel context visible when install-aware support is available.");
-    Assert(trustSource.Contains("supportHeadId", StringComparison.Ordinal), "contact intake should keep head context visible when install-aware support is available.");
-    Assert(trustSource.Contains("supportArch", StringComparison.Ordinal), "contact intake should keep architecture context visible when install-aware support is available.");
-    Assert(trustSource.Contains("What changed in this version", StringComparison.Ordinal), "privacy and terms should render a policy-delta block instead of leaving summary points buried in the generic hero chrome.");
-    Assert(trustSource.Contains("HelpFallbackActionFor", StringComparison.Ordinal), "help should expose a deliberate fallback action per lane instead of only one outbound link.");
-    Assert(trustSource.Contains("Fallback:", StringComparison.Ordinal), "help cards should render a visible fallback route under the primary next step.");
-    Assert(trustSource.Contains("_PrivacyBoundaryPanel.cshtml", StringComparison.Ordinal), "help, privacy, and contact routes should render the shared privacy-boundary panel instead of ad hoc trust copy.");
+    var trustSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/TrustPage.cshtml"));
+    Assert(trustSource.Contains("Title: \"Chummer5 Discord\"", StringComparison.Ordinal), "contact should keep normal questions and feedback on the explicit Chummer5 Discord route.");
+    Assert(trustSource.Contains("Href: \"https://discord.gg/chummer\"", StringComparison.Ordinal), "contact should expose the configured Chummer5 Discord destination directly.");
+    Assert(trustSource.Contains("policyFacts.Add", StringComparison.Ordinal), "privacy and terms should derive a concise policy-summary band from their canonical sections.");
+    Assert(trustSource.Contains("Read the short privacy summary first, then the full policy.", StringComparison.Ordinal), "privacy should lead with a bounded short summary before the full policy.");
+    Assert(trustSource.Contains("HelpActionFor", StringComparison.Ordinal), "help should derive a deliberate action for each supported help lane.");
+    Assert(trustSource.Contains("minimal-help-card", StringComparison.Ordinal), "help should render the current minimal route-choice cards.");
+    Assert(trustSource.Contains("_PrivacyBoundaryPanel.cshtml", StringComparison.Ordinal), "privacy and terms should reuse the shared privacy-boundary panel instead of ad hoc trust copy.");
     Assert(supportSubmittedSource.Contains("Watch Account > Support", StringComparison.Ordinal), "support confirmation should explain the signed-in follow-up lane instead of stopping at a generic receipt.");
     Assert(supportSubmittedSource.Contains("Watch your reply email", StringComparison.Ordinal), "support confirmation should explain the guest follow-up lane instead of assuming an account-only workflow.");
     Assert(supportSubmittedSource.Contains("Next safe action", StringComparison.Ordinal), "support confirmation should keep the tracked case next-step visible when the reporter is signed in.");
-    Assert(supportSubmittedSource.Contains("Follow-up lane", StringComparison.Ordinal), "support confirmation should surface the concrete follow-up lane when tracked case truth is available.");
+    Assert(supportSubmittedSource.Contains("helperFacts.Add((\"Follow-up\", Model.TrackedCaseSummary.FollowUpLaneSummary))", StringComparison.Ordinal), "support confirmation should surface the concrete follow-up route when tracked case truth is available.");
     Assert(supportSubmittedSource.Contains("Affected install", StringComparison.Ordinal), "support confirmation should surface the linked install when the report came from one.");
     Assert(supportSubmittedSource.Contains("Download</a>", StringComparison.Ordinal), "support confirmation should keep saved attachment downloads visible on the first confirmation screen.");
-    var faqSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
+    var faqSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Faq.cshtml"));
     Assert(faqSource.Contains("FaqActionFor", StringComparison.Ordinal), "faq should attach direct next-step routing under answers instead of stopping at a text-only sheet.");
     Assert(faqSource.Contains("Open downloads", StringComparison.Ordinal), "faq should expose a direct downloads route for install/update answers.");
-    Assert(faqSource.Contains("Open support", StringComparison.Ordinal), "faq should expose a direct support route for help and bug-report answers.");
-    Assert(faqSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared signed-in trust panel instead of inventing a faq-only trust surface.");
-    Assert(faqSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "faq should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
+    Assert(faqSource.Contains("Open contact", StringComparison.Ordinal), "faq should expose the current contact route for help and bug-report answers.");
+    Assert(faqSource.Contains("Find the answer fast", StringComparison.Ordinal), "faq should keep a focused search path before the grouped answers.");
+    Assert(faqSource.Contains("use Contact to reach the Chummer5 Discord server.", StringComparison.Ordinal), "faq should end with the current human-contact fallback.");
+    Assert(!faqSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "faq should stay minimal instead of duplicating the broader signed-in trust panel.");
+    Assert(!faqSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "faq should stay minimal instead of duplicating weekly trust rows.");
     Assert(!faqSource.Contains("story-guide-tail", StringComparison.Ordinal), "faq should end with a quieter footnote instead of a full landing-style CTA band.");
-    var siteScriptSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "wwwroot", "js", "site.js"));
+    var siteScriptSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/wwwroot/js/site.js"));
     Assert(siteScriptSource.Contains("Retry-After", StringComparison.Ordinal), "shared site script should preserve Retry-After parsing for paced API responses.");
     Assert(siteScriptSource.Contains("retryAfterSeconds", StringComparison.Ordinal), "shared site script should project retryAfterSeconds into error payloads for support UX pacing notices.");
-    var trustCanonSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_TRUST_CONTENT.yaml"));
+    var trustCanonSource = File.ReadAllText(ProofSourcePath(".codex-design/product/PUBLIC_TRUST_CONTENT.yaml"));
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
@@ -2911,30 +2958,30 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/participate", StringComparison.Ordinal)), "landing surface should expose the participate entry route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/login", StringComparison.Ordinal)), "landing surface should expose the login route");
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
-    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
-    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Create account", StringComparison.Ordinal)), "landing guest shell should expose the create-account action");
-    Assert(surface.HeroCtas.Any(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase) && string.Equals(action.Label, "Open downloads", StringComparison.Ordinal) && string.Equals(action.Href, "/downloads", StringComparison.Ordinal)), "landing canon should single-source the public hero downloads CTA.");
+    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Open Chummer", StringComparison.Ordinal)), "landing guest shell should expose the current app-entry action.");
+    Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Claim your copy", StringComparison.Ordinal)), "landing guest shell should expose the current account-claim action.");
+    Assert(surface.HeroCtas.Any(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase) && string.Equals(action.Label, "Download Chummer", StringComparison.Ordinal) && string.Equals(action.Href, "/downloads", StringComparison.Ordinal)), "landing canon should single-source the public hero download CTA.");
     Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Research", StringComparison.Ordinal)), "landing feature registry should carry the updated readiness posture for KARMA FORGE");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Shipped MVP", StringComparison.Ordinal)), "landing feature registry should carry the current readiness posture for KARMA FORGE.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_package_browser", StringComparison.Ordinal) && string.Equals(card.Href, "/packages", StringComparison.Ordinal)), "landing feature registry should expose the public package browser route.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_app_entry", StringComparison.Ordinal) && string.Equals(card.Href, "/build", StringComparison.Ordinal)), "landing feature registry should expose the app entry route.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=%2Fparticipate%2Fcodex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/auth/google/start?next=%2Faccount%2Fparticipation", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/account/participation", StringComparison.Ordinal)), "booster participation should split the current Google auth handoff from the signed-in account participation destination.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/account/settings", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/account/settings", StringComparison.Ordinal)), "beta waitlist should split guest signup from the calmer account-settings follow-up path");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open guided contribution", StringComparison.Ordinal)), "guided contribution should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
-    var releaseExperienceSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_RELEASE_EXPERIENCE.yaml"));
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "feature_local_co_processor", StringComparison.Ordinal) && string.Equals(card.Href, "/local-co-processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open optional acceleration", StringComparison.Ordinal)), "local co-processor should route through its current first-party optional-acceleration lane.");
+    var releaseExperienceSource = File.ReadAllText(ProofSourcePath(".codex-design/product/PUBLIC_RELEASE_EXPERIENCE.yaml"));
     Assert(!releaseExperienceSource.Contains("canonical installer", StringComparison.OrdinalIgnoreCase), "release-experience canon should not leak canonical-installer wording into the public release copy.");
-    Assert(releaseExperienceSource.Contains("same published download", StringComparison.Ordinal), "release-experience canon should describe the release route in customer-facing download language.");
-    var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
-    var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
-    var statusSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml"));
-    var featureDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
-    var liveProofDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailLiveProof.cshtml"));
-    var previewDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailPreviewConcept.cshtml"));
-    var roadmapDetailSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailRoadmap.cshtml"));
+    Assert(releaseExperienceSource.Contains("Download the current published package for your platform.", StringComparison.Ordinal), "release-experience canon should describe the release route in customer-facing download language.");
+    var downloadsSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml"));
+    var publicLandingControllerSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Controllers/PublicLandingController.cs"));
+    var statusSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/Status.cshtml"));
+    var featureDetailSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/FeatureDetail.cshtml"));
+    var liveProofDetailSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailLiveProof.cshtml"));
+    var previewDetailSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml"));
+    var roadmapDetailSource = File.ReadAllText(ProofSourcePath("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailRoadmap.cshtml"));
     Assert(downloadsSource.Contains("<span>Stable</span>", StringComparison.Ordinal), "downloads should keep the stable lane visible.");
     Assert(downloadsSource.Contains("<span>Nightly</span>", StringComparison.Ordinal), "downloads should keep the nightly lane visible.");
     Assert(downloadsSource.Contains("build-chummer6-linux.sh", StringComparison.Ordinal), "downloads should expose the Linux build-from-source script.");
@@ -2967,10 +3014,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
     Assert(liveProofDetailSource.Contains("Model.Chrome.Authenticated", StringComparison.Ordinal), "live proof detail should conditionally surface signed-in artifact continuity instead of treating all visitors the same.");
-    Assert(previewDetailSource.Contains("/artifacts#linked-artifacts", StringComparison.Ordinal), "preview concept detail should point signed-in users back to the signed-in artifact shelf.");
-    Assert(roadmapDetailSource.Contains("/artifacts#linked-artifacts", StringComparison.Ordinal), "roadmap detail should point signed-in users back to the signed-in artifact shelf.");
-    Assert(featureDetailSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared signed-in trust panel instead of inventing a detail-only trust surface.");
-    Assert(featureDetailSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "feature detail should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
+    Assert(previewDetailSource.Contains("/artifacts#signed-in-detail-view", StringComparison.Ordinal), "preview concept detail should point signed-in users back to the account-detail view of the artifact shelf.");
+    Assert(roadmapDetailSource.Contains("/artifacts#signed-in-detail-view", StringComparison.Ordinal), "roadmap detail should point signed-in users back to the account-detail view of the artifact shelf.");
+    Assert(!featureDetailSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "feature detail should stay focused instead of duplicating the broader signed-in trust panel.");
+    Assert(!featureDetailSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "feature detail should stay focused instead of duplicating weekly trust rows.");
+    Assert(featureDetailSource.Contains("id=\"feature-route-map\"", StringComparison.Ordinal), "signed-in feature detail should keep a bounded route map for the next action.");
     Assert(!roadmapDetailSource.Contains("Audience impact", StringComparison.Ordinal), "roadmap detail should not repeat audience copy once the fact rail already states who should follow it.");
     Directory.CreateDirectory(Path.GetDirectoryName(storePath)!);
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
@@ -3122,6 +3170,7 @@ async Task VerifyPublicLandingProjectionAsync()
             HttpContext = new DefaultHttpContext()
         }
     };
+    controller.ControllerContext.HttpContext.RequestServices = EmptyServiceProvider.Instance;
     var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, participateSnapshots, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -3259,12 +3308,20 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(landingModel.PrimaryHeroAction.Label, expectedLandingPrimaryAction!.Label, StringComparison.Ordinal), "landing page should bind the primary CTA from manifest-owned public canon.");
     Assert(string.Equals(landingModel.PrimaryHeroAction.Href, expectedLandingPrimaryAction.Href, StringComparison.Ordinal), "landing page should route the primary CTA through the manifest-owned public install path.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "Open current release", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
-    Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
-    Assert(landingModel.TrustPulse.Rows.Count >= 5, "landing page should surface a multi-row trust pulse on the front door.");
-    Assert(landingModel.TrustPulse.TrendSamples.Count > 1, "landing page should surface measured progress points alongside the trust pulse summary.");
+    Assert(landingModel.TrustPulse is null, "minimal landing page should keep the weekly trust pulse off the front door.");
     Assert(landingModel.SignedInStatus is null, "guest landing should not project install-specific signed-in trust posture.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
-    Assert(landingModel.Chrome.HeaderActions.Any(action => string.Equals(action.Label, expectedLandingPrimaryAction!.Label, StringComparison.Ordinal) && string.Equals(action.Href, expectedLandingPrimaryAction.Href, StringComparison.Ordinal)), "landing page chrome should expose the same manifest-backed primary CTA beside sign in");
+    Assert(landingModel.ReleaseExperience.Recommended is not null, "landing page should resolve a recommended installer from the live release manifest.");
+    var expectedLandingHeaderLabel = landingModel.ReleaseExperience.Recommended!.RequiresAccount
+        ? landingModel.ReleaseExperience.GuestGatePrimaryLabel
+        : landingModel.ReleaseExperience.Recommended.ActionLabel;
+    var expectedLandingHeaderHref = landingModel.ReleaseExperience.Recommended.RequiresAccount
+        ? landingModel.ReleaseExperience.GuestGatePrimaryHref
+        : landingModel.ReleaseExperience.Recommended.DispatchHref;
+    Assert(landingModel.Chrome.HeaderActions.Any(action =>
+        string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(action.Label, expectedLandingHeaderLabel, StringComparison.Ordinal)
+        && string.Equals(action.Href, expectedLandingHeaderHref, StringComparison.Ordinal)), "landing page chrome should expose the contextual manifest-backed release CTA beside sign in");
     Assert(landingModel.AccessPosture is not null, "landing page should project the shared public access posture.");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
@@ -3286,12 +3343,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(roadmapDetailModel!.MicroProof.Count > 0, "roadmap detail pages should surface micro-proof markers.");
     Assert(roadmapDetailModel.TrustPulse is not null, "guest roadmap detail should surface the weekly public trust pulse.");
     Assert(roadmapDetailModel.SignedInStatus is null, "guest roadmap detail should not project install-specific signed-in trust posture.");
-    Assert(roadmapDetailModel.SecondaryAction is not null, "roadmap detail pages should keep a single deeper brief action.");
-    var roadmapSecondaryAction = roadmapDetailModel.SecondaryAction!;
-    Assert(!string.Equals(
-        PublicRouteCatalog.NormalizeRoute(roadmapDetailModel.PrimaryAction.Href),
-        PublicRouteCatalog.NormalizeRoute(roadmapSecondaryAction.Href),
-        StringComparison.OrdinalIgnoreCase), "roadmap detail pages should not repeat the same primary and secondary action.");
+    Assert(string.Equals(roadmapDetailModel.PrimaryAction.Href, "/artifacts/runsite-pack", StringComparison.Ordinal), "roadmap artifact bridges should use the canonical artifact detail as their one deeper action.");
+    Assert(string.Equals(roadmapDetailModel.PrimaryAction.Label, "Open the runsite pack", StringComparison.Ordinal), "roadmap artifact bridges should keep the canon-owned artifact action label.");
+    Assert(!roadmapDetailModel.PrimaryAction.Current, "roadmap artifact bridges should not project a self-link as their primary action.");
+    Assert(roadmapDetailModel.SecondaryAction is null, "roadmap artifact bridges should not duplicate the canonical deeper action on a secondary route.");
     var artifactDetailView = await controller.ArtifactDetailPage("current-preview-build", CancellationToken.None) as ViewResult;
     var artifactDetailModel = artifactDetailView?.Model as FeatureDetailPageViewModel;
     Assert(artifactDetailModel is not null && !string.IsNullOrWhiteSpace(artifactDetailModel.Payoff), "artifact detail pages should carry explicit product payoff.");
@@ -3308,7 +3363,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(runsiteTourDispatch is not null && string.Equals(runsiteTourDispatch.Url, "https://my.matterport.com/show/?m=ax2JhiPGk5P", StringComparison.Ordinal), "authenticated runsite tour dispatch should redirect to the configured tour provider only after Chummer accepts the request.");
     Assert(authenticatedLandingController.Response.Headers.TryGetValue("X-Horizon-Artifact-Request-Id", out var runsiteArtifactRequestId)
         && runsiteArtifactRequestId.ToString().StartsWith("horizon-artifact-", StringComparison.Ordinal), "runsite tour dispatch should expose the Chummer-owned artifact request id header.");
-    HorizonArtifactRequestReceipt runsiteTourReceipt = AssertSingle(horizonArtifactRequestReceipts.ListRecent("runsite", "subject.demo", limit: 5), "runsite tour dispatch should persist exactly one shared artifact request receipt for the signed-in subject.");
+    var runsiteSubjectUser = accounts.GetBySubject("subject.demo");
+    Assert(runsiteSubjectUser is not null, "runsite tour dispatch should resolve the signed-in subject to the account user that owns artifact receipts.");
+    HorizonArtifactRequestReceipt runsiteTourReceipt = AssertSingle(horizonArtifactRequestReceipts.ListRecent("runsite", runsiteSubjectUser!.UserId, limit: 5), "runsite tour dispatch should persist exactly one shared artifact request receipt for the signed-in account user.");
     Assert(string.Equals(runsiteTourReceipt.Status, "accepted", StringComparison.Ordinal), "runsite tour dispatch receipt should be accepted.");
     Assert(string.Equals(runsiteTourReceipt.SourceRef, "runsite:redmond-dockyard-pack", StringComparison.Ordinal), "runsite tour dispatch receipt should bind to the runsite source ref.");
     Assert(runsiteTourReceipt.Quota?.WeeklyUsed == 1 && runsiteTourReceipt.Quota.WeeklyRemaining == 0, "runsite tour dispatch should consume exactly one weekly allowance through the shared artifact request path.");
@@ -3327,7 +3384,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedParticipateModel is not null, "authenticated participate page should use the same Chummer-owned board shell.");
     Assert(string.Equals(authenticatedParticipateModel!.Heading, "Participate", StringComparison.Ordinal), "authenticated participate page should keep the same first-party heading.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
-    Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
+    Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Claim your copy", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
     var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
     var publicPrivacyModel = publicPrivacyView?.Model as TrustPageViewModel;
     Assert(publicPrivacyModel?.TrustPulse is not null, "privacy page should surface the weekly public trust pulse.");
@@ -3350,7 +3407,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var publicContactModel = publicContactView?.Model as TrustPageViewModel;
     Assert(publicContactModel?.TrustPulse is not null, "guest contact page should surface the weekly public trust pulse.");
     Assert(publicContactModel?.PrivacyBoundary is not null, "guest contact page should surface the same privacy-boundary panel before support intake.");
-    Assert(publicContactModel?.SupportIntake is not null, "guest contact page should keep the first-party support intake available.");
+    Assert(publicContactModel?.SupportIntake is null, "guest contact page should keep private support intake out of the Discord-first public contact surface.");
+    Assert(publicContactModel!.Actions.Any(static action =>
+        string.Equals(action.Label, "Open Discord", StringComparison.Ordinal)
+        && string.Equals(action.Href, "https://discord.gg/chummer", StringComparison.Ordinal)), "guest contact page should retain the canonical Chummer5 Discord action.");
     var publicFaqView = await controller.FaqPage(CancellationToken.None) as ViewResult;
     var publicFaqModel = publicFaqView?.Model as FaqPageViewModel;
     Assert(publicFaqModel?.TrustPulse is not null, "guest faq should surface the weekly public trust pulse.");
@@ -3358,7 +3418,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicFaqModel?.AccessPosture is not null, "guest faq should bind the shared public access posture.");
     Assert(publicFaqModel!.Sections.SelectMany(static section => section.Entries).Any(entry =>
         string.Equals(entry.Question, "Do I need an account to download the current release?", StringComparison.Ordinal)
-        && entry.Answer.Contains("Create an account when you want recovery", StringComparison.OrdinalIgnoreCase)), "guest faq should reuse the shared access truth for the current release-answer row.");
+        && string.Equals(entry.Answer, publicFaqModel.AccessPosture!.DownloadFaqAnswer, StringComparison.Ordinal)), "guest faq should reuse the shared access truth for the current release-answer row.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
@@ -3368,9 +3428,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Download the current published package for your platform.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should keep the public install steps for the current preview recommendation.");
     Assert(!downloadsModel.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should not pretend the current preview requires account creation before download.");
-    Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account for guided install", StringComparison.Ordinal), "downloads page should keep the guided-install guest gate label.");
+    Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Open downloads", StringComparison.Ordinal), "downloads page should keep the canonical public-access guest gate label.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.KnownIssuesLabel, "Known issues and install help", StringComparison.Ordinal), "downloads page should keep a single known-issues/install-help label for the current preview.");
-    Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
+    var registryOwnedManifest = releases.LoadManifest();
+    Assert(!string.IsNullOrWhiteSpace(registryOwnedManifest.SupportabilityState), "release manifest should retain an explicit registry-owned supportability posture.");
+    Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, registryOwnedManifest.SupportabilityState, StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
     Assert(string.Equals(downloadsModel.Manifest.ProofStatus, "passed", StringComparison.Ordinal), "downloads page should preserve registry-owned release proof posture.");
     Assert(downloadsModel.Manifest.FixAvailabilitySummary?.Contains("affected install", StringComparison.OrdinalIgnoreCase) == true, "downloads page should preserve registry-owned fix availability guidance.");
     var runtimeManifestConfiguration = new ConfigurationBuilder()
@@ -3397,7 +3459,8 @@ async Task VerifyPublicLandingProjectionAsync()
         })));
     var runtimeManifest = runtimeManifestService.LoadManifest();
     Assert(string.Equals(runtimeManifest.Source, "registry_runtime", StringComparison.Ordinal), "release manifest service should prefer the registry runtime endpoint when configured.");
-    Assert(string.Equals(runtimeManifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "runtime manifest fetch should preserve supportability posture.");
+    Assert(!string.IsNullOrWhiteSpace(runtimeManifest.SupportabilityState), "runtime manifest fetch should retain an explicit supportability posture.");
+    Assert(string.Equals(runtimeManifest.SupportabilityState, registryOwnedManifest.SupportabilityState, StringComparison.Ordinal), "runtime manifest fetch should preserve the same guarded supportability posture as the local registry source.");
     Assert(string.Equals(runtimeManifest.ProofStatus, "passed", StringComparison.Ordinal), "runtime manifest fetch should preserve proof posture.");
     controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)";
     var macDownloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
@@ -3408,7 +3471,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(macDownloadsModel.ReleaseExperience.PlatformShelfNoticeTitle), "downloads page should surface a shelf note when macOS is not publicly promoted.");
     Assert(
         macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary?.Contains("macOS", StringComparison.OrdinalIgnoreCase) == true
-        && macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary.Contains("does not publish", StringComparison.OrdinalIgnoreCase),
+        && macDownloadsModel.ReleaseExperience.PlatformShelfNoticeSummary.Contains("does not include a public", StringComparison.OrdinalIgnoreCase),
         "downloads page should explain that the macOS build is not yet on the public shelf.");
     Assert(
         macDownloadsModel.ReleaseExperience.PlatformAvailability.Any(static item =>
@@ -3421,18 +3484,54 @@ async Task VerifyPublicLandingProjectionAsync()
             && !item.PubliclyAvailable),
         "downloads page should explicitly mark macOS as off-shelf instead of silently falling through to another platform.");
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
-    var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
-    Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
+    var authenticatedDownloadFile = authenticatedDownloadResult as FileStreamResult;
+    Assert(authenticatedDownloadFile is not null
+        && string.Equals(authenticatedDownloadFile.FileDownloadName, "smoke-poc-linux-x64.deb", StringComparison.Ordinal), "signed-in open-public compatibility downloads should serve the verified installer bytes directly.");
+    Assert(downloadsController.Response.Headers.ContainsKey("X-Chummer-Download-Receipt-Id"), "open-public compatibility downloads should retain a durable download receipt header.");
+    authenticatedDownloadFile!.FileStream.Dispose();
     string? releaseEvidencePath = releases.ResolveReleaseEvidenceFilePath("browser-lane/BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json");
     Assert(!string.IsNullOrWhiteSpace(releaseEvidencePath) && File.Exists(releaseEvidencePath), "release evidence resolver should expose browser-lane JSON receipts.");
     Assert(releases.ResolveReleaseEvidenceFilePath("../RELEASE_CHANNEL.generated.json") is null, "release evidence resolver should reject traversal.");
     Assert(releases.ResolveReleaseEvidenceFilePath("browser-lane/not-json.txt") is null, "release evidence resolver should reject non-JSON files.");
-    var blockedMacFile = await downloadsController.DownloadFile("smoke-poc-osx-arm64-installer.dmg", CancellationToken.None);
-    Assert(blockedMacFile is NotFoundResult, "direct file routes should not serve macOS artifacts that were withheld from the public shelf.");
+    downloadsController.ControllerContext = new ControllerContext
+    {
+        HttpContext = new DefaultHttpContext
+        {
+            RequestServices = EmptyServiceProvider.Instance
+        }
+    };
+    var gatedMacFile = await downloadsController.DownloadFile("smoke-poc-osx-arm64-installer.dmg", CancellationToken.None);
+    var gatedMacRedirect = gatedMacFile as RedirectResult;
+    Assert(gatedMacRedirect?.Url.StartsWith("/login?next=", StringComparison.Ordinal) == true
+        && gatedMacRedirect.Url.Contains("%2Fdownloads%2Finstall%2Fsmoke-poc-osx-arm64-installer", StringComparison.Ordinal), "guest direct file routes should keep account-required macOS artifacts behind the install handoff login.");
+    downloadsController.ControllerContext = AuthenticatedControllerContext("subject-token");
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
-    Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
-    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimExchangeUrl) && dispatchModel.ClaimExchangeUrl!.EndsWith("/continue.json", StringComparison.Ordinal), "signed-in download handoff should expose a private continuation route for install recovery.");
+    Assert(dispatchModel is not null, "signed-in download handoff should render a dispatch model.");
+    var dispatchDownloadUri = new Uri(new Uri("https://chummer.run"), dispatchModel!.DownloadHref);
+    var dispatchDownloadQuery = QueryHelpers.ParseQuery(dispatchDownloadUri.Query);
+    Assert(string.Equals(dispatchDownloadUri.AbsolutePath, "/downloads/install/smoke-poc-linux-x64/bootstrap.sh", StringComparison.Ordinal), "signed-in download handoff should expose the private Linux bootstrap route.");
+    Assert(dispatchDownloadQuery.TryGetValue("ticket", out var dispatchBootstrapTicket), "signed-in Linux bootstrap routes should carry an install ticket.");
+    var dispatchBootstrapTicketValue = dispatchBootstrapTicket.ToString();
+    Assert(!string.IsNullOrWhiteSpace(dispatchBootstrapTicketValue), "signed-in Linux bootstrap routes should carry a non-empty install ticket.");
+    Assert(string.IsNullOrWhiteSpace(dispatchModel.ClaimExchangeUrl), "ticket-bound Linux handoffs should keep continuation inside the private bootstrap script instead of exposing a browser exchange URL.");
+    authenticatedLandingController.Request.QueryString = QueryString.Create("ticket", dispatchBootstrapTicketValue);
+    var dispatchBootstrapResult = await authenticatedLandingController.DownloadDispatchLinuxBootstrapScript("smoke-poc-linux-x64", CancellationToken.None);
+    var dispatchBootstrapFile = dispatchBootstrapResult as FileContentResult;
+    Assert(dispatchBootstrapFile is not null && string.Equals(dispatchBootstrapFile.FileDownloadName, "chummer-setup.sh", StringComparison.Ordinal), "signed-in Linux handoffs should serve the private bootstrap script for the issued ticket.");
+    var dispatchBootstrapText = Encoding.UTF8.GetString(dispatchBootstrapFile!.FileContents);
+    Assert(dispatchBootstrapText.Contains($"/downloads/install/smoke-poc-linux-x64/continue.json?ticket={Uri.EscapeDataString(dispatchBootstrapTicketValue)}", StringComparison.Ordinal), "private Linux bootstrap scripts should carry the ticket-bound continuation route.");
+    var dispatchContinuationResult = await authenticatedLandingController.DownloadDispatchBootstrapClaim("smoke-poc-linux-x64", CancellationToken.None);
+    var dispatchContinuationOk = dispatchContinuationResult as OkObjectResult;
+    Assert(dispatchContinuationOk is not null, "ticket-bound Linux continuation should exchange the issued install ticket.");
+    JsonElement dispatchContinuationPayload = JsonSerializer.SerializeToElement(dispatchContinuationOk!.Value);
+    Assert(dispatchContinuationPayload.TryGetProperty("artifactId", out JsonElement dispatchContinuationArtifactId)
+        && string.Equals(dispatchContinuationArtifactId.GetString(), "smoke-poc-linux-x64", StringComparison.Ordinal), "ticket-bound Linux continuation should remain bound to the selected artifact.");
+    Assert(dispatchContinuationPayload.TryGetProperty("downloadReceiptId", out JsonElement dispatchContinuationReceiptId)
+        && !string.IsNullOrWhiteSpace(dispatchContinuationReceiptId.GetString()), "ticket-bound Linux continuation should return the durable download receipt id.");
+    Assert(dispatchContinuationPayload.TryGetProperty("claimCode", out JsonElement dispatchContinuationClaimCode)
+        && !string.IsNullOrWhiteSpace(dispatchContinuationClaimCode.GetString()), "ticket-bound Linux continuation should return the pending install claim code.");
+    authenticatedLandingController.Request.QueryString = QueryString.Empty;
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Heading), "signed-in download handoff should expose a non-empty heading.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Summary), "signed-in download handoff should expose a non-empty summary.");
     Assert(dispatchModel?.Steps.Count > 0, "signed-in download handoff should expose the signed-in install steps.");
@@ -3532,25 +3631,40 @@ async Task VerifyPublicLandingProjectionAsync()
         AccessToken: currentGrantAccessToken));
     var nativeContinuationPayload = (nativeContinuationResult.Result as OkObjectResult)?.Value as DesktopInstallNativeContinuationResponse;
     Assert(nativeContinuationPayload is not null, "native claimed-install continuation api should return a typed continuation payload.");
-    Assert(nativeContinuationPayload!.RouteReceipt is not null && !string.IsNullOrWhiteSpace(nativeContinuationPayload.RouteReceipt.MatchedRoute), "native claimed-install continuation api should expose the governing route receipt or bounded review posture.");
+    Assert(
+        (nativeContinuationPayload!.RouteReceipt is not null && !string.IsNullOrWhiteSpace(nativeContinuationPayload.RouteReceipt.MatchedRoute))
+        || (string.Equals(nativeContinuationPayload.RouteState, "bounded_failure", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(nativeContinuationPayload.BoundedFailureReason)),
+        "native claimed-install continuation api should expose the governing route receipt or bounded review posture.");
     Assert(string.Equals(nativeContinuationPayload.RouteState, "bounded_failure", StringComparison.Ordinal), "native claimed-install continuation api should keep the governing route on bounded-failure posture while parity claims stay review-required.");
-    Assert(nativeContinuationPayload.BoundedFailureReason?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true, "native claimed-install continuation api should explain the current bounded review posture when the direct route receipt cannot clear parity claims yet.");
+    Assert(!string.IsNullOrWhiteSpace(nativeContinuationPayload.BoundedFailureReason)
+        && (nativeContinuationPayload.BoundedFailureReason.Contains("review-required", StringComparison.OrdinalIgnoreCase)
+            || nativeContinuationPayload.BoundedFailureReason.Contains("release status record", StringComparison.OrdinalIgnoreCase)), "native claimed-install continuation api should explain the current bounded review posture when the direct route receipt cannot clear parity claims yet.");
     var nativeUpdateResult = installLinkingController.PlanClaimedInstallUpdate(new DesktopInstallNativeContinuationRequest(
         InstallationId: redeemPayload.Installation.InstallationId,
         AccessToken: currentGrantAccessToken));
     var nativeUpdatePayload = (nativeUpdateResult.Result as OkObjectResult)?.Value as DesktopInstallNativeUpdateResponse;
-    Assert(nativeUpdatePayload is not null && nativeUpdatePayload.RouteReceipt is not null, "native claimed-install update planner should carry the same governing route receipt as the continuation route.");
+    Assert(nativeUpdatePayload is not null
+        && string.Equals(nativeUpdatePayload.RouteState, nativeContinuationPayload.RouteState, StringComparison.Ordinal)
+        && ((nativeUpdatePayload.RouteReceipt is not null && nativeContinuationPayload.RouteReceipt is not null)
+            || (string.Equals(nativeUpdatePayload.RouteState, "bounded_failure", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(nativeUpdatePayload.BoundedFailureReason))), "native claimed-install update planner should carry the same governing route proof posture as the continuation route.");
     var nativeRollbackResult = installLinkingController.PlanClaimedInstallRollback(new DesktopInstallNativeContinuationRequest(
         InstallationId: redeemPayload.Installation.InstallationId,
         AccessToken: currentGrantAccessToken));
     var nativeRollbackPayload = (nativeRollbackResult.Result as OkObjectResult)?.Value as DesktopInstallNativeRollbackResponse;
-    Assert(nativeRollbackPayload is not null && nativeRollbackPayload.RouteReceipt is not null, "native claimed-install rollback planner should carry the same governing route receipt as the continuation route.");
+    Assert(nativeRollbackPayload is not null
+        && string.Equals(nativeRollbackPayload.RouteState, nativeContinuationPayload.RouteState, StringComparison.Ordinal)
+        && ((nativeRollbackPayload.RouteReceipt is not null && nativeContinuationPayload.RouteReceipt is not null)
+            || (string.Equals(nativeRollbackPayload.RouteState, "bounded_failure", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(nativeRollbackPayload.BoundedFailureReason))), "native claimed-install rollback planner should carry the same governing route proof posture as the continuation route.");
     var linkedSummaryResult = await installLinkingController.GetSummary(CancellationToken.None);
     var linkedSummaryPayload = (linkedSummaryResult.Result as OkObjectResult)?.Value as InstallLinkingSummaryDto;
     Assert(linkedSummaryPayload is not null, "install linking summary endpoint should return the signed-in account state.");
     Assert(linkedSummaryPayload!.ClaimedInstallations?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal)) == true, "account summary should surface claimed installs after redemption.");
     Assert(linkedSummaryPayload.ActiveGrants?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal) && string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.Ordinal)) == true, "account summary should surface the active grant after rotation.");
     Assert(!linkedSummaryPayload.PendingClaimTickets.Any(item => string.Equals(item.TicketId, pendingTicket.TicketId, StringComparison.Ordinal)), "redeemed claim tickets should no longer appear as pending.");
+    campaignProof.Complete("install_claim_restore_continue");
 
     var supportSubmitResult = await supportCasesController.Submit(
         new SupportCaseSubmitRequest(
@@ -3756,16 +3870,26 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(emailitRequests.All(item => string.Equals(item.Authorization, "emailit-smoke-token", StringComparison.Ordinal)), "Emailit sends should use the configured provider token.");
     Assert(emailitRequests.All(item => !string.IsNullOrWhiteSpace(item.IdempotencyKey)), "Emailit sends should carry an idempotency key.");
 
-    var accountPage = await accountController.AccountPage(section: null, caseId: null, CancellationToken.None) as ViewResult;
+    var accountHubPage = await accountController.AccountPage(section: null, caseId: null, CancellationToken.None) as ViewResult;
+    var accountHubModel = accountHubPage?.Model as AccountHubPageViewModel;
+    Assert(accountHubModel is not null
+        && string.Equals(accountHubPage?.ViewName, "~/Views/Accounts/Hub.cshtml", StringComparison.Ordinal)
+        && accountHubModel.Cards.Any(card => string.Equals(card.Title, "Help", StringComparison.Ordinal)
+            && card.Summary.Contains("support case", StringComparison.OrdinalIgnoreCase)), "default account route should surface support-case history through the minimal account hub.");
+    var accountPage = await accountController.AccountPage(section: "support", caseId: supportCase.CaseId, CancellationToken.None) as ViewResult;
     var accountModel = accountPage?.Model as AccountPageViewModel;
-    Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
+    Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account support detail should surface support-case history beside installs and access.");
     Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
     Assert(accountModel.SignedInTrustStatus is not null, "account page should project install-specific trust status directly on the signed-in account surface.");
     Assert(accountModel.SignedInTrustStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "account page should surface who-can-get-it-now posture inside the signed-in trust panel.");
-    Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "account page should surface adoption health inside the signed-in trust panel.");
+    SignedInTrustStatusRowViewModel? accountAdoptionHealth = accountModel.SignedInTrustStatus.Rows.FirstOrDefault(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal));
+    Assert(accountAdoptionHealth is not null
+        && accountAdoptionHealth.Value.Contains("review required", StringComparison.OrdinalIgnoreCase)
+        && accountAdoptionHealth.Value.Contains("unavailable", StringComparison.OrdinalIgnoreCase)
+        && accountAdoptionHealth.Value.Contains("Hold parity claims", StringComparison.Ordinal), $"account page should fail closed on adoption health when the isolated proof fixture has no current release-status package. Actual: {accountAdoptionHealth?.Value ?? "<missing>"}");
     Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "account page should surface the install-specific caution lane inside the signed-in trust panel.");
     Assert(accountModel.PrivacyBoundary is not null, "account page should surface the signed-in privacy boundary next to visibility and recovery posture.");
-    Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
+    Assert(string.Equals(accountModel!.CurrentSection, "support", StringComparison.Ordinal), "account support detail should remain in the support section.");
     Assert(accountModel.CoreSections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)), "account should expose the devices-and-access section link.");
     Assert(accountModel!.CampaignSpine.Dossiers.Count >= 1, "account page should surface the living dossier summary.");
     Assert(accountModel.CampaignSpine.Runs.Count >= 1, "account page should surface the current runboard summary.");
@@ -3847,7 +3971,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(organizerOpsPayload!.Items.Count >= 1, "campaign spine api should return at least one organizer rail when the account carries community operations.");
     Assert(organizerOpsPayload.Items[0].Roles.Count >= 1, "organizer operations api should surface explicit organizer role assignments.");
     Assert(organizerOpsPayload.Items[0].Permissions.Count >= 1, "organizer operations api should surface explicit organizer permissions.");
-    Assert(organizerOpsPayload.Items[0].Roster.RecentTransferSummaries.Count >= 1, "organizer operations api should surface recent governed roster movement on the operator contract.");
+    Assert(organizerOpsPayload.Items.All(item => item.Roster.RecentTransferSummaries.Count == 0), "organizer operations api should start with an explicit empty roster-movement history before a governed transfer occurs.");
     Assert(organizerOpsPayload.Items[0].EventRail.SeasonLanes.Count >= 1, "organizer operations api should surface governed season and event lanes.");
     Assert(organizerOpsPayload.Items[0].ArtifactPublication.Receipts.Count >= 1, "organizer operations api should surface artifact publication receipts on the operator contract.");
     Assert(organizerOpsPayload.Items[0].SupportEscalation.Cases.Count >= 1, "organizer operations api should keep tracked support escalation cases on the operator contract.");
@@ -4017,6 +4141,7 @@ async Task VerifyPublicLandingProjectionAsync()
         workspaceServerPlanePayload.RestoreConflictReceipts.Count == 0
             || workspaceServerPlanePayload.ContinuityConflicts.Any(item => item.CueId.Contains("restore-conflict:", StringComparison.Ordinal)),
         "campaign spine server plane api should carry restore conflict receipts into continuity conflict cues when conflict evidence exists.");
+    campaignProof.Complete("recover_from_sync_conflict");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Status), "campaign spine server plane api should expose one bounded visible workspace state.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Label), "campaign spine server plane api should expose a customer-facing workspace-state label.");
     Assert(workspaceServerPlanePayload.WorkspaceState.EvidenceLines.Count >= 1, "campaign spine server plane api should attach evidence lines to the bounded workspace state.");
@@ -4321,13 +4446,22 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(runboardContinuityPayload.RunboardState.Blockers.Any(item => item.Contains("overwatch pressure", StringComparison.Ordinal)), "campaign spine runboard-continuity api should persist blocker lines on the GM runboard state.");
     var runboardContinuityGetResult = await campaignSpineController.GetMyCampaignWorkspaceRunboardContinuity(workspaceId, CancellationToken.None);
     var runboardContinuityGetPayload = (runboardContinuityGetResult.Result as OkObjectResult)?.Value as RunboardContinuityProjection ?? runboardContinuityGetResult.Value;
-    Assert(runboardContinuityGetPayload is not null && string.Equals(runboardContinuityGetPayload.ContinuityId, runboardContinuityPayload.ContinuityId, StringComparison.Ordinal), "campaign spine runboard-continuity detail api should return the persisted continuity payload for the workspace.");
+    var runboardContinuityGetStatusCode = runboardContinuityGetResult.Result switch
+    {
+        ObjectResult objectResult => objectResult.StatusCode,
+        StatusCodeResult statusCodeResult => statusCodeResult.StatusCode,
+        _ => null
+    };
+    Assert(runboardContinuityGetPayload is not null, $"campaign spine runboard-continuity detail api should return the persisted continuity payload for the workspace. status={runboardContinuityGetStatusCode?.ToString() ?? "<null>"}");
+    Assert(string.Equals(runboardContinuityGetPayload!.ContinuityId, runboardContinuityPayload.ContinuityId, StringComparison.Ordinal), $"campaign spine runboard-continuity detail api should preserve continuity identity. expected={runboardContinuityPayload.ContinuityId} actual={runboardContinuityGetPayload.ContinuityId}");
     Assert(runboardContinuityGetPayload.TurnLedgerHandoff.EvidenceLines.Any(item => item.Contains("without replaying engine math", StringComparison.Ordinal)), "campaign spine runboard-continuity detail api should keep the no-engine-math boundary explicit on the turn-ledger handoff.");
-    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Continuity is not null, "campaign spine server plane api should project persisted runboard continuity on the bounded runboard summary.");
-    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Continuity?.ResolutionReportDraft.Notes.Any(item => item.Contains("Spoiler-safe notes", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep ResolutionReport draft notes attached to the runboard continuity summary.");
-    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.ObjectiveSummary.Contains("GM runboard", StringComparison.Ordinal) == true, "campaign spine server plane api should prefer the persisted runboard-state summary once continuity is stored.");
-    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)) == true, "campaign spine server plane api should project persisted blocker lines on the runboard summary.");
-    Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runboard continuity onto the bounded what-changed rail.");
+    var postRunboardWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
+    var postRunboardWorkspaceServerPlanePayload = (postRunboardWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? postRunboardWorkspaceServerPlaneResult.Value;
+    Assert(postRunboardWorkspaceServerPlanePayload?.Runboard?.Continuity is not null, "campaign spine server plane api should project persisted runboard continuity on the bounded runboard summary.");
+    Assert(postRunboardWorkspaceServerPlanePayload?.Runboard?.Continuity?.ResolutionReportDraft.Notes.Any(item => item.Contains("Spoiler-safe notes", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep ResolutionReport draft notes attached to the runboard continuity summary.");
+    Assert(postRunboardWorkspaceServerPlanePayload?.Runboard?.ObjectiveSummary.Contains("GM runboard", StringComparison.Ordinal) == true, "campaign spine server plane api should prefer the persisted runboard-state summary once continuity is stored.");
+    Assert(postRunboardWorkspaceServerPlanePayload?.Runboard?.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)) == true, "campaign spine server plane api should project persisted blocker lines on the runboard summary.");
+    Assert(postRunboardWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runboard continuity onto the bounded what-changed rail.");
     var campaignAdoptionResult = await campaignSpineController.UpsertMyCampaignWorkspaceCampaignAdoption(
         workspaceId,
         new CampaignAdoptionUpdateRequest(
@@ -4354,6 +4488,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var campaignAdoptionPayload = (campaignAdoptionResult.Result as OkObjectResult)?.Value as CampaignAdoptionProjection ?? campaignAdoptionResult.Value;
     Assert(campaignAdoptionPayload is not null && campaignAdoptionPayload.SafeToPlay, "campaign spine campaign-adoption api should persist the adoption wizard posture for the governed workspace.");
     Assert(campaignAdoptionPayload.ConfidencePercent == 82, "campaign spine campaign-adoption api should preserve the explicit adoption confidence percentage.");
+    var postAdoptionWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
+    var postAdoptionWorkspaceServerPlanePayload = (postAdoptionWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? postAdoptionWorkspaceServerPlaneResult.Value;
+    Assert(postAdoptionWorkspaceServerPlanePayload?.ChangePackets.Count <= 6, "campaign spine server plane api should keep the what-changed rail bounded after campaign adoption.");
+    Assert(postAdoptionWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "campaign_adoption", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the campaign adoption wizard onto the bounded what-changed rail immediately after adoption.");
     var runnerGoalResult = await campaignSpineController.UpsertMyCampaignWorkspaceRunnerGoal(
         workspaceId,
         new RunnerGoalUpdateRequest(
@@ -4400,13 +4538,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var m122WorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
     var m122WorkspaceServerPlanePayload = (m122WorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? m122WorkspaceServerPlaneResult.Value;
     Assert(m122WorkspaceServerPlanePayload?.CampaignAdoptionLoop is not null, "campaign spine server plane api should project the combined campaign adoption loop on the bounded workspace plane.");
-    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "campaign_adoption", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the campaign adoption wizard onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Count <= 6, "campaign spine server plane api should keep the combined adoption-loop what-changed rail bounded after newer closeout events.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runner-goal pins onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "campaign spine server plane api should project ResolutionReport approvals onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the first BLACK LEDGER WorldTick onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.RecapShelf.Any(item => string.Equals(item.EntryId, resolutionReportApprovalPayload!.NewsId, StringComparison.Ordinal)) == true, "campaign spine server plane api should attach player-safe news previews to the richer recap shelf.");
-    Assert(m122WorkspaceServerPlanePayload?.CampaignMemory?.Summary.Contains("BLACK LEDGER", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep the first BLACK LEDGER WorldTick on the governed campaign-memory lane.");
+    Assert(m122WorkspaceServerPlanePayload?.CampaignMemory?.EvidenceLines.Any(item => item.Contains("BLACK LEDGER", StringComparison.OrdinalIgnoreCase)) == true, "campaign spine server plane api should keep the first BLACK LEDGER WorldTick in the governed campaign-memory evidence.");
     Assert(m122WorkspaceServerPlanePayload?.NextSessionCarryForward?.EvidenceLines.Any(item => item.Contains("Tacoma grid rumor", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep player-safe news follow-through attached to the next-session return.");
     var openRunCreateResult = await campaignSpineController.CreateMyCampaignWorkspaceOpenRun(
         workspaceId,
@@ -4532,6 +4670,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
     Assert(runPayload.RunboardContinuity is not null && string.Equals(runPayload.RunboardContinuity.ResolutionReportDraft.Status, "approved", StringComparison.Ordinal), "campaign spine run detail api should surface the approved ResolutionReport continuity on the active run.");
+    campaignProof.Complete("campaign_session_recover_recap");
     var handoffResult = await campaignSpineController.GetMyBuildLabHandoff(handoffId, CancellationToken.None);
     var handoffPayload = (handoffResult.Result as OkObjectResult)?.Value as BuildLabHandoffProjection ?? handoffResult.Value;
     Assert(handoffPayload is not null && handoffPayload.Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "campaign spine api should expose the customer-facing build-path handoff detail.");
@@ -4555,6 +4694,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publicationPayload!.NextSafeAction), "campaign spine api should keep the creator-publication next step attached.");
     Assert(!string.IsNullOrWhiteSpace(publicationPayload.CampaignReturnSummary), "campaign spine api should keep creator-publication return truth attached.");
     Assert(!string.IsNullOrWhiteSpace(publicationPayload.SupportClosureSummary), "campaign spine api should keep creator-publication support closure attached.");
+    campaignProof.Complete("build_explain_publish");
     var missingWorkspaceResult = await campaignSpineController.GetMyCampaignWorkspace("workspace-missing", CancellationToken.None);
     Assert(missingWorkspaceResult.Result is NotFoundResult, "campaign spine workspace api should return 404 when the signed-in workspace does not exist.");
     var missingWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane("workspace-missing", CancellationToken.None);
@@ -4585,12 +4725,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(authenticatedDownloadsModel!.SignedInStatus!.Heading, "Update your linked install", StringComparison.Ordinal), "signed-in downloads should tell the reporter to update the linked install before verification when the fix is on a newer build.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Summary.Contains("preview 0.6.3-smoke", StringComparison.Ordinal), "signed-in downloads should project the exact reporter-ready build in the trust panel.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Recommended for this install", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal) && row.Value.Contains("0.6.1-smoke", StringComparison.Ordinal)), "signed-in downloads should explain both the tracked fix target and the current public shelf for this linked install.");
-    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Install posture", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific posture from the support readiness summary.");
+    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Install status", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific status from the support readiness summary.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal)), "signed-in downloads should surface fix availability for the linked install instead of leaving it implicit in prose.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific caution lane beside the fix target.");
-    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "signed-in downloads should surface adoption health directly inside the install-specific trust panel.");
+    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("review required", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("unavailable", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("Hold parity claims", StringComparison.Ordinal)), "signed-in downloads should surface fail-closed adoption health directly inside the install-specific trust panel.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "downloads should explain the current access posture beside the release shelf.");
-    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "downloads should surface current adoption evidence beside the release shelf.");
+    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("needs review", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("weekly snapshots", StringComparison.OrdinalIgnoreCase)), "downloads should surface current review-required adoption evidence beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "downloads should surface launch-readiness posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Current focus:", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
@@ -4604,22 +4744,22 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHelpModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("weekly snapshots", StringComparison.OrdinalIgnoreCase)), "signed-in help should carry measured adoption history inside the install-specific trust panel.");
     Assert(authenticatedHelpModel.TrustPulse!.MicroProof.Any(static item => item.Contains("campaign OS indispensable", StringComparison.OrdinalIgnoreCase)), "help should surface the current next-checkpoint question in the weekly trust pulse.");
     Assert(authenticatedHelpModel.TrustPulse.TrendSamples.Count > 1, "help should surface measured progress points alongside the weekly pulse summary.");
-    Assert(authenticatedHelpModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "help should surface provider-route stewardship on the weekly trust pulse.");
-    Assert(authenticatedHelpModel.PrivacyBoundary!.SurfaceRules.Any(static rule => string.Equals(rule.Label, "Provider-backed help", StringComparison.Ordinal)), "help should keep the provider-backed help boundary explicit.");
+    Assert(authenticatedHelpModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider status", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "help should surface provider-route stewardship on the weekly trust pulse.");
+    Assert(authenticatedHelpModel.PrivacyBoundary!.SurfaceRules.Any(static rule => string.Equals(rule.Label, "Help tools", StringComparison.Ordinal)), "help should keep the provider-backed help boundary explicit in customer-facing language.");
     var authenticatedNowPage = await authenticatedLandingController.NowPage(CancellationToken.None) as ViewResult;
     var authenticatedNowModel = authenticatedNowPage?.Model as NowPageViewModel;
     Assert(authenticatedNowModel?.SignedInStatus is not null, "signed-in current-release page should project install-specific trust status.");
     Assert(authenticatedNowModel?.TrustPulse is not null, "current-release should surface the weekly public trust pulse.");
-    Assert(authenticatedNowModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Support follow-through", StringComparison.Ordinal) && row.Value.Contains("Closed with notice", StringComparison.Ordinal)), "signed-in current-release page should surface the current support follow-through stage.");
+    Assert(authenticatedNowModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Support next steps", StringComparison.Ordinal) && row.Value.Contains("Closed with notice", StringComparison.Ordinal)), "signed-in current-release page should surface the current support next-step stage.");
     Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal)), "signed-in current-release page should surface install-specific fix availability.");
     Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in current-release page should surface install-specific caution.");
-    Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("trust routes", StringComparison.OrdinalIgnoreCase)), "signed-in current-release page should surface adoption health next to the install-specific trust rows.");
-    Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "current-release should explain who can get the recommended build now.");
+    Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("review required", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("unavailable", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("Hold parity claims", StringComparison.Ordinal)), "signed-in current-release page should surface fail-closed adoption health next to the install-specific trust rows.");
+    Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && (row.Value.Contains("linked install route", StringComparison.OrdinalIgnoreCase) || (row.Value.Contains("current downloads page", StringComparison.OrdinalIgnoreCase) && row.Value.Contains("support", StringComparison.OrdinalIgnoreCase)))), "current-release should explain the governed recommended-install path now.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "current-release should surface closure-health follow-through in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend window", StringComparison.OrdinalIgnoreCase)), "current-release should surface trend window movement in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.TrendSamples.Count > 1, "current-release should surface measured progress points alongside the weekly pulse summary.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "current-release should surface launch-readiness posture on the weekly trust pulse.");
-    Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider-route stewardship", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "current-release should surface provider-route stewardship on the weekly trust pulse.");
+    Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Provider status", StringComparison.Ordinal) && row.Value.Contains("Pilot defaults are governed", StringComparison.Ordinal)), "current-release should surface provider-route stewardship on the weekly trust pulse.");
     var fixedReadyRefreshResult = installLinkingController.RefreshGrant(new RefreshInstallationGrantRequestDto(
         InstallationId: redeemPayload.Installation.InstallationId,
         AccessToken: currentGrantAccessToken,
@@ -4641,7 +4781,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var readyToVerifyDownloadsPage = await authenticatedLandingController.DownloadsPage(CancellationToken.None) as ViewResult;
     var readyToVerifyDownloadsModel = readyToVerifyDownloadsPage?.Model as DownloadsPageViewModel;
     Assert(string.Equals(readyToVerifyDownloadsModel?.SignedInStatus?.Heading, "Your linked install can verify a fix now", StringComparison.Ordinal), "signed-in downloads should switch from update-needed to verification-ready once the linked install matches the fix build.");
-    Assert(readyToVerifyDownloadsModel?.SignedInStatus?.Rows.Any(static row => string.Equals(row.Label, "Install posture", StringComparison.Ordinal) && row.Value.Contains("fix worked here", StringComparison.OrdinalIgnoreCase)) == true, "signed-in downloads should turn the install posture row into a verification-ready summary once the linked install reaches the tracked fix.");
+    Assert(readyToVerifyDownloadsModel?.SignedInStatus?.Rows.Any(static row => string.Equals(row.Label, "Install status", StringComparison.Ordinal) && row.Value.Contains("fix worked here", StringComparison.OrdinalIgnoreCase)) == true, "signed-in downloads should turn the install status row into a verification-ready summary once the linked install reaches the tracked fix.");
     Assert(readyToVerifyDownloadsModel?.SignedInStatus?.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("can verify", StringComparison.OrdinalIgnoreCase)) == true, "signed-in downloads should turn fix availability into a verification-ready statement once the linked install reaches the tracked fix.");
     Assert(readyToVerifyDownloadsModel?.SignedInStatus?.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("No extra caution", StringComparison.OrdinalIgnoreCase)) == true, "signed-in downloads should lower the caution lane once the linked install reaches the tracked fix.");
     Assert(string.Equals(readyToVerifyDownloadsModel?.SignedInStatus?.PrimaryAction.Label, "Verify fix on this install", StringComparison.Ordinal), "signed-in downloads should switch the primary trust action from a generic timeline link to a direct verify-fix action once the linked install is ready.");
@@ -4653,7 +4793,7 @@ async Task VerifyPublicLandingProjectionAsync()
         CancellationToken.None);
     var readyToVerifyAssistantPayload = (readyToVerifyAssistant.Result as OkObjectResult)?.Value as SupportAssistantResponse;
     Assert(readyToVerifyAssistantPayload is not null, "support assistant should answer verification-ready questions for signed-in reporters.");
-    Assert(readyToVerifyAssistantPayload!.Answer.Contains("Use the verification buttons", StringComparison.Ordinal), "support assistant should explicitly ask the reporter to verify the fix once the linked install is ready.");
+    Assert(readyToVerifyAssistantPayload!.Answer.Contains("Use the case buttons now", StringComparison.Ordinal), "support assistant should explicitly ask the reporter to try the fix from the tracked case once the linked install is ready.");
     Assert(readyToVerifyAssistantPayload.Actions.Any(static item => string.Equals(item.ActionId, "verify_fix_on_case", StringComparison.Ordinal)), "support assistant should surface a direct fix-verification action once the linked install is ready.");
     Assert(readyToVerifyAssistantPayload.Actions.Any(item => string.Equals(item.Href, readyToVerifyAccountDetailModel!.SelectedSupportCaseSummary!.DetailHref, StringComparison.Ordinal)), "support assistant should route the verification-ready action back to the tracked case detail.");
     var verifiedFixedResult = await supportCasesController.VerifyReporterFix(
@@ -4760,7 +4900,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var orphanedAccountDetailModel = orphanedAccountDetailPage?.Model as AccountPageViewModel;
     Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.NeedsLinkedInstall == true, "support detail should require relinking when no current install matches the affected device context.");
     Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.CanVerifyFix == false, "support detail should not reopen fix verification when the affected install is no longer linked.");
-    Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.InstallReadinessSummary.Contains("not currently linked here", StringComparison.OrdinalIgnoreCase) == true, "support detail should explain that the affected install must be relinked instead of silently choosing another device.");
+    Assert(orphanedAccountDetailModel?.SelectedSupportCaseSummary?.InstallReadinessSummary.Contains("not linked to this account right now", StringComparison.OrdinalIgnoreCase) == true, "support detail should explain that the affected install must be relinked instead of silently choosing another device.");
     var orphanedVerifyResult = await supportCasesController.VerifyReporterFix(
         orphanedInstallCase.CaseId,
         new SupportCaseVerificationRequest(
@@ -4769,11 +4909,13 @@ async Task VerifyPublicLandingProjectionAsync()
         CancellationToken.None);
     var orphanedVerifyProblem = orphanedVerifyResult.Result as ObjectResult;
     Assert(orphanedVerifyProblem?.StatusCode == StatusCodes.Status409Conflict, "support verification api should reject fix confirmation when the affected install is no longer linked.");
-    Assert((orphanedVerifyProblem?.Value as ProblemDetails)?.Detail?.Contains("not currently linked here", StringComparison.OrdinalIgnoreCase) == true, "support verification api should explain that the affected install must be relinked before verification.");
+    Assert((orphanedVerifyProblem?.Value as ProblemDetails)?.Detail?.Contains("not linked to this account right now", StringComparison.OrdinalIgnoreCase) == true, "support verification api should explain that the affected install must be relinked before verification.");
+    campaignProof.Complete("report_cluster_release_notify");
     var accountAccessPage = await accountController.AccountPage(section: "access", caseId: null, CancellationToken.None) as ViewResult;
-    var accountAccessModel = accountAccessPage?.Model as AccountPageViewModel;
-    Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
+    var accountAccessModel = accountAccessPage?.Model as AccountSectionPageViewModel;
+    Assert(string.Equals(accountAccessModel?.Eyebrow, "Installs", StringComparison.Ordinal), "account access route should render the minimal installs section.");
     Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Installs", StringComparison.Ordinal), "account access route should project its own chrome title.");
+    Assert(accountAccessModel?.AccessInstallations?.Any(static item => string.Equals(item.InstallationId, "install-smoke-001", StringComparison.Ordinal)) == true, "account access route should keep the active linked install visible on the minimal installs surface.");
     Assert(accountAccessModel?.SignedInTrustStatus is not null, "account access route should keep the install-specific trust panel visible on the device surface.");
     Assert(accountAccessModel?.SignedInTrustStatus?.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))) == true, "account access route should keep the current access posture visible next to linked-install details.");
     Assert(accountAccessModel?.EntitlementSyncReceipts is not null, "account access route should project standalone entitlement-sync receipts next to devices and access posture.");
@@ -4880,11 +5022,14 @@ async Task VerifyPublicLandingProjectionAsync()
                 string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(item.Query, "opposition", StringComparison.OrdinalIgnoreCase)) == true),
                 "account workspace detail search should store the last workspace query in user personalization history.");
-            Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "account workspace detail search should keep prep-launch receipts on the what-changed rail.");
-            Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "account workspace detail search should keep travel-prefetch receipts on the what-changed rail.");
-            Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "account workspace detail search should keep aftermath recap packages on the what-changed rail.");
-    Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "account workspace detail search should keep replay packages on the what-changed rail.");
-    Assert(searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "account workspace detail search should keep the next-session carry-forward packet on the what-changed rail.");
+    var searchableWorkspaceChangePackets = searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets ?? Array.Empty<WorkspaceChangePacketProjection>();
+    Assert(searchableWorkspaceChangePackets.Count <= 6, "account workspace detail search should keep the what-changed rail bounded to the six most recent packets.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)), "account workspace detail search should keep the next-session carry-forward packet on the current what-changed rail.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)), "account workspace detail search should keep current runboard continuity on the what-changed rail.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)), "account workspace detail search should keep current resolution approval on the what-changed rail.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)), "account workspace detail search should keep the current world tick on the what-changed rail.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)), "account workspace detail search should keep current player-safe news on the what-changed rail.");
+    Assert(searchableWorkspaceChangePackets.Any(static item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)), "account workspace detail search should keep the current runner goal on the what-changed rail.");
     var accountRunDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, runId: runId) as ViewResult;
     var accountRunDetailModel = accountRunDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountRunDetailModel?.SelectedRun?.RunId, runId, StringComparison.Ordinal), "account run detail route should load the selected live run context.");
@@ -5096,23 +5241,33 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(federationBatchPayload.RouteReceipt is null, "campaign federation api should not mint a fake batch route receipt before every outward-facing source pack is live.");
     Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.SourcePackKind, "campaign_recap", StringComparison.OrdinalIgnoreCase)
         && !string.Equals(item.RouteState, "published", StringComparison.OrdinalIgnoreCase)), "campaign federation api should keep unpublished replay source packs on bounded-failure posture until a public shelf receipt exists.");
-    Assert(federationBatchPayload.BoundedFailureReason?.Contains("visible source receipts", StringComparison.OrdinalIgnoreCase) == true, "campaign federation api should explain why the launched exchange batch stays bounded.");
+    Assert(
+        federationBatchPayload.BoundedFailureReason is { Length: > 0 } federationBoundedFailureReason
+        && (federationBoundedFailureReason.Contains("visible source receipts", StringComparison.OrdinalIgnoreCase)
+            || federationBoundedFailureReason.Contains("release status record", StringComparison.OrdinalIgnoreCase)),
+        $"campaign federation api should explain why the launched exchange batch stays bounded (actual: {federationBatchPayload.BoundedFailureReason ?? "<null>"}).");
     Assert(federationBatchPayload.SourcePacks.Any(item => item.RouteReceipt is not null && item.RouteReceipt.MatchedRoute.StartsWith("/artifacts/publications/", StringComparison.Ordinal)), "campaign federation api should surface current public source-pack receipts on published inputs.");
     Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.SourcePackKind, "campaign_recap", StringComparison.Ordinal) && string.Equals(item.RouteState, "bounded_failure", StringComparison.Ordinal) && item.RouteReceipt is null), "campaign federation api should keep unpublished replay source packs on bounded-failure posture until a public shelf receipt exists.");
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
     Assert(string.Equals(authenticatedHomeModel!.CurrentSection, "overview", StringComparison.Ordinal), "default home route should land on the overview section.");
-    Assert(authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/home/access", StringComparison.Ordinal)), "home should expose the dedicated access section link.");
+    Assert(
+        authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/account/access", StringComparison.Ordinal)),
+        $"home should expose the dedicated access section link (actual: {string.Join(", ", authenticatedHomeModel.Sections.Select(static section => section.Href))}).");
     Assert(authenticatedHomeModel.SignedInStatus is not null, "signed-in home should project the shared signed-in trust status.");
     Assert(authenticatedHomeModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "signed-in home should surface who-can-get-it-now posture directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty fix-availability row directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty install-specific caution row directly in the shared trust panel.");
+    authenticatedLandingController.Request.Headers[HeaderNames.Cookie] = $"{HubBrowserAuthConstants.AccessTokenCookieName}=subject-token";
+    Assert(
+        authenticatedLandingController.Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName),
+        $"authenticated landing smoke fixture should carry the browser access-token cookie (raw cookie header: {authenticatedLandingController.Request.Headers.Cookie}).");
     var authenticatedLandingView = await authenticatedLandingController.LandingPage(CancellationToken.None) as ViewResult;
     var authenticatedLandingModel = authenticatedLandingView?.Model as LandingPageViewModel;
-    Assert(authenticatedLandingModel?.SignedInStatus is not null, "authenticated landing should project the shared signed-in trust status on the front door.");
-    Assert(authenticatedLandingModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "authenticated landing should surface who-can-get-it-now posture directly in the shared trust panel.");
-    Assert(authenticatedLandingModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "authenticated landing should surface a non-empty fix-availability row directly in the shared trust panel.");
+    Assert(authenticatedLandingModel is not null, "authenticated landing should render through the MVC view layer.");
+    Assert(authenticatedLandingModel!.Chrome.Authenticated, "authenticated landing should preserve signed-in account navigation on the minimal front door.");
+    Assert(authenticatedLandingModel.AccessPosture is not null, "authenticated landing should preserve the current install-access posture on the minimal front door.");
     var authenticatedFaqPage = await authenticatedLandingController.FaqPage(CancellationToken.None) as ViewResult;
     var authenticatedFaqModel = authenticatedFaqPage?.Model as FaqPageViewModel;
     Assert(authenticatedFaqModel?.SignedInStatus is not null, "authenticated faq should project the shared signed-in trust status.");
@@ -5175,32 +5330,24 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Any(entry => !string.IsNullOrWhiteSpace(entry.RecapSummary)), "signed-in home should keep a season-board recap summary attached to at least one lead operator lane.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.Any(entry => !string.IsNullOrWhiteSpace(entry.ConsequenceSummary)), "signed-in home should keep a season-board consequence summary attached to at least one lead operator lane.");
     Assert(authenticatedHomeModel.CampaignSpine.CommunityOperations[0].SeasonBoardEntries.All(entry => !string.IsNullOrWhiteSpace(entry.CampaignMemorySummary)), "signed-in home should keep campaign-memory summaries attached to the lead season-board lanes.");
+    campaignProof.Complete("organize_community_and_close_loop");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs.Count >= 1, "signed-in home should surface Build Lab handoff continuity.");
     Assert(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "signed-in home should receive customer-facing build-path titles directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction), "signed-in home should receive the next safe build action directly from the campaign spine service.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedHomeModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageSummary), "signed-in home should receive planner-coverage summary directly from the campaign spine service.");
     var authenticatedContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var authenticatedContactModel = authenticatedContactPage?.Model as TrustPageViewModel;
-    Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
-    Assert(authenticatedContactModel?.SignedInStatus is not null, "authenticated contact page should project the shared signed-in trust status.");
-    Assert(authenticatedContactModel?.TrustPulse is not null, "authenticated contact page should surface the weekly public trust pulse.");
-    Assert(authenticatedContactModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "authenticated contact page should surface who-can-get-it-now posture next to support intake.");
-    Assert(!string.IsNullOrWhiteSpace(authenticatedContactModel!.SupportIntake!.DefaultInstallationId), "authenticated contact page should prefill install-aware support context when a linked install exists.");
-    Assert(authenticatedContactModel.SupportIntake.ContextHint?.Contains("linked install", StringComparison.OrdinalIgnoreCase) == true, "authenticated contact page should explain where the prefilled install context came from.");
-    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
-    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultHeadId, "avalonia", StringComparison.Ordinal), "authenticated contact page should prefill the shipped desktop head.");
-    Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultArch, "x64", StringComparison.Ordinal), "authenticated contact page should prefill the install architecture.");
+    Assert(authenticatedContactModel is not null && string.Equals(authenticatedContactModel.PageId, "contact", StringComparison.Ordinal), "authenticated contact page should render the canonical contact model.");
+    Assert(authenticatedContactModel!.Chrome.Authenticated, "authenticated contact page should preserve signed-in account navigation.");
+    Assert(authenticatedContactModel.Intro.Contains("Discord", StringComparison.OrdinalIgnoreCase), "contact page should direct normal questions and feedback to the Chummer5 Discord server.");
+    Assert(authenticatedContactModel.Actions.Any(static action => action.Href.Contains("discord.gg/chummer", StringComparison.OrdinalIgnoreCase)), "contact page should expose the canonical Chummer5 Discord action.");
+    Assert(authenticatedContactModel.SupportIntake is null, "Discord-first contact should not expose the retired private web intake form.");
+    Assert(authenticatedContactModel.SignedInStatus is null, "Discord-first contact should not attach account trust details to the public contact model.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond");
     var queryPrefilledContactPage = await authenticatedLandingController.ContactPage(CancellationToken.None) as ViewResult;
     var queryPrefilledContactModel = queryPrefilledContactPage?.Model as TrustPageViewModel;
-    Assert(queryPrefilledContactModel?.SupportIntake is not null, "query-prefilled contact page should keep the first-party support intake intact.");
-    Assert(queryPrefilledContactModel?.SignedInStatus is not null, "query-prefilled contact page should keep the shared signed-in trust status intact.");
-    Assert(queryPrefilledContactModel?.TrustPulse is not null, "query-prefilled contact page should keep the weekly public trust pulse intact.");
-    Assert(string.Equals(queryPrefilledContactModel!.SupportIntake!.DefaultKind, SupportCaseKinds.InstallHelp, StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support case type.");
-    Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultTitle, "Mobile follow-through needs grounded runtime", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support title.");
-    Assert(string.Equals(queryPrefilledContactModel.SupportIntake.DefaultSummary, "Scene resume needs support review", StringComparison.Ordinal), "query-prefilled contact page should preserve the requested support summary.");
-    Assert(queryPrefilledContactModel.SupportIntake.DefaultDetail?.Contains("session-redmond", StringComparison.Ordinal) == true, "query-prefilled contact page should preserve the requested support detail.");
-    Assert(queryPrefilledContactModel.SupportIntake.ContextHint?.Contains("scene scene-redmond", StringComparison.OrdinalIgnoreCase) == true, "query-prefilled contact page should surface the follow-through scene context.");
+    Assert(queryPrefilledContactModel is not null && queryPrefilledContactModel.SupportIntake is null, "legacy intake query parameters should not re-enable a hidden support form on Discord-first contact.");
+    Assert(queryPrefilledContactModel!.Intro.Contains("Discord", StringComparison.OrdinalIgnoreCase), "legacy intake query parameters should preserve the canonical Discord contact guidance.");
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = QueryString.Empty;
     var contactSubmittedPage = await authenticatedLandingController.ContactSubmittedPage(supportCase.CaseId, CancellationToken.None) as ViewResult;
     var contactSubmittedModel = contactSubmittedPage?.Model as SupportSubmittedPageViewModel;
@@ -5223,39 +5370,37 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.BuildHandoffId), "signed-in home should keep the related build handoff attached to creator publication follow-through.");
     Assert(authenticatedHomeModel.CampaignSpine.MigrationReceipts.Count >= 1, "signed-in home should surface migration receipt truth.");
     Assert(authenticatedHomeModel.InstallLinking.ClaimedInstallations?.Any(static item => string.Equals(item.Platform, "linux", StringComparison.OrdinalIgnoreCase)) == true, "signed-in home should surface claimed install posture.");
-    var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None) as ViewResult;
-    var accessHomeModel = accessHomePage?.Model as HomePageViewModel;
-    Assert(string.Equals(accessHomeModel?.CurrentSection, "access", StringComparison.Ordinal), "home access route should render the access section.");
-    Assert(string.Equals(accessHomeModel?.Chrome.Title, "Home · Access", StringComparison.Ordinal), "home access route should project its own chrome title.");
-    Assert(accessHomeModel?.SignedInStatus is not null, "home access route should keep the shared signed-in trust panel available.");
-    var workHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
-    var workHomeModel = workHomePage?.Model as HomePageViewModel;
-    Assert(string.Equals(workHomeModel?.CurrentSection, "work", StringComparison.Ordinal), "home work route should render the work section.");
-    Assert(string.Equals(workHomeModel?.Chrome.Title, "Home · Work", StringComparison.Ordinal), "home work route should project its own chrome title.");
-    Assert(workHomeModel?.SignedInStatus is not null, "home work route should keep the shared signed-in trust panel available.");
+    var accessHomePage = await authenticatedLandingController.HomePage("access", CancellationToken.None);
+    Assert(accessHomePage is RedirectResult { Url: "/account/access" }, "legacy home access should redirect to the canonical account installs route.");
+    var workHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None);
+    Assert(workHomePage is RedirectResult { Url: "/account/roster" }, "legacy home work should redirect to the canonical account roster route.");
+    var workHomeModel = authenticatedHomeModel;
+    Assert(workHomeModel.SignedInStatus is not null, "signed-in home should keep the shared signed-in trust panel available.");
     Assert(!string.IsNullOrWhiteSpace(workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label), "home work route should keep the bounded workspace state visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Count >= 1, "home work route should keep the what-changed packet tied to a real change packet.");
-    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "prep_launch", StringComparison.Ordinal)) == true, "home work route should keep governed prep-launch receipts on the bounded what-changed rail.");
-    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "travel_prefetch", StringComparison.Ordinal)) == true, "home work route should keep staged travel-prefetch receipts on the bounded what-changed rail.");
-    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "aftermath_recap", StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages on the bounded what-changed rail.");
-    Assert(workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "home work route should keep replay packages on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Count <= 6, "signed-in home should keep the what-changed rail bounded to six current packets.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "signed-in home should keep the current next-session carry-forward packet on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)) == true, "signed-in home should keep current runboard continuity on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "signed-in home should keep the current resolution approval on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "signed-in home should keep the current world tick on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "signed-in home should keep current player-safe news on the bounded what-changed rail.");
+    Assert(workHomeModel.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "signed-in home should keep the current runner goal on the bounded what-changed rail.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3, "home work route should keep the governed prep library visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary.Contains("governed prep packet", StringComparison.Ordinal) == true, "home work route should keep bounded prep-carrying travel inventory visible.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep aftermath recap packages visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep replay packages visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.Consequences.Count >= 1, "home work route should keep governed consequence follow-through visible on the lead workspace spine.");
     Assert(workHomeModel?.LeadWorkspaceServerPlane?.CampaignMemory is not null, "home work route should keep the bounded campaign-memory projection visible on the lead workspace spine.");
-    Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Any(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the aftermath package attached to the bounded return shelf.");
+    Assert(workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf.Count <= 6, "signed-in home should keep the current return shelf bounded to six category-ranked entries.");
     var recapShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
-        .FirstOrDefault(item => string.Equals(item.EntryId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal));
-    Assert(recapShelfPayload is not null, "home work route should surface the generated aftermath package on the richer recap-shelf projection.");
-    Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "home work route should mark the lead aftermath artifact as usable from the creator shelf as well as the campaign shelf.");
+        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, publicationId, StringComparison.Ordinal));
+    Assert(recapShelfPayload is not null, "signed-in home should surface the published campaign recap on the richer bounded shelf projection.");
+    Assert(recapShelfPayload?.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) == true, "signed-in home should mark the selected campaign recap as usable from the creator shelf as well as the campaign shelf.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.OwnershipSummary), "home work route should keep explicit artifact ownership posture attached to the recap shelf.");
     Assert(recapShelfPayload?.PublicationSummary?.Contains("publication shelf", StringComparison.OrdinalIgnoreCase) == true, "home work route should explain that the same artifact already feeds shared publication posture.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.CreatorPublicationId), "home work route should keep the linked creator-publication id attached to the recap shelf entry.");
     Assert(!string.IsNullOrWhiteSpace(recapShelfPayload?.NextSafeAction), "home work route should keep the next safe shelf action attached to the recap shelf entry.");
-    var publishedRecapShelfPayload = workHomeModel?.LeadWorkspaceServerPlane?.RecapShelf
-        .FirstOrDefault(item => string.Equals(item.CreatorPublicationId, publicationId, StringComparison.Ordinal));
+    var publishedRecapShelfPayload = recapShelfPayload;
     Assert(publishedRecapShelfPayload is not null, "home work route should keep the recap entry linked to the published shared publication on the bounded return shelf.");
     Assert(string.Equals(publishedRecapShelfPayload?.PublicationState, "published", StringComparison.Ordinal), "home work route should carry published shared-publication state on the recap entry linked to the live publication.");
     Assert(string.Equals(publishedRecapShelfPayload?.TrustBand, "curated-live", StringComparison.Ordinal), "home work route should carry live trust ranking on the recap entry linked to the published shared publication.");
@@ -5328,9 +5473,9 @@ async Task VerifyPublicLandingProjectionAsync()
         retainedAftermathPayload = (retainedAftermathResult.Result as OkObjectResult)?.Value as AftermathRecapPackageProjection ?? retainedAftermathResult.Value;
     }
     Assert(retainedAftermathPayload is not null, "campaign spine aftermath generation should keep returning packages after the retention cap is exceeded.");
-    var retainedWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
+    var retainedWorkHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var retainedWorkHomeModel = retainedWorkHomePage?.Model as HomePageViewModel;
-    Assert(retainedWorkHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, retainedAftermathPayload!.PackageId, StringComparison.Ordinal)) == true, "home work route should keep the newest aftermath recap package visible after the retention cap is exceeded.");
+    Assert(retainedWorkHomeModel?.LeadWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, retainedAftermathPayload!.PackageId, StringComparison.Ordinal)) == true, "signed-in home should keep the newest aftermath recap package visible after the retention cap is exceeded.");
     var reloadedCampaignStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var reloadedCampaignSpine = new CampaignSpineService(reloadedCampaignStore, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(reloadedCampaignStore), supportStore);
     var reloadedWorkspace = reloadedCampaignSpine.GetWorkspace(linkedUser, workspaceId);
@@ -5348,8 +5493,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var reloadedAdoptionLoop = NotNull(reloadedCampaignSpine.GetCampaignAdoptionLoop(linkedUser, workspaceId), "campaign spine adoption loop should survive a community-store reload.");
     Assert(reloadedAdoptionLoop.Adoption is not null && reloadedAdoptionLoop.Adoption.ConfidencePercent == 82, "campaign spine adoption loop should preserve adoption confidence across reload.");
     Assert(reloadedAdoptionLoop.RunnerGoals.Any(item => item.Label.Contains("Delta-grade wired reflexes fund", StringComparison.Ordinal)), "campaign spine adoption loop should preserve runner goal pins across reload.");
-    Assert(reloadedAdoptionLoop.WorldTicks.Any(item => item.Summary.Contains("BLACK LEDGER WorldTick", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the first WorldTick across reload.");
-    Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the player-safe news preview across reload.");
+    Assert(reloadedAdoptionLoop.WorldTicks.Any(item => string.Equals(item.WorldTickId, resolutionReportApprovalPayload!.WorldTickId, StringComparison.Ordinal)), "campaign spine adoption loop should preserve the first WorldTick receipt across reload.");
+    Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => string.Equals(item.NewsId, resolutionReportApprovalPayload!.NewsId, StringComparison.Ordinal)), "campaign spine adoption loop should preserve the first player-safe news receipt across reload.");
     var reloadedOpenRunDetail = NotNull(reloadedCampaignSpine.GetOpenRun(linkedUser, openRunListingPayload!.OpenRunId), "campaign spine open-run orchestration should survive a community-store reload.");
     Assert(string.Equals(reloadedOpenRunDetail.Listing.Status, "closed", StringComparison.Ordinal), "campaign spine open-run orchestration should preserve listing closeout posture across reload.");
     Assert(reloadedOpenRunDetail.Schedule is not null, "campaign spine open-run orchestration should preserve the scheduling receipt across reload.");
@@ -5472,6 +5617,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail.");
 
+    var sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
+    var sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault();
+    Assert(sourceDossier is not null, "signed-in owners should have a governed dossier before a GM moves roster state.");
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(
         SubjectId: "subject.demo",
@@ -5480,9 +5628,7 @@ async Task VerifyPublicLandingProjectionAsync()
         Visibility: "group",
         Capabilities: null));
     var transferCampaign = groups.GetOrCreateCampaign(transferGroup.GroupId, "hub", "Thursday Crew Relay");
-    var sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
-    var sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault();
-    Assert(sourceDossier is not null, "signed-in owners should have a governed dossier before a GM moves roster state.");
+    Assert(!string.Equals(sourceDossier!.CampaignId, transferCampaign.CampaignId, StringComparison.Ordinal), "dossier movement smoke fixture should use a destination campaign distinct from the source dossier.");
     var dossierMovementPlanResult = await campaignSpineController.GetMyCampaignWorkspaceDossierMovementPlan(workspaceId, CancellationToken.None);
     var dossierMovementPlanPayload = (dossierMovementPlanResult.Result as OkObjectResult)?.Value as DossierMovementPlannerProjection ?? dossierMovementPlanResult.Value;
     Assert(dossierMovementPlanPayload is not null, "campaign spine movement planner api should expose governed dossier movement targets on the starter workspace.");
@@ -5496,7 +5642,7 @@ async Task VerifyPublicLandingProjectionAsync()
             TargetCampaignTitle: transferCampaign.Title,
             TargetRunTitle: "Dockside handoff",
             TargetSceneTitle: "Pier 3 exchange",
-            TargetOwnerUserId: transferTargetUser.UserId,
+            TargetOwnerUserId: null,
             Note: "GM handoff for the next run."),
         CancellationToken.None);
     var dossierMovementPayload = (dossierMovementResult.Result as OkObjectResult)?.Value as DossierMovementReceiptProjection ?? dossierMovementResult.Value;
@@ -5576,12 +5722,16 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)), "target workspace server plane should preserve the roster-transfer receipt.");
     Assert(outsiderWorkspaceServerPlanePayload!.ChangePackets.Any(item => string.Equals(item.Kind, "roster_transfer", StringComparison.Ordinal)), "target workspace server plane should project roster transfer as a first-class change packet.");
     var operatorWorkPage = await accountController.AccountPage(section: "work", caseId: null, CancellationToken.None) as ViewResult;
-    var operatorWorkModel = operatorWorkPage?.Model as AccountPageViewModel;
-    Assert(operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "account work should keep recent governed roster moves visible on the operator rail after a transfer.");
-    var postTransferWorkHomePage = await authenticatedLandingController.HomePage("work", CancellationToken.None) as ViewResult;
+    var operatorWorkModel = operatorWorkPage?.Model as AccountSectionPageViewModel;
+    Assert(operatorWorkModel is not null && string.Equals(operatorWorkModel.Eyebrow, "Roster", StringComparison.Ordinal), "account roster should render through the compact canonical roster surface after a transfer.");
+    Assert(operatorWorkModel!.Cards.Count >= 3, "account roster should keep runner, campaign, and browser entry points visible after a transfer.");
+    var postTransferWorkHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var postTransferWorkHomeModel = postTransferWorkHomePage?.Model as HomePageViewModel;
-    Assert(postTransferWorkHomeModel?.LeadWorkspaceServerPlane?.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true, "home work should keep the governed roster-transfer receipt visible on the lead workspace spine after a transfer.");
-    Assert(postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "home work should keep the same governed roster-move audit visible on the operator posture card after a transfer.");
+    Assert(postTransferWorkHomeModel?.CampaignSpine.Workspaces.Any(item => item.RosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "signed-in home should keep the governed roster-transfer receipt on its owning workspace after a transfer.");
+    Assert(postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true, "signed-in home should keep the same governed roster-move audit visible on the operator posture card after a transfer.");
+    var postTransferOrganizerOpsResult = await campaignSpineController.GetMyOrganizerOperations(CancellationToken.None);
+    var postTransferOrganizerOpsPayload = (postTransferOrganizerOpsResult.Result as OkObjectResult)?.Value as OrganizerOperationsDashboardProjection ?? postTransferOrganizerOpsResult.Value;
+    Assert(postTransferOrganizerOpsPayload?.Items.Any(item => item.Roster.RecentTransferSummaries.Count >= 1) == true, "organizer operations api should surface recent governed roster movement after the roster transfer is recorded.");
 
     var outsiderTransferDenied = await outsiderCampaignSpineController.TransferMyRoster(
         new RosterTransferRequest(
@@ -5636,7 +5786,7 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         Assert(string.Equals(privacyBoundaryDocument.RootElement.GetProperty("contractName").GetString(), "chummer.public_privacy_boundaries", StringComparison.Ordinal), "privacy-boundary endpoint should serve the mirrored privacy-boundary artifact.");
         Assert(privacyBoundaryDocument.RootElement.GetProperty("domains").GetArrayLength() >= 4, "privacy-boundary endpoint should keep all public trust domains visible.");
-        Assert(privacyBoundaryDocument.RootElement.GetProperty("surfaceRules").EnumerateArray().Any(item => string.Equals(item.GetProperty("label").GetString(), "Provider-backed help", StringComparison.Ordinal)), "privacy-boundary endpoint should keep the provider-backed help rule explicit.");
+        Assert(privacyBoundaryDocument.RootElement.GetProperty("surfaceRules").EnumerateArray().Any(item => string.Equals(item.GetProperty("label").GetString(), "Help tools", StringComparison.Ordinal)), "privacy-boundary endpoint should keep the help-tools privacy rule explicit.");
     }
 
     var artifactShelfReplayResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
@@ -5659,6 +5809,7 @@ async Task VerifyPublicLandingProjectionAsync()
         "artifacts shelf should point teaser cards at deliberate related detail pages");
     Assert(artifactsModel!.TrustPulse is not null, "guest artifacts shelf should surface the weekly public trust pulse.");
     Assert(artifactsModel.PublicCreatorPublications?.Count > 0, "guest artifacts shelf should surface governed public creator discovery once a creator packet is actually published.");
+    Assert(artifactsModel.PublicCreatorPublications?.Count <= 3, "guest artifacts shelf should keep governed public creator discovery bounded to the three highest-ranked packets.");
     Assert(string.Equals(artifactsModel.PublicCreatorPublications?[0].PublicationStatus, "published", StringComparison.Ordinal), "guest artifacts shelf should carry live published creator-publication posture on the public discovery cards.");
     Assert(artifactsModel.PublicCreatorPublications?[0].Discoverable == true, "guest artifacts shelf should keep public creator discovery limited to discoverable live packets.");
     Assert(!string.IsNullOrWhiteSpace(artifactsModel.PublicCreatorPublications?[0].TrustSummary), "guest artifacts shelf should keep trust reasoning attached to public creator discovery.");
@@ -5669,10 +5820,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicPrimerPublication is not null, "guest artifacts shelf should surface the published primer on governed public discovery.");
     Assert(string.Equals(publicPrimerPublication?.Kind, "primer", StringComparison.Ordinal), "guest artifacts shelf should preserve the primer publication kind on the public discovery rail.");
     Assert(publicPrimerPublication?.Discoverable == true, "guest artifacts shelf should keep the published primer discoverable on the public discovery rail.");
-    var publicRunModulePublication = artifactsModel.PublicCreatorPublications?.FirstOrDefault(item => string.Equals(item.PublicationId, runModulePublicationId, StringComparison.Ordinal));
-    Assert(publicRunModulePublication is not null, "guest artifacts shelf should surface the published run module on governed public discovery.");
-    Assert(string.Equals(publicRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "guest artifacts shelf should preserve the run-module publication kind on the public discovery rail.");
-    Assert(publicRunModulePublication?.Discoverable == true, "guest artifacts shelf should keep the published run module discoverable on the public discovery rail.");
+    var publicRunModulePublication = publicCreatorDiscovery.GetDiscoverable(runModulePublicationId);
+    Assert(publicRunModulePublication is not null, "published run modules outside the bounded gallery rail should remain reachable through governed direct discovery.");
+    Assert(string.Equals(publicRunModulePublication?.Kind, "run_module", StringComparison.Ordinal), "governed direct discovery should preserve the run-module publication kind.");
+    Assert(publicRunModulePublication?.Discoverable == true, "governed direct discovery should keep the published run module discoverable.");
     var publicDossierPublication = artifactsModel.PublicCreatorPublications?.FirstOrDefault(item => string.Equals(item.PublicationId, dossierPublicationId, StringComparison.Ordinal));
     Assert(publicDossierPublication is not null, "guest artifacts shelf should surface the published dossier on governed public discovery.");
     Assert(string.Equals(publicDossierPublication?.Kind, "dossier", StringComparison.Ordinal), "guest artifacts shelf should preserve the dossier publication kind on the public discovery rail.");
@@ -5682,14 +5833,16 @@ async Task VerifyPublicLandingProjectionAsync()
     using (var publicCreatorDetailApiDocument = JsonDocument.Parse(JsonSerializer.Serialize(publicCreatorDetailApiPayload)))
     {
         Assert(
-            publicCreatorDetailApiDocument.RootElement.TryGetProperty("routeReceipt", out JsonElement creatorRouteReceipt)
-            && creatorRouteReceipt.ValueKind == JsonValueKind.Object,
+            (publicCreatorDetailApiDocument.RootElement.TryGetProperty("routeReceipt", out JsonElement creatorRouteReceipt)
+                && creatorRouteReceipt.ValueKind == JsonValueKind.Object)
+            || (publicCreatorDetailApiDocument.RootElement.TryGetProperty("boundedFailureReason", out JsonElement creatorBoundedFailureReason)
+                && !string.IsNullOrWhiteSpace(creatorBoundedFailureReason.GetString())),
             "creator publication detail api should expose the governing route receipt or bounded review posture.");
         Assert(
             string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("routeState").GetString(), "bounded_failure", StringComparison.Ordinal),
             "creator publication detail api should keep the outward-facing claim on bounded-failure posture while parity claims stay review-required.");
         Assert(
-            publicCreatorDetailApiDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true,
+            publicCreatorDetailApiDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("release record", StringComparison.OrdinalIgnoreCase) == true,
             "creator publication detail api should explain the current bounded review posture instead of silently claiming parity.");
     }
     var publicCreatorDetailView = await controller.CreatorPublicationDetailPage(publicationId, CancellationToken.None) as ViewResult;
@@ -5700,23 +5853,27 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.ComparisonSummary), "guest creator-publication detail should keep creator-comparison guidance visible.");
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.LineageSummary), "guest creator-publication detail should keep lineage posture visible.");
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.ModerationSummary), "guest creator-publication detail should keep moderation-watch posture visible.");
-    Assert(publicCreatorDetailModel.RouteReceipt is not null && publicCreatorDetailModel.RouteReceipt.MatchedRoute.StartsWith("/artifacts/publications/", StringComparison.Ordinal), "guest creator-publication detail should expose the governing route receipt or bounded review posture on the HTML route.");
+    Assert(publicCreatorDetailModel.RouteReceipt is null, "guest creator-publication detail should not expose a fake route receipt while the HTML route remains bounded.");
     Assert(string.Equals(publicCreatorDetailModel.RouteState, "bounded_failure", StringComparison.Ordinal), "guest creator-publication detail should keep the outward-facing HTML claim on bounded-failure posture while parity claims stay review-required.");
-    Assert(publicCreatorDetailModel.BoundedFailureReason?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true, "guest creator-publication detail should explain the bounded review posture on the HTML route.");
+    Assert(publicCreatorDetailModel.BoundedFailureReason?.Contains("release record", StringComparison.OrdinalIgnoreCase) == true, "guest creator-publication detail should explain the bounded review posture on the HTML route.");
     Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");
     Assert(publicCreatorDetailModel.SignedInStatus is null, "guest creator-publication detail should not project install-specific signed-in trust posture.");
-    var releaseBundleProofResult = controller.ReleaseArtifactBundleProof("avalonia-linux-x64-installer") as OkObjectResult;
+    var releaseBundleArtifact = releases.LoadManifest().Downloads.FirstOrDefault();
+    Assert(releaseBundleArtifact is not null, "release-bundle public proof smoke should have a current manifest artifact to inspect.");
+    var releaseBundleProofResult = controller.ReleaseArtifactBundleProof(releaseBundleArtifact!.Id) as OkObjectResult;
+    Assert(releaseBundleProofResult is not null, "release-bundle public proof route should resolve a current manifest artifact.");
     using (var releaseBundleProofDocument = JsonDocument.Parse(JsonSerializer.Serialize(releaseBundleProofResult?.Value)))
     {
         Assert(
             releaseBundleProofDocument.RootElement.TryGetProperty("routeReceipt", out JsonElement releaseBundleRouteReceipt)
-            && releaseBundleRouteReceipt.ValueKind == JsonValueKind.Object,
+            && releaseBundleRouteReceipt.ValueKind == JsonValueKind.Null
+            && !string.IsNullOrWhiteSpace(releaseBundleProofDocument.RootElement.GetProperty("boundedFailureReason").GetString()),
             "release-bundle public proof route should expose the governing proof receipt or bounded review posture.");
         Assert(
             string.Equals(releaseBundleProofDocument.RootElement.GetProperty("state").GetString(), "bounded_failure", StringComparison.Ordinal),
             "release-bundle public proof route should keep the outward-facing claim on bounded-failure posture while parity claims stay review-required.");
         Assert(
-            releaseBundleProofDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true,
+            releaseBundleProofDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("release record", StringComparison.OrdinalIgnoreCase) == true,
             "release-bundle public proof route should explain the bounded review posture instead of silently claiming parity.");
     }
     var publicPrimerDetailView = await controller.CreatorPublicationDetailPage(primerPublicationId, CancellationToken.None) as ViewResult;
@@ -5837,11 +5994,28 @@ async Task VerifyPublicLandingProjectionAsync()
         && Uri.UnescapeDataString(homeRedirect.Url["/login?next=".Length..]).Contains("/home", StringComparison.Ordinal),
         "home page should redirect signed-out guests to login while preserving the requested home route.");
 
+    string authPauseFlagPath = Path.Combine(tempRoot, "auth-signin-smoke-not-paused.flag");
+    Assert(!File.Exists(authPauseFlagPath), "enabled auth-entry smoke should start without an automation pause flag.");
+    IConfiguration authEntryConfiguration = new ConfigurationBuilder()
+        .AddConfiguration(configuration)
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["IDENTITY_EMAIL_START_ENABLED"] = "true",
+            ["CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG"] = authPauseFlagPath
+        })
+        .Build();
+    var authRequestServiceCollection = new ServiceCollection()
+        .AddSingleton(authEntryConfiguration);
+    authRequestServiceCollection.AddControllersWithViews();
+    using var authRequestServices = authRequestServiceCollection.BuildServiceProvider();
     var authController = new AuthController(authService, identityClient, landing, releases, releaseSelection, chrome, google, accounts, participationNotifications, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext()
+            HttpContext = new DefaultHttpContext
+            {
+                RequestServices = authRequestServices
+            }
         }
     };
     var loginResult = await authController.LoginPage("/home", CancellationToken.None);
@@ -5858,7 +6032,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var emailStartMessage = await authController.StartEmail("runner@example.invalid", null, "/downloads", CancellationToken.None);
     var emailStartModel = (emailStartMessage as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(emailStartModel?.StateLabel, "Magic link sent", StringComparison.Ordinal), "email sign-in start should render the explicit magic-link-sent state.");
-    Assert(emailStartModel?.Highlights?.Any(static item => item.Contains("Downloads", StringComparison.Ordinal)) == true, "email sign-in start should explain the post-verification return target.");
+    Assert(emailStartModel?.Highlights?.Any(static item => item.Contains("downloads", StringComparison.OrdinalIgnoreCase)) == true, "email sign-in start should explain the post-verification return target.");
 
     var unavailableIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(_ =>
         new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
@@ -5940,7 +6114,10 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext()
+            HttpContext = new DefaultHttpContext
+            {
+                RequestServices = authRequestServices
+            }
         }
     };
     var unavailableEmailStart = await failingEmailAuthController.StartEmail("runner@example.invalid", "Runner Demo", "/home", CancellationToken.None);
@@ -5957,14 +6134,17 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext()
+            HttpContext = new DefaultHttpContext
+            {
+                RequestServices = authRequestServices
+            }
         }
     };
     var expiredEmailResult = await expiredEmailAuthController.CompleteEmail("expired-ticket", "/downloads", CancellationToken.None);
     var expiredEmailModel = (expiredEmailResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(expiredEmailModel?.Heading, "Magic link expired", StringComparison.Ordinal), "expired email callback should render a stable expired-link state.");
-    Assert(string.Equals(expiredEmailModel?.StateLabel, "Verification expired", StringComparison.Ordinal), "expired email callback should expose the verification-expired state label.");
-    Assert(expiredEmailModel?.Highlights?.Any(static item => item.Contains("Downloads", StringComparison.Ordinal)) == true, "expired email callback should preserve the requested return target.");
+    Assert(string.Equals(expiredEmailModel?.StateLabel, "Confirmation expired", StringComparison.Ordinal), "expired email callback should expose the confirmation-expired state label.");
+    Assert(expiredEmailModel?.Highlights?.Any(static item => item.Contains("downloads", StringComparison.OrdinalIgnoreCase)) == true, "expired email callback should preserve the requested return target.");
     Assert(!(expiredEmailModel?.SupportLine?.Contains("expired-ticket", StringComparison.OrdinalIgnoreCase) ?? false), "expired email callback should not leak raw identity ticket details.");
 
     var googleFailureConfiguration = new ConfigurationBuilder()
@@ -5995,6 +6175,7 @@ async Task VerifyPublicLandingProjectionAsync()
             WebRootPath = Path.Combine(tempRoot, "wwwroot")
         });
     var googleFailureContext = new DefaultHttpContext();
+    googleFailureContext.RequestServices = authRequestServices;
     googleFailureContext.Request.Scheme = "https";
     googleFailureContext.Request.Host = new HostString("hub.example.test");
     var googleChallenge = failingGoogle.CreateChallenge(googleFailureContext.Request, "/home");
@@ -6010,7 +6191,7 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var unavailableGoogleResult = await failingGoogleAuthController.GoogleCallback(CancellationToken.None);
     var unavailableGoogleModel = (unavailableGoogleResult as ViewResult)?.Model as AuthMessagePageViewModel;
-    Assert(string.Equals(unavailableGoogleModel?.Heading, "Google sign-in failed", StringComparison.Ordinal), "google callback should render a stable failure message when upstream token exchange fails.");
+    Assert(string.Equals(unavailableGoogleModel?.Heading, "Google sign-in code could not be redeemed", StringComparison.Ordinal), "google callback should render the typed code-redemption failure when upstream token exchange fails.");
     Assert(!(unavailableGoogleModel?.SupportLine?.Contains("provider-secret-raw-detail", StringComparison.OrdinalIgnoreCase) ?? false), "google callback should not leak raw provider failure details.");
 
     var malformedCodeGoogle = new HubGoogleAuthService(
@@ -6032,6 +6213,7 @@ async Task VerifyPublicLandingProjectionAsync()
             WebRootPath = Path.Combine(tempRoot, "wwwroot")
         });
     var malformedCodeContext = new DefaultHttpContext();
+    malformedCodeContext.RequestServices = authRequestServices;
     malformedCodeContext.Request.Scheme = "https";
     malformedCodeContext.Request.Host = new HostString("hub.example.test");
     var malformedCodeChallenge = malformedCodeGoogle.CreateChallenge(malformedCodeContext.Request, "/home");
@@ -6050,6 +6232,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(malformedCodeModel?.Heading, "Google sign-in code was malformed", StringComparison.Ordinal), "google callback should render the specific malformed-code heading when Google rejects a broken authorization code.");
     Assert(string.Equals(malformedCodeModel?.SupportLine, "Google returned a malformed authorization code. Start the Google sign-in flow again.", StringComparison.Ordinal), "google callback should keep the specific malformed-code guidance instead of regressing to the stale generic handshake copy.");
     Assert(!(malformedCodeModel?.SupportLine?.Contains("could not complete your Google sign-in right now", StringComparison.OrdinalIgnoreCase) ?? false), "google callback malformed-code guidance should not fall back to the generic Google sign-in failure copy.");
+    Assert(!Directory.EnumerateFileSystemEntries(fleetArtifactRoot).Any(), "Campaign OS proof fleet-artifact fixture must remain empty.");
 }
 
 void VerifyRegistryWorkflow()
@@ -7924,7 +8107,10 @@ T NotNull<T>(T? value, string message)
 
 ControllerContext AuthenticatedControllerContext(string accessToken)
 {
-    var httpContext = new DefaultHttpContext();
+    var httpContext = new DefaultHttpContext
+    {
+        RequestServices = EmptyServiceProvider.Instance
+    };
     httpContext.Request.Headers.Authorization = $"Bearer {accessToken}";
     return new ControllerContext
     {
@@ -8288,6 +8474,198 @@ async Task VerifyHostedBoundedContextCoverageWorkflowAsync()
     await Task.CompletedTask;
 }
 
+sealed class CampaignOsRuntimeCheckpointTracker : IDisposable
+{
+    private const string RunIdEnvironmentVariable = "CHUMMER_CAMPAIGN_OS_RUN_ID";
+    private const string CheckpointOutputEnvironmentVariable = "CHUMMER_CAMPAIGN_OS_CHECKPOINT_OUT";
+    private const string CheckpointSuffix = ".run_services_smoke_exit_zero";
+
+    private static readonly string[] CanonicalJourneyIds =
+    [
+        "install_claim_restore_continue",
+        "build_explain_publish",
+        "campaign_session_recover_recap",
+        "recover_from_sync_conflict",
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop"
+    ];
+
+    private readonly string _runId = string.Empty;
+    private readonly FileStream? _stream;
+    private readonly StreamWriter? _writer;
+    private readonly HashSet<string> _completedJourneyIds = new(StringComparer.Ordinal);
+    private int _nextCheckpointIndex;
+    private bool _disposed;
+
+    public bool Enabled => _writer is not null;
+
+    private CampaignOsRuntimeCheckpointTracker()
+    {
+    }
+
+    private CampaignOsRuntimeCheckpointTracker(string runId, string checkpointOutput)
+    {
+        _runId = runId;
+        _stream = new FileStream(
+            checkpointOutput,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 4096,
+            FileOptions.WriteThrough);
+
+        try
+        {
+            _writer = new StreamWriter(
+                _stream,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                bufferSize: 4096,
+                leaveOpen: true)
+            {
+                NewLine = "\n"
+            };
+        }
+        catch
+        {
+            _stream.Dispose();
+            throw;
+        }
+    }
+
+    public static CampaignOsRuntimeCheckpointTracker CreateFromEnvironment()
+    {
+        string? runId = Environment.GetEnvironmentVariable(RunIdEnvironmentVariable);
+        string? checkpointOutput = Environment.GetEnvironmentVariable(CheckpointOutputEnvironmentVariable);
+        if (runId is null && checkpointOutput is null)
+        {
+            return new CampaignOsRuntimeCheckpointTracker();
+        }
+
+        if (runId is null || checkpointOutput is null)
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof requires both proof environment variables when either is present.");
+        }
+
+        if (!Guid.TryParseExact(runId, "D", out Guid parsedRunId)
+            || !string.Equals(parsedRunId.ToString("D"), runId, StringComparison.Ordinal)
+            || runId.Length != 36
+            || runId[14] != '4'
+            || !"89ab".Contains(runId[19]))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof requires a canonical lowercase UUIDv4 run id.");
+        }
+
+        if (!Path.IsPathFullyQualified(checkpointOutput))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof requires a fully-qualified checkpoint output path.");
+        }
+
+        string normalizedCheckpointOutput;
+        try
+        {
+            normalizedCheckpointOutput = Path.GetFullPath(checkpointOutput);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof checkpoint output path is invalid.", exception);
+        }
+
+        if (!string.Equals(normalizedCheckpointOutput, checkpointOutput, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof requires a normalized checkpoint output path.");
+        }
+
+        string? checkpointDirectory = Path.GetDirectoryName(checkpointOutput);
+        if (string.IsNullOrWhiteSpace(checkpointDirectory) || !Directory.Exists(checkpointDirectory))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof checkpoint directory must already exist.");
+        }
+
+        if (Directory.Exists(checkpointOutput))
+        {
+            throw new InvalidOperationException("Campaign OS smoke proof checkpoint output must be a new file.");
+        }
+
+        return new CampaignOsRuntimeCheckpointTracker(runId, checkpointOutput);
+    }
+
+    public void Complete(string journeyId)
+    {
+        ThrowIfDisposed();
+        if (_writer is null || _stream is null)
+        {
+            return;
+        }
+
+        if (Array.IndexOf(CanonicalJourneyIds, journeyId) < 0)
+        {
+            throw new InvalidOperationException($"Unknown Campaign OS smoke journey '{journeyId}'.");
+        }
+
+        if (!_completedJourneyIds.Add(journeyId))
+        {
+            throw new InvalidOperationException($"Campaign OS smoke journey '{journeyId}' completed more than once.");
+        }
+
+        while (_nextCheckpointIndex < CanonicalJourneyIds.Length
+            && _completedJourneyIds.Contains(CanonicalJourneyIds[_nextCheckpointIndex]))
+        {
+            string checkpointId = CanonicalJourneyIds[_nextCheckpointIndex] + CheckpointSuffix;
+            _writer.WriteLine(JsonSerializer.Serialize(new
+            {
+                checkpoint_id = checkpointId,
+                run_id = _runId,
+                status = "passed"
+            }));
+            _nextCheckpointIndex++;
+        }
+
+        _writer.Flush();
+        _stream.Flush(flushToDisk: true);
+    }
+
+    public void RequireAllCompleted()
+    {
+        ThrowIfDisposed();
+        if (_writer is null)
+        {
+            return;
+        }
+
+        if (_nextCheckpointIndex != CanonicalJourneyIds.Length)
+        {
+            string missingJourneys = string.Join(", ", CanonicalJourneyIds.Where(id => !_completedJourneyIds.Contains(id)));
+            throw new InvalidOperationException($"Campaign OS smoke proof is missing completed journey gates: {missingJourneys}.");
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_writer is not null && _stream is not null)
+        {
+            _writer.Flush();
+            _stream.Flush(flushToDisk: true);
+            _writer.Dispose();
+            _stream.Dispose();
+        }
+
+        _disposed = true;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(CampaignOsRuntimeCheckpointTracker));
+        }
+    }
+}
+
 sealed class StubHttpMessageHandler : HttpMessageHandler
 {
     private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
@@ -8299,6 +8677,22 @@ sealed class StubHttpMessageHandler : HttpMessageHandler
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         => Task.FromResult(_handler(request));
+}
+
+sealed class EmptyServiceProvider : IServiceProvider
+{
+    private static readonly IServiceProvider MvcServices = new ServiceCollection()
+        .AddControllersWithViews()
+        .Services
+        .BuildServiceProvider();
+
+    public static EmptyServiceProvider Instance { get; } = new();
+
+    private EmptyServiceProvider()
+    {
+    }
+
+    public object? GetService(Type serviceType) => MvcServices.GetService(serviceType);
 }
 
 sealed class StubHttpClientFactory : IHttpClientFactory

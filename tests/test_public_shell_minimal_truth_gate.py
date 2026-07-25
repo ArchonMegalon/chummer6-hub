@@ -32,6 +32,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
     STALE_EMAIL_DISABLED_COPY = False
     STATUS_REDIRECTS = False
     STALE_STATUS_HEADING = False
+    DOWNLOADS_UNCONFIRMED = False
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path
@@ -170,20 +171,31 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             )
             return
         if path == "/downloads":
+            release_posture = (
+                """
+                    <p>Preview</p>
+                    <h2>No build is available right now</h2>
+                    <details><summary>Build from source</summary></details>
+                """
+                if type(self).DOWNLOADS_UNCONFIRMED
+                else """
+                    <p>Stable</p>
+                    <p>Nightly</p>
+                """
+            )
             self._send_html(
                 200,
-                """
+                f"""
                 <html>
                   <head>
                     <meta property="og:url" content="/downloads" />
                     <meta name="twitter:url" content="/downloads" />
                   </head>
                   <body>
-                    <p>Stable</p>
-                    <p>Nightly</p>
+                    <p>Current public installer</p>
+                    {release_posture}
                     <p>Build</p>
                     <p>Downloads</p>
-                    <p>Stable release</p>
                   </body>
                 </html>
                 """,
@@ -244,6 +256,7 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         _PublicShellMinimalTruthHandler.STALE_EMAIL_DISABLED_COPY = False
         _PublicShellMinimalTruthHandler.STATUS_REDIRECTS = False
         _PublicShellMinimalTruthHandler.STALE_STATUS_HEADING = False
+        _PublicShellMinimalTruthHandler.DOWNLOADS_UNCONFIRMED = False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellMinimalTruthHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -256,6 +269,15 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
 
     def test_gate_passes_when_routes_stay_minimal_and_first_party(self) -> None:
         _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["failure_count"], 0)
+
+    def test_gate_passes_when_downloads_shelf_has_no_confirmed_build(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+        _PublicShellMinimalTruthHandler.DOWNLOADS_UNCONFIRMED = True
 
         payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
 

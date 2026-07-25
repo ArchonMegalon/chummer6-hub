@@ -18,7 +18,7 @@ test('runbook public route stays available and surfaces primer export action', a
   expect(primerPayload.tour_open_in_new_tab).toBe(false);
 
   await page.goto(`${baseUrl}/runbook`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'RUNBOOK PRESS', exact: true })).toBeVisible();
+  await expect(page.locator('h1')).toContainText('RUNBOOK PRESS');
   await expect(page.locator('body')).toContainText('RUNBOOK PRESS now ships real primers');
   await expect(page.locator('body')).toContainText('Open first primer');
   await expect(page.getByRole('link', { name: 'Export Primer' }).first()).toHaveAttribute('href', '/runbook/primers/new-runner-primer/export');

@@ -124,6 +124,15 @@
     var entitlementSyncReceipts = Model.EntitlementSyncReceipts;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
+    bool IsSafeReceiptRecoveryRoute(string? candidate)
+    {
+        var route = candidate?.Trim() ?? string.Empty;
+        return route.StartsWith("/", StringComparison.Ordinal)
+            && !route.StartsWith("//", StringComparison.Ordinal)
+            && !route.Contains('\\', StringComparison.Ordinal)
+            && !route.Contains('?', StringComparison.Ordinal)
+            && !route.Contains('#', StringComparison.Ordinal);
+    }
     var selectedWorkspacePortableExchangeNotice = selectedWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceDecisionNotices = (selectedWorkspaceServerPlane?.DecisionNotices ?? Array.Empty<Chummer.Control.Contracts.Support.DecisionNotice>())
         .Where(notice => !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
@@ -1650,7 +1659,7 @@
                         <strong>@(runCount == 0 ? "Quiet" : runCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Recent recaps</span>
+                        <span>Recaps</span>
                         <strong>@(recapProjectionCount == 0 ? "None yet" : recapProjectionCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -4601,6 +4610,256 @@
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
+            </details>
+            }
+
+            @if ((showAccessSection && entitlementSyncReceipts is not null)
+                || (showWorkSection && selectedWorkspaceServerPlane is not null))
+            {
+            <details class="details-drawer" id="restore-receipts">
+                <summary>Restore provenance and conflict receipts</summary>
+                <section class="settings-section" data-account-panel>
+                    <div class="settings-section__header">
+                        <h2>Restore provenance and conflict receipts</h2>
+                        <p>Receipt authority, observation time, recovery route, and continue posture stay visible before this account trusts restored workspace or entitlement state.</p>
+                    </div>
+
+                    @if (showAccessSection && entitlementSyncReceipts is not null)
+                    {
+                        <h3>Entitlement sync</h3>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Lead receipt</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadReceiptId</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Recovery</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.RecoverySummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Blocking conflicts</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
+                            </div>
+                        </div>
+
+                        @if (entitlementSyncReceipts.ReceiptSurfaces.Count > 0)
+                        {
+                            @foreach (var surface in entitlementSyncReceipts.ReceiptSurfaces)
+                            {
+                                <details class="details-drawer">
+                                    <summary>@surface.Label · @surface.Status.LeadReceiptId</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Recovery hint</span>
+                                            <strong>@surface.Status.LeadRecoveryHint</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Observed</span>
+                                            <strong>@surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Recovery route</span>
+                                            <strong>
+                                                @if (IsSafeReceiptRecoveryRoute(surface.Status.RecoveryRoute))
+                                                {
+                                                    <a class="inline-link" href="@surface.Status.RecoveryRoute">@surface.Status.RecoveryActionLabel</a>
+                                                }
+                                                else
+                                                {
+                                                    @surface.Status.RecoveryActionLabel
+                                                }
+                                            </strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Recovery summary</span>
+                                            <strong>@surface.Status.RecoverySummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Refresh before continue</span>
+                                            <strong>@surface.Status.RefreshBeforeContinueCount</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Blocking conflicts</span>
+                                            <strong>@surface.Status.BlockingConflictCount</strong>
+                                        </div>
+                                    </div>
+                                </details>
+                            }
+                        }
+
+                        @if (entitlementSyncReceipts.ReceiptStatus.RecoveryActions.Count > 0)
+                        {
+                            <div class="app-rail">
+                                @foreach (var action in entitlementSyncReceipts.ReceiptStatus.RecoveryActions)
+                                {
+                                    <article class="app-rail__item">
+                                        <span class="tag">@HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
+                                        <div class="app-rail__copy">
+                                            <h3>@action.Label</h3>
+                                            <p>@action.Summary</p>
+                                        </div>
+                                        @if (IsSafeReceiptRecoveryRoute(action.Route))
+                                        {
+                                            <a class="inline-link" href="@action.Route">@action.Label</a>
+                                        }
+                                    </article>
+                                }
+                            </div>
+                        }
+                    }
+
+                    @if (showWorkSection && selectedWorkspaceServerPlane is not null)
+                    {
+                        var leadRestoreProvenanceRecovery = selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault();
+                        <h3>Workspace restore</h3>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Lead subject</span>
+                                <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Safe to continue</span>
+                                <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Review before continue</span>
+                                <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.ReviewBeforeContinueConflictCount</strong>
+                            </div>
+                        </div>
+
+                        @if (selectedWorkspaceServerPlane.RestoreReceiptSurfaces.Count > 0)
+                        {
+                            @foreach (var surface in selectedWorkspaceServerPlane.RestoreReceiptSurfaces)
+                            {
+                                <details class="details-drawer">
+                                    <summary>@surface.Label · @surface.Status.LeadReceiptId</summary>
+                                    <div class="settings-summary-list">
+                                        <div class="settings-summary-row">
+                                            <span>Recovery hint</span>
+                                            <strong>@surface.Status.LeadRecoveryHint</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Observed</span>
+                                            <strong>@surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Recovery route</span>
+                                            <strong>
+                                                @if (IsSafeReceiptRecoveryRoute(surface.Status.RecoveryRoute))
+                                                {
+                                                    <a class="inline-link" href="@surface.Status.RecoveryRoute">@surface.Status.RecoveryActionLabel</a>
+                                                }
+                                                else
+                                                {
+                                                    @surface.Status.RecoveryActionLabel
+                                                }
+                                            </strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Recovery summary</span>
+                                            <strong>@surface.Status.RecoverySummary</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Refresh before continue</span>
+                                            <strong>@surface.Status.RefreshBeforeContinueCount</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Blocking conflicts</span>
+                                            <strong>@surface.Status.BlockingConflictCount</strong>
+                                        </div>
+                                    </div>
+                                </details>
+                            }
+                        }
+
+                        @if (selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActions.Count > 0)
+                        {
+                            <div class="app-rail">
+                                @foreach (var action in selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActions)
+                                {
+                                    <article class="app-rail__item">
+                                        <span class="tag">@HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
+                                        <div class="app-rail__copy">
+                                            <h3>@action.Label</h3>
+                                            <p>@action.Summary</p>
+                                        </div>
+                                        @if (IsSafeReceiptRecoveryRoute(action.Route))
+                                        {
+                                            <a class="inline-link" href="@action.Route">@action.Label</a>
+                                        }
+                                    </article>
+                                }
+                            </div>
+                        }
+
+                        @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count > 0)
+                        {
+                            <details class="details-drawer">
+                                <summary>Provenance receipts</summary>
+                                @foreach (var receipt in selectedWorkspaceServerPlane.RestoreProvenanceReceipts)
+                                {
+                                    <article class="app-rail__item">
+                                        <div class="app-rail__copy">
+                                            <h3>@receipt.Summary</h3>
+                                                        <p>Verified by @HumanizeStatus(receipt.Authority, "Chummer").</p>
+                                                        <p>Last checked @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</p>
+                                            <p>@receipt.RecoveryHint</p>
+                                        </div>
+                                    </article>
+                                }
+                            </details>
+                        }
+
+                        @if (leadRestoreProvenanceRecovery is not null)
+                        {
+                            <details class="details-drawer">
+                                <summary>Provenance recovery</summary>
+                                @foreach (var recovery in selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts)
+                                {
+                                    <article class="app-rail__item">
+                                        <div class="app-rail__copy">
+                                            <h3>@recovery.Summary</h3>
+                                            <p>@HumanizeStatus(recovery.StalenessPosture, "Current receipt")</p>
+                                            <p>@HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</p>
+                                            <p>Recovery route: @recovery.RecoveryRoute</p>
+                                            <p>@recovery.RecoverySummary</p>
+                                            <p>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue with receipt")</p>
+                                        </div>
+                                        @if (IsSafeReceiptRecoveryRoute(recovery.RecoveryRoute))
+                                        {
+                                            <a class="inline-link" href="@recovery.RecoveryRoute">Open recovery</a>
+                                        }
+                                    </article>
+                                }
+                            </details>
+                        }
+
+                        @if (selectedWorkspaceServerPlane.RestoreConflictReceipts.Count > 0)
+                        {
+                            <details class="details-drawer">
+                                <summary>Conflict receipts</summary>
+                                @foreach (var receipt in selectedWorkspaceServerPlane.RestoreConflictReceipts)
+                                {
+                                    <article class="app-rail__item">
+                                        <span class="tag">@HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
+                                        <div class="app-rail__copy">
+                                            <h3>@receipt.Summary</h3>
+                                            <p>@HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</p>
+                                            <p>Recovery route: @receipt.RecoveryRoute</p>
+                                            <p>@receipt.RecoveryHint</p>
+                                            <p>@receipt.RecoverySummary</p>
+                                            <p>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Review before continuing")</p>
+                                        </div>
+                                        @if (IsSafeReceiptRecoveryRoute(receipt.RecoveryRoute))
+                                        {
+                                            <a class="inline-link" href="@receipt.RecoveryRoute">Open recovery</a>
+                                        }
+                                    </article>
+                                }
+                            </details>
+                        }
+                    }
+                </section>
             </details>
             }
             </div>

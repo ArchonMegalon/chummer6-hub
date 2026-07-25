@@ -6,6 +6,7 @@
     ViewData["SurfaceClass"] = "surface-account surface-minimal";
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     var isAccessSection = Model.AccessInstallations is not null;
+    var entitlementSyncReceipts = Model.EntitlementSyncReceipts;
 }
 @if (isAccessSection)
 {
@@ -68,6 +69,52 @@
                     </article>
                 }
             </div>
+        </section>
+    }
+
+    @if (Model.SignedInTrustStatus is not null || entitlementSyncReceipts is not null)
+    {
+        <section class="minimal-section account-access__status" data-account-access-status aria-labelledby="account-access-status-title">
+            <div class="minimal-section__lead">
+                <h2 id="account-access-status-title">Install status and recovery</h2>
+                <p>Check the current release guidance and resolve any blocking sync conflict before continuing.</p>
+            </div>
+            @if (Model.SignedInTrustStatus is not null)
+            {
+                <details class="minimal-details">
+                    <summary>Release and support status</summary>
+                    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInTrustStatus)
+                </details>
+            }
+            @if (entitlementSyncReceipts is not null)
+            {
+                var blockingConflictCount = entitlementSyncReceipts.ConflictReceipts.Count(static item => item.BlocksContinue);
+                <details class="minimal-details" data-account-access-sync open="@(blockingConflictCount > 0 ? "open" : null)">
+                    <summary>Sync and recovery status</summary>
+                    @if (blockingConflictCount > 0)
+                    {
+                        <p role="alert"><strong>@blockingConflictCount blocking sync conflict(s) need review before this account continues.</strong></p>
+                    }
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Linked-copy history</span>
+                            <strong>@entitlementSyncReceipts.ReceiptStatus.ProvenanceSummary</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Conflict status</span>
+                            <strong>@entitlementSyncReceipts.ReceiptStatus.ConflictSummary</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Recovery</span>
+                            <strong>@entitlementSyncReceipts.ReceiptStatus.RecoverySummary</strong>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(entitlementSyncReceipts.ReceiptStatus.RecoveryActionLabel))
+                    {
+                        <p class="muted-copy">Next: @entitlementSyncReceipts.ReceiptStatus.RecoveryActionLabel</p>
+                    }
+                </details>
+            }
         </section>
     }
 

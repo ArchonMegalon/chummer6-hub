@@ -1,8 +1,8 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-29T11:55:31Z",
+  "generated_at_utc": "2026-07-30T03:13:36Z",
   "source_generated_at_utc": {
-    "full_completion": "2026-06-26T11:28:00Z",
+    "full_completion": "2026-07-29T11:04:25Z",
     "operator_gold": "2026-06-22T06:21:24Z"
   },
   "minimum_rulefacts_required": 100,

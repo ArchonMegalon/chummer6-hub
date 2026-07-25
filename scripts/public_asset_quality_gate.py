@@ -17,7 +17,10 @@ from absolute_completion_common import LocalHubApp, now_iso, write_json, write_t
 ALLOWED_RASTER_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".avif")
 DEFAULT_COMPLETION_DIR = Path("/docker/chummercomplete/_completion/chummer_run_redesign_closure")
 MAX_UPSCALE_RATIO = 1.25
-MIN_HERO_WIDTH = 1600
+# The flagship preview occupies at most half of the 1440px desktop layout.
+# A 1280px source therefore remains comfortably above a 1.5x density budget
+# without upscaling in the rendered surface.
+MIN_HERO_WIDTH = 1200
 MIN_BLUR_METRIC = 2.0
 
 

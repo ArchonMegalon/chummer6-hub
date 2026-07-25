@@ -1,7 +1,9 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-06-29T12:23:35Z",
+  "generated_at_utc": "2026-07-30T03:14:03Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
+  "public_install_count": 0,
+  "downloads_paused": true,
   "external_required": false,
   "distribution_resilience_status": "optional_external_mirrors_degraded",
   "advisory_external_failures": [
@@ -10,8 +12,7 @@
   ],
   "status": "pass",
   "required_providers": [
-    "local_registry",
-    "public_edge"
+    "local_registry"
   ],
   "providers": {
     "local_registry": {
@@ -22,51 +23,25 @@
           "id": "avalonia-linux-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-linux-x64-installer.deb",
-          "size": 36999590,
-          "sha256": "ce931a759101e507780b62c6203a3b59572646050aaaea51e168b002c472e655",
+          "size": 39118902,
+          "sha256": "c310febe74ea2250f90bde60309bb2a290b443b29691c41de6343d6fde2a85fa",
           "status": "pass"
         },
         {
           "id": "avalonia-win-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64-installer.exe",
-          "size": 2794320,
-          "sha256": "d9d25b2c93dbd4887590b52b03431c4aba3c5614dbc4b18ec2f282222067466c",
+          "size": 2734299,
+          "sha256": "d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca",
           "status": "pass"
         }
       ]
     },
     "public_edge": {
-      "status": "pass",
-      "base_url": "http://127.0.0.1:8091",
-      "artifacts": [
-        {
-          "id": "avalonia-linux-x64-installer",
-          "url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-          "access_class": "open_public",
-          "status_code": 206,
-          "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-          "content_range": "bytes 0-0/36999590",
-          "content_length": 1,
-          "streamed_size": null,
-          "streamed_sha256": "",
-          "posture": "direct_download_bytes",
-          "status": "pass"
-        },
-        {
-          "id": "avalonia-win-x64-installer",
-          "url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "access_class": "open_public",
-          "status_code": 206,
-          "final_url": "http://127.0.0.1:8091/downloads/files/chummer-avalonia-win-x64-installer.exe",
-          "content_range": "bytes 0-0/2794320",
-          "content_length": 1,
-          "streamed_size": null,
-          "streamed_sha256": "",
-          "posture": "direct_download_bytes",
-          "status": "pass"
-        }
-      ]
+      "status": "not_applicable",
+      "reason": "authoritative release manifest reports zero public installers",
+      "base_url": "https://chummer.run",
+      "artifacts": []
     },
     "pcloud": {
       "status": "fail",

@@ -70,10 +70,22 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   );
   const stableLane = desktop.locator('#stable');
   const nightlyLane = desktop.locator('#nightly');
-  await expect(stableLane).toBeVisible();
-  await expect(nightlyLane).toBeVisible();
-  await expect(stableLane.getByRole('link')).toHaveCount(1);
-  await expect(nightlyLane.getByRole('link')).toHaveCount(1);
+  const publicInstallCount = Number(
+    (manifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  const publicInstallerAvailable = Number.isFinite(publicInstallCount) && publicInstallCount > 0;
+  if (publicInstallerAvailable) {
+    await expect(stableLane).toBeVisible();
+    await expect(nightlyLane).toBeVisible();
+    await expect(stableLane.getByRole('link')).toHaveCount(1);
+    await expect(nightlyLane.getByRole('link')).toHaveCount(1);
+  } else {
+    await expect(desktop.getByRole('heading', { name: 'No build is available right now' })).toBeVisible();
+    await expect(desktop.locator('[data-release-lane]')).toHaveCount(0);
+  }
   const downloadsText = await desktop.locator('body').innerText();
   if (!promotedPlatforms.includes('linux') && downloadsText.includes('Windows and Linux installers.')) {
     failures.push('downloads: claims Linux installers while the release manifest does not promote Linux');
@@ -83,15 +95,22 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       failures.push(`downloads: contains retired copy "${forbidden}"`);
     }
   }
-  results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true, promoted_platforms: promotedPlatforms });
+  results.push({
+    surface: 'downloads',
+    stable_visible: publicInstallerAvailable,
+    nightly_visible: publicInstallerAvailable,
+    public_install_count: Number.isFinite(publicInstallCount) ? publicInstallCount : null,
+    promoted_platforms: promotedPlatforms,
+  });
 
   await desktop.goto(`${baseUrl}/status`, { waitUntil: 'domcontentloaded' });
   await expect(desktop).toHaveURL(/\/status(?:[?#].*)?$/);
   await expect(desktop.getByRole('heading', { name: /Preview downloads|Stable downloads|Downloads paused/ })).toBeVisible();
   await expect(desktop.locator('body')).toContainText('Now');
   await expect(desktop.locator('body')).toContainText(/downloads are live|download is live|Downloads are paused|No public installer right now/);
-  await expect(desktop.getByRole('link', { name: 'Downloads' })).toBeVisible();
-  await expect(desktop.getByRole('link', { name: 'Help' })).toBeVisible();
+  const statusActions = desktop.getByLabel('Status next actions');
+  await expect(statusActions.getByRole('link', { name: 'Downloads' })).toBeVisible();
+  await expect(statusActions.getByRole('link', { name: 'Help' })).toBeVisible();
   const statusText = await desktop.locator('body').innerText();
   for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance', 'Release and next step.', 'Current caution.', 'Platforms', 'Nightly', 'Build from source']) {
     if (statusText.includes(forbidden)) {

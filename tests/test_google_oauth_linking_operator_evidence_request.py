@@ -160,6 +160,47 @@ def test_request_nonce_and_raw_bytes_are_stable_only_for_exact_release_and_progr
     assert third["request_binding_sha256"] != second["request_binding_sha256"]
 
 
+def test_explicit_live_release_refresh_rebinds_capture_timestamp(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    _draft_root, _incoming_root, template = configure_temp_roots(module, monkeypatch, tmp_path)
+    portal = tmp_path / "portal-release.json"
+    hub = tmp_path / "hub-release.json"
+    live = tmp_path / "live-release.json"
+    for path in (portal, hub):
+        write_release(path, version="run-20260713-123603", published_at="2026-07-13T12:38:14Z")
+    output = tmp_path / "GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json"
+    evidence = tmp_path / "GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json"
+    captured_at = "2026-07-30T03:30:00Z"
+
+    def fake_capture(base_url: str, output_path: Path) -> str:
+        assert base_url == module.DEFAULT_BASE_URL
+        write_release(
+            output_path,
+            version="run-20260713-123603",
+            published_at="2026-07-13T12:38:14Z",
+        )
+        return captured_at
+
+    monkeypatch.setattr(module, "capture_live_release_manifest", fake_capture)
+    payload = module.materialize(
+        output,
+        evidence_path=evidence,
+        template_path=template,
+        screenshot_root=tmp_path / "screens",
+        release_channel_path=portal,
+        hub_release_channel_path=hub,
+        live_release_manifest_path=live,
+        refresh_live_release_manifest=True,
+    )
+
+    assert payload["release"]["live"]["captured_at_utc"] == captured_at
+    assert payload["release"]["ready"] is True
+    assert live.is_file()
+
+
 def test_build_request_rebinds_operator_ask_paths_to_patched_draft_root(
     tmp_path: Path,
     monkeypatch,

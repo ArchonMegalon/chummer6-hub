@@ -155,15 +155,36 @@ class FakeSession:
 
 class PassingStaticVerifier:
     @staticmethod
-    def verify_live(base_url: str, timeout: float):
-        return {"status": "pass", "failures": [], "baseUrl": base_url, "timeout": timeout}
+    def verify_live(
+        base_url: str,
+        timeout: float,
+        expected_full_deployment_digest_sha256: str,
+        expected_asset_inventory_sha256: str,
+    ):
+        return {
+            "status": "pass",
+            "failures": [],
+            "baseUrl": base_url,
+            "timeout": timeout,
+            "expectedFullDeploymentDigestSha256": expected_full_deployment_digest_sha256,
+            "expectedAssetInventorySha256": expected_asset_inventory_sha256,
+        }
+
+
+def live_projection(module, session):
+    return module.live_projection(
+        "https://example.test",
+        session=session,
+        expected_full_deployment_digest_sha256="ab" * 32,
+        expected_asset_inventory_sha256="cd" * 32,
+    )
 
 
 def test_live_contract_accepts_truthful_readiness_and_role_specific_install_shells(monkeypatch) -> None:
     module = load_module()
     monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
 
-    payload = module.live_projection("https://example.test", session=FakeSession())
+    payload = live_projection(module, FakeSession())
 
     assert payload["status"] == "pass", payload["failures"]
     assert payload["readiness"]["payload"]["ready"] is True
@@ -188,9 +209,9 @@ def test_live_contract_rejects_readiness_body_status_contradiction(monkeypatch) 
     module = load_module()
     monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
 
-    payload = module.live_projection(
-        "https://example.test",
-        session=FakeSession(readiness_status=503, readiness_ready=True),
+    payload = live_projection(
+        module,
+        FakeSession(readiness_status=503, readiness_ready=True),
     )
 
     assert payload["status"] == "fail"
@@ -224,9 +245,9 @@ def test_live_contract_rejects_missing_failed_or_incomplete_hub_truth(monkeypatc
         ({"ready": True, "status": "pass"}, "not_ready", "bodyStatus"),
     )
     for hub_payload, top_status, failed_check in cases:
-        payload = module.live_projection(
-            "https://example.test",
-            session=InvalidHubSession(hub_payload, top_status=top_status),
+        payload = live_projection(
+            module,
+            InvalidHubSession(hub_payload, top_status=top_status),
         )
         assert payload["status"] == "fail"
         assert payload["readiness"]["checks"][failed_check] is False
@@ -248,10 +269,7 @@ def test_live_contract_rejects_unbound_deployment_identity(monkeypatch) -> None:
                 }
             return response
 
-    payload = module.live_projection(
-        "https://example.test",
-        session=UnboundIdentitySession(),
-    )
+    payload = live_projection(module, UnboundIdentitySession())
 
     assert payload["status"] == "fail"
     assert payload["readiness"]["checks"]["deploymentIdentityReady"] is False
@@ -273,7 +291,7 @@ def test_live_contract_rejects_generic_or_noncanonical_role_shell(monkeypatch) -
             response.history = []
             return response
 
-    payload = module.live_projection("https://example.test", session=GenericShellSession())
+    payload = live_projection(module, GenericShellSession())
 
     assert payload["status"] == "fail"
     assert "gm (/play?role=gm): capability failed" in payload["failures"]
@@ -296,7 +314,7 @@ def test_live_contract_rejects_multi_hop_or_secret_bearing_redirect_history(monk
             ]
             return response
 
-    payload = module.live_projection("https://example.test", session=LeakyHistorySession())
+    payload = live_projection(module, LeakyHistorySession())
 
     assert payload["status"] == "fail"
     assert "gm_secret_extra (/play?role=gm&secret=must-not-survive&extra=1): exactlyOneRedirect failed" in payload["failures"]

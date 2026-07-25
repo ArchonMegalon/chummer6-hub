@@ -1,4 +1,4 @@
-const { chromium } = require('/work/node_modules/playwright');
+const { chromium } = require('../node_modules/playwright');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,7 +19,7 @@ function loadEnv(file) {
 
 async function main() {
   loadEnv('/docker/chummercomplete/chummer.run-services/.env');
-  const outDir = '/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/probe';
+  const outDir = process.env.MAGICFIT_PROBE_OUT_DIR || '/tmp/chummer-magicfit-probe';
   fs.mkdirSync(outDir, { recursive: true });
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
@@ -54,9 +54,11 @@ async function main() {
   const links = await page.locator('a').evaluateAll((nodes) => nodes.map((a) => ({ text: (a.innerText || a.textContent || '').trim(), href: a.href })).slice(0, 100)).catch(() => []);
   const buttons = await page.locator('button').evaluateAll((nodes) => nodes.map((b) => (b.innerText || b.textContent || '').trim()).filter(Boolean).slice(0, 100)).catch(() => []);
   const inputs = await page.locator('input, textarea, [contenteditable=true]').evaluateAll((nodes) => nodes.map((n) => ({ tag: n.tagName, type: n.getAttribute('type') || '', placeholder: n.getAttribute('placeholder') || '', text: (n.innerText || n.textContent || '').slice(0, 100) })).slice(0, 100)).catch(() => []);
+  const cookieNames = (await context.cookies()).map((row) => ({ name: row.name, domain: row.domain, secure: row.secure, httpOnly: row.httpOnly }));
+  const localStorageKeys = await page.evaluate(() => Object.keys(localStorage)).catch(() => []);
   const html = await page.content().catch(() => '');
   fs.writeFileSync(path.join(outDir, 'generate-video.html'), html);
-  fs.writeFileSync(path.join(outDir, 'probe.json'), JSON.stringify({ url: page.url(), title: await page.title(), body: (await page.locator('body').innerText().catch(() => '')).slice(0, 9000), links, buttons, inputs, events: events.slice(-160) }, null, 2));
+  fs.writeFileSync(path.join(outDir, 'probe.json'), JSON.stringify({ url: page.url(), title: await page.title(), body: (await page.locator('body').innerText().catch(() => '')).slice(0, 9000), links, buttons, inputs, cookieNames, localStorageKeys, events: events.slice(-160) }, null, 2));
   await browser.close();
   console.log(path.join(outDir, 'probe.json'));
 }

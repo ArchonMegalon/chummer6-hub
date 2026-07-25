@@ -3,11 +3,13 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_flagship_product_readiness_gate.py"
+REPO_ROOT = SCRIPT_PATH.parents[1]
 
 
 def load_module():
@@ -102,7 +104,10 @@ def hosted_build_operator_decisions_payload(*, review_required: bool) -> dict[st
     return {
         "contractName": "chummer.hosted_build_v002_operator_decision_gate",
         "contractVersion": 1,
-        "generatedAtUtc": "2026-07-15T10:00:00Z",
+        "generatedAtUtc": datetime.now(UTC)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "status": "review_required" if review_required else "pass",
         "reviewRequired": review_required,
         "decisionGatePassed": not review_required,
@@ -192,13 +197,395 @@ def write_fresh_root_release_blockers(path: Path) -> None:
     )
 
 
-def test_summary_accepts_green_whole_product_readiness() -> None:
+def current_campaign_os_csc(dotnet_path: Path) -> Path:
+    completed = subprocess.run(
+        [str(dotnet_path), "--version"],
+        cwd=REPO_ROOT,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
+    version = completed.stdout.strip()
+    csc_path = (
+        dotnet_path.resolve(strict=True).parent
+        / "sdk"
+        / version
+        / "Roslyn"
+        / "bincore"
+        / "csc.dll"
+    )
+    assert csc_path.is_file()
+    return csc_path
+
+
+def campaign_os_v3_payload(contract, *, observed_at: datetime) -> dict[str, object]:  # noqa: ANN001
+    started = observed_at.replace(microsecond=0)
+    completed = started + timedelta(seconds=1)
+    run_id = "3f1f5b8e-6f8a-4f5e-8f16-65d4a917c9a2"
+    checkpoints = [
+        {
+            "checkpoint_id": contract.CHECKPOINT_IDS[journey_id],
+            "run_id": run_id,
+            "status": "passed",
+        }
+        for journey_id in contract.JOURNEY_IDS
+    ]
+    runtime_entries = [{"path": path} for path in contract.MANIFEST_PATHS]
+    return {
+        "contract_name": contract.CONTRACT_NAME,
+        "contract_version": contract.CONTRACT_VERSION,
+        "status": "passed",
+        "proof_kind": contract.PROOF_KIND,
+        "run_id": run_id,
+        "started_at": contract.format_utc(started),
+        "completed_at": contract.format_utc(completed),
+        "generated_at": contract.format_utc(completed),
+        "expires_at": contract.format_utc(completed + contract.RECEIPT_LIFETIME),
+        "invocation": {
+            "id": contract.INVOCATION_ID,
+            "owner": contract.INVOCATION_OWNER,
+            "dependency_mode": contract.DEPENDENCY_MODE,
+            "prepare_exit_code": 0,
+            "runner_exit_code": 0,
+        },
+        "inputs": {
+            "dotnet_host": {"path": str(contract.DOTNET_HOST_PATH)},
+            "csc": {"path": str(current_campaign_os_csc(contract.DOTNET_HOST_PATH))},
+        },
+        "execution": {
+            "phase": "verified",
+            "failure_reason": None,
+            "runtime_checkpoints": checkpoints,
+            "runtime_manifest_before": {"entries": runtime_entries},
+            "closure_stable": True,
+        },
+        "journeys": [{"journey_id": journey_id} for journey_id in contract.JOURNEY_IDS],
+        "summary": {"journey_count": len(contract.JOURNEY_IDS)},
+    }
+
+
+def install_campaign_os_v3_validator_double(module, monkeypatch):  # noqa: ANN001
+    """Exercise consumer binding without minting or copying a production proof."""
+
+    contract = module.load_campaign_os_local_proof_contract()
+
+    def validate_passed_receipt(_root, path, **_kwargs):  # noqa: ANN001
+        try:
+            raw = contract._read_regular_bytes(
+                path,
+                max_bytes=contract.MAX_RECEIPT_BYTES,
+                reason_prefix="receipt",
+            )
+        except contract.ProofContractError as exc:
+            reason = (
+                "receipt_output_symlink"
+                if exc.reason_code == "receipt_symlink"
+                else exc.reason_code
+            )
+            return contract.ValidationResult(False, reason)
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return contract.ValidationResult(False, "receipt_invalid_json")
+        if not isinstance(payload, dict):
+            return contract.ValidationResult(False, "receipt_invalid_shape")
+        if payload.get("contract_version") != contract.CONTRACT_VERSION:
+            return contract.ValidationResult(False, "contract_version_mismatch")
+        try:
+            expires_at = contract.parse_utc(payload.get("expires_at"))
+        except contract.ProofContractError as exc:
+            return contract.ValidationResult(False, exc.reason_code)
+        if contract.utc_now() > expires_at:
+            return contract.ValidationResult(False, "receipt_expired")
+        return contract.ValidationResult(True, "valid", payload)
+
+    monkeypatch.setattr(contract, "validate_passed_receipt", validate_passed_receipt)
+    monkeypatch.setattr(module, "load_campaign_os_local_proof_contract", lambda: contract)
+    return contract
+
+
+def write_valid_campaign_os_local_proof(
+    module,
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    observed_at: datetime | None = None,
+) -> tuple[dict[str, object], Path]:
+    contract = install_campaign_os_v3_validator_double(module, monkeypatch)
+    receipt_path = tmp_path / "campaign-os-fixture" / contract.DEFAULT_RECEIPT_PATH
+    receipt_path.parent.mkdir(parents=True)
+    started = (observed_at or datetime.now(UTC)).replace(microsecond=0)
+    proof = campaign_os_v3_payload(contract, observed_at=started)
+    receipt_path.write_text(
+        json.dumps(proof, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        module,
+        "CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE",
+        REPO_ROOT / contract.CONTRACT_MODULE_PATH,
+    )
+    monkeypatch.setattr(module, "DEFAULT_CAMPAIGN_OS_LOCAL_PROOF", receipt_path)
+    return proof, receipt_path
+
+
+def install_valid_campaign_os_local_proof_default(
+    module,
+    tmp_path: Path,
+    monkeypatch,
+) -> Path:
+    _proof, proof_path = write_valid_campaign_os_local_proof(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
+    return proof_path
+
+
+def summarize_with_valid_campaign(
+    module,  # noqa: ANN001
+    payload: dict[str, object],
+    **kwargs,
+) -> dict[str, object]:
+    """Keep non-Campaign unit cases focused while satisfying the required proof seam."""
+
+    if "campaign_os_local_proof_path" in kwargs:
+        return module.summarize(payload, **kwargs)
+    original = module.evaluate_campaign_os_local_proof
+    module.evaluate_campaign_os_local_proof = lambda _path: {
+        "path": "/test/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+        "load_status": "loaded",
+        "contract_name": "chummer6-hub.campaign_os_local_proof",
+        "contract_version": 3,
+        "status": "passed",
+        "proof_kind": "materializer_owned_executed_smoke_receipt",
+        "run_id": "3f1f5b8e-6f8a-4f5e-8f16-65d4a917c9a2",
+        "dependency_mode": "restore_free_with_locally_closed_package_inputs",
+        "generated_at": "2026-07-17T12:00:00Z",
+        "expires_at": "2026-07-18T12:00:00Z",
+        "journey_count": 6,
+        "receipt_identity": {
+            "path": "/test/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+            "sha256": "a" * 64,
+            "size_bytes": 1,
+        },
+        "validator_identity": {
+            "path": "/test/campaign_os_local_proof_v3.py",
+            "sha256": "b" * 64,
+            "size_bytes": 1,
+        },
+        "reason_code": "valid",
+        "blockers": [],
+        "pass": True,
+    }
+    try:
+        return module.summarize(
+            payload,
+            campaign_os_local_proof_path=Path(
+                "/test/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            ),
+            **kwargs,
+        )
+    finally:
+        module.evaluate_campaign_os_local_proof = original
+
+
+def test_summary_without_campaign_proof_fails_closed() -> None:
     module = load_module()
 
     summary = module.summarize(passing_payload())
 
-    assert summary["pass"] is True
+    expected_blocker = (
+        f"{module.CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX} (not_evaluated)."
+    )
+    assert summary["pass"] is False
     assert summary["contract_name"] == "fleet.flagship_product_readiness"
+    assert summary["campaign_os_local_proof"]["load_status"] == "not_evaluated"
+    assert summary["campaign_os_local_proof"]["pass"] is False
+    assert summary["campaign_os_local_proof"]["dependency_mode"] is None
+    assert summary["campaign_os_local_proof"]["receipt_identity"] is None
+    assert summary["campaign_os_local_proof"]["validator_identity"] is None
+    assert summary["campaign_os_local_proof"]["blockers"] == [expected_blocker]
+    assert summary["launch_critical_nested_blockers"] == [expected_blocker]
+
+
+def test_campaign_os_v3_executed_proof_is_structured_launch_evidence(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    proof, proof_path = write_valid_campaign_os_local_proof(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
+
+    summary = summarize_with_valid_campaign(module,
+        passing_payload(),
+        campaign_os_local_proof_path=proof_path,
+    )
+
+    evidence = summary["campaign_os_local_proof"]
+    assert summary["pass"] is True
+    assert evidence["pass"] is True
+    assert evidence["reason_code"] == "valid"
+    assert evidence["contract_name"] == "chummer6-hub.campaign_os_local_proof"
+    assert evidence["contract_version"] == 3
+    assert evidence["proof_kind"] == "materializer_owned_executed_smoke_receipt"
+    assert evidence["run_id"] == proof["run_id"]
+    assert evidence["dependency_mode"] == (
+        "restore_free_with_locally_closed_package_inputs"
+    )
+    assert evidence["journey_count"] == 6
+    assert proof["invocation"]["owner"] == "campaign_os_local_proof_materializer"
+    assert proof["invocation"]["dependency_mode"] == evidence["dependency_mode"]
+    assert proof["execution"]["phase"] == "verified"
+    assert proof["execution"]["closure_stable"] is True
+    contract = module.load_campaign_os_local_proof_contract()
+    assert contract.CONTRACT_VERSION == 3
+    assert contract.CONTRACT_MODULE_PATH == "scripts/campaign_os_local_proof_v3.py"
+    assert [
+        checkpoint["checkpoint_id"]
+        for checkpoint in proof["execution"]["runtime_checkpoints"]
+    ] == [contract.CHECKPOINT_IDS[journey_id] for journey_id in contract.JOURNEY_IDS]
+    assert proof["inputs"]["dotnet_host"]["path"] == "/usr/bin/dotnet"
+    assert proof["inputs"]["csc"]["path"] == str(
+        current_campaign_os_csc(Path("/usr/bin/dotnet"))
+    )
+    assert len(contract.RUNTIME_CLOSURE_PATHS) == 16
+    assert "Chummer.World.Contracts.dll" in contract.RUNTIME_CLOSURE_PATHS
+    assert tuple(
+        entry["path"]
+        for entry in proof["execution"]["runtime_manifest_before"]["entries"]
+    ) == contract.MANIFEST_PATHS
+    assert evidence["receipt_identity"] == {
+        "path": str(proof_path.resolve()),
+        "sha256": hashlib.sha256(proof_path.read_bytes()).hexdigest(),
+        "size_bytes": proof_path.stat().st_size,
+    }
+    validator_path = module.CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE.resolve()
+    assert evidence["validator_identity"] == {
+        "path": str(validator_path),
+        "sha256": hashlib.sha256(validator_path.read_bytes()).hexdigest(),
+        "size_bytes": validator_path.stat().st_size,
+    }
+    assert evidence["blockers"] == []
+
+
+def test_campaign_os_receipt_identity_tracks_exact_validated_bytes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    _proof, proof_path = write_valid_campaign_os_local_proof(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
+
+    first = module.evaluate_campaign_os_local_proof(proof_path)
+    proof_path.write_bytes(proof_path.read_bytes() + b" ")
+    second = module.evaluate_campaign_os_local_proof(proof_path)
+
+    assert first["pass"] is True
+    assert second["pass"] is True
+    assert first["receipt_identity"] != second["receipt_identity"]
+    assert first["receipt_identity"]["sha256"] != second["receipt_identity"]["sha256"]
+    assert first["receipt_identity"]["size_bytes"] + 1 == second[
+        "receipt_identity"
+    ]["size_bytes"]
+    assert first["validator_identity"] == second["validator_identity"]
+
+
+def test_campaign_os_missing_legacy_malformed_and_stale_proofs_fail_closed(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    stale_time = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=25)
+    _proof, stale = write_valid_campaign_os_local_proof(
+        module,
+        tmp_path,
+        monkeypatch,
+        observed_at=stale_time,
+    )
+    stale_bytes = stale.read_bytes()
+    legacy_bytes = (
+        json.dumps(
+            {
+                "contract_name": "chummer6-hub.campaign_os_local_proof",
+                "contract_version": 1,
+                "status": "passed",
+            }
+        )
+        + "\n"
+    ).encode("utf-8")
+
+    for receipt_bytes, expected_reason in (
+        (None, "receipt_missing"),
+        (legacy_bytes, "contract_version_mismatch"),
+        (b"{not json}\n", "receipt_invalid_json"),
+        (stale_bytes, "receipt_expired"),
+    ):
+        stale.unlink(missing_ok=True)
+        if receipt_bytes is not None:
+            stale.write_bytes(receipt_bytes)
+        summary = summarize_with_valid_campaign(module,
+            passing_payload(),
+            campaign_os_local_proof_path=stale,
+        )
+        evidence = summary["campaign_os_local_proof"]
+        expected_blocker = (
+            f"{module.CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX} ({expected_reason})."
+        )
+        assert summary["pass"] is False
+        assert evidence["pass"] is False
+        assert evidence["reason_code"] == expected_reason
+        assert evidence["blockers"] == [expected_blocker]
+        assert summary["launch_critical_nested_blockers"] == [expected_blocker]
+        assert evidence["validator_identity"] is not None
+        if receipt_bytes is None:
+            assert evidence["receipt_identity"] is None
+        else:
+            assert evidence["receipt_identity"] == {
+                "path": str(stale.resolve()),
+                "sha256": hashlib.sha256(stale.read_bytes()).hexdigest(),
+                "size_bytes": stale.stat().st_size,
+            }
+
+
+def test_campaign_os_symlink_and_oversized_receipts_have_no_byte_authority(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    _proof, receipt_path = write_valid_campaign_os_local_proof(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
+    symlink_target = tmp_path / "campaign-os-symlink-target.json"
+    symlink_target.write_bytes(receipt_path.read_bytes())
+    receipt_path.unlink()
+    receipt_path.symlink_to(symlink_target)
+    contract = module.load_campaign_os_local_proof_contract()
+    symlink_evidence = module.evaluate_campaign_os_local_proof(receipt_path)
+    assert symlink_evidence["pass"] is False
+    assert symlink_evidence["load_status"] == "invalid"
+    assert symlink_evidence["reason_code"] == "receipt_output_symlink"
+    assert symlink_evidence["receipt_identity"] is None
+    assert symlink_evidence["validator_identity"] is not None
+
+    receipt_path.unlink()
+    receipt_path.write_bytes(b"x" * (contract.MAX_RECEIPT_BYTES + 1))
+    oversized_evidence = module.evaluate_campaign_os_local_proof(receipt_path)
+    assert oversized_evidence["pass"] is False
+    assert oversized_evidence["load_status"] == "invalid"
+    assert oversized_evidence["reason_code"] == "receipt_too_large"
+    assert oversized_evidence["receipt_identity"] is None
+    assert oversized_evidence["validator_identity"] is not None
 
 
 def test_privacy_review_blocks_flagship_readiness_with_explicit_reason(tmp_path) -> None:
@@ -206,7 +593,7 @@ def test_privacy_review_blocks_flagship_readiness_with_explicit_reason(tmp_path)
     gate_path = tmp_path / "privacy-launch-gate.json"
     gate = privacy_launch_gate_payload(review_required=True)
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         privacy_launch_gate_payload=gate,
         privacy_launch_gate_load_status="loaded",
@@ -223,7 +610,7 @@ def test_clear_privacy_contract_does_not_block_flagship_readiness(tmp_path) -> N
     module = load_module()
     gate_path = tmp_path / "privacy-launch-gate.json"
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         privacy_launch_gate_payload=privacy_launch_gate_payload(review_required=False),
         privacy_launch_gate_load_status="loaded",
@@ -247,7 +634,7 @@ def test_missing_malformed_or_wrong_version_privacy_contract_fails_closed(tmp_pa
     ]
 
     for gate, load_status, expected in scenarios:
-        summary = module.summarize(
+        summary = summarize_with_valid_campaign(module,
             passing_payload(),
             privacy_launch_gate_payload=gate,
             privacy_launch_gate_load_status=load_status,
@@ -262,7 +649,7 @@ def test_unresolved_hosted_build_decisions_block_with_structured_ids(tmp_path) -
     gate_path = tmp_path / "hosted-build-decisions.json"
     gate = hosted_build_operator_decisions_payload(review_required=True)
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         privacy_launch_gate_payload=privacy_launch_gate_payload(review_required=False),
         privacy_launch_gate_load_status="loaded",
@@ -280,10 +667,22 @@ def test_unresolved_hosted_build_decisions_block_with_structured_ids(tmp_path) -
     assert structured["validation_failures"] == []
 
 
-def test_repository_hosted_build_decision_receipt_is_review_required() -> None:
+def test_repository_hosted_build_decision_receipt_is_review_required(monkeypatch) -> None:
     module = load_module()
     receipt_path = module.DEFAULT_HOSTED_BUILD_OPERATOR_DECISIONS
     receipt, load_status = module.load_json(receipt_path)
+    generated_at = datetime.strptime(
+        str(receipt["generatedAtUtc"]),
+        "%Y-%m-%dT%H:%M:%SZ",
+    ).replace(tzinfo=UTC)
+
+    class ReceiptObservationClock(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN001, ANN206
+            observed = generated_at + timedelta(hours=1)
+            return observed if tz is not None else observed.replace(tzinfo=None)
+
+    monkeypatch.setattr(module, "datetime", ReceiptObservationClock)
 
     evaluated = module.evaluate_hosted_build_operator_decisions(
         receipt,
@@ -372,7 +771,7 @@ def test_clear_decision_gate_does_not_clear_review_required_privacy_gate(tmp_pat
     module = load_module()
     privacy = privacy_launch_gate_payload(review_required=True)
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         privacy_launch_gate_payload=privacy,
         privacy_launch_gate_load_status="loaded",
@@ -398,7 +797,7 @@ def test_clear_decision_gate_does_not_clear_review_required_privacy_gate(tmp_pat
 def test_clear_privacy_and_decision_freeze_still_require_implementation_gate(tmp_path) -> None:
     module = load_module()
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         privacy_launch_gate_payload=privacy_launch_gate_payload(review_required=False),
         privacy_launch_gate_load_status="loaded",
@@ -430,7 +829,7 @@ def test_missing_malformed_or_wrong_decision_receipt_fails_closed(tmp_path) -> N
     ]
 
     for gate, load_status, expected_failure in scenarios:
-        summary = module.summarize(
+        summary = summarize_with_valid_campaign(module,
             passing_payload(),
             privacy_launch_gate_payload=privacy_launch_gate_payload(review_required=False),
             privacy_launch_gate_load_status="loaded",
@@ -465,7 +864,7 @@ def test_summary_rejects_missing_desktop_client_gap() -> None:
         "warning_count": 0,
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["coverage_gap_keys"] == ["desktop_client"]
@@ -531,7 +930,7 @@ def test_summary_subsumes_desktop_client_gap_when_only_windows_external_proof_is
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["coverage_gap_keys"] == []
@@ -601,7 +1000,7 @@ def test_summary_subsumes_desktop_client_gap_when_only_release_posture_blockers_
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["coverage_gap_keys"] == []
@@ -674,7 +1073,7 @@ def test_failed_independent_audits_are_not_recoverable_as_wrapper_only(
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["coverage_gap_keys"] == []
@@ -787,7 +1186,7 @@ def test_summary_keeps_desktop_client_gap_when_release_channel_freshness_lacks_w
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["coverage_gap_keys"] == ["desktop_client"]
     assert summary["scoped_coverage_gap_keys"] == ["desktop_client"]
@@ -810,7 +1209,7 @@ def test_summary_rejects_launch_critical_nested_failures() -> None:
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blocker_count"] == 5
@@ -843,7 +1242,7 @@ def test_summary_ignores_recovered_supervisor_staleness() -> None:
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blocker_count"] == 3
@@ -865,7 +1264,7 @@ def test_fail_closed_readiness_payload_overrides_pass_shaped_nested_blockers() -
             },
         },
     }
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     updated, changed = module.fail_closed_readiness_payload(payload, summary, "2026-07-02T08:10:00Z")
 
@@ -922,7 +1321,7 @@ def test_summary_replaces_release_wrapper_blockers_with_concrete_release_ready_f
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1034,7 +1433,7 @@ def test_summary_prefers_current_release_truth_receipts_over_stale_release_ready
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1089,7 +1488,7 @@ def test_summary_rejects_pass_shaped_release_ready_wrapper_with_unexpected_verdi
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1188,7 +1587,7 @@ def test_summary_recovers_google_signed_in_only_failures_when_operator_evidence_
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is True
     assert summary["launch_critical_nested_blockers"] == []
@@ -1286,7 +1685,7 @@ def test_summary_recovers_google_signed_in_only_failures_when_effective_request_
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is True
     assert summary["launch_critical_nested_blockers"] == []
@@ -1376,7 +1775,7 @@ def test_summary_recovers_user_paused_google_sign_in_automation_when_request_is_
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is True
     assert summary["launch_critical_nested_blockers"] == []
@@ -1455,7 +1854,7 @@ def test_summary_rejects_pass_shaped_google_oauth_receipt_with_failures(
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1525,7 +1924,7 @@ def test_summary_rejects_pass_shaped_windows_visual_audit_receipt_with_failures(
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1600,7 +1999,7 @@ def test_summary_rejects_pass_shaped_windows_visual_audit_receipt_with_nested_di
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1682,7 +2081,7 @@ def test_summary_merges_current_windows_audit_with_release_ready_bundle_gap_deta
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1768,7 +2167,7 @@ def test_summary_merges_current_windows_audit_with_pass_shaped_release_ready_bun
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -1840,7 +2239,7 @@ def test_summary_recomputes_current_portal_registry_identity_instead_of_echoing_
             "evidence": {"final_gold_janitor_path": "/tmp/final-gold.json"}
         }
     }
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         payload,
         readiness_path=tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
@@ -1850,6 +2249,42 @@ def test_summary_recomputes_current_portal_registry_identity_instead_of_echoing_
         blocker.startswith(module.WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX)
         for blocker in summary["launch_critical_nested_blockers"]
     )
+
+
+def test_workspace_portal_release_channel_drift_uses_active_atomic_generation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    shelf_root = tmp_path / "downloads"
+    generation_root = shelf_root / "generations" / "g-current"
+    generation_root.mkdir(parents=True)
+    portal_path = shelf_root / "RELEASE_CHANNEL.generated.json"
+    authoritative = {
+        "status": "published",
+        "channel": "preview",
+        "version": "run-current",
+        "supportabilityState": "review_required",
+        "rolloutState": "coverage_incomplete",
+    }
+    portal_path.write_text(
+        json.dumps({**authoritative, "version": "run-stale-legacy"}),
+        encoding="utf-8",
+    )
+    (generation_root / portal_path.name).write_text(
+        json.dumps(authoritative),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        module,
+        "resolve_shelf_root",
+        lambda _root: ("generation", generation_root, {"generationId": "g-current"}),
+    )
+
+    assert module.workspace_portal_release_channel_drift_failures(
+        authoritative,
+        portal_path,
+    ) == []
 
 
 def test_summary_reports_current_portal_registry_identity_mismatch(
@@ -1915,7 +2350,7 @@ def test_summary_reports_current_portal_registry_identity_mismatch(
             "evidence": {"final_gold_janitor_path": "/tmp/final-gold.json"}
         }
     }
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         payload,
         readiness_path=tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
@@ -1998,7 +2433,7 @@ def test_concrete_summary_adds_stale_root_release_truth_as_launch_blocker(
     )
     monkeypatch.setattr(module, "DEFAULT_RELEASE_BLOCKERS", blockers)
 
-    summary = module.summarize(
+    summary = summarize_with_valid_campaign(module,
         passing_payload(),
         readiness_path=tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
@@ -2089,7 +2524,7 @@ def test_summary_surfaces_root_blocker_context_and_stable_promotion_commands(
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["root_blocker_ids"] == [
         "release_posture:non_flagship_channel",
@@ -2111,6 +2546,7 @@ def test_summary_surfaces_root_blocker_context_and_stable_promotion_commands(
 
 def test_main_skip_materialize_fails_closed_and_writes_summary(tmp_path, monkeypatch) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
     summary_path = tmp_path / "summary.json"
     payload = passing_payload()
@@ -2153,6 +2589,7 @@ def test_main_skip_materialize_fails_closed_and_writes_summary(tmp_path, monkeyp
 
 def test_main_skip_materialize_reports_missing_readiness_receipt_structurally(tmp_path, monkeypatch) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
     summary_path = tmp_path / "summary.json"
     monkeypatch.setattr(
@@ -2180,6 +2617,7 @@ def test_main_skip_materialize_reports_missing_readiness_receipt_structurally(tm
 
 def test_main_skip_materialize_reports_malformed_readiness_receipt_structurally(tmp_path, monkeypatch) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
     summary_path = tmp_path / "summary.json"
     readiness.write_text("{not json}\n", encoding="utf-8")
@@ -2208,6 +2646,7 @@ def test_main_skip_materialize_reports_malformed_readiness_receipt_structurally(
 
 def test_main_rewrites_pass_shaped_readiness_when_nested_blockers_remain(tmp_path, monkeypatch) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
     summary_path = tmp_path / "summary.json"
     payload = passing_payload()
@@ -2250,6 +2689,7 @@ def test_main_rewrites_pass_shaped_readiness_when_nested_blockers_remain(tmp_pat
 
 def test_main_allows_recoverable_wrapper_blockers_when_requested(tmp_path, monkeypatch) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     root_blockers = tmp_path / "RELEASE_BLOCKERS.generated.json"
     write_fresh_root_release_blockers(root_blockers)
     monkeypatch.setattr(module, "DEFAULT_RELEASE_BLOCKERS", root_blockers)
@@ -2310,6 +2750,7 @@ def test_main_never_waives_failed_independent_audits_even_when_wrapper_waiver_is
     monkeypatch,
 ) -> None:
     module = load_module()
+    install_valid_campaign_os_local_proof_default(module, tmp_path, monkeypatch)
     root_blockers = tmp_path / "RELEASE_BLOCKERS.generated.json"
     write_fresh_root_release_blockers(root_blockers)
     monkeypatch.setattr(module, "DEFAULT_RELEASE_BLOCKERS", root_blockers)
@@ -2415,7 +2856,7 @@ def test_summary_surfaces_malformed_google_oauth_linking_proof_receipt(tmp_path,
         },
     }
 
-    summary = module.summarize(payload)
+    summary = summarize_with_valid_campaign(module, payload)
 
     assert summary["pass"] is False
     assert summary["launch_critical_nested_blockers"] == [
@@ -2426,8 +2867,80 @@ def test_summary_surfaces_malformed_google_oauth_linking_proof_receipt(tmp_path,
     )
 
 
+def test_main_propagates_missing_campaign_os_proof_to_gate_output(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    missing_proof = install_valid_campaign_os_local_proof_default(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
+    missing_proof.unlink()
+    root_blockers = tmp_path / "RELEASE_BLOCKERS.generated.json"
+    write_fresh_root_release_blockers(root_blockers)
+    monkeypatch.setattr(module, "DEFAULT_RELEASE_BLOCKERS", root_blockers)
+    readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+    summary_path = tmp_path / "summary.json"
+    privacy_gate_path = tmp_path / "privacy-launch-gate.json"
+    hosted_build_decisions_path = tmp_path / "hosted-build-decisions.json"
+    write_clear_privacy_launch_gate(privacy_gate_path)
+    write_clear_hosted_build_operator_decisions(hosted_build_decisions_path)
+    monkeypatch.setattr(
+        module,
+        "evaluate_hosted_build_operator_decisions",
+        lambda *args, **kwargs: {
+            "decision_gate_passed": True,
+            "blockers": [],
+            "pass": True,
+        },
+    )
+    readiness.write_text(json.dumps(passing_payload()), encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "verify_flagship_product_readiness_gate.py",
+            "--skip-materialize",
+            "--readiness",
+            str(readiness),
+            "--privacy-launch-gate",
+            str(privacy_gate_path),
+            "--hosted-build-v002-decisions",
+            str(hosted_build_decisions_path),
+            "--campaign-os-local-proof",
+            str(missing_proof),
+            "--summary-output",
+            str(summary_path),
+        ],
+    )
+
+    assert module.main() == 1
+    written = json.loads(summary_path.read_text(encoding="utf-8"))
+    expected_blocker = (
+        f"{module.CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX} (receipt_missing)."
+    )
+    assert written["pass"] is False
+    assert written["readiness_receipt_fail_closed"] is True
+    assert written["launch_critical_nested_blockers"] == [expected_blocker]
+    assert written["campaign_os_local_proof"]["path"] == str(missing_proof)
+    assert written["campaign_os_local_proof"]["load_status"] == "missing"
+    assert written["campaign_os_local_proof"]["reason_code"] == "receipt_missing"
+    assert written["campaign_os_local_proof"]["pass"] is False
+    assert written["campaign_os_local_proof"]["receipt_identity"] is None
+    assert written["campaign_os_local_proof"]["validator_identity"] is not None
+    assert written["summary"]["campaign_os_local_proof"] == written[
+        "campaign_os_local_proof"
+    ]
+
+
 def test_main_writes_default_published_summary_output(tmp_path, monkeypatch) -> None:
     module = load_module()
+    campaign_os_local_proof = install_valid_campaign_os_local_proof_default(
+        module,
+        tmp_path,
+        monkeypatch,
+    )
     root_blockers = tmp_path / "RELEASE_BLOCKERS.generated.json"
     write_fresh_root_release_blockers(root_blockers)
     monkeypatch.setattr(module, "DEFAULT_RELEASE_BLOCKERS", root_blockers)
@@ -2474,3 +2987,13 @@ def test_main_writes_default_published_summary_output(tmp_path, monkeypatch) -> 
     assert written["coverage_gap_keys"] == []
     assert written["scoped_coverage_gap_keys"] == []
     assert written["generated_at_utc"]
+    assert written["campaign_os_local_proof"]["path"] == str(
+        campaign_os_local_proof
+    )
+    assert written["campaign_os_local_proof"]["pass"] is True
+    assert written["campaign_os_local_proof"]["reason_code"] == "valid"
+    assert written["campaign_os_local_proof"]["receipt_identity"] is not None
+    assert written["campaign_os_local_proof"]["validator_identity"] is not None
+    assert written["summary"]["campaign_os_local_proof"] == written[
+        "campaign_os_local_proof"
+    ]

@@ -1,14 +1,31 @@
 {
   "contract_name": "chummer.run.portable_receipts_audit",
   "status": "pass",
-  "generated_at": "2026-05-09T06:00:00.000000Z",
-  "summary": "Portable receipts audit passed. No published proof artifacts depend on machine-specific absolute paths like /workspace/.",
-  "scanned_artifact_count": 25,
+  "generated_at": "2026-07-28T05:16:10.952664Z",
+  "summary": "Portable receipts audit passed. Published proof artifacts do not embed machine-specific home paths.",
+  "scanned_artifact_count": 915,
   "machine_specific_hits": [],
+  "machine_specific_path_hits": [],
+  "artifact_integrity_hits": [],
+  "failure_counts": {
+    "machine_specific_paths": 0,
+    "artifact_integrity": 0
+  },
+  "machine_specific_hit_details": [],
+  "unreadable_artifacts": [],
+  "scan_roots": [
+    "scan-root-1",
+    "scan-root-2",
+    "scan-root-3"
+  ],
   "policy": {
     "use_repo_relative_paths": true,
     "allow_local_only_hostnames": true,
-    "forbid_machine_specific_paths": true
+    "forbid_machine_specific_paths": true,
+    "redact_failure_samples": true,
+    "scan_nested_json_artifacts": true,
+    "fail_on_artifact_integrity_errors": true,
+    "machine_specific_pattern_description": "literal Linux, macOS, and Windows user-home path segments are forbidden in published receipts"
   },
   "abs_ids": [
     "ABS-012"

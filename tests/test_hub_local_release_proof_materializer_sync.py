@@ -7,8 +7,11 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import threading
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +28,126 @@ def load_materializer_module():
 
 
 class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
+    def test_private_absolute_mutation_lock_override_keeps_secure_identity_checks(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-proof-private-lock-") as temp_dir:
+            temp_root = Path(temp_dir)
+            lock_path = temp_root / ".state" / "public-edge-mutation.lock"
+            old_lock_path = os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH")
+            os.environ["CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"] = str(lock_path)
+            try:
+                with module._public_edge_proof_mutation_lock() as acquired_lock_path:
+                    overlay = module._load_public_edge_overlay_module()
+                    token_path = lock_path / overlay.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+                    self.assertEqual(lock_path, acquired_lock_path)
+                    self.assertEqual(0o700, stat.S_IMODE(lock_path.parent.stat().st_mode))
+                    self.assertEqual(0o700, stat.S_IMODE(lock_path.stat().st_mode))
+                    self.assertEqual(0o600, stat.S_IMODE(token_path.stat().st_mode))
+                    self.assertEqual(os.getuid(), lock_path.stat().st_uid)
+                    self.assertEqual(os.getuid(), token_path.stat().st_uid)
+                    self.assertEqual(1, token_path.stat().st_nlink)
+                self.assertFalse(lock_path.exists())
+            finally:
+                if old_lock_path is None:
+                    os.environ.pop("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"] = old_lock_path
+
+    def test_default_mutation_lock_is_portable_stable_and_private(self) -> None:
+        module = load_materializer_module()
+        overlay = module._load_public_edge_overlay_module()
+        with tempfile.TemporaryDirectory(prefix="hub-proof-portable-default-") as temp_dir:
+            temp_root = Path(temp_dir)
+            portable_tmp = temp_root / "portable tmp"
+            portable_tmp.mkdir()
+            old_lock_path = os.environ.pop(
+                "CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH",
+                None,
+            )
+            old_tempdir = tempfile.tempdir
+            tempfile.tempdir = str(portable_tmp)
+            try:
+                expected_lock_path = (
+                    Path(os.path.abspath(tempfile.gettempdir()))
+                    / f"chummer-public-edge-mutation-{os.getuid()}"
+                    / "public-edge-mutation.lock"
+                )
+                self.assertEqual(
+                    Path(
+                        "/docker/chummercomplete/.state/public-edge-mutation.lock"
+                    ),
+                    overlay.PUBLIC_EDGE_MUTATION_LOCK,
+                )
+                with mock.patch.object(module, "_is_macos_host", return_value=True):
+                    with module._public_edge_proof_mutation_lock() as acquired_lock_path:
+                        self.assertEqual(expected_lock_path, acquired_lock_path)
+                        self.assertNotIn("/docker/", str(acquired_lock_path))
+                        self.assertEqual(
+                            0o700,
+                            stat.S_IMODE(acquired_lock_path.parent.stat().st_mode),
+                        )
+                        self.assertEqual(
+                            0o700,
+                            stat.S_IMODE(acquired_lock_path.stat().st_mode),
+                        )
+                self.assertFalse(expected_lock_path.exists())
+                self.assertTrue(expected_lock_path.parent.is_dir())
+            finally:
+                tempfile.tempdir = old_tempdir
+                if old_lock_path is not None:
+                    os.environ[
+                        "CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"
+                    ] = old_lock_path
+
+    def test_non_macos_default_preserves_canonical_production_lock(self) -> None:
+        module = load_materializer_module()
+        overlay = module._load_public_edge_overlay_module()
+        with mock.patch.object(module, "_is_macos_host", return_value=False):
+            self.assertEqual(
+                overlay.PUBLIC_EDGE_MUTATION_LOCK,
+                module._default_public_edge_proof_mutation_lock_path(overlay),
+            )
+
+    def test_mutation_lock_override_rejects_relative_path(self) -> None:
+        module = load_materializer_module()
+        old_lock_path = os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH")
+        os.environ[
+            "CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"
+        ] = "relative/public-edge-mutation.lock"
+        try:
+            with self.assertRaisesRegex(RuntimeError, "path must be absolute"):
+                with module._public_edge_proof_mutation_lock():
+                    self.fail("relative mutation lock override was accepted")
+        finally:
+            if old_lock_path is None:
+                os.environ.pop("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH", None)
+            else:
+                os.environ[
+                    "CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"
+                ] = old_lock_path
+
+    def test_mutation_lock_override_rejects_non_private_root(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-proof-unsafe-lock-") as temp_dir:
+            lock_root = Path(temp_dir) / ".state"
+            lock_root.mkdir(mode=0o777)
+            lock_root.chmod(0o777)
+            lock_path = lock_root / "public-edge-mutation.lock"
+            old_lock_path = os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH")
+            os.environ["CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"] = str(lock_path)
+            try:
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "caller-owned mode-0700 real directory",
+                ):
+                    with module._public_edge_proof_mutation_lock():
+                        self.fail("unsafe mutation lock root was accepted")
+                self.assertFalse(lock_path.exists())
+            finally:
+                if old_lock_path is None:
+                    os.environ.pop("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"] = old_lock_path
     def test_public_json_writer_replaces_linked_or_mode_drifted_destination(self) -> None:
         module = load_materializer_module()
         with tempfile.TemporaryDirectory(prefix="hub-local-proof-public-json-") as temp_dir:
@@ -96,13 +219,29 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            portable_tmp = temp_root / "portable-tmp"
+            portable_tmp.mkdir()
             env = os.environ.copy()
+            env.pop("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH", None)
+            env["TMPDIR"] = str(portable_tmp)
             env["CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH"] = str(readiness_path)
             env["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
 
             completed = subprocess.run(
                 [
                     "python3",
+                    "-c",
+                    (
+                        "import importlib.util, sys; "
+                        "script = sys.argv[1]; "
+                        "spec = importlib.util.spec_from_file_location("
+                        "'materialize_hub_local_release_proof_macos_test', script); "
+                        "module = importlib.util.module_from_spec(spec); "
+                        "spec.loader.exec_module(module); "
+                        "module._is_macos_host = lambda: True; "
+                        "sys.argv = sys.argv[1:]; "
+                        "raise SystemExit(module.main())"
+                    ),
                     str(MATERIALIZER),
                     str(proof_path),
                     "http://127.0.0.1:8091",
@@ -126,6 +265,14 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             self.assertEqual("run-20260703-170551", release_channel.get("releaseVersion"))
             self.assertEqual("promoted_preview", release_channel.get("rolloutState"))
             self.assertEqual("preview_supported", release_channel.get("supportabilityState"))
+            default_lock_root = (
+                portable_tmp / f"chummer-public-edge-mutation-{os.getuid()}"
+            )
+            self.assertTrue(default_lock_root.is_dir())
+            self.assertEqual(0o700, stat.S_IMODE(default_lock_root.stat().st_mode))
+            self.assertFalse(
+                (default_lock_root / "public-edge-mutation.lock").exists()
+            )
 
     def test_default_read_path_prefers_local_canonical_flagship_readiness_after_sync(self) -> None:
         module = load_materializer_module()
@@ -371,6 +518,15 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
 
             repo_script_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(MATERIALIZER, repo_script_path)
+            for dependency_name in (
+                "strict_json_contract.py",
+                "public_edge_payload_modes.py",
+                "publish_public_edge_portal_overlay.py",
+            ):
+                shutil.copyfile(
+                    REPO_ROOT / "scripts" / dependency_name,
+                    repo_script_path.parent / dependency_name,
+                )
             readiness_path.write_text(
                 json.dumps(
                     {
@@ -392,6 +548,11 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             )
 
             env = os.environ.copy()
+            lock_root = temp_root / ".state"
+            lock_root.mkdir(mode=0o700)
+            env["CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH"] = str(
+                lock_root / "public-edge-mutation.lock"
+            )
             env["CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH"] = str(readiness_path)
 
             command = [

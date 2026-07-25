@@ -10,6 +10,7 @@ public sealed class LegacySurfaceRedirectControllerTests
 {
     [Theory]
     [InlineData("support", "/contact")]
+    [InlineData("session", "/mobile/player")]
     [InlineData("blazor", "/downloads")]
     public async Task PublicConvenienceRoutesRedirectToLiveFlagshipSurfaces(string route, string expectedUrl)
     {
@@ -18,6 +19,7 @@ public sealed class LegacySurfaceRedirectControllerTests
         IActionResult result = route switch
         {
             "support" => controller.Support(),
+            "session" => controller.Session(),
             "blazor" => await controller.Workbench(path: null, CancellationToken.None),
             _ => throw new ArgumentOutOfRangeException(nameof(route), route, null)
         };

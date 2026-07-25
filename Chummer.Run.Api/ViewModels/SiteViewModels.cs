@@ -2381,7 +2381,9 @@ public sealed record AccountSectionPageViewModel(
     IReadOnlyList<AccountHubCardViewModel> Cards,
     string BackLabel,
     string BackHref,
-    IReadOnlyList<AccountAccessInstallationViewModel>? AccessInstallations = null);
+    IReadOnlyList<AccountAccessInstallationViewModel>? AccessInstallations = null,
+    SignedInTrustStatusPanelViewModel? SignedInTrustStatus = null,
+    EntitlementSyncReceiptProjection? EntitlementSyncReceipts = null);
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,

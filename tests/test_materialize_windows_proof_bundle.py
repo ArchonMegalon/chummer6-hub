@@ -834,17 +834,17 @@ def test_rejects_non_zip_and_unsafe_archive_entries_without_leaking_values(
         ),
         (
             "classic-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN RSA PRIVATE KEY-----")]),
+            make_payload_zip([("app/notes.txt", b"-----BEGIN " + b"RSA PRIVATE KEY-----")]),
             "rule=content.private_key_marker",
         ),
         (
             "encrypted-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN ENCRYPTED PRIVATE KEY-----")]),
+            make_payload_zip([("app/notes.txt", b"-----BEGIN " + b"ENCRYPTED PRIVATE KEY-----")]),
             "rule=content.private_key_marker",
         ),
         (
             "pgp-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN PGP PRIVATE KEY BLOCK-----")]),
+            make_payload_zip([("app/notes.txt", b"-----BEGIN " + b"PGP PRIVATE KEY BLOCK-----")]),
             "rule=content.private_key_marker",
         ),
         (

@@ -422,8 +422,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
-    await expectVisible(page, 'text=What is wrong?');
-    await expectBodyText(page, 'Start here', '/help');
+    await expectVisible(page, 'text=How can we help?');
+    await expectBodyText(page, 'Choose a path', '/help');
     await expectBodyText(page, 'Pick the next step.', '/help');
     await expectBodyText(page, 'Install or update', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
@@ -766,7 +766,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
-    await expectVisible(page, 'text=What is wrong?');
+    await expectVisible(page, 'text=How can we help?');
     await expectVisible(page, 'text=Contact');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });

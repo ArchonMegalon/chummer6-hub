@@ -1270,7 +1270,7 @@ def verify_signed_in_work_audit(
     signed_in_minimal_expectations = {
         "/downloads": ("Install Chummer", "Stable", "Nightly"),
         "/now": ("Current build", "Known issues and install help"),
-        "/help": ("What is wrong?", "Open contact"),
+        "/help": ("How can we help?", "Open contact"),
     }
     for signed_in_path, expected_snippets in signed_in_minimal_expectations.items():
         status, body, _, _ = fetch(
@@ -12101,7 +12101,7 @@ def main() -> int:
             expects_header_count=None),
         AuditRoute(
             "/help",
-            "What is wrong?",
+            "How can we help?",
             required_texts=("Open downloads", "Open contact", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(

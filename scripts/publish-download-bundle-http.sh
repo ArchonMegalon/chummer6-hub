@@ -12,11 +12,13 @@ MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json
 CANONICAL_MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_CANONICAL_MANIFEST_PATH:-$BUNDLE_DIR/RELEASE_CHANNEL.generated.json}"
 LEGACY_DIRECT_UPLOAD_URL="${CHUMMER_RELEASE_UPLOAD_URL:-}"
 SESSIONS_URL="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-https://chummer.run/api/internal/releases/upload-sessions}"
+CURL_LOOPBACK_RESOLVE="${CHUMMER_RELEASE_UPLOAD_LOOPBACK_RESOLVE:-}"
 PUBLIC_BASE_URL="${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}"
 VERIFY_URL="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-$PUBLIC_BASE_URL/downloads/RELEASE_CHANNEL.generated.json}"
 TOKEN="${CHUMMER_RELEASE_UPLOAD_TOKEN:-}"
 TOKEN_FILE="${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}}"
 CHUMMER_RELEASE_UPLOAD_NON_INTERACTIVE="${CHUMMER_RELEASE_UPLOAD_NON_INTERACTIVE:-0}"
+RESUME_CREATED_HANDOFF="${CHUMMER_RELEASE_UPLOAD_RESUME_CREATED_HANDOFF:-0}"
 ARTIFACT_FACTORY_AUTOLAUNCH="${CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH:-1}"
 ARTIFACT_FACTORY_REQUIRED="${CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH_REQUIRED:-0}"
 ARTIFACT_FACTORY_TOKEN="${CHUMMER_ARTIFACT_FACTORY_TOKEN:-}"
@@ -72,6 +74,55 @@ fi
 if [[ -n "$LEGACY_DIRECT_UPLOAD_URL" ]]; then
   echo "CHUMMER_RELEASE_UPLOAD_URL is retired; configure CHUMMER_RELEASE_UPLOAD_SESSIONS_URL only." >&2
   exit 1
+fi
+
+if [[ -n "$CURL_LOOPBACK_RESOLVE" ]]; then
+  CURL_LOOPBACK_RESOLVE="$(
+    python3 - "$CURL_LOOPBACK_RESOLVE" "$SESSIONS_URL" <<'PY'
+from __future__ import annotations
+
+import ipaddress
+import re
+import sys
+from urllib.parse import urlsplit
+
+mapping = str(sys.argv[1]).strip()
+sessions = urlsplit(str(sys.argv[2]).strip())
+match = re.fullmatch(
+    r"(?P<host>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?):"
+    r"(?P<port>[1-9][0-9]{0,4}):(?P<address>[0-9.]+)",
+    mapping,
+)
+if match is None:
+    raise SystemExit(
+        "CHUMMER_RELEASE_UPLOAD_LOOPBACK_RESOLVE must be one host:port:IPv4 mapping."
+    )
+
+host = match.group("host").lower()
+port = int(match.group("port"))
+address = ipaddress.ip_address(match.group("address"))
+sessions_port = sessions.port or (443 if sessions.scheme == "https" else 80)
+if (
+    sessions.scheme != "http"
+    or not sessions.hostname
+    or sessions.username is not None
+    or sessions.password is not None
+    or sessions.query
+    or sessions.fragment
+    or host != sessions.hostname.lower()
+    or port != sessions_port
+    or port > 65535
+    or address.version != 4
+    or not address.is_loopback
+):
+    raise SystemExit(
+        "CHUMMER_RELEASE_UPLOAD_LOOPBACK_RESOLVE must map the HTTP upload-session "
+        "authority to a loopback IPv4 address on the same port."
+    )
+
+print(f"{host}:{port}:{address}")
+PY
+  )"
 fi
 
 case "$(printf '%s' "$ALLOW_DIRECT_FALLBACK" | tr '[:upper:]' '[:lower:]')" in
@@ -282,21 +333,12 @@ release_version = str(payload.get("version") or "").strip()
 
 def derive_verifier_owned_value(name: str, current_value: object) -> object:
     helper = getattr(module, name, None)
-    artifact_bound_registry_names = {
-        "expected_desktop_route_truth_rows",
-        "expected_install_aware_artifact_registry_rows",
-        "expected_desktop_surface_ref_rows",
-        "expected_artifact_identity_registry_rows",
-        "expected_artifact_publication_binding_rows",
-    }
-    if callable(helper) and name not in artifact_bound_registry_names:
+    # The verifier is the authority for verifier-owned projections. Prefer its
+    # payload-level API whenever it exists instead of reconstructing rows
+    # through materializer helpers whose lower-level signatures may evolve.
+    if callable(helper):
         return helper(payload)
     if materializer is None:
-        if callable(helper):
-            try:
-                return helper(payload)
-            except TypeError:
-                return current_value
         return current_value
     fallback_helpers = {
         "expected_install_aware_artifact_registry_rows": lambda: (
@@ -311,9 +353,12 @@ def derive_verifier_owned_value(name: str, current_value: object) -> object:
         ),
         "expected_desktop_route_truth_rows": lambda: (
             materializer.desktop_route_truth(
-                tuple_coverage,
-                channel_id=channel_id,
-                release_version=release_version,
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
+                required_platforms=required_heads_and_platforms(payload)[1],
+                channel_status=str(payload.get("status") or ""),
+                rollout_state=str(payload.get("rolloutState") or payload.get("rollout_state") or ""),
+                rollout_reason=str(payload.get("rolloutReason") or payload.get("rollout_reason") or ""),
+                known_issue_summary=str(payload.get("knownIssueSummary") or payload.get("known_issue_summary") or ""),
             )
             if tuple_coverage is not None and hasattr(materializer, "desktop_route_truth")
             else current_value
@@ -550,12 +595,14 @@ PY
 join_url() {
   local base_url="$1"
   local maybe_relative="$2"
-  python3 - "$base_url" "$maybe_relative" <<'PY'
+  local canonical_origin="${3:-}"
+  python3 - "$base_url" "$maybe_relative" "$canonical_origin" <<'PY'
 import sys
-from urllib.parse import unquote, urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 
 base_text = str(sys.argv[1]).strip()
 candidate_text = str(sys.argv[2]).strip()
+canonical_text = str(sys.argv[3]).strip()
 base = urlsplit(base_text)
 if (
     base.scheme not in {"http", "https"}
@@ -575,22 +622,53 @@ try:
 except ValueError as exc:
     raise SystemExit("upload session URL has an invalid port") from exc
 
+canonical_authority = None
+if canonical_text:
+    canonical = urlsplit(canonical_text)
+    try:
+        canonical_authority = (
+            canonical.scheme.lower(),
+            (canonical.hostname or "").lower(),
+            canonical.port,
+        )
+    except ValueError as exc:
+        raise SystemExit("canonical public origin has an invalid port") from exc
+    if (
+        canonical.scheme.lower() != "https"
+        or not canonical.hostname
+        or canonical.username is not None
+        or canonical.password is not None
+        or canonical.query
+        or canonical.fragment
+        or canonical.path not in {"", "/"}
+        or canonical.hostname.lower() != base.hostname.lower()
+    ):
+        raise SystemExit(
+            "canonical public origin must be an HTTPS origin-only URL for the upload transport hostname"
+        )
+
 decoded_path = unquote(resolved.path)
 segments = decoded_path.replace("\\", "/").split("/")
 required_prefix = base.path.rstrip("/") + "/"
+same_transport = resolved_authority == base_authority
+same_canonical = canonical_authority is not None and resolved_authority == canonical_authority
 if (
-    resolved_authority != base_authority
+    not (same_transport or same_canonical)
     or resolved.username is not None
     or resolved.password is not None
     or resolved.query
     or resolved.fragment
     or "\\" in resolved.path
+    or decoded_path != resolved.path
     or any(segment in {".", ".."} for segment in segments)
     or not decoded_path.startswith(required_prefix)
 ):
     raise SystemExit("upload session response URL escaped its same-origin session root")
 
-print(resolved.geturl())
+if same_canonical:
+    print(urlunsplit((base.scheme, base.netloc, resolved.path, "", "")))
+else:
+    print(resolved.geturl())
 PY
 }
 
@@ -858,6 +936,7 @@ request_json() {
   local url="$3"
   shift 3
   local http_status=""
+  REQUEST_HTTP_STATUS=""
   if ! http_status="$(authenticated_curl -sS --max-filesize "$MAX_RESPONSE_BYTES" \
       --write-out $'\nCHUMMER_HTTP_STATUS:%{http_code}' "$@" "$url" \
       | sanitize_release_upload_response_stream "$response_path")"; then
@@ -865,11 +944,45 @@ request_json() {
     [[ -f "$response_path" ]] && print_sanitized_response "$response_path" >&2 || true
     return 22
   fi
+  REQUEST_HTTP_STATUS="$http_status"
   if [[ ! "$http_status" =~ ^2 ]]; then
     echo "$label failed with HTTP $http_status" >&2
     print_sanitized_response "$response_path" >&2 || true
     return 22
   fi
+}
+
+is_deterministic_pre_activation_rejection() {
+  local response_path="$1"
+  local expected_session_id="$2"
+  python3 - "$response_path" "$expected_session_id" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+session_id = sys.argv[2]
+try:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+except (OSError, UnicodeError, json.JSONDecodeError):
+    raise SystemExit(1)
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+expected_type = "https://chummer.run/problems/release-bundle/rejected"
+instance = payload.get("instance")
+expected_prefix = (
+    f"/api/internal/releases/upload-sessions/{session_id}/complete#"
+)
+if (
+    payload.get("status") != 400
+    or payload.get("type") != expected_type
+    or not isinstance(instance, str)
+    or not instance.startswith(expected_prefix)
+    or re.fullmatch(r"[0-9a-f]{32}", session_id) is None
+):
+    raise SystemExit(1)
+PY
 }
 
 verify_route() {
@@ -993,6 +1106,15 @@ upload_file_chunked() {
   rm -rf "$chunk_dir"
 }
 
+case "$(printf '%s' "$RESUME_CREATED_HANDOFF" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|on) RESUME_CREATED_HANDOFF=1 ;;
+  0|false|no|off|"") RESUME_CREATED_HANDOFF=0 ;;
+  *)
+    echo "CHUMMER_RELEASE_UPLOAD_RESUME_CREATED_HANDOFF must be an explicit boolean." >&2
+    exit 1
+    ;;
+esac
+
 if to_bool "$DRY_RUN"; then
   file_count="$(collect_upload_files "$BUNDLE_DIR" | wc -l | tr -d ' ')"
   echo "Dry run only. Bundle: $BUNDLE_DIR"
@@ -1010,8 +1132,10 @@ if [[ ! -f "$UPLOAD_ATTEMPT_RECEIPT_HELPER" || -L "$UPLOAD_ATTEMPT_RECEIPT_HELPE
   exit 1
 fi
 
-python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" preflight \
-  --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH"
+if (( RESUME_CREATED_HANDOFF == 0 )); then
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" preflight \
+    --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH"
+fi
 
 if ! resolve_upload_token; then
   if to_bool "$CHUMMER_RELEASE_UPLOAD_NON_INTERACTIVE"; then
@@ -1054,6 +1178,9 @@ fi
 request_common=(
   -H "Accept: application/json"
 )
+if [[ -n "$CURL_LOOPBACK_RESOLVE" ]]; then
+  request_common+=(--resolve "$CURL_LOOPBACK_RESOLVE")
+fi
 
 canonicalize_bundle_release_channel_registries
 
@@ -1087,21 +1214,6 @@ echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
 session_json="$tmp_root/session.json"
 response_json="$tmp_root/response.json"
 
-request_json "$session_json" "create upload session" "$SESSIONS_URL" "${request_common[@]}" -X POST
-session_id="$(resolve_json_field "$session_json" sessionId SessionId session_id id)"
-[[ "$session_id" =~ ^[0-9a-f]{32}$ ]] || {
-  echo "Upload session response contains an unsafe sessionId." >&2
-  exit 1
-}
-files_url="$(resolve_json_field "$session_json" filesUrl FilesUrl files_url files || true)"
-chunks_url="$(resolve_json_field "$session_json" chunksUrl ChunksUrl chunks_url chunks || true)"
-complete_url="$(resolve_json_field "$session_json" completeUrl CompleteUrl complete_url complete || true)"
-expires_at="$(resolve_json_field "$session_json" expiresAtUtc ExpiresAtUtc expires_at_utc expiresAt || true)"
-[[ -n "$session_id" ]] || {
-  echo "Upload session response missing sessionId." >&2
-  exit 1
-}
-
 record_upload_attempt_state() {
   local state="$1"
   shift
@@ -1115,20 +1227,53 @@ record_upload_attempt_state() {
     "$@"
 }
 
-if ! record_upload_attempt_state created; then
-  echo "Upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded." >&2
-  exit 1
+if (( RESUME_CREATED_HANDOFF == 1 )); then
+  resume_json="$tmp_root/resume-created.json"
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" validate-resume-created \
+    --receipt "$UPLOAD_ATTEMPT_RECEIPT_PATH" \
+    --summary "$candidate_summary" \
+    --sessions-url "$SESSIONS_URL" \
+    > "$resume_json"
+  session_id="$(resolve_json_field "$resume_json" sessionId)"
+  expires_at="$(resolve_json_field "$resume_json" expiresAtUtc)"
+  files_url="${SESSIONS_URL%/}/${session_id}/files"
+  chunks_url="${SESSIONS_URL%/}/${session_id}/chunks"
+  complete_url="${SESSIONS_URL%/}/${session_id}/complete"
+  echo "Resuming pristine created upload session $session_id from $UPLOAD_ATTEMPT_RECEIPT_PATH"
+else
+  request_json "$session_json" "create upload session" "$SESSIONS_URL" "${request_common[@]}" -X POST
+  session_id="$(resolve_json_field "$session_json" sessionId SessionId session_id id)"
+  [[ "$session_id" =~ ^[0-9a-f]{32}$ ]] || {
+    echo "Upload session response contains an unsafe sessionId." >&2
+    exit 1
+  }
+  files_url="$(resolve_json_field "$session_json" filesUrl FilesUrl files_url files || true)"
+  chunks_url="$(resolve_json_field "$session_json" chunksUrl ChunksUrl chunks_url chunks || true)"
+  complete_url="$(resolve_json_field "$session_json" completeUrl CompleteUrl complete_url complete || true)"
+  expires_at="$(resolve_json_field "$session_json" expiresAtUtc ExpiresAtUtc expires_at_utc expiresAt || true)"
+  [[ -n "$session_id" ]] || {
+    echo "Upload session response missing sessionId." >&2
+    exit 1
+  }
+  if ! record_upload_attempt_state created; then
+    echo "Upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded." >&2
+    exit 1
+  fi
 fi
 
 [[ -n "$files_url" ]] || files_url="${SESSIONS_URL%/}/${session_id}/files"
 [[ -n "$chunks_url" ]] || chunks_url="${SESSIONS_URL%/}/${session_id}/chunks"
 [[ -n "$complete_url" ]] || complete_url="${SESSIONS_URL%/}/${session_id}/complete"
-files_url="$(join_url "$SESSIONS_URL" "$files_url")"
-chunks_url="$(join_url "$SESSIONS_URL" "$chunks_url")"
-complete_url="$(join_url "$SESSIONS_URL" "$complete_url")"
-expected_files_url="$(join_url "$SESSIONS_URL" "${session_id}/files")"
-expected_chunks_url="$(join_url "$SESSIONS_URL" "${session_id}/chunks")"
-expected_complete_url="$(join_url "$SESSIONS_URL" "${session_id}/complete")"
+SESSION_CANONICAL_ORIGIN=""
+if [[ -n "$CURL_LOOPBACK_RESOLVE" ]]; then
+  SESSION_CANONICAL_ORIGIN="$PUBLIC_BASE_URL"
+fi
+files_url="$(join_url "$SESSIONS_URL" "$files_url" "$SESSION_CANONICAL_ORIGIN")"
+chunks_url="$(join_url "$SESSIONS_URL" "$chunks_url" "$SESSION_CANONICAL_ORIGIN")"
+complete_url="$(join_url "$SESSIONS_URL" "$complete_url" "$SESSION_CANONICAL_ORIGIN")"
+expected_files_url="$(join_url "$SESSIONS_URL" "${session_id}/files" "$SESSION_CANONICAL_ORIGIN")"
+expected_chunks_url="$(join_url "$SESSIONS_URL" "${session_id}/chunks" "$SESSION_CANONICAL_ORIGIN")"
+expected_complete_url="$(join_url "$SESSIONS_URL" "${session_id}/complete" "$SESSION_CANONICAL_ORIGIN")"
 [[ "$files_url" == "$expected_files_url" \
     && "$chunks_url" == "$expected_chunks_url" \
     && "$complete_url" == "$expected_complete_url" ]] || {
@@ -1149,6 +1294,17 @@ done < <(array_values_nul upload_files)
 record_upload_attempt_state uploaded
 record_upload_attempt_state request_started
 if ! request_json "$response_json" "complete upload session" "$complete_url" "${request_common[@]}" -X POST; then
+  if [[ "$REQUEST_HTTP_STATUS" == "400" ]] \
+      && is_deterministic_pre_activation_rejection "$response_json" "$session_id"; then
+    problem_type="$(resolve_json_field "$response_json" type || true)"
+    trace_id="$(resolve_json_field "$response_json" traceId trace_id || true)"
+    record_upload_attempt_state durably_aborted \
+      --http-status "$REQUEST_HTTP_STATUS" \
+      --problem-type "$problem_type" \
+      --trace-id "$trace_id"
+    echo "Release candidate was deterministically rejected before activation. The durable handoff is resolved as durably_aborted; repair the candidate before creating a new session." >&2
+    exit 1
+  fi
   echo "Release completion outcome is unknown. Do not create another session; reconcile the request_started handoff at $UPLOAD_ATTEMPT_RECEIPT_PATH." >&2
   exit 1
 fi

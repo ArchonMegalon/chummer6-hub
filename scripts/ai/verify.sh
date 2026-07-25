@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$script_dir/_env.sh" ]]; then
   source "$script_dir/_env.sh"
 fi
+source "$script_dir/_external_artifact_blockers.sh"
 
 ROOT_DIR="$(cd "$script_dir/../.." && pwd)"
 cd "$ROOT_DIR"
@@ -177,6 +178,7 @@ python3 "$ROOT_DIR/scripts/verify_public_edge_compose_operability.py" >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_analytics_hooks.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_verify_external_artifact_blockers.py' >/dev/null
 python3 -m pytest "$ROOT_DIR/tests/test_public_minimal_humanized_surface.py" "$ROOT_DIR/tests/test_participate_codex_guest_fallback.py" -q >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_billing_honesty_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_account_handoff_runtime_config.py' >/dev/null
@@ -208,13 +210,25 @@ python3 "$ROOT_DIR/scripts/public_download_shelf_truth_gate.py" --base-url "${CH
 python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/materialize_windows_installer_visual_audit_intake_request.py" --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json >/dev/null
 python3 "$ROOT_DIR/scripts/verify_windows_installer_visual_audit_intake_request.py" >/dev/null
-python3 "$ROOT_DIR/scripts/auto_import_windows_installer_gold_proof.py" --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null
+run_expected_external_artifact_gate \
+  "Native Windows installer visual proof is waiting. Drop the digest-bound bundle at the preferred path in .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json." \
+  "windows_installer_visual_audit_auto_import:waiting" \
+  python3 "$ROOT_DIR/scripts/auto_import_windows_installer_gold_proof.py" \
+    --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json \
+    --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json \
+    --wait-seconds 0
 if [[ -f "$AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" ]]; then
   echo "skipping google oauth auth automation in verify.sh: auth/sign-in automation is paused at $AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" >&2
 else
   python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_operator_evidence_request.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
   python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_operator_evidence_request.py" >/dev/null
-  python3 "$ROOT_DIR/scripts/auto_import_google_oauth_linking_operator_evidence.py" --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null
+  run_expected_external_artifact_gate \
+    "Google OAuth operator evidence is waiting. Follow the request in .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json." \
+    "google_oauth_linking_operator_evidence_auto_import:waiting" \
+    python3 "$ROOT_DIR/scripts/auto_import_google_oauth_linking_operator_evidence.py" \
+      --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json \
+      --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json \
+      --wait-seconds 0
   python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
   python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_proof.py" >/dev/null
 fi
@@ -228,7 +242,7 @@ release_ready_materializer_active="$(printf '%s' "${CHUMMER_RELEASE_READY_MATERI
 if [[ "$release_ready_materializer_active" == "1" || "$release_ready_materializer_active" == "true" || "$release_ready_materializer_active" == "yes" || "$release_ready_materializer_active" == "on" ]]; then
   echo "skipping release-ready materializer recursion in verify.sh: outer materializer is active" >&2
 else
-  python3 "$ROOT_DIR/scripts/materialize_release_ready_receipt.py" --force-global-verifier >/dev/null
+  env -u PYTHONPATH PATH=/usr/bin:/bin python3 "$ROOT_DIR/scripts/materialize_release_ready_receipt.py" --force-global-verifier >/dev/null
 fi
 run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"
 run_slice_safe_dotnet_test "FullyQualifiedName~AiMutationAuthorizationMiddlewareTests"
@@ -2654,3 +2668,4 @@ python3 scripts/verify_table_pulse_connected_lane_surface.py
 python3 -m unittest tests/test_table_pulse_connected_lane_surface.py
 
 bash scripts/ai/run_services_smoke.sh
+fail_on_external_release_blockers

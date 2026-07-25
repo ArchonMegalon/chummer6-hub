@@ -61,7 +61,7 @@ def passing_receipts():
             "findings": [],
         },
         {
-            "contractName": "chummer.downloads_version_marker.v1",
+            "contractName": "chummer.downloads_version_marker.bound.v1",
             "status": "pass",
             "base_url": "https://chummer.run",
             "downloads_has_marker": True,
@@ -165,7 +165,7 @@ def passing_receipts():
                     "route": "/mobile/player",
                     "manifest_path": "/manifest.player.webmanifest",
                     "manifest_id": "/mobile/player",
-                    "manifest_start_url": "/mobile/player?role=Player",
+                    "manifest_start_url": "/mobile/player",
                     "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
                     "frontdoor_default": True,
                 },
@@ -175,7 +175,7 @@ def passing_receipts():
                     "route": "/mobile/gm",
                     "manifest_path": "/manifest.gm.webmanifest",
                     "manifest_id": "/mobile/gm",
-                    "manifest_start_url": "/mobile/gm?role=GameMaster",
+                    "manifest_start_url": "/mobile/gm",
                     "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
                     "frontdoor_default": False,
                 },
@@ -429,7 +429,7 @@ def _alias_redirect_headers(target: str) -> dict[str, str]:
 def _alias_canonical_headers(**overrides: str) -> dict[str, str]:
     headers = {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "private, no-store, no-cache, max-age=0",
+        "Cache-Control": "private, no-store, max-age=0",
         "Pragma": "no-cache",
         "Expires": "0",
         "Referrer-Policy": "no-referrer",
@@ -794,18 +794,12 @@ def passing_mobile_pwa_viewport_artifact(module) -> dict[str, object]:  # noqa: 
                 "navigation_error": "",
             }
             if route == "/build":
-                expected_layout = expectation["buildLayout"]
                 result.update(
                     {
                         "final_url": "https://chummer.run/blazor/app?command=character_roster",
-                        "build_layout_source": "browser-media-query",
-                        "build_layout_preference": "auto",
-                        "build_layout_effective": expected_layout,
-                        "build_layout_override_checked": (
-                            "workspace"
-                            if expected_layout == "compact"
-                            else "compact"
-                        ),
+                        "build_surface": "character-roster",
+                        "build_route_surface": "roster",
+                        "build_command": "character-roster",
                     }
                 )
             results.append(result)
@@ -842,7 +836,7 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
         "artifact": {
             "contractName": "chummer.pwa_offline_cache.v2",
             "status": "pass",
-            "cache_version": "v17",
+            "cache_version": "v19",
             "navigation_policy": "network_only",
             "private_state_scope": "open_tab_only",
             "query_bearing_requests_cached": False,
@@ -859,7 +853,7 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
                 "/manifest.player.webmanifest",
                 "/manifest.gm.webmanifest",
                 "/mobile.css",
-                "/mobile-turn-companion.js",
+            "/mobile-install-shell.js",
             ],
             "offline_role_fallbacks": [
                 {
@@ -882,7 +876,6 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
 
 
 def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane: Stable.") -> dict[str, object]:
-    redacted = "%5Bredacted%5D"
     return {
         "status": "pass",
         "exitCode": 0,
@@ -891,79 +884,79 @@ def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane:
             "contractName": "chummer.frontdoor_mobile_launch.v2",
             "status": "pass",
             "base_url": "https://chummer.run",
-            "gated_targets": ["Build", "Play"],
-            "public_targets": [],
+            "gated_targets": [],
+            "public_targets": ["Build", "Play"],
             "homepage_lane_text": homepage_lane_text,
             "play_route": "/mobile/player",
-            "play_sign_in_route": "/login?next=%2Fmobile%2Fplayer",
+            "play_sign_in_route": "/login?next=%2F",
             "direct_player_http_status": 200,
             "direct_player_route": "/mobile/player",
             "final_url": "https://chummer.run/mobile/player",
             "private_identity_redacted": True,
             "visible_player_url_private_identity_absent": True,
-            "player_session_context_present": True,
-            "player_device_context_present": True,
-            "live_turn_companion_shell": True,
+            "player_session_context_present": False,
+            "player_device_context_present": False,
+            "live_turn_companion_shell": False,
             "pwa_manifest_path": "/manifest.player.webmanifest",
             "pwa_role": "Player",
-            "blazor_shell": "interactive-server",
-            "rybbit_configured": True,
-            "rybbit_tag": "mobile_play_shell",
-            "rybbit_route": "/mobile/player",
-            "rybbit_mode": "player",
-            "rybbit_role": "Player",
-            "rybbit_site_id_present": True,
-            "rybbit_script_url_present": True,
-            "rybbit_script_url_allowed": True,
-            "rybbit_skip_patterns": ["/mobile/**"],
-            "rybbit_mask_patterns": ["/api/play/**", "/mobile/**"],
-            "rybbit_skip_mobile_paths": True,
-            "rybbit_mask_mobile_paths": True,
-            "rybbit_masks_private_play_routes": True,
-            "rybbit_replay_block_selector": "[data-turn-root]",
-            "rybbit_replay_blocks_turn_root": True,
-            "player_session_handoff_url": f"https://chummer.run/mobile/player?sessionId={redacted}&role=Player",
-            "player_session_handoff_status": "Session handoff is ready in the link above.",
-            "player_session_handoff_link_text": "Open session handoff link",
-            "player_session_handoff_preserves_session": True,
-            "player_session_handoff_preserves_role": True,
-            "player_session_handoff_strips_device": True,
-            "player_session_handoff_sender_device_id_present": True,
+            "blazor_shell": "install-only",
+            "rybbit_configured": False,
+            "rybbit_tag": "",
+            "rybbit_route": "",
+            "rybbit_mode": "",
+            "rybbit_role": "",
+            "rybbit_site_id_present": False,
+            "rybbit_script_url_present": False,
+            "rybbit_script_url_allowed": False,
+            "rybbit_skip_patterns": [],
+            "rybbit_mask_patterns": [],
+            "rybbit_skip_mobile_paths": False,
+            "rybbit_mask_mobile_paths": False,
+            "rybbit_masks_private_play_routes": False,
+            "rybbit_replay_block_selector": "",
+            "rybbit_replay_blocks_turn_root": False,
+            "player_session_handoff_url": "",
+            "player_session_handoff_status": "",
+            "player_session_handoff_link_text": "",
+            "player_session_handoff_preserves_session": False,
+            "player_session_handoff_preserves_role": False,
+            "player_session_handoff_strips_device": False,
+            "player_session_handoff_sender_device_id_present": False,
             "player_session_handoff_private_identity_redacted": True,
             "gm_route": "/mobile/gm",
-            "gm_route_session_id_present": True,
+            "gm_route_session_id_present": False,
             "gm_route_private_identity_redacted": True,
             "gm_http_status": 200,
             "gm_final_url": "https://chummer.run/mobile/gm",
             "visible_gm_url_private_identity_absent": True,
-            "gm_session_context_present": True,
-            "gm_device_context_present": True,
-            "gm_live_turn_companion_shell": True,
+            "gm_session_context_present": False,
+            "gm_device_context_present": False,
+            "gm_live_turn_companion_shell": False,
             "gm_pwa_manifest_path": "/manifest.gm.webmanifest",
             "gm_pwa_role": "GameMaster",
-            "gm_blazor_shell": "interactive-server",
-            "gm_rybbit_configured": True,
-            "gm_rybbit_tag": "mobile_play_shell",
-            "gm_rybbit_route": "/mobile/gm",
-            "gm_rybbit_mode": "gm",
-            "gm_rybbit_role": "GameMaster",
-            "gm_rybbit_site_id_present": True,
-            "gm_rybbit_script_url_present": True,
-            "gm_rybbit_script_url_allowed": True,
-            "gm_rybbit_skip_patterns": ["/mobile/**"],
-            "gm_rybbit_mask_patterns": ["/api/play/**", "/mobile/**"],
-            "gm_rybbit_skip_mobile_paths": True,
-            "gm_rybbit_mask_mobile_paths": True,
-            "gm_rybbit_masks_private_play_routes": True,
-            "gm_rybbit_replay_block_selector": "[data-turn-root]",
-            "gm_rybbit_replay_blocks_turn_root": True,
-            "gm_session_handoff_url": f"https://chummer.run/mobile/gm?sessionId={redacted}&role=GameMaster",
-            "gm_session_handoff_status": "Session handoff is ready in the link above.",
-            "gm_session_handoff_link_text": "Open session handoff link",
-            "gm_session_handoff_preserves_session": True,
-            "gm_session_handoff_preserves_role": True,
-            "gm_session_handoff_strips_device": True,
-            "gm_session_handoff_sender_device_id_present": True,
+            "gm_blazor_shell": "install-only",
+            "gm_rybbit_configured": False,
+            "gm_rybbit_tag": "",
+            "gm_rybbit_route": "",
+            "gm_rybbit_mode": "",
+            "gm_rybbit_role": "",
+            "gm_rybbit_site_id_present": False,
+            "gm_rybbit_script_url_present": False,
+            "gm_rybbit_script_url_allowed": False,
+            "gm_rybbit_skip_patterns": [],
+            "gm_rybbit_mask_patterns": [],
+            "gm_rybbit_skip_mobile_paths": False,
+            "gm_rybbit_mask_mobile_paths": False,
+            "gm_rybbit_masks_private_play_routes": False,
+            "gm_rybbit_replay_block_selector": "",
+            "gm_rybbit_replay_blocks_turn_root": False,
+            "gm_session_handoff_url": "",
+            "gm_session_handoff_status": "",
+            "gm_session_handoff_link_text": "",
+            "gm_session_handoff_preserves_session": False,
+            "gm_session_handoff_preserves_role": False,
+            "gm_session_handoff_strips_device": False,
+            "gm_session_handoff_sender_device_id_present": False,
             "gm_session_handoff_private_identity_redacted": True,
         },
         "ledgerArtifact": {
@@ -971,6 +964,8 @@ def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane:
             "status": "pass",
             "base_url": "https://chummer.run",
             "ledger_primary": False,
+            "gated_targets": [],
+            "public_targets": ["Build", "Play"],
         },
         "anchorArtifact": {
             "contractName": "chummer.frontdoor_mobile_anchor_redirect.v2",
@@ -982,11 +977,11 @@ def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane:
             "final_hash": "#turn-runsite-card",
             "pwa_manifest_path": "/manifest.player.webmanifest",
             "pwa_role": "Player",
-            "blazor_shell": "interactive-server",
+            "blazor_shell": "install-only",
             "private_identity_redacted": True,
             "visible_url_private_identity_absent": True,
-            "session_context_present": True,
-            "device_context_present": True,
+            "session_context_present": False,
+            "device_context_present": False,
             "failure": "",
         },
     }
@@ -1120,7 +1115,7 @@ def test_postdeploy_gate_passes_when_all_child_receipts_pass() -> None:
         ("/observer", "/mobile/observer", "/mobile/observer"),
     }
     assert result["coreChildContracts"]["preflight"] == "chummer.public_edge_deploy_preflight.v1"
-    assert result["coreChildContracts"]["downloads"] == "chummer.downloads_version_marker.v1"
+    assert result["coreChildContracts"]["downloads"] == "chummer.downloads_version_marker.bound.v1"
     assert result["coreChildContracts"]["pwaStatic"] == "chummer.public_pwa_static_assets.v1"
     assert result["failures"] == []
 
@@ -1511,7 +1506,7 @@ def test_postdeploy_gate_fails_when_core_child_contract_is_wrong() -> None:
 
     assert result["status"] == "fail"
     assert result["coreChildContracts"]["downloads"] == "chummer.downloads_version_marker.preview"
-    assert "downloads child receipt contract is not chummer.downloads_version_marker.v1" in result["failures"]
+    assert "downloads child receipt contract is not chummer.downloads_version_marker.bound.v1" in result["failures"]
 
 
 def test_postdeploy_gate_fails_when_preflight_or_downloads_fail() -> None:
@@ -2433,10 +2428,9 @@ def test_postdeploy_gate_rejects_legacy_v1_mobile_pwa_artifact_without_build_res
             "overflow_x",
             "navigation_error",
             "final_url",
-            "build_layout_source",
-            "build_layout_preference",
-            "build_layout_effective",
-            "build_layout_override_checked",
+            "build_surface",
+            "build_route_surface",
+            "build_command",
         }
     ),
 )
@@ -2484,7 +2478,7 @@ def test_mobile_pwa_incomplete_reuse_artifact_reruns_canonical_playwright_path(
             for row in legacy_artifact["results"]
             if row["route"] == "/build" and row["viewport"] == "desktop-1366"
         )
-        del build_result["build_layout_effective"]
+        del build_result["build_surface"]
     artifact_path.write_text(json.dumps(legacy_artifact), encoding="utf-8")
     captured: dict[str, object] = {}
 
@@ -2580,7 +2574,7 @@ def test_postdeploy_gate_can_require_pwa_offline_cache_browser_proof() -> None:
     assert result["status"] == "pass"
     assert result["pwaOfflineCacheStatus"] == "pass"
     assert result["pwaOfflineCacheArtifactContract"] == "chummer.pwa_offline_cache.v2"
-    assert result["pwaOfflineCacheCacheVersion"] == "v17"
+    assert result["pwaOfflineCacheCacheVersion"] == "v19"
     assert result["pwaOfflineCacheNavigationPolicy"] == "network_only"
     assert result["pwaOfflineCachePrivateStateScope"] == "open_tab_only"
     assert "/mobile.css" in result["pwaOfflineCacheStaticPaths"]
@@ -2940,81 +2934,81 @@ def test_postdeploy_gate_can_require_frontdoor_navigation_browser_proof() -> Non
     assert result["frontdoorNavigationMobileArtifactContract"] == "chummer.frontdoor_mobile_launch.v2"
     assert result["frontdoorNavigationLedgerArtifactContract"] == "chummer.black_ledger_globe_frontdoor.v1"
     assert result["frontdoorNavigationAnchorArtifactContract"] == "chummer.frontdoor_mobile_anchor_redirect.v2"
-    assert result["frontdoorNavigationGatedTargets"] == ["Build", "Play"]
-    assert result["frontdoorNavigationPublicTargets"] == []
+    assert result["frontdoorNavigationGatedTargets"] == []
+    assert result["frontdoorNavigationPublicTargets"] == ["Build", "Play"]
     assert result["frontdoorNavigationHomepageLaneText"] == "Current public lane: Stable."
     assert result["frontdoorNavigationHomepageLaneExpected"] == "Current public lane: Stable."
     assert result["frontdoorNavigationHomepageLaneMatchesReleaseChannel"] is True
     assert result["frontdoorNavigationPlayRoute"] == "/mobile/player"
-    assert result["frontdoorNavigationPlaySignInRoute"] == "/login?next=%2Fmobile%2Fplayer"
+    assert result["frontdoorNavigationPlaySignInRoute"] == "/login?next=%2F"
     assert result["frontdoorNavigationDirectPlayerRoute"] == "/mobile/player"
     assert result["frontdoorNavigationDirectPlayerHttpStatus"] == 200
     assert result["frontdoorNavigationFinalUrl"] == "https://chummer.run/mobile/player"
     assert result["frontdoorNavigationPrivateIdentityRedacted"] is True
     assert result["frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent"] is True
-    assert result["frontdoorNavigationPlayerSessionContextPresent"] is True
-    assert result["frontdoorNavigationPlayerDeviceContextPresent"] is True
-    assert result["frontdoorNavigationLiveTurnCompanionShell"] is True
+    assert result["frontdoorNavigationPlayerSessionContextPresent"] is False
+    assert result["frontdoorNavigationPlayerDeviceContextPresent"] is False
+    assert result["frontdoorNavigationLiveTurnCompanionShell"] is False
     assert result["frontdoorNavigationPwaManifestPath"] == "/manifest.player.webmanifest"
     assert result["frontdoorNavigationPwaRole"] == "Player"
-    assert result["frontdoorNavigationBlazorShell"] == "interactive-server"
-    assert result["frontdoorNavigationRybbitConfigured"] is True
-    assert result["frontdoorNavigationRybbitTag"] == "mobile_play_shell"
-    assert result["frontdoorNavigationRybbitRoute"] == "/mobile/player"
-    assert result["frontdoorNavigationRybbitMode"] == "player"
-    assert result["frontdoorNavigationRybbitRole"] == "Player"
-    assert result["frontdoorNavigationRybbitSiteIdPresent"] is True
-    assert result["frontdoorNavigationRybbitScriptUrlPresent"] is True
-    assert result["frontdoorNavigationRybbitScriptUrlAllowed"] is True
-    assert result["frontdoorNavigationRybbitSkipPatterns"] == ["/mobile/**"]
-    assert result["frontdoorNavigationRybbitMaskPatterns"] == ["/api/play/**", "/mobile/**"]
-    assert result["frontdoorNavigationRybbitSkipMobilePaths"] is True
-    assert result["frontdoorNavigationRybbitMaskMobilePaths"] is True
-    assert result["frontdoorNavigationRybbitMasksPrivatePlayRoutes"] is True
-    assert result["frontdoorNavigationRybbitReplayBlockSelector"] == "[data-turn-root]"
-    assert result["frontdoorNavigationRybbitReplayBlocksTurnRoot"] is True
-    assert result["frontdoorNavigationPlayerSessionHandoffUrl"] == "https://chummer.run/mobile/player?sessionId=[redacted]&role=Player"
-    assert result["frontdoorNavigationPlayerSessionHandoffStatus"] == "Session handoff is ready in the link above."
-    assert result["frontdoorNavigationPlayerSessionHandoffLinkText"] == "Open session handoff link"
-    assert result["frontdoorNavigationPlayerSessionHandoffPreservesSession"] is True
-    assert result["frontdoorNavigationPlayerSessionHandoffPreservesRole"] is True
-    assert result["frontdoorNavigationPlayerSessionHandoffStripsDevice"] is True
-    assert result["frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent"] is True
+    assert result["frontdoorNavigationBlazorShell"] == "install-only"
+    assert result["frontdoorNavigationRybbitConfigured"] is False
+    assert result["frontdoorNavigationRybbitTag"] == ""
+    assert result["frontdoorNavigationRybbitRoute"] == ""
+    assert result["frontdoorNavigationRybbitMode"] == ""
+    assert result["frontdoorNavigationRybbitRole"] == ""
+    assert result["frontdoorNavigationRybbitSiteIdPresent"] is False
+    assert result["frontdoorNavigationRybbitScriptUrlPresent"] is False
+    assert result["frontdoorNavigationRybbitScriptUrlAllowed"] is False
+    assert result["frontdoorNavigationRybbitSkipPatterns"] == []
+    assert result["frontdoorNavigationRybbitMaskPatterns"] == []
+    assert result["frontdoorNavigationRybbitSkipMobilePaths"] is False
+    assert result["frontdoorNavigationRybbitMaskMobilePaths"] is False
+    assert result["frontdoorNavigationRybbitMasksPrivatePlayRoutes"] is False
+    assert result["frontdoorNavigationRybbitReplayBlockSelector"] == ""
+    assert result["frontdoorNavigationRybbitReplayBlocksTurnRoot"] is False
+    assert result["frontdoorNavigationPlayerSessionHandoffUrl"] == ""
+    assert result["frontdoorNavigationPlayerSessionHandoffStatus"] == ""
+    assert result["frontdoorNavigationPlayerSessionHandoffLinkText"] == ""
+    assert result["frontdoorNavigationPlayerSessionHandoffPreservesSession"] is False
+    assert result["frontdoorNavigationPlayerSessionHandoffPreservesRole"] is False
+    assert result["frontdoorNavigationPlayerSessionHandoffStripsDevice"] is False
+    assert result["frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent"] is False
     assert result["frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted"] is True
     assert result["frontdoorNavigationGmRoute"] == "/mobile/gm"
-    assert result["frontdoorNavigationGmRouteSessionIdPresent"] is True
+    assert result["frontdoorNavigationGmRouteSessionIdPresent"] is False
     assert result["frontdoorNavigationGmRoutePrivateIdentityRedacted"] is True
     assert result["frontdoorNavigationGmHttpStatus"] == 200
     assert result["frontdoorNavigationGmFinalUrl"] == "https://chummer.run/mobile/gm"
     assert result["frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent"] is True
-    assert result["frontdoorNavigationGmSessionContextPresent"] is True
-    assert result["frontdoorNavigationGmDeviceContextPresent"] is True
-    assert result["frontdoorNavigationGmLiveTurnCompanionShell"] is True
+    assert result["frontdoorNavigationGmSessionContextPresent"] is False
+    assert result["frontdoorNavigationGmDeviceContextPresent"] is False
+    assert result["frontdoorNavigationGmLiveTurnCompanionShell"] is False
     assert result["frontdoorNavigationGmPwaManifestPath"] == "/manifest.gm.webmanifest"
     assert result["frontdoorNavigationGmPwaRole"] == "GameMaster"
-    assert result["frontdoorNavigationGmBlazorShell"] == "interactive-server"
-    assert result["frontdoorNavigationGmRybbitConfigured"] is True
-    assert result["frontdoorNavigationGmRybbitTag"] == "mobile_play_shell"
-    assert result["frontdoorNavigationGmRybbitRoute"] == "/mobile/gm"
-    assert result["frontdoorNavigationGmRybbitMode"] == "gm"
-    assert result["frontdoorNavigationGmRybbitRole"] == "GameMaster"
-    assert result["frontdoorNavigationGmRybbitSiteIdPresent"] is True
-    assert result["frontdoorNavigationGmRybbitScriptUrlPresent"] is True
-    assert result["frontdoorNavigationGmRybbitScriptUrlAllowed"] is True
-    assert result["frontdoorNavigationGmRybbitSkipPatterns"] == ["/mobile/**"]
-    assert result["frontdoorNavigationGmRybbitMaskPatterns"] == ["/api/play/**", "/mobile/**"]
-    assert result["frontdoorNavigationGmRybbitSkipMobilePaths"] is True
-    assert result["frontdoorNavigationGmRybbitMaskMobilePaths"] is True
-    assert result["frontdoorNavigationGmRybbitMasksPrivatePlayRoutes"] is True
-    assert result["frontdoorNavigationGmRybbitReplayBlockSelector"] == "[data-turn-root]"
-    assert result["frontdoorNavigationGmRybbitReplayBlocksTurnRoot"] is True
-    assert result["frontdoorNavigationGmSessionHandoffUrl"] == "https://chummer.run/mobile/gm?sessionId=[redacted]&role=GameMaster"
-    assert result["frontdoorNavigationGmSessionHandoffStatus"] == "Session handoff is ready in the link above."
-    assert result["frontdoorNavigationGmSessionHandoffLinkText"] == "Open session handoff link"
-    assert result["frontdoorNavigationGmSessionHandoffPreservesSession"] is True
-    assert result["frontdoorNavigationGmSessionHandoffPreservesRole"] is True
-    assert result["frontdoorNavigationGmSessionHandoffStripsDevice"] is True
-    assert result["frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent"] is True
+    assert result["frontdoorNavigationGmBlazorShell"] == "install-only"
+    assert result["frontdoorNavigationGmRybbitConfigured"] is False
+    assert result["frontdoorNavigationGmRybbitTag"] == ""
+    assert result["frontdoorNavigationGmRybbitRoute"] == ""
+    assert result["frontdoorNavigationGmRybbitMode"] == ""
+    assert result["frontdoorNavigationGmRybbitRole"] == ""
+    assert result["frontdoorNavigationGmRybbitSiteIdPresent"] is False
+    assert result["frontdoorNavigationGmRybbitScriptUrlPresent"] is False
+    assert result["frontdoorNavigationGmRybbitScriptUrlAllowed"] is False
+    assert result["frontdoorNavigationGmRybbitSkipPatterns"] == []
+    assert result["frontdoorNavigationGmRybbitMaskPatterns"] == []
+    assert result["frontdoorNavigationGmRybbitSkipMobilePaths"] is False
+    assert result["frontdoorNavigationGmRybbitMaskMobilePaths"] is False
+    assert result["frontdoorNavigationGmRybbitMasksPrivatePlayRoutes"] is False
+    assert result["frontdoorNavigationGmRybbitReplayBlockSelector"] == ""
+    assert result["frontdoorNavigationGmRybbitReplayBlocksTurnRoot"] is False
+    assert result["frontdoorNavigationGmSessionHandoffUrl"] == ""
+    assert result["frontdoorNavigationGmSessionHandoffStatus"] == ""
+    assert result["frontdoorNavigationGmSessionHandoffLinkText"] == ""
+    assert result["frontdoorNavigationGmSessionHandoffPreservesSession"] is False
+    assert result["frontdoorNavigationGmSessionHandoffPreservesRole"] is False
+    assert result["frontdoorNavigationGmSessionHandoffStripsDevice"] is False
+    assert result["frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent"] is False
     assert result["frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted"] is True
     assert result["frontdoorNavigationLedgerPrimary"] is False
     assert result["frontdoorNavigationAnchorEntryUrl"] == "https://chummer.run/#turn-runsite-card"
@@ -3022,11 +3016,11 @@ def test_postdeploy_gate_can_require_frontdoor_navigation_browser_proof() -> Non
     assert result["frontdoorNavigationAnchorFinalHash"] == "#turn-runsite-card"
     assert result["frontdoorNavigationAnchorPwaManifestPath"] == "/manifest.player.webmanifest"
     assert result["frontdoorNavigationAnchorPwaRole"] == "Player"
-    assert result["frontdoorNavigationAnchorBlazorShell"] == "interactive-server"
+    assert result["frontdoorNavigationAnchorBlazorShell"] == "install-only"
     assert result["frontdoorNavigationAnchorPrivateIdentityRedacted"] is True
     assert result["frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent"] is True
-    assert result["frontdoorNavigationAnchorSessionContextPresent"] is True
-    assert result["frontdoorNavigationAnchorDeviceContextPresent"] is True
+    assert result["frontdoorNavigationAnchorSessionContextPresent"] is False
+    assert result["frontdoorNavigationAnchorDeviceContextPresent"] is False
     assert result["frontdoorNavigationAnchorFailure"] == ""
     assert result["frontdoorNavigationAnchorArtifactCurrentContractSatisfied"] is True
 
@@ -3984,7 +3978,7 @@ def test_run_playwright_command_executes_from_repo_root(monkeypatch) -> None:
     assert captured["cwd"] == module.RUN_SERVICES_ROOT
 
 
-def test_frontdoor_navigation_probe_uses_playwright_click_for_gm_switch(monkeypatch, tmp_path) -> None:
+def test_frontdoor_navigation_probe_proves_public_install_only_roles(monkeypatch, tmp_path) -> None:
     module = load_module()
     captured: dict[str, object] = {}
 
@@ -4002,51 +3996,29 @@ def test_frontdoor_navigation_probe_uses_playwright_click_for_gm_switch(monkeypa
 
     script = captured["script"]
     assert isinstance(script, str)
-    assert "const playButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target=\"/mobile/player\"]'" in script
-    assert "const playLink = openMenu.locator('a.site-open-chummer-menu__button[href=\"/mobile/player\"]'" not in script
-    assert "gmLink.click({ noWaitAfter: true })" in script
-    assert "gmLink.evaluate((element) => element.click())" not in script
-    assert "channel: (process.env.CHUMMER_PLAYWRIGHT_CHANNEL || 'chromium').trim() || 'chromium'" in script
-    assert "args: ['--disable-quic']" in script
-    assert "const maxAttempts = 3;" in script
-    assert "'net::ERR_NETWORK_CHANGED'" in script
-    assert "'net::ERR_CONNECTION_RESET'" in script
-    assert "if (!transient || attempt === maxAttempts)" in script
-    assert "await gotoWithTransientRetry(page, baseUrl, { waitUntil: 'domcontentloaded' });" in script
-    assert "new URL(directPlayerRoute || '/mobile/player', baseUrl).toString()," in script
-    assert "await page.addInitScript(() => {" in script
-    assert "Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });" in script
-    assert "Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });" in script
-    assert "await page.evaluate(() => {" not in script
+    assert "async function proveInstallShell" in script
+    assert '[data-play-surface="install-only"]' in script
+    assert '[data-live-session="unavailable"]' in script
+    assert '[data-authority="none"]' in script
+    assert "await page.locator('[data-turn-root]').count() === 0" in script
+    assert "await page.locator('[data-blazor-shell=\"interactive-server\"]').count() === 0" in script
+    assert "public_targets: ['Build', 'Play']" in script
+    assert "gated_targets: []" in script
     assert "const proofTimeoutMs = 180000;" in script
-    assert "page.waitForURL('**/mobile/gm**', { timeout: proofTimeoutMs })" in script
-    assert "await page.close({ runBeforeUnload: false }).catch(() => undefined);" in script
     assert "const anchorPage = await browser.newPage({ viewport: mobileViewport });" in script
     assert "const anchorEntryUrl = new URL('/#turn-runsite-card', baseUrl).toString();" in script
-    assert "await anchorPage.waitForFunction(() => {" in script
-    assert "}, null, { timeout: proofTimeoutMs });" in script
-    assert "currentUrl.pathname === '/mobile/player'" in script
-    assert "currentUrl.hash === '#turn-runsite-card'" in script
-    assert "currentUrl.search === '';" in script
+    assert "url.pathname === '/mobile/player'" in script
+    assert "url.hash === '#turn-runsite-card'" in script
+    assert "url.search === ''" in script
     assert "contractName: 'chummer.frontdoor_mobile_launch.v2'" in script
     assert "contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2'" in script
-    assert "player_session_handoff_url: redactedPrivateUrl(playerHandoffUrl.toString())" in script
-    assert "gm_session_handoff_url: redactedPrivateUrl(gmHandoffUrl.toString())" in script
-    assert "visible_player_url_private_identity_absent: visibleRoleUrlIsPathOnly(finalUrl, '/mobile/player')" in script
-    assert "player_session_context_present: Boolean(playerSessionId)" in script
-    assert "player_device_context_present: Boolean(playerDeviceId)" in script
-    assert "visible_gm_url_private_identity_absent: visibleRoleUrlIsPathOnly(gmFinalUrl, '/mobile/gm')" in script
-    assert "gm_session_context_present: Boolean(gmSessionId)" in script
-    assert "gm_device_context_present: Boolean(gmDeviceId)" in script
-    assert "final_url: anchorFinalUrlText" in script
-    assert "\n      session_id_present:" not in script
-    assert "\n      device_id_present:" not in script
-    assert "const legacyHomepageLaneMatch = heroText.match(/Current release:\\s*(Stable\\.|Preview build\\.|Downloads paused\\.)/);" in script
-    assert "Homepage still serves legacy release posture copy:" in script
-    assert "status: anchorStatus," in script
-    assert "failure: anchorFailure," in script
-    assert "page_errors: anchorPageErrors.map(redactPrivateText)," in script
-    assert "if (anchorFailure) {" in script
+    assert "player_session_context_present: false" in script
+    assert "player_device_context_present: false" in script
+    assert "gm_session_context_present: false" in script
+    assert "gm_device_context_present: false" in script
+    assert "blazor_shell: 'install-only'" in script
+    assert "session_context_present: false" in script
+    assert "device_context_present: false" in script
     assert "writeJson('FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json'" in script
     assert result["status"] == "fail"
 

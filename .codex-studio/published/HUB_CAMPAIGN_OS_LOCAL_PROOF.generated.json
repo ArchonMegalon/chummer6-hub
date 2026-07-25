@@ -1,197 +1,844 @@
 {
   "contract_name": "chummer6-hub.campaign_os_local_proof",
+  "contract_version": 3,
   "status": "passed",
-  "proof_kind": "source_backed_local_smoke_contract",
-  "package_proof": {
-    "package_id": "next90-m112-hub-campaign-consequence-truth",
-    "title": "Promote campaign consequence state into governed campaign APIs",
-    "task": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions.",
-    "frontier_id": 4730880976,
-    "milestone_id": 112,
-    "allowed_paths": [
-      "Chummer.Run.Api",
-      "scripts",
-      "tests"
-    ],
-    "owned_surfaces": [
-      "campaign_memory:consequence_truth",
-      "downtime_aftermath:api"
-    ]
+  "proof_kind": "materializer_owned_executed_smoke_receipt",
+  "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+  "started_at": "2026-07-30T03:23:00Z",
+  "completed_at": "2026-07-30T03:24:38Z",
+  "generated_at": "2026-07-30T03:24:38Z",
+  "expires_at": "2026-07-31T03:24:38Z",
+  "invocation": {
+    "id": "run_services_smoke",
+    "owner": "campaign_os_local_proof_materializer",
+    "dependency_mode": "restore_free_with_locally_closed_package_inputs",
+    "prepare_exit_code": 0,
+    "runner_exit_code": 0
   },
-  "source_file": "tests/RunServicesSmoke/Program.cs",
-  "journeys_passed": [
-    "install_claim_restore_continue",
-    "build_explain_publish",
-    "campaign_session_recover_recap",
-    "report_cluster_release_notify",
-    "organize_community_and_close_loop"
+  "inputs": {
+    "source": {
+      "path": "tests/RunServicesSmoke/Program.cs",
+      "sha256": "4d409f1f364ef1358f8caca778c4a0b23e08c6bdd9c77487fc73c2a8fcba537d",
+      "size_bytes": 817453
+    },
+    "journey_spec": {
+      "path": ".codex-design/product/GOLDEN_JOURNEY_RELEASE_GATES.yaml",
+      "sha256": "0d21c059522ad60581951264d08e9a0a09179997e3d55a818b2c4e03c4a275c2",
+      "size_bytes": 51116,
+      "version": 1
+    },
+    "runner": {
+      "path": "scripts/ai/run_services_smoke.sh",
+      "sha256": "0b90a09f7438d0e3403cfb893e6f38cd005c6d576e10ca4babf4492c80aebe54",
+      "size_bytes": 266
+    },
+    "prepare_helper": {
+      "path": "scripts/ai/prepare_run_services_smoke.sh",
+      "sha256": "19d4216f39d3295b5947f04b9cb2ddd07ade38ec2b6dd0b8ffd74a6d1bbaad26",
+      "size_bytes": 12763
+    },
+    "environment_helper": {
+      "path": "scripts/ai/_env.sh",
+      "sha256": "98a10f0fe5bd6b056ce7eb10ec3b2e74d8ccfdfe7a9da2604cd5ed78a75d9284",
+      "size_bytes": 384
+    },
+    "cleanroom_builder": {
+      "path": "scripts/ai/build_r1_cleanroom.sh",
+      "sha256": "af74144b58354a1f424c4d10371c0622a568170c59499281ec96a216a2e64c15",
+      "size_bytes": 3141
+    },
+    "registry_global_usings": {
+      "path": "../chummer-hub-registry/Chummer.Run.Registry/GlobalUsings.RegistryContracts.cs",
+      "sha256": "334770d82e35874bcdd9a286b19c9a2720e0ba3eb4de70f57cc2fabb2403b05f",
+      "size_bytes": 171
+    },
+    "materializer": {
+      "path": "scripts/materialize_campaign_os_local_proof.py",
+      "sha256": "f9b594829baa7a842e7352e8ae5b7a135846a25cdbf0d13944db4d9c166775f2",
+      "size_bytes": 1810
+    },
+    "contract_module": {
+      "path": "scripts/campaign_os_local_proof_v3.py",
+      "sha256": "37cbb68ee67afe7e1dc1a8946ab2ec6008b6bd561a87857a030a861b77ca4c62",
+      "size_bytes": 134433
+    },
+    "dotnet_host": {
+      "path": "/usr/bin/dotnet",
+      "resolved_path": "/usr/lib/dotnet/dotnet",
+      "sha256": "a2e03e682b5ba32303077bc5ed95ca3dd6b57b6d55d09491b67444644e211940",
+      "size_bytes": 73016
+    },
+    "csc": {
+      "path": "/usr/lib/dotnet/sdk/10.0.110/Roslyn/bincore/csc.dll",
+      "sha256": "3258c469342dfbb3fd47b82413b3043c698849466250657559f98c31ba40050f",
+      "size_bytes": 123904
+    },
+    "assembly": {
+      "file_name": "RunServicesSmoke.dll",
+      "sha256": "59cb092d9b8a15b9d7672088c3c766102df35d429768d1bb1ee90a2596f29d8e",
+      "size_bytes": 1042432
+    }
+  },
+  "execution": {
+    "phase": "verified",
+    "failure_reason": null,
+    "candidate_source_build_inputs_before": {
+      "kind": "candidate_source_build_inputs",
+      "tree_format_version": 1,
+      "project_roots": [
+        {
+          "root": "../chummer-core-engine/Chummer.Contracts",
+          "file_count": 91,
+          "total_size_bytes": 230291,
+          "tree_sha256": "ece3615d2ff6f47cc74a57afbcda11ebbda39cc7f49f6c483a56f8c14e6b81b3"
+        },
+        {
+          "root": "../chummer-hub-registry/Chummer.Hub.Registry.Contracts",
+          "file_count": 18,
+          "total_size_bytes": 128589,
+          "tree_sha256": "2f333ec740d29764657a95e5500a9da03743be2444b63d185df5ba60b34b75c8"
+        },
+        {
+          "root": "../chummer-hub-registry/Chummer.Run.Registry",
+          "file_count": 16,
+          "total_size_bytes": 213360,
+          "tree_sha256": "a440546ddd31295927ef70cefc4a5cda1b459a1a7ec5c78df34e6fa31d183739"
+        },
+        {
+          "root": "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts",
+          "file_count": 25,
+          "total_size_bytes": 128248,
+          "tree_sha256": "6733edfb0283b9f755ee1492d8654dd4d7ca630a4325ba751118f258dbbdb0cc"
+        },
+        {
+          "root": "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime",
+          "file_count": 31,
+          "total_size_bytes": 459473,
+          "tree_sha256": "b1aedee96bdff669eb46c753a090d589b4e2742c96cd9feb1dec7663bca7e6fc"
+        },
+        {
+          "root": "Chummer.Play.Contracts",
+          "file_count": 11,
+          "total_size_bytes": 31176,
+          "tree_sha256": "35cd103c872cb0540b36c4f24660d429c0a42f244853374edded8970d65d3bf4"
+        },
+        {
+          "root": "Chummer.Campaign.Contracts",
+          "file_count": 6,
+          "total_size_bytes": 39392,
+          "tree_sha256": "ffe02cc2a2a91c7d7306623809ecccf4ff6dcf3ae3c0fd2c27c5da231f714b49"
+        },
+        {
+          "root": "Chummer.Control.Contracts",
+          "file_count": 2,
+          "total_size_bytes": 11799,
+          "tree_sha256": "8656c92e9c07948b3a99381ee33ff0987b370c0fec5c73c404bc99f6a1f620df"
+        },
+        {
+          "root": "Chummer.Run.Contracts",
+          "file_count": 64,
+          "total_size_bytes": 311668,
+          "tree_sha256": "5295c01fd62934a8e4b2163929fd00870ab613ed8269998830fe61a1d1ce53a4"
+        },
+        {
+          "root": "Chummer.World.Contracts",
+          "file_count": 2,
+          "total_size_bytes": 2968,
+          "tree_sha256": "f27513731792dae17f6ee4f05706b6760d78c5b08ce609af7765fd9094d9a62d"
+        },
+        {
+          "root": "Chummer.Run.Api",
+          "file_count": 601,
+          "total_size_bytes": 735785299,
+          "tree_sha256": "59e613d6da8a5d0bd658377ae03506c7d88cc662552a892c296ad05c41b20f83"
+        },
+        {
+          "root": "Chummer.Run.Identity",
+          "file_count": 10,
+          "total_size_bytes": 87493,
+          "tree_sha256": "b6bd08534cd5e5892b764932485398fcd958a13bd25d240510b98b972fe9eadf"
+        },
+        {
+          "root": "Chummer.Run.AI",
+          "file_count": 72,
+          "total_size_bytes": 546158,
+          "tree_sha256": "b5abba3754dbc72a332b3ecab9f07f04797b3be1e2781ba535905fa5d6fe3bff"
+        }
+      ],
+      "smoke_source_tree": {
+        "root": "tests/RunServicesSmoke",
+        "file_count": 1,
+        "total_size_bytes": 817453,
+        "tree_sha256": "7335f99f5e2848bf8ccd202909eabb0ba277180c9bc8a17155d69044d991cfff"
+      },
+      "runtime_data_roots": [
+        {
+          "root": ".codex-design/product",
+          "file_count": 203,
+          "total_size_bytes": 2671692,
+          "tree_sha256": "70badc6e9fe3585739ca99fd5709e67fd497f607988fcd736698c41ee7721a8f"
+        },
+        {
+          "root": "../chummer-design/products/chummer",
+          "file_count": 789,
+          "total_size_bytes": 84814460,
+          "tree_sha256": "c72cd39ce2286dc9227d61cdd7e28db0c9aed3eea773f298693971fab130aa25"
+        }
+      ],
+      "runtime_data_files": {
+        "root": "runtime_data_files",
+        "file_count": 1,
+        "total_size_bytes": 40676,
+        "tree_sha256": "1fcdee5c976fbda0e01b661609a55d4c4566ea2c9dc3147b81b08930ccef9a66"
+      },
+      "ancestor_build_controls": {
+        "root": "ancestor_build_controls",
+        "file_count": 12,
+        "total_size_bytes": 5465,
+        "tree_sha256": "b9c81a7af8d719b53e54b0ec9a1cb2a123161d6ecec714023b6d1480364c4dbc"
+      },
+      "project_assets": {
+        "root": "project_assets",
+        "file_count": 13,
+        "total_size_bytes": 337332,
+        "tree_sha256": "e76f0cf151cdcad3da9e2110ffd47dea437c157537817d74d6f128d403bf6046"
+      },
+      "generated_nuget_imports": {
+        "root": "generated_nuget_imports",
+        "file_count": 26,
+        "total_size_bytes": 17789,
+        "tree_sha256": "b05272f7ed338db67072971d92d50a61e6428e277d03e9aea07b5bc4b3998623"
+      },
+      "nuget_package_roots": [
+        "/docker/chummercomplete/chummer-core-engine/.tmp/nuget/packages",
+        "/docker/chummercomplete/chummer-hub-registry/.tmp/nuget/packages",
+        "/docker/chummercomplete/chummer.run-services/.tmp/nuget/packages",
+        "/docker/fleet/repos/chummer-media-factory/.tmp/nuget/packages"
+      ],
+      "nuget_packages": {
+        "root": "project_assets.packageFolders",
+        "file_count": 30,
+        "total_size_bytes": 12421824,
+        "tree_sha256": "233a14ad9dd587968889305b2b97db5ef5b8ef70428a6ea4c4a692ecd19e8733"
+      },
+      "project_root_count": 13,
+      "runtime_data_root_count": 2,
+      "closure_sha256": "fbc82d1894cb2f52f44212fb723e0c62142216d874486e85d64f4fed8c4e5fd1"
+    },
+    "candidate_source_build_inputs_after": {
+      "kind": "candidate_source_build_inputs",
+      "tree_format_version": 1,
+      "project_roots": [
+        {
+          "root": "../chummer-core-engine/Chummer.Contracts",
+          "file_count": 91,
+          "total_size_bytes": 230291,
+          "tree_sha256": "ece3615d2ff6f47cc74a57afbcda11ebbda39cc7f49f6c483a56f8c14e6b81b3"
+        },
+        {
+          "root": "../chummer-hub-registry/Chummer.Hub.Registry.Contracts",
+          "file_count": 18,
+          "total_size_bytes": 128589,
+          "tree_sha256": "2f333ec740d29764657a95e5500a9da03743be2444b63d185df5ba60b34b75c8"
+        },
+        {
+          "root": "../chummer-hub-registry/Chummer.Run.Registry",
+          "file_count": 16,
+          "total_size_bytes": 213360,
+          "tree_sha256": "a440546ddd31295927ef70cefc4a5cda1b459a1a7ec5c78df34e6fa31d183739"
+        },
+        {
+          "root": "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts",
+          "file_count": 25,
+          "total_size_bytes": 128248,
+          "tree_sha256": "6733edfb0283b9f755ee1492d8654dd4d7ca630a4325ba751118f258dbbdb0cc"
+        },
+        {
+          "root": "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime",
+          "file_count": 31,
+          "total_size_bytes": 459473,
+          "tree_sha256": "b1aedee96bdff669eb46c753a090d589b4e2742c96cd9feb1dec7663bca7e6fc"
+        },
+        {
+          "root": "Chummer.Play.Contracts",
+          "file_count": 11,
+          "total_size_bytes": 31176,
+          "tree_sha256": "35cd103c872cb0540b36c4f24660d429c0a42f244853374edded8970d65d3bf4"
+        },
+        {
+          "root": "Chummer.Campaign.Contracts",
+          "file_count": 6,
+          "total_size_bytes": 39392,
+          "tree_sha256": "ffe02cc2a2a91c7d7306623809ecccf4ff6dcf3ae3c0fd2c27c5da231f714b49"
+        },
+        {
+          "root": "Chummer.Control.Contracts",
+          "file_count": 2,
+          "total_size_bytes": 11799,
+          "tree_sha256": "8656c92e9c07948b3a99381ee33ff0987b370c0fec5c73c404bc99f6a1f620df"
+        },
+        {
+          "root": "Chummer.Run.Contracts",
+          "file_count": 64,
+          "total_size_bytes": 311668,
+          "tree_sha256": "5295c01fd62934a8e4b2163929fd00870ab613ed8269998830fe61a1d1ce53a4"
+        },
+        {
+          "root": "Chummer.World.Contracts",
+          "file_count": 2,
+          "total_size_bytes": 2968,
+          "tree_sha256": "f27513731792dae17f6ee4f05706b6760d78c5b08ce609af7765fd9094d9a62d"
+        },
+        {
+          "root": "Chummer.Run.Api",
+          "file_count": 601,
+          "total_size_bytes": 735785299,
+          "tree_sha256": "59e613d6da8a5d0bd658377ae03506c7d88cc662552a892c296ad05c41b20f83"
+        },
+        {
+          "root": "Chummer.Run.Identity",
+          "file_count": 10,
+          "total_size_bytes": 87493,
+          "tree_sha256": "b6bd08534cd5e5892b764932485398fcd958a13bd25d240510b98b972fe9eadf"
+        },
+        {
+          "root": "Chummer.Run.AI",
+          "file_count": 72,
+          "total_size_bytes": 546158,
+          "tree_sha256": "b5abba3754dbc72a332b3ecab9f07f04797b3be1e2781ba535905fa5d6fe3bff"
+        }
+      ],
+      "smoke_source_tree": {
+        "root": "tests/RunServicesSmoke",
+        "file_count": 1,
+        "total_size_bytes": 817453,
+        "tree_sha256": "7335f99f5e2848bf8ccd202909eabb0ba277180c9bc8a17155d69044d991cfff"
+      },
+      "runtime_data_roots": [
+        {
+          "root": ".codex-design/product",
+          "file_count": 203,
+          "total_size_bytes": 2671692,
+          "tree_sha256": "70badc6e9fe3585739ca99fd5709e67fd497f607988fcd736698c41ee7721a8f"
+        },
+        {
+          "root": "../chummer-design/products/chummer",
+          "file_count": 789,
+          "total_size_bytes": 84814460,
+          "tree_sha256": "c72cd39ce2286dc9227d61cdd7e28db0c9aed3eea773f298693971fab130aa25"
+        }
+      ],
+      "runtime_data_files": {
+        "root": "runtime_data_files",
+        "file_count": 1,
+        "total_size_bytes": 40676,
+        "tree_sha256": "1fcdee5c976fbda0e01b661609a55d4c4566ea2c9dc3147b81b08930ccef9a66"
+      },
+      "ancestor_build_controls": {
+        "root": "ancestor_build_controls",
+        "file_count": 12,
+        "total_size_bytes": 5465,
+        "tree_sha256": "b9c81a7af8d719b53e54b0ec9a1cb2a123161d6ecec714023b6d1480364c4dbc"
+      },
+      "project_assets": {
+        "root": "project_assets",
+        "file_count": 13,
+        "total_size_bytes": 337332,
+        "tree_sha256": "e76f0cf151cdcad3da9e2110ffd47dea437c157537817d74d6f128d403bf6046"
+      },
+      "generated_nuget_imports": {
+        "root": "generated_nuget_imports",
+        "file_count": 26,
+        "total_size_bytes": 17789,
+        "tree_sha256": "b05272f7ed338db67072971d92d50a61e6428e277d03e9aea07b5bc4b3998623"
+      },
+      "nuget_package_roots": [
+        "/docker/chummercomplete/chummer-core-engine/.tmp/nuget/packages",
+        "/docker/chummercomplete/chummer-hub-registry/.tmp/nuget/packages",
+        "/docker/chummercomplete/chummer.run-services/.tmp/nuget/packages",
+        "/docker/fleet/repos/chummer-media-factory/.tmp/nuget/packages"
+      ],
+      "nuget_packages": {
+        "root": "project_assets.packageFolders",
+        "file_count": 30,
+        "total_size_bytes": 12421824,
+        "tree_sha256": "233a14ad9dd587968889305b2b97db5ef5b8ef70428a6ea4c4a692ecd19e8733"
+      },
+      "project_root_count": 13,
+      "runtime_data_root_count": 2,
+      "closure_sha256": "fbc82d1894cb2f52f44212fb723e0c62142216d874486e85d64f4fed8c4e5fd1"
+    },
+    "staged_candidate_inputs_before": {
+      "kind": "staged_candidate_inputs",
+      "tree_format_version": 1,
+      "roots": [
+        {
+          "root": "Chummer.Run.Api",
+          "file_count": 601,
+          "total_size_bytes": 735785299,
+          "tree_sha256": "59e613d6da8a5d0bd658377ae03506c7d88cc662552a892c296ad05c41b20f83"
+        },
+        {
+          "root": ".codex-design/product",
+          "file_count": 203,
+          "total_size_bytes": 2671692,
+          "tree_sha256": "70badc6e9fe3585739ca99fd5709e67fd497f607988fcd736698c41ee7721a8f"
+        },
+        {
+          "root": "products/chummer",
+          "file_count": 789,
+          "total_size_bytes": 84814460,
+          "tree_sha256": "c72cd39ce2286dc9227d61cdd7e28db0c9aed3eea773f298693971fab130aa25"
+        }
+      ],
+      "runtime_data_files": {
+        "root": "runtime_data_files",
+        "file_count": 1,
+        "total_size_bytes": 40676,
+        "tree_sha256": "1fcdee5c976fbda0e01b661609a55d4c4566ea2c9dc3147b81b08930ccef9a66"
+      },
+      "root_count": 3,
+      "closure_sha256": "923309759e783bcd3836621903f655198b14f72a949c3235c13c1623689260c2"
+    },
+    "staged_candidate_inputs_after": {
+      "kind": "staged_candidate_inputs",
+      "tree_format_version": 1,
+      "roots": [
+        {
+          "root": "Chummer.Run.Api",
+          "file_count": 601,
+          "total_size_bytes": 735785299,
+          "tree_sha256": "59e613d6da8a5d0bd658377ae03506c7d88cc662552a892c296ad05c41b20f83"
+        },
+        {
+          "root": ".codex-design/product",
+          "file_count": 203,
+          "total_size_bytes": 2671692,
+          "tree_sha256": "70badc6e9fe3585739ca99fd5709e67fd497f607988fcd736698c41ee7721a8f"
+        },
+        {
+          "root": "products/chummer",
+          "file_count": 789,
+          "total_size_bytes": 84814460,
+          "tree_sha256": "c72cd39ce2286dc9227d61cdd7e28db0c9aed3eea773f298693971fab130aa25"
+        }
+      ],
+      "runtime_data_files": {
+        "root": "runtime_data_files",
+        "file_count": 1,
+        "total_size_bytes": 40676,
+        "tree_sha256": "1fcdee5c976fbda0e01b661609a55d4c4566ea2c9dc3147b81b08930ccef9a66"
+      },
+      "root_count": 3,
+      "closure_sha256": "923309759e783bcd3836621903f655198b14f72a949c3235c13c1623689260c2"
+    },
+    "managed_dotnet_closure_before": {
+      "kind": "managed_dotnet_closure",
+      "dotnet_host": {
+        "path": "/usr/bin/dotnet",
+        "resolved_path": "/usr/lib/dotnet/dotnet",
+        "sha256": "a2e03e682b5ba32303077bc5ed95ca3dd6b57b6d55d09491b67444644e211940",
+        "size_bytes": 73016
+      },
+      "components": [
+        {
+          "root": "hostfxr",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/host/fxr/10.0.10",
+          "file_count": 1,
+          "total_size_bytes": 324272,
+          "tree_sha256": "0444083fe9b68ef326611af658f646d81d0462dcff73325b98aa1ca0389f447e"
+        },
+        {
+          "root": "Microsoft.NETCore.App",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/shared/Microsoft.NETCore.App/10.0.10",
+          "file_count": 189,
+          "total_size_bytes": 75493150,
+          "tree_sha256": "dda1982f6bfa0ca4957b4a97c7c24a9d1dcc30a25c389180550432fa884cbf73"
+        },
+        {
+          "root": "Microsoft.AspNetCore.App",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/shared/Microsoft.AspNetCore.App/10.0.10",
+          "file_count": 144,
+          "total_size_bytes": 24073811,
+          "tree_sha256": "96f28f5e495ffef1197ed2517c29c5fe3ffbbbf6f2754c393e1f9208ca954ec4"
+        },
+        {
+          "root": "Microsoft.NETCore.App.Ref",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/10.0.10/ref/net10.0",
+          "file_count": 274,
+          "total_size_bytes": 35779105,
+          "tree_sha256": "87733668b52133829d5e1e6ec8d0069fa3889225bc5c2b17bfc354462745d8d9"
+        },
+        {
+          "root": "Microsoft.AspNetCore.App.Ref",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/packs/Microsoft.AspNetCore.App.Ref/10.0.10/ref/net10.0",
+          "file_count": 387,
+          "total_size_bytes": 45921234,
+          "tree_sha256": "ffb5fc707b35b9da1953172433c2a18242707e16dc59cdee4a6785cbc7ecfa23"
+        },
+        {
+          "root": "sdk",
+          "version": "10.0.110",
+          "path": "/usr/lib/dotnet/sdk/10.0.110",
+          "file_count": 3145,
+          "total_size_bytes": 346898490,
+          "tree_sha256": "48bd74a066cd073539e880549ec8d207d2fb99234064ae7477a584fd338eb13b"
+        }
+      ],
+      "component_count": 6,
+      "closure_sha256": "e3131b810c4025fa98dc146c91d440013fd442ed1f3bb70ec55307616223ac69"
+    },
+    "managed_dotnet_closure_after": {
+      "kind": "managed_dotnet_closure",
+      "dotnet_host": {
+        "path": "/usr/bin/dotnet",
+        "resolved_path": "/usr/lib/dotnet/dotnet",
+        "sha256": "a2e03e682b5ba32303077bc5ed95ca3dd6b57b6d55d09491b67444644e211940",
+        "size_bytes": 73016
+      },
+      "components": [
+        {
+          "root": "hostfxr",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/host/fxr/10.0.10",
+          "file_count": 1,
+          "total_size_bytes": 324272,
+          "tree_sha256": "0444083fe9b68ef326611af658f646d81d0462dcff73325b98aa1ca0389f447e"
+        },
+        {
+          "root": "Microsoft.NETCore.App",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/shared/Microsoft.NETCore.App/10.0.10",
+          "file_count": 189,
+          "total_size_bytes": 75493150,
+          "tree_sha256": "dda1982f6bfa0ca4957b4a97c7c24a9d1dcc30a25c389180550432fa884cbf73"
+        },
+        {
+          "root": "Microsoft.AspNetCore.App",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/shared/Microsoft.AspNetCore.App/10.0.10",
+          "file_count": 144,
+          "total_size_bytes": 24073811,
+          "tree_sha256": "96f28f5e495ffef1197ed2517c29c5fe3ffbbbf6f2754c393e1f9208ca954ec4"
+        },
+        {
+          "root": "Microsoft.NETCore.App.Ref",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/packs/Microsoft.NETCore.App.Ref/10.0.10/ref/net10.0",
+          "file_count": 274,
+          "total_size_bytes": 35779105,
+          "tree_sha256": "87733668b52133829d5e1e6ec8d0069fa3889225bc5c2b17bfc354462745d8d9"
+        },
+        {
+          "root": "Microsoft.AspNetCore.App.Ref",
+          "version": "10.0.10",
+          "path": "/usr/lib/dotnet/packs/Microsoft.AspNetCore.App.Ref/10.0.10/ref/net10.0",
+          "file_count": 387,
+          "total_size_bytes": 45921234,
+          "tree_sha256": "ffb5fc707b35b9da1953172433c2a18242707e16dc59cdee4a6785cbc7ecfa23"
+        },
+        {
+          "root": "sdk",
+          "version": "10.0.110",
+          "path": "/usr/lib/dotnet/sdk/10.0.110",
+          "file_count": 3145,
+          "total_size_bytes": 346898490,
+          "tree_sha256": "48bd74a066cd073539e880549ec8d207d2fb99234064ae7477a584fd338eb13b"
+        }
+      ],
+      "component_count": 6,
+      "closure_sha256": "e3131b810c4025fa98dc146c91d440013fd442ed1f3bb70ec55307616223ac69"
+    },
+    "runtime_manifest_before": {
+      "algorithm": "sha256",
+      "entries": [
+        {
+          "path": "Chummer.Campaign.Contracts.dll",
+          "sha256": "f7ea2e2819c5ed6b1ee343648ce1cfe86353df64cf863fa575e15deff3114b89",
+          "size_bytes": 390144
+        },
+        {
+          "path": "Chummer.Control.Contracts.dll",
+          "sha256": "70d840da64e343889200740882d6be3afc33f35063f284118d30f8766de96f9a",
+          "size_bytes": 94208
+        },
+        {
+          "path": "Chummer.Engine.Contracts.dll",
+          "sha256": "25fa94b657e96ea8e176d2de29f56e6f8c04db249eecbacd78b98356ae158642",
+          "size_bytes": 1419776
+        },
+        {
+          "path": "Chummer.Hub.Registry.Contracts.dll",
+          "sha256": "da8f322891c67b16cd00905ee8bf851d7b55ad17e39db3327c7a39e9da2e2b4d",
+          "size_bytes": 508928
+        },
+        {
+          "path": "Chummer.Media.Contracts.dll",
+          "sha256": "d5c9bd9ac2508544975725cd8dffefcb3b88741dbb97d12be6e1ad0215d66110",
+          "size_bytes": 600576
+        },
+        {
+          "path": "Chummer.Media.Factory.Runtime.dll",
+          "sha256": "b7bd16f9d06ce10a68a431e8d59b8bc3be23c26e80a68ea35b298e5b771f3bd3",
+          "size_bytes": 480768
+        },
+        {
+          "path": "Chummer.Play.Contracts.dll",
+          "sha256": "b8e0e9e2a865e95aa235fa6b0e4bb016b9ece94701e5c8c99fff4a3e174900fc",
+          "size_bytes": 325632
+        },
+        {
+          "path": "Chummer.Run.AI.dll",
+          "sha256": "97858ff978145abdf490626a6b58b86e07f8f761eb0b01d2ee38410b6ed0276b",
+          "size_bytes": 894464
+        },
+        {
+          "path": "Chummer.Run.Api.dll",
+          "sha256": "3c0f01054380950c017bea232985e8b8e6b2b5bfa1d56cb82f12a01feffceeb6",
+          "size_bytes": 12376064
+        },
+        {
+          "path": "Chummer.Run.Contracts.dll",
+          "sha256": "1ac88b5200ec8526b3377841adbc87edb14c09603d01bb88f9f865d1e67e162a",
+          "size_bytes": 1474048
+        },
+        {
+          "path": "Chummer.Run.Identity.dll",
+          "sha256": "91beb173067e1123005dbc8f1fee4a2fd04718441ce63bab07691f12b092115f",
+          "size_bytes": 99328
+        },
+        {
+          "path": "Chummer.Run.Registry.dll",
+          "sha256": "4a00dc972d937848fd8cd17311383075fbde0f761e47d550a09e523f6124ce5d",
+          "size_bytes": 244224
+        },
+        {
+          "path": "Chummer.World.Contracts.dll",
+          "sha256": "4714ca4954eb449ee7dfe8fac5ad1611b3bfed3d40581c8684c494fa07c5da34",
+          "size_bytes": 31744
+        },
+        {
+          "path": "RunServicesSmoke.dll",
+          "sha256": "59cb092d9b8a15b9d7672088c3c766102df35d429768d1bb1ee90a2596f29d8e",
+          "size_bytes": 1042432
+        },
+        {
+          "path": "RunServicesSmoke.runtimeconfig.json",
+          "sha256": "7728699cfdb0825e836acdb1cad30a628f2f4fb7600f79818624a348a9d1a887",
+          "size_bytes": 210
+        },
+        {
+          "path": "YamlDotNet.dll",
+          "sha256": "86f873f682c619a0c24e263dcdd15fe027104666641c92f503516671d61edda6",
+          "size_bytes": 293376
+        },
+        {
+          "path": "toolchain/csc.dll",
+          "sha256": "3258c469342dfbb3fd47b82413b3043c698849466250657559f98c31ba40050f",
+          "size_bytes": 123904
+        },
+        {
+          "path": "toolchain/dotnet",
+          "sha256": "a2e03e682b5ba32303077bc5ed95ca3dd6b57b6d55d09491b67444644e211940",
+          "size_bytes": 73016
+        }
+      ],
+      "entry_count": 18,
+      "manifest_sha256": "493c7738a9351c287ccd3f675133fcaf8755aca30b4ec08ef936fa7444b9d057"
+    },
+    "runtime_manifest_after": {
+      "algorithm": "sha256",
+      "entries": [
+        {
+          "path": "Chummer.Campaign.Contracts.dll",
+          "sha256": "f7ea2e2819c5ed6b1ee343648ce1cfe86353df64cf863fa575e15deff3114b89",
+          "size_bytes": 390144
+        },
+        {
+          "path": "Chummer.Control.Contracts.dll",
+          "sha256": "70d840da64e343889200740882d6be3afc33f35063f284118d30f8766de96f9a",
+          "size_bytes": 94208
+        },
+        {
+          "path": "Chummer.Engine.Contracts.dll",
+          "sha256": "25fa94b657e96ea8e176d2de29f56e6f8c04db249eecbacd78b98356ae158642",
+          "size_bytes": 1419776
+        },
+        {
+          "path": "Chummer.Hub.Registry.Contracts.dll",
+          "sha256": "da8f322891c67b16cd00905ee8bf851d7b55ad17e39db3327c7a39e9da2e2b4d",
+          "size_bytes": 508928
+        },
+        {
+          "path": "Chummer.Media.Contracts.dll",
+          "sha256": "d5c9bd9ac2508544975725cd8dffefcb3b88741dbb97d12be6e1ad0215d66110",
+          "size_bytes": 600576
+        },
+        {
+          "path": "Chummer.Media.Factory.Runtime.dll",
+          "sha256": "b7bd16f9d06ce10a68a431e8d59b8bc3be23c26e80a68ea35b298e5b771f3bd3",
+          "size_bytes": 480768
+        },
+        {
+          "path": "Chummer.Play.Contracts.dll",
+          "sha256": "b8e0e9e2a865e95aa235fa6b0e4bb016b9ece94701e5c8c99fff4a3e174900fc",
+          "size_bytes": 325632
+        },
+        {
+          "path": "Chummer.Run.AI.dll",
+          "sha256": "97858ff978145abdf490626a6b58b86e07f8f761eb0b01d2ee38410b6ed0276b",
+          "size_bytes": 894464
+        },
+        {
+          "path": "Chummer.Run.Api.dll",
+          "sha256": "3c0f01054380950c017bea232985e8b8e6b2b5bfa1d56cb82f12a01feffceeb6",
+          "size_bytes": 12376064
+        },
+        {
+          "path": "Chummer.Run.Contracts.dll",
+          "sha256": "1ac88b5200ec8526b3377841adbc87edb14c09603d01bb88f9f865d1e67e162a",
+          "size_bytes": 1474048
+        },
+        {
+          "path": "Chummer.Run.Identity.dll",
+          "sha256": "91beb173067e1123005dbc8f1fee4a2fd04718441ce63bab07691f12b092115f",
+          "size_bytes": 99328
+        },
+        {
+          "path": "Chummer.Run.Registry.dll",
+          "sha256": "4a00dc972d937848fd8cd17311383075fbde0f761e47d550a09e523f6124ce5d",
+          "size_bytes": 244224
+        },
+        {
+          "path": "Chummer.World.Contracts.dll",
+          "sha256": "4714ca4954eb449ee7dfe8fac5ad1611b3bfed3d40581c8684c494fa07c5da34",
+          "size_bytes": 31744
+        },
+        {
+          "path": "RunServicesSmoke.dll",
+          "sha256": "59cb092d9b8a15b9d7672088c3c766102df35d429768d1bb1ee90a2596f29d8e",
+          "size_bytes": 1042432
+        },
+        {
+          "path": "RunServicesSmoke.runtimeconfig.json",
+          "sha256": "7728699cfdb0825e836acdb1cad30a628f2f4fb7600f79818624a348a9d1a887",
+          "size_bytes": 210
+        },
+        {
+          "path": "YamlDotNet.dll",
+          "sha256": "86f873f682c619a0c24e263dcdd15fe027104666641c92f503516671d61edda6",
+          "size_bytes": 293376
+        },
+        {
+          "path": "toolchain/csc.dll",
+          "sha256": "3258c469342dfbb3fd47b82413b3043c698849466250657559f98c31ba40050f",
+          "size_bytes": 123904
+        },
+        {
+          "path": "toolchain/dotnet",
+          "sha256": "a2e03e682b5ba32303077bc5ed95ca3dd6b57b6d55d09491b67444644e211940",
+          "size_bytes": 73016
+        }
+      ],
+      "entry_count": 18,
+      "manifest_sha256": "493c7738a9351c287ccd3f675133fcaf8755aca30b4ec08ef936fa7444b9d057"
+    },
+    "checkpoint_log": {
+      "file_name": "campaign-os-checkpoints.jsonl",
+      "sha256": "ead0cefcdcf0024e632c6b9ddbe4a9983509ba96d6323510b4e647bde1c824f4",
+      "size_bytes": 865
+    },
+    "runtime_checkpoints": [
+      {
+        "checkpoint_id": "install_claim_restore_continue.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": "build_explain_publish.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": "campaign_session_recover_recap.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": "recover_from_sync_conflict.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": "report_cluster_release_notify.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": "organize_community_and_close_loop.run_services_smoke_exit_zero",
+        "run_id": "1355b928-76d3-4904-a61f-af8686b66d82",
+        "status": "passed"
+      }
+    ],
+    "candidate_source_build_inputs_stable": true,
+    "staged_candidate_inputs_stable": true,
+    "managed_dotnet_closure_stable": true,
+    "runtime_closure_stable": true,
+    "closure_stable": true
+  },
+  "journeys": [
+    {
+      "id": "install_claim_restore_continue",
+      "status": "passed",
+      "checkpoint_ids": [
+        "install_claim_restore_continue.run_services_smoke_exit_zero"
+      ]
+    },
+    {
+      "id": "build_explain_publish",
+      "status": "passed",
+      "checkpoint_ids": [
+        "build_explain_publish.run_services_smoke_exit_zero"
+      ]
+    },
+    {
+      "id": "campaign_session_recover_recap",
+      "status": "passed",
+      "checkpoint_ids": [
+        "campaign_session_recover_recap.run_services_smoke_exit_zero"
+      ]
+    },
+    {
+      "id": "recover_from_sync_conflict",
+      "status": "passed",
+      "checkpoint_ids": [
+        "recover_from_sync_conflict.run_services_smoke_exit_zero"
+      ]
+    },
+    {
+      "id": "report_cluster_release_notify",
+      "status": "passed",
+      "checkpoint_ids": [
+        "report_cluster_release_notify.run_services_smoke_exit_zero"
+      ]
+    },
+    {
+      "id": "organize_community_and_close_loop",
+      "status": "passed",
+      "checkpoint_ids": [
+        "organize_community_and_close_loop.run_services_smoke_exit_zero"
+      ]
+    }
   ],
-  "required_markers": {
-    "install_claim_restore_continue": [
-      "downloadDispatchSource.Contains(\"Account linking is optional.\"",
-      "downloadDispatchSource.Contains(\"Support stays with this install.\"",
-      "accountSource.Contains(\"Recent installs\"",
-      "accountSource.Contains(\"Recovery mode only\"",
-      "accountSource.Contains(\"Do not redeem claim codes in a browser tab.\"",
-      "installSummary.PendingClaimTickets.Any(static item => string.Equals(item.ArtifactId, \"smoke-poc-linux-x64\", StringComparison.Ordinal) && string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.Ordinal))",
-      "redeemPayload is not null && !redeemPayload.AlreadyClaimed",
-      "string.Equals(redeemPayload.Installation.Status, ClaimedInstallationStates.Active, StringComparison.Ordinal)",
-      "string.Equals(redeemPayload.Grant.Status, InstallationGrantStates.Active, StringComparison.Ordinal)",
-      "linkedSummaryPayload!.ClaimedInstallations?.Any(static item => string.Equals(item.InstallationId, \"install-smoke-001\", StringComparison.Ordinal)) == true",
-      "!string.IsNullOrWhiteSpace(dispatchModel?.ClaimExchangeUrl) && dispatchModel.ClaimExchangeUrl!.EndsWith(\"/continue.json\", StringComparison.Ordinal)",
-      "dispatchModel?.SupportHref.Contains(\"/contact?\", StringComparison.Ordinal) == true"
-    ],
-    "build_explain_publish": [
-      "accountModel.CampaignSpine.BuildLabHandoffs.Count >= 1",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].NextSafeAction",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].RuntimeCompatibilitySummary",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].SupportClosureSummary",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].PlannerCoverageSummary",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].TradeoffLines[0].Contains(\"campaign-safe output\"",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[0].Contains(\"25 / 50 / 100 Karma checkpoints\"",
-      "accountModel.CampaignSpine.BuildLabHandoffs[0].ProgressionOutcomes[1].Contains(\"recap follow-through\"",
-      "campaignSpineController.GetMyBuildLabHandoff",
-      "campaignSpineController.GetMyRulesNavigatorAnswer",
-      "campaignSpineController.GetMyCreatorPublication",
-      "publishedWorkHomePublication?.ProvenanceSummary"
-    ],
-    "campaign_session_recover_recap": [
-      "accountModel.CampaignSpine.Workspaces.Count >= 1",
-      "accountModel.CampaignSpine.Workspaces[0].ReadinessCues.Count >= 1",
-      "accountModel.CampaignSpine.Workspaces[0].RecapShelf.Count >= 1",
-      "accountModel.CampaignSpine.Workspaces[0].ActiveSceneSummary",
-      "accountModel.CampaignSpine.Workspaces[0].NextSafeAction",
-      "workspacePayload.FirstPlayableSession is not null",
-      "workspaceServerPlanePayload.FirstPlayableSession is not null",
-      "accountModel.CampaignSpine.Workspaces[0].ChangePackets?.Count >= 1",
-      "campaignSpineController.GetMyCampaignWorkspace",
-      "campaignSpineController.GetMyRun",
-      "workspacePayload?.ActiveSceneSummary",
-      "workspacePayload?.NextSafeAction",
-      "workspacePayload?.ChangePackets?.Count >= 1",
-      "workspaceServerPlanePayload.RestoreProvenanceReceipts.Count == restorePayload!.ProvenanceReceipts.Count",
-      "workspaceServerPlanePayload.RestoreConflictReceipts.Count == restorePayload.ConflictReceipts.Count",
-      "workspaceServerPlanePayload.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, \"workspace_restore\", StringComparison.Ordinal))",
-      "workspaceServerPlanePayload.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, \"entitlement_sync\", StringComparison.Ordinal))",
-      "string.Equals(item.Kind, \"active_entitlement\", StringComparison.OrdinalIgnoreCase)",
-      "string.Equals(item.Authority, \"hub_entitlement_ledger\", StringComparison.Ordinal)",
-      "!string.IsNullOrWhiteSpace(item.RecoveryHint)",
-      "workspaceServerPlanePayload.RestoreConflictReceipts.All(item => !string.IsNullOrWhiteSpace(item.Surface))",
-      "workspaceServerPlanePayload.RestoreConflictReceipts",
-      "item.Kind.StartsWith(\"entitlement_\", StringComparison.OrdinalIgnoreCase)",
-      "item.Surface, \"entitlement_sync\", StringComparison.Ordinal",
-      "item.BlocksContinue",
-      "All(static item => !string.IsNullOrWhiteSpace(item.RecoveryHint))",
-      "string.Equals(item.Kind, \"entitlement_artifact_drift\", StringComparison.OrdinalIgnoreCase)",
-      "workspaceServerPlanePayload.ContinuityConflicts.Any(item => item.CueId.Contains(\"restore-conflict:\", StringComparison.Ordinal))",
-      "workspaceServerPlanePayload.WorkspaceState.Status",
-      "workspaceServerPlanePayload.PrepLibrary.Packets.Count >= 3",
-      "workspaceServerPlanePayload.TravelMode.TravelReadyDeviceCount >= 1",
-      "campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan",
-      "rosterTransferPlanPayload.TargetGroups.Count >= 1",
-      "campaignSpineController.GetMyCampaignWorkspaceDossierMovementPlan",
-      "dossierMovementPlanPayload.TargetGroups.Count >= 1",
-      "var dossierMovementResult = await campaignSpineController.MoveMyDossier(",
-      "dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, \"target_run\", StringComparison.Ordinal))",
-      "dossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true",
-      "campaignSpineController.GetMyCampaignWorkspacePrepLibrary",
-      "prepLibraryPayload.TotalCount >= 1",
-      "campaignSpineController.LaunchMyCampaignWorkspacePrepPacket",
-      "prepLaunchPayload.Summary.Contains(\"without recreating local shadow prep notes\"",
-      "campaignSpineController.StageMyCampaignWorkspaceTravelPrefetch",
-      "travelPrefetchPayload!.PrefetchSummary.Contains(\"exact offline prefetch set\"",
-      "campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage",
-      "aftermathPackagePayload!.Summary.Contains(\"session recap package\"",
-      "refreshedWorkspaceServerPlanePayload?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload.LaunchId, StringComparison.Ordinal)) == true",
-      "refreshedWorkspaceServerPlanePayload?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload.ReceiptId, StringComparison.Ordinal)) == true",
-      "refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Count == restorePayload!.ProvenanceReceipts.Count",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.Count == restorePayload.ConflictReceipts.Count",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, \"workspace_restore\", StringComparison.Ordinal)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, \"entitlement_sync\", StringComparison.Ordinal)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item =>",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.All(item => !string.IsNullOrWhiteSpace(item.Surface)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts",
-      "string.Equals(item.Kind, \"entitlement_artifact_drift\", StringComparison.OrdinalIgnoreCase)",
-      "account workspace detail route should keep concrete recovery hints on blocking restore conflict receipts.",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceRosterTransferPlan?.TargetGroups.Count >= 1",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload!.LaunchId, StringComparison.Ordinal)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true",
-      "accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true",
-      "searchableWorkspaceDetailModel?.SelectedWorkspacePrepLibrarySearch?.TotalCount >= 1",
-      "searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"prep_launch\", StringComparison.Ordinal)) == true",
-      "searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"travel_prefetch\", StringComparison.Ordinal)) == true",
-      "searchableWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"aftermath_recap\", StringComparison.Ordinal)) == true",
-      "authenticatedHomeModel.LeadWorkspaceServerPlane is not null",
-      "authenticatedHomeModel.LeadWorkspaceServerPlane!.WorkspaceState.Status",
-      "authenticatedHomeModel.LeadWorkspaceServerPlane.PrepLaunches.Any(item => string.Equals(item.LaunchId, prepLaunchPayload!.LaunchId, StringComparison.Ordinal)) == true",
-      "authenticatedHomeModel.LeadWorkspaceServerPlane.TravelPrefetches.Any(item => string.Equals(item.ReceiptId, travelPrefetchPayload!.ReceiptId, StringComparison.Ordinal)) == true",
-      "authenticatedHomeModel.LeadWorkspaceServerPlane.AftermathPackages.Any(item => string.Equals(item.PackageId, aftermathPackagePayload!.PackageId, StringComparison.Ordinal)) == true",
-      "workHomeModel?.LeadWorkspaceServerPlane?.WorkspaceState.Label",
-      "workHomeModel?.LeadWorkspaceServerPlane?.PrepLibrary.Packets.Count >= 3",
-      "workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"prep_launch\", StringComparison.Ordinal)) == true",
-      "workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"travel_prefetch\", StringComparison.Ordinal)) == true",
-      "workHomeModel?.LeadWorkspaceServerPlane?.ChangePackets.Any(item => string.Equals(item.Kind, \"aftermath_recap\", StringComparison.Ordinal)) == true",
-      "workHomeModel!.CampaignSpine.Workspaces[0].ReturnSummary",
-      "starterWorkspacePayload!.FirstPlayableSession is not null",
-      "operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true",
-      "homeSource.Contains(\"What changed for me\"",
-      "homeSource.Contains(\"@workspace.FirstPlayableSession.CampaignStartSummary\"",
-      "accountSource.Contains(\"selected-first-playable-session\"",
-      "homeSource.Contains(\"@workspace.ActiveSceneSummary\"",
-      "homeSource.Contains(\"@workspace.NextSafeAction\"",
-      "workHomeModel.CampaignSpine.Restore.ClaimedDevices.Count >= 1",
-      "accountSource.Contains(\"From @HumanizeStatus(receipt.Authority, \\\"Chummer\\\")\"",
-      "accountSource.Contains(\"@receipt.RecoveryHint\"",
-      "accountSource.Contains(\"Finish this item before you continue.\"",
-      "consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, \"heat\", StringComparison.Ordinal)",
-      "consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"governed_consequence_update\", StringComparison.Ordinal))",
-      "consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && item.Summary.Contains(\"Review heat fallout\", StringComparison.Ordinal))",
-      "consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_route\", StringComparison.Ordinal) && string.Equals(item.ReceiptId, \"/account/work\", StringComparison.Ordinal))",
-      "factionConsequencePayload is not null && string.Equals(factionConsequencePayload.Kind, \"faction\", StringComparison.Ordinal)",
-      "factionConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && item.Summary.Contains(\"Confirm faction standing\", StringComparison.Ordinal))",
-      "contactConsequencePayload is not null && string.Equals(contactConsequencePayload.Kind, \"contact\", StringComparison.Ordinal)",
-      "contactConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && item.Summary.Contains(\"Review contact fallout\", StringComparison.Ordinal))",
-      "downtimeConsequencePayload is not null && string.Equals(downtimeConsequencePayload.Kind, \"downtime\", StringComparison.Ordinal)",
-      "downtimeConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_route\", StringComparison.Ordinal) && string.Equals(item.ReceiptId, \"/account/work#aftermath-packages\", StringComparison.Ordinal))",
-      "reputationConsequencePayload is not null && string.Equals(reputationConsequencePayload.Kind, \"reputation\", StringComparison.Ordinal)",
-      "reputationConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && item.Summary.Contains(\"Review reputation fallout\", StringComparison.Ordinal))",
-      "refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"downtime\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"governed_aftermath_package\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"aftermath\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"governed_aftermath_package\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"heat\", StringComparison.Ordinal) && string.Equals(item.State, \"high\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"governed_consequence_update\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"faction\", StringComparison.Ordinal) && string.Equals(item.State, \"strained\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && receipt.Summary.Contains(\"Confirm faction standing\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"contact\", StringComparison.Ordinal) && string.Equals(item.State, \"fragile\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && receipt.Summary.Contains(\"Review contact fallout\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"downtime\", StringComparison.Ordinal) && string.Equals(item.State, \"queued\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"return_loop_route\", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, \"/account/work#aftermath-packages\", StringComparison.Ordinal))) == true",
-      "refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, \"reputation\", StringComparison.Ordinal) && string.Equals(item.State, \"under_review\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && receipt.Summary.Contains(\"Review reputation fallout\", StringComparison.Ordinal))) == true",
-      "var consequencesListResult = await campaignSpineController.GetMyCampaignWorkspaceConsequences(workspaceId, CancellationToken.None);",
-      "consequencesListPayload?.Any(item => string.Equals(item.Kind, \"aftermath\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"governed_aftermath_package\", StringComparison.Ordinal))) == true",
-      "consequencesListPayload?.Any(item => string.Equals(item.Kind, \"reputation\", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, \"return_loop_action\", StringComparison.Ordinal) && receipt.Summary.Contains(\"Review reputation fallout\", StringComparison.Ordinal))) == true",
-      "var aftermathPackagesListResult = await campaignSpineController.GetMyCampaignWorkspaceAftermathRecapPackages(workspaceId, CancellationToken.None);",
-      "aftermathPackagesListPayload?.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal) && string.Equals(item.ArtifactKind, \"ReplayPackage\", StringComparison.Ordinal)) == true",
-      "var campaignMemoryResult = await campaignSpineController.GetMyCampaignWorkspaceCampaignMemory(workspaceId, CancellationToken.None);",
-      "campaignMemoryPayload?.EvidenceLines.Any(item => item.Contains(\"Review downtime obligations\", StringComparison.Ordinal)) == true",
-      "var carryForwardResult = await campaignSpineController.GetMyCampaignWorkspaceNextSessionCarryForward(workspaceId, CancellationToken.None);",
-      "carryForwardPayload?.EvidenceLines.Any(item => item.Contains(\"Review downtime obligations\", StringComparison.Ordinal)) == true"
-    ],
-    "report_cluster_release_notify": [
-      "accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary))",
-      "supportCasesController.VerifyReporterFix",
-      "SelectedSupportCaseSummary.CanVerifyFix",
-      "TrackedCaseSummary.NextSafeAction.Contains(\"Update\"",
-      "TrackedCaseSummary!.FollowUpLaneSummary.Contains(\"Account > Support\"",
-      "authenticatedHomeModel.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && item.ClosureSummary.Contains(\"closure notice\""
-    ],
-    "organize_community_and_close_loop": [
-      "homeSource.Contains(\"/account/work#community-op-league-\"",
-      "homeSource.Contains(\"/account/work#community-op-board-\"",
-      "homeSource.Contains(\"/account/work#community-op-invites-\"",
-      "contactSubmittedModel.TrackedCaseSummary!.FollowUpLaneSummary.Contains(\"Account > Support\"",
-      "contactSubmittedModel.TrackedCaseSummary.NextSafeAction.Contains(\"Update\"",
-      "authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1"
-    ]
-  },
-  "generated_at": "2026-06-24T04:06:36Z"
+  "summary": {
+    "journey_count": 6,
+    "passed_journey_count": 6,
+    "checkpoint_count": 6,
+    "passed_checkpoint_count": 6
+  }
 }

@@ -68,6 +68,23 @@ public sealed class HubBrowserAuthSanitizationTests
     }
 
     [Fact]
+    public void Install_link_callback_preserves_only_safe_fragment_listener_state()
+    {
+        const string callback =
+            "http://127.0.0.1:47761/install-link/callback#state=desktop-fragment&nonce=fragment-proof&accessToken=fragment-access&claimCode=fragment-claim&unknown=fragment-unknown";
+
+        string sanitized = HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callback)
+            ?? throw new InvalidOperationException("The app-local callback should be accepted.");
+        string repeatedlyDecoded = DecodeRepeatedly(sanitized);
+
+        Assert.Contains("#state=desktop-fragment", repeatedlyDecoded, StringComparison.Ordinal);
+        Assert.Contains("nonce=fragment-proof", repeatedlyDecoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-access", repeatedlyDecoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-claim", repeatedlyDecoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-unknown", repeatedlyDecoded, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Install_link_next_path_fails_closed_when_callback_is_missing_or_invalid()
     {
         Assert.Equal(

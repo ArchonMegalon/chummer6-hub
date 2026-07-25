@@ -777,17 +777,16 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
             service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
             service_text = service_path.read_text(encoding="utf-8")
-            service_path.write_text(
-                service_text.replace(
+            mutated_service_text = service_text.replace(
                     "\n            if (!IsStablePublicShelfSegment(decodedSegment))\n"
                     "            {\n"
                     "                throw new InvalidDataException(\n"
-                    "                    $\"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.\"); // .Replace(\n"
+                    "                    $\"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public status shelf segments.\");\n"
                     "            }\n",
                     "",
-                ),
-                encoding="utf-8",
             )
+            self.assertNotEqual(service_text, mutated_service_text)
+            service_path.write_text(mutated_service_text, encoding="utf-8")
 
             env = os.environ.copy()
             env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
@@ -802,7 +801,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifact factory bundle refs must use stable public proof shelf segment characters", result.stderr)
+        self.assertIn("artifact factory bundle refs must use stable public status shelf segments", result.stderr)
 
     def test_verifier_fails_closed_when_recipe_catalog_endpoint_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-recipe-endpoint-proof-") as temp_dir:
@@ -1563,11 +1562,11 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
             service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
             service_text = service_path.read_text(encoding="utf-8")
-            service_path.write_text(
-                service_text.replace(
+            mutated_service_text = service_text.replace(
                     "        if (family.Equals(\"release\", StringComparison.OrdinalIgnoreCase))\n"
                     "        {\n"
                     "            RejectReleaseBundleShelfAnchorShape(sourcePackId, publicShelfRef, fieldName);\n"
+                    "            return;\n"
                     "        }\n",
                     "",
                 ).replace(
@@ -1583,13 +1582,13 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "            || releaseArtifactId.Contains('\\\\', StringComparison.Ordinal))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
-                    "                $\"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\"); // .Replace(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\");\n"
                     "        }\n"
                     "    }\n",
                     "",
-                ),
-                encoding="utf-8",
             )
+            self.assertNotEqual(service_text, mutated_service_text)
+            service_path.write_text(mutated_service_text, encoding="utf-8")
 
             env = os.environ.copy()
             env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
@@ -1750,8 +1749,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
             service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
             service_text = service_path.read_text(encoding="utf-8")
-            service_path.write_text(
-                service_text.replace(
+            mutated_service_text = service_text.replace(
                     '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");\n'
                     '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.SupportCaseId, "supportCaseId");\n'
                     '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.PublicationId, "publicationId");\n',
@@ -1763,6 +1761,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "        {\n"
                     "            return;\n"
                     "        }\n\n"
+                    "        RejectProviderSpecificRef(sourcePackId, value, fieldName);\n\n"
                     "        string pathId = value.Trim();\n"
                     "        if (pathId.Contains('?', StringComparison.Ordinal)\n"
                     "            || pathId.Contains('#', StringComparison.Ordinal)\n"
@@ -1770,7 +1769,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "            || pathId.Contains('\\\\', StringComparison.Ordinal))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
-                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public proof shelf segments.\");\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public status shelf segments.\");\n"
                     "        }\n\n"
                     "        string decoded = Uri.UnescapeDataString(pathId);\n"
                     "        if (decoded is \".\" or \"..\"\n"
@@ -1781,11 +1780,17 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "            throw new InvalidDataException(\n"
                     "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal, encoded provider delimiters, or encoded path separators.\");\n"
                     "        }\n"
+                    "\n"
+                    "        if (!IsStablePublicShelfSegment(decoded))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must use stable public route segment characters.\");\n"
+                    "        }\n"
                     "    }\n",
                     "",
-                ),
-                encoding="utf-8",
             )
+            self.assertNotEqual(service_text, mutated_service_text)
+            service_path.write_text(mutated_service_text, encoding="utf-8")
 
             env = os.environ.copy()
             env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)

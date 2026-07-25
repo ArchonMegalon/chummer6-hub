@@ -298,6 +298,53 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["live"]["pageArtifactIds"], ["avalonia-linux-x64-installer"])
         self.assertEqual(len(receipt["live"]["artifactProbes"]), 1)
 
+    def test_failed_embedded_flagship_readiness_hides_artifacts_across_generation_urls(self) -> None:
+        releases_payload = make_releases_manifest()
+        canonical_payload = make_canonical_manifest()
+        canonical_payload["releaseProof"] = {
+            "status": "passed",
+            "flagshipReadiness": {
+                "status": "fail",
+                "reason": "Native desktop proof is incomplete.",
+            },
+        }
+        live_releases_payload = json.loads(json.dumps(releases_payload))
+        live_releases_payload["downloads"] = []
+        live_canonical_payload = json.loads(json.dumps(canonical_payload))
+        live_canonical_payload["artifacts"][0][
+            "downloadUrl"
+        ] = "https://chummer.run/downloads/g/g-test/files/chummer-avalonia-linux-x64-installer.deb"
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-readiness-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                if url == "https://chummer.run/downloads":
+                    return FakeResponse(url=url, text="<main>No build is available right now</main>")
+                if url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=live_releases_payload)
+                if url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=live_canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertEqual(receipt["failures"], [])
+        self.assertEqual(receipt["local"]["canonicalManifest"]["artifactCount"], 1)
+        self.assertEqual(receipt["local"]["projectedPublicManifest"]["artifactCount"], 0)
+
     def test_matching_local_and_live_bundle_truth_passes_for_linux_and_windows_public_installers(self) -> None:
         releases_payload, canonical_payload = add_windows_bootstrap_artifact(
             releases_payload=make_releases_manifest(),

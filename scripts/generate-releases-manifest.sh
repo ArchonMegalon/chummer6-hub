@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
+AUTHORITATIVE_PUBLISHED_ROOT="${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISHED_ROOT:-$REGISTRY_ROOT/.codex-studio/published}"
+MANIFEST_SOURCE_ONLY="${CHUMMER_RELEASE_MANIFEST_SOURCE_ONLY:-false}"
 
 DOWNLOADS_DIR="${DOWNLOADS_DIR:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/files}"
 MANIFEST_PATH="${MANIFEST_PATH:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/releases.json}"
@@ -20,11 +22,16 @@ CANONICAL_MANIFEST_PATH="${CANONICAL_MANIFEST_PATH:-$(dirname "$MANIFEST_PATH")/
 PORTAL_CANONICAL_MANIFEST_PATH="${PORTAL_CANONICAL_MANIFEST_PATH:-$(dirname "$PORTAL_MANIFEST_PATH")/RELEASE_CHANNEL.generated.json}"
 SOURCE_MANIFEST_PATH="${SOURCE_MANIFEST_PATH:-}"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
+FLAGSHIP_READINESS_GATE_PATH="${CHUMMER_FLAGSHIP_READINESS_GATE_PATH:-$REPO_ROOT/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json}"
 PREVIEW_INSTALL_ACCESS_CLASS="${CHUMMER_PREVIEW_INSTALL_ACCESS_CLASS:-}"
 FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-}"
 PUBLIC_WEB_BASE_URL="${CHUMMER_PUBLIC_WEB_BASE_URL:-https://chummer.run}"
 DOWNLOADS_PREFIX="${CHUMMER_PUBLIC_DOWNLOADS_PREFIX:-${PUBLIC_WEB_BASE_URL%/}/downloads/files}"
 PUBLIC_VERSION="${CHUMMER_PUBLIC_VERSION:-0.0.0.1}"
+
+lower_ascii() {
+  printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'
+}
 
 resolve_ui_localization_release_gate_path() {
   local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-}"
@@ -55,7 +62,7 @@ resolve_ui_localization_release_gate_path() {
 }
 
 if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
-  if [[ "${RELEASE_CHANNEL,,}" == "preview" ]]; then
+  if [[ "$(lower_ascii "$RELEASE_CHANNEL")" == "preview" ]]; then
     PUBLIC_SKIP_STARTUP_SMOKE_FILTER="true"
   else
     PUBLIC_SKIP_STARTUP_SMOKE_FILTER="false"
@@ -221,16 +228,106 @@ PY
 
 SANITIZED_UI_LOCALIZATION_RELEASE_GATE_PATH=""
 
+to_bool() {
+  local value
+  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+# This generator is a candidate producer. Once a release shelf has opted into
+# layout v1, only the generation publisher may write beneath its authoritative
+# root. Refuse direct legacy output paths before creating or replacing files.
+assert_legacy_release_shelf_target() {
+  local target_root="${1:-}"
+  local target_label="${2:-release manifest target}"
+  [[ -n "$target_root" ]] || {
+    echo "$target_label is empty" >&2
+    exit 1
+  }
+  if [[ -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "$target_label is owned by server-journal-v1; direct manifest generation is forbidden: $target_root" >&2
+    exit 1
+  fi
+  if [[ -e "$target_root/.release-shelf-layout-v1" || -e "$target_root/current.json" ]]; then
+    echo "$target_label uses immutable release-shelf layout v1; direct manifest generation is forbidden: $target_root" >&2
+    exit 1
+  fi
+}
+
+assert_legacy_release_shelf_target "$(dirname "$MANIFEST_PATH")" "manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$CANONICAL_MANIFEST_PATH")" "canonical manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$PORTAL_MANIFEST_PATH")" "portal manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$PORTAL_CANONICAL_MANIFEST_PATH")" "portal canonical manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$DOWNLOADS_DIR")" "downloads output root"
+assert_legacy_release_shelf_target "$PORTAL_DOWNLOADS_DIR" "portal downloads output root"
+if ! to_bool "$MANIFEST_SOURCE_ONLY"; then
+  assert_legacy_release_shelf_target "$AUTHORITATIVE_PUBLISHED_ROOT" "authoritative published manifest root"
+fi
+
 mkdir -p "$(dirname "$MANIFEST_PATH")"
 mkdir -p "$(dirname "$PORTAL_MANIFEST_PATH")"
 mkdir -p "$DOWNLOADS_DIR"
 
 promoted_file_names=()
 
-to_bool() {
-  local value
-  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
-  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "set -- \"\${${array_name}[@]}\""
+  local count="$#"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
+replace_file_atomically() {
+  local source_path="${1:-}"
+  local target_path="${2:-}"
+  if [[ -z "$source_path" || -z "$target_path" || ! -f "$source_path" ]]; then
+    return 1
+  fi
+
+  local target_dir target_name temp_path
+  target_dir="$(dirname "$target_path")"
+  target_name="$(basename "$target_path")"
+  mkdir -p "$target_dir"
+  temp_path="$(mktemp "$target_dir/.${target_name}.XXXXXX")"
+  cp "$source_path" "$temp_path"
+  chmod --reference="$source_path" "$temp_path" 2>/dev/null || chmod 644 "$temp_path"
+  mv -f "$temp_path" "$target_path"
+}
+
+sync_authoritative_published_manifest() {
+  local source_path="${1:-}"
+  local target_name="${2:-}"
+  if to_bool "$MANIFEST_SOURCE_ONLY"; then
+    return 0
+  fi
+  if [[ -z "$source_path" || -z "$target_name" || ! -f "$source_path" ]]; then
+    return 0
+  fi
+
+  local target_path="$AUTHORITATIVE_PUBLISHED_ROOT/$target_name"
+  if [[ "$(realpath -m "$source_path")" == "$(realpath -m "$target_path")" ]]; then
+    return 0
+  fi
+
+  replace_file_atomically "$source_path" "$target_path"
 }
 
 normalize_preview_install_access_classes() {
@@ -561,14 +658,17 @@ payload["publicTrustMetrics"] = derive_verifier_owned_value(
 
 trust_release_channel = payload.get("publicTrustMetrics", {}).get("releaseChannel", {})
 trust_supportability_state = normalized_token(trust_release_channel.get("supportabilityState"))
-if normalized_token(payload.get("status")) == "published" and trust_supportability_state:
-    payload["supportabilityState"] = trust_supportability_state
-    if trust_supportability_state == "review_required":
+trust_rollout_state = normalized_token(trust_release_channel.get("rolloutState"))
+if normalized_token(payload.get("status")) == "published":
+    if trust_supportability_state:
+        payload["supportabilityState"] = trust_supportability_state
+    if trust_rollout_state:
+        payload["rolloutState"] = trust_rollout_state
+    if trust_supportability_state == "gold_supported" and trust_rollout_state == "public_stable":
         payload["supportabilitySummary"] = (
-            "Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable."
-        )
-        payload["knownIssueSummary"] = (
-            "Release checks are missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+            "Current public release is supported on the promoted routes. Recent checks cover install guidance, "
+            "session recovery, account return, release updates, community wrap-up, bounded offline prefetch, "
+            "and current support follow-up."
         )
 
 # Recompute verifier-owned registry surfaces once more after supportability/trust normalization
@@ -831,6 +931,9 @@ if [[ -n "$UI_LOCALIZATION_RELEASE_GATE_PATH" && -f "$UI_LOCALIZATION_RELEASE_GA
 fi
 
 materializer_help="$(python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" --help 2>&1 || true)"
+if [[ -n "$FLAGSHIP_READINESS_GATE_PATH" && -f "$FLAGSHIP_READINESS_GATE_PATH" && "$materializer_help" == *"--flagship-readiness"* ]]; then
+  materialize_args+=(--flagship-readiness "$FLAGSHIP_READINESS_GATE_PATH")
+fi
 if [[ -d "$STARTUP_SMOKE_DIR" && "$materializer_help" == *"--startup-smoke-dir"* ]]; then
   materialize_args+=(--startup-smoke-dir "$STARTUP_SMOKE_DIR")
 fi
@@ -851,6 +954,8 @@ stamp_public_version "$CANONICAL_MANIFEST_PATH" "$PUBLIC_VERSION"
 stamp_public_version "$MANIFEST_PATH" "$PUBLIC_VERSION"
 canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
 canonicalize_release_channel_registries "$MANIFEST_PATH"
+sync_authoritative_published_manifest "$CANONICAL_MANIFEST_PATH" "RELEASE_CHANNEL.generated.json"
+sync_authoritative_published_manifest "$MANIFEST_PATH" "releases.json"
 filter_files_to_manifest_truth "$DOWNLOADS_DIR" "$CANONICAL_MANIFEST_PATH"
 materialize_aur_sidecar "$(dirname "$MANIFEST_PATH")" "$MANIFEST_PATH" "$DOWNLOADS_DIR"
 promoted_file_names=()
@@ -893,8 +998,8 @@ resolved_portal_manifest_path="$(realpath -m "$PORTAL_MANIFEST_PATH")"
 if [[ "$resolved_manifest_path" == "$resolved_portal_manifest_path" ]]; then
   echo "portal manifest path matches manifest output; skipped secondary sync"
 else
-  cp "$MANIFEST_PATH" "$PORTAL_MANIFEST_PATH"
-  cp "$CANONICAL_MANIFEST_PATH" "$PORTAL_CANONICAL_MANIFEST_PATH"
+  replace_file_atomically "$MANIFEST_PATH" "$PORTAL_MANIFEST_PATH"
+  replace_file_atomically "$CANONICAL_MANIFEST_PATH" "$PORTAL_CANONICAL_MANIFEST_PATH"
   stamp_public_version "$PORTAL_MANIFEST_PATH" "$PUBLIC_VERSION"
   stamp_public_version "$PORTAL_CANONICAL_MANIFEST_PATH" "$PUBLIC_VERSION"
   canonicalize_release_channel_registries "$PORTAL_MANIFEST_PATH"
@@ -930,11 +1035,12 @@ else
     fi
     portal_artifacts+=("$artifact_path")
   done
-  if [[ "${#portal_artifacts[@]}" -gt 0 ]]; then
+  portal_artifact_count="$(array_count portal_artifacts)"
+  if (( portal_artifact_count > 0 )); then
     cp "${portal_artifacts[@]}" "$portal_files_dir"/
     filter_files_to_manifest_truth "$portal_files_dir" "$PORTAL_CANONICAL_MANIFEST_PATH"
     materialize_aur_sidecar "$PORTAL_DOWNLOADS_DIR" "$PORTAL_MANIFEST_PATH" "$portal_files_dir"
-    echo "synced ${#portal_artifacts[@]} local portal artifact(s) -> $portal_files_dir"
+    echo "synced ${portal_artifact_count} local portal artifact(s) -> $portal_files_dir"
   else
     echo "no local desktop artifacts found in $DOWNLOADS_DIR for portal file sync"
   fi

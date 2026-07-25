@@ -54,10 +54,14 @@ public sealed class FlipLinkDocumentPortalService
     ];
 
     private readonly string _productRoot;
+    private readonly string? _strictConfiguredRoot;
 
     public FlipLinkDocumentPortalService(IConfiguration configuration)
     {
-        _productRoot = ResolveProductRoot(configuration);
+        _strictConfiguredRoot = PublicStrictConfiguredRoot.IsEnabled(configuration)
+            ? PublicStrictConfiguredRoot.Require(configuration)
+            : null;
+        _productRoot = ResolveProductRoot(configuration, _strictConfiguredRoot);
     }
 
     public IReadOnlyList<ChummerDocument> ListPublicDocuments()
@@ -132,7 +136,7 @@ public sealed class FlipLinkDocumentPortalService
             return null;
         }
 
-        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
+        string sourceFullPath = ResolveSourcePath(definition);
         if (!File.Exists(sourceFullPath))
         {
             return null;
@@ -155,7 +159,7 @@ public sealed class FlipLinkDocumentPortalService
             return null;
         }
 
-        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
+        string sourceFullPath = ResolveSourcePath(definition);
         if (!File.Exists(sourceFullPath))
         {
             return null;
@@ -171,7 +175,7 @@ public sealed class FlipLinkDocumentPortalService
 
     private ChummerDocument BuildDocument(DocumentDefinition definition)
     {
-        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
+        string sourceFullPath = ResolveSourcePath(definition);
         string sourceHash = ComputeFileSha256(sourceFullPath);
         DocumentPortalPdfArtifact? pdfArtifact = TryBuildPdfArtifact(definition.Slug);
 
@@ -200,8 +204,45 @@ public sealed class FlipLinkDocumentPortalService
             PublishedAtUtc: definition.CreatedAtUtc);
     }
 
-    private static string ResolveProductRoot(IConfiguration configuration)
+    private string ResolveSourcePath(DocumentDefinition definition)
     {
+        if (_strictConfiguredRoot is null)
+        {
+            return Path.Combine(_productRoot, definition.RelativeGuidePath);
+        }
+
+        string relativePath = Path.GetRelativePath(
+            _strictConfiguredRoot,
+            Path.Combine(_productRoot, definition.RelativeGuidePath));
+        return PublicStrictConfiguredRoot.ResolveContainedPath(_strictConfiguredRoot, relativePath);
+    }
+
+    private static string ResolveProductRoot(IConfiguration configuration, string? strictConfiguredRoot)
+    {
+        if (strictConfiguredRoot is not null)
+        {
+            string rootedProductPath = PublicStrictConfiguredRoot.ResolveContainedPath(
+                strictConfiguredRoot,
+                Path.Combine("products", "chummer"));
+            string rootedQuickstartPath = PublicStrictConfiguredRoot.ResolveContainedPath(
+                strictConfiguredRoot,
+                Path.Combine("products", "chummer", Quickstart.RelativeGuidePath));
+            if (File.Exists(rootedQuickstartPath))
+            {
+                return rootedProductPath;
+            }
+
+            string mirroredProductPath = PublicStrictConfiguredRoot.ResolveContainedPath(
+                strictConfiguredRoot,
+                Path.Combine(".codex-design", "product"));
+            string mirroredQuickstartPath = PublicStrictConfiguredRoot.ResolveContainedPath(
+                strictConfiguredRoot,
+                Path.Combine(".codex-design", "product", Quickstart.RelativeGuidePath));
+            return File.Exists(mirroredQuickstartPath)
+                ? mirroredProductPath
+                : rootedProductPath;
+        }
+
         string? configuredRoot = configuration["CHUMMER_PUBLIC_CANON_ROOT"];
         if (!string.IsNullOrWhiteSpace(configuredRoot))
         {

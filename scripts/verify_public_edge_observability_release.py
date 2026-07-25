@@ -15,8 +15,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
-ROOT = Path(__file__).resolve().parents[1]
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
+
+
+ROOT = SCRIPT_DIR.parent
 ATTESTATION_SUPPORT_SCRIPT = (
     ROOT / "scripts" / "verify_detached_ed25519_attestation.py"
 )
@@ -480,6 +486,27 @@ def runtime_source_binding(
 def release_candidate_binding(
     release_channel_path: Path,
 ) -> tuple[dict[str, Any], dict[str, Any] | None, str | None, list[str]]:
+    requested_path = release_channel_path
+    try:
+        mode, active_root, _pointer = resolve_shelf_root(release_channel_path.parent)
+        if mode == "generation":
+            release_channel_path = active_root / release_channel_path.name
+    except ReleaseShelfError as exc:
+        load_error = "release_shelf_resolution_failed"
+        binding = {
+            "path": str(requested_path),
+            "load_status": load_error,
+            "sha256": None,
+            "version": None,
+            "channel": None,
+            "status": None,
+            "rollout_state": None,
+            "supportability_state": None,
+            "published_at_utc": None,
+        }
+        return binding, None, load_error, [
+            f"release shelf resolution failed: {exc}"
+        ]
     payload, load_error, manifest_digest = load_json_with_sha256(release_channel_path)
     binding: dict[str, Any] = {
         "path": str(release_channel_path),

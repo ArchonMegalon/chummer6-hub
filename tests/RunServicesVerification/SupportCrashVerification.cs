@@ -66,7 +66,7 @@ internal static class SupportCrashVerification
 
             IDataProtectionProvider installStoreDataProtection = DataProtectionProvider.Create(
                 Path.Combine(tempRoot, "install-linking-keys"));
-            InstallLinkingStore installStore = new(
+            using InstallLinkingStore installStore = new(
                 configuration,
                 installStoreDataProtection,
                 NullLogger<InstallLinkingStore>.Instance);
@@ -354,7 +354,8 @@ internal static class SupportCrashVerification
                 configuration,
                 NullLogger<SupportProgressEmailWorkflowService>.Instance);
             SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, reloadedRewards, reloadedProgressEmails, NullLogger<SupportCaseService>.Instance);
-            InstallLinkingStore reloadedInstallStore = new(
+            installStore.Dispose();
+            using InstallLinkingStore reloadedInstallStore = new(
                 configuration,
                 installStoreDataProtection,
                 NullLogger<InstallLinkingStore>.Instance);

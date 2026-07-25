@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 DEFAULT_MANUSCRIPT_PROVIDER_TOKENS = (
     "subscribr",
+    "workllm",
 )
 DEFAULT_AUDIO_PROVIDER_TOKENS = (
     "inkfluence",

@@ -62,13 +62,18 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(participateBoardText).not.toContain('ProductLift');
   expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
   expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');
-  expect(participateFrameText).toContain('<base href="/participate/board/"');
+  if (participateFrameText.includes('Board offline right now')) {
+    expect(participateFrameText).toContain('Try again shortly.');
+    expect(participateFrameText).toContain('href="/contact"');
+  } else {
+    expect(participateFrameText).toContain('<base href="/participate/board/"');
+  }
   expect(participateFrameText).not.toContain('productlift.dev');
   expect(participateFrameText).not.toContain('support@productlift.dev');
   expect(participateBoardText).not.toContain('/auth/google/start?next=');
 
   const helpPage = await openPublicPage(browser, '/help');
-  await expect(helpPage.getByRole('heading', { name: 'What is wrong?' })).toBeVisible();
+  await expect(helpPage.getByRole('heading', { name: 'How can we help?' })).toBeVisible();
   await expect(helpPage.locator('body')).toContainText('Pick the next step');
   await expect(helpPage.getByRole('link', { name: 'Open downloads' })).toBeVisible();
   await expect(helpPage.getByRole('link', { name: 'Read the FAQ' })).toBeVisible();

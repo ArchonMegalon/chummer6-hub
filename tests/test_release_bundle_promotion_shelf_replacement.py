@@ -27,16 +27,41 @@ class ReleaseBundlePromotionShelfReplacementTests(unittest.TestCase):
         self.assertIn('compatibility["compatibleArtifactCount"] = publishedArtifactCount;', text)
         self.assertIn('compatibility["unknownArtifactCount"] = 0;', text)
         validation_index = text.index("ValidateRegistryBoundaryCompatibilityCounts(liveCompatibilityManifest, liveCanonicalManifest);")
-        policy_index = text.index("return releaseSelection.ApplyAccessPolicy(liveCompatibilityManifest);")
+        authoritative_return_index = text.index("return liveCompatibilityManifest;", validation_index)
         self.assertLess(
             validation_index,
-            policy_index,
-            "registry boundary counts must be validated against the unfiltered live manifest before access-policy filtering",
+            authoritative_return_index,
+            "registry boundary counts must be validated against the complete authoritative manifest before it is returned",
+        )
+        self.assertNotIn(
+            "ApplyAccessPolicy(",
+            text,
+            "promotion must not apply request-time visibility policy to the authoritative release shelf",
         )
         self.assertIn(
             "dist/releases.json preview_supported release must keep registryBoundaryCoverage.compatibility.compatibleArtifactCount equal to published artifact count",
             text,
         )
+
+    def test_release_channel_summary_rebuilds_public_trust_counts_from_route_truth(self) -> None:
+        text = SERVICE_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('JsonObject adoptionHealth = metrics["adoptionHealth"] as JsonObject ?? new JsonObject();', text)
+        self.assertIn('JsonObject revocationFacts = metrics["revocationFacts"] as JsonObject ?? new JsonObject();', text)
+        self.assertIn("List<JsonObject> recommendedRoutes = rows", text)
+        self.assertIn("List<JsonObject> fallbackRoutes = rows", text)
+        self.assertIn("List<JsonObject> blockedRoutes = rows", text)
+        self.assertIn('releaseChannel["fallbackRecoveryRouteCount"] = fallbackRouteCount;', text)
+        self.assertIn('adoptionHealth["primaryPromotedCount"] = recommendedRouteCount;', text)
+        self.assertIn('adoptionHealth["fallbackRecoveryCount"] = fallbackRouteCount;', text)
+        self.assertIn('adoptionHealth["blockedRouteCount"] = blockedRouteCount;', text)
+        self.assertIn('revocationFacts["activeRevocationCount"] = revokedRouteCount;', text)
+        self.assertIn('metrics["adoptionHealth"] = adoptionHealth;', text)
+        self.assertIn('metrics["revocationFacts"] = revocationFacts;', text)
+        self.assertIn("private static bool RouteTruthIsFallbackRecovery(JsonObject row)", text)
+        self.assertIn("private static bool RouteTruthIsBlocked(JsonObject row)", text)
+        self.assertIn("private static bool ProofFreshnessBlocksOutputReadiness(string proofFreshnessStatus)", text)
+        self.assertIn("private static int GetMetricCount(JsonObject? section, string propertyName, int fallbackValue)", text)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,7 @@ public static class InstallLinkingPostgresConnectionConfiguration
             {
                 builder = new NpgsqlConnectionStringBuilder(value)
                 {
+                    GssEncryptionMode = GssEncryptionMode.Disable,
                     IncludeErrorDetail = false,
                     PersistSecurityInfo = false,
                     ApplicationName = "chummer-run-install-linking",

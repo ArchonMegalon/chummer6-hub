@@ -134,6 +134,62 @@ public sealed class PublicLandingService
                 PublicRouteCatalog.NormalizeRoute(path),
                 StringComparison.OrdinalIgnoreCase));
 
+    public PublicFeatureCardDto? FindCardForDetailPage(PublicLandingSurfaceDto surface, string path)
+    {
+        var card = FindCardByDetailRoute(surface, path);
+        if (card is not null)
+        {
+            return card;
+        }
+
+        var normalizedPath = PublicRouteCatalog.NormalizeRoute(path);
+        if (!normalizedPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return surface.FeatureCards.FirstOrDefault(candidate =>
+            IsArtifactRoadmapBridge(candidate, normalizedPath));
+    }
+
+    public string? ResolveArtifactRoadmapBridgeDetailRoute(PublicFeatureCardDto card, string path)
+    {
+        var normalizedPath = PublicRouteCatalog.NormalizeRoute(path);
+        if (!normalizedPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase)
+            || !IsArtifactRoadmapBridge(card, normalizedPath))
+        {
+            return null;
+        }
+
+        return PublicRouteCatalog.NormalizeRoute(card.DetailRoute!);
+    }
+
+    private static bool IsArtifactRoadmapBridge(PublicFeatureCardDto candidate, string normalizedRoadmapPath)
+    {
+        if (!string.Equals(candidate.Bucket, "featured_artifacts", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(candidate.Href)
+            || PublicUrlPolicy.IsExternalHref(candidate.Href)
+            || !string.Equals(
+                PublicRouteCatalog.NormalizeRoute(candidate.Href),
+                normalizedRoadmapPath,
+                StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(candidate.DetailRoute)
+            || PublicUrlPolicy.IsExternalHref(candidate.DetailRoute)
+            || string.IsNullOrWhiteSpace(candidate.DetailPrimaryHref)
+            || PublicUrlPolicy.IsExternalHref(candidate.DetailPrimaryHref)
+            || !string.Equals(
+                PublicRouteCatalog.NormalizeRoute(candidate.DetailPrimaryHref),
+                normalizedRoadmapPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var normalizedDetailRoute = PublicRouteCatalog.NormalizeRoute(candidate.DetailRoute);
+        return normalizedDetailRoute.StartsWith("/artifacts/", StringComparison.OrdinalIgnoreCase)
+            && normalizedDetailRoute.Length > "/artifacts/".Length;
+    }
+
     private void ValidateSurface(PublicLandingSurfaceDto surface, string repoRoot)
     {
         ValidateAssets(surface, repoRoot);

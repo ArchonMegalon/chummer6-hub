@@ -79,7 +79,7 @@ SOURCE_MARKERS = {
         "var adoptionLoopResult = await campaignSpineController.GetMyCampaignWorkspaceAdoptionLoop(workspaceId, CancellationToken.None);",
         'NewsTitle: "Tacoma grid rumor points to a vanished courier"',
         'campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.',
-        'campaign spine adoption loop should preserve the player-safe news preview across reload.',
+        'campaign spine adoption loop should preserve the first player-safe news receipt across reload.',
     ],
     "scripts/materialize_next90_m122_hub_campaign_adoption_loop_proof.py": [
         '"package_id": "next90-m122-hub-implement-campaign-adoption-wizard-state-runner-goal-per"',

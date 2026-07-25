@@ -116,7 +116,14 @@ public sealed class ArtifactDeliveryPolicy
             return Denied(ArtifactDeliveryFailure.InvalidContract, "artifact_identity_ambiguous");
         }
 
-        return Resolve(snapshot, manifest, matches[0], role);
+        PublicReleaseArtifactDto artifact = matches[0];
+        if (role != ArtifactDeliveryRoles.Primary
+            && !HasAdvertisedPayloadContract(artifact))
+        {
+            return Denied(ArtifactDeliveryFailure.NotFound, "artifact_role_not_found");
+        }
+
+        return Resolve(snapshot, manifest, artifact, role);
     }
 
     public ArtifactDeliveryResolution ResolveByPath(
@@ -438,6 +445,7 @@ public sealed class ArtifactDeliveryPolicy
                 artifact.PayloadSha256,
                 artifact.PayloadSizeBytes,
                 manifest.Version,
+                artifact.PayloadAcquisitionMode,
                 allowMutableIncomingUrl: snapshot.IsLegacy,
                 out _))
         {
@@ -703,6 +711,13 @@ public sealed class ArtifactDeliveryPolicy
         => value?.Length == 64
            && value.All(static character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
+    private static bool HasAdvertisedPayloadContract(PublicReleaseArtifactDto artifact)
+        => !string.IsNullOrWhiteSpace(artifact.PayloadFileName)
+           || !string.IsNullOrWhiteSpace(artifact.PayloadDownloadUrl)
+           || !string.IsNullOrWhiteSpace(artifact.PayloadSha256)
+           || artifact.PayloadSizeBytes.HasValue
+           || !string.IsNullOrWhiteSpace(artifact.PayloadAcquisitionMode);
+
     private static bool FixedTimeDigestEquals(string left, string right)
     {
         byte[] leftBytes = System.Text.Encoding.ASCII.GetBytes(left.ToLowerInvariant());
@@ -735,6 +750,7 @@ internal static class PayloadSidecarContractValidator
         "installerFileName",
         "releaseVersion"
     ];
+    private const string AcquisitionModeProperty = "payloadAcquisitionMode";
 
     public static bool TryValidate(
         byte[] bytes,
@@ -744,6 +760,7 @@ internal static class PayloadSidecarContractValidator
         string? payloadSha256,
         long? payloadSizeBytes,
         string? releaseVersion,
+        string? payloadAcquisitionMode,
         bool allowMutableIncomingUrl,
         out string? failure)
     {
@@ -766,7 +783,17 @@ internal static class PayloadSidecarContractValidator
                 }
             }
 
-            if (!properties.SetEquals(RequiredProperties))
+            string expectedAcquisitionMode =
+                NormalizeAcquisitionMode(payloadAcquisitionMode);
+            bool expectsAcquisitionMode = expectedAcquisitionMode.Length > 0;
+            var expectedProperties = new HashSet<string>(
+                RequiredProperties,
+                StringComparer.Ordinal);
+            if (expectsAcquisitionMode)
+            {
+                expectedProperties.Add(AcquisitionModeProperty);
+            }
+            if (!properties.SetEquals(expectedProperties))
             {
                 return Fail("payload sidecar property set is noncanonical", out failure);
             }
@@ -790,6 +817,18 @@ internal static class PayloadSidecarContractValidator
                 || actualSize != payloadSizeBytes)
             {
                 return Fail("payload sidecar identity does not match its manifests", out failure);
+            }
+            if (expectsAcquisitionMode
+                && (!TryString(root, AcquisitionModeProperty, out string? actualAcquisitionMode)
+                    || !string.Equals(
+                        NormalizeAcquisitionMode(actualAcquisitionMode),
+                        expectedAcquisitionMode,
+                        StringComparison.Ordinal)
+                    || expectedAcquisitionMode is not ("download" or "embedded")))
+            {
+                return Fail(
+                    "payload sidecar acquisition mode does not match its manifests",
+                    out failure);
             }
 
             if (!TryString(root, "downloadUrl", out string? actualUrl)
@@ -884,6 +923,9 @@ internal static class PayloadSidecarContractValidator
                    or >= 'a' and <= 'z'
                    or >= '0' and <= '9'
                    or '-' or '_' or '.');
+
+    private static string NormalizeAcquisitionMode(string? value)
+        => (value ?? string.Empty).Trim().Replace('-', '_').ToLowerInvariant();
 
     private static bool TryString(JsonElement root, string property, out string? value)
     {

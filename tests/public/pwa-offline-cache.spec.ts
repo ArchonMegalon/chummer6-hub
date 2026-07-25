@@ -9,7 +9,7 @@ const legacyPrivateCachePrefixes = [
 ];
 const requiredStaticPaths = [
   '/mobile.css',
-  '/mobile-turn-companion.js',
+  '/mobile-install-shell.js',
   '/manifest.player.webmanifest',
   '/manifest.gm.webmanifest',
 ];
@@ -130,6 +130,7 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
     // `navigator.serviceWorker.ready` and controller assertions are meaningful.
     await page.goto(`${baseUrl}/mobile/player`, { waitUntil: 'domcontentloaded' });
     await waitForV19Control();
+    await publishWorkerNetworkState(true);
 
     // Reinstall the worker over caches that model the private legacy namespaces.
     // Cache Storage survives unregister, so the next v19 activation must purge them.
@@ -150,14 +151,15 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
     page = await context.newPage();
     await page.goto(`${baseUrl}/mobile/player`, { waitUntil: 'domcontentloaded' });
     await waitForV19Control();
+    await publishWorkerNetworkState(true);
 
     await expect.poll(async () => (await readCacheSnapshot()).cacheNames, {
       timeout: 30000,
     }).not.toEqual(expect.arrayContaining(legacyPrivateCachePrefixes.map((prefix) => `${prefix}v16`)));
 
     const roleRoutes = [
-      { path: '/mobile/player', role: 'Player', manifest: '/manifest.player.webmanifest' },
-      { path: '/mobile/gm', role: 'GameMaster', manifest: '/manifest.gm.webmanifest' },
+      { path: '/mobile/player', role: 'Player', installRole: 'player', manifest: '/manifest.player.webmanifest' },
+      { path: '/mobile/gm', role: 'GameMaster', installRole: 'gm', manifest: '/manifest.gm.webmanifest' },
     ];
     for (const roleRoute of roleRoutes) {
       const rolePage = await context.newPage();
@@ -167,30 +169,32 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
       expect(cacheControl).toContain('private');
       expect(cacheControl).toContain('no-store');
       expect((await response?.headerValue('Referrer-Policy'))?.toLowerCase()).toBe('no-referrer');
-      await expect(rolePage.locator(`[data-blazor-shell="interactive-server"][data-role="${roleRoute.role}"]`).first()).toBeVisible();
+      await expect(rolePage.locator(
+        `[data-play-surface="install-only"][data-live-session="unavailable"][data-authority="none"][data-install-role="${roleRoute.installRole}"]`,
+      ).first()).toBeVisible();
       await expect(rolePage.locator('link[rel="manifest"]').first()).toHaveAttribute('href', roleRoute.manifest);
+      await expect(rolePage.locator('[data-turn-root]')).toHaveCount(0);
+      await expect(rolePage.locator('[data-blazor-shell="interactive-server"]')).toHaveCount(0);
       await rolePage.close();
     }
 
     // Exercise query-bearing private navigation, then prove neither the query nor
     // the rendered role document entered Cache Storage.
     const privatePage = await context.newPage();
-    await privatePage.goto(
+    const rejectedPrivateResponse = await privatePage.goto(
       `${baseUrl}/mobile/player?sessionId=private-proof&deviceId=private-device&role=Player`,
       { waitUntil: 'domcontentloaded' },
     );
-    await expect.poll(() => {
-      const visible = new URL(privatePage.url());
-      return visible.searchParams.has('sessionId') || visible.searchParams.has('deviceId');
-    }).toBe(false);
+    expect(rejectedPrivateResponse?.status()).toBe(404);
+    expect((await rejectedPrivateResponse?.headerValue('Cache-Control'))?.toLowerCase()).toContain('no-store');
+    expect((await rejectedPrivateResponse?.headerValue('Referrer-Policy'))?.toLowerCase()).toBe('no-referrer');
+    await expect(privatePage.locator('[data-play-surface]')).toHaveCount(0);
+    await expect(privatePage.locator('[data-turn-root]')).toHaveCount(0);
+    await expect(privatePage.locator('[data-blazor-shell="interactive-server"]')).toHaveCount(0);
     await privatePage.close();
 
-    const buildAssetStatus = await page.evaluate(async () => {
-      const response = await fetch('/blazor/app.css', { cache: 'reload' });
-      await response.arrayBuffer();
-      return response.status;
-    });
-    expect(buildAssetStatus).toBe(200);
+    const buildAssetResponse = await context.request.get(`${baseUrl}/blazor/app.css`);
+    expect(buildAssetResponse.status()).toBe(200);
 
     const cacheSnapshot = await readCacheSnapshot();
     expect(cacheSnapshot.supported).toBeTruthy();
@@ -216,27 +220,43 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
       expect(entry.cacheControl.toLowerCase(), `${entry.url} must not cache a no-store response`).not.toContain('no-store');
     }
 
-    await context.setOffline(true);
-    await publishWorkerNetworkState(false);
     const offlineRoleResults = [];
     for (const roleRoute of roleRoutes) {
-      const response = await page.goto(`${baseUrl}${roleRoute.path}`, { waitUntil: 'domcontentloaded' });
-      expect(response?.status()).toBe(503);
-      expect((await response?.headerValue('Cache-Control'))?.toLowerCase()).toContain('no-store');
-      expect((await response?.headerValue('Content-Security-Policy'))?.toLowerCase()).toContain("default-src 'none'");
-      expect((await response?.headerValue('X-Content-Type-Options'))?.toLowerCase()).toBe('nosniff');
-      await expect(page.getByRole('heading', { name: 'Reconnect to reopen this play shell' })).toBeVisible();
-      await expect(page.getByText('Private table state is never restored from Cache Storage. Reopen a trusted session link after reconnecting.')).toBeVisible();
-      await expect(page.locator('[data-turn-root]')).toHaveCount(0);
-      await expect(page.locator('#turn-companion-bootstrap')).toHaveCount(0);
-      await expect(page.locator('[data-blazor-shell="interactive-server"]')).toHaveCount(0);
-      offlineRoleResults.push({
-        role: roleRoute.role,
-        path: roleRoute.path,
-        status: response?.status(),
-        cache_control: await response?.headerValue('Cache-Control'),
-        private_projection_restored: false,
-      });
+      const offlineContext = await browser.newContext();
+      try {
+        const rolePage = await offlineContext.newPage();
+        await rolePage.goto(`${baseUrl}${roleRoute.path}`, { waitUntil: 'domcontentloaded' });
+        await rolePage.evaluate(async () => {
+          if ('serviceWorker' in navigator) {
+            await navigator.serviceWorker.ready;
+          }
+        });
+        if (!await rolePage.evaluate(() => !!navigator.serviceWorker?.controller)) {
+          await rolePage.reload({ waitUntil: 'domcontentloaded' });
+        }
+        expect(await rolePage.evaluate(() => !!navigator.serviceWorker?.controller)).toBeTruthy();
+        await offlineContext.setOffline(true);
+        const response = await rolePage.reload({ waitUntil: 'domcontentloaded' });
+        expect(response?.status(), `${roleRoute.path} must fail closed offline`).toBe(503);
+        expect((await response?.headerValue('Cache-Control'))?.toLowerCase()).toContain('no-store');
+        expect((await response?.headerValue('Content-Security-Policy'))?.toLowerCase()).toContain("default-src 'none'");
+        expect((await response?.headerValue('X-Content-Type-Options'))?.toLowerCase()).toBe('nosniff');
+        await expect(rolePage.getByRole('heading', { name: "You're offline" })).toBeVisible();
+        await expect(rolePage.getByText('No account or release data was loaded from an old page.')).toBeVisible();
+        await expect(rolePage.locator('[data-turn-root]')).toHaveCount(0);
+        await expect(rolePage.locator('#turn-companion-bootstrap')).toHaveCount(0);
+        await expect(rolePage.locator('[data-blazor-shell="interactive-server"]')).toHaveCount(0);
+        offlineRoleResults.push({
+          role: roleRoute.role,
+          path: roleRoute.path,
+          status: response?.status(),
+          cache_control: await response?.headerValue('Cache-Control'),
+          private_projection_restored: false,
+        });
+      } finally {
+        await offlineContext.setOffline(false).catch(() => undefined);
+        await offlineContext.close();
+      }
     }
 
     writeJsonArtifact('PWA_OFFLINE_CACHE.generated.json', {

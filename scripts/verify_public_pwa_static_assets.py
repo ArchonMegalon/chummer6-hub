@@ -47,7 +47,8 @@ MAX_LIVE_MANIFEST_BYTES = 256 * 1024
 MAX_LIVE_DOCUMENT_BYTES = 2 * 1024 * 1024
 MAX_LIVE_TEXT_ASSET_BYTES = 8 * 1024 * 1024
 MAX_LIVE_BINARY_ASSET_BYTES = 8 * 1024 * 1024
-PUBLIC_ASSET_CACHE_CONTROL = "public, max-age=300, must-revalidate"
+PUBLIC_ASSET_CACHE_CONTROL = "public, max-age=14400, must-revalidate"
+PUBLIC_MANIFEST_CACHE_CONTROL = "public, max-age=300, must-revalidate"
 WORKER_CACHE_CONTROL = "no-cache, no-store, must-revalidate"
 PRIVATE_CACHE_CONTROL = "private, no-store, max-age=0"
 CDN_NO_STORE = "no-store, max-age=0"
@@ -148,13 +149,13 @@ LOCAL_ASSETS = {
 
 LIVE_BOUND_ASSET_POLICY = (
     ("/js/mobile-app-handoff.js", "application/javascript", PUBLIC_ASSET_CACHE_CONTROL, False),
-    ("/manifest.webmanifest", "application/manifest+json", PUBLIC_ASSET_CACHE_CONTROL, False),
+    ("/manifest.webmanifest", "application/manifest+json", PUBLIC_MANIFEST_CACHE_CONTROL, False),
     ("/mobile-install-shell.js", "application/javascript", PUBLIC_ASSET_CACHE_CONTROL, True),
     ("/mobile.css", "text/css", PUBLIC_ASSET_CACHE_CONTROL, True),
-    ("/manifest.play.webmanifest", "application/manifest+json", PUBLIC_ASSET_CACHE_CONTROL, True),
-    ("/manifest.player.webmanifest", "application/manifest+json", PUBLIC_ASSET_CACHE_CONTROL, True),
-    ("/manifest.gm.webmanifest", "application/manifest+json", PUBLIC_ASSET_CACHE_CONTROL, True),
-    ("/manifest.observer.webmanifest", "application/manifest+json", PUBLIC_ASSET_CACHE_CONTROL, True),
+    ("/manifest.play.webmanifest", "application/manifest+json", PUBLIC_MANIFEST_CACHE_CONTROL, True),
+    ("/manifest.player.webmanifest", "application/manifest+json", PUBLIC_MANIFEST_CACHE_CONTROL, True),
+    ("/manifest.gm.webmanifest", "application/manifest+json", PUBLIC_MANIFEST_CACHE_CONTROL, True),
+    ("/manifest.observer.webmanifest", "application/manifest+json", PUBLIC_MANIFEST_CACHE_CONTROL, True),
     ("/icons/icon-192.png", "image/png", PUBLIC_ASSET_CACHE_CONTROL, True),
     ("/icons/icon-512.png", "image/png", PUBLIC_ASSET_CACHE_CONTROL, True),
     ("/icons/icon-192.svg", "image/svg+xml", PUBLIC_ASSET_CACHE_CONTROL, True),
@@ -820,12 +821,26 @@ def require_private_response_headers(
         failures,
         f"{path}: Cache-Control must be exactly {PRIVATE_CACHE_CONTROL}",
     )
-    for name in ("cdn-cache-control", "cloudflare-cdn-cache-control"):
-        require(
-            headers.get(name, "").strip().lower() == CDN_NO_STORE,
-            failures,
-            f"{path}: {name} must be exactly {CDN_NO_STORE}",
-        )
+    require(
+        headers.get("cdn-cache-control", "").strip().lower() == CDN_NO_STORE,
+        failures,
+        f"{path}: cdn-cache-control must be exactly {CDN_NO_STORE}",
+    )
+    cloudflare_cache_control = (
+        headers.get("cloudflare-cdn-cache-control", "").strip().lower()
+    )
+    require(
+        cloudflare_cache_control == CDN_NO_STORE
+        or (
+            not cloudflare_cache_control
+            and "cloudflare" in headers.get("server", "").strip().lower()
+        ),
+        failures,
+        (
+            f"{path}: cloudflare-cdn-cache-control must be exactly {CDN_NO_STORE} "
+            "unless the Cloudflare edge consumed it"
+        ),
+    )
     require(
         headers.get("surrogate-control", "").strip().lower() == "no-store",
         failures,

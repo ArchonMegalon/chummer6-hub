@@ -81,7 +81,8 @@ public sealed record PublicReleaseArtifactDto(
     string? PayloadFileName = null,
     string? PayloadDownloadUrl = null,
     string? PayloadSha256 = null,
-    long? PayloadSizeBytes = null);
+    long? PayloadSizeBytes = null,
+    string? PayloadAcquisitionMode = null);
 
 public sealed record PublicReleaseManifestDto(
     string Version,

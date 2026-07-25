@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services.Community;
@@ -245,6 +247,47 @@ public sealed class MediaArtifactHorizonsService
     public string BuildSourceRef(MediaArtifactSurfaceDefinition surface, string sourceId)
         => $"{surface.HorizonId}:{sourceId.Trim()}";
 
+    public MediaArtifactTerminalDocument BuildRunsiteMap(MediaArtifactDocument pack)
+    {
+        ArgumentNullException.ThrowIfNull(pack);
+        string label = WebUtility.HtmlEncode(pack.Label);
+        string summary = WebUtility.HtmlEncode(pack.Summary);
+        string highlights = string.Join(
+            string.Empty,
+            pack.Highlights.Select(
+                (highlight, index) =>
+                    $"<text x=\"48\" y=\"{154 + index * 28}\" class=\"detail\">• {WebUtility.HtmlEncode(highlight)}</text>"));
+        string content =
+            $$"""
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title description">
+              <title id="title">{{label}} route map</title>
+              <desc id="description">{{summary}}</desc>
+              <style>.background{fill:#101719}.route{fill:none;stroke:#65d6c3;stroke-width:8}.node{fill:#f0bc5e}.heading{fill:#fff;font:700 30px sans-serif}.detail{fill:#d7e3e1;font:18px sans-serif}</style>
+              <rect class="background" width="960" height="540" rx="24"/>
+              <text x="48" y="64" class="heading">{{label}}</text>
+              <path class="route" d="M90 420 C240 290 350 455 500 300 S760 180 870 104"/>
+              <circle class="node" cx="90" cy="420" r="14"/><circle class="node" cx="500" cy="300" r="14"/><circle class="node" cx="870" cy="104" r="14"/>
+              {{highlights}}
+            </svg>
+            """;
+        return new MediaArtifactTerminalDocument(
+            Content: content,
+            ContentType: "image/svg+xml; charset=utf-8",
+            FileName: $"{NormalizeFileName(pack.Id)}-route-map.svg");
+    }
+
+    public MediaArtifactTerminalDocument BuildRunbookPrimerExport(MediaArtifactDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return new MediaArtifactTerminalDocument(
+            Content: BuildDocumentMarkdown(
+                document,
+                "RUNBOOK Press",
+                "Player-safe primer export. Rules authority remains with the active ruleset and campaign."),
+            ContentType: "text/markdown; charset=utf-8",
+            FileName: $"{NormalizeFileName(document.Id)}.md");
+    }
+
     public string BuildDocumentMarkdown(MediaArtifactDocument document, string horizonLabel, string boundary)
     {
         var lines = new List<string>
@@ -477,6 +520,15 @@ public sealed class MediaArtifactHorizonsService
         => values
             .Select(static item => string.IsNullOrWhiteSpace(item) ? null : item.Trim())
             .FirstOrDefault(static item => item is not null);
+
+    private static string NormalizeFileName(string value)
+    {
+        string normalized = new(
+            value.Trim().ToLowerInvariant()
+                .Select(character => char.IsLetterOrDigit(character) || character is '-' or '_' ? character : '-')
+                .ToArray());
+        return string.IsNullOrWhiteSpace(normalized) ? "artifact" : normalized.Trim('-');
+    }
 }
 
 internal sealed record SpatialTourStyleDefaults(
@@ -509,3 +561,8 @@ public sealed record MediaArtifactDocument(
 public sealed record MediaArtifactSurfaceDefinition(
     string HorizonId,
     string CapabilityId);
+
+public sealed record MediaArtifactTerminalDocument(
+    string Content,
+    string ContentType,
+    string FileName);

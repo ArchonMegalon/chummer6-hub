@@ -206,4 +206,106 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Contains("SubscribrManuscriptLane", sourceText, StringComparison.Ordinal);
         Assert.Contains("Narrative Origin", sourceText, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void StrictConfiguredRootUsesOnlyStagedQuickstartGuide()
+    {
+        string root = CreateStrictRoot();
+        try
+        {
+            string guideRoot = Path.Combine(root, "products", "chummer", "public-guides");
+            Directory.CreateDirectory(guideRoot);
+            File.WriteAllText(
+                Path.Combine(guideRoot, "chummer6-quickstart.md"),
+                "# Candidate-bound quickstart\n\nStrict fixture text.\n");
+            var service = new FlipLinkDocumentPortalService(CreateStrictConfiguration(root));
+
+            FlipLinkDocumentPortalService.DocumentPortalSourceArtifact? artifact =
+                service.TryBuildSourceArtifact("chummer6-quickstart");
+
+            Assert.NotNull(artifact);
+            string source = System.Text.Encoding.UTF8.GetString(artifact!.Bytes);
+            Assert.Contains("Candidate-bound quickstart", source, StringComparison.Ordinal);
+            Assert.Contains("Strict fixture text", source, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteStrictRoot(root);
+        }
+    }
+
+    [Fact]
+    public void StrictConfiguredRootReturnsMissingInsteadOfUsingAmbientGuideFallback()
+    {
+        string root = CreateStrictRoot();
+        try
+        {
+            var service = new FlipLinkDocumentPortalService(CreateStrictConfiguration(root));
+
+            FlipLinkDocumentPortalService.DocumentPortalPdfArtifact? artifact =
+                service.TryBuildPdfArtifact("chummer6-quickstart");
+
+            Assert.Null(artifact);
+        }
+        finally
+        {
+            DeleteStrictRoot(root);
+        }
+    }
+
+    [Fact]
+    public void StrictConfiguredRootRejectsSymlinkedGuideDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string testRoot = CreateStrictRoot();
+        string configuredRoot = Path.Combine(testRoot, "configured");
+        string outsideGuideRoot = Path.Combine(testRoot, "outside-guides");
+        Directory.CreateDirectory(Path.Combine(configuredRoot, "products", "chummer"));
+        Directory.CreateDirectory(outsideGuideRoot);
+        File.WriteAllText(
+            Path.Combine(outsideGuideRoot, "chummer6-quickstart.md"),
+            "# Outside guide\n");
+        Directory.CreateSymbolicLink(
+            Path.Combine(configuredRoot, "products", "chummer", "public-guides"),
+            outsideGuideRoot);
+        try
+        {
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                new FlipLinkDocumentPortalService(CreateStrictConfiguration(configuredRoot)));
+
+            Assert.Contains("symbolic link or reparse point", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteStrictRoot(testRoot);
+        }
+    }
+
+    private static IConfiguration CreateStrictConfiguration(string root)
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = root,
+                ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true"
+            })
+            .Build();
+
+    private static string CreateStrictRoot()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "fliplink-strict-root-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
+    private static void DeleteStrictRoot(string root)
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

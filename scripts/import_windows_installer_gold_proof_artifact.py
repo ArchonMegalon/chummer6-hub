@@ -62,6 +62,10 @@ MIN_SCREENSHOT_WIDTH = 320
 MIN_SCREENSHOT_HEIGHT = 180
 MAX_SCREENSHOT_WIDTH = 7680
 MAX_SCREENSHOT_HEIGHT = 4320
+MAX_SCREENSHOT_PIXELS = 32 * 1024 * 1024
+MAX_SCREENSHOT_FRAMES = 1
+MAX_SCREENSHOT_DECOMPRESSED_BYTES = 128 * 1024 * 1024
+MAX_SCREENSHOT_PNG_CHUNKS = 128
 POST_IMPORT_LOCAL_TIMEOUT_SECONDS = 900.0
 POST_IMPORT_EXTERNAL_TIMEOUT_SECONDS = 300.0
 POST_IMPORT_TERMINATION_GRACE_SECONDS = 5.0
@@ -71,7 +75,8 @@ POST_IMPORT_EARLY_DESCENDANT_OBSERVATION_SECONDS = 2.0
 POST_IMPORT_DESCENDANT_OBSERVATION_INTERVAL_SECONDS = 0.005
 POST_IMPORT_CONTAINMENT_ENVIRONMENT_KEY = "CHUMMER_POST_IMPORT_CONTAINMENT_NONCE"
 MAX_PROC_ENVIRON_BYTES = 4 * 1024 * 1024
-PROOF_GENERATION_CONTRACT = "chummer.windows_installer_proof_generation.v1"
+LEGACY_PROOF_GENERATION_CONTRACT = "chummer.windows_installer_proof_generation.v1"
+PROOF_GENERATION_CONTRACT = "chummer.windows_installer_proof_generation.v2"
 PROOF_PUBLICATION_CONTRACT = "chummer.windows_installer_proof_generation_publication.v1"
 PROOF_CONTROL_DIRECTORY = ".windows-installer-proof"
 PROOF_GENERATIONS_DIRECTORY = "generations"
@@ -439,6 +444,82 @@ def normalized_surface(value: Any) -> str:
         "install-complete": "completion",
     }
     return aliases.get(surface, surface)
+
+
+def _visual_dpi_bucket(value: Any) -> str:
+    if isinstance(value, bool) or value is None:
+        return ""
+    raw_value = str(value).strip().casefold()
+    if not raw_value:
+        return ""
+    is_percent = raw_value.endswith("%")
+    if is_percent:
+        raw_value = raw_value[:-1].strip()
+    try:
+        numeric_value = float(raw_value)
+    except (TypeError, ValueError):
+        return ""
+    if not math.isfinite(numeric_value) or numeric_value <= 0:
+        return ""
+    if is_percent or numeric_value >= 10:
+        numeric_value /= 100.0
+    if math.isclose(numeric_value, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        return "default"
+    if numeric_value > 1.0:
+        return "scaled"
+    return ""
+
+
+def validate_visual_proof_semantics(visual_payload: dict[str, Any]) -> None:
+    if normalized(visual_payload.get("status")) != "pass":
+        raise SystemExit("visual audit source must have status='pass'")
+    if "pass" in visual_payload and visual_payload.get("pass") is not True:
+        raise SystemExit("passing visual audit source has an inconsistent pass field")
+    for field in ("failures", "failed_gates"):
+        if field not in visual_payload:
+            continue
+        value = visual_payload.get(field)
+        if not isinstance(value, list):
+            raise SystemExit(f"visual audit source {field} field must be a list")
+        if value:
+            raise SystemExit(f"passing visual audit source has non-empty {field}")
+
+    screenshots = visual_payload.get("screenshots")
+    if not isinstance(screenshots, list) or not screenshots:
+        raise SystemExit("visual audit source must contain screenshot evidence")
+    coverage = {surface: set() for surface in REQUIRED_SURFACES}
+    for row in screenshots:
+        if not isinstance(row, dict):
+            raise SystemExit("visual audit screenshot row is not an object")
+        path = str(row.get("path") or "<unnamed>")
+        if normalized(row.get("clippingStatus")) != "pass":
+            raise SystemExit(
+                f"visual audit screenshot clipping check is not pass: {path}"
+            )
+        if normalized(row.get("readabilityStatus")) != "pass":
+            raise SystemExit(
+                f"visual audit screenshot readability check is not pass: {path}"
+            )
+        surface = normalized_surface(row.get("surface"))
+        if surface not in REQUIRED_SURFACES:
+            continue
+        dpi_bucket = _visual_dpi_bucket(row.get("dpiScale"))
+        if not dpi_bucket:
+            raise SystemExit(
+                "visual audit required-surface screenshot has an invalid DPI scale: "
+                f"{path}"
+            )
+        coverage[surface].add(dpi_bucket)
+
+    for surface in sorted(REQUIRED_SURFACES):
+        if "default" not in coverage[surface]:
+            raise SystemExit(
+                f"visual audit has no default-DPI {surface} screenshot"
+            )
+        if "scaled" not in coverage[surface]:
+            raise SystemExit(
+                f"visual audit has no scaled-DPI {surface} screenshot"
+            )
 
 
 def sha256_file(path: Path) -> str:
@@ -1409,6 +1490,7 @@ def run_bound_python_subprocess(
         os.close(script_descriptor)
         os.close(interpreter_descriptor)
         raise
+    process: subprocess.Popen[bytes] | None = None
     try:
         execution_argv = [
             f"/proc/self/fd/{interpreter_descriptor}",
@@ -1613,6 +1695,14 @@ def run_bound_python_subprocess(
                 stderr,
             )
     finally:
+        if process is not None:
+            for pipe in (process.stdout, process.stderr):
+                if pipe is None:
+                    continue
+                try:
+                    pipe.close()
+                except BaseException:
+                    pass
         os.close(dependency_descriptor)
         os.close(script_descriptor)
         os.close(interpreter_descriptor)
@@ -2686,6 +2776,7 @@ def _validate_generation_directory(
     *,
     directory_component: str | None = None,
     expected_manifest_bytes: bytes | None = None,
+    allow_legacy_contract: bool = False,
 ) -> dict[str, Any]:
     generation_fd = _open_directory_at(
         generations_fd,
@@ -2703,8 +2794,22 @@ def _validate_generation_directory(
             manifest = json.loads(manifest_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise SystemExit(f"proof generation manifest is invalid: {exc}") from exc
-        if not isinstance(manifest, dict) or manifest.get("contract_name") != PROOF_GENERATION_CONTRACT:
+        if not isinstance(manifest, dict):
             raise SystemExit("proof generation manifest contract is invalid")
+        generation_contract = str(manifest.get("contract_name") or "")
+        if generation_contract not in {
+            LEGACY_PROOF_GENERATION_CONTRACT,
+            PROOF_GENERATION_CONTRACT,
+        }:
+            raise SystemExit("proof generation manifest contract is invalid")
+        if (
+            generation_contract == LEGACY_PROOF_GENERATION_CONTRACT
+            and not allow_legacy_contract
+        ):
+            raise SystemExit(
+                "legacy proof generation contract is accepted only for recovery/current validation"
+            )
+        strict_v2_evidence = generation_contract == PROOF_GENERATION_CONTRACT
         canonical_manifest_bytes = (
             json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n"
         ).encode("utf-8")
@@ -2817,7 +2922,8 @@ def _validate_generation_directory(
                         "data": data,
                         "destination_name": relative.name,
                         "path": relative_text,
-                    }
+                    },
+                    require_full_decode=strict_v2_evidence,
                 )
                 if row.get("image") != image_metadata:
                     raise SystemExit("proof generation screenshot metadata disagrees with its bytes")
@@ -2870,6 +2976,8 @@ def _validate_generation_directory(
         )
         if startup_digest != visual_digest:
             raise SystemExit("proof generation native proof metadata targets different artifacts")
+        if strict_v2_evidence:
+            validate_visual_proof_semantics(visual_payload)
         screenshot_rows = visual_payload.get("screenshots")
         if not isinstance(screenshot_rows, list) or len(screenshot_rows) != role_counts["screenshot"]:
             raise SystemExit("proof generation visual source screenshot inventory is incomplete")
@@ -3233,7 +3341,11 @@ def _validate_journal_generation(
     generation_id: str,
     expected_manifest_sha256: str,
 ) -> dict[str, Any]:
-    manifest = _validate_generation_directory(generations_fd, generation_id)
+    manifest = _validate_generation_directory(
+        generations_fd,
+        generation_id,
+        allow_legacy_contract=True,
+    )
     generation_fd = _open_directory_at(generations_fd, generation_id)
     try:
         manifest_bytes = _read_file_at(
@@ -3278,7 +3390,11 @@ def _recover_publication_journal(
             previous_generation_id = previous_target.removeprefix(
                 f"{PROOF_GENERATIONS_DIRECTORY}/"
             )
-            _validate_generation_directory(generations_fd, previous_generation_id)
+            _validate_generation_directory(
+                generations_fd,
+                previous_generation_id,
+                allow_legacy_contract=True,
+            )
             _assert_fixed_public_anchors(root_fd)
         return journal
     if state == "rollback_incomplete":
@@ -3480,6 +3596,7 @@ def publish_proof_set_transactionally(
             "contract_name": PROOF_PUBLICATION_CONTRACT,
             "status": "committed",
             "generation_id": generation_id,
+            "generation_contract_name": str(manifest["contract_name"]),
             "generation_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest().lower(),
             "item_count": len(manifest_rows),
             "exact_public_relative_paths": list(manifest["exact_public_relative_paths"]),
@@ -3692,7 +3809,216 @@ def _jpeg_dimensions(data: bytes) -> tuple[int, int]:
     return dimensions
 
 
-def validate_screenshot_image(snapshot: dict[str, Any]) -> dict[str, Any]:
+def _fully_decode_screenshot_png(
+    data: bytes,
+    *,
+    expected_dimensions: tuple[int, int],
+) -> None:
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not data.startswith(signature):
+        raise SystemExit("strict screenshot decoder requires PNG framing")
+    allowed_ancillary_lengths = {
+        b"cHRM": 32,
+        b"gAMA": 4,
+        b"pHYs": 9,
+        b"sRGB": 1,
+    }
+    offset = len(signature)
+    chunk_count = 0
+    saw_ihdr = False
+    saw_idat = False
+    saw_iend = False
+    seen_ancillary: set[bytes] = set()
+    idat_chunks: list[bytes] = []
+    idat_size = 0
+    width = 0
+    height = 0
+    channel_count = 0
+    while offset < len(data):
+        chunk_count += 1
+        if chunk_count > MAX_SCREENSHOT_PNG_CHUNKS:
+            raise SystemExit("screenshot PNG exceeds the chunk-count bound")
+        if offset + 12 > len(data):
+            raise SystemExit("screenshot PNG has a truncated chunk")
+        chunk_length = struct.unpack(">I", data[offset : offset + 4])[0]
+        chunk_type = data[offset + 4 : offset + 8]
+        chunk_end = offset + 12 + chunk_length
+        if chunk_end > len(data):
+            raise SystemExit("screenshot PNG chunk exceeds the file boundary")
+        chunk_data = data[offset + 8 : offset + 8 + chunk_length]
+        expected_crc = struct.unpack(">I", data[offset + 8 + chunk_length : chunk_end])[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise SystemExit("screenshot PNG chunk CRC is invalid")
+
+        if chunk_type == b"IHDR":
+            if saw_ihdr or chunk_count != 1 or chunk_length != 13:
+                raise SystemExit("strict screenshot PNG has an invalid IHDR")
+            (
+                width,
+                height,
+                bit_depth,
+                color_type,
+                compression,
+                filtering,
+                interlace,
+            ) = struct.unpack(">IIBBBBB", chunk_data)
+            if (width, height) != expected_dimensions:
+                raise SystemExit(
+                    "strict screenshot PNG dimensions disagree with validated framing"
+                )
+            if bit_depth != 8 or color_type not in {2, 6}:
+                raise SystemExit(
+                    "strict screenshot PNG must use 8-bit RGB or RGBA pixels"
+                )
+            if compression != 0 or filtering != 0 or interlace != 0:
+                raise SystemExit(
+                    "strict screenshot PNG must be non-interlaced with standard compression and filtering"
+                )
+            channel_count = 3 if color_type == 2 else 4
+            saw_ihdr = True
+        elif not saw_ihdr:
+            raise SystemExit("strict screenshot PNG does not begin with IHDR")
+        elif chunk_type == b"IDAT":
+            if saw_iend or chunk_length <= 0:
+                raise SystemExit("strict screenshot PNG has an invalid IDAT chunk")
+            saw_idat = True
+            idat_size += chunk_length
+            if idat_size > MAX_SCREENSHOT_BYTES:
+                raise SystemExit("strict screenshot PNG IDAT data exceeds the byte bound")
+            idat_chunks.append(chunk_data)
+        elif chunk_type == b"IEND":
+            if not saw_idat or saw_iend or chunk_length != 0 or chunk_end != len(data):
+                raise SystemExit("strict screenshot PNG has an invalid or non-terminal IEND")
+            saw_iend = True
+            offset = chunk_end
+            break
+        elif chunk_type in allowed_ancillary_lengths:
+            if saw_idat or chunk_type in seen_ancillary:
+                raise SystemExit("strict screenshot PNG ancillary chunk ordering is invalid")
+            if chunk_length != allowed_ancillary_lengths[chunk_type]:
+                raise SystemExit("strict screenshot PNG ancillary chunk length is invalid")
+            if chunk_type == b"sRGB" and chunk_data[0] > 3:
+                raise SystemExit("strict screenshot PNG sRGB intent is invalid")
+            if chunk_type == b"gAMA" and struct.unpack(">I", chunk_data)[0] == 0:
+                raise SystemExit("strict screenshot PNG gamma is invalid")
+            if chunk_type == b"cHRM":
+                chromaticities = struct.unpack(">8I", chunk_data)
+                if any(
+                    x > 100000 or y > 100000 or x + y > 100000
+                    for x, y in zip(
+                        chromaticities[0::2],
+                        chromaticities[1::2],
+                    )
+                ):
+                    raise SystemExit("strict screenshot PNG chromaticities are invalid")
+            if chunk_type == b"pHYs":
+                pixels_x, pixels_y, unit = struct.unpack(">IIB", chunk_data)
+                if pixels_x == 0 or pixels_y == 0 or unit not in {0, 1}:
+                    raise SystemExit("strict screenshot PNG physical dimensions are invalid")
+            seen_ancillary.add(chunk_type)
+        else:
+            raise SystemExit(
+                "strict screenshot PNG contains an unsupported chunk: "
+                + chunk_type.decode("ascii", errors="replace")
+            )
+        offset = chunk_end
+    if not (saw_ihdr and saw_idat and saw_iend) or offset != len(data):
+        raise SystemExit("strict screenshot PNG is missing required chunks")
+    if MAX_SCREENSHOT_FRAMES != 1:
+        raise SystemExit("strict screenshot PNG frame bound is misconfigured")
+
+    pixel_count = width * height
+    if pixel_count <= 0 or pixel_count > MAX_SCREENSHOT_PIXELS:
+        raise SystemExit(
+            f"screenshot pixel count is outside the allowed range: {pixel_count}"
+        )
+    scanline_size = width * channel_count
+    expected_decompressed_size = height * (scanline_size + 1)
+    if (
+        pixel_count * 4 > MAX_SCREENSHOT_DECOMPRESSED_BYTES
+        or expected_decompressed_size > MAX_SCREENSHOT_DECOMPRESSED_BYTES
+    ):
+        raise SystemExit(
+            "screenshot bounded decode exceeds the decompressed-data limit: "
+            f"{expected_decompressed_size}"
+        )
+
+    decoder = zlib.decompressobj()
+    decoded = bytearray()
+    try:
+        for chunk_data in idat_chunks:
+            remaining = expected_decompressed_size + 1 - len(decoded)
+            if remaining <= 0:
+                raise SystemExit("screenshot PNG decompressed data exceeds its exact bound")
+            decoded.extend(decoder.decompress(chunk_data, remaining))
+            if decoder.unconsumed_tail:
+                raise SystemExit("screenshot PNG decompressed data exceeds its exact bound")
+            if decoder.unused_data:
+                raise SystemExit("screenshot PNG contains trailing compressed data")
+        remaining = expected_decompressed_size + 1 - len(decoded)
+        if remaining <= 0:
+            raise SystemExit("screenshot PNG decompressed data exceeds its exact bound")
+        decoded.extend(decoder.flush(remaining))
+    except zlib.error as exc:
+        raise SystemExit("screenshot failed bounded full PNG decompression") from exc
+    if len(decoded) > expected_decompressed_size:
+        raise SystemExit("screenshot PNG decompressed data exceeds its exact bound")
+    if not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+        raise SystemExit("screenshot PNG compressed stream is incomplete or has trailing data")
+    if len(decoded) != expected_decompressed_size:
+        raise SystemExit("screenshot PNG decompressed data has the wrong exact length")
+
+    previous_scanline = bytearray(scanline_size)
+    decoded_offset = 0
+    bytes_per_pixel = channel_count
+    for _row_index in range(height):
+        filter_type = decoded[decoded_offset]
+        decoded_offset += 1
+        filtered = decoded[decoded_offset : decoded_offset + scanline_size]
+        decoded_offset += scanline_size
+        if filter_type > 4:
+            raise SystemExit("screenshot PNG scanline uses an invalid filter")
+        if filter_type == 0:
+            previous_scanline = bytearray(filtered)
+            continue
+        reconstructed = bytearray(scanline_size)
+        for index, value in enumerate(filtered):
+            left = reconstructed[index - bytes_per_pixel] if index >= bytes_per_pixel else 0
+            above = previous_scanline[index]
+            upper_left = (
+                previous_scanline[index - bytes_per_pixel]
+                if index >= bytes_per_pixel
+                else 0
+            )
+            if filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = above
+            elif filter_type == 3:
+                predictor = (left + above) // 2
+            else:
+                estimate = left + above - upper_left
+                left_distance = abs(estimate - left)
+                above_distance = abs(estimate - above)
+                upper_left_distance = abs(estimate - upper_left)
+                if left_distance <= above_distance and left_distance <= upper_left_distance:
+                    predictor = left
+                elif above_distance <= upper_left_distance:
+                    predictor = above
+                else:
+                    predictor = upper_left
+            reconstructed[index] = (value + predictor) & 0xFF
+        previous_scanline = reconstructed
+    if decoded_offset != len(decoded):
+        raise SystemExit("screenshot PNG scanline decoding did not consume exact data")
+
+
+def validate_screenshot_image(
+    snapshot: dict[str, Any],
+    *,
+    require_full_decode: bool = True,
+) -> dict[str, Any]:
     data = bytes(snapshot.get("data") or b"")
     if not data or len(data) > MAX_SCREENSHOT_BYTES:
         raise SystemExit(
@@ -3707,6 +4033,8 @@ def validate_screenshot_image(snapshot: dict[str, Any]) -> dict[str, Any]:
     elif data.startswith(b"\xff\xd8"):
         if suffix not in {".jpg", ".jpeg"}:
             raise SystemExit("screenshot JPEG magic does not match its filename extension")
+        if require_full_decode:
+            raise SystemExit("strict v2 screenshot profile accepts PNG only")
         image_format = "jpeg"
         width, height = _jpeg_dimensions(data)
     else:
@@ -3715,6 +4043,11 @@ def validate_screenshot_image(snapshot: dict[str, Any]) -> dict[str, Any]:
         raise SystemExit(f"screenshot width is outside the allowed range: {width}")
     if not (MIN_SCREENSHOT_HEIGHT <= height <= MAX_SCREENSHOT_HEIGHT):
         raise SystemExit(f"screenshot height is outside the allowed range: {height}")
+    if require_full_decode:
+        _fully_decode_screenshot_png(
+            data,
+            expected_dimensions=(width, height),
+        )
     return {
         "format": image_format,
         "width": width,
@@ -3857,7 +4190,9 @@ def validate_visual_payload_matches_promoted_digest(
 
 def import_artifact(artifact_root: Path, downloads_root: Path, *, intake_request: Path | None = None) -> dict[str, Any]:
     intake_payload = load_intake_payload_for_import(intake_request)
-    startup_receipt_bundle_required = startup_receipt_bundle_required_from_intake(intake_payload)
+    startup_receipt_bundle_required_requested = startup_receipt_bundle_required_from_intake(
+        intake_payload
+    )
     promoted_digest = promoted_digest_from_intake(intake_payload)
     immutable_bundle_root = _absolute_lexical_path(artifact_root)
     startup_source = find_optional_unique(artifact_root, STARTUP_RECEIPT_NAME)
@@ -3904,6 +4239,7 @@ def import_artifact(artifact_root: Path, downloads_root: Path, *, intake_request
             f"proof artifact is missing {STARTUP_RECEIPT_NAME}; complete generation publication "
             "requires the native startup receipt inside the bounded ZIP"
         )
+    validate_visual_proof_semantics(visual_payload)
 
     proof_set_entries: list[tuple[dict[str, Any], Path]] = []
     if startup_snapshot is not None:
@@ -3933,7 +4269,10 @@ def import_artifact(artifact_root: Path, downloads_root: Path, *, intake_request
     return {
         "startupReceipt": str(startup_destination),
         "startupReceiptSource": startup_receipt_source,
-        "startupReceiptBundleRequired": startup_receipt_bundle_required,
+        "startupReceiptBundleRequired": True,
+        "startupReceiptBundleRequiredRequested": (
+            startup_receipt_bundle_required_requested
+        ),
         "visualAuditSource": str(visual_destination),
         "screenshots": copied_screenshots,
         "screenshotBindings": screenshot_bindings,

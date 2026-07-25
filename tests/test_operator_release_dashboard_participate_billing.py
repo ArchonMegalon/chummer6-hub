@@ -216,13 +216,13 @@ def test_expected_visible_version_candidates_allow_blank_status_for_stable_lane(
 
 
 def passing_public_edge_postdeploy_payload() -> dict[str, object]:
-    return {
+    payload = {
         "contractName": "chummer.public_edge_postdeploy_gate.v1",
         "status": "pass",
         "generatedAtUtc": fresh_timestamp(),
         "coreChildContracts": {
             "preflight": "chummer.public_edge_deploy_preflight.v1",
-            "downloads": "chummer.downloads_version_marker.v1",
+            "downloads": "chummer.downloads_version_marker.bound.v1",
             "pwaStatic": "chummer.public_pwa_static_assets.v1",
             "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
             "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -335,14 +335,14 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
         "mobilePwaViewportMissingRoutes": [],
         "pwaOfflineCacheStatus": "pass",
         "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
-        "pwaOfflineCacheCacheVersion": "v17",
+        "pwaOfflineCacheCacheVersion": "v19",
         "pwaOfflineCacheNavigationPolicy": "network_only",
         "pwaOfflineCachePrivateStateScope": "open_tab_only",
         "pwaOfflineCacheStaticPaths": [
             "/manifest.player.webmanifest",
             "/manifest.gm.webmanifest",
             "/mobile.css",
-            "/mobile-turn-companion.js",
+            "/mobile-install-shell.js",
         ],
         "pwaOfflineCacheOfflineRoleFallbacks": [
             {
@@ -500,6 +500,70 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
         "frontdoorNavigationAnchorDeviceContextPresent": True,
         "frontdoorNavigationAnchorFailure": "",
     }
+    payload.update(
+        {
+            "frontdoorNavigationGatedTargets": [],
+            "frontdoorNavigationPublicTargets": ["Build", "Play"],
+            "frontdoorNavigationPlaySignInRoute": "/login?next=%2F",
+            "frontdoorNavigationPlayerSessionContextPresent": False,
+            "frontdoorNavigationPlayerDeviceContextPresent": False,
+            "frontdoorNavigationLiveTurnCompanionShell": False,
+            "frontdoorNavigationBlazorShell": "install-only",
+            "frontdoorNavigationRybbitConfigured": False,
+            "frontdoorNavigationRybbitTag": "",
+            "frontdoorNavigationRybbitRoute": "",
+            "frontdoorNavigationRybbitMode": "",
+            "frontdoorNavigationRybbitRole": "",
+            "frontdoorNavigationRybbitSiteIdPresent": False,
+            "frontdoorNavigationRybbitScriptUrlPresent": False,
+            "frontdoorNavigationRybbitScriptUrlAllowed": False,
+            "frontdoorNavigationRybbitSkipPatterns": [],
+            "frontdoorNavigationRybbitMaskPatterns": [],
+            "frontdoorNavigationRybbitSkipMobilePaths": False,
+            "frontdoorNavigationRybbitMaskMobilePaths": False,
+            "frontdoorNavigationRybbitMasksPrivatePlayRoutes": False,
+            "frontdoorNavigationRybbitReplayBlockSelector": "",
+            "frontdoorNavigationRybbitReplayBlocksTurnRoot": False,
+            "frontdoorNavigationPlayerSessionHandoffUrl": "",
+            "frontdoorNavigationPlayerSessionHandoffStatus": "",
+            "frontdoorNavigationPlayerSessionHandoffLinkText": "",
+            "frontdoorNavigationPlayerSessionHandoffPreservesSession": False,
+            "frontdoorNavigationPlayerSessionHandoffPreservesRole": False,
+            "frontdoorNavigationPlayerSessionHandoffStripsDevice": False,
+            "frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent": False,
+            "frontdoorNavigationGmRouteSessionIdPresent": False,
+            "frontdoorNavigationGmSessionContextPresent": False,
+            "frontdoorNavigationGmDeviceContextPresent": False,
+            "frontdoorNavigationGmLiveTurnCompanionShell": False,
+            "frontdoorNavigationGmBlazorShell": "install-only",
+            "frontdoorNavigationGmRybbitConfigured": False,
+            "frontdoorNavigationGmRybbitTag": "",
+            "frontdoorNavigationGmRybbitRoute": "",
+            "frontdoorNavigationGmRybbitMode": "",
+            "frontdoorNavigationGmRybbitRole": "",
+            "frontdoorNavigationGmRybbitSiteIdPresent": False,
+            "frontdoorNavigationGmRybbitScriptUrlPresent": False,
+            "frontdoorNavigationGmRybbitScriptUrlAllowed": False,
+            "frontdoorNavigationGmRybbitSkipPatterns": [],
+            "frontdoorNavigationGmRybbitMaskPatterns": [],
+            "frontdoorNavigationGmRybbitSkipMobilePaths": False,
+            "frontdoorNavigationGmRybbitMaskMobilePaths": False,
+            "frontdoorNavigationGmRybbitMasksPrivatePlayRoutes": False,
+            "frontdoorNavigationGmRybbitReplayBlockSelector": "",
+            "frontdoorNavigationGmRybbitReplayBlocksTurnRoot": False,
+            "frontdoorNavigationGmSessionHandoffUrl": "",
+            "frontdoorNavigationGmSessionHandoffStatus": "",
+            "frontdoorNavigationGmSessionHandoffLinkText": "",
+            "frontdoorNavigationGmSessionHandoffPreservesSession": False,
+            "frontdoorNavigationGmSessionHandoffPreservesRole": False,
+            "frontdoorNavigationGmSessionHandoffStripsDevice": False,
+            "frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent": False,
+            "frontdoorNavigationAnchorBlazorShell": "install-only",
+            "frontdoorNavigationAnchorSessionContextPresent": False,
+            "frontdoorNavigationAnchorDeviceContextPresent": False,
+        }
+    )
+    return payload
 
 
 def passing_teable_important_work_payload() -> dict[str, object]:
@@ -1710,7 +1774,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", failures)
         self.assertIn("public-edge postdeploy PWA offline cache did not prove private API responses remain uncached", failures)
         self.assertIn("public-edge postdeploy front-door visible GM URL is not query-free /mobile/gm", failures)
-        self.assertIn("public-edge postdeploy front-door GM handoff is not a redacted GM route", failures)
+        self.assertIn("public-edge postdeploy anonymous GM shell exposed a session handoff", failures)
         self.assertNotIn("public-edge postdeploy Black Ledger remains primary on the front door", failures)
 
     def test_dashboard_check_failures_stay_concise_when_homepage_lane_is_missing(self) -> None:
@@ -2812,7 +2876,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertNotIn("release_ready", payload["failures"])
         self.assertIn("- PASS `release_ready`: `self_check_skipped` (operator context, not release-blocking)", markdown)
         self.assertIn(
-            "mobile PWA offline cache: status=pass version=v17 navigation=network_only private_state=open_tab_only",
+            "mobile PWA offline cache: status=pass version=v19 navigation=network_only private_state=open_tab_only",
             markdown,
         )
         self.assertIn("role PWA manifests: count=2", markdown)
@@ -2820,21 +2884,21 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn("/mobile/player?role=Player", markdown)
         self.assertIn("/manifest.gm.webmanifest", markdown)
         self.assertIn("/mobile/gm?role=GameMaster", markdown)
-        self.assertIn("static_paths=['/manifest.player.webmanifest', '/manifest.gm.webmanifest', '/mobile.css', '/mobile-turn-companion.js']", markdown)
+        self.assertIn("static_paths=['/manifest.player.webmanifest', '/manifest.gm.webmanifest', '/mobile.css', '/mobile-install-shell.js']", markdown)
         self.assertIn("personalized_ledger_cached=False", markdown)
         self.assertIn(
             "front-door mobile launch: player_http=200 player_role=Player "
-            "player_manifest=/manifest.player.webmanifest player_blazor=interactive-server "
-            "player_rybbit=True player_rybbit_skip_mobile=True player_rybbit_mask_api=True "
-            "player_rybbit_replay_block=True gm_http=200 gm_role=GameMaster "
-            "gm_manifest=/manifest.gm.webmanifest gm_blazor=interactive-server gm_rybbit=True "
-            "gm_rybbit_skip_mobile=True gm_rybbit_mask_api=True gm_rybbit_replay_block=True",
+            "player_manifest=/manifest.player.webmanifest player_blazor=install-only "
+            "player_rybbit=False player_rybbit_skip_mobile=False player_rybbit_mask_api=False "
+            "player_rybbit_replay_block=False gm_http=200 gm_role=GameMaster "
+            "gm_manifest=/manifest.gm.webmanifest gm_blazor=install-only gm_rybbit=False "
+            "gm_rybbit_skip_mobile=False gm_rybbit_mask_api=False gm_rybbit_replay_block=False",
             markdown,
         )
         self.assertIn(
-            "front-door session handoff: player_preserves_session=True player_preserves_role=True "
-            "player_strips_device=True player_identity_redacted=True gm_preserves_session=True "
-            "gm_preserves_role=True gm_strips_device=True gm_identity_redacted=True",
+            "front-door session handoff: player_preserves_session=False player_preserves_role=False "
+            "player_strips_device=False player_identity_redacted=True gm_preserves_session=False "
+            "gm_preserves_role=False gm_strips_device=False gm_identity_redacted=True",
             markdown,
         )
 
@@ -3663,8 +3727,8 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn("public-edge postdeploy roleAliasRouteStatus is not pass", public_edge_check["failures"])
         self.assertIn("public-edge postdeploy role alias routes drifted", public_edge_check["failures"])
         self.assertIn("public-edge postdeploy /player resolved to /play?role=player instead of /mobile/player", public_edge_check["failures"])
-        self.assertIn("public-edge postdeploy front-door navigation does not gate Build", public_edge_check["failures"])
-        self.assertIn("public-edge postdeploy front-door navigation does not gate Play", public_edge_check["failures"])
+        self.assertIn("public-edge postdeploy front-door navigation still reports account-gated targets", public_edge_check["failures"])
+        self.assertIn("public-edge postdeploy front-door navigation does not expose exactly Build and Play", public_edge_check["failures"])
         self.assertIn("public-edge postdeploy front-door navigation Play route is not /mobile/player", public_edge_check["failures"])
         self.assertIn("failures:", markdown)
         self.assertIn("public-edge postdeploy downloads marker is not proven", markdown)

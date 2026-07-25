@@ -361,6 +361,47 @@ def test_source_contract_rejects_boolean_downloads_version_marker(tmp_path: Path
     assert "Status view must expose a valued data-downloads-release-version attribute" in failures
 
 
+def test_public_release_manifest_resolves_active_generation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    shelf_root = tmp_path / "downloads"
+    generation_root = shelf_root / "generations" / "g-current"
+    configured_path = shelf_root / "RELEASE_CHANNEL.generated.json"
+    generation_root.mkdir(parents=True)
+    active_path = generation_root / configured_path.name
+    active_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "resolve_shelf_root",
+        lambda root: ("generation", generation_root, {"generationId": "g-current"}),
+    )
+
+    assert module.resolve_public_release_manifest_path(configured_path) == active_path
+
+
+def test_public_release_manifest_resolution_fails_closed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    configured_path = tmp_path / "downloads" / "RELEASE_CHANNEL.generated.json"
+
+    def fail_resolution(_root: Path):
+        raise module.ReleaseShelfError("current pointer is malformed")
+
+    monkeypatch.setattr(module, "resolve_shelf_root", fail_resolution)
+
+    try:
+        module.resolve_public_release_manifest_path(configured_path)
+    except RuntimeError as exc:
+        assert str(exc) == "release shelf resolution failed: current pointer is malformed"
+    else:
+        raise AssertionError("malformed atomic shelf must fail closed")
+
+
 def test_live_contract_passes_when_downloads_and_status_have_marker() -> None:
     module = load_module()
     server, thread, base_url = with_server(include_marker=True)
@@ -1625,15 +1666,20 @@ def test_main_rejects_release_channel_receipt_sha256_mismatch(tmp_path) -> None:
     assert "release channel receipt SHA-256 does not match the explicitly selected digest" in payload["failures"]
 
 
-def test_main_accepts_consistent_conservative_served_review_floor_for_stale_or_missing_proof(tmp_path) -> None:
+def test_main_accepts_consistent_conservative_served_review_floor_for_nonfresh_proof(tmp_path) -> None:
     module = load_module()
-    for proof_status in ("stale", "missing"):
-        case_root = tmp_path / proof_status
+    cases = (
+        ("stale", "stale"),
+        ("stale", "missing"),
+        ("missing", "missing"),
+    )
+    for expected_proof_status, served_proof_status in cases:
+        case_root = tmp_path / f"{expected_proof_status}-{served_proof_status}"
         case_root.mkdir()
         release_channel = case_root / "RELEASE_CHANNEL.generated.json"
         expected_sha256 = write_bound_preview_manifest(
             release_channel,
-            proof_freshness_status=proof_status,
+            proof_freshness_status=expected_proof_status,
         )
         public_manifest = case_root / "public-RELEASE_CHANNEL.generated.json"
         public_manifest.write_bytes(release_channel.read_bytes())
@@ -1649,7 +1695,7 @@ def test_main_accepts_consistent_conservative_served_review_floor_for_stale_or_m
             release_known_issue_summary="Known issue: preview proof receipts remain under review.",
             release_fix_availability_summary="Use the preview shelf while review remains active.",
             release_published_at="2026-07-13T11:34:17Z",
-            release_proof_freshness_status=proof_status,
+            release_proof_freshness_status=served_proof_status,
             release_public_trust_supportability_state="review_required",
             release_public_trust_rollout_state="public_release_review_required",
             release_registry_supportability_state="review_required",
@@ -1685,9 +1731,31 @@ def test_main_accepts_consistent_conservative_served_review_floor_for_stale_or_m
         assert payload["release_manifest_conservative_review_floor_applied"] is True
         assert payload["release_manifest_internal_supportability_consistent"] is True
         assert payload["expected_release_published_at"] == "2026-07-13T11:34:17Z"
-        assert payload["expected_release_proof_freshness_status"] == proof_status
+        assert payload["expected_release_proof_freshness_status"] == expected_proof_status
         assert payload["release_manifest_published_at_matches_release_channel"] is True
-        assert payload["release_manifest_proof_freshness_matches_release_channel"] is True
+        assert payload["release_manifest_proof_freshness_matches_release_channel"] is (
+            expected_proof_status == served_proof_status
+        )
+        assert payload["release_manifest_proof_freshness_compatible_with_release_channel"] is True
+
+
+def test_proof_freshness_compatibility_allows_only_fail_closed_stale_to_missing() -> None:
+    module = load_module()
+    expected_results = {
+        ("fresh", "fresh"): True,
+        ("fresh", "stale"): False,
+        ("fresh", "missing"): False,
+        ("stale", "fresh"): False,
+        ("stale", "stale"): True,
+        ("stale", "missing"): True,
+        ("missing", "fresh"): False,
+        ("missing", "stale"): False,
+        ("missing", "missing"): True,
+        ("future_status", "future_status"): False,
+        ("stale", "future_status"): False,
+    }
+    for statuses, expected in expected_results.items():
+        assert module.proof_freshness_compatible(*statuses) is expected
 
 
 def test_main_rejects_review_floor_for_fresh_proof_or_mixed_nested_supportability(tmp_path) -> None:

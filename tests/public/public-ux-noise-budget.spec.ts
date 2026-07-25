@@ -43,7 +43,7 @@ test('help page stays practical instead of exposing internal policy language', a
 
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
-  await expect(page.locator('h1')).toContainText('What is wrong?');
+  await expect(page.locator('h1')).toContainText('How can we help?');
   expect(bodyText).toContain('Pick the next step');
   expect(bodyText).not.toContain('Pick the problem');
   expect(bodyText).not.toContain('Provider-backed help');
@@ -171,12 +171,14 @@ test('core public pages stay inside a minimal interaction budget', async ({ page
 
     const metrics = await page.evaluate(() => {
       const main = document.querySelector('main') || document.body;
-      const text = (main.textContent || '').replace(/\s+/g, ' ').trim();
+      const text = ((main as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim();
       return {
         text,
         wordCount: text.length === 0 ? 0 : text.split(/\s+/).length,
-        linkCount: main.querySelectorAll('a').length,
-        buttonCount: main.querySelectorAll('a.button-like, button').length,
+        linkCount: Array.from(main.querySelectorAll('a')).filter((element) => element.getClientRects().length > 0).length,
+        buttonCount: Array.from(main.querySelectorAll('a.button-like, button')).filter(
+          (element) => element.getClientRects().length > 0,
+        ).length,
         sectionCount: main.querySelectorAll('section').length,
       };
     });
@@ -200,7 +202,8 @@ test('future ideas keep unfinished campaign layers out of the public path', asyn
   expect(horizonsText).not.toContain('Open Black Ledger');
   expect(horizonsText).toContain('Future work stays behind the main app');
   expect(horizonsText).toContain('Not the front door');
-  expect(horizonsText.toLowerCase()).not.toContain('horizon');
+  expect(horizonsText).toContain('Horizons');
+  expect(horizonsText).not.toContain('Research tracks');
   expect(horizonsText).not.toContain('Watch');
   expect(horizonsText).not.toContain('deep dive');
 

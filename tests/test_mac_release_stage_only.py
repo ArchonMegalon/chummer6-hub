@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import stat
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -171,6 +174,60 @@ def reviewed_pin_environment() -> dict[str, str]:
             for index, setting in enumerate(EXPECTED_COMMIT_SETTINGS, start=1)
         }
     )
+    return environment
+
+
+def hub_projection_authority_environment(tmp_path: Path) -> dict[str, str]:
+    environment = clean_release_environment()
+    environment.update(
+        {
+            "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT": "1" * 40,
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT": "2" * 40,
+        }
+    )
+    handoffs = (
+        (
+            "CHUMMER_HUB_RELEASE_CHANNEL_PATH",
+            "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256",
+            "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY",
+            "registry://release/run-test",
+        ),
+        (
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY",
+            "fleet://readiness/run-test",
+        ),
+        (
+            "CHUMMER_FLEET_QUEUE_STAGING_PATH",
+            "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY",
+            "fleet://queue/run-test",
+        ),
+        (
+            "CHUMMER_DESIGN_QUEUE_STAGING_PATH",
+            "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY",
+            "repo://design/run-test/queue",
+        ),
+        (
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY",
+            "repo://design/run-test/registry",
+        ),
+    )
+    for index, (path_name, digest_name, authority_name, authority) in enumerate(
+        handoffs
+    ):
+        path = tmp_path / f"authority-{index}.json"
+        payload = (
+            json.dumps({"authority": index}, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        path.write_bytes(payload)
+        environment[path_name] = str(path)
+        environment[digest_name] = hashlib.sha256(payload).hexdigest()
+        environment[authority_name] = authority
     return environment
 
 
@@ -538,6 +595,215 @@ exit 73
     assert "synthetic-test-token" not in result.stderr
 
 
+def test_hub_http_publisher_also_streams_auth_config_without_a_temp_file() -> None:
+    publisher = (REPO_ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'write_auth_curl_config "$UPLOAD_AUTH_VALUE" \\' in publisher
+    assert '| curl -q --config - "$@"' in publisher
+    assert "release_upload_curl_config=\"$(mktemp" not in publisher
+    assert "Authorization: Bearer" in publisher
+
+
+def test_release_python_selection_requires_311_and_honors_reviewed_interpreter() -> None:
+    environment = clean_release_environment()
+    environment["CHUMMER_RELEASE_PYTHON"] = sys.executable
+    accepted = run_sourced("resolve_release_python", env=environment)
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert Path(accepted.stdout.strip()).resolve() == Path(sys.executable).resolve()
+
+    environment["CHUMMER_RELEASE_PYTHON"] = "/bin/false"
+    rejected = run_sourced("resolve_release_python", env=environment)
+    assert rejected.returncode != 0
+
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    generator_start = bootstrap.index("generate_hub_local_release_proof() {")
+    generator_end = bootstrap.index("\ngenerate_validated_hub_local_release_proof() {", generator_start)
+    generator = bootstrap[generator_start:generator_end]
+    assert '"$python_bin" "$generator_path"' in generator
+    assert "CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS=1" in generator
+    assert ">/dev/null 2>&1" not in generator
+
+
+def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path: Path) -> None:
+    hub_alias = tmp_path / "hub-alias"
+    generator = hub_alias / "scripts" / "materialize_hub_local_release_proof.py"
+    generator.parent.mkdir(parents=True)
+    generator.write_text(
+        "import os, pathlib, stat, sys\n"
+        "lock_path = pathlib.Path(os.environ['CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH'])\n"
+        "assert stat.S_IMODE(lock_path.parent.stat().st_mode) == 0o700\n"
+        "pathlib.Path(os.environ['LOCK_CAPTURE_PATH']).write_text(\n"
+        "    str(lock_path), encoding='utf-8')\n"
+        "print('safe-preamble-' + ('x' * 32768), file=sys.stderr)\n"
+        "print('Authorization: Bearer leaked-ticket', file=sys.stderr)\n"
+        "print('token=plain-secret', file=sys.stderr)\n"
+        "print('eyJ1bmxhYmVsZWQ.abcdefghijklmnop.qrstuvwxyz12345', file=sys.stderr)\n"
+        "print('/Users/operator/work/proof.json failed', file=sys.stderr)\n"
+        "raise SystemExit(9)\n",
+        encoding="utf-8",
+    )
+    temp_root = tmp_path / "tmp"
+    temp_root.mkdir()
+    temp_root.chmod(0o1777)
+    lock_capture_path = tmp_path / "lock-path.txt"
+    environment = hub_projection_authority_environment(tmp_path)
+    environment.update(
+        {
+            "CHUMMER_RELEASE_PYTHON": sys.executable,
+            "LOCK_CAPTURE_PATH": str(lock_capture_path),
+            "TMPDIR": str(temp_root),
+        }
+    )
+    output = temp_root / "proof.json"
+
+    result = run_sourced(
+        'trap cleanup_bootstrap_tmp_paths EXIT; '
+        'generate_hub_local_release_proof "$2" "$3" "$4"',
+        str(hub_alias),
+        str(tmp_path / "hub-repo"),
+        str(output),
+        env=environment,
+    )
+
+    assert result.returncode != 0
+    assert "leaked-ticket" not in result.stdout + result.stderr
+    assert "plain-secret" not in result.stdout + result.stderr
+    assert "eyJ1bmxhYmVsZWQ" not in result.stdout + result.stderr
+    assert "/Users/operator" not in result.stdout + result.stderr
+    assert "<redacted>" in result.stderr
+    assert "<local-path>" in result.stderr
+    assert len(result.stderr.encode("utf-8")) < 17_000
+    mutation_lock_path = Path(lock_capture_path.read_text(encoding="utf-8"))
+    assert mutation_lock_path.name == "public-edge-mutation.lock"
+    assert mutation_lock_path.parent.parent == temp_root
+    assert "/docker/" not in str(mutation_lock_path)
+    assert mutation_lock_path.parent.is_dir()
+    assert stat.S_IMODE(mutation_lock_path.parent.stat().st_mode) == 0o700
+    assert not mutation_lock_path.exists()
+    assert list(temp_root.iterdir()) == [mutation_lock_path.parent]
+
+
+def test_hub_generator_recovery_uses_python_312_and_all_immutable_handoffs(tmp_path: Path) -> None:
+    hub_alias = tmp_path / "hub-alias"
+    generator = hub_alias / "scripts" / "materialize_hub_local_release_proof.py"
+    generator.parent.mkdir(parents=True)
+    required_names = (
+        "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+        "CHUMMER_HUB_RELEASE_CHANNEL_PATH",
+        "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256",
+        "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY",
+        "CHUMMER_FLEET_QUEUE_STAGING_PATH",
+        "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256",
+        "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY",
+        "CHUMMER_DESIGN_QUEUE_STAGING_PATH",
+        "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256",
+        "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY",
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH",
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256",
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY",
+    )
+    generator.write_text(
+        "import json, os, pathlib, sys\n"
+        f"required = {required_names!r}\n"
+        "assert all(os.environ.get(name) for name in required)\n"
+        "assert os.environ.get('CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS') == '1'\n"
+        "payload = {\n"
+        "  'status': 'pass',\n"
+        "  'journeysPassed': [\n"
+        "    'install_claim_restore_continue', 'build_explain_publish',\n"
+        "    'campaign_session_recover_recap', 'report_cluster_release_notify',\n"
+        "    'organize_community_and_close_loop'],\n"
+        "  'proofRoutes': [\n"
+        "    '/downloads/install/avalonia-linux-x64-installer', '/home/access',\n"
+        "    '/home/work', '/account/access', '/account/work', '/account/support',\n"
+        "    '/contact', '/downloads', '/downloads/install/avalonia-osx-arm64-installer',\n"
+        "    '/downloads/install/avalonia-win-x64-installer']}\n"
+        "pathlib.Path(sys.argv[1]).write_text(json.dumps(payload) + '\\n', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    selection_marker = tmp_path / "python-312-selected"
+    fake_python3 = fake_bin / "python3"
+    fake_python312 = fake_bin / "python3.12"
+    fake_python3.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${1:-}\" == '-c' ]]; then exit 1; fi\n"
+        "exec \"$REAL_PYTHON\" \"$@\"\n",
+        encoding="utf-8",
+    )
+    fake_python312.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf selected >\"$PYTHON_312_MARKER\"\n"
+        "exec \"$REAL_PYTHON\" \"$@\"\n",
+        encoding="utf-8",
+    )
+    fake_python3.chmod(0o755)
+    fake_python312.chmod(0o755)
+    environment = hub_projection_authority_environment(tmp_path)
+    environment.update(
+        {
+            "PATH": f"{fake_bin}:/usr/bin:/bin",
+            "REAL_PYTHON": sys.executable,
+            "PYTHON_312_MARKER": str(selection_marker),
+            "TMPDIR": str(tmp_path),
+        }
+    )
+    output = tmp_path / "proof.json"
+
+    result = run_sourced(
+        'trap cleanup_bootstrap_tmp_paths EXIT; '
+        'generate_hub_local_release_proof "$2" "$3" "$4"',
+        str(hub_alias),
+        str(tmp_path / "hub-repo"),
+        str(output),
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert selection_marker.read_text(encoding="utf-8") == "selected"
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "pass"
+
+
+def test_hub_generator_rejects_missing_authority_before_execution(tmp_path: Path) -> None:
+    hub_alias = tmp_path / "hub-alias"
+    generator = hub_alias / "scripts" / "materialize_hub_local_release_proof.py"
+    generator.parent.mkdir(parents=True)
+    marker = tmp_path / "generator-ran"
+    generator.write_text(
+        "import os, pathlib\n"
+        "pathlib.Path(os.environ['GENERATOR_MARKER']).write_text('ran', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    environment = hub_projection_authority_environment(tmp_path)
+    environment.update(
+        {
+            "CHUMMER_RELEASE_PYTHON": sys.executable,
+            "GENERATOR_MARKER": str(marker),
+        }
+    )
+    environment.pop("CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256")
+
+    result = run_sourced(
+        'generate_hub_local_release_proof "$2" "$3" "$4"',
+        str(hub_alias),
+        str(tmp_path / "hub-repo"),
+        str(tmp_path / "proof.json"),
+        env=environment,
+    )
+
+    assert result.returncode != 0
+    assert "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256" in result.stderr
+    assert not marker.exists()
+
+
 def test_post_completion_exit_trap_forbids_blind_retry(tmp_path: Path) -> None:
     receipt_path = tmp_path / "release-upload-handoff.json"
     result = run_sourced(
@@ -663,10 +929,16 @@ esac
 def test_hosted_upload_uses_stdin_config_without_credential_file() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
     main_index = bootstrap.index("main() {")
-    cleanup_init_index = bootstrap.index("bootstrap_tmp_paths=()", main_index)
-    cleanup_trap_index = bootstrap.index("trap cleanup_bootstrap_tmp_paths EXIT", cleanup_init_index)
+    cleanup_trap_index = bootstrap.index(
+        "install_bootstrap_cleanup_traps",
+        main_index,
+    )
+    auth_capture_index = bootstrap.index(
+        "capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source",
+        cleanup_trap_index,
+    )
 
-    assert cleanup_init_index < cleanup_trap_index
+    assert main_index < cleanup_trap_index < auth_capture_index
     assert 'release_upload_curl_config="$(mktemp)"' not in bootstrap
     assert (
         'write_release_upload_curl_config "$release_upload_auth_value" \\\n'

@@ -43,6 +43,31 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             environment,
         )
 
+    def test_all_install_linking_processes_pin_the_tls_name_and_mount_the_selected_ca(
+        self,
+    ) -> None:
+        expected_host = (
+            "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:"
+            "?Set the managed InstallLinking PostgreSQL TLS DNS name}:"
+            "${CHUMMER_INSTALL_LINKING_POSTGRES_IP:"
+            "?Set its independently verified IP address}"
+        )
+        expected_ca_mount = (
+            "${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:"
+            "?Set the managed InstallLinking PostgreSQL server CA file}:"
+            "/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro"
+        )
+
+        for service_name in (
+            "chummer-portal",
+            "chummer-install-linking-postgres-admin",
+            "chummer-install-linking-postgres-import",
+        ):
+            with self.subTest(service=service_name):
+                service = self.services[service_name]
+                self.assertIn(expected_host, service["extra_hosts"])
+                self.assertIn(expected_ca_mount, service["volumes"])
+
     def test_install_linking_processes_disable_privilege_escalation_and_core_dumps(self) -> None:
         for service_name in (
             "chummer-portal",
@@ -159,14 +184,15 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         ordered_markers = (
             '--output "$overlay_preflight_receipt"',
             "cutover_drained=1",
-            "stop chummer-run-cloudflared",
+            "stop chummer-run-cloudflared chummer-run-cloudflared-replica",
             "stop chummer-portal",
             "chummer-install-linking-postgres-admin prepare",
             "import-local --confirm-empty-authority",
             "chummer-install-linking-postgres-admin validate",
             "up -d --no-deps --force-recreate \\\n  --wait --wait-timeout 180 chummer-portal",
             "http://127.0.0.1:8080/api/ready",
-            "up -d --no-deps --force-recreate \\\n  --wait --wait-timeout 180 \\\n  chummer-run-cloudflared",
+            "up -d --no-deps --force-recreate \\\n  --wait --wait-timeout 180 \\\n  "
+            "chummer-run-cloudflared chummer-run-cloudflared-replica",
             'https://chummer.run/api/ready >"$public_readiness_receipt"',
             "cutover_drained=0",
         )
@@ -216,7 +242,11 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertGreaterEqual(section.count("--wait-timeout 180"), 2)
         self.assertIn("--skip-overlay-marker-check", section)
         self.assertGreaterEqual(section.count("stop chummer-portal"), 1)
-        self.assertIn("leave the tunnel stopped", section)
+        self.assertGreaterEqual(
+            section.count("chummer-run-cloudflared-replica"),
+            3,
+        )
+        self.assertIn("leave every tunnel replica", section)
         self.assertIn("point-in-time recovery", section)
         self.assertIn("Rollback is fail-closed", section)
         self.assertIn("protected local floor", section)

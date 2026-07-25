@@ -117,6 +117,7 @@ if ! CHUMMER_UI_REPO_ROOT="$UI_REPO_ROOT" \
   CHUMMER_UI_OLDER_REPO_ROOT="$OLDER_UI_REPO_ROOT" \
   python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" "$SR4_WORKFLOW_LEDGER_PATH" "$SR6_WORKFLOW_LEDGER_PATH" <<'PY'
 import datetime as dt
+import hashlib
 import json
 import os
 import pathlib
@@ -160,6 +161,28 @@ ALLOWED_RELEASE_PROOF_KEYS = (
     "journeys_passed",
     "proofRoutes",
     "proof_routes",
+    "flagshipReadiness",
+)
+FLAGSHIP_READINESS_CONTRACT_NAME = "chummer.flagship_product_readiness_gate.v1"
+FLAGSHIP_READINESS_KEYS = {
+    "contractName",
+    "generatedAt",
+    "status",
+    "coverageGapKeys",
+    "launchBlockers",
+    "desktopClientReady",
+    "reason",
+    "sourceSha256",
+    "snapshotSha256",
+}
+FLAGSHIP_READINESS_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+FLAGSHIP_READINESS_COVERAGE_GAP_RE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
+FLAGSHIP_READINESS_SENSITIVE_PATH_RE = re.compile(
+    r"(?i)(?:^|[\\s(])(?:/(?:docker|home|root|run|srv|tmp|var)(?:/|\\b)|[a-z]:\\\\)"
+)
+FLAGSHIP_READINESS_EMAIL_RE = re.compile(
+    r"(?i)(?<![a-z0-9.!#$%&'*+/=?^_`{|}~-])[a-z0-9.!#$%&'*+/=?^_`{|}~-]+"
+    r"@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+"
 )
 REQUIRED_LOCALIZATION_SHIPPING_LOCALES = ("en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn")
 REQUIRED_LOCALIZATION_ACCEPTANCE_GATES = (
@@ -544,6 +567,166 @@ ALLOWED_RELEASE_PROOF_BASE_URLS = parse_allowed_release_proof_base_urls(
 )
 
 
+def validate_flagship_readiness_snapshot(
+    release_channel_path: pathlib.Path,
+    readiness_value: object,
+) -> None:
+    readiness = require_object(
+        readiness_value,
+        message=(
+            "parity audit failed: release-channel nested receipt "
+            f"releaseProof.flagshipReadiness must be an object: {release_channel_path}"
+        ),
+    )
+    readiness_keys = {str(key) for key in readiness}
+    if readiness_keys != FLAGSHIP_READINESS_KEYS:
+        missing = sorted(FLAGSHIP_READINESS_KEYS - readiness_keys)
+        unexpected = sorted(readiness_keys - FLAGSHIP_READINESS_KEYS)
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness keys do not match the canonical contract: "
+            f"{release_channel_path} "
+            f"(missing={','.join(missing) or 'none'}; unexpected={','.join(unexpected) or 'none'})"
+        )
+
+    contract_name = readiness.get("contractName")
+    if contract_name != FLAGSHIP_READINESS_CONTRACT_NAME:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.contractName is invalid: "
+            f"{release_channel_path}"
+        )
+
+    generated_at_text = readiness.get("generatedAt")
+    generated_at = parse_iso_timestamp(
+        generated_at_text,
+        field_path="releaseProof.flagshipReadiness.generatedAt",
+        source=release_channel_path,
+    )
+    if (
+        not isinstance(generated_at_text, str)
+        or generated_at_text != generated_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.generatedAt must use canonical UTC format: "
+            f"{release_channel_path}"
+        )
+
+    status = readiness.get("status")
+    if status not in {"pass", "fail"}:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.status must be pass or fail: "
+            f"{release_channel_path}"
+        )
+
+    coverage_gap_keys = readiness.get("coverageGapKeys")
+    if (
+        not isinstance(coverage_gap_keys, list)
+        or len(coverage_gap_keys) > 128
+        or any(
+            not isinstance(value, str)
+            or value != value.strip()
+            or not FLAGSHIP_READINESS_COVERAGE_GAP_RE.fullmatch(value)
+            for value in coverage_gap_keys
+        )
+        or coverage_gap_keys != sorted(set(coverage_gap_keys))
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.coverageGapKeys must be a canonical sorted token list: "
+            f"{release_channel_path}"
+        )
+
+    launch_blockers = readiness.get("launchBlockers")
+    if (
+        not isinstance(launch_blockers, list)
+        or len(launch_blockers) > 128
+        or any(
+            not isinstance(value, str)
+            or value != value.strip()
+            or not value
+            or len(value) > 1024
+            or FLAGSHIP_READINESS_EMAIL_RE.search(value)
+            or FLAGSHIP_READINESS_SENSITIVE_PATH_RE.search(value)
+            for value in launch_blockers
+        )
+        or launch_blockers != sorted(set(launch_blockers))
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.launchBlockers must be canonical, bounded, and redacted: "
+            f"{release_channel_path}"
+        )
+
+    desktop_client_ready = readiness.get("desktopClientReady")
+    if (
+        type(desktop_client_ready) is not bool
+        or desktop_client_ready
+        != (status == "pass" and not coverage_gap_keys and not launch_blockers)
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.desktopClientReady conflicts with nested readiness facts: "
+            f"{release_channel_path}"
+        )
+
+    reason = readiness.get("reason")
+    if (
+        not isinstance(reason, str)
+        or reason != reason.strip()
+        or not reason
+        or len(reason) > 4096
+        or FLAGSHIP_READINESS_EMAIL_RE.search(reason)
+        or FLAGSHIP_READINESS_SENSITIVE_PATH_RE.search(reason)
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.reason must be bounded and redacted: "
+            f"{release_channel_path}"
+        )
+
+    source_sha256 = readiness.get("sourceSha256")
+    snapshot_sha256 = readiness.get("snapshotSha256")
+    if (
+        not isinstance(source_sha256, str)
+        or not FLAGSHIP_READINESS_SHA256_RE.fullmatch(source_sha256)
+        or not isinstance(snapshot_sha256, str)
+        or not FLAGSHIP_READINESS_SHA256_RE.fullmatch(snapshot_sha256)
+    ):
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness digests must be canonical sha256 values: "
+            f"{release_channel_path}"
+        )
+
+    digest_payload = {
+        "contractName": contract_name,
+        "coverageGapKeys": coverage_gap_keys,
+        "desktopClientReady": desktop_client_ready,
+        "generatedAt": generated_at_text,
+        "launchBlockers": launch_blockers,
+        "reason": reason,
+        "sourceSha256": source_sha256,
+        "status": status,
+    }
+    expected_snapshot_sha256 = "sha256:" + hashlib.sha256(
+        json.dumps(
+            digest_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    if snapshot_sha256 != expected_snapshot_sha256:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt "
+            "releaseProof.flagshipReadiness.snapshotSha256 does not bind the canonical fields: "
+            f"{release_channel_path}"
+        )
+
+
 def validate_release_channel_proof(release_channel_path: pathlib.Path, release_channel_data: dict) -> None:
     proof = require_object(
         release_channel_data.get("releaseProof"),
@@ -560,6 +743,10 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof has unexpected keys: "
             f"{release_channel_path} ({', '.join(str(key) for key in unexpected_release_proof_keys)})"
         )
+    validate_flagship_readiness_snapshot(
+        release_channel_path,
+        proof.get("flagshipReadiness"),
+    )
     proof_status = normalized_token(proof.get("status"))
     if proof_status not in {"pass", "passed", "ready"}:
         raise SystemExit(
@@ -1569,24 +1756,14 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         )
     now = dt.datetime.now(UTC)
     release_channel_age_seconds = int((now - release_channel_generated_at).total_seconds())
-    max_age_seconds = read_int_value(
-        evidence,
-        "proof_freshness_max_age_seconds",
-        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
-        path=path,
-    )
     max_future_skew_seconds = read_int_value(
         evidence,
         "proof_freshness_max_future_skew_seconds",
         default_value=DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS,
         path=path,
     )
-    if release_channel_age_seconds > max_age_seconds:
-        raise SystemExit(
-            "parity audit failed: workflow receipt release-channel nested receipt generatedAt is stale: "
-            f"{path} (age_seconds={release_channel_age_seconds}, "
-            f"max_age_seconds={max_age_seconds}, nested_receipt={release_channel_path})"
-        )
+    # releaseChannel.generatedAt is the immutable publication timestamp. Its age
+    # is diagnostic; releaseProof.generatedAt above is the freshness authority.
     if release_channel_age_seconds < -max_future_skew_seconds:
         raise SystemExit(
             "parity audit failed: workflow receipt release-channel nested receipt generatedAt is in the future: "
@@ -2126,24 +2303,14 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         )
     now = dt.datetime.now(UTC)
     release_channel_age_seconds = int((now - release_channel_generated_at).total_seconds())
-    max_age_seconds = read_int_value(
-        evidence,
-        "proof_freshness_max_age_seconds",
-        default_value=DEFAULT_PROOF_FRESHNESS_MAX_AGE_SECONDS,
-        path=path,
-    )
     max_future_skew_seconds = read_int_value(
         evidence,
         "proof_freshness_max_future_skew_seconds",
         default_value=DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS,
         path=path,
     )
-    if release_channel_age_seconds > max_age_seconds:
-        raise SystemExit(
-            "parity audit failed: visual receipt release-channel nested receipt generatedAt is stale: "
-            f"{path} (age_seconds={release_channel_age_seconds}, "
-            f"max_age_seconds={max_age_seconds}, nested_receipt={release_channel_path})"
-        )
+    # releaseChannel.generatedAt is the immutable publication timestamp. Its age
+    # is diagnostic; releaseProof.generatedAt above is the freshness authority.
     if release_channel_age_seconds < -max_future_skew_seconds:
         raise SystemExit(
             "parity audit failed: visual receipt release-channel nested receipt generatedAt is in the future: "
@@ -2272,14 +2439,20 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("undersized_screenshots"),
         message=f"parity audit failed: visual receipt reports undersized screenshots: {path}",
     )
-    require_empty_collection(
-        evidence.get("stale_screenshots"),
-        message=f"parity audit failed: visual receipt reports stale screenshots: {path}",
-    )
-    require_empty_collection(
-        evidence.get("screenshots_older_than_flagship_receipt"),
-        message=f"parity audit failed: visual receipt reports screenshots older than flagship receipt: {path}",
-    )
+    # These fields belong to the legacy mtime-authority contract. Current
+    # receipts bind screenshot bytes through the control receipt and keep mtimes
+    # diagnostic-only. If an older producer still emits the fields, fail closed
+    # unless they are explicitly empty.
+    if "stale_screenshots" in evidence:
+        require_empty_collection(
+            evidence.get("stale_screenshots"),
+            message=f"parity audit failed: visual receipt reports stale screenshots: {path}",
+        )
+    if "screenshots_older_than_flagship_receipt" in evidence:
+        require_empty_collection(
+            evidence.get("screenshots_older_than_flagship_receipt"),
+            message=f"parity audit failed: visual receipt reports screenshots older than flagship receipt: {path}",
+        )
     screenshot_dir_raw = require_non_empty_string(
         evidence.get("screenshot_dir"),
         message=f"parity audit failed: visual receipt screenshot_dir is missing: {path}",

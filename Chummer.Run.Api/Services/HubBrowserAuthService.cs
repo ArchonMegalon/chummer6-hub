@@ -275,7 +275,7 @@ public sealed class HubBrowserAuthService
             baseUri = builder.Uri.GetLeftPart(UriPartial.Path);
         }
 
-        var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var preservedQuery = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query =
             QueryHelpers.ParseQuery(parsed.Query);
         foreach (string key in CallbackStateKeys)
@@ -283,13 +283,37 @@ public sealed class HubBrowserAuthService
             string? value = SingleQueryValue(query, key);
             if (IsSafeCallbackStateValue(value))
             {
-                preserved[key] = value;
+                preservedQuery[key] = value;
             }
         }
 
-        // Fragments never reach the server and are intentionally discarded. Keeping arbitrary
-        // fragment/query material here would turn the login continuation into a credential relay.
-        return preserved.Count == 0 ? baseUri : QueryHelpers.AddQueryString(baseUri, preserved);
+        var preservedFragment = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> fragment =
+            QueryHelpers.ParseQuery(
+                string.IsNullOrEmpty(parsed.Fragment)
+                    ? string.Empty
+                    : $"?{parsed.Fragment.TrimStart('#')}");
+        foreach (string key in CallbackStateKeys)
+        {
+            string? value = SingleQueryValue(fragment, key);
+            if (IsSafeCallbackStateValue(value))
+            {
+                preservedFragment[key] = value;
+            }
+        }
+
+        // Preserve only bounded desktop-listener correlation values. Arbitrary query or fragment
+        // material would turn the login continuation into a credential relay.
+        string sanitized = preservedQuery.Count == 0
+            ? baseUri
+            : QueryHelpers.AddQueryString(baseUri, preservedQuery);
+        if (preservedFragment.Count == 0)
+        {
+            return sanitized;
+        }
+
+        string fragmentQuery = QueryHelpers.AddQueryString(string.Empty, preservedFragment);
+        return $"{sanitized}#{fragmentQuery.TrimStart('?')}";
     }
 
     private static bool IsSafeLocalPath(string? path)

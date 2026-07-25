@@ -52,7 +52,16 @@ services:
 
   chummer-public-blazor:
     image: chummer-public-blazor:local
+    init: true
     restart: unless-stopped
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     build:
       context: /docker/chummercomplete
       dockerfile: chummer-presentation/Chummer.Blazor/Dockerfile
@@ -68,9 +77,19 @@ services:
       CHUMMER_RYBBIT_SITE_ID: ${RYBBIT_CHUMMER_RUN_SITE_ID:-}
       CHUMMER_RYBBIT_SCRIPT_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_URL:-}
       CHUMMER_RYBBIT_BASE_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN:-https://app.rybbit.io}
-      CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      CHUMMER_BUILD_WORKSPACE_STORE_PROVIDER: file
+      CHUMMER_BUILD_EXPECTED_REPLICA_COUNT: "1"
+      CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_DIRECTORY: /var/lib/chummer-build/data-protection
+      CHUMMER_BLAZOR_DATA_PROTECTION_CERTIFICATE_PATH: /run/secrets/chummer-config/certificates/chummer-build-data-protection.p12
     volumes:
       - chummer-public-blazor-state:/app/state
+      - chummer-public-blazor-data-protection:/var/lib/chummer-build/data-protection
+      - type: bind
+        source: "${CHUMMER_BLAZOR_SECRETS_DIRECTORY:-/docker/fleet/state/chummer-secrets/chummer-public-blazor}"
+        target: /run/secrets/chummer-config
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/blazor/health"]
       interval: 15s
@@ -178,6 +197,40 @@ services:
           - chummer-run-identity
       fleet-origin: {}
 
+  chummer-release-storage-init:
+    image: python:3.12-alpine
+    restart: "no"
+    network_mode: "none"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CHUMMER_RUNTIME_UID: "${CHUMMER_PORTAL_UID:-1654}"
+      CHUMMER_RUNTIME_GID: "${CHUMMER_PORTAL_GID:-1654}"
+    command:
+      - python
+      - -I
+      - /workspace/prepare_release_publication_storage.py
+      - --sessions-root
+      - /release-upload-sessions
+      - --downloads-root
+      - /downloads-source
+      - --uid
+      - "${CHUMMER_PORTAL_UID:-1654}"
+      - --gid
+      - "${CHUMMER_PORTAL_GID:-1654}"
+    volumes:
+      - /docker/chummercomplete/chummer.run-services/scripts/prepare_release_publication_storage.py:/workspace/prepare_release_publication_storage.py:ro
+      - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
+      - chummer-release-upload-sessions:/release-upload-sessions
+
   chummer-portal:
     image: chummer-run-api:local
     restart: unless-stopped
@@ -202,6 +255,8 @@ services:
     env_file:
       - /docker/fleet/secrets/codexliz-cf-access.env
     depends_on:
+      chummer-release-storage-init:
+        condition: service_completed_successfully
       chummer-public-blazor:
         condition: service_healthy
       chummer-run-identity:
@@ -210,6 +265,9 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # Keep the TLS hostname stable while pinning the managed database endpoint selected by
+      # the operator. The connection string remains VerifyFull and validates this DNS name.
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the managed InstallLinking PostgreSQL TLS DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set its independently verified IP address}"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
@@ -551,6 +609,7 @@ services:
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
       # This runtime-only credential must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the managed InstallLinking PostgreSQL server CA file}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
       - chummer-release-upload-sessions:/release-upload-sessions
@@ -606,9 +665,12 @@ services:
     environment:
       CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
       CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the managed InstallLinking PostgreSQL TLS DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set its independently verified IP address}"
     volumes:
       # The migrator credential is never mounted into the long-running portal or the import job.
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL migrator connection file}:/run/chummer-secrets/install-linking-postgres-migrator.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the managed InstallLinking PostgreSQL server CA file}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
     # Safe default: validate only. Operators must explicitly override this with `prepare <runtime-role>`.
     command: ["validate"]
     networks:
@@ -647,24 +709,36 @@ services:
       CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
       CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
       CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+    extra_hosts:
+      - "${CHUMMER_INSTALL_LINKING_POSTGRES_DNS_NAME:?Set the managed InstallLinking PostgreSQL TLS DNS name}:${CHUMMER_INSTALL_LINKING_POSTGRES_IP:?Set its independently verified IP address}"
     volumes:
       # The import job shares only the state and cryptographic material needed to decrypt the local snapshot.
       - chummer-run-api-state:/app/state
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
       - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_SERVER_CA_FILE:?Set the managed InstallLinking PostgreSQL server CA file}:/run/chummer-secrets/install-linking-postgres-server-ca.pem:ro
     # Deliberately invalid/non-mutating: import requires an explicit command and confirmation flag.
     command: ["refuse-import-without-explicit-command"]
     networks:
       public-origin: {}
 
   chummer-run-cloudflared:
-    image: "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2026.7.0}"
     container_name: chummer-run-cloudflared
+    image: "cloudflare/cloudflared:2026.7.0@sha256:8c70a8c2d373e93caac1ee79fcc615908a49ccf3f3975775d1e10d24e41327af"
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       chummer-portal:
         condition: service_healthy
+    user: "${CHUMMER_CLOUDFLARED_RUNTIME_UID:-1000}:${CHUMMER_CLOUDFLARED_RUNTIME_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
@@ -673,8 +747,60 @@ services:
       - --metrics
       - 0.0.0.0:2000
       - run
-      - --token
-      - "${CHUMMER_RUN_CF_TUNNEL_TOKEN:?set CHUMMER_RUN_CF_TUNNEL_TOKEN in an ignored .env file}"
+      - --token-file
+      - /run/secrets/chummer-run-cloudflared.token
+    volumes:
+      - type: bind
+        source: "${CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE:?set an absolute owner-only token-file path outside the repository}"
+        target: /run/secrets/chummer-run-cloudflared.token
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      public-origin: {}
+    mem_limit: ${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}
+
+  # A separately named service lets token rotations restart one connector at a
+  # time while the other continues to serve every route on this shared tunnel.
+  chummer-run-cloudflared-replica:
+    container_name: chummer-run-cloudflared-replica
+    image: "cloudflare/cloudflared:2026.7.0@sha256:8c70a8c2d373e93caac1ee79fcc615908a49ccf3f3975775d1e10d24e41327af"
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      chummer-portal:
+        condition: service_healthy
+    user: "${CHUMMER_CLOUDFLARED_RUNTIME_UID:-1000}:${CHUMMER_CLOUDFLARED_RUNTIME_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --metrics
+      - 0.0.0.0:2000
+      - run
+      - --token-file
+      - /run/secrets/chummer-run-cloudflared.token
+    volumes:
+      - type: bind
+        source: "${CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE:?set an absolute owner-only token-file path outside the repository}"
+        target: /run/secrets/chummer-run-cloudflared.token
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
       interval: 15s
@@ -687,6 +813,7 @@ services:
 
 volumes:
   chummer-public-blazor-state:
+  chummer-public-blazor-data-protection:
   chummer-play-web-state:
   chummer-run-api-state:
   chummer-release-upload-sessions:

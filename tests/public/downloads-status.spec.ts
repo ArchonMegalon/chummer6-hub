@@ -16,6 +16,15 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
   const supportabilityState = normalizedText(manifest.supportabilityState ?? manifest.supportability_state);
   const rolloutState = normalizedText(manifest.rolloutState ?? manifest.rollout_state);
   const statusAllowsStableRelease = !status || status === 'published';
+  const publicInstallCount = Number(
+    (manifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  if (Number.isFinite(publicInstallCount) && publicInstallCount === 0) {
+    return 'Downloads paused';
+  }
   const isPublishedStableRelease = (
     statusAllowsStableRelease
     && supportabilityState === 'gold_supported'
@@ -73,39 +82,30 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const downloadsPage = await openPublicPage(browser, '/downloads');
   const downloadsMain = downloadsPage.locator('#main');
   await expect(downloadsPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-  await expect(downloadsPage.locator('body')).toContainText('Stable');
-  await expect(downloadsPage.locator('body')).toContainText('Nightly');
-  await expect(downloadsPage.locator('body')).toContainText('Chummer selects the best installer when it can.');
   const downloadsVersionMarker = downloadsMain.locator('[data-downloads-release-version]');
   await expect(downloadsVersionMarker).toHaveAttribute('data-downloads-release-version', /^Version \S+/);
   const downloadsVersionText = normalizedText((await downloadsMain.locator('.downloads-version').first().textContent()) || '');
-  const hasStableReleaseCopy = (await downloadsPage.locator('text=Stable release.').count()) > 0;
-  const hasNoStableCopy = (await downloadsPage.locator('text=No Stable build on this shelf.').count()) > 0;
-  const hasPreviewRequiredCopy = (await downloadsPage.locator('text=Preview build. Review required.').count()) > 0;
-  expect(hasStableReleaseCopy || hasNoStableCopy).toBeTruthy();
-  if (hasStableReleaseCopy) {
-    await expect(downloadsPage.locator('body')).toContainText('Stable release.');
-    await expect(downloadsPage.locator('body')).not.toContainText('Preview build. Review required.');
-    await expect(downloadsPage.locator('body')).not.toContainText('No Stable build on this shelf.');
+  const publicInstallCount = Number(
+    (releaseManifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((releaseManifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  const publicInstallerAvailable = Number.isFinite(publicInstallCount) && publicInstallCount > 0;
+  if (publicInstallerAvailable) {
+    await expect(downloadsMain.locator('[data-release-lane]')).not.toHaveCount(0);
   } else {
-    expect(hasNoStableCopy).toBeTruthy();
-    await expect(downloadsPage.locator('body')).toContainText('No Stable build on this shelf.');
-    await expect(downloadsPage.locator('body')).toContainText('Preview build. Review required.');
+    await expect(downloadsPage.getByRole('heading', { name: 'No build is available right now' })).toBeVisible();
+    await expect(downloadsMain.locator('[data-release-lane]')).toHaveCount(0);
   }
-  await expect(downloadsPage.locator('body')).toContainText('Build from source');
-  const stableDownload = downloadsMain.locator('#stable');
-  const stableDownloadLink = stableDownload.locator('[data-release-lane="stable"]');
-  await expect(stableDownload).toBeVisible();
-  if (hasStableReleaseCopy) {
-    await expect(stableDownloadLink).toHaveAttribute('data-download-artifact', /avalonia-.+/);
-    await expect(stableDownloadLink).toHaveAttribute('data-release-lane', 'stable');
-    await expect(stableDownload.getByRole('link')).toHaveCount(1);
-    await expect(stableDownload.getByRole('link', { name: /Download for|Use Stable/ })).toBeVisible();
-  } else {
-    await expect(stableDownload.getByRole('link', { name: 'Other downloads' })).toBeVisible();
-    await expect(stableDownload.getByRole('link', { name: /Download for|Use Stable|Downloads are paused/ })).toHaveCount(0);
-  }
-  expect(await downloadsMain.getByRole('link').count()).toBeGreaterThanOrEqual(2);
+  const sourceBuild = downloadsMain.locator('#source-build');
+  await expect(sourceBuild).toBeVisible();
+  await expect(sourceBuild).toContainText('Build from source');
+  await expect(sourceBuild.locator('a[href="/downloads/build-chummer6-linux.sh"]')).toHaveAttribute(
+    'href',
+    '/downloads/build-chummer6-linux.sh',
+  );
+  expect(await downloadsMain.getByRole('link').count()).toBeGreaterThanOrEqual(1);
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
@@ -156,5 +156,7 @@ test('downloads and status stay concise and point to the right next steps', asyn
     release_manifest_channel: normalizedText(releaseManifest.channel ?? releaseManifest.channelId ?? releaseManifest.channel_id),
     release_manifest_supportability_state: normalizedText(releaseManifest.supportabilityState ?? releaseManifest.supportability_state),
     release_manifest_rollout_state: normalizedText(releaseManifest.rolloutState ?? releaseManifest.rollout_state),
+    release_manifest_public_install_count: Number.isFinite(publicInstallCount) ? publicInstallCount : null,
+    public_installer_available: publicInstallerAvailable,
   });
 });

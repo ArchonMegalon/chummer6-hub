@@ -498,11 +498,14 @@ internal static class CompatibilityVerification
 
         var buildScriptPath = Path.Combine(RepoRoot, "scripts", "ai", "build_r1_cleanroom.sh");
         var buildScript = File.ReadAllText(buildScriptPath);
+        VerificationAssert.True(
+            buildScript.Contains("/usr/bin/dotnet build \"$project_path\"", StringComparison.Ordinal),
+            "Clean-room build helper must invoke the host-pinned dotnet executable for each declared project.");
 
         foreach (var projectName in expectedHostedProjects)
         {
             VerificationAssert.True(
-                buildScript.Contains($"dotnet build {projectName}/{projectName}.csproj --nologo", StringComparison.Ordinal),
+                buildScript.Contains($"build_if_present {projectName}/{projectName}.csproj", StringComparison.Ordinal),
                 $"Clean-room build script must build hosted project '{projectName}'.");
         }
 

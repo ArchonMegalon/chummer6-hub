@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('character helper public route stays bounded and private-preview', async ({ request, page }) => {
+test('character help public route stays bounded and hands private work to the signed-in bench', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/alice`);
   const receiptResponse = await request.get(`${baseUrl}/alice/receipts/build-ghost.json`);
 
@@ -20,8 +20,10 @@ test('character helper public route stays bounded and private-preview', async ({
   expect(JSON.stringify(payload)).not.toContain('build-ghost');
 
   await page.goto(`${baseUrl}/alice`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Character helper' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('This preview is kept off the main public path');
+  await expect(page.locator('h1')).toContainText('Character help');
+  await expect(page.locator('main')).toContainText('First-party compare/apply only');
+  await expect(page.getByRole('link', { name: 'Open signed-in helper' })).toHaveAttribute('href', '/account/alice/open');
+  await expect(page.locator('body')).not.toContainText('Build Ghost');
   await expect(page.locator('body')).not.toContainText('receipt');
   await expect(page.locator('body')).not.toContainText('proof');
 

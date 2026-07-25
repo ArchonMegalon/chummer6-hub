@@ -4,7 +4,7 @@
   "platform": "windows",
   "hostClass": "native-windows-Microsoft Windows Server 2025 Datacenter",
   "artifactPath": "D:\\a\\chummer6-hub\\chummer6-hub\\Chummer.Portal\\downloads\\files\\chummer-avalonia-win-x64-installer.exe",
-  "artifactSha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+  "artifactSha256": "80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a",
   "sourceUpdatedAtUtc": "2026-06-21T17:44:15.3027652Z",
   "requiredSurfaces": [
     "install-progress",

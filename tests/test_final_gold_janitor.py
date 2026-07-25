@@ -97,14 +97,14 @@ def test_expected_visible_version_candidates_allow_blank_status_for_stable_lane(
 
 
 def passing_public_edge_postdeploy_payload(module):
-    return {
+    payload = {
         "contractName": module.PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
         "status": "pass",
         "generatedAtUtc": module.now_iso(),
         "baseUrl": "https://chummer.run",
         "coreChildContracts": {
             "preflight": "chummer.public_edge_deploy_preflight.v1",
-            "downloads": "chummer.downloads_version_marker.v1",
+            "downloads": "chummer.downloads_version_marker.bound.v1",
             "pwaStatic": "chummer.public_pwa_static_assets.v1",
             "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
             "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -206,14 +206,14 @@ def passing_public_edge_postdeploy_payload(module):
         "mobilePwaViewportMissingRoutes": [],
         "pwaOfflineCacheStatus": "pass",
         "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
-        "pwaOfflineCacheCacheVersion": "v17",
+        "pwaOfflineCacheCacheVersion": "v19",
         "pwaOfflineCacheNavigationPolicy": "network_only",
         "pwaOfflineCachePrivateStateScope": "open_tab_only",
         "pwaOfflineCacheStaticPaths": [
             "/manifest.player.webmanifest",
             "/manifest.gm.webmanifest",
             "/mobile.css",
-            "/mobile-turn-companion.js",
+            "/mobile-install-shell.js",
         ],
         "pwaOfflineCacheOfflineRoleFallbacks": [
             {
@@ -371,6 +371,70 @@ def passing_public_edge_postdeploy_payload(module):
         "frontdoorNavigationAnchorDeviceContextPresent": True,
         "frontdoorNavigationAnchorFailure": "",
     }
+    payload.update(
+        {
+            "frontdoorNavigationGatedTargets": [],
+            "frontdoorNavigationPublicTargets": ["Build", "Play"],
+            "frontdoorNavigationPlaySignInRoute": "/login?next=%2F",
+            "frontdoorNavigationPlayerSessionContextPresent": False,
+            "frontdoorNavigationPlayerDeviceContextPresent": False,
+            "frontdoorNavigationLiveTurnCompanionShell": False,
+            "frontdoorNavigationBlazorShell": "install-only",
+            "frontdoorNavigationRybbitConfigured": False,
+            "frontdoorNavigationRybbitTag": "",
+            "frontdoorNavigationRybbitRoute": "",
+            "frontdoorNavigationRybbitMode": "",
+            "frontdoorNavigationRybbitRole": "",
+            "frontdoorNavigationRybbitSiteIdPresent": False,
+            "frontdoorNavigationRybbitScriptUrlPresent": False,
+            "frontdoorNavigationRybbitScriptUrlAllowed": False,
+            "frontdoorNavigationRybbitSkipPatterns": [],
+            "frontdoorNavigationRybbitMaskPatterns": [],
+            "frontdoorNavigationRybbitSkipMobilePaths": False,
+            "frontdoorNavigationRybbitMaskMobilePaths": False,
+            "frontdoorNavigationRybbitMasksPrivatePlayRoutes": False,
+            "frontdoorNavigationRybbitReplayBlockSelector": "",
+            "frontdoorNavigationRybbitReplayBlocksTurnRoot": False,
+            "frontdoorNavigationPlayerSessionHandoffUrl": "",
+            "frontdoorNavigationPlayerSessionHandoffStatus": "",
+            "frontdoorNavigationPlayerSessionHandoffLinkText": "",
+            "frontdoorNavigationPlayerSessionHandoffPreservesSession": False,
+            "frontdoorNavigationPlayerSessionHandoffPreservesRole": False,
+            "frontdoorNavigationPlayerSessionHandoffStripsDevice": False,
+            "frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent": False,
+            "frontdoorNavigationGmRouteSessionIdPresent": False,
+            "frontdoorNavigationGmSessionContextPresent": False,
+            "frontdoorNavigationGmDeviceContextPresent": False,
+            "frontdoorNavigationGmLiveTurnCompanionShell": False,
+            "frontdoorNavigationGmBlazorShell": "install-only",
+            "frontdoorNavigationGmRybbitConfigured": False,
+            "frontdoorNavigationGmRybbitTag": "",
+            "frontdoorNavigationGmRybbitRoute": "",
+            "frontdoorNavigationGmRybbitMode": "",
+            "frontdoorNavigationGmRybbitRole": "",
+            "frontdoorNavigationGmRybbitSiteIdPresent": False,
+            "frontdoorNavigationGmRybbitScriptUrlPresent": False,
+            "frontdoorNavigationGmRybbitScriptUrlAllowed": False,
+            "frontdoorNavigationGmRybbitSkipPatterns": [],
+            "frontdoorNavigationGmRybbitMaskPatterns": [],
+            "frontdoorNavigationGmRybbitSkipMobilePaths": False,
+            "frontdoorNavigationGmRybbitMaskMobilePaths": False,
+            "frontdoorNavigationGmRybbitMasksPrivatePlayRoutes": False,
+            "frontdoorNavigationGmRybbitReplayBlockSelector": "",
+            "frontdoorNavigationGmRybbitReplayBlocksTurnRoot": False,
+            "frontdoorNavigationGmSessionHandoffUrl": "",
+            "frontdoorNavigationGmSessionHandoffStatus": "",
+            "frontdoorNavigationGmSessionHandoffLinkText": "",
+            "frontdoorNavigationGmSessionHandoffPreservesSession": False,
+            "frontdoorNavigationGmSessionHandoffPreservesRole": False,
+            "frontdoorNavigationGmSessionHandoffStripsDevice": False,
+            "frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent": False,
+            "frontdoorNavigationAnchorBlazorShell": "install-only",
+            "frontdoorNavigationAnchorSessionContextPresent": False,
+            "frontdoorNavigationAnchorDeviceContextPresent": False,
+        }
+    )
+    return payload
 
 
 def test_normalized_release_ready_snapshot_truth_audit_rejects_pass_shaped_failed_gates() -> None:
@@ -619,6 +683,44 @@ def passing_required_receipt_payload(module, key: str, generated_at: str | None 
         payload["verdict"] = "UI_LAYOUT_EXIT_READY"
     if key == "ui_frame_integrity":
         payload["verdict"] = "READY"
+    if key == "horizon_e2e_gold_matrix":
+        horizon_ids = [
+            "alice",
+            "origin-dossier",
+            "karma-forge",
+            "knowledge-fabric",
+            "jackpoint",
+            "black-ledger",
+            "runsite",
+            "runbook-press",
+            "table-pulse",
+        ]
+        payload.update(
+            {
+                "contract_name": "chummer.horizon_e2e_gold_matrix/v1",
+                "verdict": "HORIZON_PORTFOLIO_GOLD",
+                "all_horizons_gold": True,
+                "required_horizon_ids": horizon_ids,
+                "summary": {
+                    "horizon_count": 9,
+                    "gold_count": 9,
+                    "failed_count": 0,
+                    "expected_count": 9,
+                    "assertion_count": 108,
+                },
+                "horizons": [
+                    {
+                        "id": horizon_id,
+                        "status": "pass",
+                        "verdict": "GOLD",
+                        "assertion_count": 12,
+                        "evidence_sha256": "a" * 64,
+                        "failures": [],
+                    }
+                    for horizon_id in horizon_ids
+                ],
+            }
+        )
     if key == "release_ready":
         payload.update(
             {
@@ -1221,7 +1323,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", failures)
         self.assertIn("public-edge postdeploy PWA offline cache did not prove private navigation remain uncached", failures)
         self.assertIn("public-edge postdeploy front-door visible Player URL is not query-free /mobile/player", failures)
-        self.assertIn("public-edge postdeploy front-door Player handoff is not a redacted player route", failures)
+        self.assertIn("public-edge postdeploy anonymous Player shell exposed a session handoff", failures)
 
     def test_materializers_build_provider_receipts_before_ltd_stack(self) -> None:
         module = load_module()
@@ -1245,11 +1347,22 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertLess(minimal_index, design_index)
 
+    def test_materializers_refresh_mobile_pwa_projection_before_blazor_bridge(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        mobile_pwa_index = commands.index(
+            f"python3 scripts/verify_mobile_pwa_public_projection.py --base-url {module.DEFAULT_BASE_URL}"
+        )
+        blazor_bridge_index = commands.index("python3 scripts/verify_blazor_execution_horizon_bridge.py")
+
+        self.assertLess(mobile_pwa_index, blazor_bridge_index)
+
     def test_materializers_refresh_release_ready_before_operator_dashboard(self) -> None:
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
-        release_ready_index = commands.index("python3 scripts/materialize_release_ready_receipt.py")
+        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
         operator_dashboard_index = commands.index("python3 scripts/materialize_operator_release_dashboard.py")
 
         self.assertLess(release_ready_index, operator_dashboard_index)
@@ -1258,7 +1371,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
-        release_ready_index = commands.index("python3 scripts/materialize_release_ready_receipt.py")
+        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
         hub_local_release_proof_index = commands.index(
             "python3 scripts/materialize_hub_local_release_proof.py "
             f"{module.PUBLISHED_ROOT / 'HUB_LOCAL_RELEASE_PROOF.generated.json'} "
@@ -1296,7 +1409,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             f"{module.PUBLISHED_ROOT / 'WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json'} "
             "--wait-seconds 0"
         )
-        release_ready_index = commands.index("python3 scripts/materialize_release_ready_receipt.py")
+        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
 
         self.assertLess(verify_windows_index, intake_index)
         self.assertLess(intake_index, auto_import_index)
@@ -1364,7 +1477,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
             "--output "
             f"{module.PUBLISHED_ROOT / 'GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json'} "
             "--evidence-path "
-            f"{module.PUBLISHED_ROOT / 'GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json'}"
+            f"{module.PUBLISHED_ROOT / 'GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json'} "
+            "--live-release-manifest-path "
+            f"{module.RUN_SERVICES_ROOT / '.state' / 'google_oauth_live_release_manifest.json'} "
+            "--refresh-live-release-manifest"
         )
         auto_import_command = (
             "python3 scripts/auto_import_google_oauth_linking_operator_evidence.py "
@@ -1393,7 +1509,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         ea_verify_index = commands.index(ea_verify_command)
         mymedia_materialize_index = commands.index(mymedia_materialize_command)
         mymedia_verify_index = commands.index(mymedia_verify_command)
-        release_ready_index = commands.index("python3 scripts/materialize_release_ready_receipt.py")
+        release_ready_index = commands.index(str(module.RELEASE_READY_CONTROLLER))
         dashboard_index = commands.index("python3 scripts/materialize_operator_release_dashboard.py")
 
         self.assertIn("google_oauth_linking_proof", module.REQUIRED_RECEIPTS)
@@ -2138,6 +2254,17 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = passing_flagship_product_readiness_payload(module)
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": generated_at_utc,
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
                 if key == "windows_installer_visual_audit":
                     payload = {
                         **passing_required_receipt_payload(module, key),
@@ -2246,7 +2373,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "waiting_for_artifact",
-                        "generated_at_utc": "2026-07-04T17:00:05Z",
+                        "generated_at_utc": generated_at_utc,
                         "import_failure": {
                             "type": "BadZipFile",
                             "message": "File is not a zip file",
@@ -2323,7 +2450,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             watcher_state_path.write_text(
                 json.dumps(
                     {
-                        "generated_at_utc": "2026-07-04T17:00:06Z",
+                        "generated_at_utc": generated_at_utc,
                         "status": "running",
                         "pid": 1866861,
                         "process_alive": True,
@@ -2341,6 +2468,22 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=(
+                        True,
+                        {
+                            "status": "pass",
+                            "issues": [],
+                            "recovery_pack_pass": True,
+                            "operator_action_still_required": True,
+                            "effective_status": "external_artifact_required",
+                            "current_windows_visual_audit_status": "fail",
+                            "current_windows_visual_audit_effective_pass": False,
+                        },
+                    ),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
@@ -2597,6 +2740,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
     def test_payload_surfaces_windows_operator_missing_artifact_and_stale_ask(self) -> None:
         module = load_module()
         module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING = False
+        generated_at_utc = module.now_iso()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-windows-operator-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
@@ -2624,7 +2768,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = {
                         "contract_name": "chummer.teable_important_work.v1",
                         "status": "pass",
-                        "generated_at_utc": "2026-07-04T17:00:08Z",
+                        "generated_at_utc": generated_at_utc,
                         "row_count": 1,
                         "rows": [{"title": "row"}],
                         "sync": {"state": "passed", "attempted": True, "synced_count": 1, "failed_count": 0},
@@ -2633,11 +2777,22 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = passing_flagship_product_readiness_payload(module)
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": generated_at_utc,
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
                 if key == "windows_installer_visual_audit":
                     payload = {
                         **passing_required_receipt_payload(module, key),
                         "status": "fail",
-                        "generated_at_utc": "2026-07-04T17:00:09Z",
+                        "generated_at_utc": generated_at_utc,
                         "contract_name": module.WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME,
                         "artifact": {"sha256": "a" * 64, "actualSha256": "a" * 64},
                         "startupReceipt": {
@@ -2646,18 +2801,18 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "path": "/tmp/windows-startup.receipt.json",
                         },
                         "visualAuditSource": {
-                            "exists": True,
-                            "status": "pass",
+                            "exists": False,
+                            "status": "missing",
                             "platform": "windows",
                             "hostClass": "native-windows-11",
-                            "artifactSha256": "b" * 64,
-                            "path": "/tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-                            "screenshotCount": 4,
-                            "defaultDpiScreenshotCount": 2,
-                            "scaledDpiScreenshotCount": 2,
-                            "requiredSurfaces": ["install-progress", "completion"],
+                            "artifactSha256": "",
+                            "path": "",
+                            "screenshotCount": 0,
+                            "defaultDpiScreenshotCount": 0,
+                            "scaledDpiScreenshotCount": 0,
+                            "requiredSurfaces": [],
                         },
-                        "failures": ["Windows installer visual audit source digest does not match promoted installer"],
+                        "failures": ["Windows installer visual audit source is missing"],
                         "nextActions": ["Capture fresh Windows proof."],
                     }
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
@@ -2700,6 +2855,22 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
                 mock.patch.object(module, "TELEGRAM_TEXT_DELIVERY_ROOT", delivery_root),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=(
+                        True,
+                        {
+                            "status": "pass",
+                            "issues": [],
+                            "recovery_pack_pass": True,
+                            "operator_action_still_required": True,
+                            "effective_status": "external_artifact_required",
+                            "current_windows_visual_audit_status": "fail",
+                            "current_windows_visual_audit_effective_pass": False,
+                        },
+                    ),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
@@ -4294,8 +4465,8 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("public-edge postdeploy roleAliasRouteStatus is not pass", gate["semanticFailures"])
         self.assertIn("public-edge postdeploy role alias routes drifted", gate["semanticFailures"])
         self.assertIn("public-edge postdeploy /player resolved to /play?role=player instead of /mobile/player", gate["semanticFailures"])
-        self.assertIn("public-edge postdeploy front-door navigation does not gate Build", gate["semanticFailures"])
-        self.assertIn("public-edge postdeploy front-door navigation does not gate Play", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation still reports account-gated targets", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation does not expose exactly Build and Play", gate["semanticFailures"])
         self.assertIn("public-edge postdeploy front-door navigation Play route is not /mobile/player", gate["semanticFailures"])
         self.assertIn("public-edge postdeploy front-door navigation direct player route is not /mobile/player", gate["semanticFailures"])
         self.assertIn("edge failures:", markdown)

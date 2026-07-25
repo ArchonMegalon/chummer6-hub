@@ -58,8 +58,9 @@ REQUIRED_MARKERS = {
         'rosterTransferPayload.Summary.Contains("ownership transferred", StringComparison.OrdinalIgnoreCase)',
         'outsiderWorkspace is not null && outsiderWorkspace.RosterTransfers?.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true',
         'outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal))',
-        'operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',
-        'postTransferWorkHomeModel?.LeadWorkspaceServerPlane?.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true',
+        'operatorWorkModel is not null && string.Equals(operatorWorkModel.Eyebrow, "Roster", StringComparison.Ordinal)',
+        "operatorWorkModel!.Cards.Count >= 3",
+        'postTransferWorkHomeModel?.CampaignSpine.Workspaces.Any(item => item.RosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',
         'postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',
     ],
 }

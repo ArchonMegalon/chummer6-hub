@@ -28,6 +28,7 @@ from verify_detached_ed25519_attestation import (
     parse_time,
     verify_detached_attestation,
 )
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -201,7 +202,26 @@ def program_bindings() -> dict[str, dict[str, Any]]:
     return bindings
 
 
+def resolve_release_manifest_path(path: Path) -> Path:
+    """Resolve a legacy shelf path through the atomic generation pointer.
+
+    Explicit manifest captures and registry receipts live in ordinary
+    directories and therefore resolve to themselves. A marked downloads shelf
+    must resolve through ``current.json``; malformed generation state is never
+    allowed to fall back to a stale legacy mirror.
+    """
+
+    try:
+        mode, active_root, _pointer = resolve_shelf_root(path.parent)
+    except ReleaseShelfError as exc:
+        raise ContractError(f"release shelf resolution failed: {exc}") from exc
+    if mode == "generation":
+        return active_root / path.name
+    return path
+
+
 def release_binding(path: Path = DEFAULT_RELEASE_MANIFEST_PATH) -> dict[str, Any]:
+    path = resolve_release_manifest_path(path)
     payload, raw = read_json_object(path)
     release_tuple = {
         "version": str(payload.get("version") or payload.get("releaseVersion") or "").strip(),

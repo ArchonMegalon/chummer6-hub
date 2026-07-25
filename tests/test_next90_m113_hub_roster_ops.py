@@ -106,6 +106,26 @@ class Next90M113HubRosterOpsProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("MoveMyDossier", result.stderr)
 
+    def test_verifier_fails_when_materializer_drops_roster_home_receipt_marker(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m113-roster-home-materializer-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            materializer_path = temp_root / "scripts/materialize_next90_m113_hub_roster_ops_proof.py"
+            materializer_text = materializer_path.read_text(encoding="utf-8")
+            marker = (
+                "'postTransferWorkHomeModel?.CampaignSpine.Workspaces.Any(item => "
+                "item.RosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, "
+                "rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',\n"
+            )
+            mutated_materializer_text = materializer_text.replace(marker, "")
+            self.assertNotEqual(materializer_text, mutated_materializer_text)
+            materializer_path.write_text(mutated_materializer_text, encoding="utf-8")
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("postTransferWorkHomeModel?.CampaignSpine.Workspaces", result.stderr)
+
     def test_verifier_rejects_active_run_markers_in_generated_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m113-proof-") as temp_dir:
             proof_path = Path(temp_dir) / "proof.json"

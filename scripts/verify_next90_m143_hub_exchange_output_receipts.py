@@ -474,7 +474,17 @@ def main() -> int:
     )
     require_contains(
         SMOKE,
-        'guest creator-publication detail should expose the governing route receipt or bounded review posture on the HTML route.',
+        'guest creator-publication detail should not expose a fake route receipt while the HTML route remains bounded.',
+        issues,
+    )
+    require_contains(
+        SMOKE,
+        'guest creator-publication detail should keep the outward-facing HTML claim on bounded-failure posture while parity claims stay review-required.',
+        issues,
+    )
+    require_contains(
+        SMOKE,
+        'guest creator-publication detail should explain the bounded review posture on the HTML route.',
         issues,
     )
     require_contains(

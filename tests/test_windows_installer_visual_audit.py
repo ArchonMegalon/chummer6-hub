@@ -1,13 +1,17 @@
 import argparse
+import base64
+import gc
 import importlib.util
 import json
 import os
 import subprocess
 import struct
+import sys
 import tempfile
 import threading
 import time
 import unittest
+import warnings
 import zipfile
 import zlib
 from pathlib import Path
@@ -106,9 +110,61 @@ def write_windows_gold_proof_fixture(
     return artifact, visual_root
 
 
-def valid_png_bytes(*, width: int = 320, height: int = 180, token: int = 1) -> bytes:
-    color = bytes(((token * 31) % 251, (token * 67) % 251, (token * 97) % 251))
+def valid_png_bytes(
+    *,
+    width: int = 320,
+    height: int = 180,
+    token: int = 1,
+    rgba: bool = False,
+) -> bytes:
+    color = bytes(
+        (
+            (token * 31) % 251,
+            (token * 67) % 251,
+            (token * 97) % 251,
+            *([255] if rgba else []),
+        )
+    )
     raw = b"".join(b"\x00" + color * width for _ in range(height))
+
+    def chunk(chunk_type: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + chunk_type
+            + data
+            + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+        )
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(
+            b"IHDR",
+            struct.pack(">IIBBBBB", width, height, 8, 6 if rgba else 2, 0, 0, 0),
+        )
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def framed_but_undecodable_png_bytes(*, width: int = 320, height: int = 180) -> bytes:
+    def chunk(chunk_type: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + chunk_type
+            + data
+            + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+        )
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00", 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def png_with_invalid_scanline_filter(*, width: int = 320, height: int = 180) -> bytes:
+    raw = b"".join(b"\x05" + (b"\x10\x20\x30" * width) for _ in range(height))
 
     def chunk(chunk_type: bytes, data: bytes) -> bytes:
         return (
@@ -124,6 +180,19 @@ def valid_png_bytes(*, width: int = 320, height: int = 180, token: int = 1) -> b
         + chunk(b"IDAT", zlib.compress(raw, 9))
         + chunk(b"IEND", b"")
     )
+
+
+def png_with_unsupported_animation_chunk(*, token: int = 1) -> bytes:
+    data = valid_png_bytes(token=token)
+    animation_data = struct.pack(">II", 2, 0)
+    animation_chunk = (
+        struct.pack(">I", len(animation_data))
+        + b"acTL"
+        + animation_data
+        + struct.pack(">I", zlib.crc32(b"acTL" + animation_data) & 0xFFFFFFFF)
+    )
+    ihdr_end = 8 + 4 + 4 + 13 + 4
+    return data[:ihdr_end] + animation_chunk + data[ihdr_end:]
 
 
 def write_valid_png(path: Path, *, token: int = 1) -> None:
@@ -159,18 +228,99 @@ def proof_generation_entries(module, downloads_root: Path, *, token: int) -> lis
         },
         sort_keys=True,
     ).encode("utf-8")
+    screenshot_specs = [
+        ("capture.png", "install-progress", 1.0, token),
+        ("capture-progress-scaled.png", "install-progress", 1.5, token + 1),
+        ("capture-completion-default.png", "completion", 1.0, token + 2),
+        ("capture-completion-scaled.png", "completion", 1.5, token + 3),
+    ]
+    visual_data = json.dumps(
+        {
+            "status": "pass",
+            "pass": True,
+            "failures": [],
+            "failed_gates": [],
+            "platform": "windows",
+            "hostClass": "native-windows-11",
+            "artifactSha256": artifact_digest,
+            "token": token,
+            "screenshots": [
+                {
+                    "path": name,
+                    "surface": surface,
+                    "dpiScale": dpi_scale,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                }
+                for name, surface, dpi_scale, _image_token in screenshot_specs
+            ],
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+
+    def snapshot(data: bytes, **extra: object) -> dict[str, object]:
+        return {
+            "data": data,
+            "sha256": module.hashlib.sha256(data).hexdigest(),
+            **extra,
+        }
+
+    entries = [
+        (
+            snapshot(startup_data),
+            downloads_root / "startup-smoke" / module.STARTUP_RECEIPT_NAME,
+        ),
+        (
+            snapshot(visual_data),
+            downloads_root / "visual-audit" / "windows-installer" / module.VISUAL_SOURCE_NAME,
+        ),
+    ]
+    for name, _surface, _dpi_scale, image_token in screenshot_specs:
+        image_data = valid_png_bytes(token=image_token)
+        entries.append(
+            (
+                snapshot(
+                    image_data,
+                    image_metadata={
+                        "format": "png",
+                        "width": 320,
+                        "height": 180,
+                        "size_bytes": len(image_data),
+                    },
+                ),
+                downloads_root / "visual-audit" / "windows-installer" / name,
+            )
+        )
+    return entries
+
+
+def legacy_proof_generation_entries(
+    module,
+    downloads_root: Path,
+    *,
+    token: int,
+) -> list[tuple[dict[str, object], Path]]:
+    artifact_digest = f"{token:064x}"[-64:]
+    startup_data = json.dumps(
+        {
+            "status": "pass",
+            "platform": "windows",
+            "hostClass": "native-windows-11",
+            "artifactDigest": f"sha256:{artifact_digest}",
+        },
+        sort_keys=True,
+    ).encode("utf-8")
     visual_data = json.dumps(
         {
             "status": "pass",
             "platform": "windows",
             "hostClass": "native-windows-11",
             "artifactSha256": artifact_digest,
-            "token": token,
             "screenshots": [{"path": "capture.png"}],
         },
         sort_keys=True,
     ).encode("utf-8")
-    image_data = valid_png_bytes(token=token)
+    image_data = framed_but_undecodable_png_bytes()
 
     def snapshot(data: bytes, **extra: object) -> dict[str, object]:
         return {
@@ -186,7 +336,10 @@ def proof_generation_entries(module, downloads_root: Path, *, token: int) -> lis
         ),
         (
             snapshot(visual_data),
-            downloads_root / "visual-audit" / "windows-installer" / module.VISUAL_SOURCE_NAME,
+            downloads_root
+            / "visual-audit"
+            / "windows-installer"
+            / module.VISUAL_SOURCE_NAME,
         ),
         (
             snapshot(
@@ -203,6 +356,87 @@ def proof_generation_entries(module, downloads_root: Path, *, token: int) -> lis
     ]
 
 
+def seed_legacy_current_generation(
+    module,
+    downloads_root: Path,
+    entries: list[tuple[dict[str, object], Path]],
+) -> str:
+    with mock.patch.object(
+        module,
+        "PROOF_GENERATION_CONTRACT",
+        module.LEGACY_PROOF_GENERATION_CONTRACT,
+    ):
+        generation_id, _manifest, manifest_bytes, manifest_rows = (
+            module._proof_generation_manifest(entries, downloads_root)
+        )
+
+    control_root = downloads_root / module.PROOF_CONTROL_DIRECTORY
+    generations_root = control_root / module.PROOF_GENERATIONS_DIRECTORY
+    generation_root = generations_root / generation_id
+    generation_root.mkdir(parents=True)
+    snapshots_by_path = {
+        destination.relative_to(downloads_root).as_posix(): snapshot
+        for snapshot, destination in entries
+    }
+    written_files: list[Path] = []
+    for row in manifest_rows:
+        relative_path = Path(str(row["public_relative_path"]))
+        destination = generation_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(
+            bytes(snapshots_by_path[relative_path.as_posix()]["data"])
+        )
+        written_files.append(destination)
+    manifest_path = generation_root / module.PROOF_GENERATION_MANIFEST
+    manifest_path.write_bytes(manifest_bytes)
+    written_files.append(manifest_path)
+    for path in written_files:
+        path.chmod(0o444)
+    for path in (
+        generation_root / "visual-audit" / "windows-installer",
+        generation_root / "visual-audit",
+        generation_root / "startup-smoke",
+        generation_root,
+    ):
+        path.chmod(0o555)
+
+    (control_root / module.PROOF_CURRENT_LINK).symlink_to(
+        f"{module.PROOF_GENERATIONS_DIRECTORY}/{generation_id}"
+    )
+    visual_anchor = downloads_root / "visual-audit" / "windows-installer"
+    visual_anchor.parent.mkdir(parents=True)
+    visual_anchor.symlink_to(module.VISUAL_PUBLIC_ANCHOR_TARGET)
+    startup_anchor = downloads_root / "startup-smoke" / module.STARTUP_RECEIPT_NAME
+    startup_anchor.parent.mkdir(parents=True)
+    startup_anchor.symlink_to(
+        f"../{module.PROOF_CONTROL_DIRECTORY}/{module.PROOF_CURRENT_LINK}/"
+        f"startup-smoke/{module.STARTUP_RECEIPT_NAME}"
+    )
+    (control_root / module.PROOF_RECOVERY_JOURNAL).write_text(
+        json.dumps(
+            {
+                "contract_name": module.PROOF_PUBLICATION_CONTRACT,
+                "state": "committed",
+                "generation_id": generation_id,
+                "generation_manifest_sha256": module.hashlib.sha256(
+                    manifest_bytes
+                ).hexdigest(),
+                "previous_target": None,
+                "new_target": (
+                    f"{module.PROOF_GENERATIONS_DIRECTORY}/{generation_id}"
+                ),
+                "created_anchors": ["visual", "startup"],
+            },
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return generation_id
+
+
 def write_valid_gold_proof_zip(
     path: Path,
     *,
@@ -211,6 +445,12 @@ def write_valid_gold_proof_zip(
 ) -> None:
     visual_prefix = "Chummer.Portal/downloads/visual-audit/windows-installer"
     startup_name = "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+    screenshot_specs = [
+        ("progress-default.png", "install-progress", 1.0, token),
+        ("progress-scaled.png", "install-progress", 1.5, token + 1),
+        ("completion-default.png", "completion", 1.0, token + 2),
+        ("completion-scaled.png", "completion", 1.5, token + 3),
+    ]
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
             f"{visual_prefix}/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
@@ -220,11 +460,24 @@ def write_valid_gold_proof_zip(
                     "platform": "windows",
                     "hostClass": "native-windows-11",
                     "artifactSha256": digest,
-                    "screenshots": [{"path": "capture.png", "surface": "install-progress"}],
+                    "screenshots": [
+                        {
+                            "path": name,
+                            "surface": surface,
+                            "dpiScale": dpi_scale,
+                            "clippingStatus": "pass",
+                            "readabilityStatus": "pass",
+                        }
+                        for name, surface, dpi_scale, _image_token in screenshot_specs
+                    ],
                 }
             ),
         )
-        archive.writestr(f"{visual_prefix}/capture.png", valid_png_bytes(token=token))
+        for name, _surface, _dpi_scale, image_token in screenshot_specs:
+            archive.writestr(
+                f"{visual_prefix}/{name}",
+                valid_png_bytes(token=image_token),
+            )
         archive.writestr(
             startup_name,
             json.dumps(
@@ -276,6 +529,90 @@ def fake_bound_python_result(
 
 
 class WindowsInstallerVisualAuditTests(unittest.TestCase):
+    def test_resolve_portal_shelf_context_uses_active_generation_inputs(self):
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            shelf_root = Path(temp_dir) / "downloads"
+            active_root = shelf_root / "generations" / "g-current"
+            portal_manifest = shelf_root / "RELEASE_CHANNEL.generated.json"
+            startup_receipt = (
+                shelf_root
+                / "startup-smoke"
+                / "startup-smoke-avalonia-win-x64.receipt.json"
+            )
+
+            with mock.patch.object(
+                module,
+                "resolve_shelf_root",
+                return_value=(
+                    "generation",
+                    active_root,
+                    {"generationId": "g-current"},
+                ),
+            ):
+                (
+                    resolved_manifest,
+                    resolved_downloads,
+                    resolved_startup,
+                    resolution,
+                    failures,
+                ) = module.resolve_portal_shelf_context(
+                    portal_manifest,
+                    shelf_root,
+                    startup_receipt,
+                )
+
+            self.assertEqual(
+                resolved_manifest,
+                active_root / "RELEASE_CHANNEL.generated.json",
+            )
+            self.assertEqual(resolved_downloads, active_root)
+            self.assertEqual(
+                resolved_startup,
+                active_root
+                / "startup-smoke"
+                / "startup-smoke-avalonia-win-x64.receipt.json",
+            )
+            self.assertEqual(resolution["generationId"], "g-current")
+            self.assertEqual(resolution["status"], "resolved")
+            self.assertEqual(failures, [])
+
+    def test_resolve_portal_shelf_context_fails_closed_on_invalid_pointer(self):
+        module = load_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            shelf_root = Path(temp_dir) / "downloads"
+            portal_manifest = shelf_root / "RELEASE_CHANNEL.generated.json"
+            startup_receipt = shelf_root / "startup-smoke" / "receipt.json"
+
+            with mock.patch.object(
+                module,
+                "resolve_shelf_root",
+                side_effect=module.ReleaseShelfError("pointer digest mismatch"),
+            ):
+                (
+                    resolved_manifest,
+                    resolved_downloads,
+                    resolved_startup,
+                    resolution,
+                    failures,
+                ) = module.resolve_portal_shelf_context(
+                    portal_manifest,
+                    shelf_root,
+                    startup_receipt,
+                )
+
+            self.assertEqual(resolved_manifest, portal_manifest)
+            self.assertEqual(resolved_downloads, shelf_root)
+            self.assertEqual(resolved_startup, startup_receipt)
+            self.assertEqual(resolution["status"], "fail")
+            self.assertEqual(
+                failures,
+                [
+                    "Portal release shelf resolution failed: "
+                    "pointer digest mismatch"
+                ],
+            )
+
     def test_windows_operator_request_artifacts_flags_stale_delivery_for_resend(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="windows-proof-operator-resend-") as temp_dir:
@@ -2189,6 +2526,70 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("RELEASE_CHANNEL.generated.json", text)
         self.assertIn("avalonia-win-x64-installer", text)
 
+    def test_import_visual_semantics_requires_complete_passing_surface_matrix(self) -> None:
+        module = load_import_module()
+        valid_payload = {
+            "status": "pass",
+            "pass": True,
+            "failures": [],
+            "failed_gates": [],
+            "screenshots": [
+                {
+                    "path": "progress-default.png",
+                    "surface": "install-progress",
+                    "dpiScale": 1.0,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "progress-scaled.png",
+                    "surface": "install-progress",
+                    "dpiScale": 1.5,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "completion-default.png",
+                    "surface": "completion",
+                    "dpiScale": 1.0,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "completion-scaled.png",
+                    "surface": "completion",
+                    "dpiScale": "150%",
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+            ],
+        }
+        module.validate_visual_proof_semantics(valid_payload)
+
+        scenarios: list[tuple[str, str, object]] = [
+            ("explicit_pass", "pass", False),
+            ("failures", "failures", ["not passing"]),
+            ("failed_gates", "failed_gates", ["visual"]),
+        ]
+        for scenario, field, value in scenarios:
+            with self.subTest(scenario=scenario):
+                payload = json.loads(json.dumps(valid_payload))
+                payload[field] = value
+                with self.assertRaises(SystemExit):
+                    module.validate_visual_proof_semantics(payload)
+
+        for field in ("clippingStatus", "readabilityStatus"):
+            with self.subTest(field=field):
+                payload = json.loads(json.dumps(valid_payload))
+                payload["screenshots"][0][field] = "fail"
+                with self.assertRaisesRegex(SystemExit, "is not pass"):
+                    module.validate_visual_proof_semantics(payload)
+
+        incomplete_payload = json.loads(json.dumps(valid_payload))
+        incomplete_payload["screenshots"] = incomplete_payload["screenshots"][:-1]
+        with self.assertRaisesRegex(SystemExit, "scaled-DPI completion"):
+            module.validate_visual_proof_semantics(incomplete_payload)
+
     def test_import_windows_installer_gold_proof_artifact_copies_expected_receipts_and_screenshots(self) -> None:
         module = load_import_module()
         with tempfile.TemporaryDirectory(prefix="windows-proof-import-") as temp_dir:
@@ -2222,10 +2623,34 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                         "hostClass": "native-windows-11",
                         "artifactSha256": "a" * 64,
                         "screenshots": [
-                            {"path": "progress-default.png"},
-                            {"path": "progress-scaled.png"},
-                            {"path": "completion-default.png"},
-                            {"path": "completion-scaled.png"},
+                            {
+                                "path": "progress-default.png",
+                                "surface": "install-progress",
+                                "dpiScale": 1.0,
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
+                            {
+                                "path": "progress-scaled.png",
+                                "surface": "install-progress",
+                                "dpiScale": 1.5,
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
+                            {
+                                "path": "completion-default.png",
+                                "surface": "completion",
+                                "dpiScale": 1.0,
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
+                            {
+                                "path": "completion-scaled.png",
+                                "surface": "completion",
+                                "dpiScale": 1.5,
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            },
                         ],
                     }
                 ),
@@ -2233,13 +2658,30 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             )
             downloads_root = root / "downloads"
             downloads_root.mkdir()
-            summary = module.import_artifact(artifact, downloads_root)
+            intake_request = (
+                root / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            )
+            intake_request.write_text(
+                json.dumps(
+                    {
+                        "promoted_installer_sha256": "a" * 64,
+                        "startup_receipt_bundle_required": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            summary = module.import_artifact(
+                artifact,
+                downloads_root,
+                intake_request=intake_request,
+            )
 
             self.assertTrue((downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json").is_file())
             self.assertTrue((downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json").is_file())
             self.assertEqual(4, len(summary["screenshots"]))
             self.assertEqual("artifact_bundle", summary["startupReceiptSource"])
             self.assertTrue(summary["startupReceiptBundleRequired"])
+            self.assertFalse(summary["startupReceiptBundleRequiredRequested"])
             self.assertTrue((downloads_root / "visual-audit" / "windows-installer" / "completion-scaled.png").is_file())
             self.assertEqual("committed", summary["proofSetTransaction"]["status"])
             self.assertEqual(6, summary["proofSetTransaction"]["item_count"])
@@ -2283,6 +2725,121 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             self.assertEqual(
                 f"generations/{second['generation_id']}",
                 os.readlink(downloads_root / ".windows-installer-proof" / "current"),
+            )
+
+    def test_windows_gold_proof_generation_upgrades_legacy_v1_current_to_v2(self) -> None:
+        module = load_import_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-generation-v1-upgrade-") as temp_dir:
+            downloads_root = Path(temp_dir) / "downloads"
+            downloads_root.mkdir()
+            legacy_entries = legacy_proof_generation_entries(
+                module,
+                downloads_root,
+                token=51,
+            )
+            legacy_generation_id = seed_legacy_current_generation(
+                module,
+                downloads_root,
+                legacy_entries,
+            )
+            generations_root = (
+                downloads_root
+                / module.PROOF_CONTROL_DIRECTORY
+                / module.PROOF_GENERATIONS_DIRECTORY
+            )
+            generations_fd = os.open(
+                generations_root,
+                os.O_RDONLY | os.O_DIRECTORY,
+            )
+            try:
+                with self.assertRaisesRegex(SystemExit, "only for recovery/current"):
+                    module._validate_generation_directory(
+                        generations_fd,
+                        legacy_generation_id,
+                    )
+                legacy_manifest = module._validate_generation_directory(
+                    generations_fd,
+                    legacy_generation_id,
+                    allow_legacy_contract=True,
+                )
+            finally:
+                os.close(generations_fd)
+            self.assertEqual(
+                module.LEGACY_PROOF_GENERATION_CONTRACT,
+                legacy_manifest["contract_name"],
+            )
+
+            upgraded = module.publish_proof_set_transactionally(
+                proof_generation_entries(module, downloads_root, token=52),
+                downloads_root,
+            )
+
+            self.assertEqual(
+                module.PROOF_GENERATION_CONTRACT,
+                upgraded["generation_contract_name"],
+            )
+            self.assertNotEqual(legacy_generation_id, upgraded["generation_id"])
+            self.assertEqual(
+                f"{module.PROOF_GENERATIONS_DIRECTORY}/{upgraded['generation_id']}",
+                os.readlink(
+                    downloads_root
+                    / module.PROOF_CONTROL_DIRECTORY
+                    / module.PROOF_CURRENT_LINK
+                ),
+            )
+            self.assertTrue((generations_root / legacy_generation_id).is_dir())
+            upgraded_manifest = json.loads(
+                (
+                    generations_root
+                    / upgraded["generation_id"]
+                    / module.PROOF_GENERATION_MANIFEST
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                module.PROOF_GENERATION_CONTRACT,
+                upgraded_manifest["contract_name"],
+            )
+            self.assertEqual(
+                valid_png_bytes(token=52),
+                (
+                    downloads_root
+                    / "visual-audit"
+                    / "windows-installer"
+                    / "capture.png"
+                ).read_bytes(),
+            )
+
+    def test_windows_gold_proof_generation_rejects_semantic_failure_before_cutover(self) -> None:
+        module = load_import_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-generation-semantic-gate-") as temp_dir:
+            downloads_root = Path(temp_dir) / "downloads"
+            downloads_root.mkdir()
+            first_entries = proof_generation_entries(module, downloads_root, token=31)
+            first = module.publish_proof_set_transactionally(first_entries, downloads_root)
+            public_image_before = (
+                downloads_root / "visual-audit" / "windows-installer" / "capture.png"
+            ).read_bytes()
+
+            rejected_entries = proof_generation_entries(module, downloads_root, token=41)
+            visual_snapshot = rejected_entries[1][0]
+            visual_payload = json.loads(bytes(visual_snapshot["data"]).decode("utf-8"))
+            visual_payload["screenshots"][-1]["readabilityStatus"] = "fail"
+            visual_data = json.dumps(visual_payload, sort_keys=True).encode("utf-8")
+            visual_snapshot["data"] = visual_data
+            visual_snapshot["sha256"] = module.hashlib.sha256(visual_data).hexdigest()
+
+            with self.assertRaisesRegex(SystemExit, "readability check is not pass"):
+                module.publish_proof_set_transactionally(rejected_entries, downloads_root)
+
+            self.assertEqual(
+                f"generations/{first['generation_id']}",
+                os.readlink(downloads_root / ".windows-installer-proof" / "current"),
+            )
+            self.assertEqual(
+                public_image_before,
+                (
+                    downloads_root / "visual-audit" / "windows-installer" / "capture.png"
+                ).read_bytes(),
             )
 
     def test_windows_gold_proof_generation_recovers_crash_after_pointer_cutover(self) -> None:
@@ -3094,34 +3651,221 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             self.assertIn("basenames collide", str(raised.exception))
             self.assertFalse(downloads_root.exists())
 
-    def test_import_windows_installer_gold_proof_artifact_accepts_only_real_png_and_jpeg_images(self) -> None:
+    def test_screenshot_image_requires_bounded_full_decode(self) -> None:
+        module = load_import_module()
+        snapshot = {
+            "data": framed_but_undecodable_png_bytes(),
+            "destination_name": "capture.png",
+            "path": "capture.png",
+        }
+
+        with self.assertRaisesRegex(SystemExit, "wrong exact length"):
+            module.validate_screenshot_image(snapshot)
+
+        valid_snapshot = {
+            "data": valid_png_bytes(token=91),
+            "destination_name": "capture.png",
+            "path": "capture.png",
+        }
+        with mock.patch.object(module, "MAX_SCREENSHOT_PIXELS", 100):
+            with self.assertRaisesRegex(SystemExit, "pixel count"):
+                module.validate_screenshot_image(valid_snapshot)
+        with mock.patch.object(module, "MAX_SCREENSHOT_DECOMPRESSED_BYTES", 100):
+            with self.assertRaisesRegex(SystemExit, "decompressed-data limit"):
+                module.validate_screenshot_image(valid_snapshot)
+        rgba_metadata = module.validate_screenshot_image(
+            {
+                "data": valid_png_bytes(token=95, rgba=True),
+                "destination_name": "rgba.png",
+                "path": "rgba.png",
+            }
+        )
+        self.assertEqual("png", rgba_metadata["format"])
+        with self.assertRaisesRegex(SystemExit, "invalid filter"):
+            module.validate_screenshot_image(
+                {
+                    "data": png_with_invalid_scanline_filter(),
+                    "destination_name": "invalid-filter.png",
+                    "path": "invalid-filter.png",
+                }
+            )
+
+    def test_screenshot_image_rejects_unsupported_png_chunks_and_strict_jpeg(self) -> None:
+        module = load_import_module()
+        snapshot = {
+            "data": png_with_unsupported_animation_chunk(token=92),
+            "destination_name": "capture.png",
+            "path": "capture.png",
+        }
+
+        with self.assertRaisesRegex(SystemExit, "unsupported chunk: acTL"):
+            module.validate_screenshot_image(snapshot)
+
+        jpeg_snapshot = {
+            "data": valid_jpeg_bytes(token=93),
+            "destination_name": "capture.jpg",
+            "path": "capture.jpg",
+        }
+        self.assertEqual(
+            "jpeg",
+            module.validate_screenshot_image(
+                jpeg_snapshot,
+                require_full_decode=False,
+            )["format"],
+        )
+        with self.assertRaisesRegex(SystemExit, "strict v2 screenshot profile accepts PNG only"):
+            module.validate_screenshot_image(jpeg_snapshot)
+
+    def test_strict_png_decoder_runs_under_isolated_system_python(self) -> None:
+        encoded_png = base64.b64encode(valid_png_bytes(token=94)).decode("ascii")
+        probe = f"""
+import base64
+import importlib.util
+import sys
+
+assert sys.flags.isolated == 1
+assert sys.flags.no_user_site == 1
+spec = importlib.util.spec_from_file_location(
+    "isolated_windows_proof_importer",
+    {str(IMPORT_SCRIPT_PATH)!r},
+)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+metadata = module.validate_screenshot_image(
+    {{
+        "data": base64.b64decode({encoded_png!r}, validate=True),
+        "destination_name": "isolated.png",
+        "path": "isolated.png",
+    }}
+)
+assert metadata["format"] == "png"
+assert metadata["width"] == 320
+assert metadata["height"] == 180
+assert not any(name == "PIL" or name.startswith("PIL.") for name in sys.modules)
+"""
+        completed = subprocess.run(
+            ["/usr/bin/python3", "-I", "-c", probe],
+            cwd="/",
+            env={
+                "LANG": "C.UTF-8",
+                "LC_ALL": "C.UTF-8",
+                "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONNOUSERSITE": "1",
+            },
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+
+    def test_import_windows_installer_gold_proof_artifact_accepts_strict_png_profile_images(self) -> None:
         module = load_import_module()
         with tempfile.TemporaryDirectory(prefix="windows-proof-valid-images-") as temp_dir:
             root = Path(temp_dir)
             artifact, visual_root = write_windows_gold_proof_fixture(
                 root,
                 [
-                    {"path": "capture.png", "surface": "install-progress"},
-                    {"path": "capture.jpg", "surface": "completion"},
+                    {
+                        "path": "progress-default.png",
+                        "surface": "install-progress",
+                        "dpiScale": 1.0,
+                        "clippingStatus": "pass",
+                        "readabilityStatus": "pass",
+                    },
+                    {
+                        "path": "progress-scaled.png",
+                        "surface": "install-progress",
+                        "dpiScale": 1.5,
+                        "clippingStatus": "pass",
+                        "readabilityStatus": "pass",
+                    },
+                    {
+                        "path": "completion-default.png",
+                        "surface": "completion",
+                        "dpiScale": 1.0,
+                        "clippingStatus": "pass",
+                        "readabilityStatus": "pass",
+                    },
+                    {
+                        "path": "completion-scaled.png",
+                        "surface": "completion",
+                        "dpiScale": 1.5,
+                        "clippingStatus": "pass",
+                        "readabilityStatus": "pass",
+                    },
                 ],
             )
-            (visual_root / "capture.png").write_bytes(valid_png_bytes(token=21))
-            (visual_root / "capture.jpg").write_bytes(valid_jpeg_bytes(token=22))
+            (visual_root / "progress-default.png").write_bytes(valid_png_bytes(token=21))
+            (visual_root / "progress-scaled.png").write_bytes(valid_png_bytes(token=22))
+            (visual_root / "completion-default.png").write_bytes(valid_png_bytes(token=23))
+            (visual_root / "completion-scaled.png").write_bytes(valid_png_bytes(token=24))
             downloads_root = root / "downloads"
             downloads_root.mkdir()
 
             summary = module.import_artifact(artifact, downloads_root)
 
             self.assertEqual(
-                ["png", "jpeg"],
+                ["png", "png", "png", "png"],
                 [row["image"]["format"] for row in summary["screenshotBindings"]],
             )
             self.assertTrue(
-                (downloads_root / "visual-audit" / "windows-installer" / "capture.png").is_file()
+                (downloads_root / "visual-audit" / "windows-installer" / "progress-default.png").is_file()
             )
             self.assertTrue(
-                (downloads_root / "visual-audit" / "windows-installer" / "capture.jpg").is_file()
+                (downloads_root / "visual-audit" / "windows-installer" / "completion-scaled.png").is_file()
             )
+
+    def test_import_windows_installer_gold_proof_artifact_rejects_jpeg_for_v2(self) -> None:
+        module = load_import_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-v2-jpeg-rejected-") as temp_dir:
+            root = Path(temp_dir)
+            rows = [
+                {
+                    "path": "progress-default.png",
+                    "surface": "install-progress",
+                    "dpiScale": 1.0,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "progress-scaled.jpg",
+                    "surface": "install-progress",
+                    "dpiScale": 1.5,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "completion-default.png",
+                    "surface": "completion",
+                    "dpiScale": 1.0,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+                {
+                    "path": "completion-scaled.png",
+                    "surface": "completion",
+                    "dpiScale": 1.5,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                },
+            ]
+            artifact, visual_root = write_windows_gold_proof_fixture(root, rows)
+            (visual_root / "progress-default.png").write_bytes(valid_png_bytes(token=31))
+            (visual_root / "progress-scaled.jpg").write_bytes(valid_jpeg_bytes(token=32))
+            (visual_root / "completion-default.png").write_bytes(valid_png_bytes(token=33))
+            (visual_root / "completion-scaled.png").write_bytes(valid_png_bytes(token=34))
+            downloads_root = root / "downloads"
+
+            with self.assertRaisesRegex(
+                SystemExit,
+                "strict v2 screenshot profile accepts PNG only",
+            ):
+                module.import_artifact(artifact, downloads_root)
+
+            self.assertFalse(downloads_root.exists())
 
     def test_import_windows_installer_gold_proof_artifact_rejects_empty_html_fake_and_undersized_images_before_public_mutation(self) -> None:
         module = load_import_module()
@@ -5673,7 +6417,9 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             "operator_telegram_send_command",
         ):
             self.assertTrue(payload[key]["redacted"], key)
-            self.assertRegex(payload[key]["sha256"], r"^[0-9a-f]{64}$")
+            self.assertIn(payload[key]["value_kind"], {"mapping", "text"})
+            self.assertNotIn("sha256", payload[key])
+            self.assertNotIn("byte_count", payload[key])
         self.assertEqual(0, payload["directory_candidate_count"])
         self.assertEqual(0, payload["matching_promoted_directory_candidate_count"])
         self.assertEqual([], payload["matching_promoted_directory_candidates"])
@@ -5774,7 +6520,9 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             self.assertNotIn(secret, serialized)
         for key in ("raw_exception", "raw_candidate", "raw_result"):
             self.assertTrue(payload[key]["redacted"], key)
-            self.assertRegex(payload[key]["sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual("mapping", payload[key]["value_kind"])
+            self.assertNotIn("sha256", payload[key])
+            self.assertNotIn("byte_count", payload[key])
         self.assertEqual("/portable/proof.zip", payload["safe_candidate"]["path"])
         self.assertTrue(payload["safe_candidate"]["session_token"]["redacted"])
 
@@ -5786,10 +6534,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
 
         serialized = json.dumps(details, sort_keys=True)
         self.assertNotIn(secret, serialized)
-        self.assertEqual("RuntimeError", details["type"])
+        self.assertEqual("Exception", details["type"])
+        self.assertEqual("unexpected_failure", details["error_code"])
         self.assertIsNone(details["code"])
         self.assertTrue(details["message_receipt"]["redacted"])
-        self.assertRegex(details["message_receipt"]["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual("text", details["message_receipt"]["value_kind"])
+        self.assertNotIn("sha256", details["message_receipt"])
 
     def test_auto_import_failure_details_redacts_string_system_exit_code(self) -> None:
         module = load_auto_import_module()
@@ -5800,10 +6550,12 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         serialized = json.dumps(details, sort_keys=True)
         self.assertNotIn(secret, serialized)
         self.assertEqual("SystemExit", details["type"])
+        self.assertEqual("artifact_validation_failed", details["error_code"])
         self.assertIsNone(details["code"])
         self.assertTrue(details["code_receipt"]["redacted"])
         self.assertTrue(details["message_receipt"]["redacted"])
-        self.assertRegex(details["code_receipt"]["sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual("text", details["code_receipt"]["value_kind"])
+        self.assertNotIn("sha256", details["code_receipt"])
 
     def test_auto_import_windows_installer_gold_proof_waiting_payload_surfaces_rejected_directory_candidates(self) -> None:
         module = load_auto_import_module()
@@ -6347,7 +7099,9 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
 
         self.assertEqual(1, exit_code)
         self.assertEqual("fail", payload["status"])
-        self.assertEqual(str(bundle), payload["artifact"])
+        self.assertEqual(module.AUTO_IMPORT_CONTRACT_NAME, payload["contract_name"])
+        self.assertEqual(module.AUTO_IMPORT_CONTRACT_NAME_V1, payload["supersedes_contract_name"])
+        self.assertEqual(bundle.name, payload["artifact"])
         self.assertEqual("BadZipFile", payload["import_failure"]["type"])
         self.assertIn("Selected Windows installer gold-proof artifact failed import validation", payload["summary"])
         self.assertEqual([], payload["post_import_commands"])
@@ -6630,8 +7384,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         message = str(raised.exception)
         self.assertNotIn(stdout_secret, message)
         self.assertNotIn(stderr_secret, message)
-        self.assertIn("returncode=9", message)
-        self.assertIn('"redacted": true', message)
+        self.assertEqual("intake_materializer_failed:returncode=9", message)
 
     def test_import_code_owned_step_uses_shell_false_and_sanitized_deterministic_env(self) -> None:
         module = load_import_module()
@@ -7048,8 +7801,11 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             bundle_bytes, bundle_binding = module.build_code_owned_python_dependency_bundle([root])
             original_process_table = module._proc_process_table
             original_emergency = module._emergency_kill_and_reap_primary_session
+            original_popen = module.subprocess.Popen
             process_table_call_count = 0
             emergency_call_count = 0
+            spawned_processes: list[subprocess.Popen[bytes]] = []
+            unraisable_errors: list[object] = []
             raw_secret = "PROC_INSPECTION_SECRET_b371d0"
 
             def fail_process_table_after_baseline():
@@ -7064,30 +7820,56 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                 emergency_call_count += 1
                 return original_emergency(*args, **kwargs)
 
-            with mock.patch.object(
-                module,
-                "_proc_process_table",
-                side_effect=fail_process_table_after_baseline,
-            ), mock.patch.object(
-                module,
-                "_emergency_kill_and_reap_primary_session",
-                side_effect=capture_emergency,
+            def capture_popen(*args, **kwargs):
+                process = original_popen(*args, **kwargs)
+                spawned_processes.append(process)
+                return process
+
+            def capture_unraisable(unraisable):
+                unraisable_errors.append(unraisable)
+
+            with warnings.catch_warnings(), mock.patch.object(
+                sys,
+                "unraisablehook",
+                side_effect=capture_unraisable,
             ):
-                with self.assertRaisesRegex(
-                    SystemExit,
-                    "emergency session cleanup; zero descendants could not be proven",
-                ) as raised:
-                    module.run_bound_python_subprocess(
-                        [str(module.PYTHON_EXECUTABLE), str(probe), str(marker)],
-                        interpreter_sha256=module.PYTHON_PROGRAM_BINDING_AT_LOAD["sha256"],
-                        script_sha256=module.sha256_file(probe),
-                        cwd=root,
-                        environment=module.code_owned_post_import_environment(),
-                        dependency_bundle_bytes=bundle_bytes,
-                        dependency_bundle_binding=bundle_binding,
-                        timeout_seconds=2.0,
-                        termination_grace_seconds=0.1,
-                    )
+                warnings.simplefilter("error", ResourceWarning)
+                with mock.patch.object(
+                    module,
+                    "_proc_process_table",
+                    side_effect=fail_process_table_after_baseline,
+                ), mock.patch.object(
+                    module,
+                    "_emergency_kill_and_reap_primary_session",
+                    side_effect=capture_emergency,
+                ), mock.patch.object(
+                    module.subprocess,
+                    "Popen",
+                    side_effect=capture_popen,
+                ):
+                    with self.assertRaisesRegex(
+                        SystemExit,
+                        "emergency session cleanup; zero descendants could not be proven",
+                    ) as raised:
+                        module.run_bound_python_subprocess(
+                            [str(module.PYTHON_EXECUTABLE), str(probe), str(marker)],
+                            interpreter_sha256=module.PYTHON_PROGRAM_BINDING_AT_LOAD["sha256"],
+                            script_sha256=module.sha256_file(probe),
+                            cwd=root,
+                            environment=module.code_owned_post_import_environment(),
+                            dependency_bundle_bytes=bundle_bytes,
+                            dependency_bundle_binding=bundle_binding,
+                            timeout_seconds=2.0,
+                            termination_grace_seconds=0.1,
+                        )
+                self.assertEqual(1, len(spawned_processes))
+                spawned_process = spawned_processes.pop()
+                self.assertIsNotNone(spawned_process.stdout)
+                self.assertIsNotNone(spawned_process.stderr)
+                self.assertTrue(spawned_process.stdout.closed)
+                self.assertTrue(spawned_process.stderr.closed)
+                del spawned_process
+                gc.collect()
             release_containment_probe(marker)
 
             self.assertNotIn(raw_secret, str(raised.exception))
@@ -7096,6 +7878,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             self.assertEqual(1, emergency_call_count)
             self.assertGreaterEqual(process_table_call_count, 3)
             self.assertFalse(marker.exists())
+            self.assertEqual([], unraisable_errors)
 
     def test_sealed_python_launcher_preserves_logical_file_sys_path_and_sibling_import_in_real_process(self) -> None:
         module = load_import_module()

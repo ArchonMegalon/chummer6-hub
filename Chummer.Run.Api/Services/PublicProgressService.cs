@@ -30,7 +30,9 @@ public sealed class PublicProgressService
     private string ResolveRequiredPath(string relativePath)
     {
         var repoRoot = ResolveRepoRoot(relativePath);
-        var fullPath = Path.Combine(repoRoot, relativePath);
+        var fullPath = PublicStrictConfiguredRoot.IsEnabled(_configuration)
+            ? PublicStrictConfiguredRoot.ResolveContainedPath(repoRoot, relativePath)
+            : Path.Combine(repoRoot, relativePath);
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException($"public progress artifact not found: {fullPath}");
@@ -42,6 +44,19 @@ public sealed class PublicProgressService
 
     private string ResolveRepoRoot(params string[] requiredRelativePaths)
     {
+        if (PublicStrictConfiguredRoot.IsEnabled(_configuration))
+        {
+            string strictRoot = PublicStrictConfiguredRoot.Require(_configuration);
+            if (requiredRelativePaths.All(relativePath =>
+                    File.Exists(PublicStrictConfiguredRoot.ResolveContainedPath(strictRoot, relativePath))))
+            {
+                return strictRoot;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Strict public canon root does not contain the mirrored public progress bundle.");
+        }
+
         var configured = _configuration["CHUMMER_PUBLIC_CANON_ROOT"];
         var candidates = new[]
         {

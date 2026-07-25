@@ -3,13 +3,10 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-type BuildLayout = 'compact' | 'workspace';
-
 type ViewportExpectation = {
   name: string;
   width: number;
   height: number;
-  expectedBuildLayout: BuildLayout;
 };
 
 type RouteExpectation = {
@@ -17,13 +14,13 @@ type RouteExpectation = {
   expectedHeading: string | null;
   requiredSelectors: string[];
   requiredText: string[];
-  surface?: 'build-pwa';
+  surface?: 'build-roster';
 };
 
 const viewports: ViewportExpectation[] = [
-  { name: 'phone-390', width: 390, height: 844, expectedBuildLayout: 'compact' },
-  { name: 'tablet', width: 768, height: 1024, expectedBuildLayout: 'compact' },
-  { name: 'desktop-1366', width: 1366, height: 768, expectedBuildLayout: 'workspace' },
+  { name: 'phone-390', width: 390, height: 844 },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop-1366', width: 1366, height: 768 },
 ];
 
 const routes: RouteExpectation[] = [
@@ -66,60 +63,33 @@ const routes: RouteExpectation[] = [
   {
     path: '/build',
     expectedHeading: null,
-    requiredSelectors: ['.build-pwa-workspace', '[data-build-pwa-layout-picker]'],
-    requiredText: ['Layout'],
-    surface: 'build-pwa',
+    requiredSelectors: [
+      '.browser-app-roster[data-route-surface="roster"][data-command="character-roster"]',
+    ],
+    requiredText: ['Character Roster'],
+    surface: 'build-roster',
   },
 ];
 
-async function assertBuildPwaResponsiveContract(
+async function assertBuildRosterContract(
   page: Page,
-  viewport: ViewportExpectation,
 ): Promise<Record<string, string>> {
-  const workspace = page.locator('.build-pwa-workspace');
-  const expectedLayout = viewport.expectedBuildLayout;
-  const overrideLayout: BuildLayout = expectedLayout === 'compact' ? 'workspace' : 'compact';
   const finalUrl = new URL(page.url());
 
   expect(`${finalUrl.pathname}${finalUrl.search}`, '/build must open the roster-first Build PWA').toBe(
     '/blazor/app?command=character_roster',
   );
-  await expect(workspace).toBeVisible({ timeout: 30000 });
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout', 'responsive');
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-source', 'browser-media-query');
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-preference', 'auto', { timeout: 15000 });
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-effective', expectedLayout);
-  await expect(workspace).toHaveClass(new RegExp(`build-pwa-layout--${expectedLayout}`));
-  await expect(page.locator('[data-build-pwa-layout-choice="auto"]')).toBeChecked();
-  await expect(page.locator('#build-pwa-layout-status')).toContainText(
-    `Auto is using the ${expectedLayout} layout for the current browser width.`,
+  const roster = page.locator(
+    '.browser-app-roster[data-route-surface="roster"][data-command="character-roster"]',
   );
-  await expect(page.locator('#chummer-workspace-main')).toBeVisible();
-
-  if (expectedLayout === 'compact') {
-    await expect(page.locator('.build-pwa-compact-context')).toBeVisible();
-    await expect(page.locator('h1#build-pwa-compact-title')).toBeVisible();
-  } else {
-    await expect(page.locator('.build-pwa-compact-context')).toBeHidden();
-  }
-
-  await page.locator(`[data-build-pwa-layout-choice="${overrideLayout}"]`).check();
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-preference', overrideLayout);
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-effective', overrideLayout);
-  await expect(page.locator('#build-pwa-layout-status')).toContainText(
-    `${overrideLayout === 'compact' ? 'Compact' : 'Workspace'} layout selected.`,
-  );
-
-  await page.locator('[data-build-pwa-layout-choice="auto"]').check();
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-preference', 'auto');
-  await expect(workspace).toHaveAttribute('data-build-pwa-layout-effective', expectedLayout);
+  await expect(roster).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Character Roster' })).toBeVisible();
 
   return {
     final_url: finalUrl.toString(),
-    build_layout_source: 'browser-media-query',
-    build_layout_preference: 'auto',
-    build_layout_effective: expectedLayout,
-    build_layout_override_checked: overrideLayout,
+    build_surface: 'character-roster',
+    build_route_surface: 'roster',
+    build_command: 'character-roster',
   };
 }
 
@@ -181,8 +151,8 @@ test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ b
           throw new Error(navigationError);
         }
         status = response?.status() ?? recoveredStatus ?? 0;
-        if (route.surface === 'build-pwa') {
-          buildLayoutProof = await assertBuildPwaResponsiveContract(page, viewport);
+        if (route.surface === 'build-roster') {
+          buildLayoutProof = await assertBuildRosterContract(page);
         } else if (route.expectedHeading) {
           await page.waitForFunction(
             (expectedHeading) => {

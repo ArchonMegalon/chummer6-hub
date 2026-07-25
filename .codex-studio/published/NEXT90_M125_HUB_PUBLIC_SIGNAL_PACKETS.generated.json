@@ -1,7 +1,16 @@
 {
   "contract_name": "chummer6-hub.next90_m125_hub_public_signal_packets",
+  "schema_version": 2,
   "status": "passed",
-  "proof_kind": "source_backed_local_smoke_contract",
+  "status_scope": "executed_public_signal_packet_capability",
+  "proof_kind": "source_digest_and_executed_test_contract",
+  "generated_at": "2026-07-29T09:50:59Z",
+  "verification_command": "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m125_hub_public_signal_packets.py",
+  "release_binding": {
+    "scope": "release_independent_product_capability",
+    "release_artifact_specific": false,
+    "reason": "The SignalToCanon packet service contract is source- and test-bound, not installer-byte-bound."
+  },
   "package_proof": {
     "package_id": "next90-m125-hub-build-public-feedback-roadmap-changelog-support-and-sign",
     "work_task_id": "125.1",
@@ -21,6 +30,8 @@
       "build_public_feedback_roadmap_changelog:hub"
     ]
   },
+  "package_workflow_status": "not_started",
+  "package_workflow_status_affects_capability_status": false,
   "source_file": "tests/RunServicesSmoke/Program.cs",
   "required_markers": [
     "var publicSignalPackets = new PublicSignalToCanonPacketService(releases);",
@@ -30,5 +41,75 @@
     "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.",
     "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.",
     "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface."
-  ]
+  ],
+  "source_evidence": [
+    {
+      "path": "Chummer.Run.Api/Contracts/SignalToCanonPacketContracts.cs",
+      "sha256": "67ccfb581e3de95cf6a691299195574aafde85a8ff79e84179ad4296e1fbcd8d",
+      "size_bytes": 989
+    },
+    {
+      "path": "Chummer.Run.Api/Services/Support/PublicSignalToCanonPacketService.cs",
+      "sha256": "c8068e6aa41eaa2322f586ea8e5c557cefaefcc9f614be511cf99a842deeb8d0",
+      "size_bytes": 23318
+    },
+    {
+      "path": "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+      "sha256": "86c8a69be33a0c070301b1100b0d7faa7e48d1d8ec05df91c147487380846518",
+      "size_bytes": 16253
+    },
+    {
+      "path": "Chummer.Tests/PublicSignalToCanonPacketServiceTests.cs",
+      "sha256": "b32d62e5a47479816a3e08d204f19e02ea14f142c7e25b67285f762885d0aa86",
+      "size_bytes": 6444
+    },
+    {
+      "path": "tests/RunServicesSmoke/Program.cs",
+      "sha256": "4d409f1f364ef1358f8caca778c4a0b23e08c6bdd9c77487fc73c2a8fcba537d",
+      "size_bytes": 817453
+    },
+    {
+      "path": "scripts/materialize_next90_m125_hub_public_signal_packets_proof.py",
+      "sha256": "7934d4f42883851555489faa349f98add308cf527a23168548bf490ef0eb5dba",
+      "size_bytes": 8809
+    },
+    {
+      "path": "scripts/verify_next90_m125_hub_public_signal_packets.py",
+      "sha256": "162dd8c84d367b5cb081ad68162ebb285561194014ca872c8023d109bb7e965f",
+      "size_bytes": 18295
+    }
+  ],
+  "source_evidence_set_sha256": "f08508577e8f46d19cc07714a4485d169d61d2d8abd1b84596b0c58022f54d84",
+  "queue_evidence": [
+    {
+      "path": "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+      "sha256": "9ed2805870aab4b98139e0638d9f5829303b6095f3bf747ed33f742c9ea5d37d",
+      "size_bytes": 471229
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-design-m114/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+      "sha256": "ba2dcd722ce83d77b08bf4838249796ec6f2dacc8f0e341e6a6075ed42152de1",
+      "size_bytes": 278228
+    }
+  ],
+  "queue_evidence_set_sha256": "5d18da5c389ef85209851596e5d23b8911bb1fdd2285e522226469a6ca575285",
+  "test_receipt": {
+    "status": "passed",
+    "executed_at": "2026-07-29T09:50:59Z",
+    "command": [
+      "dotnet",
+      "test",
+      "Chummer.Tests/Chummer.Tests.csproj",
+      "--filter",
+      "FullyQualifiedName=Chummer.Tests.PublicSignalToCanonPacketServiceTests.PublicSignalPacketsCoverFeedbackRoadmapChangelogSupportAndSignalIntake",
+      "--no-restore",
+      "--nologo",
+      "--logger",
+      "console;verbosity=normal"
+    ],
+    "fully_qualified_name": "Chummer.Tests.PublicSignalToCanonPacketServiceTests.PublicSignalPacketsCoverFeedbackRoadmapChangelogSupportAndSignalIntake",
+    "exit_code": 0,
+    "executed_test_count": 2,
+    "output_sha256": "7d0c5cd80ee501d413cc12f04036733088af3aa979ee88e63fbe7200dfc50998"
+  }
 }

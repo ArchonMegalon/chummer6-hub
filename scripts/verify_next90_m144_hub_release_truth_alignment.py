@@ -213,6 +213,33 @@ def route_truth_is_blocked(row: dict[str, Any]) -> bool:
     )
 
 
+def route_truth_publication_state(
+    row: dict[str, Any],
+    *,
+    proof_freshness_status: str,
+) -> str:
+    explicit_state = normalized_token(
+        row.get("publicationState") or row.get("publication_state")
+    )
+    if explicit_state in {"preview", "published", "revoked", "retained"}:
+        state = explicit_state
+    elif route_truth_is_revoked(row):
+        state = "revoked"
+    elif normalized_token(row.get("promotionState")) == "promoted":
+        state = "published"
+    elif normalized_token(row.get("routeRole")) == "fallback":
+        state = "retained"
+    else:
+        state = "preview"
+
+    if normalized_token(proof_freshness_status) in {"stale", "missing"} and state in {
+        "published",
+        "retained",
+    }:
+        return "preview"
+    return state
+
+
 def summary_requires(summary: str, marker: str, errors: list[str], label: str) -> None:
     if marker not in normalize(summary):
         errors.append(f"{label} summary is missing {marker!r}")
@@ -242,10 +269,43 @@ def verify_public_trust_metrics(
         errors.append("publicTrustMetrics is missing revocationFacts")
         return
 
-    recommended_routes = [row for row in route_truth if route_truth_is_recommended_primary(row)]
-    fallback_routes = [row for row in route_truth if route_truth_is_fallback_recovery(row)]
+    promoted_primary_routes = [
+        row for row in route_truth if route_truth_is_recommended_primary(row)
+    ]
+    promoted_fallback_routes = [
+        row for row in route_truth if route_truth_is_fallback_recovery(row)
+    ]
     blocked_routes = [row for row in route_truth if route_truth_is_blocked(row)]
     revoked_routes = [row for row in route_truth if route_truth_is_revoked(row)]
+    proof_freshness = metrics.get("proofFreshness")
+    proof_freshness_status = (
+        normalized_token(proof_freshness.get("status"))
+        if isinstance(proof_freshness, dict)
+        else "missing"
+    )
+    recommended_routes = [
+        row
+        for row in promoted_primary_routes
+        if route_truth_publication_state(
+            row,
+            proof_freshness_status=proof_freshness_status,
+        )
+        == "published"
+    ]
+    fallback_routes = [
+        row
+        for row in promoted_fallback_routes
+        if route_truth_publication_state(
+            row,
+            proof_freshness_status=proof_freshness_status,
+        )
+        == "retained"
+    ]
+    blocked_routes.extend(
+        row
+        for row in [*promoted_primary_routes, *promoted_fallback_routes]
+        if row not in recommended_routes and row not in fallback_routes
+    )
 
     expected_primary = len(recommended_routes)
     expected_fallback = len(fallback_routes)

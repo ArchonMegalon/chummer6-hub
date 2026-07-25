@@ -13,7 +13,20 @@ umask 077
 
 bootstrap_tmp_paths=()
 BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=0
+BOOTSTRAP_TMP_CLEANUP_COMPLETE=0
+BOOTSTRAP_RELEASE_STAGE_ACCEPTED=0
+BOOTSTRAP_RELEASE_CURRENT_ACTIVATED=0
 BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH=""
+BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN=""
+BOOTSTRAP_RELEASE_STAGE_SESSION_ID=""
+RELEASE_PYTHON_BIN=""
+export -n \
+  BOOTSTRAP_TMP_CLEANUP_COMPLETE \
+  BOOTSTRAP_RELEASE_STAGE_PROBE_TOKEN \
+  BOOTSTRAP_RELEASE_STAGE_SESSION_ID \
+  BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH \
+  RELEASE_PYTHON_BIN \
+  2>/dev/null || true
 
 log() {
   printf '[chummer-mac-release] %s\n' "$*"
@@ -76,11 +89,21 @@ array_values_nul() {
 }
 
 cleanup_bootstrap_tmp_paths() {
-  local status="$?"
+  local incoming_status="$?"
+  local status="${1:-$incoming_status}"
   local path
+  if [[ "${BOOTSTRAP_TMP_CLEANUP_COMPLETE:-0}" == "1" ]]; then
+    return "$status"
+  fi
+  BOOTSTRAP_TMP_CLEANUP_COMPLETE=1
+
   if (( $(array_count bootstrap_tmp_paths) > 0 )); then
     while IFS= read -r -d '' path; do
-      [[ -f "$path" ]] && rm -f "$path"
+      if [[ -f "$path" ]] || [[ -L "$path" ]]; then
+        rm -f -- "$path"
+      elif [[ -d "$path" ]]; then
+        rmdir -- "$path" 2>/dev/null || true
+      fi
     done < <(array_values_nul bootstrap_tmp_paths)
   fi
 
@@ -96,6 +119,20 @@ cleanup_bootstrap_tmp_paths() {
       "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
   fi
   return "$status"
+}
+
+exit_bootstrap_on_signal() {
+  local exit_status="$1"
+  trap - HUP INT TERM
+  cleanup_bootstrap_tmp_paths "$exit_status" || true
+  exit "$exit_status"
+}
+
+install_bootstrap_cleanup_traps() {
+  trap cleanup_bootstrap_tmp_paths EXIT
+  trap 'exit_bootstrap_on_signal 129' HUP
+  trap 'exit_bootstrap_on_signal 130' INT
+  trap 'exit_bootstrap_on_signal 143' TERM
 }
 
 require_all_reviewed_commit_pins() {
@@ -124,6 +161,223 @@ require_all_reviewed_commit_pins() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command missing: $1"
+}
+
+resolve_release_python() {
+  local requested="${CHUMMER_RELEASE_PYTHON:-}"
+  local candidate=""
+  local resolved=""
+  if [[ -n "$requested" ]]; then
+    resolved="$(command -v "$requested" 2>/dev/null || true)"
+    [[ -n "$resolved" ]] \
+      && "$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1 \
+      || return 1
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+
+  for candidate in python3.13 python3.12 python3.11 python3; do
+    resolved="$(command -v "$candidate" 2>/dev/null || true)"
+    [[ -n "$resolved" ]] || continue
+    if "$resolved" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  done
+  return 1
+}
+
+default_hub_local_proof_mutation_lock_path() {
+  local python_bin="$1"
+  "$python_bin" -I -S - <<'PY'
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import stat
+import tempfile
+
+
+lock_root = (
+    Path(os.path.abspath(tempfile.gettempdir()))
+    / f"chummer-public-edge-mutation-{os.getuid()}"
+)
+try:
+    lock_root.mkdir(mode=0o700)
+except FileExistsError:
+    pass
+else:
+    os.chmod(lock_root, 0o700)
+metadata = lock_root.lstat()
+if (
+    not stat.S_ISDIR(metadata.st_mode)
+    or stat.S_ISLNK(metadata.st_mode)
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) != 0o700
+):
+    raise SystemExit(
+        "portable Hub proof mutation-lock root is not a caller-owned "
+        "mode-0700 real directory"
+    )
+print(lock_root / "public-edge-mutation.lock")
+PY
+}
+
+sanitize_hub_generator_diagnostic() {
+  local python_bin="$1"
+  "$python_bin" -c '
+import re
+import sys
+
+limit = 16384
+kept = bytearray()
+truncated = False
+while True:
+    chunk = sys.stdin.buffer.read(65536)
+    if not chunk:
+        break
+    kept.extend(chunk)
+    if len(kept) > limit:
+        del kept[:-limit]
+        truncated = True
+text = bytes(kept).decode("utf-8", errors="replace")
+if truncated:
+    _, separator, text = text.partition("\n")
+    if not separator:
+        text = ""
+text = re.sub(r"(?i)(authorization\s*:\s*bearer\s+)[^\s\"]+", r"\1<redacted>", text)
+text = re.sub(r"(?i)\b(token|ticket|api[_-]?key|secret|password)\s*[:=]\s*[^\s,;]+", r"\1=<redacted>", text)
+text = re.sub(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]{8,})?\b", "<redacted-token>", text)
+text = re.sub(r"(?<![A-Za-z0-9:])(?:/Users/|/home/|/root/|/tmp/|/private/|/var/tmp/|/docker/|/workspace/)[^\s\"]*", "<local-path>", text)
+lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+sys.stdout.write("\n".join(lines[-40:])[:limit])
+'
+}
+
+require_hub_projection_authority_handoffs() {
+  local python_bin="$1"
+  "$python_bin" -I -S - <<'PY'
+from __future__ import annotations
+
+import hashlib
+import hmac
+import os
+import re
+import stat
+
+SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
+SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
+AUTHORITY = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$", re.IGNORECASE)
+MAX_BYTES = 32 * 1024 * 1024
+COMMIT_NAMES = (
+    "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+)
+HANDOFFS = (
+    (
+        "CHUMMER_HUB_RELEASE_CHANNEL_PATH",
+        "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256",
+        "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY",
+    ),
+    (
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256",
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY",
+    ),
+    (
+        "CHUMMER_FLEET_QUEUE_STAGING_PATH",
+        "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256",
+        "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY",
+    ),
+    (
+        "CHUMMER_DESIGN_QUEUE_STAGING_PATH",
+        "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256",
+        "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY",
+    ),
+    (
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH",
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256",
+        "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY",
+    ),
+)
+
+
+def fail(name: str, reason: str) -> None:
+    raise SystemExit(f"Hub proof authority handoff {name} {reason}")
+
+
+for name in COMMIT_NAMES:
+    value = os.environ.get(name, "").strip()
+    if SHA40.fullmatch(value) is None:
+        fail(name, "must be a full 40-character commit SHA")
+
+for path_name, digest_name, authority_name in HANDOFFS:
+    path_value = os.environ.get(path_name, "").strip()
+    digest_value = os.environ.get(digest_name, "").strip().lower()
+    authority_value = os.environ.get(authority_name, "").strip()
+    if not path_value:
+        fail(path_name, "is required")
+    if SHA256.fullmatch(digest_value) is None:
+        fail(digest_name, "must be a 64-character SHA256")
+    if AUTHORITY.fullmatch(authority_value) is None or authority_value.lower().startswith("file://"):
+        fail(authority_name, "must be a non-file immutable authority reference")
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path_value, flags)
+    except OSError:
+        fail(path_name, "is unavailable")
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            fail(path_name, "must be a single-link regular file")
+        if before.st_size < 1 or before.st_size > MAX_BYTES:
+            fail(path_name, "has an invalid size")
+        chunks: list[bytes] = []
+        remaining = before.st_size + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        try:
+            path_metadata = os.lstat(path_value)
+        except OSError:
+            fail(path_name, "changed during stable read")
+    finally:
+        os.close(descriptor)
+
+    before_identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+        before.st_mode,
+        before.st_nlink,
+    )
+    after_identity = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+        after.st_mode,
+        after.st_nlink,
+    )
+    if before_identity != after_identity or (path_metadata.st_dev, path_metadata.st_ino) != (
+        after.st_dev,
+        after.st_ino,
+    ):
+        fail(path_name, "changed during stable read")
+    payload = b"".join(chunks)
+    if len(payload) != before.st_size:
+        fail(path_name, "changed during stable read")
+    if not hmac.compare_digest(hashlib.sha256(payload).hexdigest(), digest_value):
+        fail(digest_name, "does not match the immutable handoff")
+PY
 }
 
 file_sha256() {
@@ -1687,19 +1941,55 @@ generate_hub_local_release_proof() {
   local compose_file="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_COMPOSE_FILE:-$hub_repo/docker-compose.public-edge.yml}"
   local timeout_seconds="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}"
   local skip_rebuild="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}"
+  local python_bin="${RELEASE_PYTHON_BIN:-}"
+  local mutation_lock_path="${CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH:-}"
+  local diagnostic_path=""
+  local generator_status=0
+  local sanitizer_status=0
+  local -a generator_pipeline_status=()
+
+  if [[ -z "$python_bin" ]]; then
+    python_bin="$(resolve_release_python)" \
+      || die "Hub proof generation requires Python 3.11 or newer; set CHUMMER_RELEASE_PYTHON to a reviewed interpreter"
+  fi
 
   if [[ -f "$generator_path" ]]; then
-    if python3 "$generator_path" \
+    require_hub_projection_authority_handoffs "$python_bin"
+    if [[ -z "$mutation_lock_path" ]]; then
+      mutation_lock_path="$(default_hub_local_proof_mutation_lock_path "$python_bin")" \
+        || die "unable to establish the portable shared Hub proof mutation authority"
+    fi
+    diagnostic_path="$(mktemp)"
+    bootstrap_tmp_paths+=("$diagnostic_path")
+    set +e
+    CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS=1 \
+    CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH="$mutation_lock_path" \
+    "$python_bin" "$generator_path" \
       "$output_path" \
       "$base_url" \
       "$compose_file" \
       "$timeout_seconds" \
-      "$skip_rebuild" >/dev/null 2>&1; then
+      "$skip_rebuild" 2>&1 \
+      | sanitize_hub_generator_diagnostic "$python_bin" >"$diagnostic_path"
+    generator_pipeline_status=("${PIPESTATUS[@]}")
+    generator_status="${generator_pipeline_status[0]}"
+    sanitizer_status="${generator_pipeline_status[1]}"
+    set -e
+    if (( sanitizer_status != 0 )); then
+      die "checked-out Hub proof generator diagnostic sanitizer failed closed"
+    fi
+    if (( generator_status == 0 )); then
       if hub_local_release_proof_has_canonical_baseline "$output_path"; then
         return 0
       fi
+      if [[ -s "$diagnostic_path" ]]; then
+        printf '[chummer-mac-release] Hub proof generator diagnostic: %s\n' "$(<"$diagnostic_path")" >&2
+      fi
       die "checked-out hub proof generator produced a non-canonical receipt at $output_path; fix the generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
     else
+      if [[ -s "$diagnostic_path" ]]; then
+        printf '[chummer-mac-release] Hub proof generator diagnostic: %s\n' "$(<"$diagnostic_path")" >&2
+      fi
       die "checked-out hub proof generator failed at $generator_path; fix the generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
     fi
   else
@@ -4692,8 +4982,7 @@ PY
 }
 
 main() {
-  bootstrap_tmp_paths=()
-  trap cleanup_bootstrap_tmp_paths EXIT
+  install_bootstrap_cleanup_traps
 
   # Capture the one HTTP-promotion credential before any preflight/build child
   # can inherit it, then scrub every inbound bearer variable. The private local

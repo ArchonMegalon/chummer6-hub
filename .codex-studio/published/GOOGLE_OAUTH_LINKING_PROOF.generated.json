@@ -1,21 +1,452 @@
 {
   "contract_name": "chummer.run.google_oauth_linking_proof",
-  "status": "pass",
-  "generated_at": "2026-05-08T20:02:00.000000Z",
+  "proof_contract_version": 3,
+  "status": "fail",
+  "generated_at_utc": "2026-07-30T03:14:09.293275Z",
   "base_url": "https://chummer.run",
-  "summary": "Live Google OAuth/account-linking proof passed. Anonymous users land on /login, Google handoff completes to signed-in state, linked accounts show provider state on /account/access.",
-  "command": [
-    "python3",
-    "scripts/check-google-oauth-linking.py"
+  "bindings": {
+    "release": {
+      "portal": {
+        "manifest_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/generations/g-20260727T205345Z-19e9c4d1afb64dd5/RELEASE_CHANNEL.generated.json",
+        "manifest_sha256": "004ed87caf6920154b129616cd09863a4ad28537c70da8381ae65caa279aa3c6",
+        "manifest_size_bytes": 52068,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "hub_registry": {
+        "manifest_path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
+        "manifest_sha256": "888930240448eac6d6b0e9974ca4993a7289ec90b4849bb49949b03c646ae8a1",
+        "manifest_size_bytes": 51929,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "live": {
+        "status": "captured",
+        "source_url": "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
+        "capture_path": "/docker/chummercomplete/chummer.run-services/.state/google_oauth_live_release_manifest.json",
+        "captured_at_utc": "2026-07-28T03:54:54.683399Z",
+        "manifest_path": "/docker/chummercomplete/chummer.run-services/.state/google_oauth_live_release_manifest.json",
+        "manifest_sha256": "004ed87caf6920154b129616cd09863a4ad28537c70da8381ae65caa279aa3c6",
+        "manifest_size_bytes": 52068,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "identity_fields": [
+        "version",
+        "channel",
+        "published_at"
+      ],
+      "posture_fields": [
+        "supportability_state",
+        "rollout_state"
+      ],
+      "portal_hub_identity_agrees": true,
+      "portal_hub_posture_agrees": true,
+      "live_identity_agrees": true,
+      "live_posture_agrees": true,
+      "ready": true,
+      "blockers": []
+    },
+    "request": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json",
+      "sha256": "c458ec286c3b1e06f03776545e58da253c52c40584834249d88c2f9dbb91c8a6",
+      "request_nonce": "478d390f0662bcc2ab49a566883b69ed08e511648532b275870f3e45335c8876",
+      "request_binding_sha256": "26fb57abeafaad8d06eed2da0f9a173c3162f744891da6d5b39421ea2d8993a3",
+      "generated_at_utc": "2026-07-30T02:54:01.154395Z"
+    },
+    "evidence": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json",
+      "sha256": "7b0400dbf68c6c077e39c7ee833e30c0f475839d95e8aa52764ecfbf39a978ca",
+      "observed_at_utc": "2026-07-04T22:16:09Z",
+      "attester_key_id": null
+    },
+    "programs": {
+      "request_materializer": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/materialize_google_oauth_linking_operator_evidence_request.py",
+        "relative_path": "scripts/materialize_google_oauth_linking_operator_evidence_request.py",
+        "sha256": "5fa835e72805c0bd91a3afdc121cb339214ee538555e19037f70ede7d49b42b7",
+        "size_bytes": 40657
+      },
+      "request_verifier": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/verify_google_oauth_linking_operator_evidence_request.py",
+        "relative_path": "scripts/verify_google_oauth_linking_operator_evidence_request.py",
+        "sha256": "112584247219d02d08d1bbd631ff98885f6ebd01c44e74a9fac92d419f965203",
+        "size_bytes": 2689
+      },
+      "evidence_importer": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/import_google_oauth_linking_operator_evidence_artifact.py",
+        "relative_path": "scripts/import_google_oauth_linking_operator_evidence_artifact.py",
+        "sha256": "eae6efbc62e88d57087d1cd5a49548f76c6098da086b18b2b755cac52f279a07",
+        "size_bytes": 15698
+      },
+      "evidence_auto_importer": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/auto_import_google_oauth_linking_operator_evidence.py",
+        "relative_path": "scripts/auto_import_google_oauth_linking_operator_evidence.py",
+        "sha256": "ac47bf5baf7208e3b256eefa6031e463eb8a1c1782259504016b49985802acf4",
+        "size_bytes": 22342
+      },
+      "proof_materializer": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/materialize_google_oauth_linking_proof.py",
+        "relative_path": "scripts/materialize_google_oauth_linking_proof.py",
+        "sha256": "32a11c0c7baee27d01b5df8980b082898e0823ccdb828442bde26483d16b3c20",
+        "size_bytes": 88909
+      },
+      "proof_verifier": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/verify_google_oauth_linking_proof.py",
+        "relative_path": "scripts/verify_google_oauth_linking_proof.py",
+        "sha256": "d1ae488cf81cea13ec74ce2c04315c6050a75e66487b4b7f50e80ff8e2267be5",
+        "size_bytes": 3241
+      },
+      "google_contract_verifier": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/google_oauth_linking_evidence_v2.py",
+        "relative_path": "scripts/google_oauth_linking_evidence_v2.py",
+        "sha256": "0c2e9917100f63d10dcac9b94c6505af0e8cc29532e0b63b606f6583f6c0535e",
+        "size_bytes": 48825
+      },
+      "detached_attestation_verifier": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/verify_detached_ed25519_attestation.py",
+        "relative_path": "scripts/verify_detached_ed25519_attestation.py",
+        "sha256": "2ad751424bb3f6cb63894c49028e7f5ea28d5e372a4f105253f97eb863d7a872",
+        "size_bytes": 12597
+      }
+    }
+  },
+  "verifier": {
+    "script": "scripts/materialize_google_oauth_linking_proof.py",
+    "command": [
+      "python3",
+      "scripts/materialize_google_oauth_linking_proof.py",
+      "--base-url",
+      "https://chummer.run",
+      "--output",
+      "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "--operator-evidence",
+      "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json"
+    ]
+  },
+  "automation_pause": {
+    "paused": true,
+    "flag_path": "/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag",
+    "note": "paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval"
+  },
+  "quick_handoff_probe": {
+    "pass": true,
+    "failures": [],
+    "login_url": "https://chummer.run/login?next=%2Fhome",
+    "google_start_url": "https://chummer.run/auth/google/start?next=%2Fhome",
+    "login_status": 200,
+    "google_start_status": 302,
+    "google_start_href_present": true,
+    "state_cookie_present": true,
+    "redirect": {
+      "present": true,
+      "is_google_host": true,
+      "is_supported_google_path": true,
+      "redirect_uri_matches": true,
+      "response_type_code": true,
+      "scope_includes_openid_profile_email": true,
+      "state_present": true,
+      "nonce_present": true,
+      "code_challenge_present": true,
+      "code_challenge_method_s256": true,
+      "prompt_select_account": true,
+      "redirect_target_host": "accounts.google.com",
+      "redirect_target_path": "/o/oauth2/v2/auth",
+      "pass": true
+    },
+    "callback_smoke": {
+      "pass": true,
+      "failures": [],
+      "redirect_state_present": true,
+      "state_cookie_value_present": true,
+      "callback_status": 200,
+      "specific_error_detected": true,
+      "matched_title": "Google sign-in callback was incomplete",
+      "matched_detail": "Google did not return an authorization code.",
+      "state_cookie_cleared": true,
+      "no_store_headers_present": true,
+      "stale_generic_copy_present": false
+    },
+    "covered_assertions": [
+      "login page exposes a first-party Google start link",
+      "Google start issues a redirect instead of rendering a local dead end",
+      "redirect_uri stays on /auth/google/callback",
+      "response_type remains code with PKCE S256",
+      "scope remains openid profile email",
+      "state and nonce are present",
+      "prompt stays select_account",
+      "callback with a missing code lands on a specific callback failure instead of the stale generic Google sign-in page",
+      "callback smoke clears the Google state cookie and stays no-store"
+    ]
+  },
+  "signed_in_link_handoff": {
+    "status": "fail",
+    "pass": false,
+    "failures": [
+      "Auth sign-in automation is paused, so the signed-in Google link lane currently relies on the browser-backed operator evidence bundle instead of email preview automation."
+    ],
+    "notes": [
+      "Signed-in Google link automation stayed paused by user request, so email preview sign-in did not run."
+    ],
+    "email": "google-oauth-proof@chummer.run",
+    "email_preview_available": false,
+    "session_auth_used": false,
+    "satisfied_by_operator_evidence": false,
+    "session_auth_context": {
+      "mode": "cookie",
+      "cookieName": "chummer_hub_access_token",
+      "tokenSha256": "",
+      "tokenValueStoredInReceipt": false
+    }
+  },
+  "operator_end_to_end_evidence": {
+    "status": "fail",
+    "pass": false,
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json",
+    "contract_name": "chummer.run.google_oauth_linking_operator_evidence.v1",
+    "observed_at_utc": "2026-07-04T22:16:09Z",
+    "request_nonce": null,
+    "request_sha256": null,
+    "release_authority_sha256": null,
+    "portal_release_manifest_sha256": null,
+    "hub_release_manifest_sha256": null,
+    "live_release_manifest_sha256": null,
+    "screenshot_claims": [],
+    "attestation": {
+      "status": "fail"
+    },
+    "failures": [
+      "request: release.live.captured_at_utc is stale",
+      "contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+      "observed_at_utc is stale",
+      "observed_at_utc predates the current request",
+      "request_nonce does not match the current request/release binding",
+      "request_sha256 does not match the current request/release binding",
+      "release_authority_sha256 does not match the current request/release binding",
+      "portal_release_manifest_sha256 does not match the current request/release binding",
+      "hub_release_manifest_sha256 does not match the current request/release binding",
+      "live_release_manifest_sha256 does not match the current request/release binding",
+      "screenshots must contain at least 2 entries",
+      "detached operator attestation is missing",
+      "import_provenance is missing",
+      "import provenance source_artifact_sha256 is invalid",
+      "import provenance source_receipt_sha256 is invalid",
+      "import provenance importer_program_sha256 is stale",
+      "imported_at_utc must be a timezone-aware timestamp",
+      "import_source_artifact contains pytest/test-fixture provenance",
+      "import_source_receipt_path contains pytest/test-fixture provenance",
+      "import_source_screenshot_paths contains pytest/test-fixture provenance"
+    ],
+    "evidence_sha256": "7b0400dbf68c6c077e39c7ee833e30c0f475839d95e8aa52764ecfbf39a978ca",
+    "evidence_size_bytes": 1551,
+    "exists": true,
+    "required_steps": [
+      "google_sign_in_completed_to_signed_in_state",
+      "existing_account_linked_google",
+      "google_sign_in_returned_to_existing_account",
+      "linked_provider_visible_on_signed_in_surface"
+    ]
+  },
+  "operator_request_artifacts": {
+    "pass": false,
+    "request_status": "operator_action_required",
+    "request_effective_status": "operator_action_required",
+    "operator_action_still_required": true,
+    "request_receipt_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json",
+    "request_receipt_exists": true,
+    "request_sha256": "c458ec286c3b1e06f03776545e58da253c52c40584834249d88c2f9dbb91c8a6",
+    "request_nonce": "478d390f0662bcc2ab49a566883b69ed08e511648532b275870f3e45335c8876",
+    "request_binding_sha256": "26fb57abeafaad8d06eed2da0f9a173c3162f744891da6d5b39421ea2d8993a3",
+    "release_authority": {
+      "portal": {
+        "manifest_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/generations/g-20260727T205345Z-19e9c4d1afb64dd5/RELEASE_CHANNEL.generated.json",
+        "manifest_sha256": "004ed87caf6920154b129616cd09863a4ad28537c70da8381ae65caa279aa3c6",
+        "manifest_size_bytes": 52068,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "hub_registry": {
+        "manifest_path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
+        "manifest_sha256": "888930240448eac6d6b0e9974ca4993a7289ec90b4849bb49949b03c646ae8a1",
+        "manifest_size_bytes": 51929,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "live": {
+        "status": "captured",
+        "source_url": "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
+        "capture_path": "/docker/chummercomplete/chummer.run-services/.state/google_oauth_live_release_manifest.json",
+        "captured_at_utc": "2026-07-28T03:54:54.683399Z",
+        "manifest_path": "/docker/chummercomplete/chummer.run-services/.state/google_oauth_live_release_manifest.json",
+        "manifest_sha256": "004ed87caf6920154b129616cd09863a4ad28537c70da8381ae65caa279aa3c6",
+        "manifest_size_bytes": 52068,
+        "version": "run-20260712-174412",
+        "channel": "preview",
+        "supportability_state": "review_required",
+        "rollout_state": "coverage_incomplete",
+        "published_at": "2026-07-12T18:46:26Z",
+        "tuple_sha256": "b866a845165b2587f605521e36c5fb176af6ef292e9d9919d2daae8b213cae32"
+      },
+      "identity_fields": [
+        "version",
+        "channel",
+        "published_at"
+      ],
+      "posture_fields": [
+        "supportability_state",
+        "rollout_state"
+      ],
+      "portal_hub_identity_agrees": true,
+      "portal_hub_posture_agrees": true,
+      "live_identity_agrees": true,
+      "live_posture_agrees": true,
+      "ready": true,
+      "blockers": []
+    },
+    "operator_ask_text_path": "/docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt",
+    "operator_ask_text_exists": true,
+    "operator_ask_metadata_path": "/docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.generated.json",
+    "operator_ask_metadata_exists": true,
+    "operator_evidence_template_path": "/docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.template.generated.json",
+    "operator_evidence_template_exists": true,
+    "required_operator_evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json",
+    "operator_ask_receipt_name": "google-oauth-linking-operator-ask.receipt.json",
+    "operator_ask_send_command": "python3 scripts/send_telegram_message_via_ea.py --text-file /docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt --receipt-name google-oauth-linking-operator-ask.receipt.json",
+    "operator_ask_resend_command": "",
+    "operator_ask_delivery_needs_resend": false,
+    "preferred_drop_path": "/docker/chummercomplete/chummer.run-services/.state/incoming_google_oauth_linking_operator_evidence/google-oauth-linking-operator-evidence-run-20260712-174412.zip",
+    "import_command": "python3 scripts/import_google_oauth_linking_operator_evidence_artifact.py /docker/chummercomplete/chummer.run-services/.state/incoming_google_oauth_linking_operator_evidence/google-oauth-linking-operator-evidence-run-20260712-174412.zip --intake-request /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --verify",
+    "post_import_argv_plan": [
+      [
+        "python3",
+        "scripts/materialize_google_oauth_linking_operator_evidence_request.py",
+        "--output",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json",
+        "--base-url",
+        "https://chummer.run"
+      ],
+      [
+        "python3",
+        "scripts/verify_google_oauth_linking_operator_evidence_request.py",
+        "--receipt",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json"
+      ],
+      [
+        "python3",
+        "scripts/materialize_google_oauth_linking_proof.py",
+        "--base-url",
+        "https://chummer.run",
+        "--output",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+        "--operator-evidence",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json"
+      ],
+      [
+        "python3",
+        "scripts/verify_google_oauth_linking_proof.py",
+        "--receipt",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+        "--require-pass"
+      ]
+    ],
+    "failures": [
+      "release.live.captured_at_utc is stale"
+    ]
+  },
+  "required_operator_steps": [
+    "google_sign_in_completed_to_signed_in_state",
+    "existing_account_linked_google",
+    "google_sign_in_returned_to_existing_account",
+    "linked_provider_visible_on_signed_in_surface"
   ],
-  "script": "scripts/check-google-oauth-linking.py",
-  "test_cases": [
-    "anonymous user starts on /login",
-    "Google handoff completes and lands on signed-in state",
-    "existing account can link Google",
-    "linked account can sign back in with Google",
-    "linked-provider state is visible on /account/access",
-    "logout/login preserves the expected linked state"
+  "failures": [
+    "binding: request: release.live.captured_at_utc is stale",
+    "binding: evidence: request: release.live.captured_at_utc is stale",
+    "binding: evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+    "binding: evidence: observed_at_utc is stale",
+    "binding: evidence: observed_at_utc predates the current request",
+    "binding: evidence: request_nonce does not match the current request/release binding",
+    "binding: evidence: request_sha256 does not match the current request/release binding",
+    "binding: evidence: release_authority_sha256 does not match the current request/release binding",
+    "binding: evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: live_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: screenshots must contain at least 2 entries",
+    "binding: evidence: detached operator attestation is missing",
+    "binding: evidence: import_provenance is missing",
+    "binding: evidence: import provenance source_artifact_sha256 is invalid",
+    "binding: evidence: import provenance source_receipt_sha256 is invalid",
+    "binding: evidence: import provenance importer_program_sha256 is stale",
+    "binding: evidence: imported_at_utc must be a timezone-aware timestamp",
+    "binding: evidence: import_source_artifact contains pytest/test-fixture provenance",
+    "binding: evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+    "binding: evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: request: release.live.captured_at_utc is stale",
+    "operator_end_to_end_evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+    "operator_end_to_end_evidence: observed_at_utc is stale",
+    "operator_end_to_end_evidence: observed_at_utc predates the current request",
+    "operator_end_to_end_evidence: request_nonce does not match the current request/release binding",
+    "operator_end_to_end_evidence: request_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: release_authority_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: live_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: screenshots must contain at least 2 entries",
+    "operator_end_to_end_evidence: detached operator attestation is missing",
+    "operator_end_to_end_evidence: import_provenance is missing",
+    "operator_end_to_end_evidence: import provenance source_artifact_sha256 is invalid",
+    "operator_end_to_end_evidence: import provenance source_receipt_sha256 is invalid",
+    "operator_end_to_end_evidence: import provenance importer_program_sha256 is stale",
+    "operator_end_to_end_evidence: imported_at_utc must be a timezone-aware timestamp",
+    "operator_end_to_end_evidence: import_source_artifact contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+    "operator_request_artifacts: release.live.captured_at_utc is stale",
+    "auth_signin_automation_paused: paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval (/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag)"
   ],
-  "abs_ids": ["ABS-005"]
+  "next_actions": [
+    "Auth sign-in automation remains paused by user request. Keep it paused and satisfy the signed-in Google lane with browser-backed operator evidence instead of email preview automation.",
+    "Refresh or inspect the current operator request receipt at /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json.",
+    "Use the current operator ask text at /docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt.",
+    "Complete the operator evidence template at /docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.template.generated.json.",
+    "Capture a real browser-backed Google linking proof receipt at /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json.",
+    "The operator receipt must confirm these steps: google_sign_in_completed_to_signed_in_state, existing_account_linked_google, google_sign_in_returned_to_existing_account, linked_provider_visible_on_signed_in_surface.",
+    "When the Google OAuth evidence bundle is ready, import it: python3 scripts/import_google_oauth_linking_operator_evidence_artifact.py /docker/chummercomplete/chummer.run-services/.state/incoming_google_oauth_linking_operator_evidence/google-oauth-linking-operator-evidence-run-20260712-174412.zip --intake-request /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --verify",
+    "That --verify import reruns the full intake-request post-import gate chain, not just the first verifier.",
+    "The operator receipt must include at least 2 screenshot paths that exist on disk.",
+    "After the relevant fix, rerun: python3 scripts/materialize_google_oauth_linking_proof.py --base-url https://chummer.run"
+  ],
+  "nextActions": [
+    "Auth sign-in automation remains paused by user request. Keep it paused and satisfy the signed-in Google lane with browser-backed operator evidence instead of email preview automation.",
+    "Refresh or inspect the current operator request receipt at /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json.",
+    "Use the current operator ask text at /docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt.",
+    "Complete the operator evidence template at /docker/chummercomplete/chummer.run-services/_completion/google_oauth_linking/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.template.generated.json.",
+    "Capture a real browser-backed Google linking proof receipt at /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json.",
+    "The operator receipt must confirm these steps: google_sign_in_completed_to_signed_in_state, existing_account_linked_google, google_sign_in_returned_to_existing_account, linked_provider_visible_on_signed_in_surface.",
+    "When the Google OAuth evidence bundle is ready, import it: python3 scripts/import_google_oauth_linking_operator_evidence_artifact.py /docker/chummercomplete/chummer.run-services/.state/incoming_google_oauth_linking_operator_evidence/google-oauth-linking-operator-evidence-run-20260712-174412.zip --intake-request /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --verify",
+    "That --verify import reruns the full intake-request post-import gate chain, not just the first verifier.",
+    "The operator receipt must include at least 2 screenshot paths that exist on disk.",
+    "After the relevant fix, rerun: python3 scripts/materialize_google_oauth_linking_proof.py --base-url https://chummer.run"
+  ],
+  "summary": "Google OAuth proof still needs current browser-backed operator evidence while auth sign-in automation remains paused."
 }

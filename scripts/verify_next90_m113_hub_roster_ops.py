@@ -112,11 +112,10 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'outsiderDossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true',
     ],
     "scripts/materialize_campaign_os_local_proof.py": [
-        'campaignSpineController.GetMyCampaignWorkspaceDossierMovementPlan',
-        'dossierMovementPlanPayload.TargetGroups.Count >= 1',
-        'var dossierMovementResult = await campaignSpineController.MoveMyDossier(',
-        'dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, "target_run", StringComparison.Ordinal))',
-        'dossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true',
+        'MODULE_PATH = Path(__file__).resolve().with_name("campaign_os_local_proof_v3.py")',
+        "payload = CONTRACT.run_owned_smoke(root, receipt)",
+        "except CONTRACT.ProofContractError as exc:",
+        "campaign_os_local_proof_v3:passed:",
     ],
     "scripts/materialize_next90_m113_hub_roster_ops_proof.py": [
         '"package_id": "next90-m113-hub-roster-ops"',
@@ -127,6 +126,9 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         '"campaign_group_event_movement": [',
         '"crew_roster_ops": [',
         '"var dossierMovementResult = await campaignSpineController.MoveMyDossier("',
+        '\'operatorWorkModel is not null && string.Equals(operatorWorkModel.Eyebrow, "Roster", StringComparison.Ordinal)\'',
+        '"operatorWorkModel!.Cards.Count >= 3"',
+        '\'postTransferWorkHomeModel?.CampaignSpine.Workspaces.Any(item => item.RosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true\'',
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/materialize_next90_m113_hub_roster_ops_proof.py",
@@ -150,6 +152,17 @@ PROOF_MARKERS = [
     'dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, "target_scene", StringComparison.Ordinal))',
     'dossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true',
     'outsiderDossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true',
+    "var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);",
+    "rosterTransferPlanPayload.TargetGroups.Count >= 1",
+    "var rosterTransferResult = await campaignSpineController.TransferMyRoster(",
+    'string.Equals(rosterTransferPayload!.CurrentOwnerUserId, transferTargetUser.UserId, StringComparison.Ordinal)',
+    'rosterTransferPayload.Summary.Contains("ownership transferred", StringComparison.OrdinalIgnoreCase)',
+    'outsiderWorkspace is not null && outsiderWorkspace.RosterTransfers?.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true',
+    'outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal))',
+    'operatorWorkModel is not null && string.Equals(operatorWorkModel.Eyebrow, "Roster", StringComparison.Ordinal)',
+    "operatorWorkModel!.Cards.Count >= 3",
+    'postTransferWorkHomeModel?.CampaignSpine.Workspaces.Any(item => item.RosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',
+    'postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true',
 ]
 
 

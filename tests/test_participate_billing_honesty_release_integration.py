@@ -8,6 +8,7 @@ RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 FINAL_GOLD_JANITOR = RUN_SERVICES_ROOT / "scripts" / "final_gold_janitor.py"
 VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "ai" / "verify.sh"
 RELEASE_READY_SCRIPT = Path("/docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh")
+RELEASE_READY_MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
 RELEASE_DRESS_REHEARSAL_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "release_dress_rehearsal.sh"
 PORTAL_E2E_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "e2e-portal.cjs"
 PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_partizipate_runtime_fallback.cjs"
@@ -27,19 +28,26 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn('CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}"', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/materialize_windows_installer_visual_audit_intake_request.py" --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json >/dev/null', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/verify_windows_installer_visual_audit_intake_request.py" >/dev/null', text)
-        self.assertIn('python3 "$ROOT_DIR/scripts/auto_import_windows_installer_gold_proof.py" --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null', text)
+        self.assertIn('run_expected_external_artifact_gate \\\n  "Native Windows installer visual proof is waiting.', text)
+        self.assertIn('python3 "$ROOT_DIR/scripts/auto_import_windows_installer_gold_proof.py" \\', text)
+        self.assertIn('--intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json', text)
+        self.assertIn('--output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json', text)
         self.assertIn('AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG="${CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG:-$ROOT_DIR/.state/auth_signin_automation_paused.flag}"', text)
         self.assertIn('if [[ -f "$AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" ]]; then', text)
         self.assertIn('echo "skipping google oauth auth automation in verify.sh: auth/sign-in automation is paused at $AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" >&2', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_operator_evidence_request.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_operator_evidence_request.py" >/dev/null', text)
-        self.assertIn('python3 "$ROOT_DIR/scripts/auto_import_google_oauth_linking_operator_evidence.py" --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null', text)
+        self.assertIn('run_expected_external_artifact_gate \\\n    "Google OAuth operator evidence is waiting.', text)
+        self.assertIn('python3 "$ROOT_DIR/scripts/auto_import_google_oauth_linking_operator_evidence.py" \\', text)
+        self.assertIn('--intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json', text)
+        self.assertIn('--output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_proof.py" >/dev/null', text)
         self.assertIn('CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-1}"', text)
         self.assertIn('node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null', text)
         self.assertIn('node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null', text)
         self.assertIn('python3 "$ROOT_DIR/scripts/materialize_release_ready_receipt.py" --force-global-verifier >/dev/null', text)
+        self.assertIn('env -u PYTHONPATH PATH=/usr/bin:/bin python3 "$ROOT_DIR/scripts/materialize_release_ready_receipt.py" --force-global-verifier', text)
         self.assertIn('run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"', text)
         self.assertLess(
             text.index('python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null'),
@@ -55,84 +63,78 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         )
 
     def test_release_ready_script_runs_participate_billing_honesty_gate(self) -> None:
-        text = RELEASE_READY_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("verify_live_surface_parity", text)
-        self.assertIn('gate_timeout_seconds="${CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS:-900}"', text)
-        self.assertIn('guide_gate_timeout_seconds="${CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS:-1800}"', text)
-        self.assertIn('gate_kill_after_seconds="${CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS:-30}"', text)
-        self.assertIn('current_gate_timeout_seconds="$gate_timeout_seconds"', text)
-        self.assertIn('current_gate_timeout_seconds="$guide_gate_timeout_seconds"', text)
-        self.assertIn('echo "START $name timeout=${current_gate_timeout_seconds}s"', text)
-        self.assertIn('echo "PASS $name"', text)
-        self.assertIn('echo "FAIL $name: timed out after ${current_gate_timeout_seconds}s"', text)
-        self.assertIn('timeout -k "${gate_kill_after_seconds}s" "${current_gate_timeout_seconds}s" bash -lc "$cmd"', text)
-        self.assertIn("python3 scripts/verify_live_surface_parity.py --base-url ${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}", text)
-        self.assertIn("verify_flagship_product_readiness", text)
-        self.assertIn("python3 scripts/verify_flagship_product_readiness_gate.py", text)
-        self.assertIn("verify_windows_installer_visual_audit_intake_request", text)
-        self.assertIn("python3 scripts/materialize_windows_installer_visual_audit_intake_request.py --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json", text)
-        self.assertIn("python3 scripts/verify_windows_installer_visual_audit_intake_request.py", text)
-        self.assertIn("python3 scripts/auto_import_windows_installer_gold_proof.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0", text)
-        self.assertIn("verify_public_edge_postdeploy_gate", text)
-        self.assertIn('public_base="${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}"', text)
-        self.assertIn('public_edge_browser_proof_root="$root/chummer.run-services/.codex-studio/published/public-edge-browser-proofs"', text)
-        self.assertIn('public_edge_downloads_status_dir="$public_edge_browser_proof_root/downloads-status"', text)
-        self.assertIn('public_edge_mobile_viewport_dir="$public_edge_browser_proof_root/mobile-viewport"', text)
-        self.assertIn('public_edge_offline_cache_dir="$public_edge_browser_proof_root/offline-cache"', text)
-        self.assertIn('public_edge_frontdoor_dir="$public_edge_browser_proof_root/frontdoor-navigation"', text)
-        self.assertIn('public_edge_reuse_max_age_hours="${CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS:-24}"', text)
-        self.assertIn("public_edge_preflight_args+=(--skip-preflight)", text)
-        self.assertIn(
-            "python3 scripts/verify_public_edge_postdeploy_gate.py --base-url $public_base "
-            "--timeout-seconds $public_edge_timeout_seconds ${public_edge_preflight_args[*]}",
-            text,
+        launcher = RELEASE_READY_SCRIPT.read_text(encoding="utf-8")
+        materializer = RELEASE_READY_MATERIALIZER.read_text(encoding="utf-8")
+
+        # The root entrypoint is intentionally a tiny, fail-closed launcher. The
+        # delegated materializer owns the governed gate declarations and runner.
+        self.assertIn('if sys.flags.isolated != 1:', launcher)
+        self.assertIn('MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_receipt.py"', launcher)
+        self.assertIn('"--run-authoritative-controller"', launcher)
+        self.assertIn("os.execve(", launcher)
+        self.assertIn("FORBIDDEN_CODE_LOADING_ENV", launcher)
+
+        required_gate_names = (
+            "verify_live_surface_parity",
+            "verify_windows_installer_visual_audit_intake_request",
+            "verify_flagship_product_readiness",
+            "verify_public_edge_postdeploy_gate",
+            "verify_public_portal_e2e",
+            "verify_partizipate_runtime_fallback",
+            "verify_participate_billing_honesty",
+            "verify_account_handoff_runtime_config",
+            "verify_google_oauth_linking_operator_evidence_request",
+            "verify_google_oauth_linking_proof",
+            "verify_ea_operator_readiness",
+            "verify_mymedia_public_surface",
+            "verify_teable_important_work_sync",
+            "verify_operator_release_dashboard",
         )
-        self.assertIn("--require-downloads-status-playwright", text)
-        self.assertIn("--require-mobile-pwa-viewport-playwright", text)
-        self.assertIn("--require-pwa-offline-cache-playwright", text)
-        self.assertIn("--require-frontdoor-navigation-playwright", text)
-        self.assertIn("--reuse-existing-playwright-artifacts", text)
-        self.assertIn("--reuse-artifact-max-age-hours $public_edge_reuse_max_age_hours", text)
-        self.assertIn("--playwright-artifact-dir $public_edge_downloads_status_dir", text)
-        self.assertIn("--mobile-pwa-viewport-artifact-dir $public_edge_mobile_viewport_dir", text)
-        self.assertIn("--pwa-offline-cache-artifact-dir $public_edge_offline_cache_dir", text)
-        self.assertIn("--frontdoor-navigation-artifact-dir $public_edge_frontdoor_dir", text)
-        self.assertIn("--output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", text)
-        self.assertIn("verify_public_portal_e2e", text)
-        self.assertIn("CHUMMER_PORTAL_BASE_URL=$public_base", text)
-        self.assertIn("CHUMMER_PORTAL_REQUIRE_BLAZOR=1", text)
-        self.assertIn("node scripts/e2e-portal.cjs", text)
-        self.assertIn("verify_partizipate_runtime_fallback", text)
-        self.assertIn("node scripts/verify_partizipate_runtime_fallback.cjs --base-url $public_base", text)
-        self.assertIn("verify_participate_billing_honesty", text)
-        self.assertIn("python3 scripts/materialize_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
-        self.assertIn("python3 scripts/verify_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
-        self.assertIn("verify_account_handoff_runtime_config", text)
-        self.assertIn("python3 scripts/verify_account_handoff_runtime_config.py", text)
-        self.assertIn("verify_google_oauth_linking_proof", text)
-        self.assertIn("verify_google_oauth_linking_operator_evidence_request", text)
-        self.assertIn("python3 scripts/materialize_google_oauth_linking_operator_evidence_request.py --base-url $public_base", text)
-        self.assertIn("python3 scripts/verify_google_oauth_linking_operator_evidence_request.py", text)
-        self.assertIn("python3 scripts/auto_import_google_oauth_linking_operator_evidence.py --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0", text)
-        self.assertIn("python3 scripts/materialize_google_oauth_linking_proof.py --base-url $public_base", text)
-        self.assertIn("python3 scripts/verify_google_oauth_linking_proof.py", text)
-        self.assertIn("verify_ea_operator_readiness", text)
-        self.assertIn("python3 scripts/materialize_ea_operator_readiness.py", text)
-        self.assertIn("python3 scripts/verify_ea_operator_readiness.py", text)
-        self.assertIn("python3 scripts/materialize_mymedia_public_surface.py", text)
-        self.assertIn("python3 scripts/verify_mymedia_public_surface.py", text)
-        self.assertIn("verify_teable_important_work_sync", text)
-        self.assertIn("python3 scripts/sync_important_work_to_teable.py --sync", text)
-        self.assertLess(text.index("verify_google_oauth_linking_operator_evidence_request"), text.index("verify_google_oauth_linking_proof"))
-        self.assertLess(text.index("python3 scripts/verify_google_oauth_linking_operator_evidence_request.py"), text.index("python3 scripts/auto_import_google_oauth_linking_operator_evidence.py --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0"))
-        self.assertLess(text.index("python3 scripts/auto_import_google_oauth_linking_operator_evidence.py --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0"), text.index("python3 scripts/materialize_google_oauth_linking_proof.py --base-url $public_base"))
-        self.assertLess(text.index("verify_windows_installer_visual_audit_intake_request"), text.index("verify_flagship_product_readiness"))
-        self.assertLess(text.index("python3 scripts/verify_windows_installer_visual_audit_intake_request.py"), text.index("python3 scripts/auto_import_windows_installer_gold_proof.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0"))
-        self.assertLess(text.index("python3 scripts/auto_import_windows_installer_gold_proof.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0"), text.index("verify_flagship_product_readiness"))
-        self.assertLess(text.index("verify_google_oauth_linking_proof"), text.index("verify_operator_release_dashboard"))
-        self.assertLess(text.index("verify_ea_operator_readiness"), text.index("verify_operator_release_dashboard"))
-        self.assertLess(text.index("python3 scripts/materialize_mymedia_public_surface.py"), text.index("verify_operator_release_dashboard"))
-        self.assertLess(text.index("verify_teable_important_work_sync"), text.index("verify_operator_release_dashboard"))
+        for gate_name in required_gate_names:
+            self.assertIn(f'"{gate_name}"', materializer)
+
+        required_entrypoints = (
+            "verify_live_surface_parity.py",
+            "materialize_windows_installer_visual_audit_intake_request.py",
+            "verify_windows_installer_visual_audit_intake_request.py",
+            "auto_import_windows_installer_gold_proof.py",
+            "verify_flagship_product_readiness_gate.py",
+            "verify_public_edge_postdeploy_gate.py",
+            "e2e-portal.cjs",
+            "verify_partizipate_runtime_fallback.cjs",
+            "materialize_participate_billing_honesty.py",
+            "verify_participate_billing_honesty.py",
+            "verify_account_handoff_runtime_config.py",
+            "materialize_google_oauth_linking_operator_evidence_request.py",
+            "verify_google_oauth_linking_operator_evidence_request.py",
+            "auto_import_google_oauth_linking_operator_evidence.py",
+            "materialize_google_oauth_linking_proof.py",
+            "verify_google_oauth_linking_proof.py",
+            "materialize_ea_operator_readiness.py",
+            "verify_ea_operator_readiness.py",
+            "materialize_mymedia_public_surface.py",
+            "verify_mymedia_public_surface.py",
+            "sync_important_work_to_teable.py",
+        )
+        for entrypoint in required_entrypoints:
+            self.assertIn(entrypoint, materializer)
+
+        self.assertIn('"CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900"', materializer)
+        self.assertIn('"CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS": "1800"', materializer)
+        self.assertIn("START {gate_name} timeout={gate['timeout_seconds']}s", materializer)
+        self.assertIn("FAIL {gate_name}: timed out after {gate['timeout_seconds']}s", materializer)
+        self.assertIn("PASS {gate_name} execution_binding_sha256=", materializer)
+        self.assertIn("--require-downloads-status-playwright", materializer)
+        self.assertIn("--require-mobile-pwa-viewport-playwright", materializer)
+        self.assertIn("--require-pwa-offline-cache-playwright", materializer)
+        self.assertIn("--require-frontdoor-navigation-playwright", materializer)
+
+        gate_declaration = materializer[
+            materializer.index("REQUIRED_RELEASE_VERIFIER_GATES = ("):
+            materializer.index("\ndef isolated_python_argv(")
+        ]
+        for earlier, later in zip(required_gate_names, required_gate_names[1:]):
+            self.assertLess(gate_declaration.index(f'"{earlier}"'), gate_declaration.index(f'"{later}"'))
 
     def test_release_dress_rehearsal_refreshes_mymedia_public_surface_before_dashboard(self) -> None:
         text = RELEASE_DRESS_REHEARSAL_SCRIPT.read_text(encoding="utf-8")
@@ -148,6 +150,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("python3 scripts/verify_mymedia_public_surface.py", text)
         self.assertIn("python3 scripts/sync_important_work_to_teable.py --sync", text)
         self.assertIn("python3 scripts/materialize_release_ready_receipt.py --force-global-verifier", text)
+        self.assertIn("env -u PYTHONPATH PATH=/usr/bin:/bin python3 scripts/materialize_release_ready_receipt.py --force-global-verifier", text)
         self.assertLess(
             text.index("python3 scripts/materialize_windows_installer_visual_audit_intake_request.py --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"),
             text.index("python3 scripts/materialize_operator_release_dashboard.py"),
@@ -238,7 +241,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
     def test_portal_e2e_covers_help_status_contact_and_public_billing(self) -> None:
         text = PORTAL_E2E_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("url: `${baseUrl}/help`", text)
-        self.assertIn("text.includes('What is wrong?')", text)
+        self.assertIn("text.includes('How can we help?')", text)
         self.assertIn("text.includes('Account recovery')", text)
         self.assertIn("url: `${baseUrl}/status`", text)
         self.assertIn("function hasStatusDecisionSurface(text)", text)
@@ -261,7 +264,10 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("label: requireBlazor ? 'blazor' : 'delegated-blazor'", text)
         self.assertIn("required: requireBlazor", text)
         self.assertIn("function isBlazorReady(text)", text)
+        self.assertIn("function isBlazorRootRouteReady(response)", text)
+        self.assertIn("resolvedUrl.includes('command=character_roster')", text)
         self.assertIn("function isBlazorFallback(text)", text)
+        self.assertIn("isBlazorRootRouteReady(response)", text)
         self.assertIn("requireBlazor ? isBlazorReady(text) : (isBlazorReady(text) || isBlazorFallback(text))", text)
         self.assertIn("delegated-not-ready:", text)
         self.assertIn("portal E2E completed with delegated warnings", text)

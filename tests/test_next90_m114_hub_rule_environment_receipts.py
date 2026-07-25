@@ -191,8 +191,10 @@ class Next90M114HubRuleEnvironmentReceiptsProofTests(unittest.TestCase):
         self.assertIn("support_rule_environment_receipts", receipts)
         self.assertIn("install_aware_support_receipts", receipts)
         self.assertIn("/api/v1/campaign-spine/me/rules/{entryId}", receipts["campaign_rule_environment_receipts"]["routes"])
+        self.assertIn("/account/roster", receipts["campaign_rule_environment_receipts"]["routes"])
         self.assertIn("/api/v1/support/cases/assistant", receipts["support_rule_environment_receipts"]["routes"])
         self.assertIn("/account/access", receipts["install_aware_support_receipts"]["routes"])
+        self.assertIn("/account/roster", receipts["install_aware_support_receipts"]["routes"])
 
     def copy_sources(self, temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:

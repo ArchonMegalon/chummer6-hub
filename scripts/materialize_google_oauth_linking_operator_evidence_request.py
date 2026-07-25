@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -37,6 +40,9 @@ DEFAULT_INCOMING_EVIDENCE_ROOT = RUN_SERVICES_ROOT / ".state" / "incoming_google
 DEFAULT_RELEASE_CHANNEL_PATH = evidence_v2.DEFAULT_PORTAL_RELEASE_MANIFEST_PATH
 DEFAULT_HUB_RELEASE_CHANNEL_PATH = evidence_v2.DEFAULT_HUB_RELEASE_MANIFEST_PATH
 DEFAULT_PROOF_PATH = evidence_v2.DEFAULT_PROOF_PATH
+DEFAULT_LIVE_RELEASE_MANIFEST_PATH = RUN_SERVICES_ROOT / ".state" / "google_oauth_live_release_manifest.json"
+LIVE_RELEASE_MANIFEST_MAX_BYTES = 4 * 1024 * 1024
+LIVE_RELEASE_MANIFEST_TIMEOUT_SECONDS = 20
 DEFAULT_BUNDLE_PATTERN = "*google-oauth-linking-operator-evidence*.zip"
 DISCOVERY_MAX_DEPTH = 6
 POST_IMPORT_VERIFY_NOTE = (
@@ -67,6 +73,69 @@ def load_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def capture_live_release_manifest(base_url: str, output_path: Path) -> str:
+    if base_url.rstrip("/") != DEFAULT_BASE_URL:
+        raise ValueError(f"Google OAuth production evidence base_url must be {DEFAULT_BASE_URL}")
+    url = f"{DEFAULT_BASE_URL}/downloads/RELEASE_CHANNEL.generated.json"
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "chummer-google-oauth-release-capture/1",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=LIVE_RELEASE_MANIFEST_TIMEOUT_SECONDS) as response:
+            status = int(getattr(response, "status", 0) or response.getcode())
+            raw = response.read(LIVE_RELEASE_MANIFEST_MAX_BYTES + 1)
+    except (OSError, urllib.error.URLError) as exc:
+        raise ValueError(f"live release manifest capture failed: {exc}") from exc
+    if status != 200:
+        raise ValueError(f"live release manifest capture returned HTTP {status}")
+    if len(raw) > LIVE_RELEASE_MANIFEST_MAX_BYTES:
+        raise ValueError("live release manifest exceeds the capture size limit")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"live release manifest is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("live release manifest must be a JSON object")
+    required_values = {
+        "version": payload.get("version") or payload.get("releaseVersion"),
+        "channel": payload.get("channelId") or payload.get("channel"),
+        "supportabilityState": payload.get("supportabilityState"),
+        "rolloutState": payload.get("rolloutState"),
+        "publishedAt": payload.get("publishedAt") or payload.get("published_at"),
+    }
+    missing = [name for name, value in required_values.items() if not str(value or "").strip()]
+    if missing:
+        raise ValueError(
+            "live release manifest is missing required fields: " + ", ".join(missing)
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=output_path.parent,
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, output_path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return now_iso()
 
 
 def unique_paths(paths: list[Path]) -> list[Path]:
@@ -268,7 +337,7 @@ def read_release_context(
     )
     portal = authority["portal"]
     return {
-        "path": str(release_channel_path.resolve()),
+        "path": str(portal.get("manifest_path") or release_channel_path.resolve()),
         "version": str(portal.get("version") or ""),
         "channel": str(portal.get("channel") or ""),
         "supportability_state": str(portal.get("supportability_state") or ""),
@@ -647,6 +716,7 @@ def materialize(
     release_channel_path: Path = DEFAULT_RELEASE_CHANNEL_PATH,
     hub_release_channel_path: Path = DEFAULT_HUB_RELEASE_CHANNEL_PATH,
     live_release_manifest_path: Path | None = None,
+    refresh_live_release_manifest: bool = False,
 ) -> dict[str, Any]:
     base_url = base_url.rstrip("/")
     if base_url != DEFAULT_BASE_URL:
@@ -682,6 +752,15 @@ def materialize(
     previous_live = previous_release.get("live") if isinstance(previous_release.get("live"), dict) else {}
     previous_live_path = str(previous_live.get("capture_path") or "")
     effective_live_release_manifest_path = live_release_manifest_path
+    refreshed_live_captured_at_utc = ""
+    if refresh_live_release_manifest:
+        effective_live_release_manifest_path = (
+            effective_live_release_manifest_path or DEFAULT_LIVE_RELEASE_MANIFEST_PATH
+        )
+        refreshed_live_captured_at_utc = capture_live_release_manifest(
+            base_url,
+            effective_live_release_manifest_path,
+        )
     if effective_live_release_manifest_path is None and previous_live_path:
         previous_capture = Path(previous_live_path)
         if previous_capture.is_file():
@@ -691,11 +770,14 @@ def materialize(
         if effective_live_release_manifest_path
         else ""
     )
-    live_captured_at_utc = (
-        str(previous_live.get("captured_at_utc") or "")
-        if live_capture_path_text and previous_live_path == live_capture_path_text
-        else (now_iso() if effective_live_release_manifest_path else "")
-    )
+    if not effective_live_release_manifest_path:
+        live_captured_at_utc = ""
+    elif refreshed_live_captured_at_utc:
+        live_captured_at_utc = refreshed_live_captured_at_utc
+    elif live_capture_path_text and previous_live_path == live_capture_path_text:
+        live_captured_at_utc = str(previous_live.get("captured_at_utc") or "")
+    else:
+        live_captured_at_utc = now_iso()
     release_context = read_release_context(
         release_channel_path,
         hub_release_channel_path=hub_release_channel_path,
@@ -918,6 +1000,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Explicit local capture of the live canonical manifest. This command never fetches it implicitly.",
     )
+    parser.add_argument(
+        "--refresh-live-release-manifest",
+        action="store_true",
+        help="Explicitly fetch and atomically refresh the production release-manifest capture before binding the request.",
+    )
     return parser.parse_args()
 
 
@@ -935,6 +1022,7 @@ def main() -> int:
         release_channel_path=args.release_channel_path,
         hub_release_channel_path=args.hub_release_channel_path,
         live_release_manifest_path=args.live_release_manifest_path,
+        refresh_live_release_manifest=args.refresh_live_release_manifest,
     )
     print(f"google_oauth_linking_operator_evidence_request:{payload['status']}")
     return 0

@@ -93,6 +93,38 @@ class MinimalExperienceGateTests(unittest.TestCase):
         self.assertIn("downloads page repeats the update date", payload["failures"])
         self.assertTrue(any("internal release noise" in failure for failure in payload["failures"]))
 
+    def test_payload_accepts_paused_downloads_with_source_build_fallback(self) -> None:
+        module = load_module()
+        pages = {
+            "https://example.invalid/": """
+                <body class="shell-body shell-public">
+                    <a class="minimal-hero__visual" href="/media/promo/every-wonder-horizon-promo.mp4">
+                        <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" />
+                    </a>
+                </body>
+            """,
+            "https://example.invalid/downloads": """
+                <span hidden data-downloads-release-version>Version run-test</span>
+                <p>No build is available right now.</p>
+                <article id="source-build"><h2>Build from source</h2></article>
+            """,
+            "https://example.invalid/status": """
+                <div class="minimal-page-hero minimal-status-pill"></div>
+                <a data-analytics-event="status_next_action">Downloads</a>
+                <a data-analytics-event="status_next_action">Support</a>
+            """,
+        }
+
+        payload = module.build_payload(
+            "https://example.invalid",
+            html_fetcher=lambda url: pages[url],
+            asset_checker=lambda _url: True,
+        )
+
+        self.assertEqual("pass", payload["status"])
+        self.assertTrue(payload["results"][1]["downloads_paused_visible"])
+        self.assertTrue(payload["results"][1]["downloads_shelf_visible"])
+
     def test_main_writes_receipt_and_report(self) -> None:
         module = load_module()
         payload = {

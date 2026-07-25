@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ltd_optimization_stack",
-  "generated_at_utc": "2026-06-29T12:00:36Z",
+  "generated_at_utc": "2026-07-30T03:13:36Z",
   "status": "pass",
   "verdict": "LTD_OPTIMIZATION_STACK_READY",
   "checks": {
@@ -48,7 +48,7 @@
       "pass": true
     },
     "rafter_pixefy_stack": {
-      "path": "/docker/chummercomplete/_completion/rafter_pixefy/FINAL_RAFTER_PIXEFY_QA_STACK_REASONS.generated.json",
+      "path": "/docker/chummercomplete/_completion/RAFTER_PIXEFY_QA_STACK_VERDICT.md",
       "status": "RAFTER_PIXEFY_QA_STACK_READY",
       "pass": true
     }

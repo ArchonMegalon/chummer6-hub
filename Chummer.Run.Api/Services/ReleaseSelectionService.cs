@@ -262,14 +262,71 @@ public sealed class ReleaseSelectionService
         DesktopPlatformAcceptanceDocument platformAcceptance)
         => manifest with
         {
-            Downloads = manifest.Downloads
-                .Where(download => IsPublicShelfVisible(download, manifest, experience, platformAcceptance))
-                .Select(download => download with
-                {
-                    InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience)
-                })
-                .ToArray()
+            Downloads = ReleaseReceiptAllowsPublicInstallers(manifest)
+                ? manifest.Downloads
+                    .Where(download => IsPublicShelfVisible(download, manifest, experience, platformAcceptance))
+                    .Select(download => download with
+                    {
+                        InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience)
+                    })
+                    .ToArray()
+                : Array.Empty<PublicReleaseArtifactDto>()
         };
+
+    private static bool ReleaseReceiptAllowsPublicInstallers(PublicReleaseManifestDto manifest)
+    {
+        if (TryGetNestedProperty(
+                manifest.PublicTrustMetrics,
+                "adoptionHealth",
+                "publicInstallCount",
+                out System.Text.Json.JsonElement publicInstallCount))
+        {
+            return TryReadPositiveCount(publicInstallCount);
+        }
+
+        if (TryGetNestedProperty(
+                manifest.RegistryBoundaryCoverage,
+                "entitlement",
+                "openPublicSurfaceCount",
+                out System.Text.Json.JsonElement openPublicSurfaceCount))
+        {
+            return TryReadPositiveCount(openPublicSurfaceCount);
+        }
+
+        // Older manifests have no explicit public-route counter. Keep their
+        // established artifact-policy behavior until a receipt publishes one.
+        return true;
+    }
+
+    private static bool TryGetNestedProperty(
+        System.Text.Json.JsonElement? root,
+        string objectProperty,
+        string valueProperty,
+        out System.Text.Json.JsonElement value)
+    {
+        value = default;
+        if (root is not System.Text.Json.JsonElement rootElement
+            || rootElement.ValueKind != System.Text.Json.JsonValueKind.Object
+            || !rootElement.TryGetProperty(objectProperty, out System.Text.Json.JsonElement nested)
+            || nested.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        return nested.TryGetProperty(valueProperty, out value);
+    }
+
+    private static bool TryReadPositiveCount(System.Text.Json.JsonElement value)
+    {
+        if (value.ValueKind == System.Text.Json.JsonValueKind.Number)
+        {
+            return value.TryGetInt64(out long numericCount) && numericCount > 0;
+        }
+
+        return value.ValueKind == System.Text.Json.JsonValueKind.String
+            && long.TryParse(value.GetString(), out long textCount)
+            && textCount > 0;
+    }
 
     private static ReleaseOptionViewModel BuildNormalizedOption(PublicReleaseArtifactDto download, bool authenticated, bool recommended)
     {

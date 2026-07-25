@@ -16,9 +16,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, quote_plus, urlsplit
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -44,16 +45,46 @@ from verify_public_edge_observability_release import (
     release_candidate_binding as public_edge_observability_release_candidate_binding,
 )
 from writable_temp_root import configure_process_tmpdir, subprocess_env
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
 
 
 ROOT = Path("/docker/chummercomplete")
 RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
 CHUMMER_PLAY_ROOT = ROOT / "chummer-play"
+CHUMMER_UI_ROOT = ROOT / "chummer6-ui"
+CHUMMER_PRESENTATION_ROOT = ROOT / "chummer-presentation"
+CANONICAL_BLAZOR_PLAY_SURFACE_ENTRYPOINT = (
+    CHUMMER_UI_ROOT
+    / "scripts"
+    / "ai"
+    / "milestones"
+    / "blazor-play-surface-horizon-check.sh"
+)
+CANONICAL_BLAZOR_PLAY_SURFACE_TARGET = (
+    CHUMMER_PRESENTATION_ROOT
+    / "scripts"
+    / "ai"
+    / "milestones"
+    / "blazor-play-surface-horizon-check.sh"
+)
 TRUSTED_BASH = Path("/usr/bin/bash").resolve()
 TRUSTED_PYTHON = Path("/usr/bin/python3").resolve()
 TRUSTED_NODE = Path("/usr/bin/node").resolve()
 TRUSTED_GIT = Path("/usr/bin/git").resolve()
 TRUSTED_PATH = "/usr/bin:/bin"
+ISOLATED_PYTHON_RUNNER = (
+    "import runpy,sys;"
+    "script=sys.argv[1];"
+    "sys.path.insert(0,str(__import__('pathlib').Path(script).resolve().parent));"
+    "sys.argv=sys.argv[1:];"
+    "runpy.run_path(script,run_name='__main__')"
+)
+TRUSTED_PYTHON_ISOLATED_PREFIX = (
+    str(TRUSTED_PYTHON),
+    "-I",
+    "-c",
+    ISOLATED_PYTHON_RUNNER,
+)
 AUTHORITATIVE_CONTROLLER_SCOPE = "authoritative_controller_runtime"
 DIAGNOSTIC_AUTHORITY_SCOPE = "diagnostic_non_authoritative"
 EXTERNAL_WRITE_AUTHORIZATION_FLAG = "--authorize-external-release-writes"
@@ -144,7 +175,7 @@ GOVERNED_RESTORED_DEPENDENCY_PREFIXES = (
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_REFRESH_COMMAND = [
-    str(TRUSTED_PYTHON),
+    *TRUSTED_PYTHON_ISOLATED_PREFIX,
     "scripts/verify_flagship_product_readiness_gate.py",
     "--summary-output",
     str(DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH),
@@ -168,10 +199,6 @@ CURRENT_AUXILIARY_RELEASE_RECEIPTS: tuple[tuple[str, Path], ...] = (
 SUPPLY_CHAIN_VERIFIER_SCRIPT = ROOT / "scripts" / "release" / "verify_supply_chain_evidence.py"
 WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES = (
     ROOT / "chummer.run-services" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
-    ROOT / "chummer-presentation" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
-    ROOT / "chummer6-ui" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
-    ROOT / "chummer-presentation" / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
-    ROOT / "chummer6-ui" / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
 )
 LIVE_DOWNLOADS_SHELF_DIR = RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads"
 PORTAL_RELEASE_CHANNEL = LIVE_DOWNLOADS_SHELF_DIR / "RELEASE_CHANNEL.generated.json"
@@ -202,6 +229,8 @@ RELEASE_GATE_EXECUTION_BINDING_CONTRACT = "chummer.release_gate_execution_bindin
 RELEASE_EXECUTION_PLAN_MAX_AGE = timedelta(hours=6)
 RELEASE_EXECUTION_ENV_KEYS = (
     "CHUMMER_PUBLIC_BASE_URL",
+    "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
+    "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",
     "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH",
     "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH",
     "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS",
@@ -415,7 +444,7 @@ RELEASE_GATE_PROVIDER_ENV_KEYS: dict[str, frozenset[str]] = {
         }
     ),
 }
-CODE_ENTRYPOINT_SUFFIXES = (".sh", ".py", ".cjs", ".js")
+CODE_ENTRYPOINT_SUFFIXES = (".sh", ".py", ".cjs", ".js", ".ts")
 REQUIRED_RELEASE_VERIFIER_GATES = (
     "verify_chummer6_desktop_gold",
     "verify_chummer6_blazor_gold",
@@ -435,6 +464,7 @@ REQUIRED_RELEASE_VERIFIER_GATES = (
     "verify_public_copy_leak_gate",
     "verify_live_surface_parity",
     "verify_public_route_proof",
+    "verify_horizon_e2e_gold_matrix",
     "verify_live_public_windows_installer",
     "verify_external_distribution_mirror_proof",
     "verify_windows_installer_visual_audit_intake_request",
@@ -466,10 +496,46 @@ REQUIRED_RELEASE_VERIFIER_GATES = (
 )
 
 
+def isolated_python_argv(
+    script: str | Path,
+    *arguments: object,
+) -> list[str]:
+    """Run a governed script after isolated Python startup has completed."""
+
+    return [
+        *TRUSTED_PYTHON_ISOLATED_PREFIX,
+        str(script),
+        *(str(argument) for argument in arguments),
+    ]
+
+
+def isolated_python_command(
+    script: str | Path,
+    *arguments: object,
+) -> str:
+    return shlex.join(isolated_python_argv(script, *arguments))
+
+
+def supported_release_controller_command(*arguments: object) -> str:
+    """Return the executable launcher invocation recorded in release receipts."""
+
+    return shlex.join([str(VERIFY_SCRIPT), *(str(argument) for argument in arguments)])
+
+
+def isolated_python_script(command: list[str]) -> Path:
+    prefix_length = len(TRUSTED_PYTHON_ISOLATED_PREFIX)
+    if (
+        len(command) <= prefix_length
+        or tuple(command[:prefix_length]) != TRUSTED_PYTHON_ISOLATED_PREFIX
+    ):
+        raise ValueError("release command lacks the isolated trusted Python launcher")
+    return Path(command[prefix_length])
+
+
 def canonical_release_gate_specs(
     environment: dict[str, str],
 ) -> tuple[dict[str, object], ...]:
-    """Return the immutable, controller-owned 46-gate launch plan.
+    """Return the immutable, controller-owned 47-gate launch plan.
 
     This is the inspection API for integration tests.  It deliberately accepts
     only the already-sanitized controller environment; callers cannot inject
@@ -483,8 +549,12 @@ def canonical_release_gate_specs(
     public_edge_reuse = int(environment["CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS"])
     skip_google = environment["CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH"] == "1"
     skip_windows = environment["CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH"] == "1"
+    require_blazor_local_e2e = environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"] == "1"
+    require_blazor_self_host_e2e = (
+        environment["CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E"] == "1"
+    )
     bash = str(TRUSTED_BASH)
-    python = str(TRUSTED_PYTHON)
+    python = shlex.join(TRUSTED_PYTHON_ISOLATED_PREFIX)
     node = str(TRUSTED_NODE)
     root = str(ROOT)
     services = str(RUN_SERVICES_ROOT)
@@ -553,6 +623,8 @@ def canonical_release_gate_specs(
         google_request_command = (
             f"cd {services} && {python} {services}/scripts/"
             f"materialize_google_oauth_linking_operator_evidence_request.py --base-url {public_base} "
+            f"--live-release-manifest-path {services}/.state/google_oauth_live_release_manifest.json "
+            "--refresh-live-release-manifest "
             f"&& {python} {services}/scripts/verify_google_oauth_linking_operator_evidence_request.py "
             f"&& {python} {services}/scripts/auto_import_google_oauth_linking_operator_evidence.py "
             "--intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json "
@@ -579,9 +651,153 @@ def canonical_release_gate_specs(
         f"{python} {services}/scripts/verify_ea_operator_readiness.py"
     )
     public_edge_preflight = " --skip-preflight" if environment["CHUMMER_PUBLIC_BASE_URL"].rstrip("/") == "https://chummer.run" else ""
+    desktop_gold_entrypoints = (
+        f"{root}/scripts/release/verify_desktop_gold_policy.sh",
+        f"{root}/scripts/release/verify_package_boundaries.sh",
+        f"{root}/chummer-hub-registry/scripts/release/verify_release_channel.sh",
+        f"{services}/scripts/materialize_hub_local_release_proof.py",
+        f"{services}/scripts/verify_desktop_native_trust_receipts.py",
+        f"{root}/scripts/release/verify_platform_matrix.sh",
+        f"{root}/chummer-presentation/scripts/verify_desktop_artifact_size_budget.py",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_release_matrix.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_first_minute.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_gold_workflows.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_visual_proof.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_update_rollback_revoke.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_support_crash_feedback.sh",
+        f"{root}/scripts/release/verify_proof_freshness.sh",
+        f"{root}/scripts/release/verify_public_truth_convergence.sh",
+        f"{root}/scripts/release/verify_no_public_internal_dependencies.sh",
+        f"{root}/scripts/release/verify_repo_release_posture.sh",
+    )
+    desktop_gold_command = " && ".join(
+        (
+            f"{bash} {desktop_gold_entrypoints[0]}",
+            f"{bash} {desktop_gold_entrypoints[1]}",
+            f"{bash} {desktop_gold_entrypoints[2]}",
+            (
+                f"cd {services} && {python} {desktop_gold_entrypoints[3]} "
+                f".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json "
+                f"{public_base} docker-compose.yml 120 true >/dev/null && "
+                f"{python} {desktop_gold_entrypoints[4]}"
+            ),
+            f"{bash} {desktop_gold_entrypoints[5]}",
+            f"{python} {desktop_gold_entrypoints[6]}",
+            *(f"{bash} {entrypoint}" for entrypoint in desktop_gold_entrypoints[7:]),
+        )
+    )
+    blazor_gates: list[tuple[str, str, str]] = [
+        (
+            "verify_blazor_component_shell",
+            f"{root}/chummer-presentation/scripts/test-blazor-components.sh",
+            (
+                f"cd {root}/chummer-presentation && {bash} "
+                f"{root}/chummer-presentation/scripts/test-blazor-components.sh"
+            ),
+        ),
+        (
+            "verify_browser_surface_proxy_timeout_posture",
+            f"{root}/scripts/release/verify_browser_surface_proxy_timeout_posture.sh",
+            f"{bash} {root}/scripts/release/verify_browser_surface_proxy_timeout_posture.sh",
+        ),
+        (
+            "verify_blazor_public_edge_workbench_proof",
+            f"{root}/chummer-presentation/scripts/ai/milestones/blazor-public-edge-workbench-proof-check.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/ai/milestones/"
+                "blazor-public-edge-workbench-proof-check.sh"
+            ),
+        ),
+        (
+            "verify_blazor_public_edge_execution_proof",
+            f"{root}/chummer-presentation/scripts/ai/milestones/blazor-public-edge-execution-proof-check.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/ai/milestones/"
+                "blazor-public-edge-execution-proof-check.sh"
+            ),
+        ),
+        (
+            "verify_blazor_play_surface_horizon",
+            str(CANONICAL_BLAZOR_PLAY_SURFACE_ENTRYPOINT),
+            (
+                f"{bash} {CANONICAL_BLAZOR_PLAY_SURFACE_ENTRYPOINT}"
+            ),
+        ),
+        (
+            "verify_blazor_execution_horizon_bridge",
+            f"{services}/scripts/verify_blazor_execution_horizon_bridge.py",
+            f"cd {services} && {python} {services}/scripts/verify_blazor_execution_horizon_bridge.py",
+        ),
+        (
+            "verify_blazor_public_edge_freshness",
+            f"{root}/chummer-presentation/scripts/release/verify_blazor_public_edge_freshness.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/release/"
+                "verify_blazor_public_edge_freshness.sh"
+            ),
+        ),
+    ]
+    if require_blazor_local_e2e:
+        blazor_gates.append(
+            (
+                "verify_blazor_local_ui_e2e",
+                f"{services}/scripts/e2e-ui.sh",
+                f"cd {services} && {bash} {services}/scripts/e2e-ui.sh",
+            )
+        )
+    if require_blazor_self_host_e2e:
+        blazor_gates.extend(
+            [
+                (
+                    "verify_blazor_self_host_workbench_e2e",
+                    f"{root}/chummer-presentation/scripts/e2e-portal.sh",
+                    (
+                        f"cd {root}/chummer-presentation && {bash} "
+                        f"{root}/chummer-presentation/scripts/e2e-portal.sh"
+                    ),
+                ),
+                (
+                    "verify_blazor_self_host_workbench_freshness",
+                    (
+                        f"{root}/chummer-presentation/scripts/release/"
+                        "verify_blazor_self_host_workbench_freshness.sh"
+                    ),
+                    (
+                        f"{bash} {root}/chummer-presentation/scripts/release/"
+                        "verify_blazor_self_host_workbench_freshness.sh"
+                    ),
+                ),
+            ]
+        )
+    blazor_gold_entrypoints = tuple(entrypoint for _name, entrypoint, _command in blazor_gates)
+    blazor_command_parts = ["failures=()"]
+    for gate_name, _entrypoint, gate_command in blazor_gates:
+        blazor_command_parts.append(
+            f"if ( {gate_command} ); then printf '%s\\n' {shlex.quote(f'PASS {gate_name}')}; "
+            f"else failures+=({shlex.quote(gate_name)}); "
+            f"printf '%s\\n' {shlex.quote(f'FAIL {gate_name}')}; fi"
+        )
+    blazor_command_parts.extend(
+        [
+            (
+                "if (( ${#failures[@]} )); then printf '%s\\n' 'BLAZOR NOT GOLD'; "
+                "printf '%s\\n' \"${failures[@]}\"; exit 1; fi"
+            ),
+            "printf '%s\\n' 'BLAZOR GOLD'",
+        ]
+    )
+    blazor_gold_command = "; ".join(blazor_command_parts)
     values = (
-        spec("verify_chummer6_desktop_gold", f"{bash} {root}/scripts/release/verify_chummer6_desktop_gold.sh", f"{root}/scripts/release/verify_chummer6_desktop_gold.sh"),
-        spec("verify_chummer6_blazor_gold", f"{bash} {root}/scripts/release/verify_chummer6_blazor_gold.sh", f"{root}/scripts/release/verify_chummer6_blazor_gold.sh"),
+        spec(
+            "verify_chummer6_desktop_gold",
+            desktop_gold_command,
+            *desktop_gold_entrypoints,
+        ),
+        spec(
+            "verify_chummer6_blazor_gold",
+            blazor_gold_command,
+            *blazor_gold_entrypoints,
+        ),
         spec("verify_design_release_policy", f"{bash} {root}/scripts/release/verify_design_release_policy.sh", f"{root}/scripts/release/verify_design_release_policy.sh"),
         spec("verify_package_boundaries", f"{bash} {root}/scripts/release/verify_package_boundaries.sh", f"{root}/scripts/release/verify_package_boundaries.sh"),
         spec("verify_supply_chain_evidence", f"collector_status=0; {python} {root}/scripts/release/collect_build_provenance.py --workspace-root {root} || collector_status=$?; verifier_status=0; {python} {root}/scripts/release/verify_supply_chain_evidence.py --workspace-root {root} || verifier_status=$?; if (( collector_status != 0 )); then exit $collector_status; fi; exit $verifier_status", f"{root}/scripts/release/collect_build_provenance.py", f"{root}/scripts/release/verify_supply_chain_evidence.py"),
@@ -598,11 +814,33 @@ def canonical_release_gate_specs(
         spec("verify_public_copy_leak_gate", f"cd {services} && {python} {services}/scripts/verify_public_copy_leak_gate.py --base-url {public_base}", f"{services}/scripts/verify_public_copy_leak_gate.py"),
         spec("verify_live_surface_parity", f"cd {services} && {python} {services}/scripts/verify_live_surface_parity.py --base-url {public_base}", f"{services}/scripts/verify_live_surface_parity.py"),
         spec("verify_public_route_proof", f"cd {services} && {python} {services}/scripts/verify_public_routes_from_manifest.py --base-url {public_base} --strict-positive --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json", f"{services}/scripts/verify_public_routes_from_manifest.py"),
+        spec("verify_horizon_e2e_gold_matrix", f"cd {services} && {python} {services}/scripts/materialize_horizon_e2e_gold_matrix.py --base-url {public_base} --spec {services}/tests/public/horizon-e2e-gold.spec.ts", f"{services}/scripts/materialize_horizon_e2e_gold_matrix.py", f"{services}/tests/public/horizon-e2e-gold.spec.ts"),
         spec("verify_live_public_windows_installer", f"cd {services} && {python} {services}/scripts/verify_live_public_windows_installer.py --base-url {public_base}", f"{services}/scripts/verify_live_public_windows_installer.py"),
         spec("verify_external_distribution_mirror_proof", f"cd {services} && {python} {services}/scripts/materialize_external_distribution_mirror_proof.py --base-url {public_base} --output .codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json", f"{services}/scripts/materialize_external_distribution_mirror_proof.py"),
         spec("verify_windows_installer_visual_audit_intake_request", windows_command, *windows_entrypoints),
         spec("verify_ruleset_readiness", f"cd {services} && {python} {services}/scripts/classify_ruleset_readiness.py --output .codex-studio/published/RULESET_READINESS.generated.json", f"{services}/scripts/classify_ruleset_readiness.py"),
-        spec("verify_flagship_product_readiness", f"cd {services} && {python} {services}/scripts/verify_flagship_product_readiness_gate.py", f"{services}/scripts/verify_flagship_product_readiness_gate.py"),
+        spec(
+            "verify_flagship_product_readiness",
+            (
+                f"cd {services} "
+                f"&& [[ -f {services}/scripts/ai/prepare_run_services_smoke.sh ]] "
+                f"&& [[ -f {services}/scripts/ai/_env.sh ]] "
+                f"&& [[ -f {services}/scripts/ai/build_r1_cleanroom.sh ]] "
+                f"&& [[ -f {services}/scripts/materialize_campaign_os_local_proof.py ]] "
+                f"&& [[ -f {services}/scripts/campaign_os_local_proof_v3.py ]] "
+                f"&& {bash} {services}/scripts/ai/run_services_smoke.sh "
+                f"&& {python} {services}/scripts/verify_campaign_os_local_proof.py "
+                f"&& {python} {services}/scripts/verify_flagship_product_readiness_gate.py"
+            ),
+            f"{services}/scripts/ai/run_services_smoke.sh",
+            f"{services}/scripts/ai/prepare_run_services_smoke.sh",
+            f"{services}/scripts/ai/_env.sh",
+            f"{services}/scripts/ai/build_r1_cleanroom.sh",
+            f"{services}/scripts/materialize_campaign_os_local_proof.py",
+            f"{services}/scripts/campaign_os_local_proof_v3.py",
+            f"{services}/scripts/verify_campaign_os_local_proof.py",
+            f"{services}/scripts/verify_flagship_product_readiness_gate.py",
+        ),
         spec("verify_public_edge_postdeploy_gate", f"cd {services} && {python} {services}/scripts/verify_public_edge_postdeploy_gate.py --base-url {public_base} --timeout-seconds {public_edge_timeout}{public_edge_preflight} --require-downloads-status-playwright --require-mobile-pwa-viewport-playwright --require-pwa-offline-cache-playwright --require-blazor-new-runner-menu-playwright --require-frontdoor-navigation-playwright --reuse-existing-playwright-artifacts --reuse-artifact-max-age-hours {public_edge_reuse} --playwright-artifact-dir {published_browser_root}/downloads-status --mobile-pwa-viewport-artifact-dir {published_browser_root}/mobile-viewport --pwa-offline-cache-artifact-dir {published_browser_root}/offline-cache --blazor-new-runner-menu-artifact-dir {published_browser_root}/blazor-new-runner-menu --frontdoor-navigation-artifact-dir {published_browser_root}/frontdoor-navigation --output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", f"{services}/scripts/verify_public_edge_postdeploy_gate.py"),
         spec("verify_public_portal_e2e", f"cd {services} && CHUMMER_PORTAL_BASE_URL={public_base} CHUMMER_PORTAL_PUBLIC_HOST= CHUMMER_PORTAL_FORWARDED_PROTO= CHUMMER_PORTAL_REQUIRE_BLAZOR=1 {node} {services}/scripts/e2e-portal.cjs", f"{services}/scripts/e2e-portal.cjs"),
         spec("verify_partizipate_runtime_fallback", f"cd {services} && {node} {services}/scripts/verify_partizipate_runtime_fallback.cjs --base-url {public_base}", f"{services}/scripts/verify_partizipate_runtime_fallback.cjs"),
@@ -632,6 +870,7 @@ def canonical_release_gate_specs(
     return values
 RELEASE_VERIFIER_BOUND_PROGRAMS = (
     ("release_ready_materializer", Path(__file__).resolve()),
+    ("horizon_e2e_gold_materializer", RUN_SERVICES_ROOT / "scripts" / "materialize_horizon_e2e_gold_matrix.py"),
     ("supply_chain_verifier", SUPPLY_CHAIN_VERIFIER_SCRIPT),
     ("public_edge_postdeploy_verifier", RUN_SERVICES_ROOT / "scripts" / "verify_public_edge_postdeploy_gate.py"),
     ("downloads_version_marker_verifier", RUN_SERVICES_ROOT / "scripts" / "verify_downloads_version_marker.py"),
@@ -646,6 +885,14 @@ RELEASE_VERIFIER_BOUND_PROGRAMS = (
     ("release_channel_verifier", ROOT / "chummer-hub-registry" / "scripts" / "release" / "verify_release_channel.sh"),
 )
 RELEASE_VERIFIER_GATE_RECEIPTS = (
+    (
+        "verify_horizon_e2e_gold_matrix",
+        "horizon_e2e_gold_matrix",
+        PUBLISHED_ROOT / "HORIZON_E2E_GOLD_MATRIX.generated.json",
+        "chummer.horizon_e2e_gold_matrix/v1",
+        (),
+        (),
+    ),
     (
         "verify_supply_chain_evidence",
         "supply_chain_evidence",
@@ -710,6 +957,19 @@ PASS_STATES = {"pass", "passed", "ready"}
 FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME = "chummer.flagship_product_readiness_gate.v1"
 FLAGSHIP_PRODUCT_READY_VERDICT = "FLAGSHIP_PRODUCT_READY"
 FLAGSHIP_PRODUCT_NOT_READY_VERDICT = "NOT_FLAGSHIP_PRODUCT_READY"
+CAMPAIGN_OS_LOCAL_PROOF_PATH = (
+    PUBLISHED_ROOT / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+)
+CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH = (
+    RUN_SERVICES_ROOT / "scripts" / "campaign_os_local_proof_v3.py"
+)
+CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_NAME = "chummer6-hub.campaign_os_local_proof"
+CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_VERSION = 3
+CAMPAIGN_OS_LOCAL_PROOF_KIND = "materializer_owned_executed_smoke_receipt"
+CAMPAIGN_OS_LOCAL_PROOF_DEPENDENCY_MODE = (
+    "restore_free_with_locally_closed_package_inputs"
+)
+CAMPAIGN_OS_LOCAL_PROOF_JOURNEY_COUNT = 6
 FLAGSHIP_PRODUCT_READINESS_RECOVERABLE_LAUNCH_BLOCKERS = {
     "final gold janitor state is 'fail'",
     "final gold janitor verdict is 'NOT_GOLD'",
@@ -1098,6 +1358,40 @@ def google_oauth_receipt_validation_failures(path: Path) -> list[str]:
     if result.get("operator_evidence_pass") is not True:
         issues.append("google OAuth current verifier did not prove operator evidence")
     return list(dict.fromkeys(issues))
+
+
+def direct_receipt_semantic_validation_failures(
+    gate_name: str,
+    payload: dict[str, object],
+    receipt_path: Path,
+    *,
+    observed_at: datetime,
+) -> list[str]:
+    """Apply each direct receipt's available contract-specific verifier."""
+
+    if gate_name == "verify_supply_chain_evidence":
+        failures = supply_chain_receipt_validation_failures(
+            payload,
+            current_time=observed_at,
+        )
+    elif gate_name == "verify_public_edge_observability_release":
+        failures = public_edge_observability_release_blocking_reasons(
+            payload,
+            receipt_path=receipt_path,
+            release_channel_path=REGISTRY_RELEASE_CHANNEL,
+            now=observed_at,
+        )
+    elif gate_name == "verify_windows_installer_visual_audit_intake_request":
+        failures = windows_visual_audit_release_blocking_reasons(payload)
+    elif gate_name == "verify_flagship_product_readiness":
+        failures = flagship_product_readiness_gate_semantic_failures(payload)
+    elif gate_name == "verify_public_edge_postdeploy_gate":
+        failures = public_edge_postdeploy_release_blocking_reasons(payload)
+    elif gate_name == "verify_google_oauth_linking_proof":
+        failures = google_oauth_receipt_validation_failures(receipt_path)
+    else:
+        failures = []
+    return list(dict.fromkeys(str(item).strip() for item in failures if str(item).strip()))
 
 
 def refresh_flagship_product_readiness_gate(path: Path) -> None:
@@ -1508,9 +1802,22 @@ def workspace_portal_release_channel_drift_failures(
     seen_paths: set[Path] = set()
     for candidate in WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES:
         path = Path(candidate)
-        if not path.is_file():
+        try:
+            shelf_mode, active_shelf_root, _pointer = resolve_shelf_root(path.parent)
+        except ReleaseShelfError as exc:
+            failures.append(
+                "workspace portal release channel artifact "
+                f"{display_path(path)} could not resolve the atomic release shelf: {exc}"
+            )
             continue
-        resolved_path = path.resolve()
+        resolved_candidate = (
+            active_shelf_root / path.name
+            if shelf_mode == "generation"
+            else path
+        )
+        if not resolved_candidate.is_file():
+            continue
+        resolved_path = resolved_candidate.resolve()
         if resolved_path in seen_paths:
             continue
         seen_paths.add(resolved_path)
@@ -1588,14 +1895,128 @@ def flagship_product_readiness_expected_gate_verdict(status: object) -> str:
     )
 
 
+def canonical_uuid4(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = uuid.UUID(value)
+    except (AttributeError, ValueError):
+        return False
+    return parsed.version == 4 and str(parsed) == value
+
+
+def current_campaign_os_byte_identity(path: Path) -> dict[str, object] | None:
+    """Return the stable byte identity embedded by the flagship verifier."""
+
+    try:
+        payload, error = read_stable_regular_file_bytes(path)
+    except (OSError, ValueError):
+        return None
+    if error is not None or not payload:
+        return None
+    try:
+        execution_identity = nonsymlink_regular_file_execution_identity(path)
+    except (OSError, RuntimeError, ValueError):
+        return None
+    digest = hashlib.sha256(payload).hexdigest()
+    if (
+        execution_identity.get("sha256") != digest
+        or execution_identity.get("size_bytes") != len(payload)
+    ):
+        return None
+    return {
+        "path": str(execution_identity["path"]),
+        "sha256": digest,
+        "size_bytes": len(payload),
+    }
+
+
 def flagship_product_readiness_gate_semantic_failures(payload: dict[str, object]) -> list[str]:
     if str(payload.get("contract_name") or "").strip() != FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME:
         return []
+    failures: list[str] = []
     expected_verdict = flagship_product_readiness_expected_gate_verdict(payload.get("status"))
     actual_verdict = str(payload.get("verdict") or "").strip()
-    if actual_verdict == expected_verdict:
-        return []
-    return [f"flagship_product_readiness gate has unexpected verdict (expected {expected_verdict})"]
+    if actual_verdict != expected_verdict:
+        failures.append(
+            f"flagship_product_readiness gate has unexpected verdict (expected {expected_verdict})"
+        )
+
+    campaign = payload.get("campaign_os_local_proof")
+    if not isinstance(campaign, dict):
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof evidence is missing"
+        )
+        return failures
+
+    if campaign.get("pass") is not True:
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof pass is not true"
+        )
+    if str(campaign.get("reason_code") or "") != "valid":
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof reason_code is not valid"
+        )
+    if str(campaign.get("load_status") or "") != "loaded":
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof is not loaded"
+        )
+    if str(campaign.get("contract_name") or "") != CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_NAME:
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof contract_name is not current"
+        )
+    if campaign.get("contract_version") != CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_VERSION:
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof "
+            f"contract_version is not {CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_VERSION}"
+        )
+    if str(campaign.get("status") or "") != "passed":
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof status is not passed"
+        )
+    if str(campaign.get("proof_kind") or "") != CAMPAIGN_OS_LOCAL_PROOF_KIND:
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof proof_kind is not current"
+        )
+    if (
+        str(campaign.get("dependency_mode") or "")
+        != CAMPAIGN_OS_LOCAL_PROOF_DEPENDENCY_MODE
+    ):
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof "
+            "dependency_mode is not current"
+        )
+    if campaign.get("journey_count") != CAMPAIGN_OS_LOCAL_PROOF_JOURNEY_COUNT:
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof journey_count is not 6"
+        )
+    if not canonical_uuid4(campaign.get("run_id")):
+        failures.append(
+            "flagship_product_readiness gate Campaign OS local proof run_id is not canonical UUIDv4"
+        )
+
+    for field, path, label in (
+        (
+            "receipt_identity",
+            CAMPAIGN_OS_LOCAL_PROOF_PATH,
+            "receipt",
+        ),
+        (
+            "validator_identity",
+            CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH,
+            "validator",
+        ),
+    ):
+        current_identity = current_campaign_os_byte_identity(path)
+        if current_identity is None:
+            failures.append(
+                f"flagship_product_readiness gate Campaign OS local proof current {label} is unavailable"
+            )
+        elif campaign.get(field) != current_identity:
+            failures.append(
+                f"flagship_product_readiness gate Campaign OS local proof {label} identity does not match current bytes"
+            )
+    return list(dict.fromkeys(failures))
 
 
 def flagship_product_readiness_gate_structural_green(summary: dict[str, object]) -> bool:
@@ -1611,12 +2032,8 @@ def flagship_product_readiness_gate_structural_green(summary: dict[str, object])
         return False
     if normalized_string_list(summary.get("scoped_coverage_gap_keys")):
         return False
-    if flagship_product_readiness_gate_semantic_failures(
-        {
-            "contract_name": FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
-            "status": summary.get("status"),
-            "verdict": summary.get("verdict"),
-        }
+    if str(summary.get("verdict") or "").strip() != (
+        flagship_product_readiness_expected_gate_verdict(summary.get("status"))
     ):
         return False
 
@@ -2316,6 +2733,61 @@ def apply_release_ready_actions(payload: dict[str, object], actions: list[str]) 
     payload["advisoryActions"] = []
 
 
+def release_ready_actions_from_payload(
+    payload: dict[str, object],
+    release_channel_payload: dict[str, object] | None = None,
+) -> list[str]:
+    """Recompute action classification from the payload's final truth."""
+
+    raw_artifacts = payload.get("blocking_gate_artifacts")
+    blocking_gate_artifacts = {
+        str(name): dict(artifact)
+        for name, artifact in (
+            raw_artifacts.items() if isinstance(raw_artifacts, dict) else ()
+        )
+        if isinstance(artifact, dict)
+    }
+    root_context = {
+        key: payload.get(key)
+        for key in (
+            "root_blocker_ids",
+            "root_blockers",
+            "root_blockers_generated_at",
+            "stable_promotion_command",
+            "post_promotion_verify_command",
+            "root_release_truth_source",
+        )
+    }
+    actions = release_ready_next_actions(
+        blocking_gate_artifacts,
+        release_channel_payload,
+        root_context,
+    )
+    seen = set(actions)
+    final_revalidation_failed = (
+        "release_authority_final_revalidation"
+        in {
+            value.casefold()
+            for value in normalized_string_list(payload.get("failed_gates"))
+        }
+        or any(
+            failure.startswith("FAIL release_authority_final_revalidation:")
+            for failure in normalized_string_list(payload.get("failures"))
+        )
+    )
+    if final_revalidation_failed:
+        append_unique_action(
+            actions,
+            seen,
+            (
+                "Repair the final release-authority revalidation failure, then rerun "
+                "the executable isolated launcher: "
+                f"{supported_release_controller_command()}"
+            ),
+        )
+    return actions
+
+
 def windows_stage_visual_proof_hint_paths(artifact: dict[str, object], *, limit: int = 2) -> list[str]:
     sample_paths: list[str] = []
     for key in (
@@ -2568,7 +3040,10 @@ def windows_visual_audit_missing_artifact_failure(
 
 
 def windows_visual_audit_release_blocking_reasons(payload: dict[str, object]) -> list[str]:
-    reasons = receipt_failure_reasons(payload, "windows_installer_visual_audit receipt is not pass")
+    fallback = "windows_installer_visual_audit receipt is not pass"
+    reasons = receipt_failure_reasons(payload, fallback)
+    if normalized_token(payload.get("status")) in PASS_STATES and reasons == [fallback]:
+        reasons = []
     artifact = payload.get("artifact")
     artifact = artifact if isinstance(artifact, dict) else {}
     visual = payload.get("visualAuditSource")
@@ -3116,7 +3591,7 @@ def release_ready_materialization_failure_payload(
         "generated_at_utc": now_iso(),
         "status": "fail",
         "verdict": "NOT_RELEASE_READY",
-        "command": f"{TRUSTED_PYTHON} {Path(__file__).resolve()}",
+        "command": supported_release_controller_command(),
         "returncode": returncode,
         "timed_out": bool(timed_out),
         "timeout_seconds": TIMEOUT_SECONDS,
@@ -3215,6 +3690,32 @@ def controller_gate_environment(
     )
 
 
+def url_encoded_secret_pattern(value: str) -> str:
+    """Match percent-escape hex case without folding credential characters."""
+
+    parts: list[str] = []
+    index = 0
+    while index < len(value):
+        if (
+            value[index] == "%"
+            and index + 2 < len(value)
+            and re.fullmatch(r"[0-9A-Fa-f]{2}", value[index + 1 : index + 3])
+        ):
+            parts.append("%")
+            for digit in value[index + 1 : index + 3]:
+                lowered = digit.lower()
+                parts.append(
+                    f"[{lowered}{lowered.upper()}]"
+                    if lowered in "abcdef"
+                    else re.escape(digit)
+                )
+            index += 3
+            continue
+        parts.append(re.escape(value[index]))
+        index += 1
+    return "".join(parts)
+
+
 def redact_release_output(text: str, environment: dict[str, str]) -> str:
     """Redact credential values plus common assignment/header representations."""
 
@@ -3230,6 +3731,17 @@ def redact_release_output(text: str, environment: dict[str, str]) -> str:
     )
     for value in values:
         redacted = redacted.replace(value, "[REDACTED]")
+        encoded_values = {
+            quote(value, safe=""),
+            quote_plus(value, safe=""),
+        }
+        for encoded_value in sorted(encoded_values, key=len, reverse=True):
+            if encoded_value and encoded_value != value:
+                redacted = re.sub(
+                    url_encoded_secret_pattern(encoded_value),
+                    "[REDACTED]",
+                    redacted,
+                )
     credential_names = "|".join(
         re.escape(key) for key in sorted(RELEASE_SECRET_ENV_KEYS, key=len, reverse=True)
     )
@@ -3282,6 +3794,8 @@ def authoritative_controller_environment(
 
     controlled_defaults = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
+        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900",
@@ -3383,6 +3897,8 @@ def validate_release_execution_environment(environment: dict[str, object]) -> di
         if parsed <= 0 or parsed > 86400:
             raise ValueError(f"release execution environment {key} is out of range")
     for key in (
+        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
+        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH",
         "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH",
     ):
@@ -3410,6 +3926,57 @@ def absolute_nonsymlink_path(path: Path, *, require_directory: bool = False) -> 
         kind = "directory" if require_directory else "regular file"
         raise ValueError(f"release execution path is not a {kind}: {normalized}")
     return normalized
+
+
+def canonical_release_entrypoint_alias_binding(
+    path: Path,
+) -> tuple[Path, dict[str, object]] | None:
+    """Bind the one canonical ownership alias admitted to the gate matrix."""
+
+    normalized = Path(os.path.abspath(path))
+    if normalized != CANONICAL_BLAZOR_PLAY_SURFACE_ENTRYPOINT:
+        return None
+    absolute_nonsymlink_path(CHUMMER_UI_ROOT.parent, require_directory=True)
+    try:
+        alias_stat = os.lstat(CHUMMER_UI_ROOT)
+        raw_target = os.readlink(CHUMMER_UI_ROOT)
+    except OSError as exc:
+        raise ValueError(
+            f"canonical Blazor ownership alias is unavailable: {CHUMMER_UI_ROOT}: {exc}"
+        ) from exc
+    if not stat.S_ISLNK(alias_stat.st_mode):
+        raise ValueError(
+            f"canonical Blazor ownership alias is not a symlink: {CHUMMER_UI_ROOT}"
+        )
+    target_root = Path(raw_target)
+    if not target_root.is_absolute():
+        target_root = CHUMMER_UI_ROOT.parent / target_root
+    target_root = Path(os.path.abspath(target_root))
+    if target_root != CHUMMER_PRESENTATION_ROOT:
+        raise ValueError(
+            "canonical Blazor ownership alias target drifted: "
+            f"{CHUMMER_UI_ROOT} -> {target_root}"
+        )
+    absolute_nonsymlink_path(target_root, require_directory=True)
+    target = absolute_nonsymlink_path(CANONICAL_BLAZOR_PLAY_SURFACE_TARGET)
+    return target, {
+        "path": str(CHUMMER_UI_ROOT),
+        "target": str(target_root),
+        "raw_target": raw_target,
+        "device": alias_stat.st_dev,
+        "inode": alias_stat.st_ino,
+        "mode": alias_stat.st_mode,
+        "size_bytes": alias_stat.st_size,
+        "mtime_ns": alias_stat.st_mtime_ns,
+        "ctime_ns": alias_stat.st_ctime_ns,
+    }
+
+
+def canonical_release_entrypoint_path(path: Path) -> Path:
+    normalized = Path(os.path.abspath(path))
+    if canonical_release_entrypoint_alias_binding(normalized) is not None:
+        return normalized
+    return absolute_nonsymlink_path(normalized)
 
 
 def directory_identity(path: Path) -> dict[str, object]:
@@ -3453,7 +4020,7 @@ def directory_execution_identity(path: Path) -> dict[str, object]:
     }
 
 
-def regular_file_execution_identity(path: Path) -> dict[str, object]:
+def nonsymlink_regular_file_execution_identity(path: Path) -> dict[str, object]:
     normalized = absolute_nonsymlink_path(path)
     parent = normalized.parent
     ancestors_before = directory_ancestor_identities(parent)
@@ -3495,6 +4062,25 @@ def regular_file_execution_identity(path: Path) -> dict[str, object]:
     }
 
 
+def regular_file_execution_identity(path: Path) -> dict[str, object]:
+    normalized = Path(os.path.abspath(path))
+    alias_before = canonical_release_entrypoint_alias_binding(normalized)
+    if alias_before is None:
+        return nonsymlink_regular_file_execution_identity(normalized)
+    target, binding_before = alias_before
+    identity = nonsymlink_regular_file_execution_identity(target)
+    alias_after = canonical_release_entrypoint_alias_binding(normalized)
+    if alias_after is None or alias_after[0] != target or alias_after[1] != binding_before:
+        raise ValueError(
+            f"canonical release entrypoint alias changed while binding: {normalized}"
+        )
+    return {
+        **identity,
+        "path": str(normalized),
+        "canonical_path_alias": binding_before,
+    }
+
+
 def governed_code_path(relative_path: str) -> bool:
     normalized = relative_path.replace(os.sep, "/")
     while normalized.startswith("./"):
@@ -3525,7 +4111,9 @@ def governed_restored_dependency_path(relative_path: str) -> bool:
 
 
 def governed_repository_root(path: Path) -> Path:
-    current = Path(os.path.abspath(path))
+    normalized = Path(os.path.abspath(path))
+    alias = canonical_release_entrypoint_alias_binding(normalized)
+    current = alias[0] if alias is not None else normalized
     if current.is_file():
         current = current.parent
     while True:
@@ -3537,6 +4125,13 @@ def governed_repository_root(path: Path) -> Path:
         if current.parent == current:
             raise ValueError(f"governed code path is outside a Git repository: {path}")
         current = current.parent
+
+
+def governed_relative_code_path(path: Path, repository: Path) -> str:
+    normalized = Path(os.path.abspath(path))
+    alias = canonical_release_entrypoint_alias_binding(normalized)
+    governed_path = alias[0] if alias is not None else normalized
+    return str(governed_path.relative_to(repository))
 
 
 def governed_repository_roots(paths: list[Path] | tuple[Path, ...]) -> tuple[Path, ...]:
@@ -3830,7 +4425,7 @@ def build_release_execution_plan(
         if timeout_seconds <= 0 or timeout_seconds > 86400:
             raise ValueError(f"release execution gate timeout is out of range: {name}")
         entrypoint_paths = [
-            absolute_nonsymlink_path(Path(value))
+            canonical_release_entrypoint_path(Path(value))
             for value in raw_entrypoints.split("|")
             if value
         ]
@@ -4716,14 +5311,14 @@ def current_release_gate_receipt_binding(
         raise ValueError(f"{receipt_name} direct receipt version does not match current release")
     if channel_path and receipt_channel != release_binding["channel"]:
         raise ValueError(f"{receipt_name} direct receipt channel does not match current release")
-    if gate_name == "verify_supply_chain_evidence":
-        supply_failures = supply_chain_receipt_validation_failures(payload, current_time=observed_at)
-        if supply_failures:
-            raise ValueError("; ".join(supply_failures))
-    if gate_name == "verify_google_oauth_linking_proof":
-        google_failures = google_oauth_receipt_validation_failures(receipt_path)
-        if google_failures:
-            raise ValueError("; ".join(google_failures))
+    semantic_failures = direct_receipt_semantic_validation_failures(
+        gate_name,
+        payload,
+        receipt_path,
+        observed_at=observed_at,
+    )
+    if semantic_failures:
+        raise ValueError("; ".join(semantic_failures))
     authority_inputs: list[dict[str, object]] = []
     if gate_name == "verify_google_oauth_linking_proof":
         operator_evidence = (
@@ -5172,7 +5767,7 @@ def authoritative_release_execution_plan(
     repository_roots = governed_repository_roots(governed_paths)
     for path in governed_paths:
         repository = governed_repository_root(path)
-        relative_path = str(Path(os.path.abspath(path)).relative_to(repository))
+        relative_path = governed_relative_code_path(path, repository)
         if not governed_code_path(relative_path):
             raise ValueError(
                 f"canonical release entrypoint falls inside an excluded output root: {path}"
@@ -6057,10 +6652,13 @@ def projection_step_prebinding(
 ) -> dict[str, object]:
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
         raise ValueError("release projection step name is invalid")
-    if len(command) < 2 or command[0] != str(TRUSTED_PYTHON):
-        raise ValueError(f"release projection step lacks the trusted Python interpreter: {name}")
+    try:
+        entrypoint = isolated_python_script(command)
+    except ValueError as exc:
+        raise ValueError(
+            f"release projection step lacks the isolated trusted Python interpreter: {name}"
+        ) from exc
     normalized_cwd = absolute_nonsymlink_path(cwd, require_directory=True)
-    entrypoint = Path(command[1])
     if not entrypoint.is_absolute():
         entrypoint = normalized_cwd / entrypoint
     entrypoint = absolute_nonsymlink_path(entrypoint)
@@ -6112,7 +6710,7 @@ def refresh_release_truth_projection(
 ) -> dict[str, object]:
     return run_release_truth_projection_step(
         "release_truth_root",
-        [str(TRUSTED_PYTHON), str(RELEASE_TRUTH_SYNC_SCRIPT)],
+        isolated_python_argv(RELEASE_TRUTH_SYNC_SCRIPT),
         ROOT,
         env,
         execution_plan=execution_plan,
@@ -6226,19 +6824,21 @@ def converge_release_truth_dependents(
             [
                 (
                     "mobile_cross_surface_readiness",
-                    [str(TRUSTED_PYTHON), "scripts/materialize_mobile_cross_surface_readiness.py"],
+                    isolated_python_argv(
+                        "scripts/materialize_mobile_cross_surface_readiness.py"
+                    ),
                     CHUMMER_PLAY_ROOT,
                     False,
                 ),
                 (
                     "mobile_release_boundary",
-                    [str(TRUSTED_PYTHON), "scripts/materialize_mobile_release_boundary.py"],
+                    isolated_python_argv("scripts/materialize_mobile_release_boundary.py"),
                     CHUMMER_PLAY_ROOT,
                     False,
                 ),
                 (
                     "mobile_local_release_proof",
-                    [str(TRUSTED_PYTHON), "scripts/materialize_mobile_local_release_proof.py"],
+                    isolated_python_argv("scripts/materialize_mobile_local_release_proof.py"),
                     CHUMMER_PLAY_ROOT,
                     False,
                 ),
@@ -6248,39 +6848,36 @@ def converge_release_truth_dependents(
         [
             (
                 "operator_release_dashboard",
-                [
-                    str(TRUSTED_PYTHON),
+                isolated_python_argv(
                     "scripts/materialize_operator_release_dashboard.py",
                     "--skip-windows-runtime-refresh",
-                ],
+                ),
                 RUN_SERVICES_ROOT,
                 not final_pass,
             ),
             (
                 "final_gold_janitor",
-                [
-                    str(TRUSTED_PYTHON),
+                isolated_python_argv(
                     "scripts/final_gold_janitor.py",
                     "--skip-materializers",
                     "--skip-windows-runtime-refresh",
-                ],
+                ),
                 RUN_SERVICES_ROOT,
                 False,
             ),
             (
                 "flagship_product_readiness",
-                [
-                    str(TRUSTED_PYTHON),
+                isolated_python_argv(
                     "scripts/verify_flagship_product_readiness_gate.py",
                     "--summary-output",
                     ".codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json",
-                ],
+                ),
                 RUN_SERVICES_ROOT,
                 False,
             ),
             (
                 "release_truth_projection",
-                [str(TRUSTED_PYTHON), str(RELEASE_TRUTH_SYNC_SCRIPT)],
+                isolated_python_argv(RELEASE_TRUTH_SYNC_SCRIPT),
                 ROOT,
                 False,
             ),
@@ -6306,24 +6903,55 @@ def converge_release_truth_dependents(
     }
 
 
+def current_projection_blocker_failures(
+    blocking_gate_artifacts: dict[str, dict[str, object]],
+    receipt_states: dict[str, dict[str, object]],
+    root_context: dict[str, object],
+) -> list[str]:
+    """Return current truth that is incompatible with a ready projection."""
+
+    failures = [
+        f"FAIL current_release_truth: root blocker remains: {blocker_id}"
+        for blocker_id in normalized_string_list(root_context.get("root_blocker_ids"))
+    ]
+    blocking_statuses = {"blocked", "fail", "failed", "invalid", "missing", "not_ready"}
+    for name, artifact in sorted(blocking_gate_artifacts.items()):
+        if name == "release_truth_root" or not isinstance(artifact, dict):
+            continue
+        status = normalized_token(artifact.get("status"))
+        if status in blocking_statuses or artifact.get("pass") is False:
+            failures.append(
+                f"FAIL current_release_truth: blocking gate artifact is not pass: {name}"
+            )
+    allowed_receipt_statuses = {*PASS_STATES, "not_required", "published"}
+    for name, state in sorted(receipt_states.items()):
+        if not isinstance(state, dict):
+            continue
+        status = normalized_token(state.get("status"))
+        load_status = normalized_token(state.get("load_status"))
+        if load_status in {"invalid", "missing"} or status not in allowed_receipt_statuses:
+            failures.append(
+                f"FAIL current_release_truth: current receipt is not pass: {name}"
+            )
+    return list(dict.fromkeys(failures))
+
+
 def apply_current_release_truth_projection(
     payload: dict[str, object],
     release_channel: dict[str, object],
-) -> None:
+    *,
+    enforce_status_consistency: bool = True,
+) -> list[str]:
     blocking_gate_artifacts = current_blocking_gate_artifacts(
         refresh_windows_runtime_receipts=False
     )
     root_context = current_release_truth_root_context()
-    actions = release_ready_next_actions(
-        blocking_gate_artifacts,
-        release_channel,
-        root_context,
-    )
+    receipt_states = current_receipt_states()
     payload.update(
         {
             "generated_at_utc": now_iso(),
             "blocking_gate_artifacts": blocking_gate_artifacts,
-            "current_receipt_states": current_receipt_states(),
+            "current_receipt_states": receipt_states,
             "root_blocker_ids": root_context["root_blocker_ids"],
             "root_blockers": root_context["root_blockers"],
             "root_blockers_generated_at": root_context["root_blockers_generated_at"],
@@ -6332,7 +6960,49 @@ def apply_current_release_truth_projection(
             "root_release_truth_source": root_context["root_release_truth_source"],
         }
     )
+    if not enforce_status_consistency:
+        actions = release_ready_next_actions(
+            blocking_gate_artifacts,
+            release_channel,
+            root_context,
+        )
+        apply_release_ready_actions(payload, actions)
+        return []
+    consistency_failures = current_projection_blocker_failures(
+        blocking_gate_artifacts,
+        receipt_states,
+        root_context,
+    )
+    if consistency_failures:
+        failures = normalized_string_list(payload.get("failures"))
+        failures.extend(
+            failure for failure in consistency_failures if failure not in failures
+        )
+        payload.update(
+            {
+                "status": "fail",
+                "verdict": "NOT_RELEASE_READY",
+                "failures": failures,
+                "failed_gates": extract_failed_gates(failures),
+            }
+        )
+    actions = release_ready_next_actions(
+        blocking_gate_artifacts,
+        release_channel,
+        root_context,
+    )
+    if consistency_failures:
+        if not actions:
+            blocker_summary = "; ".join(
+                failure.removeprefix("FAIL current_release_truth: ")
+                for failure in consistency_failures
+            )
+            actions = [
+                "Resolve the current release-truth blockers "
+                f"({blocker_summary}), then rerun: {supported_release_controller_command()}"
+            ]
     apply_release_ready_actions(payload, actions)
+    return consistency_failures
 
 
 def converge_release_truth_projection(
@@ -6381,7 +7051,11 @@ def converge_release_truth_projection(
     root_refresh["phase"] = "root"
     projection_phases: list[dict[str, object]] = [root_refresh]
     if root_refresh.get("status") == "pass":
-        apply_current_release_truth_projection(payload, release_channel)
+        apply_current_release_truth_projection(
+            payload,
+            release_channel,
+            enforce_status_consistency=False,
+        )
         write_staging("wrapper_cycle")
         wrapper_cycle = converge_release_truth_dependents(
             env,
@@ -6390,7 +7064,11 @@ def converge_release_truth_projection(
         )
         projection_phases.append(wrapper_cycle)
         if wrapper_cycle.get("status") == "pass":
-            apply_current_release_truth_projection(payload, release_channel)
+            apply_current_release_truth_projection(
+                payload,
+                release_channel,
+                enforce_status_consistency=False,
+            )
             write_staging("final")
             projection_phases.append(
                 converge_release_truth_dependents(
@@ -6425,7 +7103,18 @@ def converge_release_truth_projection(
         payload["verdict"] = "NOT_RELEASE_READY"
         payload["failures"] = failure_lines
         payload["failed_gates"] = extract_failed_gates(failure_lines)
-    apply_current_release_truth_projection(payload, release_channel)
+    consistency_failures = apply_current_release_truth_projection(
+        payload,
+        release_channel,
+    )
+    if consistency_failures:
+        projection_refresh.update(
+            {
+                "status": "fail",
+                "current_truth_consistency": "fail",
+                "current_blocker_failures": consistency_failures,
+            }
+        )
     write_staging("complete_pending_authority_revalidation")
     return projection_refresh
 
@@ -6831,7 +7520,7 @@ def main(argv: list[str] | None = None) -> int:
             "generated_at_utc": now_iso(),
             "status": "fail",
             "verdict": "NOT_RELEASE_READY",
-            "command": f"current receipt precheck before CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash {VERIFY_SCRIPT}",
+            "command": supported_release_controller_command(),
             "returncode": None,
             "timed_out": False,
             "timeout_seconds": TIMEOUT_SECONDS,
@@ -6934,7 +7623,7 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at_utc": now_iso(),
         "status": "pass" if release_ready else "fail",
         "verdict": "RELEASE_READY" if release_ready else "NOT_RELEASE_READY",
-        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash {VERIFY_SCRIPT}",
+        "command": supported_release_controller_command(),
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,
@@ -7050,6 +7739,13 @@ def main(argv: list[str] | None = None) -> int:
                     "failed_gates": extract_failed_gates(failures),
                 }
             )
+    # Projection consistency and final authority revalidation can both mutate
+    # status after the first action pass.  Classify freshly from the final
+    # payload so a late failure cannot retain advisory-only guidance.
+    apply_release_ready_actions(
+        payload,
+        release_ready_actions_from_payload(payload, release_channel),
+    )
     atomic_write_json(OUTPUT_PATH, payload)
     durable_unlink(projection_staging_path())
     print(f"release_ready_receipt:{payload['status']}")

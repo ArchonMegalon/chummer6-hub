@@ -205,6 +205,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
     [Theory]
     [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof", "127.0.0.1", "/install-link/callback", true)]
+    [InlineData("http://127.0.0.1:47761/install-link/callback#state=desktop-fragment&nonce=fragment-proof&accessToken=fragment-secret", "127.0.0.1", "/install-link/callback", true)]
     [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback", true)]
     [InlineData("http://127.0.0.1:47761/install-link/callback/?state=desktop", "127.0.0.1", "/install-link/callback/", true)]
     [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback", false)]
@@ -252,6 +253,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             if (callbackUri.Contains("nonce=callback-proof", StringComparison.Ordinal))
             {
                 Assert.Contains("nonce=callback-proof", decodedCallbackHref, StringComparison.Ordinal);
+            }
+            if (callbackUri.Contains("nonce=fragment-proof", StringComparison.Ordinal))
+            {
+                Assert.Contains("nonce=fragment-proof", decodedCallbackHref, StringComparison.Ordinal);
+                Assert.DoesNotContain("fragment-secret", decodedCallbackHref, StringComparison.Ordinal);
             }
         }
 

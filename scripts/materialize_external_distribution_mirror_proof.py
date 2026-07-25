@@ -81,6 +81,25 @@ def artifact_rows(registry_root: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def release_public_install_count(registry_root: Path) -> int | None:
+    try:
+        payload = read_json(registry_root / "RELEASE_CHANNEL.generated.json")
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    metrics = payload.get("publicTrustMetrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    adoption = metrics.get("adoptionHealth")
+    adoption = adoption if isinstance(adoption, dict) else {}
+    value = adoption.get("publicInstallCount")
+    if isinstance(value, bool):
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return count if count >= 0 else None
+
+
 def verify_path(path: Path, expected_size: int, expected_sha256: str) -> dict[str, Any]:
     if not path.is_file():
         return {"exists": False, "path": str(path), "status": "missing"}
@@ -247,14 +266,28 @@ def main() -> int:
     args = parse_args()
     registry_root = Path(args.registry_root)
     rows = artifact_rows(registry_root)
+    public_install_count = release_public_install_count(registry_root)
+    downloads_paused = public_install_count == 0
     providers = {
         "local_registry": verify_local_registry(registry_root, rows),
-        "public_edge": verify_public_edge(args.base_url, rows, args.timeout),
+        "public_edge": (
+            {
+                "status": "not_applicable",
+                "reason": "authoritative release manifest reports zero public installers",
+                "base_url": public_base_url_text(
+                    args.base_url,
+                    fallback=DEFAULT_PUBLISHED_PUBLIC_BASE_URL,
+                ),
+                "artifacts": [],
+            }
+            if downloads_paused
+            else verify_public_edge(args.base_url, rows, args.timeout)
+        ),
     }
     for name, roots in DEFAULT_PROVIDER_ROOTS.items():
         providers[name] = verify_provider(name, roots, rows)
 
-    required = ["local_registry", "public_edge"]
+    required = ["local_registry"] if downloads_paused else ["local_registry", "public_edge"]
     if args.require_external:
         required.extend(["pcloud", "onedrive"])
     optional_external_failures = sorted(
@@ -266,6 +299,8 @@ def main() -> int:
         "contract_name": "chummer.external_distribution_mirror_proof",
         "generated_at_utc": now_iso(),
         "registry_root": str(registry_root),
+        "public_install_count": public_install_count,
+        "downloads_paused": downloads_paused,
         "external_required": bool(args.require_external),
         "distribution_resilience_status": (
             "full_external_mirror_ready"

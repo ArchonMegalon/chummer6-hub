@@ -348,6 +348,14 @@
     ? window.ChummerAnalyticsQueue
     : (window.ChummerAnalyticsQueue = []);
 
+  const isInstallOnlyMobilePath = (value) => {
+    try {
+      return /^\/mobile(?:\/|$)/i.test(new URL(value || window.location.href, window.location.origin).pathname);
+    } catch {
+      return false;
+    }
+  };
+
   ChummerUi.trackPublicEvent = function trackPublicEvent(name, payload = {}) {
     const eventName = normalizeAnalyticsValue(name);
     if (!eventName) return;
@@ -360,6 +368,15 @@
     };
     ChummerUi.analyticsQueue.push(record);
     window.dispatchEvent(new CustomEvent("chummer:analytics", { detail: record }));
+
+    const destinationHref = normalizeAnalyticsValue(payload?.href);
+    const installOnlyMobileDestination = isInstallOnlyMobilePath(destinationHref);
+    if (installOnlyMobileDestination) {
+      window.__RYBBIT_OPTOUT__ = true;
+    }
+    if (isInstallOnlyMobilePath(window.location.pathname) || installOnlyMobileDestination) {
+      return;
+    }
 
     const rybbitApi = window.rybbit;
     if (rybbitApi && typeof rybbitApi.track === "function") {

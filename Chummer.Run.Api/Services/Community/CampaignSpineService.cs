@@ -3183,7 +3183,8 @@ public sealed class CampaignSpineService
                 ],
                 LatestContinuity: continuity,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: existingRunForObjective?.UpdatedAtUtc ?? now);
+                UpdatedAtUtc: existingRunForObjective?.UpdatedAtUtc ?? now,
+                RunboardContinuity: existingRunForObjective?.RunboardContinuity);
             if (existingRunForObjective is null || !ContentEquals(existingRunForObjective, run))
             {
                 run = existingRunForObjective is null ? run : run with { UpdatedAtUtc = now };
@@ -6603,26 +6604,29 @@ public sealed class CampaignSpineService
             CarryForwardId: StableId("next-session", $"{campaign.CampaignId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
             Label: "Next-session carry-forward",
             Summary: summary,
-            ReturnSummary: continuity?.Summary ?? campaign.Summary,
-            NextSafeAction: nextSafeAction,
-            EvidenceLines: FinalizeLines(
-            new[] { continuity?.Summary ?? campaign.Summary }
-            .Concat(returnLoopEvidenceLines)
-            .Concat(new[]
-            {
-                activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
-                leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
-                leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
-                campaignAdoptionLoop?.Summary ?? string.Empty,
-                leadRunnerGoal is null ? string.Empty : $"{leadRunnerGoal.RunnerHandle}: {leadRunnerGoal.Label} ({leadRunnerGoal.SavedNuyen}/{leadRunnerGoal.NuyenRequired} nuyen).",
-                leadResolutionApproval?.Summary ?? string.Empty,
-                leadWorldTick?.Summary ?? string.Empty,
-                leadPlayerSafeNews is null ? string.Empty : $"{leadPlayerSafeNews.Title}: {leadPlayerSafeNews.Summary}",
-                leadConsequence?.EvidenceLines.FirstOrDefault() ?? leadConsequence?.Summary ?? string.Empty,
-                prepBindingSummary,
-                travelSummary,
-                nextSafeAction
-            })),
+                ReturnSummary: continuity?.Summary ?? campaign.Summary,
+                NextSafeAction: nextSafeAction,
+                EvidenceLines: FinalizeLines(
+                new[]
+                {
+                    continuity?.Summary ?? campaign.Summary,
+                    leadResolutionApproval?.Summary ?? string.Empty,
+                    leadWorldTick?.Summary ?? string.Empty,
+                    leadPlayerSafeNews is null ? string.Empty : $"{leadPlayerSafeNews.Title}: {leadPlayerSafeNews.Summary}",
+                    campaignAdoptionLoop?.Summary ?? string.Empty,
+                    leadRunnerGoal is null ? string.Empty : $"{leadRunnerGoal.RunnerHandle}: {leadRunnerGoal.Label} ({leadRunnerGoal.SavedNuyen}/{leadRunnerGoal.NuyenRequired} nuyen).",
+                    nextSafeAction
+                }
+                .Concat(returnLoopEvidenceLines)
+                .Concat(new[]
+                {
+                    activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
+                    leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
+                    leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
+                    leadConsequence?.EvidenceLines.FirstOrDefault() ?? leadConsequence?.Summary ?? string.Empty,
+                    prepBindingSummary,
+                    travelSummary
+                })),
             UpdatedAtUtc: updatedAtUtc);
     }
 

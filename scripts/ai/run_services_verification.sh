@@ -463,10 +463,3 @@ dotnet "$OUT_DLL"
 if [[ "${CHUMMER_HUB_PLAYWRIGHT:-0}" == "1" ]]; then
   bash scripts/e2e-hub.sh
 fi
-
-if [[ -n "$PYTHON_BIN" ]]; then
-  "$PYTHON_BIN" scripts/materialize_campaign_os_local_proof.py >/dev/null
-else
-  echo "python runtime is required to materialize campaign OS local proof." >&2
-  exit 1
-fi

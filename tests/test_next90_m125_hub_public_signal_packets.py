@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import copy
+import importlib.util
+import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -24,17 +29,111 @@ SOURCE_FILES = [
 ]
 
 
+def _load_verifier_module():
+    module_name = "verify_next90_m125_hub_public_signal_packets_test"
+    spec = importlib.util.spec_from_file_location(module_name, SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.modules.pop(module_name, None)
+
+
 class Next90M125HubPublicSignalPacketsTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_public_signal_packet_lane(self) -> None:
-        result = subprocess.run(["python3", str(SCRIPT)], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        with tempfile.TemporaryDirectory(prefix="next90-m125-proof-") as temp_dir:
+            proof_path = Path(temp_dir) / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json"
+            env = os.environ.copy()
+            env["CHUMMER_NEXT90_M125_OUT"] = str(proof_path)
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            payload = json.loads(proof_path.read_text(encoding="utf-8")) if proof_path.is_file() else {}
+
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("next90 m125 hub public signal packets proof passed", result.stdout)
+        self.assertEqual(payload.get("schema_version"), 2)
+        self.assertEqual(payload.get("status"), "passed")
+        self.assertEqual(payload.get("proof_kind"), "source_digest_and_executed_test_contract")
+        self.assertTrue(payload.get("generated_at"))
+        self.assertGreaterEqual(payload.get("test_receipt", {}).get("executed_test_count", 0), 1)
+        self.assertEqual(payload.get("test_receipt", {}).get("status"), "passed")
+        self.assertGreaterEqual(len(payload.get("source_evidence", [])), 7)
+        self.assertEqual(len(payload.get("queue_evidence", [])), 2)
+        self.assertFalse(payload.get("release_binding", {}).get("release_artifact_specific", True))
 
     def test_verify_script_runs_m125_guard(self) -> None:
         verify_script = (REPO_ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
         self.assertIn("python3 scripts/materialize_next90_m125_hub_public_signal_packets_proof.py", verify_script)
         self.assertIn("python3 scripts/verify_next90_m125_hub_public_signal_packets.py", verify_script)
         self.assertIn("python3 -m unittest tests/test_next90_m125_hub_public_signal_packets.py", verify_script)
+
+    def test_proof_validation_rejects_nonpassing_and_future_receipts(self) -> None:
+        module = _load_verifier_module()
+        generated = datetime.now(timezone.utc)
+        generated_at = generated.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        source_evidence = module._source_evidence()
+        queue_evidence = module._queue_evidence()
+        payload = {
+            "contract_name": "chummer6-hub.next90_m125_hub_public_signal_packets",
+            "schema_version": 2,
+            "status": "passed",
+            "status_scope": module.STATUS_SCOPE,
+            "proof_kind": module.PROOF_KIND,
+            "generated_at": generated_at,
+            "verification_command": module.VERIFICATION_COMMAND,
+            "release_binding": {
+                "scope": "release_independent_product_capability",
+                "release_artifact_specific": False,
+            },
+            "package_proof": module._expected_package_proof(),
+            "package_workflow_status": module.PACKAGE_STATUS,
+            "package_workflow_status_affects_capability_status": False,
+            "source_evidence": source_evidence,
+            "source_evidence_set_sha256": module._evidence_set_sha256(source_evidence),
+            "queue_evidence": queue_evidence,
+            "queue_evidence_set_sha256": module._evidence_set_sha256(queue_evidence),
+            "test_receipt": {
+                "status": "passed",
+                "executed_at": generated_at,
+                "command": module.TEST_COMMAND,
+                "fully_qualified_name": module.TEST_FQN,
+                "exit_code": 0,
+                "executed_test_count": 1,
+                "output_sha256": "0" * 64,
+            },
+        }
+        kwargs = {
+            "materialization_started_at": generated - timedelta(seconds=1),
+            "expected_source_evidence": source_evidence,
+            "expected_queue_evidence": queue_evidence,
+        }
+        self.assertEqual(module._proof_validation_issues(payload, **kwargs), [])
+
+        nonpassing = copy.deepcopy(payload)
+        nonpassing["status"] = "failed"
+        self.assertIn("proof file status must be passed", module._proof_validation_issues(nonpassing, **kwargs))
+
+        future = copy.deepcopy(payload)
+        future_at = (
+            datetime.now(timezone.utc)
+            + timedelta(seconds=module.MAX_FUTURE_SKEW_SECONDS + 60)
+        ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        future["generated_at"] = future_at
+        future["test_receipt"]["executed_at"] = future_at
+        self.assertIn(
+            "proof file generated_at is unacceptably future-dated",
+            module._proof_validation_issues(future, **kwargs),
+        )
 
     def test_verifier_fails_when_queue_row_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m125-queue-") as temp_dir:

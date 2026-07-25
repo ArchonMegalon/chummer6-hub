@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any
 from urllib.parse import urlparse
@@ -134,6 +135,13 @@ def _json_text(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+def _contains_marker_token(value: str, marker: str) -> bool:
+    return re.search(
+        rf"(?<![a-z0-9]){re.escape(marker)}(?![a-z0-9])",
+        value,
+    ) is not None
+
+
 def _contains_fake_marker(value: object) -> bool:
     if isinstance(value, str):
         lowered = (
@@ -143,7 +151,7 @@ def _contains_fake_marker(value: object) -> bool:
             .replace("nofallback", "")
             .replace("no fallback", "")
         )
-        return any(marker in lowered for marker in FAKE_MARKERS)
+        return any(_contains_marker_token(lowered, marker) for marker in FAKE_MARKERS)
     if isinstance(value, dict):
         return any(_contains_fake_marker(key) or _contains_fake_marker(item) for key, item in value.items())
     if isinstance(value, list):

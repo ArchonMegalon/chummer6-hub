@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
@@ -10,6 +11,12 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
 
 
 ROOT = Path("/docker/chummercomplete")
@@ -26,6 +33,8 @@ DEFAULT_WORKSPACE_PORTAL_RELEASE_CHANNEL = (
 DEFAULT_RELEASE_BLOCKERS = ROOT / "RELEASE_BLOCKERS.generated.json"
 DEFAULT_GOOGLE_OAUTH_LINKING_PROOF = PUBLISHED_ROOT / "GOOGLE_OAUTH_LINKING_PROOF.generated.json"
 DEFAULT_WINDOWS_INSTALLER_VISUAL_AUDIT = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
+DEFAULT_CAMPAIGN_OS_LOCAL_PROOF = PUBLISHED_ROOT / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE = RUN_SERVICES_ROOT / "scripts" / "campaign_os_local_proof_v3.py"
 DEFAULT_PRIVACY_LAUNCH_GATE = RUN_SERVICES_ROOT / ".codex-design" / "product" / "PRIVACY_LAUNCH_GATE.json"
 DEFAULT_HOSTED_BUILD_OPERATOR_DECISIONS = (
     ROOT
@@ -112,6 +121,9 @@ ROOT_RELEASE_BLOCKERS_MAX_FUTURE_SKEW = timedelta(minutes=5)
 WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX = (
     "workspace portal release channel artifact "
 )
+CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX = (
+    "Campaign OS local proof is not valid executed v3 evidence"
+)
 
 
 def now_iso() -> str:
@@ -142,6 +154,147 @@ def receipt_load_failure(
     if load_status == "invalid":
         return f"{label} receipt is malformed: {path}"
     return None
+
+
+def load_campaign_os_local_proof_contract() -> Any:
+    spec = importlib.util.spec_from_file_location(
+        "chummer_campaign_os_local_proof_v3",
+        CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError("campaign_os_local_proof_contract_unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def campaign_os_file_identity(
+    contract: Any,
+    path: Path,
+    *,
+    max_bytes: int,
+    reason_prefix: str,
+) -> dict[str, object]:
+    data = contract._read_regular_bytes(
+        path,
+        max_bytes=max_bytes,
+        reason_prefix=reason_prefix,
+    )
+    try:
+        canonical_path = path.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise contract.ProofContractError(f"{reason_prefix}_unstable") from exc
+    return {
+        "path": str(canonical_path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+    }
+
+
+def evaluate_campaign_os_local_proof(path: Path) -> dict[str, Any]:
+    receipt_identity: dict[str, object] | None = None
+    validator_identity: dict[str, object] | None = None
+    try:
+        contract = load_campaign_os_local_proof_contract()
+        validator_identity_before = campaign_os_file_identity(
+            contract,
+            CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE,
+            max_bytes=contract.MAX_INPUT_BYTES,
+            reason_prefix="validator",
+        )
+        try:
+            receipt_identity_before = campaign_os_file_identity(
+                contract,
+                path,
+                max_bytes=contract.MAX_RECEIPT_BYTES,
+                reason_prefix="receipt",
+            )
+            receipt_identity_before_error = None
+        except contract.ProofContractError as exc:
+            receipt_identity_before = None
+            receipt_identity_before_error = exc.reason_code
+
+        validation = contract.validate_passed_receipt(RUN_SERVICES_ROOT, path)
+        reason_code = str(validation.reason_code or "validator_result_invalid")
+        payload = validation.payload if isinstance(validation.payload, dict) else {}
+        valid = validation.valid is True and reason_code == "valid" and bool(payload)
+        if validation.valid is True and not valid:
+            reason_code = "validator_result_invalid"
+
+        try:
+            receipt_identity_after = campaign_os_file_identity(
+                contract,
+                path,
+                max_bytes=contract.MAX_RECEIPT_BYTES,
+                reason_prefix="receipt",
+            )
+            receipt_identity_after_error = None
+        except contract.ProofContractError as exc:
+            receipt_identity_after = None
+            receipt_identity_after_error = exc.reason_code
+        validator_identity_after = campaign_os_file_identity(
+            contract,
+            CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_MODULE,
+            max_bytes=contract.MAX_INPUT_BYTES,
+            reason_prefix="validator",
+        )
+
+        if validator_identity_before != validator_identity_after:
+            reason_code = "validator_identity_unstable"
+            valid = False
+        else:
+            validator_identity = validator_identity_before
+
+        if (
+            receipt_identity_before != receipt_identity_after
+            or receipt_identity_before_error != receipt_identity_after_error
+        ):
+            reason_code = "receipt_identity_unstable"
+            valid = False
+        else:
+            receipt_identity = receipt_identity_before
+        if valid and receipt_identity is None:
+            reason_code = "receipt_identity_unavailable"
+            valid = False
+    except Exception:
+        reason_code = "contract_validator_unavailable"
+        valid = False
+        payload = {}
+        receipt_identity = None
+        validator_identity = None
+
+    blocker = f"{CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX} ({reason_code})."
+    journeys = payload.get("journeys") if isinstance(payload.get("journeys"), list) else []
+    invocation = (
+        payload.get("invocation")
+        if isinstance(payload.get("invocation"), dict)
+        else {}
+    )
+    return {
+        "path": str(path),
+        "load_status": (
+            "loaded"
+            if valid
+            else "missing"
+            if reason_code == "receipt_missing"
+            else "invalid"
+        ),
+        "contract_name": payload.get("contract_name"),
+        "contract_version": payload.get("contract_version"),
+        "status": payload.get("status"),
+        "proof_kind": payload.get("proof_kind"),
+        "run_id": payload.get("run_id"),
+        "dependency_mode": invocation.get("dependency_mode"),
+        "generated_at": payload.get("generated_at"),
+        "expires_at": payload.get("expires_at"),
+        "journey_count": len(journeys),
+        "receipt_identity": receipt_identity,
+        "validator_identity": validator_identity,
+        "reason_code": reason_code,
+        "blockers": [] if valid else [blocker],
+        "pass": valid,
+    }
 
 
 def evaluate_privacy_launch_gate(
@@ -1015,15 +1168,29 @@ def workspace_portal_release_channel_drift_failures(
     authoritative_payload: dict[str, Any],
     portal_path: Path,
 ) -> list[str]:
-    portal_payload, portal_load_status = load_json(portal_path)
     display_path = display_workspace_path(portal_path)
+    try:
+        shelf_mode, active_shelf_root, _pointer = resolve_shelf_root(portal_path.parent)
+    except ReleaseShelfError as exc:
+        return [
+            f"{WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX}{display_path} "
+            f"could not resolve the atomic release shelf: {exc}"
+        ]
+    resolved_portal_path = (
+        active_shelf_root / portal_path.name
+        if shelf_mode == "generation"
+        else portal_path
+    )
+    portal_payload, portal_load_status = load_json(resolved_portal_path)
     if portal_load_status == "missing":
         return [
-            f"{WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX}{display_path} is missing"
+            f"{WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX}{display_path} is missing "
+            f"from the resolved release shelf: {resolved_portal_path}"
         ]
     if portal_load_status == "invalid":
         return [
-            f"{WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX}{display_path} is malformed"
+            f"{WORKSPACE_PORTAL_RELEASE_CHANNEL_DRIFT_PREFIX}{display_path} is malformed "
+            f"in the resolved release shelf: {resolved_portal_path}"
         ]
 
     authoritative_identity = release_channel_identity(authoritative_payload)
@@ -1366,6 +1533,7 @@ def summarize(
     hosted_build_operator_decisions_load_status: str = "not_evaluated",
     hosted_build_operator_decisions_path: Path | None = None,
     hosted_build_operator_decisions_verify_material_bindings: bool = True,
+    campaign_os_local_proof_path: Path | None = None,
 ) -> dict[str, Any]:
     summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
     completion = payload.get("completion_audit") if isinstance(payload.get("completion_audit"), dict) else {}
@@ -1432,6 +1600,30 @@ def summarize(
             "pass": True,
         }
     )
+    campaign_os_local_proof = (
+        evaluate_campaign_os_local_proof(campaign_os_local_proof_path)
+        if campaign_os_local_proof_path is not None
+        else {
+            "path": None,
+            "load_status": "not_evaluated",
+            "contract_name": None,
+            "contract_version": None,
+            "status": None,
+            "proof_kind": None,
+            "run_id": None,
+            "dependency_mode": None,
+            "generated_at": None,
+            "expires_at": None,
+            "journey_count": 0,
+            "receipt_identity": None,
+            "validator_identity": None,
+            "reason_code": "not_evaluated",
+            "blockers": [
+                f"{CAMPAIGN_OS_LOCAL_PROOF_BLOCKER_PREFIX} (not_evaluated)."
+            ],
+            "pass": False,
+        }
+    )
     verify_external_release_truth = readiness_path is not None
     root_release_truth_blockers = (
         list(release_truth_context["root_release_truth_failures"])
@@ -1446,6 +1638,7 @@ def summarize(
         + root_release_truth_blockers
         + list(privacy_gate["blockers"])
         + list(hosted_build_operator_decisions["blockers"])
+        + list(campaign_os_local_proof["blockers"])
     )
     coverage_gaps = normalized_coverage_gaps(payload, raw_coverage_gaps, launch_blockers)
     scoped_gaps = normalized_coverage_gaps(payload, raw_scoped_gaps, launch_blockers)
@@ -1479,6 +1672,7 @@ def summarize(
         "root_release_truth_source": release_truth_context["root_release_truth_source"],
         "privacy_launch_gate": privacy_gate,
         "hosted_build_operator_decisions": hosted_build_operator_decisions,
+        "campaign_os_local_proof": campaign_os_local_proof,
     }
     load_failure = (
         receipt_load_failure("flagship readiness", readiness_path, readiness_load_status)
@@ -1603,6 +1797,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--campaign-os-local-proof",
+        type=Path,
+        default=DEFAULT_CAMPAIGN_OS_LOCAL_PROOF,
+        help=(
+            "Executed Campaign OS local smoke proof. Missing, stale, legacy, or "
+            "invalid evidence fails the offline flagship launch gate closed."
+        ),
+    )
+    parser.add_argument(
         "--summary-output",
         type=Path,
         default=DEFAULT_SUMMARY_OUTPUT,
@@ -1645,6 +1848,7 @@ def main() -> int:
         hosted_build_operator_decisions_payload=hosted_build_operator_decisions_payload,
         hosted_build_operator_decisions_load_status=hosted_build_operator_decisions_load_status,
         hosted_build_operator_decisions_path=args.hosted_build_v002_decisions,
+        campaign_os_local_proof_path=args.campaign_os_local_proof,
     )
     fail_closed_payload, readiness_updated = fail_closed_readiness_payload(readiness_payload, summary, generated_at_utc)
     if readiness_updated:
@@ -1659,6 +1863,7 @@ def main() -> int:
             hosted_build_operator_decisions_payload=hosted_build_operator_decisions_payload,
             hosted_build_operator_decisions_load_status=hosted_build_operator_decisions_load_status,
             hosted_build_operator_decisions_path=args.hosted_build_v002_decisions,
+            campaign_os_local_proof_path=args.campaign_os_local_proof,
         )
     payload = {
         "contract_name": "chummer.flagship_product_readiness_gate.v1",
@@ -1682,6 +1887,7 @@ def main() -> int:
         "root_release_truth_source": summary["root_release_truth_source"],
         "privacy_launch_gate": summary["privacy_launch_gate"],
         "hosted_build_operator_decisions": summary["hosted_build_operator_decisions"],
+        "campaign_os_local_proof": summary["campaign_os_local_proof"],
         "summary": summary,
     }
     payload["recoverable_wrapper_blockers_only"] = recoverable_wrapper_blockers_only(summary)

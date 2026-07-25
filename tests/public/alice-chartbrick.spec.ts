@@ -6,7 +6,7 @@ const identityToken = process.env.CHUMMER_E2E_IDENTITY_TOKEN?.trim() || '';
 const localIdentityToken = process.env.CHUMMER_E2E_LOCAL_IDENTITY_TOKEN?.trim() || '';
 const signedInToken = identityToken || localIdentityToken;
 
-test('alice chartbrick panels render when configured', async ({ request, page }) => {
+test('alice keeps first-party compare truth and renders ChartBrick panels only when configured', async ({ request, page }) => {
   test.setTimeout(90_000);
 
   const receiptResponse = await request.get(`${baseUrl}/alice/receipts/build-ghost.json`);
@@ -14,21 +14,31 @@ test('alice chartbrick panels render when configured', async ({ request, page })
 
   const payload = await receiptResponse.json();
   expect(Array.isArray(payload.insights)).toBeTruthy();
-  expect(payload.insights.length).toBeGreaterThan(0);
-  expect(payload.insights.some((item: { title?: string }) => item.title === 'Why ALICE leans this way')).toBeTruthy();
-  expect(payload.insights.some((item: { title?: string }) => item.title === 'Runner stats')).toBeTruthy();
+  expect(payload.engineStatus).toBe('First-party compare/apply only');
+  expect(payload.runtimeBoundary).toContain('may compute legality');
+  expect(payload.runtimeBoundary).toContain('mutate the runner');
 
   await page.goto(`${baseUrl}/alice`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('h1')).toContainText('Character help');
-  await expect(page.getByRole('heading', { name: 'See the shape before you commit to the path.' })).toBeVisible();
-  await expect(page.locator('iframe[title="Why character help leans this way"]')).toHaveAttribute('src', /chartbrick\.com/i);
-  await expect(page.locator('iframe[title="Runner stats"]')).toHaveAttribute('src', /chartbrick\.com/i);
+  if (payload.insights.length > 0) {
+    await expect(page.getByRole('heading', { name: 'See the shape before you commit to the path.' })).toBeVisible();
+    expect(payload.insights.some((item: { title?: string }) => item.title === 'Why ALICE leans this way')).toBeTruthy();
+    expect(payload.insights.some((item: { title?: string }) => item.title === 'Runner stats')).toBeTruthy();
+    await expect(page.locator('iframe[title="Why character help leans this way"]')).toHaveAttribute('src', /chartbrick\.com/i);
+    await expect(page.locator('iframe[title="Runner stats"]')).toHaveAttribute('src', /chartbrick\.com/i);
+  } else {
+    await expect(page.locator('iframe[src*="chartbrick.com"]')).toHaveCount(0);
+    await expect(page.locator('main')).toContainText('First-party compare/apply only');
+  }
 
   writeJsonArtifact('ALICE_CHARTBRICK_PUBLIC_E2E.generated.json', {
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
     base_url: baseUrl,
     route: '/alice',
+    chartbrick_configured: payload.insights.length > 0,
+    engine_status: payload.engineStatus,
+    runtime_boundary: payload.runtimeBoundary,
     insight_count: payload.insights.length,
     insight_titles: payload.insights.map((item: { title?: string }) => item.title).filter(Boolean),
   });

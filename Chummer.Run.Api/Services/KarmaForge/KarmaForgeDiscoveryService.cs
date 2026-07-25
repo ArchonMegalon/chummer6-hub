@@ -209,6 +209,32 @@ public sealed class KarmaForgeDiscoveryService
     public IReadOnlyList<string> GetCanonicalOutputs()
         => CanonicalOutputs;
 
+    public KarmaForgeDiscoveryArtifact BuildPublicDiscoveryArtifact()
+    {
+        string content = string.Join(
+            "\n",
+            [
+                "# KARMA FORGE discovery packet",
+                string.Empty,
+                "Signal is collected here; Chummer-owned review remains the product authority.",
+                string.Empty,
+                "## Discovery flow",
+                string.Empty,
+                .. DiscoverySteps.Select(step => $"- {step}"),
+                string.Empty,
+                "## Canonical outputs",
+                string.Empty,
+                .. CanonicalOutputs.Select(output => $"- {output}"),
+                string.Empty,
+                "No submitted table text, contact data, or private campaign material is included in this public packet.",
+                string.Empty
+            ]);
+        return new KarmaForgeDiscoveryArtifact(
+            Content: content,
+            ContentType: "text/markdown; charset=utf-8",
+            FileName: "karma-forge-discovery.md");
+    }
+
     public IReadOnlyList<KarmaForgeExternalStageProjection> GetExternalStageProjections(KarmaForgeSubmissionProjection? submission = null)
     {
         string submissionId = submission?.SubmissionId ?? "pre_submission";
@@ -1317,4 +1343,7 @@ public sealed record RuleEnvironmentImpactHypothesisProjection(
     string PlayerVisibility,
     string RollbackSurface);
 
-    
+public sealed record KarmaForgeDiscoveryArtifact(
+    string Content,
+    string ContentType,
+    string FileName);

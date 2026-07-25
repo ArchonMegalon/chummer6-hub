@@ -258,6 +258,76 @@ def preflight(args: argparse.Namespace) -> int:
     )
 
 
+def validate_resume_created(args: argparse.Namespace) -> int:
+    payload = read_json_object(Path(args.receipt))
+    expected_top_level = {
+        "schemaVersion",
+        "apiOrigin",
+        "sessionId",
+        "expiresAtUtc",
+        "candidate",
+        "completion",
+        "stateHistory",
+    }
+    if set(payload) != expected_top_level or payload.get("schemaVersion") != SCHEMA_VERSION:
+        raise ValueError("durable upload receipt schema is not resumable")
+
+    candidate = validate_candidate(read_json_object(Path(args.summary)))
+    if payload.get("candidate") != candidate:
+        raise ValueError("durable upload receipt candidate binding does not match this bundle")
+
+    api_origin = normalized_api_origin(args.sessions_url)
+    if payload.get("apiOrigin") != api_origin:
+        raise ValueError("durable upload receipt API origin does not match this transport")
+    session_id = validate_session_id(str(payload.get("sessionId") or ""))
+
+    completion = payload.get("completion")
+    expected_completion_fields = {
+        "state",
+        "requestStartedAtUtc",
+        "lastUpdatedAtUtc",
+        "lastHttpStatus",
+        "lastProblemType",
+        "traceId",
+    }
+    if (
+        not isinstance(completion, dict)
+        or set(completion) != expected_completion_fields
+        or completion.get("state") != "created"
+        or completion.get("requestStartedAtUtc") is not None
+        or completion.get("lastHttpStatus") is not None
+        or completion.get("lastProblemType") is not None
+        or completion.get("traceId") is not None
+    ):
+        raise ValueError("only a pristine created upload receipt can be resumed")
+
+    history = payload.get("stateHistory")
+    if (
+        not isinstance(history, list)
+        or len(history) != 1
+        or not isinstance(history[0], dict)
+        or set(history[0]) != {"state", "atUtc"}
+        or history[0].get("state") != "created"
+    ):
+        raise ValueError("created upload receipt history is not pristine")
+
+    expires_at = normalize_expiry(str(payload.get("expiresAtUtc") or ""))
+    if expires_at is None:
+        raise ValueError("created upload receipt is missing its expiry")
+    expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    if expiry <= datetime.now(timezone.utc):
+        raise ValueError("created upload receipt has expired")
+
+    json.dump(
+        {"sessionId": session_id, "expiresAtUtc": expires_at},
+        sys.stdout,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    sys.stdout.write("\n")
+    return 0
+
+
 def transition(args: argparse.Namespace) -> int:
     state = args.state
     if state not in VALID_STATES:
@@ -340,6 +410,12 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_parser = subparsers.add_parser("preflight")
     preflight_parser.add_argument("--receipt", required=True)
     preflight_parser.set_defaults(handler=preflight)
+
+    resume_parser = subparsers.add_parser("validate-resume-created")
+    resume_parser.add_argument("--receipt", required=True)
+    resume_parser.add_argument("--summary", required=True)
+    resume_parser.add_argument("--sessions-url", required=True)
+    resume_parser.set_defaults(handler=validate_resume_created)
 
     summary_parser = subparsers.add_parser("summarize")
     summary_parser.add_argument("--bundle-root", required=True)

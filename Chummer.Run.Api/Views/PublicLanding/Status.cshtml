@@ -32,7 +32,7 @@
         ? "Downloads paused"
         : isStableRelease ? "Stable downloads" : "Preview downloads";
     var statusLine = Model.ReleaseExperience.Recommended is null
-        ? "Downloads are paused."
+        ? "Downloads are paused. The current build must clear release checks before an installer is offered."
         : isStableRelease ? publicPlatformSummary : $"{publicPlatformSummary} Stable is still unavailable.";
 
     static string PublicStatusText(string? value)

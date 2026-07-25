@@ -24,6 +24,39 @@ const requiredLandingLinks = [
   '/help',
 ];
 
+const landingRequirements = [
+  ['product name', text => text.includes('Chummer')],
+  ['Open Chummer action', text => text.includes('Open Chummer')],
+  ['minimal Open Chummer marker', text => text.includes('minimal-open-chummer')],
+  ['Build action', text => text.includes('Build')],
+  ['Play action', text => text.includes('Play')],
+  ['signed-out explanation', text => text.includes('Sign in first')],
+  ['direct Build action', text => text.includes('site-open-chummer-menu__button" href="/build"')],
+  ['direct Play action', text => text.includes('site-open-chummer-menu__button" href="/mobile/player"')],
+  ['retired disabled action class must stay absent', text => !text.includes('site-open-chummer-menu__button--disabled')],
+  ['retired Build target binding must stay absent', text => !text.includes('data-disabled-target="/build"')],
+  ['retired Build sign-in binding must stay absent', text => !text.includes('data-sign-in-href="/login?next=%2Fbuild"')],
+  ['retired Play target binding must stay absent', text => !text.includes('data-disabled-target="/mobile/player"')],
+  ['retired Play sign-in binding must stay absent', text => !text.includes('data-sign-in-href="/login?next=%2Fmobile%2Fplayer"')],
+  [
+    'current public installer summary',
+    text =>
+      text.includes('Current public installer:')
+      || text.includes('Current public installers:')
+      || text.includes('No public installer right now.'),
+  ],
+  ['current public lane summary', text => text.includes('Current public lane:')],
+  ['promo video link', text => hasPromoVideoLink(text)],
+  ['account access sign-in link', text => text.includes('/login?next=%2Faccount%2Faccess')],
+  ...requiredLandingLinks.map(link => [`landing link ${link}`, text => text.includes(link)]),
+];
+
+function landingRequirementFailures(text) {
+  return landingRequirements
+    .filter(([, requirement]) => !requirement(text))
+    .map(([label]) => label);
+}
+
 function isTransientFailure(status, error) {
   if (typeof status === 'number') {
     return transientHttpStatuses.has(status);
@@ -93,17 +126,30 @@ function hasPromoVideoLink(text) {
     );
 }
 
-function hasCurrentDownloadShelf(text) {
-  return text.includes('Downloads')
-    && (
+const currentDownloadShelfRequirements = [
+  ['Downloads heading', text => text.includes('Downloads')],
+  [
+    'current public release summary',
+    text =>
       text.includes('Current public installer')
       || text.includes('Stable release')
-      || text.includes('Current public build')
-    )
-    && text.includes('Nightly')
-    && text.includes('Version ')
-    && text.includes('Build from source')
-    && text.includes('Download script');
+      || text.includes('Current public build'),
+  ],
+  ['operator-facing Nightly label must stay absent', text => !text.includes('Nightly')],
+  ['version label', text => text.includes('Version ')],
+  ['source-build option', text => text.includes('Build from source')],
+  ['download-script label', text => text.includes('Download script')],
+  ['Linux source-build script link', text => text.includes('build-chummer6-linux.sh')],
+];
+
+function currentDownloadShelfFailures(text) {
+  return currentDownloadShelfRequirements
+    .filter(([, requirement]) => !requirement(text))
+    .map(([label]) => label);
+}
+
+function hasCurrentDownloadShelf(text) {
+  return currentDownloadShelfFailures(text).length === 0;
 }
 
 function hasBlazorBaseHref(html) {
@@ -134,6 +180,17 @@ function isBlazorReady(text) {
         && text.includes('New runner')
         && text.includes('Import')
       )
+    )
+  );
+}
+
+function isBlazorRootRouteReady(response) {
+  const resolvedUrl = response?.url || '';
+  return (
+    /\/blazor\/?$/.test(resolvedUrl)
+    || (
+      resolvedUrl.includes('/blazor/app')
+      && resolvedUrl.includes('command=character_roster')
     )
   );
 }
@@ -206,40 +263,68 @@ function hasStatusDecisionSurface(text) {
   );
 }
 
+function releaseManifestFailures(text) {
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch (error) {
+    return [`invalid JSON: ${error.message}`];
+  }
+
+  const failures = [];
+  if (typeof payload?.version !== 'string' || !payload.version.trim()) {
+    failures.push('version must be a non-empty string');
+  }
+  if (typeof payload?.channel !== 'string' || !payload.channel.trim()) {
+    failures.push('channel must be a non-empty string');
+  }
+  if (payload?.status !== 'published') {
+    failures.push('status must be published');
+  }
+  if (!Array.isArray(payload?.downloads)) {
+    failures.push('downloads must be an array');
+    return failures;
+  }
+
+  if (payload.downloads.length === 0) {
+    const tupleCoverage = payload.desktopTupleCoverage;
+    const missingCoverage = [
+      ...(Array.isArray(tupleCoverage?.missingRequiredPlatforms) ? tupleCoverage.missingRequiredPlatforms : []),
+      ...(Array.isArray(tupleCoverage?.missingRequiredPlatformHeadPairs) ? tupleCoverage.missingRequiredPlatformHeadPairs : []),
+      ...(Array.isArray(tupleCoverage?.missingRequiredPlatformHeadRidTuples) ? tupleCoverage.missingRequiredPlatformHeadRidTuples : []),
+    ];
+    const externalProofRequests = Array.isArray(tupleCoverage?.externalProofRequests)
+      ? tupleCoverage.externalProofRequests
+      : [];
+    if (
+      payload.rolloutState !== 'coverage_incomplete'
+      || payload.supportabilityState !== 'review_required'
+      || (missingCoverage.length === 0 && externalProofRequests.length === 0)
+    ) {
+      failures.push(
+        'an empty public download projection requires coverage_incomplete/review_required posture and an explicit desktop coverage gap',
+      );
+    }
+  }
+
+  return failures;
+}
+
 const checks = [
   {
     url: `${baseUrl}/`,
-    assert: text =>
-      text.includes('Chummer') &&
-      text.includes('Open Chummer') &&
-      text.includes('minimal-open-chummer') &&
-      text.includes('Build') &&
-      text.includes('Play') &&
-      text.includes('Sign in first') &&
-      text.includes('site-open-chummer-menu__button--disabled') &&
-      text.includes('data-disabled-target="/build"') &&
-      text.includes('data-sign-in-href="/login?next=%2Fbuild"') &&
-      text.includes('data-disabled-target="/mobile/player"') &&
-      text.includes('data-sign-in-href="/login?next=%2Fmobile%2Fplayer"') &&
-      !text.includes('site-open-chummer-menu__button" href="/mobile/player"') &&
-      (
-        text.includes('Current public installer:')
-        || text.includes('Current public installers:')
-        || text.includes('No public installer right now.')
-      ) &&
-      text.includes('Current public lane:') &&
-      hasPromoVideoLink(text) &&
-      text.includes('/login?next=%2Faccount%2Faccess') &&
-      requiredLandingLinks.every(link => text.includes(link))
+    assert: text => landingRequirementFailures(text).length === 0,
+    diagnose: text => `missing landing requirements: ${landingRequirementFailures(text).join(', ')}`
   },
   {
     url: `${baseUrl}/downloads/`,
-    assert: text => hasCurrentDownloadShelf(text)
+    assert: text => hasCurrentDownloadShelf(text),
+    diagnose: text => `download shelf requirements failed: ${currentDownloadShelfFailures(text).join(', ')}`
   },
   {
     url: `${baseUrl}/help`,
     assert: text =>
-      text.includes('What is wrong?')
+      text.includes('How can we help?')
       && text.includes('Pick the next step.')
       && text.includes('Install or update')
       && text.includes('Account recovery')
@@ -254,13 +339,8 @@ const checks = [
   },
   {
     url: `${baseUrl}/downloads/releases.json`,
-    assert: text => {
-      const payload = JSON.parse(text);
-      return typeof payload?.version === 'string'
-        && typeof payload?.channel === 'string'
-        && Array.isArray(payload?.downloads)
-        && payload.downloads.length > 0;
-    }
+    assert: text => releaseManifestFailures(text).length === 0,
+    diagnose: text => `release manifest requirements failed: ${releaseManifestFailures(text).join(', ')}`
   },
   {
     url: `${baseUrl}/account`,
@@ -380,7 +460,7 @@ const checks = [
     label: requireBlazor ? 'blazor' : 'delegated-blazor',
     required: requireBlazor,
     assert: (text, response) =>
-      /\/blazor\/?$/.test(response.url)
+      isBlazorRootRouteReady(response)
       && (requireBlazor ? isBlazorReady(text) : (isBlazorReady(text) || isBlazorFallback(text)))
   },
   {
@@ -394,13 +474,21 @@ const checks = [
     url: `${baseUrl}/avalonia/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && hasCurrentDownloadShelf(text)
+      && hasCurrentDownloadShelf(text),
+    diagnose: (text, response) => {
+      const failures = currentDownloadShelfFailures(text);
+      if (!/\/downloads\/?$/.test(response.url)) {
+        failures.unshift(`redirect ended at ${response.url}`);
+      }
+      return `download shelf requirements failed: ${failures.join(', ')}`;
+    }
   },
   {
     url: `${baseUrl}/session/`,
     assert: (text, response) =>
-      /\/play\/?$/.test(response.url)
-      && text.includes('Player entry')
+      /\/mobile\/player\/?$/.test(response.url)
+      && text.includes('data-play-surface="install-only"')
+      && text.includes('data-install-role="player"')
   },
   {
     url: `${baseUrl}/coach/`,
@@ -431,12 +519,14 @@ async function runRenderedCheck(browser, check) {
       };
     }
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       () => {
         const text = (document.body && document.body.innerText) || '';
         return /Participate|Board offline right now/i.test(text);
       },
-      { timeout: 15000 },
+      15000,
+      'participate surface did not reach a rendered ready or offline state',
     );
 
     const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
@@ -450,6 +540,15 @@ async function runRenderedCheck(browser, check) {
     };
   } finally {
     await context.close();
+  }
+}
+
+async function waitForPageCondition(page, condition, timeoutMs, failureLabel) {
+  try {
+    await page.waitForFunction(condition, undefined, { timeout: timeoutMs });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${failureLabel}: ${detail}`);
   }
 }
 
@@ -530,7 +629,8 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
     }
 
     await fileMenu.click({ timeout: 15000 });
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       () => {
         const button = Array.from(document.querySelectorAll('button.menu-btn.classic-menu-button'))
           .find(element => element.textContent?.includes('File'));
@@ -542,7 +642,8 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
         const classes = (button.getAttribute('class') || '').split(/\s+/);
         return ariaExpanded === 'true' || classes.includes('active');
       },
-      { timeout: 15000 },
+      15000,
+      'File menu did not expose its expanded state after click',
     );
     const fileMenuExpandedState = await fileMenu.evaluate((element) => ({
       ariaExpanded: element.getAttribute('aria-expanded') || '',
@@ -561,9 +662,11 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
     await newRunner.click({ timeout: 15000 });
 
     await page.waitForSelector('#dialogBackdrop[data-dialog-id="dialog.new_character"]', { state: 'visible', timeout: 15000 });
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       () => document.querySelector('label[data-field-id="newCharacterBuildMethod"] select')?.value === 'Priority',
-      { timeout: 15000 },
+      15000,
+      'new-character dialog did not reset Build Method to Priority after File → New runner',
     );
     const buildMethodReset = await buildMethod.inputValue();
     if (buildMethodReset !== 'Priority') {
@@ -580,7 +683,8 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
       throw new Error('Expected File menu to return to the disabled state after reopening the startup dialog.');
     }
 
-    await page.waitForFunction(
+    await waitForPageCondition(
+      page,
       () => {
         const button = Array.from(document.querySelectorAll('button.menu-btn.classic-menu-button'))
           .find(element => element.textContent?.includes('File'));
@@ -592,7 +696,8 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
         const classes = (button.getAttribute('class') || '').split(/\s+/);
         return ariaExpanded === 'false' || !classes.includes('active');
       },
-      { timeout: 15000 },
+      15000,
+      'File menu did not collapse after selecting New runner',
     );
     const fileMenuCollapsedState = await fileMenu.evaluate((element) => ({
       ariaExpanded: element.getAttribute('aria-expanded') || '',
@@ -687,14 +792,18 @@ async function runBlazorNewRunnerMenuCheck(page, check) {
       }
 
       if (!passed) {
+        const diagnostic = typeof check.diagnose === 'function'
+          ? String(check.diagnose(body, response) || '').trim()
+          : '';
+        const failureDetail = diagnostic ? `: ${diagnostic}` : '';
         if (check.required === false) {
-          const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion returned false`;
+          const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion returned false${failureDetail}`;
           delegatedWarnings.push(message);
           console.warn(message);
           continue;
         }
 
-        throw new Error(`Portal check failed: ${check.url} -> assertion returned false`);
+        throw new Error(`Portal check failed: ${check.url} -> assertion returned false${failureDetail}`);
       }
 
       console.log(`ok: ${check.url}`);

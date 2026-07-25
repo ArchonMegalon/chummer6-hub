@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 
@@ -58,3 +59,21 @@ def test_verify_public_edge_publishes_public_safe_urls_for_loopback_probe(monkey
     assert result["base_url"] == "https://chummer.run"
     assert result["artifacts"][0]["url"] == "https://chummer.run/downloads/files/chummer.zip"
     assert result["artifacts"][0]["final_url"] == "https://chummer.run/downloads/files/chummer.zip"
+
+
+def test_release_public_install_count_reads_authoritative_pause_posture(tmp_path: Path) -> None:
+    module = load_module()
+    (tmp_path / "RELEASE_CHANNEL.generated.json").write_text(
+        json.dumps(
+            {
+                "publicTrustMetrics": {
+                    "adoptionHealth": {
+                        "publicInstallCount": 0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert module.release_public_install_count(tmp_path) == 0

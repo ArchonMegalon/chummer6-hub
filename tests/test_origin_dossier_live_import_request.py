@@ -20,6 +20,15 @@ def load_module():
     return module
 
 
+def test_fake_marker_detection_uses_token_boundaries() -> None:
+    module = load_module()
+
+    assert module._contains_fake_marker("A stubborn runner makes a real choice.") is False
+    assert module._contains_fake_marker("The generated artifact is a stub.") is True
+    assert module._contains_fake_marker("/tmp/local_fixture/story.md") is True
+    assert module._contains_fake_marker("verified no-fallback provider path") is False
+
+
 def now_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 

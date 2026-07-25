@@ -13,6 +13,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import signal
@@ -75,6 +76,10 @@ PUBLISH_TIMEOUT_EXIT_CODE = 124
 PUBLISH_TIMEOUT_TERMINATION_GRACE_SECONDS = 10.0
 MAX_RELEASE_CHANNEL_RECEIPT_BYTES = 16 * 1024 * 1024
 DEFAULT_PUBLISH_LOCK_FILE = "public-edge-portal-overlay.publish.lock"
+PUBLIC_EDGE_MUTATION_LOCK = Path(
+    "/docker/chummercomplete/.state/public-edge-mutation.lock"
+)
+PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE = "owner-token"
 CONTRACT_NAME = "chummer.public_edge_portal_overlay_publish.v1"
 SOURCE_FINGERPRINT_ALGORITHM = "sha256-canonical-path-content-size-v1"
 STAGED_PAYLOAD_FINGERPRINT_ALGORITHM = (
@@ -86,6 +91,7 @@ ACTIVATION_TRANSACTION_CONTRACT_NAME = "chummer.public_edge_portal_overlay_activ
 RENAME_NOREPLACE = 1
 RENAME_EXCHANGE = 2
 OVERLAY_BUILD_INFO_RELATIVE_PATH = Path(".codex-studio") / "runtime" / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+RUNTIME_RELEASE_CHANNEL_MANIFEST_NAME = "RELEASE_CHANNEL.generated.json"
 LIVE_SURFACE_PARITY_SCRIPT_PATH = RUN_SERVICES_ROOT / "scripts" / "verify_live_surface_parity.py"
 DOWNLOADS_VERSION_MARKER_SCRIPT_PATH = RUN_SERVICES_ROOT / "scripts" / "verify_downloads_version_marker.py"
 VERIFICATION_PROGRAM_AUTHORITY_DIRECTORY_NAME = ".verification-program-authority"
@@ -212,11 +218,17 @@ REQUIRED_COMPOSE_MOUNTPOINTS = (
     Path("wwwroot") / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
 )
 REQUIRED_LANDING_MARKERS = {
-    "playDisabledTarget": 'data-disabled-target="/mobile/player"',
-    "playSignInRoute": 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
+    "playDirectTarget": 'href="/mobile/player"',
+    "playInstallHandoff": 'data-mobile-app-handoff="mobile-app-handoff"',
     "turnAnchor": "#turn-runsite-card",
     "turnAnchorNormalizedHash": 'const normalizedHash = window.location.hash.split("?")[0];',
-    "turnAnchorRedirect": "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
+    "turnAnchorRedirect": "window.location.replace(`/mobile/player${normalizedHash}`);",
+}
+FORBIDDEN_LANDING_MARKERS = {
+    "playDisabledButton": "site-open-chummer-menu__button--disabled",
+    "playDisabledTarget": 'data-disabled-target="/mobile/player"',
+    "playSignInRoute": 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
+    "turnAnchorQueryReplay": "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
 }
 ALLOWED_OVERLAY_ACTIVATION_RECEIPT_FAILURES = frozenset(
     {
@@ -249,7 +261,7 @@ OVERLAY_ACTIVATION_RECEIPT_REQUIRED_TRUE_FIELDS = (
     "release_manifest_status_matches_release_channel",
     "release_manifest_version_matches_release_channel",
     "release_manifest_published_at_matches_release_channel",
-    "release_manifest_proof_freshness_matches_release_channel",
+    "release_manifest_proof_freshness_compatible_with_release_channel",
     "release_manifest_supportability_compatible_with_release_channel",
     "release_manifest_rollout_compatible_with_release_channel",
     "release_manifest_internal_supportability_consistent",
@@ -289,6 +301,10 @@ CRITICAL_SOURCE_FINGERPRINT_FILES = {
     "siteViewModels": Path("Chummer.Run.Api") / "ViewModels" / "SiteViewModels.cs",
 }
 class OverlayPublishLockUnavailable(RuntimeError):
+    pass
+
+
+class PublicEdgeMutationLockUnavailable(RuntimeError):
     pass
 
 
@@ -898,6 +914,55 @@ def snapshot_bound_release_channel_receipt(
         raise RuntimeError("release-channel receipt snapshot digest changed after atomic write")
     binding["snapshotPath"] = str(snapshot_path)
     return snapshot_path
+
+
+def materialize_bound_release_channel_shelf(
+    receipt_path: Path,
+    expected_sha256: str,
+    shelf_root: Path,
+) -> dict[str, Any]:
+    """Create an isolated legacy shelf whose canonical bytes are the selected receipt."""
+    normalized_shelf_root = normalized_absolute_path(shelf_root)
+    assert_no_symlink_components(
+        normalized_shelf_root.parent,
+        label="bound release-channel shelf parent",
+    )
+    if normalized_shelf_root.exists():
+        raise RuntimeError(
+            f"bound release-channel shelf root already exists: {normalized_shelf_root}"
+        )
+    raw_bytes, receipt_binding = read_bound_release_channel_receipt(
+        receipt_path,
+        expected_sha256,
+    )
+    normalized_shelf_root.mkdir(parents=True, mode=0o700)
+    canonical_manifest_path = (
+        normalized_shelf_root / RUNTIME_RELEASE_CHANNEL_MANIFEST_NAME
+    )
+    atomic_write_bytes(canonical_manifest_path, raw_bytes)
+    materialized_bytes, _ = read_stable_regular_bytes(
+        canonical_manifest_path,
+        label="bound release-channel shelf canonical manifest",
+    )
+    materialized_sha256 = sha256_bytes(materialized_bytes)
+    matches_selected_receipt = bool(
+        materialized_bytes == raw_bytes
+        and materialized_sha256 == receipt_binding["sha256Actual"]
+    )
+    if not matches_selected_receipt:
+        raise RuntimeError(
+            "bound release-channel shelf canonical manifest does not match the selected receipt"
+        )
+    return {
+        "contractName": "chummer.public_edge.bound_release_channel_shelf.v1",
+        "rootPath": str(normalized_shelf_root),
+        "canonicalManifestPath": str(canonical_manifest_path),
+        "canonicalManifestSha256": materialized_sha256,
+        "selectedReceiptSha256": str(receipt_binding["sha256Actual"]),
+        "byteLength": len(materialized_bytes),
+        "matchesSelectedReceipt": True,
+        "status": "pass",
+    }
 
 
 def _renameat2(left: Path, right: Path, flags: int) -> None:
@@ -1869,6 +1934,223 @@ def publish_lock_path(source_root: Path, active_root: Path | None = None) -> Pat
     return normalized_absolute_path(source_root) / ".state" / DEFAULT_PUBLISH_LOCK_FILE
 
 
+def _validate_mutation_lock_root(lock_root: Path) -> None:
+    try:
+        lock_root.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock root cannot be created"
+        ) from exc
+    else:
+        os.chmod(lock_root, 0o700)
+    metadata = lock_root.lstat()
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock root is not a caller-owned mode-0700 real directory"
+        )
+
+
+def _mutation_lock_directory_identity(lock_path: Path, *, inherited: bool) -> os.stat_result:
+    try:
+        metadata = lock_path.lstat()
+    except OSError as exc:
+        qualifier = "inherited " if inherited else ""
+        raise PublicEdgeMutationLockUnavailable(
+            f"{qualifier}public-edge mutation lock is unavailable"
+        ) from exc
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        qualifier = "inherited " if inherited else ""
+        raise PublicEdgeMutationLockUnavailable(
+            f"{qualifier}public-edge mutation lock has unsafe identity"
+        )
+    return metadata
+
+
+def _read_mutation_lock_token(lock_path: Path) -> str:
+    token_path = lock_path / PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(token_path, flags)
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation lock has no readable owner token"
+        ) from exc
+    try:
+        metadata = os.fstat(descriptor)
+        path_metadata = token_path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or (metadata.st_dev, metadata.st_ino)
+            != (path_metadata.st_dev, path_metadata.st_ino)
+        ):
+            raise PublicEdgeMutationLockUnavailable(
+                "shared public-edge mutation owner token has unsafe identity"
+            )
+        payload = os.read(descriptor, 129)
+        if len(payload) > 128:
+            raise PublicEdgeMutationLockUnavailable(
+                "shared public-edge mutation owner token is oversized"
+            )
+        token = payload.decode("ascii", errors="strict").strip()
+    except (OSError, UnicodeError) as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation owner token is invalid"
+        ) from exc
+    finally:
+        os.close(descriptor)
+    if re.fullmatch(r"[0-9a-f]{64}", token) is None:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation owner token is malformed"
+        )
+    return token
+
+
+@contextmanager
+def public_edge_mutation_lock(
+    *,
+    activate: bool,
+    inherited_token: str = "",
+    lock_path: Path | None = None,
+):
+    """Acquire the selected host mutation authority before the overlay publish lock."""
+    if not activate:
+        yield None
+        return
+    selected_lock_path = (
+        Path(lock_path)
+        if lock_path is not None
+        else PUBLIC_EDGE_MUTATION_LOCK
+    )
+    if not selected_lock_path.is_absolute():
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock path must be absolute"
+        )
+    lock_path = normalized_absolute_path(selected_lock_path)
+    lock_root = lock_path.parent
+    _validate_mutation_lock_root(lock_root)
+    normalized_inherited_token = str(inherited_token or "").strip()
+    if normalized_inherited_token:
+        if re.fullmatch(r"[0-9a-f]{64}", normalized_inherited_token) is None:
+            raise PublicEdgeMutationLockUnavailable(
+                "inherited public-edge mutation token is malformed"
+            )
+        _mutation_lock_directory_identity(lock_path, inherited=True)
+        actual_token = _read_mutation_lock_token(lock_path)
+        if not secrets.compare_digest(actual_token, normalized_inherited_token):
+            raise PublicEdgeMutationLockUnavailable(
+                "inherited public-edge mutation token does not own the active lock"
+            )
+        yield lock_path
+        return
+
+    try:
+        lock_path.mkdir(mode=0o700)
+    except FileExistsError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "another public-edge mutation owns the shared deployment authority"
+        ) from exc
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock cannot be created"
+        ) from exc
+    os.chmod(lock_path, 0o700)
+    token_path = lock_path / PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    token = secrets.token_hex(32)
+    descriptor = -1
+    lock_metadata = _mutation_lock_directory_identity(lock_path, inherited=False)
+    token_metadata: os.stat_result | None = None
+    try:
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor = os.open(token_path, flags, 0o600)
+        os.fchmod(descriptor, 0o600)
+        os.write(descriptor, (token + "\n").encode("ascii"))
+        os.fsync(descriptor)
+        token_metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(token_metadata.st_mode)
+            or token_metadata.st_nlink != 1
+            or token_metadata.st_uid != os.getuid()
+            or stat.S_IMODE(token_metadata.st_mode) != 0o600
+        ):
+            raise PublicEdgeMutationLockUnavailable(
+                "created public-edge mutation owner token has unsafe identity"
+            )
+        os.close(descriptor)
+        descriptor = -1
+        yield lock_path
+    finally:
+        active_exception = sys.exc_info()[1]
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            current_lock_metadata = _mutation_lock_directory_identity(
+                lock_path,
+                inherited=False,
+            )
+            if (current_lock_metadata.st_dev, current_lock_metadata.st_ino) != (
+                lock_metadata.st_dev,
+                lock_metadata.st_ino,
+            ):
+                raise PublicEdgeMutationLockUnavailable(
+                    "public-edge mutation lock changed identity before cleanup"
+                )
+            if token_metadata is None:
+                try:
+                    token_path.lstat()
+                except FileNotFoundError:
+                    pass
+                else:
+                    raise PublicEdgeMutationLockUnavailable(
+                        "unowned public-edge mutation token appeared before cleanup"
+                    )
+            else:
+                current_token_metadata = token_path.lstat()
+                if (
+                    not stat.S_ISREG(current_token_metadata.st_mode)
+                    or current_token_metadata.st_nlink != 1
+                    or current_token_metadata.st_uid != os.getuid()
+                    or stat.S_IMODE(current_token_metadata.st_mode) != 0o600
+                    or (current_token_metadata.st_dev, current_token_metadata.st_ino)
+                    != (token_metadata.st_dev, token_metadata.st_ino)
+                ):
+                    raise PublicEdgeMutationLockUnavailable(
+                        "public-edge mutation owner token changed identity before cleanup"
+                    )
+                token_path.unlink()
+            lock_path.rmdir()
+        except (OSError, PublicEdgeMutationLockUnavailable) as cleanup_exc:
+            wrapped = (
+                cleanup_exc
+                if isinstance(cleanup_exc, PublicEdgeMutationLockUnavailable)
+                else PublicEdgeMutationLockUnavailable(
+                    f"unable to safely release public-edge mutation lock: {cleanup_exc}"
+                )
+            )
+            if active_exception is not None:
+                active_exception.add_note(str(wrapped))
+            else:
+                raise wrapped
 @contextmanager
 def overlay_publish_lock(source_root: Path, active_root: Path | None = None):
     lock_path = publish_lock_path(source_root, active_root)
@@ -2380,9 +2662,19 @@ def load_live_surface_parity_module(program_binding: dict[str, Any]) -> Any:
     return module
 
 
-def build_overlay_verification_env(base_url: str, dependency_base_url: str) -> dict[str, str]:
+def build_overlay_verification_env(
+    base_url: str,
+    dependency_base_url: str,
+    *,
+    runtime_state_root: Path,
+    runtime_release_shelf_root: Path,
+) -> dict[str, str]:
     normalized_dependency_base_url = dependency_base_url.rstrip("/")
     return {
+        "CHUMMER_DATA_PROTECTION_KEYS_PATH": str(
+            runtime_state_root / "data-protection-keys"
+        ),
+        "CHUMMER_DOWNLOADS_SOURCE_ROOT": str(runtime_release_shelf_root),
         "CHUMMER_PRODUCTLIFT_FEEDBACK_URL": f"{normalized_dependency_base_url}/feedback",
         "CHUMMER_PRODUCTLIFT_ROADMAP_URL": f"{normalized_dependency_base_url}/roadmap",
         "GOOGLE_OIDC_CLIENT_ID": "local-overlay-proof-client",
@@ -3748,15 +4040,31 @@ def _verify_published_overlay_with_budget(
     port = pick_free_port()
     base_url = f"http://127.0.0.1:{port}"
     temp_root = Path(tempfile.mkdtemp(prefix="chummer-public-edge-overlay-verify-"))
-    env = build_isolated_overlay_process_env(
-        dict(os.environ),
-        base_url=base_url,
-        temp_root=temp_root,
-        source_root=source_root,
-    )
     try:
+        runtime_release_shelf = materialize_bound_release_channel_shelf(
+            release_channel_receipt,
+            release_channel_receipt_sha256,
+            temp_root / "release-shelf",
+        )
+        runtime_release_shelf_root = Path(runtime_release_shelf["rootPath"])
+        runtime_release_manifest_path = Path(
+            runtime_release_shelf["canonicalManifestPath"]
+        )
+        env = build_isolated_overlay_process_env(
+            dict(os.environ),
+            base_url=base_url,
+            temp_root=temp_root,
+            source_root=source_root,
+        )
         with LocalPublicRuntimeDependencyStub() as dependency_stub:
-            env.update(build_overlay_verification_env(base_url, dependency_stub.base_url))
+            env.update(
+                build_overlay_verification_env(
+                    base_url,
+                    dependency_stub.base_url,
+                    runtime_state_root=staging_root / "state",
+                    runtime_release_shelf_root=runtime_release_shelf_root,
+                )
+            )
             startup_log_path.parent.mkdir(parents=True, exist_ok=True)
             startup_log_flags = (
                 os.O_WRONLY
@@ -3808,6 +4116,15 @@ def _verify_published_overlay_with_budget(
                         marker
                         for name, marker in REQUIRED_LANDING_MARKERS.items()
                         if not landing_marker_checks.get(name, False)
+                    ]
+                    landing_forbidden_marker_checks = {
+                        name: marker not in landing_body
+                        for name, marker in FORBIDDEN_LANDING_MARKERS.items()
+                    }
+                    landing_forbidden_markers = [
+                        marker
+                        for name, marker in FORBIDDEN_LANDING_MARKERS.items()
+                        if not landing_forbidden_marker_checks.get(name, False)
                     ]
                     landing_browser_redirect = probe_landing_anchor_browser_redirect(
                         base_url,
@@ -3862,6 +4179,8 @@ def _verify_published_overlay_with_budget(
                                     str(release_channel_receipt),
                                     "--release-channel-receipt-sha256",
                                     release_channel_receipt_sha256,
+                                    "--public-release-manifest",
+                                    str(runtime_release_manifest_path),
                                     "--invocation-id",
                                     verification_invocation_id,
                                 ],
@@ -3987,6 +4306,7 @@ def _verify_published_overlay_with_budget(
                         receipt_passed_for_overlay
                         and overlay_readiness_passed
                         and not landing_missing_markers
+                        and not landing_forbidden_markers
                         and browser_redirect_passed
                         and local_live_surface_parity_passed
                     )
@@ -4000,8 +4320,9 @@ def _verify_published_overlay_with_budget(
                             if program_binding_failure
                             else "combined_readiness_failed"
                             if overlay_readiness_passed is False
-                            else "landing_marker_missing"
-                            if receipt_passed_for_overlay and landing_missing_markers
+                            else "landing_marker_invalid"
+                            if receipt_passed_for_overlay
+                            and (landing_missing_markers or landing_forbidden_markers)
                             else "landing_browser_redirect_failed"
                             if receipt_passed_for_overlay and browser_redirect_passed is False
                             else "live_surface_parity_failed"
@@ -4057,6 +4378,7 @@ def _verify_published_overlay_with_budget(
                         "releaseChannelReceiptSha256Matches": bool(
                             receipt_payload.get("release_channel_receipt_sha256_matches")
                         ),
+                        "runtimeReleaseShelf": runtime_release_shelf,
                         "releaseChannelVersion": str(
                             receipt_payload.get("release_channel_version") or ""
                         ).strip(),
@@ -4080,9 +4402,16 @@ def _verify_published_overlay_with_budget(
                         "releaseManifestRolloutCompatible": receipt_payload.get(
                             "release_manifest_rollout_compatible_with_release_channel"
                         ),
-                        "landingMarkerStatus": "pass" if not landing_missing_markers else "fail",
+                        "landingMarkerStatus": (
+                            "pass"
+                            if not landing_missing_markers
+                            and not landing_forbidden_markers
+                            else "fail"
+                        ),
                         "landingMarkerChecks": landing_marker_checks,
                         "landingMissingMarkers": landing_missing_markers,
+                        "landingForbiddenMarkerChecks": landing_forbidden_marker_checks,
+                        "landingForbiddenMarkers": landing_forbidden_markers,
                         "landingBrowserRedirect": landing_browser_redirect,
                         "combinedReadiness": overlay_readiness,
                         "localRuntimeDependencyBaseUrl": dependency_stub.base_url,
@@ -4115,8 +4444,12 @@ def _verify_published_overlay_with_budget(
                                     "release_manifest_conservative_review_floor_applied"
                                 )
                             ),
-                            "landingHasPlayDisabledTarget": landing_marker_checks.get("playDisabledTarget"),
-                            "landingHasPlaySignInRoute": landing_marker_checks.get("playSignInRoute"),
+                            "landingHasPlayDirectTarget": landing_marker_checks.get("playDirectTarget"),
+                            "landingHasPlayInstallHandoff": landing_marker_checks.get("playInstallHandoff"),
+                            "landingOmitsPlayDisabledButton": landing_forbidden_marker_checks.get("playDisabledButton"),
+                            "landingOmitsPlayDisabledTarget": landing_forbidden_marker_checks.get("playDisabledTarget"),
+                            "landingOmitsPlaySignInRoute": landing_forbidden_marker_checks.get("playSignInRoute"),
+                            "landingOmitsTurnAnchorQueryReplay": landing_forbidden_marker_checks.get("turnAnchorQueryReplay"),
                             "landingHasTurnAnchor": landing_marker_checks.get("turnAnchor"),
                             "landingHasTurnAnchorRedirect": landing_marker_checks.get("turnAnchorRedirect"),
                             "landingBrowserRedirectStatus": landing_browser_redirect.get("status"),
@@ -4976,6 +5309,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--activate", action="store_true")
+    parser.add_argument(
+        "--shared-mutation-lock-token",
+        default="",
+        help=(
+            "Owner token for an already-held fixed public-edge mutation lock. "
+            "Only the guarded cutover lane should supply this."
+        ),
+    )
     parser.add_argument("--reuse-staging", action="store_true")
     parser.add_argument("--skip-backup-on-activate", action="store_true")
     parser.add_argument("--activation-mode", choices=("copy",), default="copy")
@@ -5056,52 +5397,80 @@ def main() -> int:
             build_root=args.build_root,
             activation_mode=args.activation_mode,
         )
-        with overlay_publish_lock(
-            path_plan["sourceRoot"],
-            path_plan["activeRoot"],
-        ):
-            capacity_check = require_disk_capacity(
-                staging_root=path_plan["stagingRoot"],
-                build_root=path_plan["buildRoot"],
-                minimum_free_bytes=minimum_free_disk_bytes,
-                allow_low_disk_capacity=allow_low_disk_capacity,
-            )
-            invalidate_prior_publisher_outputs(path_plan)
-            payload = materialize(
-                path_plan["output"],
-                release_channel_receipt=path_plan["releaseChannelReceipt"],
-                release_channel_receipt_sha256=args.release_channel_receipt_sha256,
-                source_root=path_plan["sourceRoot"],
-                staging_root=path_plan["stagingRoot"],
-                active_root=path_plan["activeRoot"],
-                backup_root=path_plan["backupRoot"],
-                build_root=path_plan["buildRoot"],
-                configuration=args.configuration,
-                activate=args.activate,
-                reuse_staging=args.reuse_staging,
-                skip_backup_on_activate=args.skip_backup_on_activate,
-                activation_mode=args.activation_mode,
-                verify_timeout_seconds=verify_timeout_seconds,
-                verification_deadline_seconds=verification_deadline_seconds,
-                publish_timeout_seconds=publish_timeout_seconds,
-                minimum_free_disk_bytes=minimum_free_disk_bytes,
-                allow_low_disk_capacity=allow_low_disk_capacity,
-                _preflight_disk_capacity_check=capacity_check,
-            )
+        with public_edge_mutation_lock(
+            activate=bool(args.activate),
+            inherited_token=str(
+                getattr(args, "shared_mutation_lock_token", "") or ""
+            ),
+        ) as mutation_lock_path:
+            with overlay_publish_lock(
+                path_plan["sourceRoot"],
+                path_plan["activeRoot"],
+            ):
+                capacity_check = require_disk_capacity(
+                    staging_root=path_plan["stagingRoot"],
+                    build_root=path_plan["buildRoot"],
+                    minimum_free_bytes=minimum_free_disk_bytes,
+                    allow_low_disk_capacity=allow_low_disk_capacity,
+                )
+                invalidate_prior_publisher_outputs(path_plan)
+                payload = materialize(
+                    path_plan["output"],
+                    release_channel_receipt=path_plan["releaseChannelReceipt"],
+                    release_channel_receipt_sha256=args.release_channel_receipt_sha256,
+                    source_root=path_plan["sourceRoot"],
+                    staging_root=path_plan["stagingRoot"],
+                    active_root=path_plan["activeRoot"],
+                    backup_root=path_plan["backupRoot"],
+                    build_root=path_plan["buildRoot"],
+                    configuration=args.configuration,
+                    activate=args.activate,
+                    reuse_staging=args.reuse_staging,
+                    skip_backup_on_activate=args.skip_backup_on_activate,
+                    activation_mode=args.activation_mode,
+                    verify_timeout_seconds=verify_timeout_seconds,
+                    verification_deadline_seconds=verification_deadline_seconds,
+                    publish_timeout_seconds=publish_timeout_seconds,
+                    minimum_free_disk_bytes=minimum_free_disk_bytes,
+                    allow_low_disk_capacity=allow_low_disk_capacity,
+                    _preflight_disk_capacity_check=capacity_check,
+                )
+                payload["sharedMutationLock"] = {
+                    "required": bool(args.activate),
+                    "status": (
+                        "held"
+                        if mutation_lock_path is not None
+                        else "not_required"
+                    ),
+                    "path": str(mutation_lock_path or ""),
+                    "inherited": bool(
+                        getattr(args, "shared_mutation_lock_token", "")
+                    ),
+                    "acquiredBeforeOverlayPublishLock": True,
+                }
+                atomic_write_json(path_plan["output"], payload)
     except Exception as exc:
+        mutation_lock_unavailable = isinstance(
+            exc,
+            PublicEdgeMutationLockUnavailable,
+        )
         lock_unavailable = isinstance(exc, OverlayPublishLockUnavailable)
         activation_error = isinstance(exc, OverlayActivationError)
         if isinstance(exc, OverlayDiskCapacityError):
             capacity_check = exc.check
         failure_reason = (
-            "overlay_publish_lock_unavailable"
+            "public_edge_mutation_lock_unavailable"
+            if mutation_lock_unavailable
+            else "overlay_publish_lock_unavailable"
             if lock_unavailable
             else exc.reason
             if activation_error
             else "overlay_publish_preflight_failed"
         )
         activation_status = (
-            "blocked_by_active_publisher"
+            "blocked_by_active_mutation"
+            if mutation_lock_unavailable
+            else "blocked_by_active_publisher"
             if lock_unavailable
             else "activation_failure_recovery_required"
             if activation_error and exc.rollback_status == "recovery_required"

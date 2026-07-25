@@ -234,6 +234,46 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     }
 
     [Fact]
+    public async Task UnadvertisedPayloadRolesAreNotFoundWithoutInvalidatingPrimaryArtifact()
+    {
+        using GenerationFixture fixture = new();
+        ReleaseShelfSnapshot snapshot = fixture.ManifestService.CaptureShelfSnapshot();
+
+        ArtifactDeliveryResolution primary = fixture.DeliveryPolicy.ResolveByArtifactId(
+            snapshot,
+            GenerationFixture.NoPayloadArtifactId);
+        Assert.True(primary.Allowed);
+
+        foreach (string role in new[]
+                 {
+                     ArtifactDeliveryRoles.Payload,
+                     ArtifactDeliveryRoles.PayloadMetadata
+                 })
+        {
+            ArtifactDeliveryResolution optionalRole = fixture.DeliveryPolicy.ResolveByArtifactId(
+                snapshot,
+                GenerationFixture.NoPayloadArtifactId,
+                role);
+            Assert.False(optionalRole.Allowed);
+            Assert.Equal(ArtifactDeliveryFailure.NotFound, optionalRole.Failure);
+            Assert.Equal("artifact_role_not_found", optionalRole.Code);
+        }
+
+        fixture.SetQuery(null, null);
+        IActionResult current = await fixture.Controller.DownloadCurrentArtifactPayloadMetadata(
+            GenerationFixture.NoPayloadArtifactId,
+            CancellationToken.None);
+        Assert.IsType<NotFoundResult>(current);
+
+        fixture.SetQuery(null, null);
+        IActionResult retained = await fixture.Controller.DownloadGenerationArtifactPayloadMetadata(
+            "generation-a",
+            GenerationFixture.NoPayloadArtifactId,
+            CancellationToken.None);
+        Assert.IsType<NotFoundResult>(retained);
+    }
+
+    [Fact]
     public async Task GlobalRevocationInvalidatesOpenCurrentAndRetainedClaimAndTicketPaths()
     {
         using GenerationFixture fixture = new();
@@ -381,6 +421,57 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             fixture.ManifestService.CaptureUnpinnedActiveShelfSnapshot().GenerationId);
     }
 
+    [Fact]
+    public async Task CompletionClaimsStayBoundToPromotedGenerationWhenCurrentShelfAdvances()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.ProtectedGenerationId);
+        var resultA = new ReleaseBundlePromotionResult(
+            Version: "run-a",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-07-15T12:00:00Z"),
+            PromotedArtifactIds: [GenerationFixture.ArtifactId],
+            DownloadsUrl: "/downloads",
+            InstallDispatchUrls:
+            [
+                $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}"
+            ],
+            DirectFileUrls: [],
+            GenerationId: "generation-a",
+            ActivationReceiptId: "activation-generation-a");
+        var claims = new ReleaseUploadTicketClaims(
+            SubjectId: "subject-release-operator",
+            DisplayName: "Release operator",
+            Email: "operator@example.test",
+            IssuedAtUtc: DateTimeOffset.UtcNow,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddHours(1),
+            TicketId: "ticket-generation-a");
+
+        ReleaseBundlePromotionResult attached = fixture.InternalController.AttachSignedInInstallClaims(
+            resultA,
+            claims);
+
+        ReleasePromotionInstallClaim claimA = Assert.Single(attached.SignedInInstallClaims!);
+        Assert.StartsWith(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}",
+            claimA.InstallDispatchUrl,
+            StringComparison.Ordinal);
+        Assert.Contains("claimCode=", claimA.InstallDispatchUrl, StringComparison.Ordinal);
+
+        fixture.SetQuery("claimCode", claimA.ClaimCode);
+        IActionResult currentB = await fixture.Controller.DownloadGenerationArtifact(
+            GenerationFixture.ProtectedGenerationId,
+            GenerationFixture.ArtifactId,
+            CancellationToken.None);
+        Assert.IsType<UnauthorizedObjectResult>(currentB);
+
+        fixture.SetQuery("claimCode", claimA.ClaimCode);
+        IActionResult retainedA = await fixture.Controller.DownloadGenerationArtifact(
+            "generation-a",
+            GenerationFixture.ArtifactId,
+            CancellationToken.None);
+        Assert.Equal("artifact-a", await ReadFileResultAsync(retainedA));
+    }
 
     private static async Task<string> ReadFileResultAsync(IActionResult result)
     {
@@ -395,6 +486,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         public const string ArtifactId = "shared-account-required-installer";
         public const string FileName = "chummer-shared-installer.dmg";
         public const string PayloadFileName = "chummer-shared-payload.zip";
+        public const string NoPayloadArtifactId = "standalone-installer";
+        public const string NoPayloadFileName = "chummer-standalone-installer.deb";
         public const string ProtectedGenerationId = "generation-protected-b";
         public const string WindowsProofArtifactId = "avalonia-win-x64-installer";
         public const string WindowsProofFileName = "chummer-avalonia-win-x64-installer.exe";
@@ -457,6 +550,20 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 configuration);
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtection, configuration);
             DeliveryPolicy = _serviceProvider.GetRequiredService<ArtifactDeliveryPolicy>();
+            var accounts = new AccountService(
+                new CommunityStore(configuration, NullLogger<CommunityStore>.Instance));
+            InternalController = new InternalReleaseBundlesController(
+                new ReleaseBundlePromotionService(
+                    configuration,
+                    NullLogger<ReleaseBundlePromotionService>.Instance),
+                new ReleaseBundleUploadSessionService(
+                    configuration,
+                    NullLogger<ReleaseBundleUploadSessionService>.Instance),
+                configuration,
+                new ReleaseUploadTicketService(dataProtection, configuration),
+                ManifestService,
+                accounts,
+                InstallLinking);
             var releaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
             Controller = new DownloadsCompatibilityController(
                 ManifestService,
@@ -478,6 +585,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         public IConfigurationRoot Configuration { get; }
         public ArtifactDeliveryPolicy DeliveryPolicy { get; }
         public DownloadsCompatibilityController Controller { get; }
+        public InternalReleaseBundlesController InternalController { get; }
 
         public (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto Artifact) LoadArtifact(string generationId)
         {
@@ -611,6 +719,12 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string artifactPath = Path.Combine(filesRoot, FileName);
             File.WriteAllBytes(artifactPath, artifactBytes);
             string artifactSha256 = Convert.ToHexStringLower(SHA256.HashData(artifactBytes));
+            byte[] noPayloadArtifactBytes = Encoding.UTF8.GetBytes(
+                "standalone-" + generationId);
+            string noPayloadArtifactPath = Path.Combine(filesRoot, NoPayloadFileName);
+            File.WriteAllBytes(noPayloadArtifactPath, noPayloadArtifactBytes);
+            string noPayloadArtifactSha256 = Convert.ToHexStringLower(
+                SHA256.HashData(noPayloadArtifactBytes));
             byte[] payloadBytes = Encoding.UTF8.GetBytes(payloadText);
             string payloadPath = Path.Combine(filesRoot, PayloadFileName);
             File.WriteAllBytes(payloadPath, payloadBytes);
@@ -663,6 +777,21 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["sha256"] = artifactSha256,
                         ["sizeBytes"] = artifactBytes.Length,
                         ["installAccessClass"] = installAccessClass
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["artifactId"] = NoPayloadArtifactId,
+                        ["head"] = "avalonia",
+                        ["platform"] = "linux",
+                        ["rid"] = "linux-x64",
+                        ["arch"] = "x64",
+                        ["kind"] = "deb",
+                        ["platformLabel"] = "Standalone installer",
+                        ["fileName"] = NoPayloadFileName,
+                        ["downloadUrl"] = $"/downloads/g/{generationId}/install/{NoPayloadArtifactId}",
+                        ["sha256"] = noPayloadArtifactSha256,
+                        ["sizeBytes"] = noPayloadArtifactBytes.Length,
+                        ["installAccessClass"] = "open_public"
                     }
                 }
             };
@@ -693,6 +822,21 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["kind"] = "dmg",
                         ["fileName"] = FileName,
                         ["installAccessClass"] = installAccessClass
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["id"] = NoPayloadArtifactId,
+                        ["platform"] = "linux",
+                        ["url"] = $"/downloads/g/{generationId}/install/{NoPayloadArtifactId}",
+                        ["sha256"] = noPayloadArtifactSha256,
+                        ["sizeBytes"] = noPayloadArtifactBytes.Length,
+                        ["head"] = "avalonia",
+                        ["platformId"] = "linux",
+                        ["rid"] = "linux-x64",
+                        ["arch"] = "x64",
+                        ["kind"] = "deb",
+                        ["fileName"] = NoPayloadFileName,
+                        ["installAccessClass"] = "open_public"
                     }
                 }
             };

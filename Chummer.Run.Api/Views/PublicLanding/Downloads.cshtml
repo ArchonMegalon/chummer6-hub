@@ -27,7 +27,7 @@
         .ToArray();
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     var showLinuxSourcePrimary = !string.IsNullOrWhiteSpace(sourceScriptHref);
-    var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
+    var hasOtherDownloads = otherPlatformOptions.Length > 0;
     var emptyDownloadMessage = requestedPlatformUnavailable
         ? $"A current {release.RequestedPlatformLabel} build has not passed release verification yet. Nothing stale will be offered as a substitute."
         : "No current build has passed release verification yet. Please check again later.";
@@ -193,6 +193,7 @@
     <section class="minimal-empty">
         <h2>No build is available right now</h2>
         <p>@PublicDownloadText(string.IsNullOrWhiteSpace(Model.Manifest.Message) ? emptyDownloadMessage : Model.Manifest.Message)</p>
+        <p>Stable and Nightly packages return here once this release is ready.</p>
         <a class="button-like button-like--primary" href="/help">Help</a>
     </section>
 }
@@ -270,23 +271,6 @@ else
         <details class="details-drawer downloads-other-platforms" id="other-downloads">
             <summary>Other downloads</summary>
             <div class="downloads-choice-list downloads-choice-list--collapsed minimal-lane-grid" aria-label="Other downloads">
-                <article class="downloads-choice-card" id="linux-source">
-                    <div>
-                        <span>Linux</span>
-                        <h2>Build from source</h2>
-                        <p>No sudo. Updates default to notify.</p>
-                    </div>
-                    @if (showLinuxSourcePrimary)
-                    {
-                        <a class="button-like button-like--ghost"
-                           href="@sourceScriptHref"
-                           download
-                           data-analytics-event="downloads_linux_source_script"
-                           data-analytics-surface="minimal_downloads"
-                           data-analytics-label="build-chummer6-linux.sh">Download script</a>
-                    }
-                </article>
-
                 @foreach (var option in otherPlatformOptions)
                 {
                     <article class="downloads-choice-card">
@@ -314,4 +298,26 @@ else
             </div>
         </details>
     }
+}
+
+@if (showLinuxSourcePrimary)
+{
+    <details class="details-drawer downloads-other-platforms" id="source-build">
+        <summary>Build from source</summary>
+        <div class="downloads-choice-list downloads-choice-list--collapsed minimal-lane-grid" aria-label="Source build">
+            <article class="downloads-choice-card" id="linux-source">
+                <div>
+                    <span>Linux</span>
+                    <h2>Build from source</h2>
+                    <p>No sudo. Updates default to notify.</p>
+                </div>
+                <a class="button-like button-like--ghost"
+                   href="@sourceScriptHref"
+                   download
+                   data-analytics-event="downloads_linux_source_script"
+                   data-analytics-surface="minimal_downloads"
+                   data-analytics-label="build-chummer6-linux.sh">Download script</a>
+            </article>
+        </div>
+    </details>
 }

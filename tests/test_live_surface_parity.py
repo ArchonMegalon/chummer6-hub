@@ -30,7 +30,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
     billing_mode = "configured"
     downloads_mode = "review"
     mobile_gm_missing_heading = False
-    guest_play_public = False
+    stale_play_disabled = False
     release_status = "published"
     release_version = "run-test"
     release_channel = "public_stable"
@@ -65,11 +65,12 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            play_control = (
-                b"<a class=\"site-account-menu__link site-open-chummer-menu__button\" href=\"/mobile/player\" data-analytics-label=\"Play\">Play</a>"
-                if self.guest_play_public
-                else b"<button class=\"site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled\" type=\"button\" disabled aria-disabled=\"true\" data-disabled-target=\"/mobile/player\" data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\" data-analytics-label=\"Play\">Play</button>"
-            )
+            if self.stale_play_disabled:
+                build_control = b"<button class=\"site-open-chummer-menu__button site-open-chummer-menu__button--disabled\" data-disabled-target=\"/build\" data-sign-in-href=\"/login?next=%2Fbuild\">Build</button>"
+                play_control = b"<button class=\"site-open-chummer-menu__button site-open-chummer-menu__button--disabled\" data-disabled-target=\"/mobile/player\" data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\">Play</button>"
+            else:
+                build_control = b"<a class=\"site-open-chummer-menu__button\" href=\"/build\" data-mobile-app-handoff=\"build-mobile-app-handoff\">Build</a>"
+                play_control = b"<a class=\"site-open-chummer-menu__button\" href=\"/mobile/player\" data-mobile-app-handoff=\"mobile-app-handoff\">Play</a>"
             installer_copy = (
                 b"No public installer right now.</p><p>Current public lane: Downloads paused."
                 if self.public_install_count <= 0
@@ -82,7 +83,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<details class=\"site-account-menu site-open-chummer-menu\">"
                 b"<summary><span>Open Chummer</span></summary>"
                 b"<div class=\"site-account-menu__panel\">"
-                b"<button class=\"site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled\" type=\"button\" disabled aria-disabled=\"true\" data-disabled-target=\"/build\" data-sign-in-href=\"/login?next=%2Fbuild\" data-analytics-label=\"Build\">Build</button>"
+                + build_control
                 + play_control +
                 b"<a href=\"/login?next=%2Faccount%2Faccess\" data-analytics-label=\"Sign in first\">Sign in first</a>"
                 b"</div></details>"
@@ -98,7 +99,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 self.wfile.write(
                     b"<html><body>"
                     b"Downloads Chummer selects the best installer when it can. Current public installer "
-                    b"No build is available right now Help"
+                    b"No build is available right now Build from source Download script Help"
                     b'<a class="inline-link" href="/now">Release notes and known issues</a>'
                     b"</body></html>"
                 )
@@ -236,51 +237,37 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         mobile_roles = {
-            "/mobile": ("Player", "Claimed player actor"),
-            "/mobile/player": ("Player", "Claimed player actor"),
-            "/mobile/gm": ("GameMaster", "GM focus actor"),
-            "/mobile/observer": ("Observer", "Observer mirror"),
+            "/mobile": ("player", "Player"),
+            "/mobile/player": ("player", "Player"),
+            "/mobile/gm": ("gm", "GM"),
+            "/mobile/observer": ("observer", "Observer"),
+            "/play": ("player", "Player"),
         }
         if self.path in mobile_roles:
-            role, summary = mobile_roles[self.path]
-            if self.path == "/mobile/gm" and self.mobile_gm_missing_heading:
-                summary = "Mobile shell"
+            role_key, role_label = mobile_roles[self.path]
+            heading_label = (
+                "Mobile"
+                if self.path == "/mobile/gm" and self.mobile_gm_missing_heading
+                else role_label
+            )
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(
                 (
-                    "<html><head>"
-                    "<title>Chummer Mobile Turn Companion</title>"
-                    "<script src=\"/mobile-turn-companion.js\"></script>"
-                    "</head><body>"
-                    f"<main data-turn-root data-role=\"{role}\">"
-                    "<p>Device posture</p>"
-                    "<p>Live-session turn companion</p>"
-                    f"<h1>{summary} on scene-main</h1>"
-                    "<a>Player</a>"
-                    "<a>GM</a>"
-                    "<a>Observer</a>"
+                    "<html><body>"
+                    f"<main data-play-surface=\"install-only\" data-live-session=\"unavailable\" data-authority=\"none\" data-install-role=\"{role_key}\">"
+                    f"<p>Chummer {heading_label} · install shell</p>"
+                    "<p>Public shell only</p>"
+                    "<p>No table data loaded</p>"
+                    "<p>No role granted</p>"
+                    "<button>Install app</button>"
+                    f"<section data-role-capabilities=\"{role_key}\">{role_label} capability</section>"
+                    f"<section data-role-privacy-warning=\"{role_key}\">{role_label} privacy boundary</section>"
+                    f"<section data-role-authority-warning=\"{role_key}\">{role_label} authority boundary</section>"
                     "</main>"
                     "</body></html>"
                 ).encode("utf-8")
-            )
-            return
-
-        if self.path == "/play":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(
-                b"<html><body>"
-                b"<h1>Player entry</h1>"
-                b"<a>Open Chummer</a>"
-                b"<button>Install this app</button>"
-                b"<h2>Black Ledger live tracker</h2>"
-                b"<span data-pwa-ledger-status>Checking</span>"
-                b"<span data-pwa-ledger-summary>Waiting for live board stream data.</span>"
-                b"<p>Player, GM, and observer entry points meet in one shell.</p>"
-                b"</body></html>"
             )
             return
 
@@ -342,7 +329,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         _SurfaceHandler.billing_mode = "configured"
         _SurfaceHandler.downloads_mode = "review"
         _SurfaceHandler.mobile_gm_missing_heading = False
-        _SurfaceHandler.guest_play_public = False
+        _SurfaceHandler.stale_play_disabled = False
         _SurfaceHandler.release_status = "published"
         _SurfaceHandler.release_version = "run-test"
         _SurfaceHandler.release_channel = "public_stable"
@@ -437,7 +424,9 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("No public installer right now.", home["required_texts"])
         self.assertIn("Current public lane: Downloads paused.", home["required_texts"])
         self.assertIn("No build is available right now", downloads["required_texts"])
-        self.assertIn("Build from source", downloads["forbidden_texts"])
+        self.assertIn("Build from source", downloads["required_texts"])
+        self.assertIn("Download script", downloads["required_texts"])
+        self.assertNotIn("Build from source", downloads["forbidden_texts"])
         self.assertIn("Downloads paused", status["required_texts"])
 
     def test_verify_rejects_download_rails_when_manifest_has_no_public_installer(self) -> None:
@@ -450,7 +439,6 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual("fail", payload["status"])
         downloads = next(item for item in payload["results"] if item["path"] == "/downloads")
         self.assertIn("No build is available right now", downloads["missing_required_texts"])
-        self.assertIn("Build from source", downloads["forbidden_hits"])
         self.assertIn("Preview build. Review required.", downloads["forbidden_hits"])
 
     def test_verify_records_expected_release_channel_match_when_receipt_is_supplied(self) -> None:
@@ -566,19 +554,28 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Preview build. Review required.", downloads["required_texts"])
         self.assertIn("Stable release.", downloads["forbidden_texts"])
 
-    def test_verify_rejects_public_frontdoor_play_link_for_signed_out_homepage(self) -> None:
+    def test_verify_rejects_stale_disabled_frontdoor_play_control(self) -> None:
         module = load_module()
-        _SurfaceHandler.guest_play_public = True
+        _SurfaceHandler.stale_play_disabled = True
 
         payload = module.verify(self.base_url)
 
         self.assertEqual("fail", payload["status"])
         home = next(item for item in payload["results"] if item["path"] == "/")
-        self.assertIn("data-disabled-target=\"/mobile/player\"", home["missing_required_html_texts"])
-        self.assertIn("data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\"", home["missing_required_html_texts"])
-        self.assertIn("site-open-chummer-menu__button\" href=\"/mobile/player\"", home["forbidden_html_hits"])
         self.assertIn(
-            "/: contains forbidden html text: site-open-chummer-menu__button\" href=\"/mobile/player\"",
+            'site-open-chummer-menu__button" href="/mobile/player"',
+            home["missing_required_html_texts"],
+        )
+        self.assertIn(
+            'data-mobile-app-handoff="mobile-app-handoff"',
+            home["missing_required_html_texts"],
+        )
+        self.assertIn(
+            'data-disabled-target="/mobile/player"',
+            home["forbidden_html_hits"],
+        )
+        self.assertIn(
+            '/: contains forbidden html text: site-open-chummer-menu__button--disabled, data-disabled-target="/build", data-sign-in-href="/login?next=%2Fbuild", data-disabled-target="/mobile/player", data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
             payload["failures"],
         )
 
@@ -645,11 +642,11 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual("pass", payload["status"])
         by_path = {item["path"]: item for item in payload["results"]}
         for path, role_marker in {
-            "/mobile": "Claimed player actor",
-            "/mobile/player": "Claimed player actor",
-            "/mobile/gm": "GM focus actor",
-            "/mobile/observer": "Observer mirror",
-            "/play": "Player entry",
+            "/mobile": "Chummer Player · install shell",
+            "/mobile/player": "Chummer Player · install shell",
+            "/mobile/gm": "Chummer GM · install shell",
+            "/mobile/observer": "Chummer Observer · install shell",
+            "/play": "Chummer Player · install shell",
             "/play/continuity": "NEXUS-PAN continuity",
         }.items():
             self.assertIn(path, by_path)
@@ -657,8 +654,14 @@ class LiveSurfaceParityTests(unittest.TestCase):
             self.assertIn(role_marker, by_path[path]["required_texts"])
             self.assertEqual([], by_path[path]["missing_required_texts"])
 
-        self.assertIn("data-turn-root", by_path["/mobile/gm"]["required_html_texts"])
-        self.assertIn("data-role=\"GameMaster\"", by_path["/mobile/gm"]["required_html_texts"])
+        self.assertIn(
+            'data-play-surface="install-only"',
+            by_path["/mobile/gm"]["required_html_texts"],
+        )
+        self.assertIn(
+            'data-install-role="gm"',
+            by_path["/mobile/gm"]["required_html_texts"],
+        )
         self.assertEqual([], by_path["/mobile/gm"]["missing_required_html_texts"])
 
     def test_verify_fails_when_mobile_gm_role_surface_loses_role_heading(self) -> None:
@@ -669,8 +672,11 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
         self.assertEqual("fail", payload["status"])
         gm = next(item for item in payload["results"] if item["path"] == "/mobile/gm")
-        self.assertIn("GM focus actor", gm["missing_required_texts"])
-        self.assertIn("/mobile/gm: missing required text: GM focus actor", payload["failures"])
+        self.assertIn("Chummer GM · install shell", gm["missing_required_texts"])
+        self.assertIn(
+            "/mobile/gm: missing required text: Chummer GM · install shell",
+            payload["failures"],
+        )
 
     def test_verify_records_fetch_error_when_surface_has_no_http_status(self) -> None:
         module = load_module()

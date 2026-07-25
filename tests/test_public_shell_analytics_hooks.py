@@ -33,7 +33,13 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn('rybbit.src = "@rybbitScriptUrl";', source)
         self.assertIn('rybbit.dataset.siteId = "@rybbitSiteId";', source)
         self.assertIn('rybbit.dataset.skipPatterns =', source)
+        self.assertIn('"/mobile","/mobile/**"', source)
         self.assertIn('rybbit.dataset.tag = "hub_public_shell";', source)
+        self.assertIn(
+            'var installOnlyMobileSurface = string.Equals(normalizedRequestPath, "/mobile", StringComparison.OrdinalIgnoreCase)',
+            source,
+        )
+        self.assertEqual(source.count("&& !installOnlyMobileSurface"), 2)
 
     def test_public_views_and_site_js_expose_first_party_cta_telemetry(self) -> None:
         site_js = (REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "js" / "site.js").read_text(encoding="utf-8")
@@ -43,6 +49,10 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         ledger = (REPO_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Ledger.cshtml").read_text(encoding="utf-8")
         self.assertIn("window.ChummerAnalyticsQueue", site_js)
         self.assertIn("ChummerUi.trackPublicEvent", site_js)
+        self.assertIn("const isInstallOnlyMobilePath =", site_js)
+        self.assertIn("isInstallOnlyMobilePath(window.location.pathname)", site_js)
+        self.assertIn("const installOnlyMobileDestination = isInstallOnlyMobilePath(destinationHref)", site_js)
+        self.assertIn("window.__RYBBIT_OPTOUT__ = true", site_js)
         self.assertIn('data-analytics-event="homepage_open_downloads"', landing)
         self.assertNotIn('data-analytics-event="homepage_open_stable"', landing)
         self.assertNotIn('data-analytics-event="homepage_open_nightly"', landing)

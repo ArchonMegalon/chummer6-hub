@@ -19,7 +19,8 @@ public sealed class PublicCanonFileLoaderTests
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["CHUMMER_PUBLIC_CANON_ROOT"] = root
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = root,
+                    ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true"
                 })
                 .Build();
 
@@ -77,6 +78,134 @@ public sealed class PublicCanonFileLoaderTests
             {
                 Directory.Delete(root, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public void StrictConfiguredRootDoesNotFallBackWhenRequiredFileIsMissing()
+    {
+        string root = CreateTestRoot();
+        try
+        {
+            PublicCanonFileLoader loader = new(CreateStrictConfiguration(root));
+
+            Assert.Throws<DirectoryNotFoundException>(() =>
+                loader.ResolveRequiredPath("products/chummer/PUBLIC_FEEDBACK_TAXONOMY.yaml"));
+        }
+        finally
+        {
+            DeleteTestRoot(root);
+        }
+    }
+
+    [Fact]
+    public void StrictConfiguredRootRejectsRelativeConfiguredRoot()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = "relative-canon-root",
+                ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true"
+            })
+            .Build();
+        PublicCanonFileLoader loader = new(configuration);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            loader.ResolveRequiredPath("products/chummer/PUBLIC_FEEDBACK_TAXONOMY.yaml"));
+
+        Assert.Contains("absolute path", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StrictConfiguredRootRequiresConfiguredCanonRoot()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true"
+            })
+            .Build();
+        PublicCanonFileLoader loader = new(configuration);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            loader.ResolveRequiredPath("products/chummer/PUBLIC_FEEDBACK_TAXONOMY.yaml"));
+
+        Assert.Contains("requires CHUMMER_PUBLIC_CANON_ROOT", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StrictConfiguredRootRejectsTraversalOutsideConfiguredRoot()
+    {
+        string testRoot = CreateTestRoot();
+        string configuredRoot = Path.Combine(testRoot, "configured");
+        Directory.CreateDirectory(configuredRoot);
+        File.WriteAllText(Path.Combine(testRoot, "outside.yaml"), "outside: true\n");
+        try
+        {
+            PublicCanonFileLoader loader = new(CreateStrictConfiguration(configuredRoot));
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                loader.ResolveRequiredPath("../outside.yaml"));
+
+            Assert.Contains("escapes", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTestRoot(testRoot);
+        }
+    }
+
+    [Fact]
+    public void StrictConfiguredRootRejectsSymbolicLinkToOutsideFile()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string testRoot = CreateTestRoot();
+        string configuredRoot = Path.Combine(testRoot, "configured");
+        string productRoot = Path.Combine(configuredRoot, "products", "chummer");
+        Directory.CreateDirectory(productRoot);
+        string outsidePath = Path.Combine(testRoot, "outside.yaml");
+        File.WriteAllText(outsidePath, "outside: true\n");
+        File.CreateSymbolicLink(Path.Combine(productRoot, "linked.yaml"), outsidePath);
+        try
+        {
+            PublicCanonFileLoader loader = new(CreateStrictConfiguration(configuredRoot));
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                loader.ResolveRequiredPath("products/chummer/linked.yaml"));
+
+            Assert.Contains("symbolic link or reparse point", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTestRoot(testRoot);
+        }
+    }
+
+    private static IConfiguration CreateStrictConfiguration(string root)
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = root,
+                ["CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT"] = "true"
+            })
+            .Build();
+
+    private static string CreateTestRoot()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "public-canon-loader-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
+    private static void DeleteTestRoot(string root)
+    {
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 }

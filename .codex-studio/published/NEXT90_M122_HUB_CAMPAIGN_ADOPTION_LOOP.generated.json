@@ -33,6 +33,6 @@
     "NewsTitle: \"Tacoma grid rumor points to a vanished courier\"",
     "campaign spine adoption-loop api should surface the player-safe news preview without turning it into world truth.",
     "campaign spine server plane api should project the first BLACK LEDGER WorldTick onto the bounded what-changed rail.",
-    "campaign spine adoption loop should preserve the player-safe news preview across reload."
+    "campaign spine adoption loop should preserve the first player-safe news receipt across reload."
   ]
 }

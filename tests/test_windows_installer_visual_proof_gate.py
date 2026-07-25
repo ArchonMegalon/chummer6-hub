@@ -85,31 +85,114 @@ def _write_bundle_manifest(
     payload_size_bytes: int = 0,
     payload_download_url: str | None = None,
 ) -> None:
+    artifact = {
+        "artifactId": "avalonia-win-x64-installer",
+        "fileName": installer_name,
+        "downloadUrl": f"https://example.invalid/downloads/files/{installer_name}",
+        "sha256": installer_sha256,
+        "sizeBytes": installer_size_bytes,
+        "kind": "installer",
+        "platform": "windows",
+        "head": "avalonia",
+        "rid": "win-x64",
+        "installerMode": "bootstrap",
+        "payloadFileName": payload_name,
+        "payloadDownloadUrl": payload_download_url
+        or (f"https://example.invalid/downloads/files/{payload_name}" if payload_name else ""),
+        "payloadSha256": payload_sha256,
+        "payloadSizeBytes": payload_size_bytes,
+    }
     payload = {
         "version": "run-test",
         "channel": "preview",
         "publishedAt": "2026-06-24T00:00:00Z",
+        "artifacts": [artifact],
+        "desktopTupleCoverage": {
+            "promotedInstallerTuples": [
+                {
+                    "artifactId": artifact["artifactId"],
+                    "head": artifact["head"],
+                    "platform": artifact["platform"],
+                    "rid": artifact["rid"],
+                }
+            ]
+        },
         "downloads": [
             {
-                "artifactId": "avalonia-win-x64-installer",
-                "fileName": installer_name,
-                "url": f"https://example.invalid/downloads/files/{installer_name}",
-                "sha256": installer_sha256,
-                "sizeBytes": installer_size_bytes,
-                "kind": "installer",
-                "platform": "windows",
-                "head": "avalonia",
-                "rid": "win-x64",
-                "installerMode": "bootstrap",
-                "payloadFileName": payload_name,
-                "payloadDownloadUrl": payload_download_url
-                or (f"https://example.invalid/downloads/files/{payload_name}" if payload_name else ""),
-                "payloadSha256": payload_sha256,
-                "payloadSizeBytes": payload_size_bytes,
+                **artifact,
+                "url": artifact["downloadUrl"],
             }
         ],
     }
     manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_release_bound_startup_receipt(
+    path: Path,
+    *,
+    installer_name: str,
+    installer_sha256: str,
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "artifactId": "avalonia-win-x64-installer",
+                "channelId": "preview",
+                "headId": "avalonia",
+                "platform": "windows",
+                "rid": "win-x64",
+                "readyCheckpoint": "pre_ui_event_loop",
+                "hostClass": "local-win-x64",
+                "artifactDigest": f"sha256:{installer_sha256}",
+                "artifactFileName": installer_name,
+                "artifactPath": installer_name,
+                "version": "run-test",
+                "releaseVersion": "run-test",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_public_promotion_evidence(
+    path: Path,
+    *,
+    installer_name: str,
+    installer_sha256: str,
+    installer_size_bytes: int,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "contractName": "chummer.run.desktop_release_publication",
+                "channelId": "preview",
+                "releaseVersion": "run-test",
+                "artifacts": [
+                    {
+                        "artifactId": "avalonia-win-x64-installer",
+                        "fileName": installer_name,
+                        "artifactSha256": installer_sha256,
+                        "artifactSizeBytes": installer_size_bytes,
+                        "platform": "windows",
+                        "kind": "installer",
+                        "promotionStatus": "promoted",
+                        "startupSmokeStatus": "pass",
+                        "startupSmokeReceiptPath": (
+                            "startup-smoke/"
+                            "startup-smoke-avalonia-win-x64.receipt.json"
+                        ),
+                    }
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _write_ui_localization_release_gate(path: Path) -> None:
@@ -196,6 +279,7 @@ def _release_proof_for_windows_installer() -> dict:
             "/home/work",
             "/account/access",
             "/account/work",
+            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",
@@ -918,7 +1002,9 @@ def test_materialize_public_downloads_bundle_fails_before_generation_when_window
     assert "Windows installer visual proof is missing" in result.stderr
 
 
-def test_materialize_public_downloads_bundle_refreshes_stage_handoff_before_visual_proof_failure_returns(tmp_path: Path) -> None:
+def test_materialize_public_downloads_bundle_refreshes_operator_intake_without_staging_release_handoff(
+    tmp_path: Path,
+) -> None:
     assert PRESENTATION_RELEASE_HANDOFF_SCRIPT.is_file()
 
     output_root = tmp_path / "downloads"
@@ -1045,18 +1131,31 @@ def test_materialize_public_downloads_bundle_refreshes_stage_handoff_before_visu
     handoff_path = output_root / "RELEASE_BUILD_HANDOFF.generated.json"
     windows_gate_path = output_root / "UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json"
     visual_handoff_path = output_root / "WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json"
-
-    assert handoff_path.is_file()
-    assert windows_gate_path.is_file()
-    assert visual_handoff_path.is_file()
-
-    handoff_payload = json.loads(handoff_path.read_text(encoding="utf-8"))
-    assert handoff_payload["windows_exit_gate_refresh"]["status"] == "failed"
-    assert handoff_payload["windows_exit_gate_refresh"]["blocking_mode"] == "external_only"
-    assert handoff_payload["windows_visual_proof_handoff"]["status"] == "ready_for_windows_host"
-    assert handoff_payload["windows_visual_proof_handoff"]["visual_proof_path"] == str(
-        output_root / "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json"
+    operator_receipt_root = tmp_path / "operator-receipts"
+    visual_audit_path = (
+        operator_receipt_root / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
     )
+    intake_request_path = (
+        operator_receipt_root
+        / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+    )
+    auto_import_path = (
+        operator_receipt_root
+        / "WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json"
+    )
+
+    assert visual_audit_path.is_file()
+    assert intake_request_path.is_file()
+    assert auto_import_path.is_file()
+    intake_request = json.loads(intake_request_path.read_text(encoding="utf-8"))
+    auto_import = json.loads(auto_import_path.read_text(encoding="utf-8"))
+    assert intake_request["status"] == "external_artifact_required"
+    assert auto_import["status"] == "waiting_for_artifact"
+    assert not handoff_path.exists()
+    assert not windows_gate_path.exists()
+    assert not visual_handoff_path.exists()
+    assert not (output_root / "RELEASE_CHANNEL.generated.json").exists()
+    assert not (output_root / "files").exists()
 
 
 def test_materialize_public_downloads_bundle_replaces_stale_duplicate_artifacts_with_manifest_matching_bytes(tmp_path: Path) -> None:
@@ -1131,8 +1230,23 @@ def test_materialize_public_downloads_bundle_replaces_stale_duplicate_artifacts_
         completion_path=tmp_path / "completion.png",
     )
 
-    release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    release_evidence_path = REPO_ROOT / "Chummer.Portal" / "downloads" / "release-evidence" / "public-promotion.json"
+    _write_release_bound_startup_receipt(
+        presentation_startup_smoke / "startup-smoke-avalonia-win-x64.receipt.json",
+        installer_name=installer_name,
+        installer_sha256=hashlib.sha256(correct_installer_bytes).hexdigest(),
+    )
+    release_proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    release_proof_path.write_text(
+        json.dumps(_release_proof_for_windows_installer(), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    release_evidence_path = tmp_path / "public-promotion.json"
+    _write_public_promotion_evidence(
+        release_evidence_path,
+        installer_name=installer_name,
+        installer_sha256=hashlib.sha256(correct_installer_bytes).hexdigest(),
+        installer_size_bytes=len(correct_installer_bytes),
+    )
     localization_gate_path = tmp_path / "UI_LOCALIZATION_RELEASE_GATE.generated.json"
     _write_ui_localization_release_gate(localization_gate_path)
 

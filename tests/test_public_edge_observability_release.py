@@ -44,6 +44,75 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
         self.module = load_module()
         self.now = datetime(2026, 7, 13, 12, 0, tzinfo=UTC)
 
+    def test_release_candidate_resolves_active_atomic_shelf_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            shelf_root = Path(tmp) / "downloads"
+            legacy = shelf_root / "RELEASE_CHANNEL.generated.json"
+            generation_root = shelf_root / "generations" / "g-current"
+            current = generation_root / legacy.name
+            write_json(
+                legacy,
+                {
+                    "status": "published",
+                    "version": "run-stale-legacy",
+                    "channel": "preview",
+                    "rolloutState": "coverage_incomplete",
+                    "supportabilityState": "review_required",
+                    "publishedAt": "2026-07-13T12:00:00Z",
+                },
+            )
+            write_json(
+                current,
+                {
+                    "status": "published",
+                    "version": "run-current-generation",
+                    "channel": "preview",
+                    "rolloutState": "coverage_incomplete",
+                    "supportabilityState": "review_required",
+                    "publishedAt": "2026-07-13T12:00:00Z",
+                },
+            )
+            with mock.patch.object(
+                self.module,
+                "resolve_shelf_root",
+                return_value=("generation", generation_root, {"generationId": "g-current"}),
+            ):
+                binding, _payload, _error, failures = (
+                    self.module.release_candidate_binding(legacy)
+                )
+
+            self.assertEqual([], failures)
+            self.assertEqual("run-current-generation", binding["version"])
+            self.assertEqual(str(current), binding["path"])
+
+    def test_release_candidate_fails_closed_when_atomic_shelf_is_malformed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            legacy = Path(tmp) / "downloads" / "RELEASE_CHANNEL.generated.json"
+            write_json(
+                legacy,
+                {
+                    "status": "published",
+                    "version": "run-stale-legacy",
+                    "channel": "preview",
+                    "publishedAt": "2026-07-13T12:00:00Z",
+                },
+            )
+            with mock.patch.object(
+                self.module,
+                "resolve_shelf_root",
+                side_effect=self.module.ReleaseShelfError("malformed current pointer"),
+            ):
+                binding, payload, error, failures = (
+                    self.module.release_candidate_binding(legacy)
+                )
+
+            self.assertIsNone(payload)
+            self.assertEqual("release_shelf_resolution_failed", error)
+            self.assertEqual("release_shelf_resolution_failed", binding["load_status"])
+            self.assertTrue(
+                any("release shelf resolution failed" in item for item in failures)
+            )
+
     def proof(
         self,
         policy_path: Path,
@@ -250,9 +319,13 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             request_path, attestation_path = self.authority_fixture(root, proof_path)
 
             expected_proof_digest = hashlib.sha256(proof_path.read_bytes()).hexdigest()
-            expected_release_digest = hashlib.sha256(
-                self.module.DEFAULT_RELEASE_CHANNEL.read_bytes()
-            ).hexdigest()
+            expected_release, _, _, expected_release_failures = (
+                self.module.release_candidate_binding(
+                    self.module.DEFAULT_RELEASE_CHANNEL
+                )
+            )
+            self.assertEqual([], expected_release_failures)
+            expected_release_digest = expected_release["sha256"]
             with mock.patch.object(
                 self.module,
                 "validate_operator_attestation",

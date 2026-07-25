@@ -28,10 +28,15 @@ optional_fields:
 - private_adjacent_recipes
 - governed_capability_posture
 - external_authority_records
+- e2e_gold
 horizons:
 - id: alice
   title: ALICE
   status: shipped_mvp
+  e2e_gold:
+    route: /alice
+    receipt_route: /alice/receipts/build-ghost.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: build_simulation
   canon_doc: products/chummer/horizons/alice.md
   public_guide:
@@ -72,6 +77,10 @@ horizons:
 - id: origin-dossier
   title: ORIGIN DOSSIER
   status: shipped_mvp
+  e2e_gold:
+    route: /origin-dossier
+    receipt_route: /origin-dossier/receipts/story-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: origin_canon_and_living_dossier
   canon_doc: products/chummer/horizons/origin-dossier.md
   public_guide:
@@ -147,6 +156,10 @@ horizons:
 - id: karma-forge
   title: KARMA FORGE
   status: shipped_mvp
+  e2e_gold:
+    route: /participate/karma-forge
+    receipt_route: /participate/karma-forge/receipts/discovery-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: governed_rules_evolution
   canon_doc: products/chummer/horizons/karma-forge.md
   public_guide:
@@ -206,6 +219,10 @@ horizons:
 - id: knowledge-fabric
   title: KNOWLEDGE FABRIC
   status: shipped_mvp
+  e2e_gold:
+    route: /rules
+    receipt_route: /rules/explanations
+    claim_scope: registered_shipped_mvp_public_journey
   family: knowledge_fabric_explainability
   canon_doc: products/chummer/horizons/knowledge-fabric.md
   public_guide:
@@ -249,6 +266,10 @@ horizons:
 - id: jackpoint
   title: JACKPOINT
   status: shipped_mvp
+  e2e_gold:
+    route: /jackpoint
+    receipt_route: /jackpoint/receipts/briefing-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: artifact_studio
   canon_doc: products/chummer/horizons/jackpoint.md
   public_guide:
@@ -310,6 +331,10 @@ horizons:
 - id: black-ledger
   title: BLACK LEDGER
   status: shipped_mvp
+  e2e_gold:
+    route: /ledger
+    receipt_route: /ledger/receipts/viewer-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: campaign_world_state
   canon_doc: products/chummer/horizons/black-ledger.md
   public_guide:
@@ -386,6 +411,10 @@ horizons:
 - id: runsite
   title: RUNSITE
   status: shipped_mvp
+  e2e_gold:
+    route: /runsites
+    receipt_route: /runsites/receipts/prep-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: spatial_exploration
   canon_doc: products/chummer/horizons/runsite.md
   public_guide:
@@ -474,6 +503,10 @@ horizons:
 - id: runbook-press
   title: RUNBOOK PRESS
   status: shipped_mvp
+  e2e_gold:
+    route: /runbook
+    receipt_route: /runbook/receipts/primer-network.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: creator_press
   canon_doc: products/chummer/horizons/runbook-press.md
   public_guide:
@@ -532,6 +565,10 @@ horizons:
 - id: table-pulse
   title: TABLE PULSE
   status: shipped_mvp
+  e2e_gold:
+    route: /table-pulse
+    receipt_route: /table-pulse/receipts/live-and-aftermath.json
+    claim_scope: registered_shipped_mvp_public_journey
   family: live_heat_and_private_aftermath
   canon_doc: products/chummer/horizons/table-pulse.md
   public_signal_eligible: true

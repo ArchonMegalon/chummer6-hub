@@ -2,16 +2,16 @@
   "contract_name": "chummer.final_gold_graph",
   "contract_version": 1,
   "product": "chummer",
-  "generated_at_utc": "2026-07-17T04:46:46Z",
+  "generated_at_utc": "2026-07-29T18:54:25Z",
   "status": "review_required",
   "verdict": "PUBLIC_RELEASE_REVIEW_REQUIRED",
   "spine_ref": "products/chummer/PRODUCT_SPINE.yaml",
   "design_ref": "products/chummer/PRODUCT_SPINE_REDESIGN.md",
   "live_release": {
-    "version": "run-20260715-140426",
+    "version": "run-20260712-174412",
     "channel": "preview",
     "status": "published",
-    "rollout_state": "public_release_review_required",
+    "rollout_state": "coverage_incomplete",
     "supportability_state": "review_required",
     "status_endpoint": "https://chummer.run/status",
     "release_manifest_endpoint": "https://chummer.run/downloads/releases.json"
@@ -40,12 +40,14 @@
   ],
   "required_horizon_lanes": [
     "alice",
+    "origin-dossier",
     "karma-forge",
+    "knowledge-fabric",
     "jackpoint",
+    "black-ledger",
     "runsite",
     "runbook-press",
-    "table-pulse",
-    "black-ledger"
+    "table-pulse"
   ],
   "required_feature_lanes": [
     "nexus-pan",
@@ -119,70 +121,81 @@
       "kind": "fleet_flagship_readiness",
       "path": "$FLEET_WORKSPACE/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
       "status": "fail",
-      "generated_at": "2026-07-13T04:39:23Z"
+      "generated_at": "2026-07-18T00:25:10Z"
     },
     {
       "kind": "operator_release_dashboard",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "status": "fail",
-      "generated_at": "2026-07-14T04:15:24Z"
+      "generated_at": "2026-07-28T05:15:42Z"
     },
     {
       "kind": "final_gold_janitor",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
       "status": "fail",
-      "generated_at": "2026-07-14T03:51:46Z"
+      "generated_at": "2026-07-29T18:51:33Z"
     },
     {
       "kind": "flagship_product_readiness_gate",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json",
       "status": "fail",
-      "generated_at": "2026-07-15T13:44:04Z"
+      "generated_at": "2026-07-29T09:29:43Z"
     },
     {
       "kind": "google_oauth_linking_proof",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
-      "status": "pass",
-      "generated_at": "2026-07-12T17:18:08.965804Z"
+      "status": "fail",
+      "generated_at": "2026-07-28T04:38:03.466853Z"
     },
     {
       "kind": "public_edge_postdeploy_gate",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
       "status": "pass",
-      "generated_at": "2026-07-12T17:16:47.060432+00:00"
+      "generated_at": "2026-07-28T10:18:51.794205+00:00"
     },
     {
       "kind": "black_ledger_live_media_proof",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
       "status": "pass",
-      "generated_at": "2026-07-12T16:55:40Z"
+      "generated_at": "2026-07-29T09:29:35Z"
     },
     {
       "kind": "ui_localization_release_gate",
       "path": "$UI_WORKSPACE/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json",
       "status": "pass",
-      "generated_at": "2026-07-13T23:39:57Z"
+      "generated_at": "2026-07-28T19:04:49Z"
+    },
+    {
+      "kind": "horizon_e2e_gold_matrix",
+      "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/HORIZON_E2E_GOLD_MATRIX.generated.json",
+      "status": "pass",
+      "generated_at": "2026-07-29T18:53:14Z",
+      "horizon_count": 9,
+      "gold_count": 9,
+      "assertion_count": 129
     },
     {
       "kind": "release_ready_matrix",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/RELEASE_READY.generated.json",
       "status": "fail",
-      "generated_at": "2026-07-14T03:51:45Z",
-      "required_gate_count": 41,
+      "generated_at": "2026-07-29T09:29:43Z",
+      "required_gate_count": 42,
       "completed_gate_count": 0
     },
     {
       "kind": "ea_release_critical_readiness",
       "path": "$RUN_SERVICES_WORKSPACE/.codex-studio/published/EA_OPERATOR_READINESS.generated.json",
       "status": "pass",
-      "generated_at": "2026-07-12T17:18:09Z",
+      "generated_at": "2026-07-28T04:38:04Z",
       "required_component_keys": [
         "google_workspace_oauth",
         "mymedia_alexa",
         "proactive_artifacts",
         "telegram"
       ],
-      "optional_blocked_component_keys": []
+      "optional_blocked_component_keys": [
+        "teable_recovery"
+      ]
     },
     {
       "kind": "registry_release_channel",
@@ -212,19 +225,19 @@
     {
       "kind": "live_status",
       "path": "https://chummer.run/status",
-      "status": "fail"
+      "status": "pass"
     },
     {
       "kind": "live_release_manifest",
       "path": "https://chummer.run/downloads/releases.json",
       "status": "fail",
-      "generated_at": "2026-07-15T14:06:48Z"
+      "generated_at": "2026-07-12T18:46:26+00:00"
     }
   ],
   "completion_audit": {
     "status": "fail",
-    "requirement_count": 12,
-    "passed_count": 3,
+    "requirement_count": 13,
+    "passed_count": 4,
     "failed_count": 9,
     "requirements": [
       {
@@ -257,11 +270,20 @@
         "status": "fail",
         "proof_kinds": [
           "journey_gates",
-          "campaign_operability_scorecard"
+          "campaign_operability_scorecard",
+          "horizon_e2e_gold_matrix"
         ],
         "missing_or_failed_proof_kinds": [
           "campaign_operability_scorecard"
         ]
+      },
+      {
+        "id": "horizon_portfolio_gold",
+        "status": "pass",
+        "proof_kinds": [
+          "horizon_e2e_gold_matrix"
+        ],
+        "missing_or_failed_proof_kinds": []
       },
       {
         "id": "legacy_and_adjacent_parity",
@@ -283,7 +305,8 @@
           "ea_release_critical_readiness"
         ],
         "missing_or_failed_proof_kinds": [
-          "release_ready_matrix"
+          "release_ready_matrix",
+          "google_oauth_linking_proof"
         ]
       },
       {
@@ -328,8 +351,7 @@
         ],
         "missing_or_failed_proof_kinds": [
           "campaign_operability_scorecard",
-          "operator_release_dashboard",
-          "live_status"
+          "operator_release_dashboard"
         ]
       },
       {
@@ -362,7 +384,6 @@
           "live_release_manifest"
         ],
         "missing_or_failed_proof_kinds": [
-          "live_status",
           "live_release_manifest"
         ]
       }
@@ -397,17 +418,17 @@
     {
       "id": "proof_6",
       "severity": "release_truth",
-      "summary": "release-ready receipt does not prove the exact current 41-gate matrix and projection"
+      "summary": "google_oauth_linking_proof status is fail"
     },
     {
       "id": "proof_7",
       "severity": "release_truth",
-      "summary": "registry release channel is not current public_stable gold-supported truth"
+      "summary": "release-ready receipt does not prove the exact current 42-gate matrix and projection"
     },
     {
       "id": "proof_8",
       "severity": "release_truth",
-      "summary": "live status page does not expose the current stable published version"
+      "summary": "registry release channel is not current public_stable gold-supported truth"
     },
     {
       "id": "proof_9",
@@ -415,6 +436,12 @@
       "summary": "live release manifest does not match current public_stable registry truth"
     }
   ],
-  "advisory_findings": [],
+  "advisory_findings": [
+    {
+      "id": "ea_optional_teable_recovery",
+      "severity": "advisory",
+      "summary": "Optional EA operator component remains blocked: teable_recovery"
+    }
+  ],
   "principle": "One current graph may reference many receipts, but no isolated receipt may claim whole-product gold by itself."
 }

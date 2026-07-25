@@ -123,6 +123,29 @@ def test_live_identity_rejects_different_full_deployment_digest(monkeypatch) -> 
     assert any("does not match" in failure for failure in failures)
 
 
+def test_private_response_headers_allow_cloudflare_to_consume_its_control_header() -> None:
+    module = load_module()
+    headers = private_response_headers()
+    headers.pop("cloudflare-cdn-cache-control")
+    headers["server"] = "cloudflare"
+    failures: list[str] = []
+
+    module.require_private_response_headers("/api/ready", headers, failures)
+
+    assert failures == []
+
+
+def test_private_response_headers_require_cloudflare_control_header_off_edge() -> None:
+    module = load_module()
+    headers = private_response_headers()
+    headers.pop("cloudflare-cdn-cache-control")
+    failures: list[str] = []
+
+    module.require_private_response_headers("/api/ready", headers, failures)
+
+    assert any("unless the Cloudflare edge consumed it" in item for item in failures)
+
+
 def copy_contract_fixture(tmp_path: Path) -> Path:
     fixture = tmp_path / "workspace" / "chummer.run-services"
     source_api = ROOT / "Chummer.Run.Api"
@@ -174,6 +197,19 @@ def test_current_source_satisfies_local_install_only_digest_closed_contract() ->
     assert inventory["assetCount"] == 14
     assert len(inventory["sha256"]) == 64
     assert sum(item["mirrorBound"] is True for item in inventory["assets"]) == 12
+    inventory_by_path = {item["path"]: item for item in inventory["assets"]}
+    assert (
+        inventory_by_path["/mobile-install-shell.js"]["cacheControl"]
+        == "public, max-age=14400, must-revalidate"
+    )
+    assert (
+        inventory_by_path["/manifest.player.webmanifest"]["cacheControl"]
+        == "public, max-age=300, must-revalidate"
+    )
+    assert (
+        inventory_by_path["/mobile/service-worker.js"]["cacheControl"]
+        == "no-cache, no-store, must-revalidate"
+    )
     assert {
         item["path"]
         for item in inventory["assets"]

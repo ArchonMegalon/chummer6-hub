@@ -18,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from writable_temp_root import subprocess_env
+from release_shelf_generation import ReleaseShelfError, resolve_shelf_root
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -531,6 +532,81 @@ def capture_bounds_look_like_desktop_fallback(row: dict[str, Any]) -> bool:
     return left == 0 and top == 0 and width >= 1000 and height >= 700
 
 
+def resolve_portal_shelf_context(
+    portal_release_channel_path: Path | None,
+    downloads_root: Path,
+    startup_receipt_path: Path,
+) -> tuple[Path | None, Path, Path, dict[str, Any], list[str]]:
+    """Resolve portal-owned release inputs through the active atomic shelf.
+
+    Native visual evidence intentionally remains outside the immutable shelf so
+    that an operator can import a new digest-bound proof without rewriting an
+    activated release generation.
+    """
+
+    resolution: dict[str, Any] = {
+        "mode": "not_configured",
+        "shelfRoot": "",
+        "activeRoot": "",
+        "generationId": "",
+        "status": "not_configured",
+    }
+    if portal_release_channel_path is None:
+        return (
+            portal_release_channel_path,
+            downloads_root,
+            startup_receipt_path,
+            resolution,
+            [],
+        )
+
+    shelf_root = portal_release_channel_path.parent
+    resolution["shelfRoot"] = str(shelf_root)
+    try:
+        mode, active_root, pointer = resolve_shelf_root(shelf_root)
+    except ReleaseShelfError as exc:
+        resolution.update({"mode": "invalid", "status": "fail"})
+        return (
+            portal_release_channel_path,
+            downloads_root,
+            startup_receipt_path,
+            resolution,
+            [f"Portal release shelf resolution failed: {exc}"],
+        )
+
+    resolved_portal = active_root / portal_release_channel_path.name
+    resolved_downloads_root = downloads_root
+    resolved_startup_receipt = startup_receipt_path
+    try:
+        downloads_is_shelf_root = downloads_root.resolve() == shelf_root.resolve()
+    except OSError:
+        downloads_is_shelf_root = downloads_root == shelf_root
+    if mode == "generation" and downloads_is_shelf_root:
+        resolved_downloads_root = active_root
+        try:
+            startup_relative = startup_receipt_path.relative_to(shelf_root)
+        except ValueError:
+            startup_relative = None
+        if startup_relative is not None:
+            resolved_startup_receipt = active_root / startup_relative
+
+    resolution.update(
+        {
+            "mode": mode,
+            "activeRoot": str(active_root),
+            "generationId": str((pointer or {}).get("generationId") or ""),
+            "status": "resolved",
+        }
+    )
+    return (
+        resolved_portal if mode == "generation" else portal_release_channel_path,
+        resolved_downloads_root,
+        resolved_startup_receipt,
+        resolution,
+        [],
+    )
+
+
 def build_payload(
     *,
     release_channel_path: Path,
@@ -541,11 +617,22 @@ def build_payload(
     refresh_operator_state: bool = False,
     expected_verifier_sha256: str = "",
 ) -> dict[str, Any]:
+    (
+        portal_release_channel_path,
+        downloads_root,
+        startup_receipt_path,
+        release_shelf_resolution,
+        release_shelf_failures,
+    ) = resolve_portal_shelf_context(
+        portal_release_channel_path,
+        downloads_root,
+        startup_receipt_path,
+    )
     release_channel, release_channel_load_status = load_json(release_channel_path)
     startup_receipt, startup_receipt_load_status = load_json(startup_receipt_path)
     source, source_load_status = load_json(source_path)
     artifact = windows_installer_artifact(release_channel)
-    failures: list[str] = []
+    failures: list[str] = list(release_shelf_failures)
     current_verifier_binding, verifier_binding_failures = verifier_binding(
         expected_verifier_sha256
     )
@@ -875,6 +962,7 @@ def build_payload(
             "bindingAuthority": "release_channel_manifest",
             "windowsInstallerBinding": authority_binding,
         },
+        "releaseShelfResolution": release_shelf_resolution,
         "releaseProjection": projection_check,
         "artifact": {
             "artifactId": artifact.get("artifactId") or artifact.get("id"),

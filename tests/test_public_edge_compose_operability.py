@@ -89,6 +89,29 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
         failures = module.validate_compose(payload)
         self.assertTrue(any(failure.startswith("chummer-play-web mem_limit") for failure in failures))
 
+    def test_release_storage_initializer_has_no_network(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        del payload["services"]["chummer-release-storage-init"]["network_mode"]
+
+        self.assertIn(
+            "chummer-release-storage-init network_mode must be none",
+            module.validate_compose(payload),
+        )
+
+    def test_portal_waits_for_successful_release_storage_initialization(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-portal"]["depends_on"][
+            "chummer-release-storage-init"
+        ]["condition"] = "service_started"
+
+        self.assertIn(
+            "chummer-portal dependency chummer-release-storage-init must require "
+            "service_completed_successfully",
+            module.validate_compose(payload),
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())
@@ -109,16 +132,34 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
-    def test_cloudflared_default_must_support_native_readiness_checks(self) -> None:
+    def test_cloudflared_image_must_be_immutable_and_support_native_readiness_checks(
+        self,
+    ) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())
         payload["services"]["chummer-run-cloudflared"]["image"] = (
-            "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2024.6.1}"
+            "cloudflare/cloudflared:2026.7.0"
         )
 
         failures = module.validate_compose(payload)
         self.assertTrue(
             any(failure.startswith("chummer-run-cloudflared image must use") for failure in failures)
+        )
+
+    def test_cloudflared_replica_must_match_the_verified_runtime_pin(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-run-cloudflared-replica"]["image"] = (
+            "cloudflare/cloudflared:2026.7.0"
+        )
+
+        self.assertTrue(
+            any(
+                failure.startswith(
+                    "chummer-run-cloudflared-replica image must use"
+                )
+                for failure in module.validate_compose(payload)
+            )
         )
 
     def test_missing_runtime_health_route_fails_closed(self) -> None:

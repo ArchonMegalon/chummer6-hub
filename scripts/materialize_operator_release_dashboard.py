@@ -294,7 +294,7 @@ PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS = {
 }
 PUBLIC_EDGE_REQUIRED_CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
-    "downloads": "chummer.downloads_version_marker.v1",
+    "downloads": "chummer.downloads_version_marker.bound.v1",
     "pwaStatic": "chummer.public_pwa_static_assets.v1",
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -1645,110 +1645,50 @@ def public_edge_postdeploy_semantic_failures(payload: dict[str, Any]) -> list[st
         frontdoor_gm_final_url = str(payload.get("frontdoorNavigationGmFinalUrl") or "").strip()
         if frontdoor_gm_final_url:
             frontdoor_gm_final_path = urlparse(frontdoor_gm_final_url).path
-        if "Build" not in gated_targets:
-            failures.append("public-edge postdeploy front-door navigation does not gate Build")
-        if "Build" in public_targets:
-            failures.append("public-edge postdeploy front-door navigation exposes Build as public")
-        if "Play" not in gated_targets:
-            failures.append("public-edge postdeploy front-door navigation does not gate Play")
-        if "Play" in public_targets:
-            failures.append("public-edge postdeploy front-door navigation exposes Play as public")
+        if gated_targets:
+            failures.append("public-edge postdeploy front-door navigation still reports account-gated targets")
+        if public_targets != {"Build", "Play"}:
+            failures.append("public-edge postdeploy front-door navigation does not expose exactly Build and Play")
         if play_route != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation Play route is not /mobile/player")
-        if str(payload.get("frontdoorNavigationPlaySignInRoute") or "").strip() != "/login?next=%2Fmobile%2Fplayer":
-            failures.append("public-edge postdeploy front-door navigation Play sign-in route is not /login?next=%2Fmobile%2Fplayer")
+        if str(payload.get("frontdoorNavigationPlaySignInRoute") or "").strip() != "/login?next=%2F":
+            failures.append("public-edge postdeploy front-door navigation sign-in route is not the clean homepage return route")
         if direct_player_route != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation direct player route is not /mobile/player")
         if int_value(payload.get("frontdoorNavigationDirectPlayerHttpStatus")) != 200:
             failures.append("public-edge postdeploy front-door navigation Play launch did not return HTTP 200")
         if frontdoor_final_path != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation Play launch did not land on /mobile/player")
-        if payload.get("frontdoorNavigationLiveTurnCompanionShell") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the live turn companion shell")
+        if payload.get("frontdoorNavigationLiveTurnCompanionShell") is not False:
+            failures.append("public-edge postdeploy anonymous Player shell exposed the live turn companion")
         if str(payload.get("frontdoorNavigationPwaManifestPath") or "").strip() != "/manifest.player.webmanifest":
             failures.append("public-edge postdeploy front-door navigation Play launch did not activate the player PWA manifest")
         if str(payload.get("frontdoorNavigationPwaRole") or "").strip() != "Player":
             failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Player role")
-        if str(payload.get("frontdoorNavigationBlazorShell") or "").strip() != "interactive-server":
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the interactive Blazor shell")
-        if payload.get("frontdoorNavigationRybbitConfigured") is not True or str(payload.get("frontdoorNavigationRybbitTag") or "").strip() != "mobile_play_shell":
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Rybbit mobile shell config")
-        if (
-            str(payload.get("frontdoorNavigationRybbitRoute") or "").strip() != "/mobile/player"
-            or str(payload.get("frontdoorNavigationRybbitMode") or "").strip() != "player"
-            or str(payload.get("frontdoorNavigationRybbitRole") or "").strip() != "Player"
-        ):
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Player Rybbit role config")
-        if payload.get("frontdoorNavigationRybbitSiteIdPresent") is not True or payload.get("frontdoorNavigationRybbitScriptUrlAllowed") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Rybbit provider config")
-        if payload.get("frontdoorNavigationRybbitSkipMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit skips mobile paths")
-        if payload.get("frontdoorNavigationRybbitMaskMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit masks mobile paths")
-        if payload.get("frontdoorNavigationRybbitMasksPrivatePlayRoutes") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit masks private play routes")
-        if payload.get("frontdoorNavigationRybbitReplayBlocksTurnRoot") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit replay blocks turn content")
-        if "/mobile/player?" not in str(payload.get("frontdoorNavigationPlayerSessionHandoffUrl") or "").strip():
-            failures.append("public-edge postdeploy front-door navigation Player session handoff URL is not a player mobile route")
-        if str(payload.get("frontdoorNavigationPlayerSessionHandoffStatus") or "").strip() != "Session handoff is ready in the link above.":
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not expose ready status")
-        if str(payload.get("frontdoorNavigationPlayerSessionHandoffLinkText") or "").strip() != "Open session handoff link":
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not relabel the visible route")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffPreservesSession") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not preserve session id")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffPreservesRole") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not preserve role")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffStripsDevice") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff leaked sender device id")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not prove a sender device id was stripped")
+        if str(payload.get("frontdoorNavigationBlazorShell") or "").strip() != "install-only":
+            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the install-only shell")
+        if payload.get("frontdoorNavigationRybbitConfigured") is not False:
+            failures.append("public-edge postdeploy anonymous Player shell unexpectedly enabled analytics")
+        if str(payload.get("frontdoorNavigationPlayerSessionHandoffUrl") or "").strip():
+            failures.append("public-edge postdeploy anonymous Player shell exposed a session handoff")
         if not str(payload.get("frontdoorNavigationGmRoute") or "").strip().startswith("/mobile/gm"):
             failures.append("public-edge postdeploy front-door navigation GM switch route is not /mobile/gm")
         if int_value(payload.get("frontdoorNavigationGmHttpStatus")) != 200:
             failures.append("public-edge postdeploy front-door navigation GM switch did not return HTTP 200")
         if frontdoor_gm_final_path != "/mobile/gm":
             failures.append("public-edge postdeploy front-door navigation GM switch did not land on /mobile/gm")
-        if payload.get("frontdoorNavigationGmLiveTurnCompanionShell") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the live turn companion shell")
+        if payload.get("frontdoorNavigationGmLiveTurnCompanionShell") is not False:
+            failures.append("public-edge postdeploy anonymous GM shell exposed the live turn companion")
         if str(payload.get("frontdoorNavigationGmPwaManifestPath") or "").strip() != "/manifest.gm.webmanifest":
             failures.append("public-edge postdeploy front-door navigation GM switch did not activate the GM PWA manifest")
         if str(payload.get("frontdoorNavigationGmPwaRole") or "").strip() != "GameMaster":
             failures.append("public-edge postdeploy front-door navigation GM switch did not prove the GameMaster role")
-        if str(payload.get("frontdoorNavigationGmBlazorShell") or "").strip() != "interactive-server":
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the interactive Blazor shell")
-        if payload.get("frontdoorNavigationGmRybbitConfigured") is not True or str(payload.get("frontdoorNavigationGmRybbitTag") or "").strip() != "mobile_play_shell":
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the Rybbit mobile shell config")
-        if (
-            str(payload.get("frontdoorNavigationGmRybbitRoute") or "").strip() != "/mobile/gm"
-            or str(payload.get("frontdoorNavigationGmRybbitMode") or "").strip() != "gm"
-            or str(payload.get("frontdoorNavigationGmRybbitRole") or "").strip() != "GameMaster"
-        ):
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the GM Rybbit role config")
-        if payload.get("frontdoorNavigationGmRybbitSiteIdPresent") is not True or payload.get("frontdoorNavigationGmRybbitScriptUrlAllowed") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the Rybbit provider config")
-        if payload.get("frontdoorNavigationGmRybbitSkipMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit skips mobile paths")
-        if payload.get("frontdoorNavigationGmRybbitMaskMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit masks mobile paths")
-        if payload.get("frontdoorNavigationGmRybbitMasksPrivatePlayRoutes") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit masks private play routes")
-        if payload.get("frontdoorNavigationGmRybbitReplayBlocksTurnRoot") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit replay blocks turn content")
-        if "/mobile/gm?" not in str(payload.get("frontdoorNavigationGmSessionHandoffUrl") or "").strip():
-            failures.append("public-edge postdeploy front-door navigation GM session handoff URL is not a GM mobile route")
-        if str(payload.get("frontdoorNavigationGmSessionHandoffStatus") or "").strip() != "Session handoff is ready in the link above.":
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not expose ready status")
-        if str(payload.get("frontdoorNavigationGmSessionHandoffLinkText") or "").strip() != "Open session handoff link":
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not relabel the visible route")
-        if payload.get("frontdoorNavigationGmSessionHandoffPreservesSession") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not preserve session id")
-        if payload.get("frontdoorNavigationGmSessionHandoffPreservesRole") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not preserve role")
-        if payload.get("frontdoorNavigationGmSessionHandoffStripsDevice") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff leaked sender device id")
-        if payload.get("frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not prove a sender device id was stripped")
+        if str(payload.get("frontdoorNavigationGmBlazorShell") or "").strip() != "install-only":
+            failures.append("public-edge postdeploy front-door navigation GM launch did not prove the install-only shell")
+        if payload.get("frontdoorNavigationGmRybbitConfigured") is not False:
+            failures.append("public-edge postdeploy anonymous GM shell unexpectedly enabled analytics")
+        if str(payload.get("frontdoorNavigationGmSessionHandoffUrl") or "").strip():
+            failures.append("public-edge postdeploy anonymous GM shell exposed a session handoff")
         if payload.get("frontdoorNavigationLedgerPrimary") is not False:
             failures.append("public-edge postdeploy Black Ledger remains primary on the front door")
 

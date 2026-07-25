@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import hmac
+import importlib.util
 import json
 import os
+import re
 import stat
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+
+
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -27,12 +37,123 @@ M141_UI_FRONTIER_ID = 2354698282
 M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
 PUBLIC_JSON_ARTIFACT_MODE = 0o644
 STABLE_READ_CHUNK_BYTES = 1024 * 1024
+MAX_AUTHORITY_INPUT_BYTES = 16 * 1024 * 1024
+MAX_RELEASE_INPUT_AGE_SECONDS = 86400
+MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS = 300
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+PORTABLE_KNOWN_ROOTS = (
+    (
+        "/docker/chummercomplete/chummer.run-services",
+        "repo://ArchonMegalon/chummer6-hub",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-hub",
+        "repo://ArchonMegalon/chummer6-hub",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-ui",
+        "repo://ArchonMegalon/chummer6-ui",
+    ),
+)
+MACHINE_LOCAL_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9:])(?:"
+    r"/private/tmp/|/private/var/|/var/folders/|/var/tmp/|/tmp/|"
+    r"/docker/|/workspace/|/Users/|/root/|/home/[^/\s]+/|"
+    r"[A-Za-z]:[\\/](?:Users|Windows[\\/]Temp|workspace)[\\/]"
+    r")",
+    re.IGNORECASE,
+)
+_PUBLIC_EDGE_OVERLAY_MODULE = None
 
 
 def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _portable_public_value(value, *, location: str = "$"):
+    """Map only known roots to honest portable identities and reject every other host path."""
+
+    if isinstance(value, str):
+        portable = value
+        for local_root, portable_root in PORTABLE_KNOWN_ROOTS:
+            portable = re.sub(
+                rf"{re.escape(local_root)}(?=(?:/|$))",
+                portable_root,
+                portable,
+            )
+        match = MACHINE_LOCAL_PATH_PATTERN.search(portable)
+        if match is not None:
+            raise RuntimeError(
+                "hub local release proof contains an unknown machine-local path at "
+                f"{location}"
+            )
+        return portable
+    if isinstance(value, list):
+        return [
+            _portable_public_value(item, location=f"{location}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    if isinstance(value, dict):
+        return {
+            key: _portable_public_value(item, location=f"{location}.{key}")
+            for key, item in value.items()
+        }
+    return value
+
+
+def _load_public_edge_overlay_module():
+    global _PUBLIC_EDGE_OVERLAY_MODULE
+    if _PUBLIC_EDGE_OVERLAY_MODULE is not None:
+        return _PUBLIC_EDGE_OVERLAY_MODULE
+    module_path = SCRIPT_DIRECTORY / "publish_public_edge_portal_overlay.py"
+    spec = importlib.util.spec_from_file_location(
+        "chummer_hub_release_proof_public_edge_lock",
+        module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"unable to load shared public-edge mutation authority: {module_path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    _PUBLIC_EDGE_OVERLAY_MODULE = module
+    return module
+
+
+def _is_macos_host() -> bool:
+    return sys.platform == "darwin"
+
+
+def _default_public_edge_proof_mutation_lock_path(overlay) -> Path:
+    if not _is_macos_host():
+        return Path(overlay.PUBLIC_EDGE_MUTATION_LOCK)
+    return (
+        Path(os.path.abspath(tempfile.gettempdir()))
+        / f"chummer-public-edge-mutation-{os.getuid()}"
+        / "public-edge-mutation.lock"
+    )
+
+
+@contextmanager
+def _public_edge_proof_mutation_lock():
+    """Serialize proof replacement with standalone overlay deploy/recovery."""
+
+    overlay = _load_public_edge_overlay_module()
+    configured_lock_path = str(
+        os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH") or ""
+    ).strip()
+    lock_path = (
+        Path(configured_lock_path)
+        if configured_lock_path
+        else _default_public_edge_proof_mutation_lock_path(overlay)
+    )
+    with overlay.public_edge_mutation_lock(
+        activate=True,
+        lock_path=lock_path,
+    ) as acquired_lock_path:
+        yield acquired_lock_path
 def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -621,7 +742,7 @@ def _m141_direct_import_route_receipts() -> list[dict]:
     ]
 
 
-def main() -> int:
+def _materialize_under_shared_mutation_lock() -> int:
     if len(sys.argv) != 6:
         print(
             "usage: materialize_hub_local_release_proof.py <out_path> <base_url> <compose_file> <timeout_seconds> <skip_rebuild>",
@@ -1130,6 +1251,7 @@ def main() -> int:
             "/home/work",
             "/account/access",
             "/account/work",
+            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",
@@ -1339,7 +1461,7 @@ def main() -> int:
                 "summary": "Workspace restore continuity emits provenance receipts and typed recovery actions for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
                 "routes": [
                     "/home/work",
-                    "/account/roster",
+                    "/account/work",
                     "/account/access",
                 ],
                 "surfaces": [
@@ -1357,7 +1479,7 @@ def main() -> int:
                 "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts and typed account-access actions on the same restore lane instead of falling back to support folklore.",
                 "routes": [
                     "/home/work",
-                    "/account/roster",
+                    "/account/work",
                     "/account/access",
                     "/downloads",
                 ],
@@ -1809,6 +1931,21 @@ def main() -> int:
     _sync_served_release_proof_if_needed(out_path=out_path)
     print(f"wrote hub local proof: {out_path}")
     return 0
+
+
+def main() -> int:
+    try:
+        with _public_edge_proof_mutation_lock():
+            return _materialize_under_shared_mutation_lock()
+    except RuntimeError as exc:
+        print(f"hub local proof generation blocked: {exc}", file=sys.stderr)
+        return 1
+    except OSError:
+        print(
+            "hub local proof generation blocked: filesystem operation failed",
+            file=sys.stderr,
+        )
+        return 1
 
 
 if __name__ == "__main__":

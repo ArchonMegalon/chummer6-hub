@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -49,7 +50,7 @@ OVERLAY_BUILD_INFO_RELATIVE_PATH = (
 MAX_OVERLAY_BUILD_INFO_BYTES = 1024 * 1024
 CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
-    "downloads": "chummer.downloads_version_marker.v1",
+    "downloads": "chummer.downloads_version_marker.bound.v1",
     "pwaStatic": "chummer.public_pwa_static_assets.v1",
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -80,7 +81,7 @@ REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/player",
         "manifest_path": "/manifest.player.webmanifest",
         "manifest_id": "/mobile/player",
-        "manifest_start_url": "/mobile/player?role=Player",
+        "manifest_start_url": "/mobile/player",
         "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
         "frontdoor_default": True,
     },
@@ -89,7 +90,7 @@ REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/gm",
         "manifest_path": "/manifest.gm.webmanifest",
         "manifest_id": "/mobile/gm",
-        "manifest_start_url": "/mobile/gm?role=GameMaster",
+        "manifest_start_url": "/mobile/gm",
         "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
         "frontdoor_default": False,
     },
@@ -106,9 +107,9 @@ REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES = {
     "/play/continuity",
 }
 REQUIRED_MOBILE_PWA_VIEWPORTS = {
-    "phone-390": {"width": 390, "height": 844, "buildLayout": "compact"},
-    "tablet": {"width": 768, "height": 1024, "buildLayout": "compact"},
-    "desktop-1366": {"width": 1366, "height": 768, "buildLayout": "workspace"},
+    "phone-390": {"width": 390, "height": 844},
+    "tablet": {"width": 768, "height": 1024},
+    "desktop-1366": {"width": 1366, "height": 768},
 }
 REQUIRED_MOBILE_PWA_RESULT_FIELDS = {
     "route",
@@ -121,10 +122,9 @@ REQUIRED_MOBILE_PWA_RESULT_FIELDS = {
 }
 REQUIRED_BUILD_PWA_RESULT_FIELDS = {
     "final_url",
-    "build_layout_source",
-    "build_layout_preference",
-    "build_layout_effective",
-    "build_layout_override_checked",
+    "build_surface",
+    "build_route_surface",
+    "build_command",
 }
 REQUIRED_BUILD_PWA_FINAL_ROUTE = "/blazor/app?command=character_roster"
 REQUIRED_PWA_MANIFEST_COUNT = 3
@@ -135,7 +135,7 @@ REQUIRED_PWA_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
     "/manifest.gm.webmanifest",
     "/mobile.css",
-    "/mobile-turn-companion.js",
+    "/mobile-install-shell.js",
 }
 REQUIRED_PWA_OFFLINE_LEGACY_PRIVATE_CACHE_PREFIXES = {
     "chummer-shell-play-shell-",
@@ -161,6 +161,11 @@ ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS = {
     "private",
     "no-store",
     "no-cache",
+    "max-age=0",
+}
+ROLE_ALIAS_CANONICAL_CACHE_CONTROL_TOKENS = {
+    "private",
+    "no-store",
     "max-age=0",
 }
 ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES = 256 * 1024
@@ -390,6 +395,7 @@ def expected_homepage_lane_text(
     expected_release_channel: str,
     expected_supportability_state: str,
     expected_rollout_state: str,
+    expected_public_installer_available: bool | None = None,
 ) -> str | None:
     normalized_status = (expected_release_status or "").strip().lower()
     normalized_version = (expected_release_version or "").strip()
@@ -407,6 +413,9 @@ def expected_homepage_lane_text(
         )
     ):
         return None
+
+    if expected_public_installer_available is False:
+        return "Current public lane: Downloads paused."
 
     if normalized_status and normalized_status != "published":
         return "Current public lane: Downloads paused."
@@ -650,7 +659,7 @@ def role_alias_canonical_target_result_matches(
         and int_value(result.get("status")) == 200
         and str(result.get("contentType") or "").split(";", 1)[0].strip().lower()
         == "text/html"
-        and ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens
+        and ROLE_ALIAS_CANONICAL_CACHE_CONTROL_TOKENS <= cache_tokens
         and str(result.get("pragma") or "").strip().lower() == "no-cache"
         and str(result.get("expires") or "").strip() == "0"
         and str(result.get("referrerPolicy") or "").strip().lower() == "no-referrer"
@@ -924,7 +933,7 @@ def inspect_role_alias_canonical_target(
         "responseUrlExact": response_url_exact,
         "noRedirectLocation": not location,
         "htmlContentType": content_type.split(";", 1)[0].strip().lower() == "text/html",
-        "privateNoCache": ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens,
+        "privateNoCache": ROLE_ALIAS_CANONICAL_CACHE_CONTROL_TOKENS <= cache_tokens,
         "pragmaNoCache": pragma.lower() == "no-cache",
         "expiresZero": expires == "0",
         "noReferrer": referrer_policy.lower() == "no-referrer",
@@ -1336,15 +1345,10 @@ def mobile_pwa_viewport_artifact_contract_failures(
                 "mobile PWA viewport Playwright result "
                 f"/build@{viewport} did not prove the canonical roster-first Build PWA URL"
             )
-        expected_layout = str(expected_viewport["buildLayout"])
-        expected_override = (
-            "workspace" if expected_layout == "compact" else "compact"
-        )
         expected_build_fields = {
-            "build_layout_source": "browser-media-query",
-            "build_layout_preference": "auto",
-            "build_layout_effective": expected_layout,
-            "build_layout_override_checked": expected_override,
+            "build_surface": "character-roster",
+            "build_route_surface": "roster",
+            "build_command": "character-roster",
         }
         for field, expected_value in expected_build_fields.items():
             if result.get(field) != expected_value:
@@ -1494,27 +1498,25 @@ def frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact: dict[str
         and mobile_artifact.get("private_identity_redacted") is True
         and mobile_artifact.get("visible_player_url_private_identity_absent") is True
         and visible_role_url_is_path_only(mobile_artifact.get("final_url"), "/mobile/player")
-        and mobile_artifact.get("player_session_context_present") is True
-        and mobile_artifact.get("player_device_context_present") is True
+        and mobile_artifact.get("player_session_context_present") is False
+        and mobile_artifact.get("player_device_context_present") is False
+        and mobile_artifact.get("live_turn_companion_shell") is False
+        and mobile_artifact.get("blazor_shell") == "install-only"
         and mobile_artifact.get("visible_gm_url_private_identity_absent") is True
         and visible_role_url_is_path_only(mobile_artifact.get("gm_final_url"), "/mobile/gm")
-        and mobile_artifact.get("gm_session_context_present") is True
-        and mobile_artifact.get("gm_device_context_present") is True
+        and mobile_artifact.get("gm_session_context_present") is False
+        and mobile_artifact.get("gm_device_context_present") is False
+        and mobile_artifact.get("gm_live_turn_companion_shell") is False
+        and mobile_artifact.get("gm_blazor_shell") == "install-only"
         and str(mobile_artifact.get("gm_route") or "").strip() == "/mobile/gm"
-        and mobile_artifact.get("gm_route_session_id_present") is True
+        and mobile_artifact.get("gm_route_session_id_present") is False
         and mobile_artifact.get("gm_route_private_identity_redacted") is True
         and mobile_artifact.get("player_session_handoff_private_identity_redacted") is True
-        and redacted_handoff_url_matches_contract(
-            mobile_artifact.get("player_session_handoff_url"),
-            "/mobile/player",
-            "Player",
-        )
+        and not str(mobile_artifact.get("player_session_handoff_url") or "").strip()
         and mobile_artifact.get("gm_session_handoff_private_identity_redacted") is True
-        and redacted_handoff_url_matches_contract(
-            mobile_artifact.get("gm_session_handoff_url"),
-            "/mobile/gm",
-            "GameMaster",
-        )
+        and not str(mobile_artifact.get("gm_session_handoff_url") or "").strip()
+        and string_set(mobile_artifact.get("gated_targets")) == set()
+        and string_set(mobile_artifact.get("public_targets")) == {"Build", "Play"}
     )
 
 
@@ -1538,7 +1540,7 @@ def pwa_offline_artifact_matches_privacy_contract(artifact: dict[str, Any]) -> b
     return (
         receipt_contract(artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]
         and str(artifact.get("status") or "").strip().lower() == "pass"
-        and artifact.get("cache_version") == "v17"
+        and artifact.get("cache_version") == "v19"
         and artifact.get("navigation_policy") == "network_only"
         and artifact.get("private_state_scope") == "open_tab_only"
         and artifact.get("query_bearing_requests_cached") is False
@@ -1572,11 +1574,11 @@ def frontdoor_anchor_artifact_matches_current_contract(anchor_artifact: dict[str
         and final_hash == "#turn-runsite-card"
         and manifest_path == "/manifest.player.webmanifest"
         and role == "Player"
-        and blazor_shell == "interactive-server"
+        and blazor_shell == "install-only"
         and anchor_artifact.get("private_identity_redacted") is True
         and anchor_artifact.get("visible_url_private_identity_absent") is True
-        and anchor_artifact.get("session_context_present") is True
-        and anchor_artifact.get("device_context_present") is True
+        and anchor_artifact.get("session_context_present") is False
+        and anchor_artifact.get("device_context_present") is False
     )
 
 
@@ -2109,8 +2111,8 @@ def compose_status(
         for expected_path in sorted(REQUIRED_PWA_OFFLINE_STATIC_PATHS):
             if expected_path not in static_paths:
                 failures.append(f"PWA offline cache proof did not cache {expected_path}")
-        if artifact.get("cache_version") != "v17":
-            failures.append("PWA offline cache proof cache version is not v17")
+        if artifact.get("cache_version") != "v19":
+            failures.append("PWA offline cache proof cache version is not v19")
         if artifact.get("navigation_policy") != "network_only":
             failures.append("PWA offline cache proof navigation policy is not network_only")
         if artifact.get("private_state_scope") != "open_tab_only":
@@ -2290,6 +2292,14 @@ def compose_status(
             expected_release_channel,
             expected_release_supportability_state,
             expected_release_rollout_state,
+            expected_public_installer_available=(
+                downloads.get("release_channel_public_installer_available")
+                if isinstance(
+                    downloads.get("release_channel_public_installer_available"),
+                    bool,
+                )
+                else None
+            ),
         )
         frontdoor_homepage_lane_matches_release_channel = (
             frontdoor_homepage_lane_text == expected_frontdoor_homepage_lane_text
@@ -2330,22 +2340,18 @@ def compose_status(
                 failures.append("front-door navigation mobile artifact does not satisfy the redacted proof contract")
             if receipt_contract(anchor_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"] and not anchor_artifact_privacy_contract_satisfied:
                 failures.append("front-door navigation anchor artifact does not satisfy the redacted proof contract")
-            if "Build" not in frontdoor_gated_targets:
-                failures.append("front-door navigation does not gate Build")
-            if "Build" in frontdoor_public_targets:
-                failures.append("front-door navigation exposes Build as public")
-            if "Play" not in frontdoor_gated_targets:
-                failures.append("front-door navigation does not gate Play")
-            if "Play" in frontdoor_public_targets:
-                failures.append("front-door navigation exposes Play as public")
+            if frontdoor_gated_targets:
+                failures.append("front-door navigation still reports anonymous Build or Play as account-gated")
+            if frontdoor_public_targets != {"Build", "Play"}:
+                failures.append("front-door navigation does not expose exactly the public Build and Play install handoffs")
             if not frontdoor_homepage_lane_text:
                 failures.append("front-door navigation homepage does not disclose current public lane")
             if expected_frontdoor_homepage_lane_text and frontdoor_homepage_lane_matches_release_channel is not True:
                 failures.append("front-door navigation homepage current public lane copy does not match release posture")
             if frontdoor_play_route != "/mobile/player":
                 failures.append("front-door navigation Play route is not /mobile/player")
-            if frontdoor_play_sign_in_route != "/login?next=%2Fmobile%2Fplayer":
-                failures.append("front-door navigation Play sign-in route is not /login?next=%2Fmobile%2Fplayer")
+            if frontdoor_play_sign_in_route != "/login?next=%2F":
+                failures.append("front-door navigation sign-in route is not the clean homepage return route")
             if frontdoor_direct_player_route != "/mobile/player":
                 failures.append("front-door navigation direct player route is not /mobile/player")
             if frontdoor_http_status != 200:
@@ -2356,52 +2362,40 @@ def compose_status(
                 failures.append("front-door navigation Play launch visible URL is not path-only after sanitization")
             if mobile_artifact.get("visible_player_url_private_identity_absent") is not True:
                 failures.append("front-door navigation Play launch did not prove private identity was removed from the visible URL")
-            if mobile_artifact.get("player_session_context_present") is not True:
-                failures.append("front-door navigation Play launch did not prove nonempty session context")
-            if mobile_artifact.get("player_device_context_present") is not True:
-                failures.append("front-door navigation Play launch did not prove nonempty device context")
-            if mobile_artifact.get("live_turn_companion_shell") is not True:
-                failures.append("front-door navigation Play launch did not prove the live turn companion shell")
+            if mobile_artifact.get("player_session_context_present") is not False:
+                failures.append("front-door navigation anonymous Player shell minted session context")
+            if mobile_artifact.get("player_device_context_present") is not False:
+                failures.append("front-door navigation anonymous Player shell minted device context")
+            if mobile_artifact.get("live_turn_companion_shell") is not False:
+                failures.append("front-door navigation anonymous Player shell exposed the live turn companion")
             if frontdoor_pwa_manifest_path != "/manifest.player.webmanifest":
                 failures.append("front-door navigation Play launch did not activate the player PWA manifest")
             if frontdoor_pwa_role != "Player":
                 failures.append("front-door navigation Play launch did not prove the Player role")
-            if frontdoor_blazor_shell != "interactive-server":
-                failures.append("front-door navigation Play launch did not prove the interactive Blazor shell")
-            if mobile_artifact.get("rybbit_configured") is not True or frontdoor_rybbit_tag != "mobile_play_shell":
-                failures.append("front-door navigation Play launch did not prove the Rybbit mobile shell config")
-            if frontdoor_rybbit_route != "/mobile/player" or frontdoor_rybbit_mode != "player" or frontdoor_rybbit_role != "Player":
-                failures.append("front-door navigation Play launch did not prove the Player Rybbit role config")
-            if mobile_artifact.get("rybbit_site_id_present") is not True or mobile_artifact.get("rybbit_script_url_allowed") is not True:
-                failures.append("front-door navigation Play launch did not prove the Rybbit provider config")
-            if mobile_artifact.get("rybbit_skip_mobile_paths") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit skips mobile paths")
-            if mobile_artifact.get("rybbit_mask_mobile_paths") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit masks mobile paths")
-            if mobile_artifact.get("rybbit_masks_private_play_routes") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit masks private play routes")
-            if mobile_artifact.get("rybbit_replay_blocks_turn_root") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit replay blocks turn content")
-            if not redacted_handoff_url_matches_contract(player_handoff_url, "/mobile/player", "Player"):
-                failures.append("front-door navigation Player session handoff URL is not safely redacted")
+            if frontdoor_blazor_shell != "install-only":
+                failures.append("front-door navigation Play launch did not prove the install-only shell")
+            if mobile_artifact.get("rybbit_configured") is not False:
+                failures.append("front-door navigation anonymous Player install shell unexpectedly enabled analytics")
+            if any((frontdoor_rybbit_tag, frontdoor_rybbit_route, frontdoor_rybbit_mode, frontdoor_rybbit_role)):
+                failures.append("front-door navigation anonymous Player install shell exposed analytics role metadata")
+            if player_handoff_url:
+                failures.append("front-door navigation anonymous Player install shell exposed a session handoff URL")
             if mobile_artifact.get("player_session_handoff_private_identity_redacted") is not True:
                 failures.append("front-door navigation Player session handoff proof did not redact private identity")
-            if player_handoff_status != "Session handoff is ready in the link above.":
-                failures.append("front-door navigation Player session handoff did not expose ready status")
-            if player_handoff_link_text != "Open session handoff link":
-                failures.append("front-door navigation Player session handoff did not relabel the visible route")
-            if mobile_artifact.get("player_session_handoff_preserves_session") is not True:
-                failures.append("front-door navigation Player session handoff did not preserve session id")
-            if mobile_artifact.get("player_session_handoff_preserves_role") is not True:
-                failures.append("front-door navigation Player session handoff did not preserve role")
-            if mobile_artifact.get("player_session_handoff_strips_device") is not True:
-                failures.append("front-door navigation Player session handoff leaked sender device id")
-            if mobile_artifact.get("player_session_handoff_sender_device_id_present") is not True:
-                failures.append("front-door navigation Player session handoff did not prove a sender device id was stripped")
+            if player_handoff_status or player_handoff_link_text:
+                failures.append("front-door navigation anonymous Player install shell exposed session handoff UI")
+            for field in (
+                "player_session_handoff_preserves_session",
+                "player_session_handoff_preserves_role",
+                "player_session_handoff_strips_device",
+                "player_session_handoff_sender_device_id_present",
+            ):
+                if mobile_artifact.get(field) is not False:
+                    failures.append(f"front-door navigation anonymous Player install shell has invalid {field}")
             if frontdoor_gm_route != "/mobile/gm":
                 failures.append("front-door navigation GM switch route is not /mobile/gm")
-            if mobile_artifact.get("gm_route_session_id_present") is not True:
-                failures.append("front-door navigation GM switch did not prove session handoff context")
+            if mobile_artifact.get("gm_route_session_id_present") is not False:
+                failures.append("front-door navigation anonymous GM route minted session context")
             if mobile_artifact.get("gm_route_private_identity_redacted") is not True:
                 failures.append("front-door navigation GM switch proof did not redact private identity")
             if frontdoor_gm_http_status != 200:
@@ -2412,48 +2406,36 @@ def compose_status(
                 failures.append("front-door navigation GM visible URL is not path-only after sanitization")
             if mobile_artifact.get("visible_gm_url_private_identity_absent") is not True:
                 failures.append("front-door navigation GM switch did not prove private identity was removed from the visible URL")
-            if mobile_artifact.get("gm_session_context_present") is not True:
-                failures.append("front-door navigation GM switch did not prove nonempty session context")
-            if mobile_artifact.get("gm_device_context_present") is not True:
-                failures.append("front-door navigation GM switch did not prove nonempty device context")
-            if mobile_artifact.get("gm_live_turn_companion_shell") is not True:
-                failures.append("front-door navigation GM switch did not prove the live turn companion shell")
+            if mobile_artifact.get("gm_session_context_present") is not False:
+                failures.append("front-door navigation anonymous GM shell minted session context")
+            if mobile_artifact.get("gm_device_context_present") is not False:
+                failures.append("front-door navigation anonymous GM shell minted device context")
+            if mobile_artifact.get("gm_live_turn_companion_shell") is not False:
+                failures.append("front-door navigation anonymous GM shell exposed the live turn companion")
             if frontdoor_gm_pwa_manifest_path != "/manifest.gm.webmanifest":
                 failures.append("front-door navigation GM switch did not activate the GM PWA manifest")
             if frontdoor_gm_pwa_role != "GameMaster":
                 failures.append("front-door navigation GM switch did not prove the GameMaster role")
-            if frontdoor_gm_blazor_shell != "interactive-server":
-                failures.append("front-door navigation GM switch did not prove the interactive Blazor shell")
-            if mobile_artifact.get("gm_rybbit_configured") is not True or frontdoor_gm_rybbit_tag != "mobile_play_shell":
-                failures.append("front-door navigation GM switch did not prove the Rybbit mobile shell config")
-            if frontdoor_gm_rybbit_route != "/mobile/gm" or frontdoor_gm_rybbit_mode != "gm" or frontdoor_gm_rybbit_role != "GameMaster":
-                failures.append("front-door navigation GM switch did not prove the GM Rybbit role config")
-            if mobile_artifact.get("gm_rybbit_site_id_present") is not True or mobile_artifact.get("gm_rybbit_script_url_allowed") is not True:
-                failures.append("front-door navigation GM switch did not prove the Rybbit provider config")
-            if mobile_artifact.get("gm_rybbit_skip_mobile_paths") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit skips mobile paths")
-            if mobile_artifact.get("gm_rybbit_mask_mobile_paths") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit masks mobile paths")
-            if mobile_artifact.get("gm_rybbit_masks_private_play_routes") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit masks private play routes")
-            if mobile_artifact.get("gm_rybbit_replay_blocks_turn_root") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit replay blocks turn content")
-            if not redacted_handoff_url_matches_contract(gm_handoff_url, "/mobile/gm", "GameMaster"):
-                failures.append("front-door navigation GM session handoff URL is not safely redacted")
+            if frontdoor_gm_blazor_shell != "install-only":
+                failures.append("front-door navigation GM launch did not prove the install-only shell")
+            if mobile_artifact.get("gm_rybbit_configured") is not False:
+                failures.append("front-door navigation anonymous GM install shell unexpectedly enabled analytics")
+            if any((frontdoor_gm_rybbit_tag, frontdoor_gm_rybbit_route, frontdoor_gm_rybbit_mode, frontdoor_gm_rybbit_role)):
+                failures.append("front-door navigation anonymous GM install shell exposed analytics role metadata")
+            if gm_handoff_url:
+                failures.append("front-door navigation anonymous GM install shell exposed a session handoff URL")
             if mobile_artifact.get("gm_session_handoff_private_identity_redacted") is not True:
                 failures.append("front-door navigation GM session handoff proof did not redact private identity")
-            if gm_handoff_status != "Session handoff is ready in the link above.":
-                failures.append("front-door navigation GM session handoff did not expose ready status")
-            if gm_handoff_link_text != "Open session handoff link":
-                failures.append("front-door navigation GM session handoff did not relabel the visible route")
-            if mobile_artifact.get("gm_session_handoff_preserves_session") is not True:
-                failures.append("front-door navigation GM session handoff did not preserve session id")
-            if mobile_artifact.get("gm_session_handoff_preserves_role") is not True:
-                failures.append("front-door navigation GM session handoff did not preserve role")
-            if mobile_artifact.get("gm_session_handoff_strips_device") is not True:
-                failures.append("front-door navigation GM session handoff leaked sender device id")
-            if mobile_artifact.get("gm_session_handoff_sender_device_id_present") is not True:
-                failures.append("front-door navigation GM session handoff did not prove a sender device id was stripped")
+            if gm_handoff_status or gm_handoff_link_text:
+                failures.append("front-door navigation anonymous GM install shell exposed session handoff UI")
+            for field in (
+                "gm_session_handoff_preserves_session",
+                "gm_session_handoff_preserves_role",
+                "gm_session_handoff_strips_device",
+                "gm_session_handoff_sender_device_id_present",
+            ):
+                if mobile_artifact.get(field) is not False:
+                    failures.append(f"front-door navigation anonymous GM install shell has invalid {field}")
             if not frontdoor_anchor_entry_url_matches_contract(frontdoor_anchor_entry_url):
                 failures.append("front-door navigation homepage anchor proof did not start from /#turn-runsite-card")
             if frontdoor_anchor_final_path != "/mobile/player":
@@ -2464,8 +2446,8 @@ def compose_status(
                 failures.append("front-door navigation homepage anchor proof did not activate the player PWA manifest")
             if frontdoor_anchor_pwa_role != "Player":
                 failures.append("front-door navigation homepage anchor proof did not prove the Player role")
-            if frontdoor_anchor_blazor_shell != "interactive-server":
-                failures.append("front-door navigation homepage anchor proof did not prove the interactive Blazor shell")
+            if frontdoor_anchor_blazor_shell != "install-only":
+                failures.append("front-door navigation homepage anchor proof did not prove the install-only shell")
             if not visible_role_url_is_path_only(
                 frontdoor_anchor_final_url,
                 "/mobile/player",
@@ -2474,10 +2456,10 @@ def compose_status(
                 failures.append("front-door navigation homepage anchor visible URL is not path-only after sanitization")
             if anchor_artifact.get("visible_url_private_identity_absent") is not True:
                 failures.append("front-door navigation homepage anchor did not prove private identity was removed from the visible URL")
-            if anchor_artifact.get("session_context_present") is not True:
-                failures.append("front-door navigation homepage anchor proof did not reach a session-backed player route")
-            if anchor_artifact.get("device_context_present") is not True:
-                failures.append("front-door navigation homepage anchor proof did not reach a device-backed player route")
+            if anchor_artifact.get("session_context_present") is not False:
+                failures.append("front-door navigation homepage anchor minted session context")
+            if anchor_artifact.get("device_context_present") is not False:
+                failures.append("front-door navigation homepage anchor minted device context")
             if frontdoor_anchor_failure:
                 failures.append("front-door navigation homepage anchor proof failed: " + frontdoor_anchor_failure)
 
@@ -3779,6 +3761,296 @@ main().catch((error) => {
 """,
         encoding="utf-8",
     )
+    # The public role boundary is now an install-only shell. Keep the historical
+    # probe above for review context, but execute the current fail-closed contract:
+    # anonymous navigation must never mint session/device identity or an
+    # interactive table shell.
+    probe_path.write_text(
+        r"""const fs = require('node:fs');
+const path = require('node:path');
+const { chromium } = require(path.join(process.cwd(), 'node_modules', 'playwright'));
+
+const baseUrl = (process.env.BASE_URL || 'https://chummer.run').replace(/\/+$/, '');
+const artifactDir = process.env.CHUMMER_COMPLETION_DIR || process.cwd();
+const mobileViewport = { width: 390, height: 844 };
+const proofTimeoutMs = """
+        + str(int(playwright_timeout_seconds * 1000))
+        + r""";
+
+function writeJson(fileName, payload) {
+  fs.mkdirSync(artifactDir, { recursive: true });
+  fs.writeFileSync(path.join(artifactDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+function assertProof(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function cleanRoleUrl(value, expectedPath, expectedHash = '') {
+  const url = new URL(value, baseUrl);
+  return url.pathname === expectedPath && url.search === '' && url.hash === expectedHash;
+}
+
+async function textOf(locator) {
+  return ((await locator.first().textContent()) || '').trim();
+}
+
+async function gotoPublic(page, url) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: proofTimeoutMs,
+      });
+      if (response && response.status() === 200) {
+        return response;
+      }
+      lastError = new Error(`${url} returned HTTP ${response ? response.status() : 0}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await page.waitForTimeout(500 * (attempt + 1));
+  }
+  throw lastError || new Error(`${url} did not load`);
+}
+
+async function proveInstallShell(page, route, roleLabel, installRole, manifestPath, expectedHash = '') {
+  const response = await gotoPublic(page, new URL(`${route}${expectedHash}`, baseUrl).toString());
+  const shell = page.locator(
+    `[data-play-surface="install-only"][data-live-session="unavailable"][data-authority="none"][data-install-role="${installRole}"]`,
+  ).first();
+  assertProof(await shell.count() === 1, `${route} did not expose the install-only ${roleLabel} shell`);
+  assertProof(await page.locator('[data-turn-root]').count() === 0, `${route} exposed private turn state`);
+  assertProof(
+    await page.locator('[data-blazor-shell="interactive-server"]').count() === 0,
+    `${route} exposed an interactive server shell`,
+  );
+  const manifest = await page.locator('link[rel="manifest"]').first().getAttribute('href');
+  assertProof(manifest === manifestPath, `${route} did not activate ${manifestPath}`);
+  assertProof(cleanRoleUrl(page.url(), route, expectedHash), `${route} visible URL is not clean`);
+  return {
+    response,
+    finalUrl: page.url(),
+    manifest,
+    roleLabel,
+    installRole,
+  };
+}
+
+async function main() {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const homepage = await browser.newPage({ viewport: mobileViewport });
+    const pageErrors = [];
+    homepage.on('pageerror', (error) => pageErrors.push(String(error.message || error)));
+    await gotoPublic(homepage, baseUrl);
+    const overflowX = await homepage.evaluate(() => Math.max(
+      document.documentElement.scrollWidth,
+      document.body?.scrollWidth || 0,
+    ) - window.innerWidth);
+    assertProof(overflowX <= 1, `homepage has ${overflowX}px horizontal overflow`);
+    const openMenuLinks = await homepage.locator('.site-open-chummer-menu__button').evaluateAll((links) =>
+      links.map((link) => ({
+        text: (link.textContent || '').trim(),
+        href: link.getAttribute('href') || '',
+      })),
+    );
+    const buildHref = openMenuLinks.find((link) => link.text === 'Build')?.href || '';
+    const playHref = openMenuLinks.find((link) => link.text === 'Play')?.href || '';
+    assertProof(
+      new URL(buildHref, baseUrl).pathname === '/build',
+      'homepage Build public install link is missing',
+    );
+    assertProof(
+      new URL(playHref, baseUrl).pathname === '/mobile/player',
+      'homepage Play public install link is missing',
+    );
+    assertProof(
+      await homepage.locator('.site-open-chummer-menu__button[href="/play"]').count() === 0,
+      'legacy /play front-door link is still present',
+    );
+    const accountRoute = await homepage
+      .locator('a[href="/login?next=%2Faccount%2Faccess"]')
+      .first()
+      .getAttribute('href');
+    const signInRoute = await homepage
+      .locator('a[href="/login?next=%2F"]')
+      .first()
+      .getAttribute('href');
+    const homepageLaneText = await textOf(
+      homepage.locator('.minimal-meta').filter({ hasText: 'Current public lane:' }),
+    );
+    assertProof(Boolean(homepageLaneText), 'homepage current public lane disclosure is missing');
+
+    const playerPage = await browser.newPage({ viewport: mobileViewport });
+    const player = await proveInstallShell(
+      playerPage,
+      '/mobile/player',
+      'Player',
+      'player',
+      '/manifest.player.webmanifest',
+    );
+    const playerTitle = await playerPage.title();
+
+    const gmPage = await browser.newPage({ viewport: mobileViewport });
+    const gm = await proveInstallShell(
+      gmPage,
+      '/mobile/gm',
+      'GameMaster',
+      'gm',
+      '/manifest.gm.webmanifest',
+    );
+
+    writeJson('FRONTDOOR_MOBILE_LAUNCH.generated.json', {
+      contractName: 'chummer.frontdoor_mobile_launch.v2',
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      viewport: mobileViewport,
+      homepage_overflow_x: overflowX,
+      homepage_lane_text: homepageLaneText,
+      account_route: accountRoute,
+      play_route: '/mobile/player',
+      play_sign_in_route: signInRoute,
+      direct_player_route: '/mobile/player',
+      direct_player_http_status: player.response.status(),
+      direct_player_title: playerTitle,
+      final_url: player.finalUrl,
+      private_identity_redacted: true,
+      visible_player_url_private_identity_absent: true,
+      player_session_context_present: false,
+      player_device_context_present: false,
+      pwa_role: 'Player',
+      blazor_shell: 'install-only',
+      live_turn_companion_shell: false,
+      pwa_manifest: player.manifest,
+      pwa_manifest_path: player.manifest,
+      rybbit_configured: false,
+      rybbit_tag: '',
+      rybbit_route: '',
+      rybbit_mode: '',
+      rybbit_role: '',
+      rybbit_site_id_present: false,
+      rybbit_script_url_present: false,
+      rybbit_script_url_allowed: false,
+      rybbit_skip_patterns: [],
+      rybbit_mask_patterns: [],
+      rybbit_skip_mobile_paths: false,
+      rybbit_mask_mobile_paths: false,
+      rybbit_masks_private_play_routes: false,
+      rybbit_replay_block_selector: '',
+      rybbit_replay_blocks_turn_root: false,
+      player_session_handoff_url: '',
+      player_session_handoff_status: '',
+      player_session_handoff_link_text: '',
+      player_session_handoff_preserves_session: false,
+      player_session_handoff_preserves_role: false,
+      player_session_handoff_strips_device: false,
+      player_session_handoff_sender_device_id_present: false,
+      player_session_handoff_private_identity_redacted: true,
+      gm_route: '/mobile/gm',
+      gm_route_session_id_present: false,
+      gm_route_private_identity_redacted: true,
+      gm_http_status: gm.response.status(),
+      gm_final_url: gm.finalUrl,
+      visible_gm_url_private_identity_absent: true,
+      gm_session_context_present: false,
+      gm_device_context_present: false,
+      gm_live_turn_companion_shell: false,
+      gm_pwa_manifest_path: gm.manifest,
+      gm_pwa_role: 'GameMaster',
+      gm_blazor_shell: 'install-only',
+      gm_rybbit_configured: false,
+      gm_rybbit_tag: '',
+      gm_rybbit_route: '',
+      gm_rybbit_mode: '',
+      gm_rybbit_role: '',
+      gm_rybbit_site_id_present: false,
+      gm_rybbit_script_url_present: false,
+      gm_rybbit_script_url_allowed: false,
+      gm_rybbit_skip_patterns: [],
+      gm_rybbit_mask_patterns: [],
+      gm_rybbit_skip_mobile_paths: false,
+      gm_rybbit_mask_mobile_paths: false,
+      gm_rybbit_masks_private_play_routes: false,
+      gm_rybbit_replay_block_selector: '',
+      gm_rybbit_replay_blocks_turn_root: false,
+      gm_session_handoff_url: '',
+      gm_session_handoff_status: '',
+      gm_session_handoff_link_text: '',
+      gm_session_handoff_preserves_session: false,
+      gm_session_handoff_preserves_role: false,
+      gm_session_handoff_strips_device: false,
+      gm_session_handoff_sender_device_id_present: false,
+      gm_session_handoff_private_identity_redacted: true,
+      gated_targets: [],
+      public_targets: ['Build', 'Play'],
+      page_errors: pageErrors,
+    });
+
+    writeJson('BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json', {
+      contractName: 'chummer.black_ledger_globe_frontdoor.v1',
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      route: '/',
+      cta_labels: ['Build', 'Play', 'Sign in first'],
+      open_menu_targets: ['/build', '/mobile/player', '/login?next=%2Faccount%2Faccess'],
+      gated_targets: [],
+      public_targets: ['Build', 'Play'],
+      ledger_primary: false,
+    });
+
+    const anchorPage = await browser.newPage({ viewport: mobileViewport });
+    const anchorEntryUrl = new URL('/#turn-runsite-card', baseUrl).toString();
+    await gotoPublic(anchorPage, anchorEntryUrl);
+    await anchorPage.waitForURL(
+      (url) => url.pathname === '/mobile/player'
+        && url.search === ''
+        && url.hash === '#turn-runsite-card',
+      { timeout: proofTimeoutMs },
+    );
+    const anchorShell = anchorPage.locator(
+      '[data-play-surface="install-only"][data-live-session="unavailable"][data-authority="none"][data-install-role="player"]',
+    ).first();
+    assertProof(await anchorShell.count() === 1, 'homepage anchor did not open the Player install shell');
+    assertProof(await anchorPage.locator('[data-turn-root]').count() === 0, 'homepage anchor exposed private turn state');
+    const anchorManifest = await anchorPage.locator('link[rel="manifest"]').first().getAttribute('href');
+    assertProof(anchorManifest === '/manifest.player.webmanifest', 'homepage anchor manifest is not Player');
+    writeJson('FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json', {
+      contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2',
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      entry_url: anchorEntryUrl,
+      final_url: anchorPage.url(),
+      final_pathname: '/mobile/player',
+      final_hash: '#turn-runsite-card',
+      private_identity_redacted: true,
+      visible_url_private_identity_absent: true,
+      session_context_present: false,
+      device_context_present: false,
+      pwa_manifest_path: anchorManifest,
+      pwa_role: 'Player',
+      blazor_shell: 'install-only',
+      failure: '',
+      page_errors: [],
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+main().catch((error) => {
+  console.error(error && error.stack ? error.stack : String(error));
+  process.exit(1);
+});
+""",
+        encoding="utf-8",
+    )
     command = ["node", str(probe_path)]
     exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
     mobile_artifact, mobile_artifact_load_status = load_json_with_status(mobile_artifact_path)
@@ -3877,12 +4149,29 @@ def main(argv: list[str] | None = None) -> int:
     expected_release_rollout_state = "" if args.skip_release_version_match else str(
         release_channel.get("rolloutState") or release_channel.get("rollout_state") or ""
     ).strip()
+    release_public_trust = (
+        release_channel.get("publicTrustMetrics")
+        if isinstance(release_channel.get("publicTrustMetrics"), dict)
+        else {}
+    )
+    release_adoption_health = (
+        release_public_trust.get("adoptionHealth")
+        if isinstance(release_public_trust.get("adoptionHealth"), dict)
+        else {}
+    )
+    release_public_install_count = release_adoption_health.get("publicInstallCount")
+    expected_public_installer_available = (
+        release_public_install_count > 0
+        if type(release_public_install_count) is int
+        else None
+    )
     expected_frontdoor_homepage_lane = expected_homepage_lane_text(
         expected_release_status,
         expected_release_version,
         expected_release_channel,
         expected_release_supportability_state,
         expected_release_rollout_state,
+        expected_public_installer_available=expected_public_installer_available,
     ) or ""
     overlay_root = resolve_public_edge_overlay_root(args.overlay_root)
     expected_source_root = Path(
@@ -4034,6 +4323,16 @@ def main(argv: list[str] | None = None) -> int:
                         "trusted build-info full deployment digest does not match preflight"
                     )
 
+        release_channel_receipt_path = Path(args.release_channel_receipt)
+        try:
+            release_channel_receipt_sha256 = hashlib.sha256(
+                release_channel_receipt_path.read_bytes()
+            ).hexdigest()
+        except OSError as exc:
+            parser.error(
+                "release-channel receipt could not be read for exact downloads binding: "
+                f"{release_channel_receipt_path}: {exc}"
+            )
         downloads_command = [
             sys.executable,
             "scripts/verify_downloads_version_marker.py",
@@ -4043,6 +4342,8 @@ def main(argv: list[str] | None = None) -> int:
             str(args.timeout_seconds),
             "--release-channel-receipt",
             args.release_channel_receipt,
+            "--release-channel-receipt-sha256",
+            release_channel_receipt_sha256,
         ]
         if args.skip_release_version_match:
             downloads_command.append("--skip-release-version-match")

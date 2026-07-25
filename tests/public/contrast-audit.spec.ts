@@ -160,7 +160,10 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
 
     await collect('normal');
 
-    const firstInteractive = page.locator('a, button, input, select, textarea, .button-like').filter({ hasNotText: 'Skip to content' }).first();
+    const firstInteractive = page
+      .locator('a:visible, button:visible, input:visible, select:visible, textarea:visible, .button-like:visible')
+      .filter({ hasNotText: 'Skip to content' })
+      .first();
     if (await firstInteractive.count() > 0) {
       await firstInteractive.hover({ force: true, timeout: 5000 });
       await collect('hover');

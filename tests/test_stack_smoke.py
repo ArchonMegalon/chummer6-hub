@@ -218,6 +218,38 @@ class StackConfigSmokeTests(unittest.TestCase):
             "expected one of the known stack services to be present",
         )
 
+    def test_public_blazor_uses_descriptor_bound_data_protection_material(self):
+        public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
+        if not public_edge_path.exists():
+            self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
+
+        compose_text = public_edge_path.read_text(encoding="utf-8")
+        service_text = compose_text.split("  chummer-public-blazor:", 1)[1].split(
+            "\n  chummer-play-web:",
+            1,
+        )[0]
+
+        self.assertNotIn("CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_PATH", service_text)
+        self.assertIn(
+            "CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_DIRECTORY: /var/lib/chummer-build/data-protection",
+            service_text,
+        )
+        self.assertIn(
+            "CHUMMER_BLAZOR_DATA_PROTECTION_CERTIFICATE_PATH: /run/secrets/chummer-config/certificates/chummer-build-data-protection.p12",
+            service_text,
+        )
+        self.assertIn("CHUMMER_BUILD_WORKSPACE_STORE_PROVIDER: file", service_text)
+        self.assertIn('CHUMMER_BUILD_EXPECTED_REPLICA_COUNT: "1"', service_text)
+        self.assertIn(
+            "chummer-public-blazor-data-protection:/var/lib/chummer-build/data-protection",
+            service_text,
+        )
+        self.assertIn("target: /run/secrets/chummer-config", service_text)
+        self.assertIn("create_host_path: false", service_text)
+        self.assertIn("read_only: true", service_text)
+        self.assertIn("no-new-privileges:true", service_text)
+        self.assertIn("cap_drop:", service_text)
+
     def test_public_edge_services_restart_unless_stopped(self):
         public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
         if not public_edge_path.exists():
@@ -455,15 +487,25 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"', publish_text)
 
     def test_shared_http_release_uploader_avoids_bash4_only_array_builtins(self):
-        uploader_path = REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-download-bundle-http.sh"
-        if not uploader_path.exists():
+        compatibility_uploader_path = REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-download-bundle-http.sh"
+        authoritative_uploader_path = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
+        if not compatibility_uploader_path.exists():
             self.skipTest("shared HTTP release uploader is not present for this repository slice")
 
-        uploader_text = uploader_path.read_text(encoding="utf-8")
+        compatibility_uploader_text = compatibility_uploader_path.read_text(encoding="utf-8")
+        authoritative_uploader_text = authoritative_uploader_path.read_text(encoding="utf-8")
 
-        self.assertIn('MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json}"', uploader_text)
-        self.assertNotIn("mapfile -t", uploader_text)
-        self.assertNotIn("readarray -t", uploader_text)
+        self.assertIn('AUTHORITATIVE_PUBLISHER="$REPO_ROOT/../chummer.run-services/scripts/publish-download-bundle-http.sh"', compatibility_uploader_text)
+        self.assertIn('[[ ! -f "$AUTHORITATIVE_PUBLISHER" || -L "$AUTHORITATIVE_PUBLISHER" ]]', compatibility_uploader_text)
+        self.assertIn('[[ "$AUTHORITATIVE_PUBLISHER" -ef "${BASH_SOURCE[0]}" ]]', compatibility_uploader_text)
+        self.assertIn('exec bash "$AUTHORITATIVE_PUBLISHER" "$@"', compatibility_uploader_text)
+        self.assertIn(
+            'MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json}"',
+            authoritative_uploader_text,
+        )
+        for uploader_text in (compatibility_uploader_text, authoritative_uploader_text):
+            self.assertNotIn("mapfile -t", uploader_text)
+            self.assertNotIn("readarray -t", uploader_text)
 
     def test_verify_release_manifest_scripts_guard_empty_verify_args_for_macos_bash(self):
         script_paths = [
@@ -818,6 +860,10 @@ class StackConfigSmokeTests(unittest.TestCase):
             release_fixture["releaseProof"]["status"] = "pass"
             release_fixture["releaseProof"]["generatedAt"] = published_at
             release_fixture["releaseProof"]["generated_at"] = published_at
+            proof_routes = release_fixture["releaseProof"].get("proofRoutes")
+            if isinstance(proof_routes, list) and "/account/roster" not in proof_routes:
+                work_index = proof_routes.index("/account/work")
+                proof_routes.insert(work_index + 1, "/account/roster")
             ui_gate = release_fixture["releaseProof"].get("uiLocalizationReleaseGate") or {}
             if isinstance(ui_gate, dict):
                 ui_gate["generatedAt"] = published_at

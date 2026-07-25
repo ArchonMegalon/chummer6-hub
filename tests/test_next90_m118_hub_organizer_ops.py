@@ -179,8 +179,10 @@ class Next90M118HubOrganizerOpsTests(unittest.TestCase):
         self.assertIn("organizer_ops", receipts)
         self.assertIn("league_convention_season_ops", receipts)
         self.assertIn("/api/v1/campaign-spine/me/organizer-ops", receipts["organizer_ops"]["routes"])
+        self.assertIn("/account/roster", receipts["organizer_ops"]["routes"])
         self.assertIn("organizer_roles", receipts["organizer_ops"]["surfaces"])
         self.assertIn("season_event_lanes", receipts["league_convention_season_ops"]["surfaces"])
+        self.assertIn("/account/roster", receipts["league_convention_season_ops"]["routes"])
         self.assertIn("support_escalation:organizer", receipts["league_convention_season_ops"]["surfaces"])
 
     def test_verifier_fails_when_served_release_proof_drifts_from_local_proof(self) -> None:
@@ -225,16 +227,18 @@ class Next90M118HubOrganizerOpsTests(unittest.TestCase):
             self.copy_sources(temp_root)
             home_view_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
             home_view_text = home_view_path.read_text(encoding="utf-8")
-            home_view_path.write_text(
-                home_view_text.replace("@leadCommunityOperation.SupportEscalationSummary", "@leadCommunityOperation.OperationsSummary"),
-                encoding="utf-8",
+            mutated_home_view_text = home_view_text.replace(
+                "@PublicText(leadCommunityOperation.SupportEscalationSummary)",
+                "@PublicText(leadCommunityOperation.OperationsSummary)",
             )
+            self.assertNotEqual(home_view_text, mutated_home_view_text)
+            home_view_path.write_text(mutated_home_view_text, encoding="utf-8")
 
             verifier_paths = self.prepare_verifier_inputs(temp_root)
             result = self.run_verifier(temp_root, **verifier_paths)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("@leadCommunityOperation.SupportEscalationSummary", result.stderr)
+        self.assertIn("@PublicText(leadCommunityOperation.SupportEscalationSummary)", result.stderr)
 
     def test_verifier_fails_when_controller_loses_organizer_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m118-controller-") as temp_dir:

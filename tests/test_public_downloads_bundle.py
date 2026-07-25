@@ -17,6 +17,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MATERIALIZER = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
 AUR_MATERIALIZER = REPO_ROOT / "scripts" / "materialize-aur-package.py"
+LOCALIZATION_MIRROR_MATERIALIZER = (
+    REPO_ROOT / "scripts" / "materialize-ui-localization-release-gate-mirror.py"
+)
 RUN_API_LOCALIZATION_GATE_MIRROR = (
     REPO_ROOT
     / "Chummer.Run.Api"
@@ -368,6 +371,22 @@ def write_public_downloads_fixture(root: Path) -> PublicDownloadsFixture:
             "rolloutState": "promoted_preview",
             "rolloutReason": "Synthetic cross-platform shelf for public bundle tests.",
             "supportabilityState": "preview_supported",
+            "desktopTupleCoverage": {
+                "requiredDesktopPlatforms": ["linux", "windows", "macos"],
+                "requiredDesktopHeads": ["avalonia"],
+                "promotedInstallerTuples": [
+                    {
+                        "tupleId": f"{row['head']}:{row['platform']}:{row['rid']}",
+                        "artifactId": row["artifactId"],
+                        "head": row["head"],
+                        "platform": row["platform"],
+                        "rid": row["rid"],
+                        "arch": row["arch"],
+                        "kind": row["kind"],
+                    }
+                    for row in artifacts
+                ],
+            },
             "artifacts": artifacts,
         },
     )
@@ -396,6 +415,8 @@ def write_public_downloads_fixture(root: Path) -> PublicDownloadsFixture:
             "contractName": "chummer.run.desktop_release_publication",
             "status": "pass",
             "generatedAt": generated_at,
+            "channel": "preview",
+            "version": FIXTURE_RELEASE_VERSION,
             "artifacts": [
                 {
                     "artifactId": row["artifactId"],
@@ -405,6 +426,9 @@ def write_public_downloads_fixture(root: Path) -> PublicDownloadsFixture:
                     "installAccessClass": row["installAccessClass"],
                     "promotionStatus": "promoted",
                     "startupSmokeStatus": "passed",
+                    "startupSmokeReceiptPath": (
+                        f"startup-smoke/startup-smoke-avalonia-{row['rid']}.receipt.json"
+                    ),
                     "artifactSha256": row["sha256"],
                     "artifactSizeBytes": row["sizeBytes"],
                 }
@@ -511,6 +535,18 @@ class PublicDownloadsBundleTests(unittest.TestCase):
 
         script_text = MATERIALIZER.read_text(encoding="utf-8")
 
+        self.assertIn("workspace_manifest_mirrors_disabled() {", script_text)
+        self.assertIn("if ! workspace_manifest_mirrors_disabled; then", script_text)
+        self.assertIn(
+            'ui_localization_release_gate_mirror="$REPO_ROOT/Chummer.Run.Api/wwwroot/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json"',
+            script_text,
+        )
+        self.assertIn(
+            'python3 "$SCRIPT_DIR/materialize-ui-localization-release-gate-mirror.py" \\\n'
+            '    --source "$UI_LOCALIZATION_RELEASE_GATE_SOURCE" \\\n'
+            '    --output "$ui_localization_release_gate_mirror"',
+            script_text,
+        )
         self.assertIn("sync_workspace_portal_manifest_mirrors() {", script_text)
         self.assertIn('replace_file_atomically "$source_path" "$target_path"', script_text)
         self.assertIn('local -a mirror_root_candidates=(', script_text)
@@ -522,6 +558,55 @@ class PublicDownloadsBundleTests(unittest.TestCase):
         self.assertIn('"/docker/chummercomplete/chummer-presentation"', script_text)
         self.assertIn('sync_workspace_portal_manifest_mirrors "RELEASE_CHANNEL.generated.json"', script_text)
         self.assertIn('sync_workspace_portal_manifest_mirrors "releases.json"', script_text)
+
+    def test_localization_gate_mirror_materializer_is_atomic_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            source = temp_root / "source.json"
+            output = temp_root / "proofs" / "UI_LOCALIZATION_RELEASE_GATE.generated.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "contract_name": "chummer6-ui.localization_release_gate",
+                        "generated_at": "2026-07-28T19:04:49Z",
+                        "status": "pass",
+                        "local_release_proof": {
+                            "base_url": "https://stale.invalid",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            command = [
+                "python3",
+                str(LOCALIZATION_MIRROR_MATERIALIZER),
+                "--source",
+                str(source),
+                "--output",
+                str(output),
+                "--base-url",
+                "https://chummer.run/",
+            ]
+
+            first = subprocess.run(command, text=True, capture_output=True, check=False)
+            self.assertEqual(0, first.returncode, first.stderr)
+            self.assertIn("ui_localization_release_gate_mirror:updated:", first.stdout)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(
+                "https://chummer.run",
+                payload["local_release_proof"]["base_url"],
+            )
+            self.assertEqual(
+                "https://chummer.run",
+                payload["local_release_proof"]["baseUrl"],
+            )
+            first_stat = output.stat()
+
+            second = subprocess.run(command, text=True, capture_output=True, check=False)
+            self.assertEqual(0, second.returncode, second.stderr)
+            self.assertIn("ui_localization_release_gate_mirror:unchanged:", second.stdout)
+            self.assertEqual(first_stat.st_mtime_ns, output.stat().st_mtime_ns)
 
     def test_materializer_hydrates_manifest_owned_artifacts_from_candidate_roots(self):
         if not MATERIALIZER.exists():
@@ -915,7 +1000,7 @@ class PublicDownloadsBundleTests(unittest.TestCase):
                 "materializer must not leak stale macOS installer bytes into the published files shelf",
             )
 
-    def test_materializer_preserves_newer_merged_artifact_bytes_over_stale_manifest_matches(self):
+    def test_materializer_fails_closed_when_manifest_bytes_and_candidate_proof_disagree(self):
         if not MATERIALIZER.exists():
             self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
 
@@ -930,9 +1015,6 @@ class PublicDownloadsBundleTests(unittest.TestCase):
 
             linux_file_name = "chummer-avalonia-linux-x64-installer.deb"
             fresh_linux_path = fresh_root / linux_file_name
-            fresh_linux_sha = sha256_file(fresh_linux_path)
-            fresh_linux_size = fresh_linux_path.stat().st_size
-
             stale_linux_path = stale_registry_root / linux_file_name
             stale_linux_path.write_bytes(b"stale-linux-installer-bytes-for-manifest-regression")
             stale_linux_sha = sha256_file(stale_linux_path)
@@ -954,28 +1036,11 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             env["CHUMMER_PUBLIC_RELEASE_CHANNEL_SOURCE"] = str(source_manifest_path)
 
             completed = run_materializer(output_root, env)
-            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
-
-            manifest = json.loads((output_root / "RELEASE_CHANNEL.generated.json").read_text(encoding="utf-8"))
-            linux_installer = next(
-                (item for item in manifest.get("artifacts") or [] if str(item.get("artifactId") or "") == "avalonia-linux-x64-installer"),
-                None,
-            )
-            self.assertIsNotNone(linux_installer, "expected a published Linux installer row")
-            self.assertEqual(
-                linux_installer.get("sha256"),
-                fresh_linux_sha,
-                "materializer must keep newer merged Linux bytes authoritative instead of restoring stale manifest-matching bytes",
-            )
-            self.assertEqual(
-                int(linux_installer.get("sizeBytes") or 0),
-                fresh_linux_size,
-                "materializer must publish the actual merged Linux installer size",
-            )
-            self.assertNotEqual(
-                linux_installer.get("sha256"),
-                stale_linux_sha,
-                "materializer must not resurrect stale Linux digest truth from registry fallback files",
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("artifact digest binding disagrees", completed.stderr)
+            self.assertFalse(
+                (output_root / "RELEASE_CHANNEL.generated.json").exists(),
+                "candidate bytes and proof must agree with authority before any shelf manifest is written",
             )
 
     def test_materializer_allows_presentation_source_to_replace_stale_runservices_bytes(self):

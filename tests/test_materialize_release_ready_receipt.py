@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
@@ -37,6 +38,8 @@ def load_module():
     module.google_oauth_receipt_validation_failures = lambda _path: []
     module._test_release_execution_environment = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
+        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900",
@@ -89,6 +92,40 @@ def load_module():
     return module
 
 
+def file_byte_identity(path: Path) -> dict[str, object]:
+    payload = path.read_bytes()
+    return {
+        "path": str(path.resolve(strict=True)),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+    }
+
+
+def passing_campaign_os_gate_evidence(
+    module,  # noqa: ANN001
+    receipt_path: Path,
+    validator_path: Path,
+) -> dict[str, object]:
+    return {
+        "path": str(receipt_path),
+        "load_status": "loaded",
+        "contract_name": module.CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_NAME,
+        "contract_version": module.CAMPAIGN_OS_LOCAL_PROOF_CONTRACT_VERSION,
+        "status": "passed",
+        "proof_kind": module.CAMPAIGN_OS_LOCAL_PROOF_KIND,
+        "dependency_mode": module.CAMPAIGN_OS_LOCAL_PROOF_DEPENDENCY_MODE,
+        "run_id": "3f1f5b8e-6f8a-4f5e-8f16-65d4a917c9a2",
+        "generated_at": "2026-07-13T12:00:00Z",
+        "expires_at": "2026-07-14T12:00:00Z",
+        "journey_count": module.CAMPAIGN_OS_LOCAL_PROOF_JOURNEY_COUNT,
+        "reason_code": "valid",
+        "receipt_identity": file_byte_identity(receipt_path),
+        "validator_identity": file_byte_identity(validator_path),
+        "blockers": [],
+        "pass": True,
+    }
+
+
 def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
     payload: dict[str, object] = {
         field: None for field in module.PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS
@@ -99,14 +136,14 @@ def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
             "status": "pass",
             "pwaOfflineCacheStatus": "pass",
             "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
-            "pwaOfflineCacheCacheVersion": "v17",
+            "pwaOfflineCacheCacheVersion": "v19",
             "pwaOfflineCacheNavigationPolicy": "network_only",
             "pwaOfflineCachePrivateStateScope": "open_tab_only",
             "pwaOfflineCacheStaticPaths": [
                 "/manifest.player.webmanifest",
                 "/manifest.gm.webmanifest",
                 "/mobile.css",
-                "/mobile-turn-companion.js",
+                "/mobile-install-shell.js",
             ],
             "pwaOfflineCacheOfflineRoleFallbacks": [
                 {
@@ -145,28 +182,33 @@ def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
             "frontdoorNavigationAnchorFinalPath": "/mobile/player",
             "frontdoorNavigationAnchorFinalHash": "#turn-runsite-card",
             "frontdoorNavigationAnchorFailure": "",
-            "frontdoorNavigationPlayerSessionHandoffUrl": "https://chummer.run/mobile/player?sessionId=[redacted]&role=Player",
-            "frontdoorNavigationGmSessionHandoffUrl": "https://chummer.run/mobile/gm?sessionId=[redacted]&role=GameMaster",
+            "frontdoorNavigationPlayerSessionHandoffUrl": "",
+            "frontdoorNavigationGmSessionHandoffUrl": "",
+            "frontdoorNavigationLiveTurnCompanionShell": False,
+            "frontdoorNavigationGmLiveTurnCompanionShell": False,
         }
     )
     for field in (
         "frontdoorNavigationPrivateIdentityRedacted",
         "frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent",
-        "frontdoorNavigationPlayerSessionContextPresent",
-        "frontdoorNavigationPlayerDeviceContextPresent",
         "frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted",
-        "frontdoorNavigationGmRouteSessionIdPresent",
         "frontdoorNavigationGmRoutePrivateIdentityRedacted",
         "frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent",
-        "frontdoorNavigationGmSessionContextPresent",
-        "frontdoorNavigationGmDeviceContextPresent",
         "frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted",
         "frontdoorNavigationAnchorPrivateIdentityRedacted",
         "frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent",
+    ):
+        payload[field] = True
+    for field in (
+        "frontdoorNavigationPlayerSessionContextPresent",
+        "frontdoorNavigationPlayerDeviceContextPresent",
+        "frontdoorNavigationGmRouteSessionIdPresent",
+        "frontdoorNavigationGmSessionContextPresent",
+        "frontdoorNavigationGmDeviceContextPresent",
         "frontdoorNavigationAnchorSessionContextPresent",
         "frontdoorNavigationAnchorDeviceContextPresent",
     ):
-        payload[field] = True
+        payload[field] = False
     return payload
 
 
@@ -690,6 +732,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             key: f"secret-value-{index}-{key.lower()}"
             for index, key in enumerate(sorted(module.RELEASE_SECRET_ENV_KEYS), start=1)
         }
+        encoded_secret = "credential/value with spaces+query?&="
+        secret_environment["TEABLE_API_TOKEN"] = encoded_secret
+        mixed_case_secret = "Ab/C"
+        secret_environment["GITHUB_TOKEN"] = mixed_case_secret
+        encoded_secret_values = {
+            module.quote(encoded_secret, safe=""),
+            module.quote_plus(encoded_secret, safe=""),
+        }
+        encoded_mixed_case_secret = module.quote(mixed_case_secret, safe="")
+        case_different_lookalike = "ab%2fC"
         raw_header_token = "derived-authorization-token-987654321"
         emitted = "\n".join(
             [
@@ -697,6 +749,9 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 f"Authorization: Bearer {raw_header_token}",
                 "x-api-key=derived-api-key-123456789",
                 "token=derived-query-token-123456789",
+                *(f"https://example.invalid/proof?opaque={value}" for value in encoded_secret_values),
+                f"https://example.invalid/proof?opaque={encoded_mixed_case_secret}",
+                f"https://example.invalid/public?opaque={case_different_lookalike}",
             ]
         )
         redacted = module.redact_release_output(emitted, secret_environment)
@@ -705,6 +760,10 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertNotIn(raw_header_token, redacted)
         self.assertNotIn("derived-api-key-123456789", redacted)
         self.assertNotIn("derived-query-token-123456789", redacted)
+        for encoded_value in encoded_secret_values:
+            self.assertNotIn(encoded_value, redacted)
+        self.assertNotIn(encoded_mixed_case_secret, redacted)
+        self.assertIn(case_different_lookalike, redacted)
         self.assertGreaterEqual(redacted.count("[REDACTED]"), len(secret_environment) + 3)
 
         with tempfile.TemporaryDirectory(prefix="release-controller-redaction-") as temp_dir:
@@ -729,12 +788,63 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertNotIn(value, result["stderr"])
         self.assertIn("[REDACTED]", result["stdout"])
 
+    def test_isolated_python_launcher_ignores_workspace_startup_module(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-controller-python-isolation-") as temp_dir:
+            root = Path(temp_dir)
+            startup_marker = root / "startup-module-ran"
+            result_path = root / "result.txt"
+            (root / "sitecustomize.py").write_text(
+                (
+                    "from pathlib import Path\n"
+                    f"Path({str(startup_marker)!r}).write_text('unexpected', encoding='utf-8')\n"
+                ),
+                encoding="utf-8",
+            )
+            (root / "helper.py").write_text("VALUE = 'isolated'\n", encoding="utf-8")
+            target = root / "target.py"
+            target.write_text(
+                (
+                    "from helper import VALUE\n"
+                    "from pathlib import Path\n"
+                    f"Path({str(result_path)!r}).write_text(VALUE, encoding='utf-8')\n"
+                ),
+                encoding="utf-8",
+            )
+            result = module.run_controller_gate_command(
+                {
+                    "command": module.isolated_python_command(target),
+                    "cwd": str(root),
+                    "timeout_seconds": 5,
+                },
+                {
+                    "PATH": module.TRUSTED_PATH,
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONNOUSERSITE": "1",
+                    "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS": "1",
+                },
+            )
+            result_text = result_path.read_text(encoding="utf-8")
+            startup_marker_exists = startup_marker.exists()
+
+        self.assertEqual(0, result["returncode"])
+        self.assertEqual("isolated", result_text)
+        self.assertFalse(startup_marker_exists)
+
     def test_python_wrapper_rejects_shell_hooks_and_wrong_interpreter_never_goes_green(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-wrapper-function-") as temp_dir:
             root = Path(temp_dir)
             marker = root / "overridden-builtin-ran"
             bash_env_marker = root / "bash-env-ran"
+            python_startup_marker = root / "python-startup-ran"
+            (root / "sitecustomize.py").write_text(
+                (
+                    "from pathlib import Path\n"
+                    f"Path({str(python_startup_marker)!r}).write_text('unexpected', encoding='utf-8')\n"
+                ),
+                encoding="utf-8",
+            )
             bash_env = root / "bash-env.sh"
             bash_env.write_text(
                 f"/usr/bin/touch {bash_env_marker}\n",
@@ -772,8 +882,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                     [str(VERIFY_SCRIPT_PATH), "--help"],
                     {"PATH": module.TRUSTED_PATH, "BASH_ENV": str(bash_env)},
                 ),
+                "direct_python_startup_path": (
+                    [str(VERIFY_SCRIPT_PATH), "--help"],
+                    {"PATH": module.TRUSTED_PATH, "PYTHONPATH": str(root)},
+                ),
                 "forced_wrong_interpreter": (
                     ["/usr/bin/bash", str(VERIFY_SCRIPT_PATH), "--help"],
+                    {"PATH": module.TRUSTED_PATH},
+                ),
+                "direct_python_bypass": (
+                    [str(module.TRUSTED_PYTHON), str(VERIFY_SCRIPT_PATH), "--help"],
                     {"PATH": module.TRUSTED_PATH},
                 ),
                 "forced_bash_env_builtin_overrides": (
@@ -810,6 +928,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             self.assertFalse(marker.exists())
             self.assertFalse(bash_env_marker.exists())
+            self.assertFalse(python_startup_marker.exists())
 
         clean_help = module.subprocess.run(
             [str(VERIFY_SCRIPT_PATH), "--help"],
@@ -1074,7 +1193,9 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         ):
             for entrypoint in spec["entrypoints"]:
                 repository = module.governed_repository_root(Path(str(entrypoint)))
-                relative = str(Path(str(entrypoint)).relative_to(repository))
+                relative = module.governed_relative_code_path(
+                    Path(str(entrypoint)), repository
+                )
                 with self.subTest(gate=spec["name"], entrypoint=entrypoint):
                     self.assertTrue(module.governed_code_path(relative))
 
@@ -1108,6 +1229,333 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         )
         self.assertNotIn("-l", result["argv"])
         self.assertNotIn("--login", result["argv"])
+
+    def test_flagship_gate_executes_and_verifies_campaign_os_proof_before_readiness(self) -> None:
+        module = load_module()
+        specs = {
+            str(spec["name"]): spec
+            for spec in module.canonical_release_gate_specs(
+                module._test_release_execution_environment
+            )
+        }
+        flagship = specs["verify_flagship_product_readiness"]
+        command = str(flagship["command"])
+        services = str(module.RUN_SERVICES_ROOT)
+        smoke = f"{services}/scripts/ai/run_services_smoke.sh"
+        prepare = f"{services}/scripts/ai/prepare_run_services_smoke.sh"
+        environment = f"{services}/scripts/ai/_env.sh"
+        cleanroom = f"{services}/scripts/ai/build_r1_cleanroom.sh"
+        materializer = f"{services}/scripts/materialize_campaign_os_local_proof.py"
+        contract_module = f"{services}/scripts/campaign_os_local_proof_v3.py"
+        verifier = f"{services}/scripts/verify_campaign_os_local_proof.py"
+        readiness = f"{services}/scripts/verify_flagship_product_readiness_gate.py"
+        entrypoints = tuple(str(value) for value in flagship["entrypoints"])
+
+        self.assertIn(f"[[ -f {prepare} ]]", command)
+        self.assertIn(f"[[ -f {environment} ]]", command)
+        self.assertIn(f"[[ -f {cleanroom} ]]", command)
+        self.assertLess(command.index(materializer), command.index(smoke))
+        self.assertLess(command.index(contract_module), command.index(smoke))
+        self.assertIn(f"[[ -f {materializer} ]]", command)
+        self.assertIn(f"[[ -f {contract_module} ]]", command)
+        self.assertLess(command.index(smoke), command.index(verifier))
+        self.assertLess(command.index(verifier), command.index(readiness))
+        self.assertIn(str(module.TRUSTED_BASH), command)
+        self.assertIn(module.shlex.join(module.TRUSTED_PYTHON_ISOLATED_PREFIX), command)
+        self.assertEqual(
+            (
+                smoke,
+                prepare,
+                environment,
+                cleanroom,
+                materializer,
+                contract_module,
+                verifier,
+                readiness,
+            ),
+            entrypoints,
+        )
+        self.assertFalse(flagship["external_write"])
+
+        with mock.patch.object(
+            module,
+            "current_governed_code_snapshot",
+            return_value={"snapshot_sha256": "test-only"},
+        ):
+            plan = module.authoritative_release_execution_plan(
+                module._test_release_execution_environment,
+                external_write_authorized=True,
+                process_containment={
+                    "mode": module.PROCESS_CONTAINMENT_MODE,
+                    "authoritative": True,
+                    "subreaper": True,
+                    "procfs": "/proc",
+                },
+            )
+        self.assertEqual(
+            len(module.REQUIRED_RELEASE_VERIFIER_GATES),
+            plan["gate_count"],
+        )
+
+    def test_canonical_gold_gates_do_not_delegate_to_login_shell_wrappers(self) -> None:
+        module = load_module()
+        specs = {
+            str(spec["name"]): spec
+            for spec in module.canonical_release_gate_specs(
+                module._test_release_execution_environment
+            )
+        }
+        expected_prefix = module.shlex.join(module.TRUSTED_PYTHON_ISOLATED_PREFIX)
+        for gate_name, former_wrapper in (
+            ("verify_chummer6_desktop_gold", "verify_chummer6_desktop_gold.sh"),
+            ("verify_chummer6_blazor_gold", "verify_chummer6_blazor_gold.sh"),
+        ):
+            command = str(specs[gate_name]["command"])
+            entrypoints = [str(value) for value in specs[gate_name]["entrypoints"]]
+            with self.subTest(gate=gate_name):
+                self.assertNotIn(former_wrapper, command)
+                self.assertFalse(any(former_wrapper in value for value in entrypoints))
+                self.assertNotIn("bash -lc", command)
+                self.assertNotIn("bash --login", command)
+                self.assertIn(expected_prefix, command)
+
+        base_blazor = specs["verify_chummer6_blazor_gold"]
+        base_blazor_entrypoints = set(str(value) for value in base_blazor["entrypoints"])
+        canonical_play_surface = str(
+            module.ROOT
+            / "chummer6-ui"
+            / "scripts"
+            / "ai"
+            / "milestones"
+            / "blazor-play-surface-horizon-check.sh"
+        )
+        presentation_play_surface = str(
+            module.ROOT
+            / "chummer-presentation"
+            / "scripts"
+            / "ai"
+            / "milestones"
+            / "blazor-play-surface-horizon-check.sh"
+        )
+        self.assertIn(canonical_play_surface, base_blazor_entrypoints)
+        self.assertIn(canonical_play_surface, str(base_blazor["command"]))
+        self.assertNotIn(presentation_play_surface, base_blazor_entrypoints)
+        self.assertNotIn(presentation_play_surface, str(base_blazor["command"]))
+        conditional_paths = {
+            str(module.RUN_SERVICES_ROOT / "scripts" / "e2e-ui.sh"),
+            str(module.ROOT / "chummer-presentation" / "scripts" / "e2e-portal.sh"),
+            str(
+                module.ROOT
+                / "chummer-presentation"
+                / "scripts"
+                / "release"
+                / "verify_blazor_self_host_workbench_freshness.sh"
+            ),
+        }
+        self.assertEqual(7, len(base_blazor_entrypoints))
+        self.assertFalse(base_blazor_entrypoints & conditional_paths)
+
+        conditional_environment = {
+            **module._test_release_execution_environment,
+            "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
+            "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
+        }
+        sanitized_conditional_environment = (
+            module._production_authoritative_controller_environment(
+                {
+                    "PATH": module.TRUSTED_PATH,
+                    "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
+                    "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
+                }
+            )
+        )
+        self.assertEqual("1", sanitized_conditional_environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"])
+        self.assertEqual(
+            "1",
+            sanitized_conditional_environment["CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E"],
+        )
+        conditional_specs = {
+            str(spec["name"]): spec
+            for spec in module.canonical_release_gate_specs(conditional_environment)
+        }
+        conditional_blazor = conditional_specs["verify_chummer6_blazor_gold"]
+        conditional_entrypoints = set(
+            str(value) for value in conditional_blazor["entrypoints"]
+        )
+        self.assertEqual(10, len(conditional_entrypoints))
+        self.assertTrue(conditional_paths <= conditional_entrypoints)
+        self.assertTrue(
+            all(path in str(conditional_blazor["command"]) for path in conditional_paths)
+        )
+        self.assertIn("failures=()", str(conditional_blazor["command"]))
+        self.assertIn("BLAZOR NOT GOLD", str(conditional_blazor["command"]))
+        self.assertNotIn("bash -lc", str(conditional_blazor["command"]))
+        for blazor_spec in (base_blazor, conditional_blazor):
+            syntax = module.subprocess.run(
+                [
+                    str(module.TRUSTED_BASH),
+                    "--noprofile",
+                    "--norc",
+                    "-n",
+                    "-c",
+                    str(blazor_spec["command"]),
+                ],
+                env={"PATH": module.TRUSTED_PATH},
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertEqual(0, syntax.returncode, syntax.stderr)
+
+        invalid_environment = dict(module._test_release_execution_environment)
+        invalid_environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"] = "true"
+        with self.assertRaisesRegex(ValueError, "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E.*0 or 1"):
+            module.validate_release_execution_environment(invalid_environment)
+
+        gate_specs = [
+            [
+                str(spec["name"]),
+                str(spec["command"]),
+                str(spec["cwd"]),
+                str(spec["timeout_seconds"]),
+                "|".join(str(value) for value in spec["entrypoints"]),
+            ]
+            for spec in specs.values()
+        ]
+        plan = module.build_release_execution_plan(
+            gate_specs,
+            [
+                ["bash_noprofile_norc", str(module.TRUSTED_BASH)],
+                ["python3", str(module.TRUSTED_PYTHON)],
+                ["node", str(module.TRUSTED_NODE)],
+                ["git", str(module.TRUSTED_GIT)],
+            ],
+            [str(module.ROOT), "/docker/fleet/repos/chummer-media-factory"],
+            environment=module._test_release_execution_environment,
+            controller_environment=module._test_release_execution_environment,
+            run_nonce="f" * 64,
+        )
+        self.assertEqual(len(module.REQUIRED_RELEASE_VERIFIER_GATES), plan["gate_count"])
+        conditional_plan = module.build_release_execution_plan(
+            [
+                [
+                    str(spec["name"]),
+                    str(spec["command"]),
+                    str(spec["cwd"]),
+                    str(spec["timeout_seconds"]),
+                    "|".join(str(value) for value in spec["entrypoints"]),
+                ]
+                for spec in conditional_specs.values()
+            ],
+            [
+                ["bash_noprofile_norc", str(module.TRUSTED_BASH)],
+                ["python3", str(module.TRUSTED_PYTHON)],
+                ["node", str(module.TRUSTED_NODE)],
+                ["git", str(module.TRUSTED_GIT)],
+            ],
+            [str(module.ROOT), "/docker/fleet/repos/chummer-media-factory"],
+            environment=conditional_environment,
+            controller_environment=conditional_environment,
+            run_nonce="e" * 64,
+        )
+        conditional_plan_blazor = next(
+            gate
+            for gate in conditional_plan["gates"]
+            if gate["name"] == "verify_chummer6_blazor_gold"
+        )
+        self.assertEqual(10, len(conditional_plan_blazor["entrypoints"]))
+
+    def test_canonical_entrypoint_alias_allowance_rejects_similar_sibling_symlink(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-controller-alias-lookalike-") as temp_dir:
+            root = Path(temp_dir)
+            target_root = root / "chummer-presentation"
+            target = (
+                target_root
+                / "scripts"
+                / "ai"
+                / "milestones"
+                / "blazor-play-surface-horizon-check.sh"
+            )
+            target.parent.mkdir(parents=True)
+            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            lookalike_root = root / "chummer6-ui-sibling"
+            lookalike_root.symlink_to(target_root, target_is_directory=True)
+            lookalike = lookalike_root / target.relative_to(target_root)
+
+            self.assertIsNone(
+                module.canonical_release_entrypoint_alias_binding(lookalike)
+            )
+            with self.assertRaisesRegex(ValueError, "symlink component"):
+                module.canonical_release_entrypoint_path(lookalike)
+            with self.assertRaisesRegex(ValueError, "symlink component"):
+                module.regular_file_execution_identity(lookalike)
+
+    def test_canonical_entrypoint_alias_rejects_retarget_and_metadata_drift(self) -> None:
+        module = load_module()
+        entrypoint = module.CANONICAL_BLAZOR_PLAY_SURFACE_ENTRYPOINT
+        target, alias_binding = module.canonical_release_entrypoint_alias_binding(
+            entrypoint
+        )
+        self.assertEqual(module.CANONICAL_BLAZOR_PLAY_SURFACE_TARGET, target)
+
+        with (
+            mock.patch.object(
+                module.os,
+                "readlink",
+                return_value="/tmp/untrusted-chummer-presentation",
+            ),
+            self.assertRaisesRegex(ValueError, "ownership alias target drifted"),
+        ):
+            module.canonical_release_entrypoint_alias_binding(entrypoint)
+
+        changed_binding = {
+            **alias_binding,
+            "ctime_ns": int(alias_binding["ctime_ns"]) + 1,
+        }
+        with (
+            mock.patch.object(
+                module,
+                "canonical_release_entrypoint_alias_binding",
+                side_effect=[
+                    (target, alias_binding),
+                    (target, changed_binding),
+                ],
+            ),
+            self.assertRaisesRegex(ValueError, "alias changed while binding"),
+        ):
+            module.regular_file_execution_identity(entrypoint)
+
+        recorded = module.regular_file_execution_identity(entrypoint)
+        target_identity = module.nonsymlink_regular_file_execution_identity(target)
+        with (
+            mock.patch.object(
+                module,
+                "release_execution_gate",
+                return_value={
+                    "interpreter_names": [],
+                    "entrypoints": [recorded],
+                },
+            ),
+            mock.patch.object(
+                module,
+                "canonical_release_entrypoint_alias_binding",
+                side_effect=[
+                    (target, changed_binding),
+                    (target, changed_binding),
+                ],
+            ),
+            mock.patch.object(
+                module,
+                "nonsymlink_regular_file_execution_identity",
+                return_value=target_identity,
+            ),
+            self.assertRaisesRegex(ValueError, "entrypoint drifted"),
+        ):
+            module.current_gate_execution_inputs(
+                {"interpreters": []},
+                "verify_chummer6_blazor_gold",
+            )
 
     def test_controller_rejects_and_extinguishes_same_pgid_background_descendant(self) -> None:
         module = load_module()
@@ -1225,6 +1673,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         with (
             mock.patch.object(module.subprocess, "Popen", return_value=process) as popen,
             mock.patch.object(module.os, "killpg") as killpg,
+            mock.patch.object(
+                module,
+                "gate_lingering_processes",
+                return_value={},
+            ),
+            mock.patch.object(
+                module,
+                "live_process_group_members",
+                return_value={},
+            ),
             mock.patch.object(module.time, "monotonic", side_effect=[0, 2, 2, 2]),
         ):
             result = module.run_controller_gate_command(
@@ -1549,15 +2007,153 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                         ),
                     ),
                 ),
+                mock.patch.object(
+                    module,
+                    "direct_receipt_semantic_validation_failures",
+                    wraps=module.direct_receipt_semantic_validation_failures,
+                ) as semantic_validation,
             ):
                 captured = module.current_release_gate_receipt_binding(
                     "verify_test_direct_gate",
                     now=observed_at,
                 )
                 self.assertIsNotNone(captured)
+                semantic_validation.assert_called_once_with(
+                    "verify_test_direct_gate",
+                    receipt,
+                    receipt_path,
+                    observed_at=observed_at,
+                )
                 receipt["projection"] = "mutated after PASS"
                 receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, "direct receipt binding drifted"):
+                    module.validate_release_gate_receipt_bindings(
+                        [captured],
+                        now=observed_at,
+                    )
+
+        with tempfile.TemporaryDirectory(prefix="flagship-campaign-binding-drift-") as temp_dir:
+            root = Path(temp_dir)
+            registry = root / "registry"
+            registry.mkdir()
+            flagship_receipt = root / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            campaign_receipt = root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_validator = root / "campaign_os_local_proof_v3.py"
+            verifier_path = root / "verify-release.sh"
+            program_path = root / "gate-verifier.py"
+            verifier_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            program_path.write_text("# current verifier\n", encoding="utf-8")
+            campaign_receipt.write_text('{"status":"passed"}\n', encoding="utf-8")
+            campaign_validator.write_text("# current campaign validator\n", encoding="utf-8")
+            (registry / "RELEASE_CHANNEL.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "published",
+                        "version": "run-current",
+                        "channel": "preview",
+                        "supportabilityState": "review_required",
+                        "rolloutState": "public_release_review_required",
+                        "publishedAt": observed_text,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            flagship_payload = {
+                "contract_name": module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
+                "status": "pass",
+                "verdict": module.FLAGSHIP_PRODUCT_READY_VERDICT,
+                "generated_at_utc": observed_text,
+                "failures": [],
+                "failed_gates": [],
+                "campaign_os_local_proof": passing_campaign_os_gate_evidence(
+                    module,
+                    campaign_receipt,
+                    campaign_validator,
+                ),
+            }
+            flagship_receipt.write_text(
+                json.dumps(flagship_payload) + "\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(module, "VERIFY_SCRIPT", verifier_path),
+                mock.patch.object(
+                    module,
+                    "RELEASE_VERIFIER_BOUND_PROGRAMS",
+                    (("test_gate_verifier", program_path),),
+                ),
+                mock.patch.object(
+                    module,
+                    "RELEASE_VERIFIER_GATE_RECEIPTS",
+                    (
+                        (
+                            "verify_flagship_product_readiness",
+                            "flagship_product_readiness",
+                            flagship_receipt,
+                            module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
+                            (),
+                            (),
+                        ),
+                    ),
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_PATH",
+                    campaign_receipt,
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH",
+                    campaign_validator,
+                ),
+            ):
+                captured = module.current_release_gate_receipt_binding(
+                    "verify_flagship_product_readiness",
+                    now=observed_at,
+                )
+                self.assertIsNotNone(captured)
+
+                original_campaign = campaign_receipt.read_bytes()
+                campaign_receipt.write_text(
+                    '{"status":"passed","mutated":true}\n',
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "receipt identity does not match current bytes",
+                ):
+                    module.current_release_gate_receipt_binding(
+                        "verify_flagship_product_readiness",
+                        now=observed_at,
+                    )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "receipt identity does not match current bytes",
+                ):
+                    module.validate_release_gate_receipt_bindings(
+                        [captured],
+                        now=observed_at,
+                    )
+                campaign_receipt.write_bytes(original_campaign)
+
+                campaign_validator.write_text(
+                    "# drifted campaign validator\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "validator identity does not match current bytes",
+                ):
+                    module.current_release_gate_receipt_binding(
+                        "verify_flagship_product_readiness",
+                        now=observed_at,
+                    )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "validator identity does not match current bytes",
+                ):
                     module.validate_release_gate_receipt_bindings(
                         [captured],
                         now=observed_at,
@@ -1597,6 +2193,87 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "publishedAt is missing or invalid"):
                     module.current_release_verifier_replay_binding()
+
+    def test_direct_receipts_dispatch_to_available_contract_validators(self) -> None:
+        module = load_module()
+        observed_at = module.datetime(2026, 7, 13, 12, 0, tzinfo=module.UTC)
+        receipt_path = Path("/tmp/DIRECT_GATE.generated.json")
+        cases = (
+            ("verify_supply_chain_evidence", "supply_chain_receipt_validation_failures"),
+            (
+                "verify_public_edge_observability_release",
+                "public_edge_observability_release_blocking_reasons",
+            ),
+            (
+                "verify_windows_installer_visual_audit_intake_request",
+                "windows_visual_audit_release_blocking_reasons",
+            ),
+            (
+                "verify_flagship_product_readiness",
+                "flagship_product_readiness_gate_semantic_failures",
+            ),
+            (
+                "verify_public_edge_postdeploy_gate",
+                "public_edge_postdeploy_release_blocking_reasons",
+            ),
+            ("verify_google_oauth_linking_proof", "google_oauth_receipt_validation_failures"),
+        )
+        for gate_name, validator_name in cases:
+            with (
+                self.subTest(gate=gate_name),
+                mock.patch.object(
+                    module,
+                    validator_name,
+                    return_value=[f"{gate_name} semantic failure"],
+                ) as validator,
+            ):
+                failures = module.direct_receipt_semantic_validation_failures(
+                    gate_name,
+                    {"status": "pass"},
+                    receipt_path,
+                    observed_at=observed_at,
+                )
+
+            self.assertEqual([f"{gate_name} semantic failure"], failures)
+            validator.assert_called_once()
+
+    def test_windows_direct_receipt_semantics_accept_clean_pass_and_retain_failures(self) -> None:
+        module = load_module()
+        observed_at = module.datetime(2026, 7, 13, 12, 0, tzinfo=module.UTC)
+        promoted_digest = "a" * 64
+        passing_receipt = {
+            "status": "pass",
+            "failures": [],
+            "failed_gates": [],
+            "artifact": {"sha256": promoted_digest},
+            "visualAuditSource": {"artifactSha256": promoted_digest},
+        }
+
+        self.assertEqual(
+            [],
+            module.direct_receipt_semantic_validation_failures(
+                "verify_windows_installer_visual_audit_intake_request",
+                passing_receipt,
+                Path("/tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"),
+                observed_at=observed_at,
+            ),
+        )
+        self.assertEqual(
+            ["recorded Windows verification failure"],
+            module.windows_visual_audit_release_blocking_reasons(
+                {
+                    **passing_receipt,
+                    "failures": ["recorded Windows verification failure"],
+                }
+            ),
+        )
+        mismatch_reasons = module.windows_visual_audit_release_blocking_reasons(
+            {
+                **passing_receipt,
+                "visualAuditSource": {"artifactSha256": "b" * 64},
+            }
+        )
+        self.assertTrue(any("instead of promoted digest" in reason for reason in mismatch_reasons))
 
     def test_direct_receipt_binding_rejects_stale_pass_receipt(self) -> None:
         module = load_module()
@@ -1806,12 +2483,14 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 if item["name"] != "verify_guide_convergence"
             )
         )
-        self.assertTrue(script.startswith("#!/usr/bin/python3\n"))
+        self.assertTrue(script.startswith("#!/usr/bin/python3 -I\n"))
         self.assertEqual(
             '__python_launcher__ = ("chummer-release-controller",)',
             script.splitlines()[1],
         )
         self.assertIn('TRUSTED_PYTHON = "/usr/bin/python3"', script)
+        self.assertIn('TRUSTED_PYTHON,\n            "-I",\n            str(MATERIALIZER)', script)
+        self.assertIn("if sys.flags.isolated != 1:", script)
         self.assertIn('"--run-authoritative-controller"', script)
         self.assertIn("os.execve(", script)
         self.assertNotIn(" -lc ", script)
@@ -1898,58 +2577,98 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
     def test_flagship_gate_with_passed_nested_audits_and_exact_wrapper_echo_is_recoverable(self) -> None:
         module = load_module()
-
-        payload = {
-            "contract_name": module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
-            "status": "fail",
-            "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
-            "pass": False,
-            "summary": {
-                "contract_name": "fleet.flagship_product_readiness",
+        with tempfile.TemporaryDirectory(prefix="flagship-recoverable-campaign-") as temp_dir:
+            root = Path(temp_dir)
+            campaign_receipt = root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_validator = root / "campaign_os_local_proof_v3.py"
+            campaign_receipt.write_text('{"status":"passed"}\n', encoding="utf-8")
+            campaign_validator.write_text("# current validator\n", encoding="utf-8")
+            payload = {
+                "contract_name": module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
                 "status": "fail",
+                "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
                 "pass": False,
-                "completion_audit_status": "pass",
-                "flagship_readiness_audit_status": "pass",
-                "missing_count": 0,
-                "scoped_missing_count": 0,
-                "coverage_gap_keys": [],
-                "scoped_coverage_gap_keys": [],
-                "launch_critical_nested_blockers": [
-                    "final gold janitor state is 'fail'",
-                    "final gold janitor verdict is 'NOT_GOLD'",
-                    "live-backed gold claim is not allowed",
-                ],
-            },
-        }
+                "campaign_os_local_proof": passing_campaign_os_gate_evidence(
+                    module,
+                    campaign_receipt,
+                    campaign_validator,
+                ),
+                "summary": {
+                    "contract_name": "fleet.flagship_product_readiness",
+                    "status": "fail",
+                    "pass": False,
+                    "completion_audit_status": "pass",
+                    "flagship_readiness_audit_status": "pass",
+                    "missing_count": 0,
+                    "scoped_missing_count": 0,
+                    "coverage_gap_keys": [],
+                    "scoped_coverage_gap_keys": [],
+                    "launch_critical_nested_blockers": [
+                        "final gold janitor state is 'fail'",
+                        "final gold janitor verdict is 'NOT_GOLD'",
+                        "live-backed gold claim is not allowed",
+                    ],
+                },
+            }
+            with (
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_PATH",
+                    campaign_receipt,
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH",
+                    campaign_validator,
+                ),
+            ):
+                self.assertTrue(module.flagship_product_readiness_recoverable(payload))
 
-        self.assertTrue(module.flagship_product_readiness_recoverable(payload))
+                missing_campaign = json.loads(json.dumps(payload))
+                missing_campaign.pop("campaign_os_local_proof")
+                self.assertFalse(
+                    module.flagship_product_readiness_recoverable(missing_campaign)
+                )
+                ambient_restore = json.loads(json.dumps(payload))
+                ambient_restore["campaign_os_local_proof"][
+                    "dependency_mode"
+                ] = "ambient_restore"
+                self.assertFalse(
+                    module.flagship_product_readiness_recoverable(ambient_restore)
+                )
 
-        for field, unsafe_value in (
-            ("completion_audit_status", "fail"),
-            ("completion_audit_status", None),
-            ("flagship_readiness_audit_status", "fail"),
-            ("flagship_readiness_audit_status", None),
-        ):
-            adversarial = json.loads(json.dumps(payload))
-            adversarial["summary"][field] = unsafe_value
-            self.assertFalse(module.flagship_product_readiness_recoverable(adversarial))
+                for field, unsafe_value in (
+                    ("completion_audit_status", "fail"),
+                    ("completion_audit_status", None),
+                    ("flagship_readiness_audit_status", "fail"),
+                    ("flagship_readiness_audit_status", None),
+                ):
+                    adversarial = json.loads(json.dumps(payload))
+                    adversarial["summary"][field] = unsafe_value
+                    self.assertFalse(
+                        module.flagship_product_readiness_recoverable(adversarial)
+                    )
 
-        unsafe_status = json.loads(json.dumps(payload))
-        unsafe_status["status"] = "pass"
-        unsafe_status["verdict"] = "FLAGSHIP_PRODUCT_READY"
-        self.assertFalse(module.flagship_product_readiness_recoverable(unsafe_status))
+                unsafe_status = json.loads(json.dumps(payload))
+                unsafe_status["status"] = "pass"
+                unsafe_status["verdict"] = "FLAGSHIP_PRODUCT_READY"
+                self.assertFalse(
+                    module.flagship_product_readiness_recoverable(unsafe_status)
+                )
 
-        for field, unsafe_value in (
-            ("status", "pass"),
-            ("pass", True),
-            ("pass", None),
-            ("verdict", "FLAGSHIP_PRODUCT_READY"),
-        ):
-            adversarial = json.loads(json.dumps(payload))
-            adversarial["summary"][field] = unsafe_value
-            self.assertFalse(module.flagship_product_readiness_recoverable(adversarial))
+                for field, unsafe_value in (
+                    ("status", "pass"),
+                    ("pass", True),
+                    ("pass", None),
+                    ("verdict", "FLAGSHIP_PRODUCT_READY"),
+                ):
+                    adversarial = json.loads(json.dumps(payload))
+                    adversarial["summary"][field] = unsafe_value
+                    self.assertFalse(
+                        module.flagship_product_readiness_recoverable(adversarial)
+                    )
 
-    def test_flagship_gate_with_unexpected_verdict_is_not_recoverable(self) -> None:
+    def test_flagship_gate_semantics_reject_unexpected_verdict_and_invalid_campaign_evidence(self) -> None:
         module = load_module()
 
         self.assertFalse(
@@ -1973,6 +2692,113 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 }
             )
         )
+
+        with tempfile.TemporaryDirectory(prefix="flagship-campaign-semantic-") as temp_dir:
+            root = Path(temp_dir)
+            campaign_receipt = root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_validator = root / "campaign_os_local_proof_v3.py"
+            campaign_receipt.write_text('{"status":"passed"}\n', encoding="utf-8")
+            campaign_validator.write_text("# current validator\n", encoding="utf-8")
+            passing_campaign = passing_campaign_os_gate_evidence(
+                module,
+                campaign_receipt,
+                campaign_validator,
+            )
+            passing_payload = {
+                "contract_name": module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
+                "status": "pass",
+                "verdict": module.FLAGSHIP_PRODUCT_READY_VERDICT,
+                "pass": True,
+                "campaign_os_local_proof": passing_campaign,
+            }
+            with (
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_PATH",
+                    campaign_receipt,
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH",
+                    campaign_validator,
+                ),
+            ):
+                self.assertEqual(
+                    [],
+                    module.flagship_product_readiness_gate_semantic_failures(
+                        passing_payload
+                    ),
+                )
+                for campaign_value in (None, "malformed"):
+                    malformed = dict(passing_payload)
+                    if campaign_value is None:
+                        malformed.pop("campaign_os_local_proof")
+                    else:
+                        malformed["campaign_os_local_proof"] = campaign_value
+                    with self.subTest(campaign_section=campaign_value):
+                        self.assertIn(
+                            "flagship_product_readiness gate Campaign OS local proof evidence is missing",
+                            module.flagship_product_readiness_gate_semantic_failures(
+                                malformed
+                            ),
+                        )
+
+                for field, invalid_value, expected_fragment in (
+                    ("pass", False, "pass is not true"),
+                    ("reason_code", "receipt_too_old", "reason_code is not valid"),
+                    ("load_status", "invalid", "is not loaded"),
+                    ("contract_name", "legacy", "contract_name is not current"),
+                    ("contract_version", 2, "contract_version is not 3"),
+                    ("status", "running", "status is not passed"),
+                    ("proof_kind", "legacy", "proof_kind is not current"),
+                    (
+                        "dependency_mode",
+                        "ambient_restore",
+                        "dependency_mode is not current",
+                    ),
+                    ("journey_count", 5, "journey_count is not 6"),
+                    (
+                        "run_id",
+                        "019f5983-c169-7873-9b31-938b2ff27e1c",
+                        "run_id is not canonical UUIDv4",
+                    ),
+                    ("receipt_identity", {}, "receipt identity does not match"),
+                    ("validator_identity", {}, "validator identity does not match"),
+                ):
+                    invalid_campaign = dict(passing_campaign)
+                    invalid_campaign[field] = invalid_value
+                    invalid_payload = {
+                        **passing_payload,
+                        "campaign_os_local_proof": invalid_campaign,
+                    }
+                    with self.subTest(campaign_field=field):
+                        self.assertTrue(
+                            any(
+                                expected_fragment in failure
+                                for failure in module.flagship_product_readiness_gate_semantic_failures(
+                                    invalid_payload
+                                )
+                            )
+                        )
+
+                campaign_receipt.unlink()
+                self.assertIn(
+                    "flagship_product_readiness gate Campaign OS local proof current receipt is unavailable",
+                    module.flagship_product_readiness_gate_semantic_failures(
+                        passing_payload
+                    ),
+                )
+                campaign_receipt.write_text(
+                    '{"status":"passed"}\n',
+                    encoding="utf-8",
+                )
+                campaign_validator.unlink()
+                self.assertIn(
+                    "flagship_product_readiness gate Campaign OS local proof current validator is unavailable",
+                    module.flagship_product_readiness_gate_semantic_failures(
+                        passing_payload
+                    ),
+                )
 
     def test_flagship_receipt_failure_reasons_include_deduplicated_coverage_gaps(self) -> None:
         module = load_module()
@@ -2131,6 +2957,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("pass", payload["status"])
             self.assertEqual("RELEASE_READY", payload["verdict"])
+            self.assertEqual(module.supported_release_controller_command(), payload["command"])
+            self.assertNotIn("bash", payload["command"])
             self.assertEqual(0, payload["returncode"])
             self.assertFalse(payload["timed_out"])
             self.assertEqual(module.TIMEOUT_SECONDS, payload["timeout_seconds"])
@@ -2165,6 +2993,67 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                     "windows_installer": "refresh_runtime_receipts",
                 },
                 payload["proof_refresh_policy"],
+            )
+
+    def test_main_final_revalidation_failure_reclassifies_actions_as_blocking(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-ready-final-revalidation-") as temp_dir:
+            output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "DEFAULT_OUTPUT_PATH", output_path),
+                mock.patch.object(
+                    module,
+                    "run_authoritative_release_controller",
+                    return_value=live_controller_result(module),
+                ),
+                mock.patch.object(module, "current_blocking_gate_artifacts", return_value={}),
+                mock.patch.object(module, "current_receipt_states", return_value={}),
+                mock.patch.object(module, "collect_current_blocking_failures", return_value=[]),
+                mock.patch.object(
+                    module,
+                    "current_release_truth_root_context",
+                    return_value={
+                        "root_blocker_ids": [],
+                        "root_blockers": [],
+                        "root_blockers_generated_at": "",
+                        "stable_promotion_command": "",
+                        "post_promotion_verify_command": "",
+                        "root_release_truth_source": "",
+                    },
+                ),
+                mock.patch.object(
+                    module,
+                    "release_ready_next_actions",
+                    return_value=["Review optional proof handoff."],
+                ),
+                mock.patch.object(
+                    module,
+                    "should_refresh_release_truth_projection",
+                    return_value=False,
+                ),
+                mock.patch.object(
+                    module,
+                    "revalidate_authoritative_release_result",
+                    side_effect=ValueError("bound authority drifted"),
+                ),
+                mock.patch.object(module, "load_json", return_value={}),
+            ):
+                result = module.main()
+
+            self.assertEqual(0, result)
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual("fail", payload["status"])
+            self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+            self.assertIn("release_authority_final_revalidation", payload["failed_gates"])
+            self.assertTrue(payload["nextActions"])
+            self.assertEqual([], payload["advisoryActions"])
+            self.assertTrue(
+                any(
+                    "final release-authority revalidation" in action
+                    and module.supported_release_controller_command() in action
+                    for action in payload["nextActions"]
+                )
             )
 
     def test_main_rejects_diagnostic_pass_shaped_controller_result(self) -> None:
@@ -2317,6 +3206,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("fail", payload["status"])
             self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+            self.assertEqual(module.supported_release_controller_command(), payload["command"])
+            self.assertNotIn("bash", payload["command"])
             self.assertEqual(124, payload["returncode"])
             self.assertTrue(payload["timed_out"])
             self.assertIn(f"verify_release_ready timed out after {module.TIMEOUT_SECONDS}s", payload["failures"])
@@ -2454,6 +3345,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("fail", payload["status"])
             self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+            self.assertEqual(module.supported_release_controller_command(), payload["command"])
+            self.assertNotIn("bash", payload["command"])
             self.assertIsNone(payload["returncode"])
             self.assertFalse(payload["timed_out"])
             self.assertTrue(payload["global_verifier_skipped_due_current_blockers"])
@@ -2650,6 +3543,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(
                     module,
                     "public_edge_postdeploy_release_blocking_reasons",
+                    return_value=[],
+                ),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
                     return_value=[],
                 ),
             ):
@@ -4170,6 +5068,10 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             registry = root / "registry"
             published.mkdir(parents=True, exist_ok=True)
             registry.mkdir(parents=True, exist_ok=True)
+            campaign_receipt = root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_validator = root / "campaign_os_local_proof_v3.py"
+            campaign_receipt.write_text('{"status":"passed"}\n', encoding="utf-8")
+            campaign_validator.write_text("# current validator\n", encoding="utf-8")
 
             (registry / "RELEASE_CHANNEL.generated.json").write_text(
                 json.dumps(
@@ -4190,6 +5092,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                         "status": "fail",
                         "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
                         "pass": False,
+                        "campaign_os_local_proof": passing_campaign_os_gate_evidence(
+                            module,
+                            campaign_receipt,
+                            campaign_validator,
+                        ),
                         "summary": {
                             "contract_name": "fleet.flagship_product_readiness",
                             "status": "fail",
@@ -4236,6 +5143,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_PATH",
+                    campaign_receipt,
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH",
+                    campaign_validator,
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -4270,6 +5187,10 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             registry = root / "registry"
             published.mkdir(parents=True, exist_ok=True)
             registry.mkdir(parents=True, exist_ok=True)
+            campaign_receipt = root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_validator = root / "campaign_os_local_proof_v3.py"
+            campaign_receipt.write_text('{"status":"passed"}\n', encoding="utf-8")
+            campaign_validator.write_text("# current validator\n", encoding="utf-8")
 
             (registry / "RELEASE_CHANNEL.generated.json").write_text(
                 json.dumps(
@@ -4290,6 +5211,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                         "status": "fail",
                         "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
                         "pass": False,
+                        "campaign_os_local_proof": passing_campaign_os_gate_evidence(
+                            module,
+                            campaign_receipt,
+                            campaign_validator,
+                        ),
                         "summary": {
                             "contract_name": "fleet.flagship_product_readiness",
                             "status": "fail",
@@ -4325,6 +5251,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_PATH",
+                    campaign_receipt,
+                ),
+                mock.patch.object(
+                    module,
+                    "CAMPAIGN_OS_LOCAL_PROOF_VALIDATOR_PATH",
+                    campaign_validator,
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -4797,6 +5733,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[],
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -4979,6 +5920,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
                 mock.patch.object(module, "WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES", (drift_path,)),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[],
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -4987,6 +5933,76 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertIn(module.display_path(drift_path), failures[0])
         self.assertIn("local channel=stable, version=run-old", failures[0])
         self.assertIn("authoritative channel=stable, version=run-test", failures[0])
+
+    def test_workspace_portal_drift_check_uses_active_atomic_generation(self) -> None:
+        module = load_module()
+        authoritative = {
+            "status": "published",
+            "version": "run-current",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+        }
+        with tempfile.TemporaryDirectory(prefix="release-ready-atomic-shelf-") as temp_dir:
+            shelf_root = Path(temp_dir) / "downloads"
+            generation_root = shelf_root / "generations" / "g-current"
+            shelf_root.mkdir(parents=True)
+            generation_root.mkdir(parents=True)
+            legacy_manifest = shelf_root / "RELEASE_CHANNEL.generated.json"
+            legacy_manifest.write_text(
+                json.dumps({**authoritative, "version": "run-stale"}),
+                encoding="utf-8",
+            )
+            (generation_root / legacy_manifest.name).write_text(
+                json.dumps(authoritative),
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(
+                    module,
+                    "WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES",
+                    (legacy_manifest,),
+                ),
+                mock.patch.object(
+                    module,
+                    "resolve_shelf_root",
+                    return_value=(
+                        "generation",
+                        generation_root,
+                        {"generationId": "g-current"},
+                    ),
+                ),
+            ):
+                failures = module.workspace_portal_release_channel_drift_failures(
+                    authoritative
+                )
+
+        self.assertEqual([], failures)
+
+    def test_workspace_portal_drift_check_fails_closed_on_invalid_atomic_shelf(
+        self,
+    ) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-ready-invalid-shelf-") as temp_dir:
+            manifest = Path(temp_dir) / "downloads" / "RELEASE_CHANNEL.generated.json"
+            with (
+                mock.patch.object(
+                    module,
+                    "WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES",
+                    (manifest,),
+                ),
+                mock.patch.object(
+                    module,
+                    "resolve_shelf_root",
+                    side_effect=module.ReleaseShelfError("pointer digest mismatch"),
+                ),
+            ):
+                failures = module.workspace_portal_release_channel_drift_failures({})
+
+        self.assertEqual(1, len(failures))
+        self.assertIn("could not resolve the atomic release shelf", failures[0])
+        self.assertIn("pointer digest mismatch", failures[0])
 
     def test_collect_current_blocking_failures_dedupes_workspace_portal_alias_paths(self) -> None:
         module = load_module()
@@ -5064,6 +6080,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
                 mock.patch.object(module, "WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES", (drift_path, alias_path)),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[],
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -5150,6 +6171,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[],
+                ),
                 mock.patch.object(module, "PUBLIC_RELEASE_SNAPSHOT", snapshot),
             ):
                 failures = module.collect_current_blocking_failures()
@@ -5224,6 +6250,14 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[
+                        "flagship_product_readiness gate has unexpected verdict "
+                        "(expected FLAGSHIP_PRODUCT_READY)"
+                    ],
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -5294,6 +6328,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "REGISTRY_PUBLISHED_ROOT", registry),
+                mock.patch.object(
+                    module,
+                    "flagship_product_readiness_gate_semantic_failures",
+                    return_value=[],
+                ),
             ):
                 failures = module.collect_current_blocking_failures()
 
@@ -5637,6 +6676,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertEqual("fail", payload["status"])
         self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
         self.assertEqual(78, payload["returncode"])
+        self.assertEqual(module.supported_release_controller_command(), payload["command"])
+        self.assertNotIn("bash", payload["command"])
         self.assertFalse(payload["authoritative"])
         self.assertTrue(payload["diagnostic"])
         self.assertFalse(payload["test_only"])
@@ -5764,14 +6805,14 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "repository is not plan-governed"):
                 module.projection_step_prebinding(
                     "unbound_projection",
-                    [str(module.TRUSTED_PYTHON), str(unbound_script)],
+                    module.isolated_python_argv(unbound_script),
                     unbound_repository,
                     environment,
                     execution_plan,
                 )
             binding = module.projection_step_prebinding(
                 "bound_projection",
-                [str(module.TRUSTED_PYTHON), str(bound_script)],
+                module.isolated_python_argv(bound_script),
                 bound_repository,
                 environment,
                 execution_plan,
@@ -5988,6 +7029,13 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertTrue(
             all(command[0] == str(module.TRUSTED_PYTHON) for _name, command, _cwd, _allow in calls)
         )
+        self.assertTrue(
+            all(
+                tuple(command[: len(module.TRUSTED_PYTHON_ISOLATED_PREFIX)])
+                == module.TRUSTED_PYTHON_ISOLATED_PREFIX
+                for _name, command, _cwd, _allow in calls
+            )
+        )
         self.assertIn("--skip-windows-runtime-refresh", flattened)
         self.assertIn("--skip-materializers", flattened)
         self.assertNotIn("google_oauth", flattened)
@@ -6074,6 +7122,50 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertEqual({"phase": "converged"}, payload["current_receipt_states"])
             self.assertEqual("pass", payload["release_truth_projection_refresh"]["status"])
             self.assertEqual(3, len(payload["release_truth_projection_refresh"]["phases"]))
+
+    def test_current_projection_blocker_forces_not_release_ready(self) -> None:
+        module = load_module()
+        root_context = {
+            "root_blocker_ids": ["release_truth:current_gate"],
+            "root_blockers": [{"id": "release_truth:current_gate"}],
+            "root_blockers_generated_at": "2026-07-16T12:00:00Z",
+            "stable_promotion_command": "",
+            "post_promotion_verify_command": "",
+            "root_release_truth_source": "/tmp/RELEASE_BLOCKERS.generated.json",
+        }
+        payload: dict[str, object] = {
+            "status": "pass",
+            "verdict": "RELEASE_READY",
+            "failures": [],
+            "failed_gates": [],
+        }
+        with (
+            mock.patch.object(
+                module,
+                "current_blocking_gate_artifacts",
+                return_value={"release_truth_root": root_context},
+            ),
+            mock.patch.object(
+                module,
+                "current_release_truth_root_context",
+                return_value=root_context,
+            ),
+            mock.patch.object(module, "current_receipt_states", return_value={}),
+            mock.patch.object(module, "release_ready_next_actions", return_value=[]),
+        ):
+            consistency_failures = module.apply_current_release_truth_projection(
+                payload,
+                {},
+            )
+
+        self.assertEqual("fail", payload["status"])
+        self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+        self.assertEqual(["release_truth:current_gate"], payload["root_blocker_ids"])
+        self.assertTrue(consistency_failures)
+        self.assertIn("current_release_truth", "\n".join(payload["failures"]))
+        self.assertTrue(payload["nextActions"])
+        self.assertIn("release_truth:current_gate", payload["nextActions"][0])
+        self.assertEqual([], payload["advisoryActions"])
 
     def test_extract_failed_gates_preserves_order_and_removes_duplicates(self) -> None:
         module = load_module()

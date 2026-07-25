@@ -40,6 +40,9 @@ builder.Services.AddSingleton<WindowsProofUploadSessionService>();
 builder.Services.AddSingleton<IReleaseUploadStorageProbe, ReleaseUploadStorageProbe>();
 builder.Services.AddSingleton<ReleaseUploadAuthorizationEvaluator>();
 builder.Services.AddSingleton<ReleaseUploadAdmissionService>();
+builder.Services.AddHostedService<ReleaseUploadExpiryJanitor>();
+builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseShelfActivationProtocolReadinessProbe>();
+builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseUploadStoragePublicationReadinessProbe>();
 builder.Services.AddHostedService<ReleaseShelfPublicationReadinessRefreshService>();
 builder.Services
     .AddControllersWithViews()
@@ -218,6 +221,13 @@ app.Use(async (context, next) =>
         if (requiresNoStore)
         {
             PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+            if (IsLocalPlayWorkerPath(context.Request.Path))
+            {
+                // Service workers are public code, but must always revalidate and
+                // must never be retained. Keep this cache contract distinct from
+                // private account/document responses.
+                context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+            }
         }
         if (RequiresNoReferrerHeaders(context.Request.Path))
         {
@@ -335,7 +345,10 @@ app.UseWhen(
                     {
                         fileContext.Context.Response.ContentType = "application/javascript; charset=utf-8";
                     }
-                    fileContext.Context.Response.Headers.CacheControl = "public, max-age=300, must-revalidate";
+                    fileContext.Context.Response.Headers.CacheControl =
+                        IsLocalPlayManifestPath(requestPath)
+                            ? "public, max-age=300, must-revalidate"
+                            : "public, max-age=14400, must-revalidate";
                 }
             }
         }
@@ -343,6 +356,21 @@ app.UseWhen(
 
 app.UseWebSockets();
 app.UseAuthorization();
+
+// Endpoint routing otherwise treats "service-worker.js" as the {role} value in
+// /mobile/{role} before the later static-file middleware can serve the file.
+// An exact endpoint keeps the nested worker installable and supports HEAD.
+app.MapMethods("/mobile/service-worker.js", new[] { HttpMethods.Get, HttpMethods.Head }, (
+    IWebHostEnvironment environment,
+    HttpContext context) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    string webRoot = environment.WebRootPath
+        ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+    return Results.File(
+        Path.Combine(webRoot, "mobile", "service-worker.js"),
+        "application/javascript; charset=utf-8");
+});
 
 app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }, () => Results.Json(new
 {
@@ -730,6 +758,21 @@ static bool IsLocalPlayInstallAssetPath(PathString path)
         || value.Equals("/icons/icon-512.svg", StringComparison.OrdinalIgnoreCase)
         || value.Equals("/icons/icon-192.png", StringComparison.OrdinalIgnoreCase)
         || value.Equals("/icons/icon-512.png", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsLocalPlayWorkerPath(PathString path)
+{
+    return path.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsLocalPlayManifestPath(PathString path)
+{
+    return path.Equals("/manifest.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/manifest.play.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/manifest.player.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/manifest.gm.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/manifest.observer.webmanifest", StringComparison.OrdinalIgnoreCase);
 }
 
 static string ResolveHubContentRoot()

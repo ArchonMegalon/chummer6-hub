@@ -29,6 +29,8 @@ from public_edge_postdeploy_contract import (
 )
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
+RELEASE_READY_CONTROLLER = WORKSPACE_ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
 DEFAULT_PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 PUBLISHED_ROOT = DEFAULT_PUBLISHED_ROOT
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
@@ -85,6 +87,7 @@ FRESHNESS_REQUIRED_GATES = {
     "rule_authority_minimum_coverage",
     "ruleset_readiness",
     "public_route_proof",
+    "horizon_e2e_gold_matrix",
     "icanpreneur_discovery_lane",
     "provider_proof_discoverability",
     "desktop_native_model_depth",
@@ -130,6 +133,7 @@ OPERATOR_DASHBOARD_CONTRACT_NAME = "chummer.operator_release_dashboard"
 PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = "chummer.public_edge_postdeploy_gate.v1"
 WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME = "chummer.windows_installer_visual_audit"
 PASS_VERDICT_EXPECTATIONS: dict[str, set[str]] = {
+    "horizon_e2e_gold_matrix": {"HORIZON_PORTFOLIO_GOLD"},
     "desktop_native_model_depth": {"DESKTOP_NATIVE_MODEL_READY"},
     "live_surface_parity": {"LIVE_SURFACE_PARITY_READY"},
     "live_public_windows_installer": {"LIVE_PUBLIC_WINDOWS_INSTALLER_READY"},
@@ -395,6 +399,7 @@ SELF_REPORTING_MATERIALIZER_GATE_KEYS = (
     ("scripts/materialize_google_oauth_linking_proof.py", "google_oauth_linking_proof"),
     ("scripts/materialize_operator_release_dashboard.py", "operator_release_dashboard"),
     ("scripts/materialize_release_ready_receipt.py", "release_ready"),
+    ("scripts/release/verify_chummer6_release_ready.sh", "release_ready"),
 )
 WINDOWS_INSTALLER_AUTO_IMPORT_WAITING_STATUS = "waiting_for_artifact"
 GOOGLE_OAUTH_AUTO_IMPORT_WAITING_STATUS = "waiting_for_artifact"
@@ -581,7 +586,7 @@ PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS = {
 }
 PUBLIC_EDGE_REQUIRED_CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
-    "downloads": "chummer.downloads_version_marker.v1",
+    "downloads": "chummer.downloads_version_marker.bound.v1",
     "pwaStatic": "chummer.public_pwa_static_assets.v1",
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -656,6 +661,7 @@ REQUIRED_RECEIPTS = {
     "black_ledger_live_media_proof": PUBLISHED_ROOT / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
     "table_pulse_scenario_replay": PUBLISHED_ROOT / "TABLE_PULSE_SCENARIO_REPLAY.generated.json",
     "public_route_proof": PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+    "horizon_e2e_gold_matrix": PUBLISHED_ROOT / "HORIZON_E2E_GOLD_MATRIX.generated.json",
     "live_surface_parity": PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json",
     "live_public_windows_installer": PUBLISHED_ROOT / "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
     "flagship_product_readiness": PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS.generated.json",
@@ -696,6 +702,7 @@ MATERIALIZERS = [
         "--output",
         str(PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"),
     ],
+    ["python3", "scripts/materialize_horizon_e2e_gold_matrix.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_live_surface_parity.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_live_public_windows_installer.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_flagship_product_readiness_gate.py"],
@@ -727,9 +734,12 @@ MATERIALIZERS = [
         str(PUBLISHED_ROOT / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"),
     ],
     ["python3", "scripts/sync_important_work_to_teable.py", "--sync"],
+    ["python3", "scripts/verify_mobile_pwa_public_projection.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_blazor_execution_horizon_bridge.py"],
     ["python3", "scripts/verify_icanpreneur_discovery_lane.py"],
     ["python3", "scripts/verify_provider_proof_discoverability.py"],
+    ["python3", "scripts/materialize_rafter_pixefy_prerequisites.py"],
+    ["python3", "/docker/fleet/scripts/materialize_rafter_pixefy_completion.py"],
     ["python3", "scripts/materialize_ltd_optimization_stack.py"],
     ["python3", "scripts/verify_rules_authority_minimum_coverage.py"],
     ["python3", "scripts/classify_ruleset_readiness.py", "--output", str(PUBLISHED_ROOT / "RULESET_READINESS.generated.json")],
@@ -777,6 +787,9 @@ MATERIALIZERS = [
         str(PUBLISHED_ROOT / "GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json"),
         "--evidence-path",
         str(PUBLISHED_ROOT / "GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json"),
+        "--live-release-manifest-path",
+        str(RUN_SERVICES_ROOT / ".state" / "google_oauth_live_release_manifest.json"),
+        "--refresh-live-release-manifest",
     ],
     ["python3", "scripts/verify_google_oauth_linking_operator_evidence_request.py"],
     [
@@ -795,7 +808,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_ea_operator_readiness.py"],
     ["python3", "scripts/materialize_mymedia_public_surface.py"],
     ["python3", "scripts/verify_mymedia_public_surface.py"],
-    ["python3", "scripts/materialize_release_ready_receipt.py"],
+    [str(RELEASE_READY_CONTROLLER)],
     [
         "python3",
         "scripts/materialize_hub_local_release_proof.py",
@@ -934,7 +947,10 @@ def materializer_timeout_seconds(command: list[str]) -> int:
         return max(MATERIALIZER_TIMEOUT_SECONDS, PARTICIPATE_BILLING_MATERIALIZER_TIMEOUT_SECONDS)
     if "scripts/verify_black_ledger_live_media_proof.py" in command_text:
         return max(MATERIALIZER_TIMEOUT_SECONDS, BLACK_LEDGER_LIVE_MEDIA_MATERIALIZER_TIMEOUT_SECONDS)
-    if "scripts/materialize_release_ready_receipt.py" in command_text:
+    if (
+        "scripts/materialize_release_ready_receipt.py" in command_text
+        or "scripts/release/verify_chummer6_release_ready.sh" in command_text
+    ):
         return max(MATERIALIZER_TIMEOUT_SECONDS, RELEASE_READY_MATERIALIZER_TIMEOUT_SECONDS)
     return MATERIALIZER_TIMEOUT_SECONDS
 
@@ -1786,110 +1802,50 @@ def public_edge_postdeploy_semantic_failures(payload: dict[str, Any]) -> list[st
         frontdoor_gm_final_url = str(payload.get("frontdoorNavigationGmFinalUrl") or "").strip()
         if frontdoor_gm_final_url:
             frontdoor_gm_final_path = urlparse(frontdoor_gm_final_url).path
-        if "Build" not in gated_targets:
-            failures.append("public-edge postdeploy front-door navigation does not gate Build")
-        if "Build" in public_targets:
-            failures.append("public-edge postdeploy front-door navigation exposes Build as public")
-        if "Play" not in gated_targets:
-            failures.append("public-edge postdeploy front-door navigation does not gate Play")
-        if "Play" in public_targets:
-            failures.append("public-edge postdeploy front-door navigation exposes Play as public")
+        if gated_targets:
+            failures.append("public-edge postdeploy front-door navigation still reports account-gated targets")
+        if public_targets != {"Build", "Play"}:
+            failures.append("public-edge postdeploy front-door navigation does not expose exactly Build and Play")
         if play_route != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation Play route is not /mobile/player")
-        if str(payload.get("frontdoorNavigationPlaySignInRoute") or "").strip() != "/login?next=%2Fmobile%2Fplayer":
-            failures.append("public-edge postdeploy front-door navigation Play sign-in route is not /login?next=%2Fmobile%2Fplayer")
+        if str(payload.get("frontdoorNavigationPlaySignInRoute") or "").strip() != "/login?next=%2F":
+            failures.append("public-edge postdeploy front-door navigation sign-in route is not the clean homepage return route")
         if direct_player_route != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation direct player route is not /mobile/player")
         if int_value(payload.get("frontdoorNavigationDirectPlayerHttpStatus")) != 200:
             failures.append("public-edge postdeploy front-door navigation Play launch did not return HTTP 200")
         if frontdoor_final_path != "/mobile/player":
             failures.append("public-edge postdeploy front-door navigation Play launch did not land on /mobile/player")
-        if payload.get("frontdoorNavigationLiveTurnCompanionShell") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the live turn companion shell")
+        if payload.get("frontdoorNavigationLiveTurnCompanionShell") is not False:
+            failures.append("public-edge postdeploy anonymous Player shell exposed the live turn companion")
         if str(payload.get("frontdoorNavigationPwaManifestPath") or "").strip() != "/manifest.player.webmanifest":
             failures.append("public-edge postdeploy front-door navigation Play launch did not activate the player PWA manifest")
         if str(payload.get("frontdoorNavigationPwaRole") or "").strip() != "Player":
             failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Player role")
-        if str(payload.get("frontdoorNavigationBlazorShell") or "").strip() != "interactive-server":
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the interactive Blazor shell")
-        if payload.get("frontdoorNavigationRybbitConfigured") is not True or str(payload.get("frontdoorNavigationRybbitTag") or "").strip() != "mobile_play_shell":
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Rybbit mobile shell config")
-        if (
-            str(payload.get("frontdoorNavigationRybbitRoute") or "").strip() != "/mobile/player"
-            or str(payload.get("frontdoorNavigationRybbitMode") or "").strip() != "player"
-            or str(payload.get("frontdoorNavigationRybbitRole") or "").strip() != "Player"
-        ):
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Player Rybbit role config")
-        if payload.get("frontdoorNavigationRybbitSiteIdPresent") is not True or payload.get("frontdoorNavigationRybbitScriptUrlAllowed") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the Rybbit provider config")
-        if payload.get("frontdoorNavigationRybbitSkipMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit skips mobile paths")
-        if payload.get("frontdoorNavigationRybbitMaskMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit masks mobile paths")
-        if payload.get("frontdoorNavigationRybbitMasksPrivatePlayRoutes") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit masks private play routes")
-        if payload.get("frontdoorNavigationRybbitReplayBlocksTurnRoot") is not True:
-            failures.append("public-edge postdeploy front-door navigation Play launch did not prove Rybbit replay blocks turn content")
-        if "/mobile/player?" not in str(payload.get("frontdoorNavigationPlayerSessionHandoffUrl") or "").strip():
-            failures.append("public-edge postdeploy front-door navigation Player session handoff URL is not a player mobile route")
-        if str(payload.get("frontdoorNavigationPlayerSessionHandoffStatus") or "").strip() != "Session handoff is ready in the link above.":
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not expose ready status")
-        if str(payload.get("frontdoorNavigationPlayerSessionHandoffLinkText") or "").strip() != "Open session handoff link":
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not relabel the visible route")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffPreservesSession") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not preserve session id")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffPreservesRole") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not preserve role")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffStripsDevice") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff leaked sender device id")
-        if payload.get("frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent") is not True:
-            failures.append("public-edge postdeploy front-door navigation Player session handoff did not prove a sender device id was stripped")
+        if str(payload.get("frontdoorNavigationBlazorShell") or "").strip() != "install-only":
+            failures.append("public-edge postdeploy front-door navigation Play launch did not prove the install-only shell")
+        if payload.get("frontdoorNavigationRybbitConfigured") is not False:
+            failures.append("public-edge postdeploy anonymous Player shell unexpectedly enabled analytics")
+        if str(payload.get("frontdoorNavigationPlayerSessionHandoffUrl") or "").strip():
+            failures.append("public-edge postdeploy anonymous Player shell exposed a session handoff")
         if not str(payload.get("frontdoorNavigationGmRoute") or "").strip().startswith("/mobile/gm"):
             failures.append("public-edge postdeploy front-door navigation GM switch route is not /mobile/gm")
         if int_value(payload.get("frontdoorNavigationGmHttpStatus")) != 200:
             failures.append("public-edge postdeploy front-door navigation GM switch did not return HTTP 200")
         if frontdoor_gm_final_path != "/mobile/gm":
             failures.append("public-edge postdeploy front-door navigation GM switch did not land on /mobile/gm")
-        if payload.get("frontdoorNavigationGmLiveTurnCompanionShell") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the live turn companion shell")
+        if payload.get("frontdoorNavigationGmLiveTurnCompanionShell") is not False:
+            failures.append("public-edge postdeploy anonymous GM shell exposed the live turn companion")
         if str(payload.get("frontdoorNavigationGmPwaManifestPath") or "").strip() != "/manifest.gm.webmanifest":
             failures.append("public-edge postdeploy front-door navigation GM switch did not activate the GM PWA manifest")
         if str(payload.get("frontdoorNavigationGmPwaRole") or "").strip() != "GameMaster":
             failures.append("public-edge postdeploy front-door navigation GM switch did not prove the GameMaster role")
-        if str(payload.get("frontdoorNavigationGmBlazorShell") or "").strip() != "interactive-server":
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the interactive Blazor shell")
-        if payload.get("frontdoorNavigationGmRybbitConfigured") is not True or str(payload.get("frontdoorNavigationGmRybbitTag") or "").strip() != "mobile_play_shell":
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the Rybbit mobile shell config")
-        if (
-            str(payload.get("frontdoorNavigationGmRybbitRoute") or "").strip() != "/mobile/gm"
-            or str(payload.get("frontdoorNavigationGmRybbitMode") or "").strip() != "gm"
-            or str(payload.get("frontdoorNavigationGmRybbitRole") or "").strip() != "GameMaster"
-        ):
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the GM Rybbit role config")
-        if payload.get("frontdoorNavigationGmRybbitSiteIdPresent") is not True or payload.get("frontdoorNavigationGmRybbitScriptUrlAllowed") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove the Rybbit provider config")
-        if payload.get("frontdoorNavigationGmRybbitSkipMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit skips mobile paths")
-        if payload.get("frontdoorNavigationGmRybbitMaskMobilePaths") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit masks mobile paths")
-        if payload.get("frontdoorNavigationGmRybbitMasksPrivatePlayRoutes") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit masks private play routes")
-        if payload.get("frontdoorNavigationGmRybbitReplayBlocksTurnRoot") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM switch did not prove Rybbit replay blocks turn content")
-        if "/mobile/gm?" not in str(payload.get("frontdoorNavigationGmSessionHandoffUrl") or "").strip():
-            failures.append("public-edge postdeploy front-door navigation GM session handoff URL is not a GM mobile route")
-        if str(payload.get("frontdoorNavigationGmSessionHandoffStatus") or "").strip() != "Session handoff is ready in the link above.":
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not expose ready status")
-        if str(payload.get("frontdoorNavigationGmSessionHandoffLinkText") or "").strip() != "Open session handoff link":
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not relabel the visible route")
-        if payload.get("frontdoorNavigationGmSessionHandoffPreservesSession") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not preserve session id")
-        if payload.get("frontdoorNavigationGmSessionHandoffPreservesRole") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not preserve role")
-        if payload.get("frontdoorNavigationGmSessionHandoffStripsDevice") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff leaked sender device id")
-        if payload.get("frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent") is not True:
-            failures.append("public-edge postdeploy front-door navigation GM session handoff did not prove a sender device id was stripped")
+        if str(payload.get("frontdoorNavigationGmBlazorShell") or "").strip() != "install-only":
+            failures.append("public-edge postdeploy front-door navigation GM launch did not prove the install-only shell")
+        if payload.get("frontdoorNavigationGmRybbitConfigured") is not False:
+            failures.append("public-edge postdeploy anonymous GM shell unexpectedly enabled analytics")
+        if str(payload.get("frontdoorNavigationGmSessionHandoffUrl") or "").strip():
+            failures.append("public-edge postdeploy anonymous GM shell exposed a session handoff")
         if payload.get("frontdoorNavigationLedgerPrimary") is not False:
             failures.append("public-edge postdeploy Black Ledger remains primary on the front door")
 
@@ -3555,9 +3511,40 @@ def build_payload(
                 and is_fresh
             )
             status_value = "pass" if passed else "fail"
+        if name == "horizon_e2e_gold_matrix" and receipt_loaded:
+            summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+            horizons = payload.get("horizons") if isinstance(payload.get("horizons"), list) else []
+            required_ids = payload.get("required_horizon_ids") if isinstance(payload.get("required_horizon_ids"), list) else []
+            horizon_ids = [
+                str(row.get("id") or "").strip()
+                for row in horizons
+                if isinstance(row, dict)
+            ]
+            passed = (
+                status_value in {"pass", "passed", "ready"}
+                and payload.get("verdict") == "HORIZON_PORTFOLIO_GOLD"
+                and payload.get("all_horizons_gold") is True
+                and int(summary.get("horizon_count") or 0) == 9
+                and int(summary.get("gold_count") or 0) == 9
+                and int(summary.get("failed_count") or 0) == 0
+                and int(summary.get("expected_count") or 0) == 9
+                and len(horizons) == 9
+                and horizon_ids == required_ids
+                and all(
+                    isinstance(row, dict)
+                    and row.get("status") == "pass"
+                    and row.get("verdict") == "GOLD"
+                    and int(row.get("assertion_count") or 0) >= 8
+                    and bool(str(row.get("evidence_sha256") or "").strip())
+                    and not row.get("failures")
+                    for row in horizons
+                )
+                and is_fresh
+            )
+            status_value = "pass" if passed else "fail"
         pass_verdict_semantic_failures = (
             required_gate_pass_verdict_semantic_failures(name, payload)
-            if receipt_loaded and status_value in {"pass", "passed", "ready"}
+            if receipt_loaded and source_status_value.lower() in {"pass", "passed", "ready"}
             else []
         )
         if passed and pass_verdict_semantic_failures:
@@ -3577,7 +3564,7 @@ def build_payload(
                     reason = f"{name} stale"
                 elif (
                     path.is_file()
-                    and status_value in {"pass", "passed", "ready"}
+                    and source_status_value.lower() in {"pass", "passed", "ready"}
                     and pass_verdict_semantic_failures
                 ):
                     reason = f"{name} has unexpected verdict"

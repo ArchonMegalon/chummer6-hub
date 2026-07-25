@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-29T01:00:03Z",
+  "generated_at_utc": "2026-07-30T03:12:35Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -20,8 +20,8 @@
       "path": "/",
       "url": "https://chummer.run/",
       "status_code": 200,
-      "sha256": "8ab48073d5b411978aeb5d434461df915b3fd7e2280a41cc758af4074c680692",
-      "excerpt": "Chummer \u2014 Shadowrun character manager \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Linux\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run\",\"description\":\"Desktop character manager for Shadowrun.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; }",
+      "sha256": "e960b97a30069068bab7d634c497261878f63e6ae35ea1cba9be8018370c3565",
+      "excerpt": "Chummer \u2014 Shadowrun character manager \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Linux\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/\",\"description\":\"Desktop character manager for Shadowrun.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; }",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -29,8 +29,8 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "1ecb91656daeeaa9204947bd05b286ef1e19f16e7cbe0d43e59e58ab4764836a",
-      "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current Chummer downloads and setup help.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit =",
+      "sha256": "aa8deaaf88a464a131212e734b444bf7caa919bac62c1d0c0194a8b39b430057",
+      "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current Chummer release status.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function ()",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -38,7 +38,7 @@
       "path": "/downloads",
       "url": "https://chummer.run/downloads",
       "status_code": 200,
-      "sha256": "a79e5c3b0b080bcea8f8deb48ec9bd951aca5a0b31d08ea781c37c40f18f5979",
+      "sha256": "e3ed52dc74e31e22730962a799b2b6b7e85440c0dfba254683aac4cde28833f1",
       "excerpt": "Downloads \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Linux\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/downloads\",\"description\":\"Current Chummer installers and platform availability.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit =",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -47,8 +47,8 @@
       "path": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
-      "sha256": "3ce51ef0ec7c3d175566a1fcfbdea83b0bdfc3bacacb11f9650a62aa81705dd2",
-      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign city command map Campaign",
+      "sha256": "596dec7f22abc6367e1a7b03788abe7ea831c364ae8b9581ee18641f5d479632",
+      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map with live district overlays.",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -56,8 +56,8 @@
       "path": "/ledger/map",
       "url": "https://chummer.run/ledger/map",
       "status_code": 200,
-      "sha256": "aef06c6cc88788557a8d1f71b972180709d7b6231084905cfd38e491d88ecca4",
-      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign city command map Campaign",
+      "sha256": "02e62ec32c63bfa8d3df6d1c2ec01b93a20421504a1abf6cb891639993c2a0bc",
+      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map with live district overlays.",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -65,8 +65,8 @@
       "path": "/ledger/factions",
       "url": "https://chummer.run/ledger/factions",
       "status_code": 200,
-      "sha256": "15b52ea9ef6fb69f7a88aaf5f96a8fb3a7c9caf708a8f75d230393349620e2bd",
-      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign",
+      "sha256": "1be42b40660527c51eb65821ac0e27034d017673d1a88d47ddd02f7c27d35e02",
+      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -74,8 +74,8 @@
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
       "status_code": 200,
-      "sha256": "2ea7978042186ee8313d8afd90b5b12355d6b6fd1e83de8babe87d326db679b2",
-      "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign",
+      "sha256": "adb287ea46f1ae363392aa0334b61ba8e6a5c9b1f16e5a52da2e45fae6d2860a",
+      "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     }

@@ -218,6 +218,35 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         self.assertEqual("fail", payload["status"])
         self.assertIn("avalonia-win-x64-installer: payload sidecar releaseVersion does not match", payload["failures"])
 
+    def test_live_public_windows_installer_accepts_explicitly_paused_downloads(self) -> None:
+        module = load_module()
+        output_path = Path("/tmp") / f"{self.id().replace('.', '_')}.json"
+        with mock.patch.object(
+            module,
+            "fetch_json",
+            side_effect=[
+                {"downloads": []},
+                {
+                    "publicTrustMetrics": {
+                        "adoptionHealth": {
+                            "publicInstallCount": 0,
+                        }
+                    }
+                },
+            ],
+        ):
+            payload = module.verify(
+                "https://example.invalid",
+                Path("/missing/windows-payload-verifier.py"),
+                output_path=output_path,
+            )
+
+        self.assertEqual("pass", payload["status"])
+        self.assertEqual("LIVE_PUBLIC_WINDOWS_INSTALLER_READY", payload["verdict"])
+        self.assertTrue(payload["downloads_paused"])
+        self.assertEqual(0, payload["public_install_count"])
+        self.assertEqual([], payload["checked_artifacts"])
+
     def test_fetch_bytes_retries_timeout_then_succeeds(self) -> None:
         module = load_module()
         response = mock.MagicMock()

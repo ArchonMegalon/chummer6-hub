@@ -616,6 +616,111 @@ platforms:
     }
 
     [Fact]
+    public void ApplyAccessPolicyHonorsAuthoritativeZeroPublicInstallerCount()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260712-174412",
+            Channel: "preview",
+            Status: "published",
+            RolloutState: "coverage_incomplete",
+            SupportabilityState: "review_required",
+            PublishedAt: DateTimeOffset.Parse("2026-07-12T17:44:12Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "blocked-installer",
+                    SizeBytes: 98_977_472,
+                    Head: "avalonia",
+                    PlatformId: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "open_public")
+            ])
+        {
+            PublicTrustMetrics = System.Text.Json.JsonSerializer.SerializeToElement(
+                new
+                {
+                    adoptionHealth = new
+                    {
+                        status = "blocked",
+                        primaryPromotedCount = 0,
+                        publicInstallCount = 0
+                    }
+                })
+        };
+
+        var normalized = service.ApplyAccessPolicy(manifest);
+        var experience = service.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            authenticated: false);
+        var posture = service.BuildPublicAccessPosture(manifest, experience);
+
+        Assert.Empty(normalized.Downloads);
+        Assert.Null(experience.Recommended);
+        Assert.False(experience.GuestDownloadAvailable);
+        Assert.DoesNotContain(experience.PlatformAvailability, item => item.PubliclyAvailable);
+        Assert.False(posture.GuestInstallAvailable);
+        Assert.False(posture.AccountRequiredInstallAvailable);
+    }
+
+    [Fact]
+    public void ApplyAccessPolicyFailsClosedForMalformedAuthoritativeInstallerCount()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-malformed-counter",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-07-12T17:44:12Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "blocked-installer",
+                    SizeBytes: 42_855_330,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public")
+            ])
+        {
+            PublicTrustMetrics = System.Text.Json.JsonSerializer.SerializeToElement(
+                new
+                {
+                    adoptionHealth = new
+                    {
+                        publicInstallCount = "unknown"
+                    }
+                })
+        };
+
+        Assert.Empty(service.ApplyAccessPolicy(manifest).Downloads);
+    }
+
+    [Fact]
     public void ApplyAccessPolicyDropsPortableAndArchiveRowsFromPublicDownloads()
     {
         var configuration = new ConfigurationBuilder()

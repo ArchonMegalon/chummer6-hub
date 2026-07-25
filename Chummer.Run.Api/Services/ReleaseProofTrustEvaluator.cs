@@ -58,6 +58,7 @@ internal static partial class ReleaseProofTrustEvaluator
         "/home/work",
         "/account/access",
         "/account/work",
+        "/account/roster",
         "/account/support",
         "/contact",
         "/downloads"

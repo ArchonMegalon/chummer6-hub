@@ -73,7 +73,10 @@ public sealed class PublicPlaySessionAccessPolicy(
         "/mobile/player",
         "/mobile/gm",
         "/mobile/observer",
-        "/mobile/service-worker.js"
+        "/mobile/service-worker.js",
+        // This endpoint enforces its own optional-identity, opt-in, and private
+        // no-store boundary. It is not a Play session transport.
+        "/mobile/pwa/ledger.json"
     };
 
     public bool LiveSessionProxyEnabled

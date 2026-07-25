@@ -62,7 +62,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         "frontier_id": FRONTIER_ID,
         "routes": [
             "/home",
-            "/account/work",
+            "/account/roster",
             "/api/v1/campaign-spine/me",
             "/api/v1/campaign-spine/me/rules/{entryId}",
         ],
@@ -114,7 +114,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         "routes": [
             "/api/v1/support/cases/assistant",
             "/account/access",
-            "/account/work",
+            "/account/roster",
             "/home",
         ],
         "surfaces": [
@@ -144,7 +144,7 @@ SOURCE_MARKERS = {
         'SourceKind: "build_truth",',
         'ReceiptId: entry.ExplainEntryId))',
         'Add("open_home", "Open home", "/home", "Review the current rule environment, campaign workspace, and grounded answer path.");',
-        'Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");',
+        'Add("open_work", "Open work", "/account/roster", "Review the current build path, living dossier, and campaign return rail.");',
     ],
     "Chummer.Run.Api/Services/Community/CampaignSpineService.cs": [
         'ExplainEntryId: $"rules.navigator.{workspace.WorkspaceId}",',

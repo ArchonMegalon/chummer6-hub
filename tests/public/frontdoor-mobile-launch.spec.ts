@@ -54,9 +54,13 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
 
     const buildLink = openMenu.getByRole('link', { name: 'Build', exact: true });
     const playLink = openMenu.getByRole('link', { name: 'Play', exact: true });
-    await expect(buildLink).toHaveAttribute('href', '/build');
+    const buildTarget = new URL((await buildLink.getAttribute('href')) || '', publicOrigin);
+    const playTarget = new URL((await playLink.getAttribute('href')) || '', publicOrigin);
+    expect(buildTarget.origin).toBe(publicOrigin);
+    expect(buildTarget.pathname).toBe('/build');
     await expect(buildLink).toHaveAttribute('data-public-install-handoff', 'true');
-    await expect(playLink).toHaveAttribute('href', '/mobile/player');
+    expect(playTarget.origin).toBe(publicOrigin);
+    expect(playTarget.pathname).toBe('/mobile/player');
     await expect(playLink).toHaveAttribute('data-public-install-handoff', 'true');
     await expect(openMenu.locator('[data-disabled-target="/build"]')).toHaveCount(0);
     await expect(openMenu.locator('[data-disabled-target="/mobile/player"]')).toHaveCount(0);
@@ -119,12 +123,13 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     expect(allObservedUrls.some((url) => url.includes('/api/play'))).toBe(false);
     expect(allObservedUrls.some((url) => url.includes('/_blazor'))).toBe(false);
     expect(allObservedUrls.some((url) => /[?&](sessionId|grant|deviceId|role)=/i.test(url))).toBe(false);
-    expect(allObservedUrls.some((value) => {
+    const analyticsRequestUrls = allObservedUrls.filter((value) => {
       const url = new URL(value);
       return /(^|\.)(rybbit|plausible)\./i.test(url.hostname)
         || /^\/api\/(?:v\d+\/)?(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname)
         || /^\/(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname);
-    })).toBe(false);
+    });
+    expect(analyticsRequestUrls).toEqual([]);
     expect(pageErrors.length).toBe(0);
 
     proofStage = 'complete';

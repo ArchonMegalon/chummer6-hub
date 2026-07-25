@@ -62,6 +62,88 @@ public sealed class PublicLandingServiceTests
     }
 
     [Fact]
+    public void FindCardForDetailPage_PreservesDetailRouteAndResolvesExactRoadmapHref()
+    {
+        var service = BuildService();
+        var surface = service.LoadSurface();
+
+        var artifact = service.FindCardForDetailPage(surface, "/artifacts/runsite-pack");
+        var roadmap = service.FindCardForDetailPage(surface, "/roadmap/runsite");
+
+        Assert.NotNull(artifact);
+        Assert.NotNull(roadmap);
+        Assert.Equal(artifact.Id, roadmap.Id);
+        Assert.Equal("featured_artifacts", roadmap.Bucket);
+        Assert.Equal("/artifacts/runsite-pack", roadmap.DetailRoute);
+        Assert.Equal("/roadmap/runsite", roadmap.Href);
+        Assert.Equal("/roadmap/runsite", roadmap.DetailPrimaryHref);
+    }
+
+    [Fact]
+    public void FindCardForDetailPage_DoesNotTreatActionRoutesAsDetailAliases()
+    {
+        var service = BuildService();
+        var surface = service.LoadSurface();
+        var runsite = Assert.Single(surface.FeatureCards, static card =>
+            string.Equals(card.DetailRoute, "/artifacts/runsite-pack", StringComparison.Ordinal));
+        var bridgeCard = runsite with
+        {
+            Href = "/roadmap/exact-href",
+            DetailRoute = "/artifacts/exact-href",
+            GuestHref = "/roadmap/guest-action",
+            RegisteredHref = "/roadmap/registered-action",
+            DetailPrimaryHref = "/roadmap/exact-href",
+            FallbackRoute = "/roadmap/fallback-action"
+        };
+        var isolatedSurface = surface with { FeatureCards = new[] { bridgeCard } };
+
+        Assert.Equal(bridgeCard.Id, service.FindCardForDetailPage(isolatedSurface, bridgeCard.Href)?.Id);
+        Assert.Null(service.FindCardForDetailPage(isolatedSurface, bridgeCard.GuestHref!));
+        Assert.Null(service.FindCardForDetailPage(isolatedSurface, bridgeCard.RegisteredHref!));
+        Assert.Null(service.FindCardForDetailPage(isolatedSurface, bridgeCard.FallbackRoute!));
+
+        var unrelatedHrefSurface = surface with
+        {
+            FeatureCards = new[]
+            {
+                bridgeCard with
+                {
+                    Href = "/downloads",
+                    DetailPrimaryHref = "/downloads"
+                }
+            }
+        };
+        Assert.Null(service.FindCardForDetailPage(unrelatedHrefSurface, "/downloads"));
+
+        var wrongBucketSurface = surface with
+        {
+            FeatureCards = new[]
+            {
+                bridgeCard with { Bucket = "coming_next" }
+            }
+        };
+        Assert.Null(service.FindCardForDetailPage(wrongBucketSurface, bridgeCard.Href));
+
+        var nonArtifactDetailSurface = surface with
+        {
+            FeatureCards = new[] { bridgeCard with { DetailRoute = "/roadmap/canonical-detail" } }
+        };
+        Assert.Null(service.FindCardForDetailPage(nonArtifactDetailSurface, bridgeCard.Href));
+
+        var mismatchedPrimarySurface = surface with
+        {
+            FeatureCards = new[] { bridgeCard with { DetailPrimaryHref = "/roadmap/other-primary" } }
+        };
+        Assert.Null(service.FindCardForDetailPage(mismatchedPrimarySurface, bridgeCard.Href));
+
+        var missingPrimarySurface = surface with
+        {
+            FeatureCards = new[] { bridgeCard with { DetailPrimaryHref = null } }
+        };
+        Assert.Null(service.FindCardForDetailPage(missingPrimarySurface, bridgeCard.Href));
+    }
+
+    [Fact]
     public void CardsForBucket_IncludesPublicReleaseArtifactCards()
     {
         var service = BuildService();

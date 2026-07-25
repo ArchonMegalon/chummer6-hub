@@ -25,12 +25,16 @@ test('homepage stays product-first while ledger remains off the primary path', a
   const openMenu = hero.locator('.minimal-open-chummer');
   await openMenu.locator('summary').click();
   await expect(openMenu).toHaveAttribute('open', '');
-  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' })).toBeDisabled();
-  const playButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/mobile/player"]', { hasText: 'Play' });
-  await expect(playButton).toBeVisible();
-  await expect(playButton).toBeDisabled();
-  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/build"]')).toHaveCount(0);
-  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]')).toHaveCount(0);
+  const buildLink = openMenu.getByRole('link', { name: 'Build', exact: true });
+  const playLink = openMenu.getByRole('link', { name: 'Play', exact: true });
+  const buildTarget = new URL((await buildLink.getAttribute('href')) || '', baseUrl);
+  const playTarget = new URL((await playLink.getAttribute('href')) || '', baseUrl);
+  expect(buildTarget.pathname).toBe('/build');
+  expect(playTarget.pathname).toBe('/mobile/player');
+  await expect(buildLink).toHaveAttribute('data-public-install-handoff', 'true');
+  await expect(playLink).toHaveAttribute('data-public-install-handoff', 'true');
+  await expect(openMenu.locator('[data-disabled-target="/build"]')).toHaveCount(0);
+  await expect(openMenu.locator('[data-disabled-target="/mobile/player"]')).toHaveCount(0);
   await expect(openMenu.locator('.site-open-chummer-menu__button[href="/play"]')).toHaveCount(0);
   await expect(openMenu.getByRole('link', { name: 'Sign in first' })).toHaveAttribute('href', '/login?next=%2Faccount%2Faccess');
 
@@ -41,9 +45,9 @@ test('homepage stays product-first while ledger remains off the primary path', a
     base_url: baseUrl,
     route: '/',
     cta_labels: await heroActionLinks.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).textContent?.trim() ?? '')),
-    open_menu_targets: ['/login?next=%2Fbuild', '/login?next=%2Fmobile%2Fplayer', '/login?next=%2Faccount%2Faccess'],
-    gated_targets: ['Build', 'Play'],
-    public_targets: [],
+    open_menu_targets: [buildTarget.href, playTarget.href, '/login?next=%2Faccount%2Faccess'],
+    gated_targets: [],
+    public_targets: ['Build', 'Play'],
     ledger_primary: false,
   });
 });

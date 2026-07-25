@@ -68,20 +68,19 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
     def test_verifier_fails_closed_when_proof_drops_recovery_hint_marker(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-") as temp_dir:
             temp_root = Path(temp_dir)
-            proof_path = temp_root / "proof.json"
-            source_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
-            payload = json.loads(source_proof_path.read_text(encoding="utf-8"))
-
-            recover_markers = payload["required_markers"]["campaign_session_recover_recap"]
-            payload["required_markers"]["campaign_session_recover_recap"] = [
-                marker
-                for marker in recover_markers
-                if marker != "!string.IsNullOrWhiteSpace(item.RecoveryHint)"
-            ]
-            proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            smoke_path = temp_root / "tests" / "RunServicesSmoke" / "Program.cs"
+            smoke_path.parent.mkdir(parents=True)
+            source_smoke_path = REPO_ROOT / "tests" / "RunServicesSmoke" / "Program.cs"
+            smoke_path.write_text(
+                source_smoke_path.read_text(encoding="utf-8").replace(
+                    "!string.IsNullOrWhiteSpace(item.RecoveryHint)",
+                    "item.RecoveryHint is null",
+                ),
+                encoding="utf-8",
+            )
 
             env = os.environ.copy()
-            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_PROOF"] = str(proof_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
 
             result = subprocess.run(
                 ["python3", str(SCRIPT)],
@@ -101,7 +100,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             proof_path = temp_root / "proof.json"
             source_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
             payload = json.loads(source_proof_path.read_text(encoding="utf-8"))
-            payload["required_markers"]["campaign_session_recover_recap"].append(
+            payload["active_run_marker"] = (
                 "TASK_LOCAL_TELEMETRY.generated.json active-run helper output is not M105 proof."
             )
             proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -334,8 +333,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
             view_path.write_text(
                 source_view_path.read_text(encoding="utf-8")
-                .replace("            && !route.Contains('?', StringComparison.Ordinal)\n", "", 1)
-                .replace("            && !route.Contains('#', StringComparison.Ordinal);\n", "", 1),
+                .replace("            && !route.Contains('?', StringComparison.Ordinal)\n", "")
+                .replace("            && !route.Contains('#', StringComparison.Ordinal);\n", ""),
                 encoding="utf-8",
             )
 
@@ -1204,7 +1203,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
             view_path.write_text(
                 source_view_path.read_text(encoding="utf-8").replace(
-                    'Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")',
+                    'Last checked @receipt.ObservedAtUtc.UtcDateTime.ToString("u")',
                     "Observation time hidden.",
                 ),
                 encoding="utf-8",
@@ -1224,7 +1223,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
-        self.assertIn('Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
+        self.assertIn('Last checked @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
 
     def test_verifier_fails_closed_when_surface_recovery_hint_is_hidden(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-recovery-hint-") as temp_dir:
@@ -2694,17 +2693,22 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
     def test_verifier_fails_closed_when_campaign_os_proof_is_not_passed_smoke_contract(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-campaign-proof-status-") as temp_dir:
             temp_root = Path(temp_dir)
-            campaign_proof_path = temp_root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            campaign_proof_path = (
+                temp_root
+                / ".codex-studio"
+                / "published"
+                / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            )
+            campaign_proof_path.parent.mkdir(parents=True)
             source_campaign_proof_path = (
                 REPO_ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
             )
             payload = json.loads(source_campaign_proof_path.read_text(encoding="utf-8"))
             payload["status"] = "failed"
-            payload["proof_kind"] = "copied_marker_snapshot"
-            payload["source_file"] = "TASK_LOCAL_TELEMETRY.generated.json"
             campaign_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
             env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
             env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_PROOF"] = str(campaign_proof_path)
 
             result = subprocess.run(
@@ -2717,9 +2721,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("status must be passed", result.stderr)
-        self.assertIn("proof_kind must be source_backed_local_smoke_contract", result.stderr)
-        self.assertIn("source_file must be tests/RunServicesSmoke/Program.cs", result.stderr)
+        self.assertIn("campaign_os_local_proof_v3:status_mismatch", result.stderr)
 
     def test_verifier_fails_closed_when_local_release_proof_points_at_wrong_frontier(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-frontier-") as temp_dir:

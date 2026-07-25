@@ -63,40 +63,12 @@ public sealed class InstallLinkingStore : IDisposable
         WriteIndented = true
     };
 
-    /// <summary>
-    /// Compatibility constructor for non-production callers that predate encrypted
-    /// install-linking snapshots. Production must provide the shared persistent data
-    /// protection authority explicitly so a restart cannot orphan protected state.
-    /// </summary>
-    public InstallLinkingStore(
-        IConfiguration configuration,
-        ILogger<InstallLinkingStore> logger)
-        : this(configuration, CreateCompatibilityDataProtectionProvider(configuration), logger)
-    {
-    }
-
     public InstallLinkingStore(
         IConfiguration configuration,
         IDataProtectionProvider dataProtectionProvider,
         ILogger<InstallLinkingStore> logger)
         : this(configuration, dataProtectionProvider, logger, postgresAuthority: null)
     {
-    }
-
-    private static IDataProtectionProvider CreateCompatibilityDataProtectionProvider(
-        IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-        if (string.Equals(
-                configuration["ASPNETCORE_ENVIRONMENT"],
-                Environments.Production,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "Production install-linking storage requires an explicit persistent data-protection provider.");
-        }
-
-        return new EphemeralDataProtectionProvider();
     }
 
     internal InstallLinkingStore(

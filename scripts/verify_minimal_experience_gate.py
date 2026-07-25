@@ -160,6 +160,12 @@ def build_payload(
         )
     )
     nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_text
+    downloads_paused_visible = (
+        "No build is available right now" in downloads_text
+        and 'id="source-build"' in downloads_html
+        and "Build from source" in downloads_text
+    )
+    downloads_shelf_visible = downloads_paused_visible or (stable_visible and nightly_visible)
     decision_card_count = count_class_token(status_html, "minimal-status-pill")
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
     status_updated_count = count_occurrences(status_text, "Updated")
@@ -177,10 +183,8 @@ def build_payload(
         failures.append("home product video sources are unreachable")
     if product_video_links and not promo_video_link_load:
         failures.append("home promo video link is unreachable")
-    if not stable_visible:
-        failures.append("downloads stable lane is not visible")
-    if not nightly_visible:
-        failures.append("downloads nightly lane is not visible")
+    if not downloads_shelf_visible:
+        failures.append("downloads does not expose either an available release lane or the paused source-build fallback")
     if decision_card_count != 1:
         failures.append("status page should expose exactly one decision card")
     if next_action_count != 2:
@@ -214,6 +218,8 @@ def build_payload(
                 "surface": "downloads",
                 "stable_visible": stable_visible,
                 "nightly_visible": nightly_visible,
+                "downloads_paused_visible": downloads_paused_visible,
+                "downloads_shelf_visible": downloads_shelf_visible,
                 "updated_label_count": downloads_updated_count,
                 "release_noise": downloads_release_noise,
             },
@@ -241,7 +247,7 @@ def write_outputs(payload: dict, completion_root: Path) -> None:
                 "",
                 f"- Generated: {payload['generated_at_utc']}",
                 f"- Base URL: {payload['base_url']}",
-                "- Checks: navigation closed by default, homepage hero image plus promo-video entry reachable, downloads exposes Stable and Nightly, status exposes one release decision plus two next actions.",
+                "- Checks: navigation closed by default, homepage hero image plus promo-video entry reachable, downloads exposes an available release lane or the paused source-build fallback, status exposes one release decision plus two next actions.",
                 "",
                 *[f"- {failure}" for failure in payload["failures"]],
                 *[f"- {result['surface']} checked" for result in payload["results"]],

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -14,6 +16,18 @@ from urllib.parse import unquote
 from zlib import decompress, error as ZlibError
 
 import yaml
+
+
+CONTRACT_MODULE_PATH = Path(__file__).resolve().with_name("campaign_os_local_proof_v3.py")
+CONTRACT_MODULE_SPEC = importlib.util.spec_from_file_location(
+    "campaign_os_local_proof_v3_for_campaign_consequence_truth",
+    CONTRACT_MODULE_PATH,
+)
+if CONTRACT_MODULE_SPEC is None or CONTRACT_MODULE_SPEC.loader is None:
+    raise RuntimeError("unable to load Campaign OS local proof v3 contract")
+CONTRACT_MODULE = importlib.util.module_from_spec(CONTRACT_MODULE_SPEC)
+sys.modules[CONTRACT_MODULE_SPEC.name] = CONTRACT_MODULE
+CONTRACT_MODULE_SPEC.loader.exec_module(CONTRACT_MODULE)
 
 
 PACKAGE_ID = "next90-m112-hub-campaign-consequence-truth"
@@ -291,59 +305,27 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'Assert(carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true, "campaign spine carry-forward api should keep downtime consequence truth attached to the next-session return.");',
     ],
     "scripts/materialize_campaign_os_local_proof.py": [
-        'consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, "heat", StringComparison.Ordinal)',
-        'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "governed_consequence_update", StringComparison.Ordinal))',
-        'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review heat fallout", StringComparison.Ordinal))',
-        'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(item.ReceiptId, "/account/work", StringComparison.Ordinal))',
-        'factionConsequencePayload is not null && string.Equals(factionConsequencePayload.Kind, "faction", StringComparison.Ordinal)',
-        'factionConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))',
-        'contactConsequencePayload is not null && string.Equals(contactConsequencePayload.Kind, "contact", StringComparison.Ordinal)',
-        'contactConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review contact fallout", StringComparison.Ordinal))',
-        'downtimeConsequencePayload is not null && string.Equals(downtimeConsequencePayload.Kind, "downtime", StringComparison.Ordinal)',
-        'downtimeConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(item.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))',
-        'reputationConsequencePayload is not null && string.Equals(reputationConsequencePayload.Kind, "reputation", StringComparison.Ordinal)',
-        'reputationConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))',
-        'refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.State, "high", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && string.Equals(item.State, "strained", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && string.Equals(item.State, "fragile", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review contact fallout", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && string.Equals(item.State, "queued", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))) == true',
-        'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && string.Equals(item.State, "under_review", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))) == true',
-        "var consequencesListResult = await campaignSpineController.GetMyCampaignWorkspaceConsequences(workspaceId, CancellationToken.None);",
-        'consequencesListPayload?.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-        'consequencesListPayload?.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))) == true',
-        "var aftermathPackagesListResult = await campaignSpineController.GetMyCampaignWorkspaceAftermathRecapPackages(workspaceId, CancellationToken.None);",
-        'aftermathPackagesListPayload?.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal) && string.Equals(item.ArtifactKind, "ReplayPackage", StringComparison.Ordinal)) == true',
-        "var campaignMemoryResult = await campaignSpineController.GetMyCampaignWorkspaceCampaignMemory(workspaceId, CancellationToken.None);",
-        'campaignMemoryPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true',
-        "var carryForwardResult = await campaignSpineController.GetMyCampaignWorkspaceNextSessionCarryForward(workspaceId, CancellationToken.None);",
-        'carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true',
+        'MODULE_PATH = Path(__file__).resolve().with_name("campaign_os_local_proof_v3.py")',
+        "payload = CONTRACT.run_owned_smoke(root, receipt)",
+        "except CONTRACT.ProofContractError as exc:",
+        "campaign_os_local_proof_v3:passed:",
+    ],
+    "scripts/campaign_os_local_proof_v3.py": [
+        'CONTRACT_VERSION = 3',
+        'PROOF_KIND = "materializer_owned_executed_smoke_receipt"',
+        'SOURCE_PATH = "tests/RunServicesSmoke/Program.cs"',
+        '"campaign_session_recover_recap",',
+        'f"{journey_id}.run_services_smoke_exit_zero"',
+        "def validate_passed_receipt_schema(",
+        "_validate_passed_schema(payload)",
+        "def validate_passed_receipt(",
+        "candidate_source_build_inputs_current_mismatch",
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_campaign_consequence_truth.py",
         "python3 -m unittest tests/test_campaign_consequence_truth.py",
     ],
 }
-
-PROOF_MARKERS = [
-    'consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, "heat", StringComparison.Ordinal)',
-    'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "governed_consequence_update", StringComparison.Ordinal))',
-    'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(item.ReceiptId, "/account/work", StringComparison.Ordinal))',
-    'factionConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))',
-    'contactConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review contact fallout", StringComparison.Ordinal))',
-    'reputationConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.State, "high", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))) == true',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && string.Equals(item.State, "strained", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))) == true',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && string.Equals(item.State, "fragile", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review contact fallout", StringComparison.Ordinal))) == true',
-    'refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && string.Equals(item.State, "under_review", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))) == true',
-    'consequencesListPayload?.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true',
-    'campaignMemoryPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true',
-    'carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true',
-]
 
 
 def main() -> int:
@@ -521,23 +503,34 @@ def verify_proof(missing: list[str], path: Path) -> None:
     if not path.is_file():
         missing.append(f"campaign os proof is missing: {path}")
         return
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("contract_name") != "chummer6-hub.campaign_os_local_proof":
-        missing.append(f"campaign os proof contract_name drifted: {path}")
-    if payload.get("status") != "passed":
-        missing.append(f"campaign os proof status must be 'passed': {path}")
-    if payload.get("package_proof") != PACKAGE_PROOF:
-        missing.append(f"campaign os proof package_proof drifted: {path}")
-    if payload.get("source_file") != "tests/RunServicesSmoke/Program.cs":
-        missing.append(f"campaign os proof source_file drifted: {path}")
-    markers = (((payload.get("required_markers") or {}).get("campaign_session_recover_recap")) or [])
-    if not isinstance(markers, list):
-        missing.append(f"campaign os proof campaign_session_recover_recap markers must be a list: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        missing.append(f"campaign os proof v3 invalid: receipt_json_invalid: {path}")
         return
-    for marker in PROOF_MARKERS:
-        if marker not in markers:
-            missing.append(f"{path}: missing proof marker {marker!r}")
-    verify_no_forbidden_proof_markers(missing, markers, f"campaign os proof {path}")
+    verify_no_forbidden_proof_markers(missing, payload, f"campaign os proof {path}")
+
+    validation = CONTRACT_MODULE.validate_passed_receipt_schema(path)
+    if not validation.valid or validation.payload is None:
+        missing.append(f"campaign os proof v3 invalid: {validation.reason_code}: {path}")
+        return
+
+    smoke_source_path = ROOT / CONTRACT_MODULE.SOURCE_PATH
+    if not smoke_source_path.is_file():
+        missing.append(f"campaign os proof source input is missing: {smoke_source_path}")
+        return
+    source_bytes = smoke_source_path.read_bytes()
+    expected_source_identity = {
+        "path": CONTRACT_MODULE.SOURCE_PATH,
+        "sha256": hashlib.sha256(source_bytes).hexdigest(),
+        "size_bytes": len(source_bytes),
+    }
+    actual_source_identity = validation.payload["inputs"]["source"]
+    if actual_source_identity != expected_source_identity:
+        missing.append(
+            f"campaign os proof source identity drifted: {path} "
+            f"(expected={expected_source_identity}, actual={actual_source_identity})"
+        )
 
 
 def verify_release_proof(

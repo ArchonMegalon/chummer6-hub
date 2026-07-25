@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,15 @@ PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 AUDIT_JSON_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"
 AUDIT_MARKDOWN_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"
 CONTRACT_NAME = "chummer.mobile_pwa_public_projection.v2"
+ACTIVE_OVERLAY_BUILD_INFO = (
+    RUN_SERVICES_ROOT
+    / ".state"
+    / "public-edge-portal-overlay"
+    / "app"
+    / ".codex-studio"
+    / "runtime"
+    / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+)
 RETIRED_ENV_KEYS = {
     "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
     "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
@@ -73,6 +83,48 @@ def load_static_verifier():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def active_full_deployment_digest(
+    path: Path = ACTIVE_OVERLAY_BUILD_INFO,
+) -> str:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"active overlay build-info is unavailable: {path}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("active overlay build-info must be a JSON object")
+    if (
+        payload.get("contractName") != "chummer.public_edge_portal_overlay_publish.v1"
+        or payload.get("status") != "pass"
+        or payload.get("activationStatus") != "activated"
+        or payload.get("authoritativeReceipt") is not True
+        or payload.get("testOnly") is True
+    ):
+        raise RuntimeError("active overlay build-info is not authoritative and activated")
+    full_deployment = payload.get("fullDeploymentDigest")
+    digest = (
+        str(full_deployment.get("sha256") or "").strip()
+        if isinstance(full_deployment, dict)
+        else ""
+    )
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise RuntimeError("active overlay build-info has no valid full deployment digest")
+    return digest
+
+
+def current_asset_inventory_digest(
+    static_verifier: Any,
+    source_root: Path = RUN_SERVICES_ROOT,
+) -> str:
+    failures: list[str] = []
+    inventory = static_verifier.source_asset_digest_inventory(source_root, failures)
+    digest = str(inventory.get("sha256") or "").strip()
+    if failures:
+        raise RuntimeError("; ".join(failures))
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise RuntimeError("current PWA asset inventory has no valid digest")
+    return digest
 
 
 def write_audit_artifacts(payload: dict[str, Any], markdown: str) -> None:
@@ -181,11 +233,36 @@ def source_topology(source_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
     }
 
 
-def live_projection(base_url: str, session: requests.Session | None = None) -> dict[str, Any]:
+def live_projection(
+    base_url: str,
+    session: requests.Session | None = None,
+    *,
+    expected_full_deployment_digest_sha256: str = "",
+    expected_asset_inventory_sha256: str = "",
+) -> dict[str, Any]:
     failures: list[str] = []
     client = session or requests.Session()
     static_verifier = load_static_verifier()
-    static_assets = static_verifier.verify_live(base_url, 30.0)
+    try:
+        expected_full_deployment_digest = (
+            expected_full_deployment_digest_sha256.strip()
+            or active_full_deployment_digest()
+        )
+        expected_asset_inventory_digest = (
+            expected_asset_inventory_sha256.strip()
+            or current_asset_inventory_digest(static_verifier)
+        )
+        static_assets = static_verifier.verify_live(
+            base_url,
+            30.0,
+            expected_full_deployment_digest,
+            expected_asset_inventory_digest,
+        )
+    except RuntimeError as exc:
+        static_assets = {
+            "status": "fail",
+            "failures": [str(exc)],
+        }
     if static_assets["status"] != "pass":
         failures.extend(f"static assets: {failure}" for failure in static_assets["failures"])
 
@@ -327,8 +404,19 @@ def run(
     *,
     source_root: Path = RUN_SERVICES_ROOT,
     session: requests.Session | None = None,
+    expected_full_deployment_digest_sha256: str = "",
+    expected_asset_inventory_sha256: str = "",
 ) -> int:
-    payload = live_projection(base_url, session=session) if base_url else source_topology(source_root)
+    payload = (
+        live_projection(
+            base_url,
+            session=session,
+            expected_full_deployment_digest_sha256=expected_full_deployment_digest_sha256,
+            expected_asset_inventory_sha256=expected_asset_inventory_sha256,
+        )
+        if base_url
+        else source_topology(source_root)
+    )
     payload["legacyMobileReleaseProof"] = {
         "path": str(mobile_release_proof_path) if mobile_release_proof_path else "",
         "gating": False,
@@ -348,6 +436,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default="")
     parser.add_argument("--source-root", type=Path, default=RUN_SERVICES_ROOT)
     parser.add_argument("--mobile-release-proof", type=Path)
+    parser.add_argument("--expected-full-deployment-digest-sha256", default="")
+    parser.add_argument("--expected-asset-inventory-sha256", default="")
     return parser.parse_args()
 
 
@@ -357,6 +447,8 @@ def main() -> int:
         args.base_url,
         args.mobile_release_proof,
         source_root=args.source_root,
+        expected_full_deployment_digest_sha256=args.expected_full_deployment_digest_sha256,
+        expected_asset_inventory_sha256=args.expected_asset_inventory_sha256,
     )
 
 

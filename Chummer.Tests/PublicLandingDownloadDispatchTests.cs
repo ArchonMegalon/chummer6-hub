@@ -56,6 +56,64 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task RoadmapRunsiteAliasUsesCanonicalArtifactActionWithoutSelfLinkOrDuplicate()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RoadmapDetailPage("runsite", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/artifacts/runsite-pack", model.PrimaryAction.Href);
+        Assert.Equal("Open the runsite pack", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.External);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
+    public async Task CanonicalRunsiteArtifactRouteKeepsItsExistingRoadmapAction()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.ArtifactDetailPage("runsite-pack", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/roadmap/runsite", model.PrimaryAction.Href);
+        Assert.Equal("See related roadmap item", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
+    public async Task NonBridgeArtifactDetailKeepsItsExistingPrimaryAction()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.ArtifactDetailPage("current-preview-build", CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<FeatureDetailPageViewModel>(view.Model);
+        Assert.Equal("/downloads", model.PrimaryAction.Href);
+        Assert.Equal("Open downloads", model.PrimaryAction.Label);
+        Assert.False(model.PrimaryAction.Current);
+        Assert.Null(model.SecondaryAction);
+    }
+
+    [Fact]
     public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
     {
         var method = typeof(PublicLandingController).GetMethod(nameof(PublicLandingController.DownloadDispatchPage));
@@ -3539,8 +3597,13 @@ public sealed class PublicLandingDownloadDispatchTests
         fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
 
         IActionResult first = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
-        var firstRedirect = Assert.IsType<RedirectResult>(first);
-        AssertProtectedMediaRedirect(firstRedirect.Url, "/media/horizons/runbook-press-90s-deepdive.mp4");
+        FileContentResult firstExport = Assert.IsType<FileContentResult>(first);
+        Assert.Equal("text/markdown; charset=utf-8", firstExport.ContentType);
+        Assert.Equal("new-runner-primer.md", firstExport.FileDownloadName);
+        Assert.Contains("# New runner primer", Encoding.UTF8.GetString(firstExport.FileContents), StringComparison.Ordinal);
+        Assert.Equal(
+            "/media/horizons/runbook-press-90s-deepdive.mp4",
+            fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
         Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
@@ -3585,7 +3648,13 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult result = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
 
-        Assert.IsType<RedirectResult>(result);
+        FileContentResult export = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/markdown; charset=utf-8", export.ContentType);
+        Assert.Equal("new-runner-primer.md", export.FileDownloadName);
+        Assert.Contains("# New runner primer", Encoding.UTF8.GetString(export.FileContents), StringComparison.Ordinal);
+        Assert.Equal(
+            "/media/horizons/runbook-press-90s-deepdive.mp4",
+            fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runbook-press", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("runbook-export", receipt.CapabilityId);
@@ -3760,8 +3829,13 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult result = await fixture.Controller.KarmaForgeDiscoveryPacketDispatch(CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate/karma-forge", redirect.Url);
+        FileContentResult packet = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/markdown; charset=utf-8", packet.ContentType);
+        Assert.Equal("karma-forge-discovery.md", packet.FileDownloadName);
+        Assert.Contains("# KARMA FORGE discovery packet", Encoding.UTF8.GetString(packet.FileContents), StringComparison.Ordinal);
+        Assert.Equal(
+            "/participate/karma-forge/discovery",
+            fixture.Controller.Response.Headers["X-Horizon-Artifact-Destination"].ToString());
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("karma-forge", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("karma-forge-discovery", receipt.CapabilityId);
@@ -4550,7 +4624,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 releases: ManifestService,
                 campaignOsProof: null!,
                 releaseSelection: ReleaseSelection,
-                actions: null!,
+                actions: new PublicActionResolver(),
                 accounts: Accounts,
                 identity: identity,
                 links: null!,

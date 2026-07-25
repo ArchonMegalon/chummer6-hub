@@ -29,6 +29,7 @@ SOURCE_FILES = [
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
     "Chummer.Tests/RunsiteOrientationRequestComposerServiceTests.cs",
     "scripts/materialize_hub_local_release_proof.py",
+    "scripts/publish_public_edge_portal_overlay.py",
     "scripts/verify_runsite_orientation_requests.py",
     "scripts/ai/verify.sh",
     "tests/test_hub_local_release_proof_native_support_route.py",

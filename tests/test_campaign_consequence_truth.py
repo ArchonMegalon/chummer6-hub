@@ -19,6 +19,7 @@ SOURCE_FILES = [
     "tests/RunServicesVerification/CampaignSpineRestoreVerification.cs",
     "tests/RunServicesSmoke/Program.cs",
     "scripts/materialize_campaign_os_local_proof.py",
+    "scripts/campaign_os_local_proof_v3.py",
     "scripts/verify_campaign_consequence_truth.py",
     "scripts/ai/verify.sh",
     "tests/test_campaign_consequence_truth.py",
@@ -418,9 +419,7 @@ milestones:
                     encoding="utf-8"
                 )
             )
-            payload["required_markers"]["campaign_session_recover_recap"].append(
-                "TASK_LOCAL_TELEMETRY.generated.json is forbidden completion proof."
-            )
+            payload["forbidden_marker"] = "TASK_LOCAL_TELEMETRY.generated.json is forbidden completion proof."
             proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
             env = os.environ.copy()
@@ -438,7 +437,7 @@ milestones:
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
 
-    def test_verifier_fails_when_generated_proof_drops_package_metadata(self) -> None:
+    def test_verifier_fails_when_generated_proof_contract_version_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="campaign-consequence-package-proof-") as temp_dir:
             proof_path = Path(temp_dir) / "proof.json"
             payload = json.loads(
@@ -446,14 +445,7 @@ milestones:
                     encoding="utf-8"
                 )
             )
-            payload["package_proof"] = {
-                "package_id": "next90-m112-hub-campaign-consequence-truth",
-                "title": "Promote campaign consequence state into governed campaign APIs",
-                "task": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions.",
-                "milestone_id": 112,
-                "allowed_paths": ["Chummer.Run.Api", "scripts", "tests"],
-                "owned_surfaces": ["campaign_memory:consequence_truth", "downtime_aftermath:api"],
-            }
+            payload["contract_version"] = 2
             proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
             env = os.environ.copy()
@@ -469,9 +461,9 @@ milestones:
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("campaign os proof package_proof drifted", result.stderr)
+        self.assertIn("campaign os proof v3 invalid: contract_version_mismatch", result.stderr)
 
-    def test_verifier_fails_when_generated_proof_drops_heat_marker(self) -> None:
+    def test_verifier_fails_when_generated_proof_source_identity_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="campaign-consequence-proof-marker-") as temp_dir:
             proof_path = Path(temp_dir) / "proof.json"
             payload = json.loads(
@@ -479,13 +471,7 @@ milestones:
                     encoding="utf-8"
                 )
             )
-            marker = (
-                'consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "governed_consequence_update", '
-                'StringComparison.Ordinal))'
-            )
-            payload["required_markers"]["campaign_session_recover_recap"] = [
-                item for item in payload["required_markers"]["campaign_session_recover_recap"] if item != marker
-            ]
+            payload["inputs"]["source"]["sha256"] = "0" * 64
             proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
             env = os.environ.copy()
@@ -501,9 +487,9 @@ milestones:
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("governed_consequence_update", result.stderr)
+        self.assertIn("campaign os proof source identity drifted", result.stderr)
 
-    def test_verifier_fails_when_generated_proof_drops_reputation_marker(self) -> None:
+    def test_verifier_fails_when_generated_proof_drops_campaign_runtime_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="campaign-consequence-reputation-marker-") as temp_dir:
             proof_path = Path(temp_dir) / "proof.json"
             payload = json.loads(
@@ -511,12 +497,11 @@ milestones:
                     encoding="utf-8"
                 )
             )
-            marker = (
-                'reputationConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", '
-                'StringComparison.Ordinal) && item.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))'
-            )
-            payload["required_markers"]["campaign_session_recover_recap"] = [
-                item for item in payload["required_markers"]["campaign_session_recover_recap"] if item != marker
+            payload["execution"]["runtime_checkpoints"] = [
+                item
+                for item in payload["execution"]["runtime_checkpoints"]
+                if item.get("checkpoint_id")
+                != "campaign_session_recover_recap.run_services_smoke_exit_zero"
             ]
             proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -533,7 +518,7 @@ milestones:
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Review reputation fallout", result.stderr)
+        self.assertIn("campaign os proof v3 invalid: runtime_checkpoint_set_mismatch", result.stderr)
 
     def test_verifier_fails_when_smoke_drops_canonical_downtime_route_guard(self) -> None:
         with tempfile.TemporaryDirectory(prefix="campaign-consequence-downtime-route-") as temp_dir:

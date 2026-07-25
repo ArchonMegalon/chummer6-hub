@@ -2700,6 +2700,18 @@ public sealed class CampaignWorkspaceServerPlaneService
                 static group => group.Key,
                 static group => group.Max(static item => item.GeneratedAtUtc),
                 StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, DateTimeOffset> playerSafeNewsTimes = (workspace.CampaignAdoptionLoop?.PlayerSafeNews ?? Array.Empty<PlayerSafeNewsProjection>())
+            .Select(static item => new
+            {
+                NewsId = NormalizeOptional(item.NewsId),
+                item.UpdatedAtUtc
+            })
+            .Where(static item => item.NewsId is not null)
+            .GroupBy(static item => item.NewsId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Max(static item => item.UpdatedAtUtc),
+                StringComparer.OrdinalIgnoreCase);
         DateTimeOffset defaultUpdatedAtUtc = workspace.LatestContinuity?.CapturedAtUtc ?? DateTimeOffset.UtcNow;
         var publicationsById = creatorPublications
             .Select(static item => new
@@ -2731,7 +2743,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     .First()
                     .Publication,
                 StringComparer.OrdinalIgnoreCase);
-        return SelectBoundedRecapShelfItems(recapShelf, aftermathTimes, defaultUpdatedAtUtc)
+        return SelectBoundedRecapShelfItems(recapShelf, aftermathTimes, playerSafeNewsTimes, defaultUpdatedAtUtc)
             .Select(item =>
             {
                 CreatorPublicationProjection? creatorPublication = ResolveCreatorPublicationForRecapItem(item, publicationsById, publicationsByArtifactId);
@@ -2742,7 +2754,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                     Label: item.Label,
                     Summary: item.Summary,
                     ArtifactId: item.ArtifactId,
-                    UpdatedAtUtc: ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, defaultUpdatedAtUtc),
+                    UpdatedAtUtc: ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, playerSafeNewsTimes, defaultUpdatedAtUtc),
                     Audience: creatorLinked
                         ? DescribeRecapShelfAudience(item, creatorLinked)
                         : string.IsNullOrWhiteSpace(item.Audience)
@@ -2782,6 +2794,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static IReadOnlyList<PublicationSafeProjection> SelectBoundedRecapShelfItems(
         IReadOnlyList<PublicationSafeProjection> items,
         IReadOnlyDictionary<string, DateTimeOffset> aftermathTimes,
+        IReadOnlyDictionary<string, DateTimeOffset> playerSafeNewsTimes,
         DateTimeOffset defaultUpdatedAtUtc)
     {
         var rankedItems = items
@@ -2789,7 +2802,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             {
                 Item = item,
                 Category = BoundedRecapShelfCategory(item),
-                UpdatedAtUtc = ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, defaultUpdatedAtUtc)
+                UpdatedAtUtc = ResolveBoundedRecapShelfUpdatedAt(item, aftermathTimes, playerSafeNewsTimes, defaultUpdatedAtUtc)
             })
             .ToArray();
 
@@ -2828,18 +2841,33 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static DateTimeOffset ResolveBoundedRecapShelfUpdatedAt(
         PublicationSafeProjection item,
         IReadOnlyDictionary<string, DateTimeOffset> aftermathTimes,
+        IReadOnlyDictionary<string, DateTimeOffset> playerSafeNewsTimes,
         DateTimeOffset defaultUpdatedAtUtc)
     {
         string? normalizedProjectionId = NormalizeOptional(item.ProjectionId);
-        return normalizedProjectionId is not null
-            && aftermathTimes.TryGetValue(normalizedProjectionId, out DateTimeOffset updatedAtUtc)
-            ? updatedAtUtc
+        if (normalizedProjectionId is null)
+        {
+            return defaultUpdatedAtUtc;
+        }
+
+        if (aftermathTimes.TryGetValue(normalizedProjectionId, out DateTimeOffset aftermathUpdatedAtUtc))
+        {
+            return aftermathUpdatedAtUtc;
+        }
+
+        return playerSafeNewsTimes.TryGetValue(normalizedProjectionId, out DateTimeOffset newsUpdatedAtUtc)
+            ? newsUpdatedAtUtc
             : defaultUpdatedAtUtc;
     }
 
     private static string BoundedRecapShelfCategory(PublicationSafeProjection item)
     {
         string normalizedKind = item.Kind.Trim().ToLowerInvariant();
+        if (string.Equals(normalizedKind, "player_safe_news", StringComparison.Ordinal))
+        {
+            return "news";
+        }
+
         if (IsCampaignRecapPublicationKind(normalizedKind))
         {
             return "campaign";
@@ -2881,6 +2909,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static int BoundedRecapShelfCategoryPriority(string category)
         => category switch
         {
+            "news" => 7,
             "campaign" => 6,
             "primer" => 5,
             "run_module" => 4,

@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-29T11:56:26.206863Z",
+  "generated_at_utc": "2026-07-29T06:25:25.664751Z",
   "status": "pass",
   "verdict": "READY",
   "completion_dir": "/docker/chummercomplete/chummer.run-services/.codex-studio/published",
@@ -10,24 +10,24 @@
   "failures": [],
   "results": {
     "billing_available": {
-      "generated_at_utc": "2026-06-29T11:56:15.681Z",
+      "generated_at_utc": "2026-07-29T06:25:15.231Z",
       "status": "pass",
-      "base_url": "http://127.0.0.1:49231",
+      "base_url": "http://127.0.0.1:33137",
       "guest_billing_status": 302,
       "guest_billing_location": "/login?next=%2Faccount%2Fbilling",
       "guest_participate_status": 200,
-      "guest_participate_public_wrapper": false,
+      "guest_participate_public_wrapper": true,
       "guest_participate_surface": "first_party_productlift_proxy",
       "guest_supporter_start_status": 302,
       "guest_supporter_start_location": "/login?next=%2Faccount%2Fbilling",
       "guest_account_status": 302,
       "guest_account_location": "/account/access",
       "signed_in_supporter_checkout_status": 302,
-      "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?external_user=usr-11304dc2d046&email=runner%40example.com&membership_plan=supporter",
+      "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?external_user=usr-7bd366e37ca6&email=runner%40example.com&membership_plan=supporter",
       "signed_in_supporter_direct_status": 302,
-      "signed_in_supporter_direct_location": "https://billing.example.test/supporter?external_user=usr-11304dc2d046&email=runner%40example.com&membership_plan=supporter",
+      "signed_in_supporter_direct_location": "https://billing.example.test/supporter?external_user=usr-7bd366e37ca6&email=runner%40example.com&membership_plan=supporter",
       "signed_in_billing_handoff_status": 302,
-      "signed_in_billing_handoff_location": "https://billing.example.test/supporter?external_user=usr-11304dc2d046&email=runner%40example.com&membership_plan=supporter",
+      "signed_in_billing_handoff_location": "https://billing.example.test/supporter?external_user=usr-7bd366e37ca6&email=runner%40example.com&membership_plan=supporter",
       "signed_in_supporter_active": false,
       "signed_in_participate_first_party_verified": true,
       "signed_in_participate_surface": "first_party_productlift_proxy",
@@ -35,13 +35,22 @@
       "first_party_sign_in_redirect": true
     },
     "billing_unavailable": {
-      "generated_at_utc": "2026-06-29T11:56:25.373Z",
+      "generated_at_utc": "2026-07-29T06:25:24.802Z",
       "status": "pass",
-      "base_url": "http://127.0.0.1:44629",
+      "base_url": "http://127.0.0.1:54227",
       "board_state": "first_party_productlift_proxy",
       "supporter_link_count": 0,
       "supporter_copy_visible": false,
       "billing_state": "unavailable"
     }
-  }
+  },
+  "materializer_source_digest": "4f7edffc086a9811fa4de4360859a5f5bb55cb3a473837586f77e2ebb5489c6d",
+  "materializer_source_files": [
+    "scripts/materialize_participate_billing_honesty.py",
+    "scripts/verify_participate_billing_honesty.py",
+    "scripts/absolute_completion_common.py",
+    "tests/public/participate-billing-auth.spec.ts",
+    "tests/public/participate-billing-unavailable.spec.ts"
+  ],
+  "reuse_receipt_max_age_hours": 24.0
 }

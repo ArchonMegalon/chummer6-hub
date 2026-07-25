@@ -28,6 +28,8 @@ DEFAULT_RETRY_DELAY_SECONDS = 2.0
 INSTALLER_EXTENSIONS = (".exe", ".deb", ".msi", ".dmg", ".pkg", ".msix")
 ACCOUNT_REQUIRED = "account_required"
 OPEN_PUBLIC = "open_public"
+PASSING_READINESS_STATUSES = {"pass", "passed", "ready"}
+TRANSPORT_LOCATION_KEYS = {"url", "payloadDownloadUrl"}
 
 
 def now_iso() -> str:
@@ -258,7 +260,9 @@ def compare_artifact_indexes(
     right_rows: dict[str, dict[str, Any]],
     *,
     failures: list[str],
+    ignore_keys: set[str] | None = None,
 ) -> None:
+    ignored = ignore_keys or set()
     left_keys = set(left_rows)
     right_keys = set(right_rows)
     missing_from_right = sorted(left_keys - right_keys)
@@ -268,11 +272,39 @@ def compare_artifact_indexes(
     if missing_from_left:
         failures.append(f"{left_name} is missing artifact(s): {', '.join(missing_from_left)}")
     for artifact_id in sorted(left_keys & right_keys):
-        if left_rows[artifact_id] != right_rows[artifact_id]:
+        left_row = {
+            key: value
+            for key, value in left_rows[artifact_id].items()
+            if key not in ignored
+        }
+        right_row = {
+            key: value
+            for key, value in right_rows[artifact_id].items()
+            if key not in ignored
+        }
+        if left_row != right_row:
             failures.append(
                 f"{left_name} and {right_name} differ for artifact {artifact_id}: "
-                f"{json.dumps(left_rows[artifact_id], sort_keys=True)} != {json.dumps(right_rows[artifact_id], sort_keys=True)}"
+                f"{json.dumps(left_row, sort_keys=True)} != {json.dumps(right_row, sort_keys=True)}"
             )
+
+
+def artifact_indexes_equal(
+    left_rows: dict[str, dict[str, Any]],
+    right_rows: dict[str, dict[str, Any]],
+    *,
+    ignore_keys: set[str] | None = None,
+) -> bool:
+    failures: list[str] = []
+    compare_artifact_indexes(
+        "left",
+        left_rows,
+        "right",
+        right_rows,
+        failures=failures,
+        ignore_keys=ignore_keys,
+    )
+    return not failures
 
 
 def normalize_platform_family(value: Any) -> str:
@@ -391,6 +423,17 @@ def resolve_effective_install_access_class(row: dict[str, Any], payload: dict[st
     return default_install_access_class(platform_family_from_row(row), artifact_kind_from_row(row))
 
 
+def embedded_flagship_readiness_blocks_public_shelf(payload: dict[str, Any]) -> bool:
+    release_proof = payload.get("releaseProof")
+    if not isinstance(release_proof, dict):
+        return False
+    readiness = release_proof.get("flagshipReadiness")
+    if not isinstance(readiness, dict):
+        return False
+    status = normalize_token(readiness.get("status"))
+    return bool(status) and status not in PASSING_READINESS_STATUSES
+
+
 def load_platform_acceptance() -> dict[str, dict[str, Any]]:
     if not PLATFORM_ACCEPTANCE_PATH.is_file():
         return {}
@@ -451,6 +494,8 @@ def compatibility_row_from_canonical(artifact: dict[str, Any], canonical: dict[s
 
 
 def is_public_shelf_visible(row: dict[str, Any], payload: dict[str, Any], platform_acceptance: dict[str, dict[str, Any]]) -> bool:
+    if embedded_flagship_readiness_blocks_public_shelf(payload):
+        return False
     if not is_installer_row(row):
         return False
     if uses_mac_bootstrap_flow(row) and not has_explicit_artifact_proof(payload, row):
@@ -694,8 +739,16 @@ def evaluate(
         "live releases.json",
         live_manifest_summary["artifacts"],
         failures=failures,
+        ignore_keys=TRANSPORT_LOCATION_KEYS,
     )
-    compare_artifact_indexes("local RELEASE_CHANNEL.generated.json", local_canonical_summary["artifacts"], "live RELEASE_CHANNEL.generated.json", live_canonical_summary["artifacts"], failures=failures)
+    compare_artifact_indexes(
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["artifacts"],
+        "live RELEASE_CHANNEL.generated.json",
+        live_canonical_summary["artifacts"],
+        failures=failures,
+        ignore_keys=TRANSPORT_LOCATION_KEYS,
+    )
 
     page_artifact_ids = extract_page_artifact_ids(downloads_response.text)
     live_public_artifact_ids = sorted(
@@ -759,14 +812,27 @@ def evaluate(
         },
         "alignment": {
             "localManifestsAligned": (
-                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
+                artifact_indexes_equal(
+                    local_projected_summary["artifacts"],
+                    live_manifest_summary["artifacts"],
+                    ignore_keys=TRANSPORT_LOCATION_KEYS,
+                )
             ),
             "liveManifestsAligned": (
                 live_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
             ),
             "localMatchesLive": (
-                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
-                and local_canonical_summary == live_canonical_summary
+                artifact_indexes_equal(
+                    local_projected_summary["artifacts"],
+                    live_manifest_summary["artifacts"],
+                    ignore_keys=TRANSPORT_LOCATION_KEYS,
+                )
+                and local_canonical_summary["topLevel"] == live_canonical_summary["topLevel"]
+                and artifact_indexes_equal(
+                    local_canonical_summary["artifacts"],
+                    live_canonical_summary["artifacts"],
+                    ignore_keys=TRANSPORT_LOCATION_KEYS,
+                )
             ),
             "pageArtifactIdsAligned": not unknown_page_artifact_ids and not missing_page_artifact_ids,
             "artifactProbesPassed": all(

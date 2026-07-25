@@ -95,6 +95,23 @@ def is_windows_bootstrap_installer(row: dict[str, Any]) -> bool:
     )
 
 
+def public_install_count(release_manifest: object) -> int | None:
+    if not isinstance(release_manifest, dict):
+        return None
+    metrics = release_manifest.get("publicTrustMetrics")
+    metrics = metrics if isinstance(metrics, dict) else {}
+    adoption = metrics.get("adoptionHealth")
+    adoption = adoption if isinstance(adoption, dict) else {}
+    value = adoption.get("publicInstallCount")
+    if isinstance(value, bool):
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return count if count >= 0 else None
+
+
 def build_sidecar_payload(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "contractName": "chummer6-ui.windows_bootstrap_payload",
@@ -137,10 +154,20 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
         downloads = []
 
     windows_rows = [row for row in downloads if isinstance(row, dict) and is_windows_bootstrap_installer(row)]
+    release_manifest_url = normalize_url(base, "/downloads/RELEASE_CHANNEL.generated.json")
+    observed_public_install_count: int | None = None
+    downloads_paused = False
     if not windows_rows:
-        failures.append("public downloads manifest does not expose any Windows bootstrap installer rows")
+        try:
+            release_manifest = fetch_json(release_manifest_url)
+            observed_public_install_count = public_install_count(release_manifest)
+        except Exception as exc:  # pragma: no cover - network failures are environment-driven
+            failures.append(f"could not verify paused downloads posture: {exc}")
+        downloads_paused = observed_public_install_count == 0
+        if not downloads_paused:
+            failures.append("public downloads manifest does not expose any Windows bootstrap installer rows")
 
-    if not verify_script.is_file():
+    if windows_rows and not verify_script.is_file():
         failures.append(f"missing Windows installer payload verifier: {verify_script}")
 
     with tempfile.TemporaryDirectory(prefix="chummer-live-public-windows-installer-") as temp_root:
@@ -274,6 +301,9 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
         "generated_at_utc": now_iso(),
         "base_url": base,
         "manifest_url": manifest_url,
+        "release_manifest_url": release_manifest_url,
+        "public_install_count": observed_public_install_count,
+        "downloads_paused": downloads_paused,
         "verify_script_path": str(verify_script),
         "status": "pass" if not failures else "fail",
         "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY" if not failures else "LIVE_PUBLIC_WINDOWS_INSTALLER_NOT_READY",

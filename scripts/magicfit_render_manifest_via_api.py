@@ -101,6 +101,7 @@ class MagicFitClient:
             page = context.new_page()
             page.set_default_timeout(30000)
             page.goto(f"{MAGICFIT_BASE}/home", wait_until="domcontentloaded")
+            page.wait_for_timeout(5000)
             body = page.locator("body").inner_text(timeout=10000)
             if re.search(r"login|sign in|email|password", body, re.I):
                 email_field = page.locator("input[type=email], input[name*=email i], input[placeholder*=email i]").first
@@ -109,8 +110,11 @@ class MagicFitClient:
                 password_field.fill(password)
                 page.get_by_role("button", name=re.compile("Sign in|Log in|Login|Continue|Submit", re.I)).first.click()
                 page.wait_for_load_state("domcontentloaded")
-                page.wait_for_timeout(6000)
+                page.wait_for_timeout(8000)
             cookies = {row["name"]: row["value"] for row in context.cookies()}
+            if not cookies.get("__session"):
+                page.wait_for_timeout(5000)
+                cookies = {row["name"]: row["value"] for row in context.cookies()}
             browser.close()
         cookie = cookies.get("__session")
         if not cookie:
@@ -370,6 +374,7 @@ def render_scene(client: MagicFitClient, job: SceneJob, out_root: Path, *, force
     scene = job.scene
     mp4_path = scene_path(out_root, asset, scene, ".mp4")
     sidecar_path = scene_path(out_root, asset, scene, ".magicfit.json")
+    mp4_path.parent.mkdir(parents=True, exist_ok=True)
     if mp4_path.is_file() and sidecar_path.is_file() and not force:
         return json.loads(sidecar_path.read_text(encoding="utf-8"))
 
