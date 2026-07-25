@@ -376,8 +376,7 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
     )
     missing = tmp_path / "deliberately-missing"
     sha = "a" * 64
-    config = controller.parse_args(
-        [
+    arguments = [
             "--operation",
             controller.RECOVERY_OPERATION,
             "--source-root",
@@ -459,7 +458,7 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
             "--delivery-phase",
             "windows-preview",
         ]
-    )
+    config = controller.parse_args(arguments)
 
     assert config.operation_root == operation_root
     assert config.final_gold_source == missing / "final-gold.json"
@@ -467,6 +466,40 @@ def test_journal_recovery_parse_does_not_require_mutable_build_inputs(
     assert config.build_context == missing / "build"
     assert config.fleet_media_contracts == missing / "fleet"
     assert config.design_product_root == missing / "design"
+
+    operation_root.mkdir(mode=0o700)
+    volume_names = {
+        logical: (
+            f"{operation_root.name}-"
+            f"{logical.removeprefix('public-download-')}"
+        )
+        for logical in controller.SIDECAR_LOGICAL_VOLUMES
+    }
+    journal.write_text(
+        json.dumps(
+            {
+                "schema": controller.TOPOLOGY_B_OPERATION_SCHEMA,
+                "phase": "active",
+                "operation": controller.CUTOVER_OPERATION,
+                "projectName": operation_root.name,
+                "operationRoot": str(operation_root),
+                "sourceHead": "a" * 40,
+                "volumes": volume_names,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    journal.chmod(0o600)
+    retirement_arguments = list(arguments)
+    retirement_arguments[1] = controller.RETIRE_OPERATION
+
+    retirement = controller.parse_args(retirement_arguments)
+
+    assert retirement.operation == controller.RETIRE_OPERATION
+    assert retirement.source_head == "a" * 40
+    assert retirement.controller_source_head == "b" * 40
+    assert retirement.operation_root == operation_root
 
 
 def _write_migration_shelf(root: Path) -> None:
@@ -626,6 +659,7 @@ def test_wrapper_routes_public_profile_before_postgres_boundary() -> None:
 
     assert controller_branch < postgres_boundary
     assert "initial-release-shelf-public-download-cutover-recover" in script
+    assert "initial-release-shelf-public-download-cutover-retire" in script
     assert "--migration-authority-sha256" in script
     assert "--runtime-proof-sha256" in script
     assert "--manifest-closure-restoration-spec-sha256" in script
@@ -635,7 +669,12 @@ def test_wrapper_routes_public_profile_before_postgres_boundary() -> None:
     assert "--delivery-phase" in script
     assert "--transaction-journal" not in script[controller_branch:postgres_boundary]
     assert "--env-file" not in script[controller_branch:postgres_boundary]
-    assert 'if ((public_download_controller_status == 76)); then' in script
+    assert "if ((public_download_controller_status == 76)) \\" in script
+    assert (
+        '&& "$public_download_controller_status" != 0'
+        in script[controller_branch:postgres_boundary]
+    )
+    assert "exit_for_signal" in script
     assert "authenticated mutation lock retained" in script
     assert "if ((RECOVERY_ROUTE_REQUESTED == 0)); then" in script
     assert (

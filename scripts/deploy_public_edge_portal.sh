@@ -15,12 +15,12 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover]" >&2; exit 2 ;;
+  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
@@ -30,7 +30,8 @@ if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover \
-  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover ]]; then
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire ]]; then
   PUBLIC_DOWNLOAD_ONLY_OPERATION=1
 fi
 
@@ -211,6 +212,7 @@ CUTOVER_STATE_CLASSIFICATION=""
 RECOVERY_ROUTE_REQUESTED=0
 if [[ "$DEPLOY_OPERATION" == recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
+  || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire \
   || -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
   RECOVERY_ROUTE_REQUESTED=1
 fi
@@ -219,7 +221,7 @@ if [[ "$DEPLOY_OPERATION" == deploy \
   && ((RECOVERY_ROUTE_REQUESTED == 0)) \
   && [[ -e "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY" \
     || -L "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY" ]]; then
-  echo "canonical public edge mutation is blocked while topology-B downloads authority exists; run initial-release-shelf-public-download-cutover-recover first to restore its exact captured incumbent configuration" >&2
+  echo "canonical public edge mutation is blocked while topology-B downloads authority exists; run initial-release-shelf-public-download-cutover-retire with the exact committed operation id to restore its captured incumbent configuration" >&2
   exit 2
 fi
 
@@ -835,10 +837,22 @@ release_only_on_exit() {
   exit "$failure_status"
 }
 
+exit_for_signal() {
+  local signal_status="$1"
+  if [[ "$DEPLOY_OPERATION" \
+      == initial-release-shelf-public-download-cutover-retire ]] \
+    && ((deploy_lock_active == 1)); then
+    deploy_lock_active=0
+    echo "public-download retirement interrupted; authenticated mutation lock retained" >&2
+    exit 76
+  fi
+  exit "$signal_status"
+}
+
 trap release_only_on_exit EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'exit_for_signal 129' HUP
+trap 'exit_for_signal 130' INT
+trap 'exit_for_signal 143' TERM
 
 if [[ -L "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
   || (-e "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
@@ -877,7 +891,7 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
   PUBLIC_DOWNLOAD_DELIVERY_PHASE="${CHUMMER_PUBLIC_DOWNLOAD_DELIVERY_PHASE-}"
   if [[ ! "$PUBLIC_DOWNLOAD_OPERATION_ID" \
     =~ ^[a-z0-9][a-z0-9-]{7,63}$ ]]; then
-    echo "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID must be a caller-generated retry-unique identifier" >&2
+    echo "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID must be the exact governed topology-B operation identifier" >&2
     exit 2
   fi
   if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
@@ -1113,19 +1127,22 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     "$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER" \
     "${public_download_controller_args[@]}" \
     || public_download_controller_status=$?
-  if ((public_download_controller_status == 76)); then
+  if ((public_download_controller_status == 76)) \
+    || [[ "$DEPLOY_OPERATION" \
+      == initial-release-shelf-public-download-cutover-retire \
+      && "$public_download_controller_status" != 0 ]]; then
     deploy_lock_active=0
-    echo "public-download recovery is uncertain; authenticated mutation lock retained" >&2
+    echo "public-download journaled operation is uncertain; authenticated mutation lock retained" >&2
     exit 76
   fi
   if ((public_download_controller_status != 0)); then
-    echo "public-download cutover failed after exact recovery or before live mutation" >&2
+    echo "public-download cutover, recovery, or retirement failed" >&2
     exit "$public_download_controller_status"
   fi
   if ! release_deploy_lock; then
     deploy_lock_active=0
     trap - EXIT
-    echo "public-download cutover completed but deployment lock release failed" >&2
+    echo "public-download journaled operation completed but deployment lock release failed" >&2
     exit 70
   fi
   trap - EXIT

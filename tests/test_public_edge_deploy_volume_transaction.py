@@ -161,6 +161,7 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "case \"$*\" in\n"
         "  *verify_public_edge_deploy_authority.py*) exit \"${FAKE_AUTHORITY_EXIT:-0}\";;\n"
         "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
+        "  *deploy_public_download_only_cutover.py*) if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID:-}\" ]; then printf '%s\\n' \"$$\" > \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID\"; fi; if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY:-}\" ]; then /usr/bin/touch \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY\"; fi; case \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_MODE:-exit}\" in block) trap '' HUP INT TERM; while :; do printf '%s\\n' alive >> \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_HEARTBEAT\"; /usr/bin/sleep 0.05; done;; term) /usr/bin/kill -TERM \"$$\";; int) /usr/bin/kill -INT \"$$\";; exit) exit \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT:-0}\";; *) exit 91;; esac;;\n"
         "  *verify_install_linking_cutover_boundary.py*\"--expected-phase public_acceptance_completed\"*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_FINAL_VERIFICATION_JSON\"; exit 0;;\n"
         "  *verify_install_linking_cutover_boundary.py*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_BOUNDARY_VERIFICATION_JSON\"; exit \"${FAKE_INSTALL_LINKING_BOUNDARY_VERIFY_EXIT:-0}\";;\n"
         "  *run_install_linking_postgres_cutover.py*\"--source-replay-preflight\"*) exit \"${FAKE_SOURCE_REPLAY_PREFLIGHT_EXIT:-0}\";;\n"
@@ -487,6 +488,34 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_EDGE_COMPOSE_ATTESTATION_OUTPUT",
         str(tmp_path / "compose-runtime-attestation.json"),
+    )
+
+
+def configure_fake_public_download_retirement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials = tmp_path / "cloudflare-credentials.json"
+    credentials.write_text(
+        '{"apiToken":"test-only-not-a-live-token"}\n',
+        encoding="utf-8",
+    )
+    credentials.chmod(0o600)
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID",
+        "retire-test-0001",
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE",
+        str(credentials),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID",
+        "a" * 32,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID",
+        "11111111-1111-1111-1111-111111111111",
     )
 
 
@@ -962,7 +991,7 @@ def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_qui
     assert result.returncode == 2
     assert TOPOLOGY_B_GUARD_MESSAGE in result.stderr
     assert (
-        "initial-release-shelf-public-download-cutover-recover"
+        "initial-release-shelf-public-download-cutover-retire"
         in result.stderr
     )
     assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
@@ -983,6 +1012,7 @@ def test_topology_b_authority_blocks_fresh_canonical_mutation_before_lock_or_qui
         "initial-release-shelf-cutover-recover",
         "initial-release-shelf-public-download-cutover",
         "initial-release-shelf-public-download-cutover-recover",
+        "initial-release-shelf-public-download-cutover-retire",
     ],
 )
 def test_topology_b_guard_allows_supported_recovery_and_download_routes(
@@ -2501,6 +2531,122 @@ def test_guarded_deploy_sigkill_leaves_external_authenticated_recovery_token(
 
     assert (tmp_path / "lock-state" / "public-edge-mutation.lock").is_dir()
     assert external_token.is_file()
+
+
+def test_retirement_controller_failure_forces_status_76_and_retains_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_fake_public_download_retirement(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "143")
+
+    result = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 76
+    assert "authenticated mutation lock retained" in result.stderr
+    assert (
+        tmp_path / "lock-state" / "public-edge-mutation.lock"
+    ).is_dir()
+
+
+def test_retirement_wrapper_sigkill_keeps_durable_lock_while_child_continues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_fake_public_download_retirement(tmp_path, monkeypatch)
+    ready = tmp_path / "retirement-controller-ready"
+    child_pid_path = tmp_path / "retirement-controller.pid"
+    heartbeat = tmp_path / "retirement-controller.heartbeat"
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_MODE", "block")
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY",
+        str(ready),
+    )
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID",
+        str(child_pid_path),
+    )
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_HEARTBEAT",
+        str(heartbeat),
+    )
+    process = subprocess.Popen(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    child_pid: int | None = None
+    try:
+        deadline = time.monotonic() + 5
+        while (
+            (not ready.exists() or not child_pid_path.exists())
+            and process.poll() is None
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
+        assert ready.exists(), "retirement controller did not start"
+        child_pid = int(child_pid_path.read_text(encoding="ascii"))
+        assert child_pid != process.pid
+        lock = (
+            tmp_path / "lock-state" / "public-edge-mutation.lock"
+        )
+        assert lock.is_dir()
+        assert heartbeat.is_file()
+        before = heartbeat.stat().st_size
+
+        os.kill(process.pid, signal.SIGKILL)
+        assert process.wait(timeout=5) == -signal.SIGKILL
+
+        os.kill(child_pid, 0)
+        deadline = time.monotonic() + 2
+        while (
+            heartbeat.stat().st_size <= before
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
+        assert heartbeat.stat().st_size > before
+        assert lock.is_dir()
+        assert (lock / "owner-token").is_file()
+        assert list(
+            (
+                tmp_path
+                / "lock-state"
+                / "public-edge-lock-recovery-receipts"
+            ).glob("deploy-*.owner-token")
+        )
+    finally:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            if child_pid is not None:
+                try:
+                    os.kill(child_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        if process.poll() is None:
+            process.wait(timeout=5)
 
 
 def test_guarded_deploy_unique_auth_orphan_does_not_block_new_lock(

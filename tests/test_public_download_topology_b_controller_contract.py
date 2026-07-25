@@ -4,8 +4,12 @@ import ast
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
+import signal
+import subprocess
 import sys
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -68,6 +72,7 @@ def require_topology_b_surface() -> None:
             "probe_public_incumbent",
             "execute_topology_b",
             "recover_topology_b",
+            "retire_topology_b",
         )
         if not hasattr(controller, name)
     ]
@@ -1021,7 +1026,11 @@ class RecordingActions:
         hosts: tuple[str, ...],
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        assert phase in {"before-cloudflare", "after-rollback"}
+        assert phase in {
+            "before-cloudflare",
+            "after-rollback",
+            "after-retirement",
+        }
         assert hosts == HOSTS
         event = f"probe_incumbent_{phase}_{','.join(hosts)}"
         if phase == "after-rollback" and not self.incumbent_baseline_captured:
@@ -1059,6 +1068,36 @@ class RecordingActions:
     def reconcile_committed(self, _config: Any, *_args: Any) -> dict[str, Any]:
         return self.record("reconcile_committed")
 
+    def authorize_committed_retirement(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("authorize_committed_retirement")
+
+    def restore_committed_prior(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("restore_committed_prior")
+
+    def commit_retirement_evidence(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("commit_retirement_evidence")
+
+    def retire_active_authority(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("retire_active_authority")
+
+    def verify_retired_authority_connectors(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("verify_retired_authority_connectors")
+
+    def finalize_committed_retirement(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record("finalize_committed_retirement")
+
 
 SUCCESS_EVENTS = [
     "prepare_shelf",
@@ -1093,6 +1132,8 @@ def test_topology_b_surface_and_dispatch_replace_topology_a() -> None:
     main_calls = call_leaf_names(main)
     assert "parse_args" in main_calls
     assert "execute" in main_calls
+    assert "recover_topology_b" in main_calls
+    assert "retire_topology_b" in main_calls
     assert "_retired_topology_a_parse_args" not in main_calls
     assert "_retired_topology_a_execute" not in main_calls
 
@@ -1115,7 +1156,11 @@ def test_topology_b_functions_contain_no_incumbent_or_canonical_mutation_calls()
         "CANONICAL_PORTAL_TAG",
         "CANONICAL_TOOL_TAG",
     }
-    for name in ("execute_topology_b", "recover_topology_b"):
+    for name in (
+        "execute_topology_b",
+        "recover_topology_b",
+        "retire_topology_b",
+    ):
         node = function_node(name)
         assert call_leaf_names(node).isdisjoint(forbidden_calls)
         loaded_names = {
@@ -3239,6 +3284,1732 @@ def test_recovery_reconciles_committed_route_without_cleanup(
     assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
+def test_explicit_retirement_restores_proves_retires_then_cleans(
+    tmp_path: Path,
+) -> None:
+    require_topology_b_surface()
+    config = topology_b_config(tmp_path)
+    config.operation = controller.RETIRE_OPERATION
+    config.source_head = "a" * 40
+    config.controller_source_head = "b" * 40
+    canonical_before = config.canonical_shelf_sentinel.read_bytes()
+    actions = RecordingActions(baseline_captured=True)
+    original_handlers = {
+        signal_number: signal.getsignal(signal_number)
+        for signal_number in (signal.SIGINT, signal.SIGTERM)
+    }
+
+    result = controller.retire_topology_b(config, actions=actions)
+
+    assert result["disposition"] == "committed-sidecar-retired-to-incumbent"
+    assert actions.events == [
+        "authorize_committed_retirement",
+        "restore_committed_prior",
+        "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
+        "commit_retirement_evidence",
+        "retire_active_authority",
+        "verify_retired_authority_connectors",
+        "cleanup_sidecar",
+        "finalize_committed_retirement",
+    ]
+    assert "classify_recovery_committed" not in actions.events
+    assert "reconcile_committed" not in actions.events
+    assert "cloudflare_rollback" not in actions.events
+    assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
+    assert {
+        signal_number: signal.getsignal(signal_number)
+        for signal_number in (signal.SIGINT, signal.SIGTERM)
+    } == original_handlers
+
+
+class FatalRetirementBoundary(BaseException):
+    pass
+
+
+@pytest.mark.parametrize(
+    "failure_event",
+    (
+        "authorize_committed_retirement",
+        "restore_committed_prior",
+        "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
+        "commit_retirement_evidence",
+        "retire_active_authority",
+        "verify_retired_authority_connectors",
+        "cleanup_sidecar",
+        "finalize_committed_retirement",
+    ),
+)
+@pytest.mark.parametrize(
+    "fatal_type",
+    (KeyboardInterrupt, SystemExit, FatalRetirementBoundary),
+)
+def test_retirement_base_exceptions_are_lock_retaining_uncertainty(
+    tmp_path: Path,
+    failure_event: str,
+    fatal_type: type[BaseException],
+) -> None:
+    config = topology_b_config(tmp_path)
+    config.operation = controller.RETIRE_OPERATION
+    config.source_head = "a" * 40
+    config.controller_source_head = "b" * 40
+    actions = RecordingActions(baseline_captured=True)
+    original_record = actions.record
+
+    def fatal_record(event: str, result: Any = None) -> Any:
+        if event == failure_event:
+            actions.events.append(event)
+            raise fatal_type()
+        return original_record(event, result)
+
+    actions.record = fatal_record  # type: ignore[method-assign]
+    original_handlers = {
+        signal_number: signal.getsignal(signal_number)
+        for signal_number in (signal.SIGINT, signal.SIGTERM)
+    }
+
+    with pytest.raises(controller.RecoveryUncertain) as raised:
+        controller.retire_topology_b(config, actions=actions)
+
+    assert isinstance(raised.value.__cause__, fatal_type)
+    assert actions.events[-1] == failure_event
+    assert {
+        signal_number: signal.getsignal(signal_number)
+        for signal_number in (signal.SIGINT, signal.SIGTERM)
+    } == original_handlers
+
+
+def test_keyboard_interrupt_outside_retirement_keeps_normal_semantics(
+    tmp_path: Path,
+) -> None:
+    config = topology_b_config(tmp_path)
+
+    def interrupted(*_args: Any, **_kwargs: Any) -> Any:
+        raise KeyboardInterrupt()
+
+    with pytest.raises(KeyboardInterrupt):
+        controller.execute_topology_b(
+            config,
+            actions=SimpleNamespace(
+                prepare_sidecar_release_shelf=interrupted
+            ),
+        )
+    with pytest.raises(KeyboardInterrupt):
+        controller.recover_topology_b(
+            config,
+            actions=SimpleNamespace(classify_recovery=interrupted),
+        )
+
+
+@pytest.mark.parametrize("signal_number", (signal.SIGINT, signal.SIGTERM))
+@pytest.mark.parametrize(
+    "boundary",
+    (
+        "restore_committed_prior",
+        "retire_active_authority",
+        "verify_retired_authority_connectors",
+    ),
+)
+def test_retirement_subprocess_signal_is_status_76_at_destructive_boundaries(
+    tmp_path: Path,
+    signal_number: signal.Signals,
+    boundary: str,
+) -> None:
+    child = tmp_path / "retirement-signal-child.py"
+    ready = tmp_path / "ready"
+    receipt = tmp_path / "receipt.json"
+    child.write_text(
+        """
+import importlib.util
+import json
+from pathlib import Path
+import sys
+import time
+from types import SimpleNamespace
+
+controller_path = Path(sys.argv[1])
+boundary = sys.argv[2]
+ready = Path(sys.argv[3])
+receipt = Path(sys.argv[4])
+spec = importlib.util.spec_from_file_location("retirement_signal_controller", controller_path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+
+def maybe_block(name):
+    if boundary == name:
+        ready.write_text(name, encoding="utf-8")
+        while True:
+            time.sleep(10)
+    return {"stage": name}
+
+class Actions:
+    def authorize_committed_retirement(self, *_args):
+        return maybe_block("authorize_committed_retirement")
+    def restore_committed_prior(self, *_args):
+        return maybe_block("restore_committed_prior")
+    def probe_public_incumbent(self, *_args, **_kwargs):
+        return maybe_block("probe_public_incumbent")
+    def commit_retirement_evidence(self, *_args):
+        return maybe_block("commit_retirement_evidence")
+    def retire_active_authority(self, *_args):
+        return maybe_block("retire_active_authority")
+    def verify_retired_authority_connectors(self, *_args):
+        return maybe_block("verify_retired_authority_connectors")
+    def cleanup_sidecar_resources(self, *_args):
+        return maybe_block("cleanup_sidecar_resources")
+    def finalize_committed_retirement(self, *_args):
+        return maybe_block("finalize_committed_retirement")
+
+config = SimpleNamespace(
+    operation=module.RETIRE_OPERATION,
+    source_head="a" * 40,
+    controller_source_head="b" * 40,
+)
+try:
+    module.retire_topology_b(config, actions=Actions())
+except module.RecoveryUncertain as error:
+    receipt.write_text(
+        json.dumps(
+            {
+                "status": 76,
+                "cause": type(error.__cause__).__name__,
+                "boundary": boundary,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    raise SystemExit(76)
+raise SystemExit(0)
+""".lstrip(),
+        encoding="utf-8",
+    )
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(child),
+            str(CONTROLLER_PATH),
+            boundary,
+            str(ready),
+            str(receipt),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    deadline = time.monotonic() + 5
+    while (
+        not ready.exists()
+        and process.poll() is None
+        and time.monotonic() < deadline
+    ):
+        time.sleep(0.01)
+    assert ready.read_text(encoding="utf-8") == boundary
+
+    os.kill(process.pid, signal_number)
+    stdout, stderr = process.communicate(timeout=5)
+
+    assert process.returncode == 76, (stdout, stderr)
+    assert json.loads(receipt.read_text(encoding="utf-8")) == {
+        "boundary": boundary,
+        "cause": "_RetirementInterrupted",
+        "status": 76,
+    }
+
+
+@pytest.mark.parametrize(
+    "failure_event",
+    (
+        "authorize_committed_retirement",
+        "restore_committed_prior",
+        "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
+        "commit_retirement_evidence",
+        "retire_active_authority",
+        "verify_retired_authority_connectors",
+        "cleanup_sidecar",
+        "finalize_committed_retirement",
+    ),
+)
+def test_retirement_partial_failure_is_uncertain_and_never_reapplies_target(
+    tmp_path: Path,
+    failure_event: str,
+) -> None:
+    config = topology_b_config(tmp_path)
+    config.operation = controller.RETIRE_OPERATION
+    config.source_head = "a" * 40
+    config.controller_source_head = "b" * 40
+    actions = RecordingActions(
+        fail_at=failure_event,
+        baseline_captured=True,
+    )
+
+    with pytest.raises(controller.RecoveryUncertain):
+        controller.retire_topology_b(config, actions=actions)
+
+    assert "cloudflare_apply" not in actions.events
+    assert "cloudflare_rollback" not in actions.events
+    failure_index = actions.events.index(failure_event)
+    assert actions.events == actions.events[: failure_index + 1]
+    if failure_event in {
+        "authorize_committed_retirement",
+        "restore_committed_prior",
+        "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
+        "commit_retirement_evidence",
+    }:
+        assert "retire_active_authority" not in actions.events
+        assert "cleanup_sidecar" not in actions.events
+    if failure_event == "verify_retired_authority_connectors":
+        assert "retire_active_authority" in actions.events
+        assert "cleanup_sidecar" not in actions.events
+
+
+class RetirementTestLock:
+    def __init__(self, _path: Path) -> None:
+        pass
+
+    def __enter__(self) -> "RetirementTestLock":
+        return self
+
+    def __exit__(self, *_args: Any) -> None:
+        return None
+
+
+class RetirementTestApi:
+    def __init__(self, snapshot: SimpleNamespace) -> None:
+        self.snapshot = snapshot
+        self.put_calls = 0
+
+    def get_configuration(self) -> SimpleNamespace:
+        return self.snapshot
+
+
+def retirement_connector_gate(
+    version: int,
+    *connector_ids: str,
+) -> dict[str, Any]:
+    ids = list(connector_ids or ("connector-a",))
+    connector_set = [
+        {
+            "id": connector_id,
+            "configVersionAvailable": True,
+            "configVersion": version,
+        }
+        for connector_id in ids
+    ]
+    return {
+        "contractName": (
+            "cloudflare.current-connector-convergence/v1"
+        ),
+        "targetVersion": version,
+        "connectorSet": connector_set,
+        "connectorSetSha256": hashlib.sha256(
+            json.dumps(
+                connector_set,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest(),
+        "connectorConvergence": [
+            {
+                "id": connector_id,
+                "configVersionAvailable": True,
+                "observedConfigVersion": version,
+                "converged": True,
+            }
+            for connector_id in ids
+        ],
+        "connectorSetTransitions": [ids],
+        "attemptsUsed": 2,
+        "stableObservationsRequired": 2,
+    }
+
+
+def retirement_connector_boundary(
+    *,
+    operation_root: Path,
+    boundary: str,
+    version: int,
+    retired_authority_sha256: str,
+    marker_gate: Mapping[str, Any],
+    convergence: Mapping[str, Any],
+    verified_at: str = "2026-07-25T00:00:00Z",
+) -> dict[str, Any]:
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    return {
+        "contractName": (
+            "chummer.public-download-retirement-"
+            "connector-boundary/v1"
+        ),
+        "status": "pass",
+        "boundary": boundary,
+        "operationRoot": str(operation_root),
+        "restoredVersion": version,
+        "retiredAuthoritySha256": retired_authority_sha256,
+        "markerConnectorGateSha256": canonical_sha256(marker_gate),
+        "connectorConvergence": dict(convergence),
+        "connectorConvergenceSha256": canonical_sha256(convergence),
+        "verifiedAtUtc": verified_at,
+    }
+
+
+def retirement_restore_actions(
+    tmp_path: Path,
+    *,
+    current: SimpleNamespace,
+) -> tuple[Any, SimpleNamespace, RetirementTestApi, dict[str, Any]]:
+    operation_root = tmp_path / "chummer-public-download-retirement-test"
+    operation_root.mkdir(mode=0o700)
+    config = SimpleNamespace(
+        operation_root=operation_root,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+    )
+    authorization = {"authorization": "durable"}
+    evidence = {
+        "targetConfigSha256": "1" * 64,
+        "targetVersion": 12,
+        "priorConfig": {"ingress": [{"service": "http_status:404"}]},
+        "priorConfigSha256": "2" * 64,
+        "preexistingConnectors": [
+            {
+                "id": "connector-a",
+                "configVersionAvailable": True,
+                "configVersion": 12,
+            }
+        ],
+    }
+    api = RetirementTestApi(current)
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "phase": "retirement-authorized",
+        "receipts": {"retirementAuthorization": authorization},
+    }
+    actions._load_retirement_authority = (
+        lambda _config: (b"active", {}, tmp_path / "active.json")
+    )
+    actions._load_committed_retirement_evidence = (
+        lambda _config, _active: (b"committed", evidence)
+    )
+    actions._cloudflare_api = lambda: api
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        validate_current_connector_convergence_receipt=lambda value: value,
+    )
+    return actions, config, api, authorization
+
+
+def test_retirement_toctou_drift_stops_before_cloudflare_put(
+    tmp_path: Path,
+) -> None:
+    current = SimpleNamespace(sha256="3" * 64, version=13)
+    actions, config, api, authorization = retirement_restore_actions(
+        tmp_path,
+        current=current,
+    )
+
+    def forbidden_put(*_args: Any, **_kwargs: Any) -> Any:
+        api.put_calls += 1
+        raise AssertionError("drifted target must not be mutated")
+
+    actions.cloudflare._configuration_after_put_or_reget = forbidden_put
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="drifted before retirement PUT",
+    ):
+        actions.restore_committed_prior(config, authorization)
+
+    assert api.put_calls == 0
+    assert "cloudflareRetirement" not in actions._state["receipts"]
+
+
+def test_retirement_reconciles_lost_receipt_without_second_put(
+    tmp_path: Path,
+) -> None:
+    target = SimpleNamespace(
+        sha256="1" * 64,
+        version=12,
+        response={"target": True},
+    )
+    prior = SimpleNamespace(
+        sha256="2" * 64,
+        version=13,
+        response={"prior": True},
+    )
+    actions, config, api, authorization = retirement_restore_actions(
+        tmp_path,
+        current=target,
+    )
+
+    def restore(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
+        api.put_calls += 1
+        api.snapshot = prior
+        return prior
+
+    actions.cloudflare._configuration_after_put_or_reget = restore
+    actions.cloudflare.poll_configuration = (
+        lambda *_args, **_kwargs: api.snapshot
+    )
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: retirement_connector_gate(13)
+    )
+    actions.cloudflare.canonical_sha256 = (
+        lambda _value: "4" * 64
+    )
+    attempts = 0
+
+    def durable_record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("simulated crash after remote restore")
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = durable_record
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="restoration is uncertain",
+    ):
+        actions.restore_committed_prior(config, authorization)
+
+    assert api.put_calls == 1
+    recovered = actions.restore_committed_prior(config, authorization)
+    repeated = actions.restore_committed_prior(config, authorization)
+
+    assert recovered == repeated
+    assert recovered["restoredVersion"] == 13
+    assert api.put_calls == 1
+    assert attempts == 3
+
+
+def test_retirement_resume_rebinds_to_the_current_connector_set(
+    tmp_path: Path,
+) -> None:
+    prior = SimpleNamespace(
+        sha256="2" * 64,
+        version=13,
+        response={"prior": True},
+    )
+    actions, config, api, authorization = retirement_restore_actions(
+        tmp_path,
+        current=prior,
+    )
+    original_gate = retirement_connector_gate(
+        13,
+        "connector-removed",
+    )
+    current_gate = retirement_connector_gate(
+        13,
+        "connector-added",
+    )
+    existing = {
+        "contractName": (
+            "chummer.public-download-cloudflare-retirement/v1"
+        ),
+        "phase": "restored",
+        "operationRoot": str(config.operation_root),
+        "targetConfigSha256": "1" * 64,
+        "targetVersion": 12,
+        "priorConfigSha256": "2" * 64,
+        "restoredVersion": 13,
+        "restoredResponseSha256": "4" * 64,
+        "connectorConvergence": original_gate,
+        "restoredAtUtc": "2026-07-25T00:00:00Z",
+        "connectorsVerifiedAtUtc": "2026-07-25T00:00:00Z",
+    }
+    actions._state["receipts"]["cloudflareRetirement"] = existing
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: current_gate
+    )
+    actions.cloudflare.canonical_sha256 = lambda _value: "4" * 64
+
+    def record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = record
+
+    resumed = actions.restore_committed_prior(config, authorization)
+
+    assert api.put_calls == 0
+    assert resumed == existing
+    assert (
+        actions._state["receipts"]["cloudflareRetirement"]
+        ["connectorConvergence"]
+        == original_gate
+    )
+    assert (
+        actions._state["receipts"]
+        ["retirementRestorationConnectorResumeGate"]
+        == current_gate
+    )
+    assert resumed["restoredAtUtc"] == existing["restoredAtUtc"]
+
+
+def test_retirement_atomically_moves_authority_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    authority_root = tmp_path / "authority"
+    operation_root = tmp_path / "operation"
+    authority_root.mkdir(mode=0o700)
+    operation_root.mkdir(mode=0o700)
+    active = authority_root / "active.json"
+    retired = operation_root / "retired.json"
+    evidence_path = operation_root / "retirement-evidence.json"
+    authority_raw = b'{"authority":"exact"}\n'
+    evidence_raw = b'{"retirement":"proved"}\n'
+    active.write_bytes(authority_raw)
+    evidence_path.write_bytes(evidence_raw)
+    active.chmod(0o600)
+    evidence_path.chmod(0o600)
+    config = SimpleNamespace(
+        active_runtime_authority=active,
+        retired_active_authority=retired,
+        cloudflare_retirement_evidence=evidence_path,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+        operation_root=operation_root,
+    )
+    authorization = {
+        "activeAuthoritySha256": hashlib.sha256(
+            authority_raw
+        ).hexdigest()
+    }
+    restoration = {"restored": True, "restoredVersion": 13}
+    retirement_evidence = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+        "evidenceSha256": hashlib.sha256(evidence_raw).hexdigest(),
+    }
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "receipts": {
+            "retirementAuthorization": authorization,
+            "cloudflareRetirement": restoration,
+            "retirementEvidence": retirement_evidence,
+        }
+    }
+    api = RetirementTestApi(
+        SimpleNamespace(sha256="1" * 64, version=13)
+    )
+    actions._cloudflare_api = lambda: api
+    connector_checks: list[tuple[bool, bool]] = []
+
+    def current_connector_gate(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        connector_checks.append((active.exists(), retired.exists()))
+        if active.exists():
+            return retirement_connector_gate(
+                13,
+                "connector-at-marker",
+            )
+        return retirement_connector_gate(
+            13,
+            "connector-added-before-resume",
+        )
+
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        poll_current_connector_convergence=current_connector_gate,
+        validate_current_connector_convergence_receipt=(
+            lambda value: value
+        ),
+        canonical_sha256=lambda value: hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest(),
+    )
+
+    def load_authority(
+        _config: SimpleNamespace,
+    ) -> tuple[bytes, dict[str, Any], Path]:
+        path = active if active.exists() else retired
+        return path.read_bytes(), {}, path
+
+    actions._load_retirement_authority = load_authority
+
+    def record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = record
+
+    first = actions.retire_active_authority(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+    )
+    second = actions.retire_active_authority(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+    )
+
+    assert first == second
+    assert first["disposition"] == "atomically-retired"
+    assert not active.exists()
+    assert retired.read_bytes() == authority_raw
+    assert retired.stat().st_mode & 0o777 == 0o600
+    assert "retirementConnectorGate" in actions._state["receipts"]
+    assert "retirementConnectorResumeGate" not in actions._state["receipts"]
+    assert connector_checks == [(True, False)]
+
+
+def post_marker_connector_actions(
+    tmp_path: Path,
+) -> tuple[
+    Any,
+    SimpleNamespace,
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    operation_root = tmp_path / "operation"
+    authority_root = tmp_path / "authority"
+    operation_root.mkdir(mode=0o700)
+    authority_root.mkdir(mode=0o700)
+    active = authority_root / "active.json"
+    retired = operation_root / "retired.json"
+    retired_raw = b'{"authority":"retired"}\n'
+    retired.write_bytes(retired_raw)
+    retired.chmod(0o600)
+    config = SimpleNamespace(
+        active_runtime_authority=active,
+        retired_active_authority=retired,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+        operation_root=operation_root,
+    )
+
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    retired_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    marker_gate = retirement_connector_gate(
+        13,
+        "connector-at-marker",
+    )
+    authorization = {"activeAuthoritySha256": retired_sha256}
+    restoration = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+    }
+    retirement_evidence = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+    }
+    retired_authority = {
+        "activeAuthoritySha256": retired_sha256,
+        "connectorGateSha256": canonical_sha256(marker_gate),
+    }
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "receipts": {
+            "retirementAuthorization": authorization,
+            "cloudflareRetirement": restoration,
+            "retirementEvidence": retirement_evidence,
+            "retiredAuthority": retired_authority,
+            "retirementConnectorGate": marker_gate,
+        }
+    }
+    actions._load_retirement_authority = (
+        lambda _config: (retired_raw, {}, retired)
+    )
+    actions._cloudflare_api = lambda: RetirementTestApi(
+        SimpleNamespace(sha256="1" * 64, version=13)
+    )
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        validate_current_connector_convergence_receipt=(
+            lambda value: value
+        ),
+        canonical_sha256=canonical_sha256,
+    )
+
+    def record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = record
+    return (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+
+def terminal_adoption_fixture(
+    tmp_path: Path,
+) -> tuple[SimpleNamespace, dict[str, Any], dict[str, Any]]:
+    operation_root = tmp_path / "operation"
+    authority_root = tmp_path / "authority"
+    receipt_root = tmp_path / "receipts"
+    operation_root.mkdir(mode=0o700)
+    authority_root.mkdir(mode=0o700)
+    receipt_root.mkdir(mode=0o700)
+    active_path = authority_root / "active.json"
+    retired_path = operation_root / "retired.json"
+    committed_path = operation_root / "cloudflare-committed.json"
+    evidence_path = operation_root / "retirement-evidence.json"
+    terminal_path = operation_root / "retirement.json"
+    operation_journal = receipt_root / "operation.json"
+    source_head = "a" * 40
+    controller_source_head = "b" * 40
+    project_name = "retirement-adoption-test"
+    volumes = {"public-download-app": "retirement-adoption-app"}
+    config = SimpleNamespace(
+        operation=controller.RETIRE_OPERATION,
+        source_root=ROOT,
+        source_head=source_head,
+        controller_source_head=controller_source_head,
+        operation_root=operation_root,
+        operation_journal=operation_journal,
+        project_name=project_name,
+        volume_names=volumes,
+        active_runtime_authority=active_path,
+        retired_active_authority=retired_path,
+        cloudflare_committed_evidence=committed_path,
+        cloudflare_retirement_evidence=evidence_path,
+        retirement_receipt=terminal_path,
+    )
+
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    active_authority = {
+        "schema": "test-only-retired-authority",
+        "status": "active",
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "sourceHead": source_head,
+    }
+    controller.write_private_json(retired_path, active_authority)
+    retired_raw = retired_path.read_bytes()
+    retired_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    committed = {"phase": "committed", "authority": "test-only"}
+    controller.write_private_json(committed_path, committed)
+    committed_raw = committed_path.read_bytes()
+    baseline = {
+        hostname: {
+            path: {
+                "httpStatus": 200,
+                "bodySha256": hashlib.sha256(
+                    f"{hostname}:{path}".encode()
+                ).hexdigest(),
+                "sizeBytes": 1,
+            }
+            for path in (
+                "/downloads/RELEASE_CHANNEL.generated.json",
+                "/downloads/releases.json",
+            )
+        }
+        for hostname in HOSTS
+    }
+    marker_gate = retirement_connector_gate(
+        13,
+        "connector-at-marker",
+    )
+    authorization = {
+        "contractName": (
+            "chummer.public-download-committed-retirement-"
+            "authorization/v1"
+        ),
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "activeAuthorityPath": str(active_path),
+        "activeAuthoritySha256": retired_sha256,
+        "committedEvidencePath": str(committed_path),
+        "committedEvidenceSha256": hashlib.sha256(
+            committed_raw
+        ).hexdigest(),
+        "targetConfigSha256": "1" * 64,
+        "targetVersion": 12,
+        "priorConfigSha256": "2" * 64,
+        "priorVersion": 11,
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "authorizedAtUtc": "2026-07-25T00:00:00Z",
+    }
+    restoration = {
+        "contractName": (
+            "chummer.public-download-cloudflare-retirement/v1"
+        ),
+        "phase": "restored",
+        "operationRoot": str(operation_root),
+        "targetConfigSha256": authorization["targetConfigSha256"],
+        "targetVersion": authorization["targetVersion"],
+        "priorConfigSha256": authorization["priorConfigSha256"],
+        "restoredVersion": 13,
+        "restoredResponseSha256": "3" * 64,
+        "connectorConvergence": retirement_connector_gate(
+            13,
+            "connector-restored",
+        ),
+        "restoredAtUtc": "2026-07-25T00:01:00Z",
+        "connectorsVerifiedAtUtc": "2026-07-25T00:01:01Z",
+    }
+    evidence = {
+        "contractName": (
+            "chummer.public-download-committed-retirement-evidence/v1"
+        ),
+        "status": "committed",
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "authorizationSha256": canonical_sha256(authorization),
+        "restorationSha256": canonical_sha256(restoration),
+        "connectorConvergenceSha256": canonical_sha256(
+            restoration["connectorConvergence"]
+        ),
+        "targetConfigSha256": authorization["targetConfigSha256"],
+        "targetVersion": authorization["targetVersion"],
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "incumbentObservationSha256": canonical_sha256(baseline),
+        "incumbent": baseline,
+        "committedAtUtc": "2026-07-25T00:02:00Z",
+    }
+    controller.write_private_json(evidence_path, evidence)
+    evidence_raw = evidence_path.read_bytes()
+    retirement_evidence = {
+        "contractName": (
+            "chummer.public-download-retirement-evidence-summary/v1"
+        ),
+        "status": "committed",
+        "evidencePath": str(evidence_path),
+        "evidenceSha256": hashlib.sha256(evidence_raw).hexdigest(),
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "connectorConvergenceSha256": canonical_sha256(
+            restoration["connectorConvergence"]
+        ),
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+    }
+    retired_authority = {
+        "contractName": (
+            "chummer.public-download-retired-authority/v1"
+        ),
+        "status": "retired",
+        "activeAuthorityPath": str(active_path),
+        "retiredAuthorityPath": str(retired_path),
+        "activeAuthoritySha256": retired_sha256,
+        "retirementEvidenceSha256": hashlib.sha256(
+            evidence_raw
+        ).hexdigest(),
+        "connectorGateSha256": canonical_sha256(marker_gate),
+        "disposition": "atomically-retired",
+        "retiredAtUtc": "2026-07-25T00:03:00Z",
+    }
+    post_marker_gate = retirement_connector_boundary(
+        operation_root=operation_root,
+        boundary="post-marker",
+        version=13,
+        retired_authority_sha256=retired_sha256,
+        marker_gate=marker_gate,
+        convergence=retirement_connector_gate(
+            13,
+            "connector-post-marker",
+        ),
+    )
+    cleanup = {
+        "contractName": "test-only-cleanup/v1",
+        "status": "pass",
+    }
+    receipts = {
+        "activeAuthority": active_authority,
+        "retirementAuthorization": authorization,
+        "cloudflareRetirement": restoration,
+        "incumbentAfterRetirement": baseline,
+        "retirementEvidence": retirement_evidence,
+        "retiredAuthority": retired_authority,
+        "retirementConnectorGate": marker_gate,
+        "retirementPostMarkerConnectorGate": post_marker_gate,
+        "cleanup": cleanup,
+    }
+    state = {
+        "schema": controller.TOPOLOGY_B_OPERATION_SCHEMA,
+        "phase": "cleaned",
+        "operation": controller.CUTOVER_OPERATION,
+        "projectName": project_name,
+        "operationRoot": str(operation_root),
+        "sourceHead": source_head,
+        "volumes": volumes,
+        "createdAtUtc": "2026-07-25T00:00:00Z",
+        "updatedAtUtc": "2026-07-25T00:04:00Z",
+        "receipts": receipts,
+        "incumbentBaseline": baseline,
+    }
+    controller.write_private_json(operation_journal, state)
+    terminal = {
+        "contractName": (
+            "chummer.public-download-committed-retirement/v1"
+        ),
+        "status": "retired",
+        "operation": controller.RETIRE_OPERATION,
+        "operationRoot": str(operation_root),
+        "projectName": project_name,
+        "operationSourceHead": source_head,
+        "controllerSourceHead": controller_source_head,
+        "retiredAuthorityPath": str(retired_path),
+        "retiredAuthoritySha256": retired_sha256,
+        "retirementEvidencePath": str(evidence_path),
+        "retirementEvidenceSha256": hashlib.sha256(
+            evidence_raw
+        ).hexdigest(),
+        "connectorGateSha256": canonical_sha256(marker_gate),
+        "postMarkerConnectorGateSha256": canonical_sha256(
+            post_marker_gate
+        ),
+        "latestConnectorGateSha256": canonical_sha256(
+            post_marker_gate
+        ),
+        "priorConfigSha256": restoration["priorConfigSha256"],
+        "restoredVersion": restoration["restoredVersion"],
+        "incumbentBaselineSha256": canonical_sha256(baseline),
+        "incumbentObservationSha256": canonical_sha256(baseline),
+        "cleanupSha256": canonical_sha256(cleanup),
+        "completedAtUtc": "2026-07-25T00:05:00Z",
+    }
+    controller.write_private_json(terminal_path, terminal)
+    return config, terminal, state
+
+
+def test_post_marker_connector_gate_precedes_cleanup_and_is_immutable(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    observed: list[tuple[bool, bool]] = []
+    gates = [
+        retirement_connector_gate(13, "connector-post-marker"),
+        retirement_connector_gate(13, "connector-added-on-resume"),
+    ]
+
+    def converge(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        observed.append(
+            (
+                config.active_runtime_authority.exists(),
+                config.retired_active_authority.exists(),
+            )
+        )
+        return gates[len(observed) - 1]
+
+    actions.cloudflare.poll_current_connector_convergence = converge
+
+    first = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+    immutable_first = json.loads(json.dumps(first))
+    second = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    receipts = actions._state["receipts"]
+    assert observed == [(False, True), (False, True)]
+    assert first["boundary"] == "post-marker"
+    assert second["boundary"] == "resume-post-marker"
+    assert (
+        receipts["retirementPostMarkerConnectorGate"]
+        == immutable_first
+    )
+    assert receipts["retirementConnectorResumeGate"] == second
+    assert first["connectorConvergence"] != second[
+        "connectorConvergence"
+    ]
+
+
+def test_post_marker_connector_receipt_crash_is_safely_resumable(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    convergence = retirement_connector_gate(
+        13,
+        "connector-post-marker",
+    )
+    attempts = 0
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: convergence
+    )
+    durable_record = actions._record
+
+    def fail_once(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("simulated crash before post-marker receipt")
+        durable_record(phase, name, receipt)
+
+    actions._record = fail_once
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="could not become durable",
+    ):
+        actions.verify_retired_authority_connectors(
+            config,
+            authorization,
+            restoration,
+            retirement_evidence,
+            retired_authority,
+        )
+
+    assert config.retired_active_authority.exists()
+    assert not config.active_runtime_authority.exists()
+    assert (
+        "retirementPostMarkerConnectorGate"
+        not in actions._state["receipts"]
+    )
+
+    resumed = actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    assert resumed["boundary"] == "post-marker"
+    assert (
+        actions._state["receipts"]
+        ["retirementPostMarkerConnectorGate"]
+        == resumed
+    )
+    assert attempts == 2
+
+
+def test_retirement_cleanup_requires_durable_post_marker_gate(
+    tmp_path: Path,
+) -> None:
+    (
+        actions,
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    ) = post_marker_connector_actions(tmp_path)
+    config.operation = controller.RETIRE_OPERATION
+    convergence = retirement_connector_gate(
+        13,
+        "connector-post-marker",
+    )
+    actions.cloudflare.poll_current_connector_convergence = (
+        lambda *_args, **_kwargs: convergence
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="connector boundary receipt drifted",
+    ):
+        actions._require_retirement_cleanup_connector_gate(
+            config,
+            actions._state["receipts"],
+        )
+
+    actions.verify_retired_authority_connectors(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+    )
+
+    actions._require_retirement_cleanup_connector_gate(
+        config,
+        actions._state["receipts"],
+    )
+
+
+def test_retirement_does_not_move_authority_before_connector_convergence(
+    tmp_path: Path,
+) -> None:
+    authority_root = tmp_path / "authority"
+    operation_root = tmp_path / "operation"
+    authority_root.mkdir(mode=0o700)
+    operation_root.mkdir(mode=0o700)
+    active = authority_root / "active.json"
+    retired = operation_root / "retired.json"
+    evidence_path = operation_root / "retirement-evidence.json"
+    authority_raw = b'{"authority":"exact"}\n'
+    evidence_raw = b'{"retirement":"proved"}\n'
+    active.write_bytes(authority_raw)
+    evidence_path.write_bytes(evidence_raw)
+    active.chmod(0o600)
+    evidence_path.chmod(0o600)
+    config = SimpleNamespace(
+        active_runtime_authority=active,
+        retired_active_authority=retired,
+        cloudflare_retirement_evidence=evidence_path,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+        operation_root=operation_root,
+    )
+    authorization = {
+        "activeAuthoritySha256": hashlib.sha256(
+            authority_raw
+        ).hexdigest()
+    }
+    restoration = {"restoredVersion": 13}
+    retirement_evidence = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+        "evidenceSha256": hashlib.sha256(evidence_raw).hexdigest(),
+    }
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "receipts": {
+            "retirementAuthorization": authorization,
+            "cloudflareRetirement": restoration,
+            "retirementEvidence": retirement_evidence,
+        }
+    }
+    actions._load_retirement_authority = (
+        lambda _config: (authority_raw, {}, active)
+    )
+    actions._cloudflare_api = lambda: RetirementTestApi(
+        SimpleNamespace(sha256="1" * 64, version=13)
+    )
+
+    def unstable_connectors(
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        assert active.exists()
+        assert not retired.exists()
+        raise RuntimeError("connector set never stabilized")
+
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        poll_current_connector_convergence=unstable_connectors,
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="authority retirement is uncertain",
+    ):
+        actions.retire_active_authority(
+            config,
+            authorization,
+            restoration,
+            retirement_evidence,
+        )
+
+    assert active.read_bytes() == authority_raw
+    assert not retired.exists()
+    assert "retirementConnectorGate" not in actions._state["receipts"]
+    assert "retiredAuthority" not in actions._state["receipts"]
+
+
+def test_terminal_retirement_binds_marker_post_marker_and_latest_gates(
+    tmp_path: Path,
+) -> None:
+    operation_root = tmp_path / "operation"
+    authority_root = tmp_path / "authority"
+    operation_root.mkdir(mode=0o700)
+    authority_root.mkdir(mode=0o700)
+    active = authority_root / "active.json"
+    retired = operation_root / "retired.json"
+    evidence_path = operation_root / "retirement-evidence.json"
+    terminal_path = operation_root / "retirement.json"
+    retired_raw = b'{"authority":"retired"}\n'
+    evidence_raw = b'{"evidence":"committed"}\n'
+    retired.write_bytes(retired_raw)
+    evidence_path.write_bytes(evidence_raw)
+    retired.chmod(0o600)
+    evidence_path.chmod(0o600)
+    config = SimpleNamespace(
+        active_runtime_authority=active,
+        retired_active_authority=retired,
+        cloudflare_retirement_evidence=evidence_path,
+        cloudflare_lock=operation_root / "cloudflare.lock",
+        retirement_receipt=terminal_path,
+        operation_root=operation_root,
+        project_name="retirement-contract-test",
+        source_head="a" * 40,
+        controller_source_head="b" * 40,
+    )
+    marker_gate = retirement_connector_gate(
+        13,
+        "connector-at-marker",
+    )
+    post_marker_convergence = retirement_connector_gate(
+        13,
+        "connector-after-marker",
+    )
+    latest_convergence = retirement_connector_gate(
+        13,
+        "connector-before-cleanup",
+    )
+
+    def canonical_sha256(value: Any) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    authorization = {"authorization": "durable"}
+    restoration = {
+        "priorConfigSha256": "1" * 64,
+        "restoredVersion": 13,
+    }
+    retirement_evidence = {"evidence": "durable"}
+    retired_authority = {
+        "connectorGateSha256": canonical_sha256(marker_gate)
+    }
+    retired_authority_sha256 = hashlib.sha256(retired_raw).hexdigest()
+    post_marker_gate = retirement_connector_boundary(
+        operation_root=operation_root,
+        boundary="post-marker",
+        version=13,
+        retired_authority_sha256=retired_authority_sha256,
+        marker_gate=marker_gate,
+        convergence=post_marker_convergence,
+    )
+    latest_gate = retirement_connector_boundary(
+        operation_root=operation_root,
+        boundary="resume-post-marker",
+        version=13,
+        retired_authority_sha256=retired_authority_sha256,
+        marker_gate=marker_gate,
+        convergence=latest_convergence,
+        verified_at="2026-07-25T00:05:00Z",
+    )
+    incumbent = {"incumbent": "exact"}
+    cleanup = {"cleanup": "exact"}
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "receipts": {
+            "retirementAuthorization": authorization,
+            "cloudflareRetirement": restoration,
+            "retirementEvidence": retirement_evidence,
+            "retiredAuthority": retired_authority,
+            "cleanup": cleanup,
+            "retirementConnectorGate": marker_gate,
+            "retirementPostMarkerConnectorGate": post_marker_gate,
+            "retirementConnectorResumeGate": latest_gate,
+        }
+    }
+    actions._load_retirement_authority = (
+        lambda _config: (retired_raw, {}, retired)
+    )
+    actions._validated_retirement_baseline = lambda: incumbent
+    actions._cloudflare_api = lambda: RetirementTestApi(
+        SimpleNamespace(sha256="1" * 64, version=13)
+    )
+    actions.cloudflare = SimpleNamespace(
+        ExclusiveFileLock=RetirementTestLock,
+        parse_configuration_response=lambda response: response,
+        validate_current_connector_convergence_receipt=(
+            lambda value: value
+        ),
+        canonical_sha256=canonical_sha256,
+    )
+
+    def record(
+        phase: str,
+        name: str,
+        receipt: dict[str, Any],
+    ) -> None:
+        actions._state["phase"] = phase
+        actions._state["receipts"][name] = receipt
+
+    actions._record = record
+
+    terminal = actions.finalize_committed_retirement(
+        config,
+        authorization,
+        restoration,
+        retirement_evidence,
+        retired_authority,
+        incumbent,
+        cleanup,
+    )
+
+    assert terminal["connectorGateSha256"] == canonical_sha256(
+        marker_gate
+    )
+    assert terminal[
+        "postMarkerConnectorGateSha256"
+    ] == canonical_sha256(post_marker_gate)
+    assert terminal["latestConnectorGateSha256"] == canonical_sha256(
+        latest_gate
+    )
+    assert (
+        terminal["connectorGateSha256"]
+        != terminal["latestConnectorGateSha256"]
+    )
+    assert json.loads(terminal_path.read_text(encoding="utf-8")) == terminal
+
+
+def test_terminal_receipt_write_interruption_is_adopted_before_reverify(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config, terminal, _state = terminal_adoption_fixture(tmp_path)
+    config.controller_source_head = "c" * 40
+    terminal_raw = config.retirement_receipt.read_bytes()
+
+    def unexpected_action_construction(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError(
+            "terminal adoption must precede provider action construction"
+        )
+
+    monkeypatch.setattr(
+        controller,
+        "TopologyBActions",
+        unexpected_action_construction,
+    )
+
+    resumed = controller.retire_topology_b(config)
+    adopted_journal_raw = config.operation_journal.read_bytes()
+    repeated = controller.retire_topology_b(config)
+
+    assert resumed["terminalReceipt"] == terminal
+    assert resumed["controllerSourceHead"] == "b" * 40
+    assert repeated == resumed
+    assert config.retirement_receipt.read_bytes() == terminal_raw
+    assert config.operation_journal.read_bytes() == adopted_journal_raw
+    adopted = json.loads(adopted_journal_raw)
+    assert adopted["phase"] == "retired"
+    assert adopted["receipts"]["retirement"] == terminal
+    assert (
+        "retirementRestorationConnectorResumeGate"
+        not in adopted["receipts"]
+    )
+    assert (
+        "retirementConnectorResumeGate" not in adopted["receipts"]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation,match",
+    (
+        ("terminal", "terminal topology-B retirement receipt drifted"),
+        (
+            "missing-cleanup",
+            "terminal topology-B retirement lacks durable boundary receipts",
+        ),
+        (
+            "retired-authority",
+            "terminal topology-B retired authority journal drifted",
+        ),
+    ),
+)
+def test_terminal_receipt_adoption_rejects_tampering_or_incomplete_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    match: str,
+) -> None:
+    config, _terminal, _state = terminal_adoption_fixture(tmp_path)
+    if mutation == "terminal":
+        tampered = json.loads(
+            config.retirement_receipt.read_text(encoding="utf-8")
+        )
+        tampered["latestConnectorGateSha256"] = "0" * 64
+        controller.write_private_json(
+            config.retirement_receipt,
+            tampered,
+            replace=True,
+        )
+    elif mutation == "missing-cleanup":
+        incomplete = json.loads(
+            config.operation_journal.read_text(encoding="utf-8")
+        )
+        del incomplete["receipts"]["cleanup"]
+        controller.write_private_json(
+            config.operation_journal,
+            incomplete,
+            replace=True,
+        )
+    else:
+        config.retired_active_authority.write_text(
+            '{"tampered":true}\n',
+            encoding="utf-8",
+        )
+        config.retired_active_authority.chmod(0o600)
+    journal_raw = config.operation_journal.read_bytes()
+
+    def unexpected_action_construction(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError(
+            "invalid terminal authority must fail before live actions"
+        )
+
+    monkeypatch.setattr(
+        controller,
+        "TopologyBActions",
+        unexpected_action_construction,
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match=match,
+    ):
+        controller.retire_topology_b(config)
+
+    assert config.operation_journal.read_bytes() == journal_raw
+
+
+def test_retirement_cleanup_reconstructs_original_runtime_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded = {
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE": "/recorded/fleet",
+        "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": "1" * 64,
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": (
+            "/recorded/projection"
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": "2" * 64,
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": (
+            "/recorded/projection/proof.json"
+        ),
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": "3" * 64,
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE": (
+            "/recorded/final-gold.json"
+        ),
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256": "4" * 64,
+    }
+    config = SimpleNamespace(
+        operation=controller.RETIRE_OPERATION,
+        project_name="chummer-public-download-retirement-cleanup",
+        volume_names={},
+        fleet_source=Path("/placeholder/fleet"),
+        fleet_sha256="0" * 64,
+        projection_snapshot_root=Path("/placeholder/projection"),
+        projection_source_tree_sha256="0" * 64,
+        runtime_proof_source=Path("/placeholder/proof.json"),
+        runtime_proof_sha256="0" * 64,
+        final_gold_source=Path("/placeholder/final-gold.json"),
+        final_gold_sha256="0" * 64,
+    )
+    runtime = {"environment": recorded}
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {"receipts": {"runtime": runtime}}
+    actions.runner = SimpleNamespace(
+        compose=lambda *_args, **_kwargs: b"",
+    )
+    observed: dict[str, Any] = {}
+    connector_gate_checks: list[dict[str, Any]] = []
+    actions._require_retirement_cleanup_connector_gate = (
+        lambda _config, receipts: connector_gate_checks.append(
+            dict(receipts)
+        )
+    )
+
+    def fake_replace(
+        original: SimpleNamespace,
+        **changes: Any,
+    ) -> SimpleNamespace:
+        values = vars(original).copy()
+        values.update(changes)
+        return SimpleNamespace(**values)
+
+    monkeypatch.setattr(controller, "dataclass_replace", fake_replace)
+
+    def validate(
+        cleanup_config: SimpleNamespace,
+        _runtime: dict[str, Any],
+        _receipts: dict[str, Any],
+        *,
+        historical_source: bool,
+    ) -> tuple[dict[str, str], str]:
+        assert historical_source is True
+        observed.update(vars(cleanup_config))
+        return recorded, "5" * 64
+
+    actions._validated_runtime_environment = validate
+    actions._preflight_candidate_image = lambda _config: {
+        "disposition": "not-bound"
+    }
+    actions._sidecar_container_references = (
+        lambda *_args, **_kwargs: []
+    )
+    actions._prove_zero_sidecar_project_networks = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._prove_rendered_compose_unchanged = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._prove_sidecar_resources_unreferenced = (
+        lambda *_args, **_kwargs: None
+    )
+    actions._remove_candidate_image = lambda value: dict(value)
+    actions._record = lambda *_args, **_kwargs: None
+
+    actions.cleanup_sidecar_resources(config)
+
+    assert observed["operation"] == controller.CUTOVER_OPERATION
+    assert observed["fleet_source"] == Path("/recorded/fleet")
+    assert observed["fleet_sha256"] == "1" * 64
+    assert observed["projection_snapshot_root"] == Path(
+        "/recorded/projection"
+    )
+    assert observed["projection_source_tree_sha256"] == "2" * 64
+    assert observed["runtime_proof_source"] == Path(
+        "/recorded/projection/proof.json"
+    )
+    assert observed["runtime_proof_sha256"] == "3" * 64
+    assert observed["final_gold_source"] == Path(
+        "/recorded/final-gold.json"
+    )
+    assert observed["final_gold_sha256"] == "4" * 64
+    assert connector_gate_checks == [{"runtime": runtime}]
+
+
+def test_retirement_cleanup_validates_deleted_source_from_operation_commit(
+    tmp_path: Path,
+) -> None:
+    config = cleanup_test_config(tmp_path)
+    config.source_head = controller.subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "rev-parse",
+            "--verify",
+            "HEAD^{commit}",
+        ],
+        check=True,
+        stdout=controller.subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+    receipts = complete_runtime_receipts(config)
+    removed_source = tmp_path / "removed-sealed-source"
+    assert not removed_source.exists()
+    materialization = json.loads(
+        config.materialization_receipt.read_text(encoding="utf-8")
+    )
+    materialization["sourceRoot"] = str(removed_source)
+    materialization["baseComposeSource"] = str(
+        removed_source / "docker-compose.public-edge.yml"
+    )
+    materialization["profileSource"] = str(
+        removed_source / "docker-compose.public-downloads.yml"
+    )
+    config.materialization_receipt.write_text(
+        json.dumps(materialization, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    config.materialization_receipt.chmod(0o600)
+    attestation = json.loads(
+        config.runtime_attestation.read_text(encoding="utf-8")
+    )
+    attestation["sourceRoot"] = str(removed_source)
+    config.runtime_attestation.write_text(
+        json.dumps(attestation, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    config.runtime_attestation.chmod(0o600)
+    actions = object.__new__(controller.TopologyBActions)
+    actions._state = {
+        "operation": controller.CUTOVER_OPERATION,
+        "receipts": receipts,
+    }
+
+    environment, rendered = actions._validated_runtime_environment(
+        config,
+        receipts["runtime"],
+        receipts,
+        historical_source=True,
+    )
+
+    assert environment == receipts["runtime"]["environment"]
+    assert rendered == hashlib.sha256(b"").hexdigest()
+    assert not removed_source.exists()
+
+
+def test_retirement_is_the_only_marker_retirement_route() -> None:
+    retirement = class_method_node(
+        "TopologyBActions",
+        "retire_active_authority",
+    )
+    recovery = function_node("recover_topology_b")
+    assert "replace" in call_leaf_names(retirement)
+    assert "unlink" not in call_leaf_names(retirement)
+    assert "retire_active_authority" not in call_leaf_names(recovery)
+
+
 def test_recovery_classification_rejects_unvalidated_committed_evidence(
     tmp_path: Path,
 ) -> None:
@@ -4378,14 +6149,19 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
         "platform": "windows",
         "rid": "win-x64",
         "fileName": fresh_installer_name,
-        "downloadUrl": f"/downloads/files/{fresh_installer_name}",
+        "downloadUrl": (
+            f"/downloads/g/{generation_id}/files/{fresh_installer_name}"
+        ),
         "sha256": hashlib.sha256(
             fresh_file_bytes[fresh_installer_name]
         ).hexdigest(),
         "sizeBytes": len(fresh_file_bytes[fresh_installer_name]),
         "installAccessClass": "open_public",
         "payloadFileName": fresh_payload_name,
-        "payloadDownloadUrl": f"/downloads/files/{fresh_payload_name}",
+        "payloadDownloadUrl": (
+            f"/downloads/g/{generation_id}/install/"
+            "avalonia-win-x64-installer/payload"
+        ),
         "payloadSha256": hashlib.sha256(
             fresh_file_bytes[fresh_payload_name]
         ).hexdigest(),
@@ -4420,7 +6196,9 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
                 else "osx-x64"
             ),
             "fileName": mac_file,
-            "downloadUrl": f"/downloads/files/{mac_file}",
+            "downloadUrl": (
+                f"/downloads/g/{generation_id}/install/{artifact_id}"
+            ),
             "sha256": hashlib.sha256(raw).hexdigest(),
             "sizeBytes": len(raw),
             "installAccessClass": "account_required",
@@ -4428,7 +6206,8 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
                 {
                     "payloadFileName": private_payload_name,
                     "payloadDownloadUrl": (
-                        f"/downloads/files/{private_payload_name}"
+                        f"/downloads/g/{generation_id}/install/"
+                        f"{artifact_id}/payload"
                     ),
                     "payloadSha256": hashlib.sha256(
                         private_payload
@@ -4438,8 +6217,8 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
                         f"{private_payload_name}.json"
                     ),
                     "payloadMetadataUrl": (
-                        "/downloads/files/"
-                        f"{private_payload_name}.json"
+                        f"/downloads/g/{generation_id}/install/"
+                        f"{artifact_id}/metadata"
                     ),
                 }
                 if artifact_id == "avalonia-osx-x64-installer"
@@ -4472,14 +6251,6 @@ def test_artifact_host_gate_covers_three_fresh_bytes_and_retained_mac_denials(
             }
         ),
         encoding="utf-8",
-    )
-    generation.normalize_manifest(
-        generation_root / generation.CANONICAL_MANIFEST,
-        generation_id,
-    )
-    generation.normalize_manifest(
-        generation_root / generation.COMPATIBILITY_MANIFEST,
-        generation_id,
     )
     fresh_paths = tuple(
         f"files/{file_name}" for file_name in fresh_file_bytes
