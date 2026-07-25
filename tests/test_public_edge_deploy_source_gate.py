@@ -521,6 +521,25 @@ def test_public_edge_rebuild_source_gate_still_covers_source_checked_scripts() -
         )
 
 
+def test_guarded_cutover_reattests_runtime_before_overlay_activation() -> None:
+    script = (
+        ROOT / "scripts" / "deploy_public_edge_portal.sh"
+    ).read_text(encoding="utf-8")
+    compatibility_gate = (
+        'abort_portal_recreate "pre-activation Compose runtime compatibility" 1'
+    )
+    activation = (
+        'trusted_source_python "$SOURCE_ROOT/scripts/'
+        'publish_public_edge_portal_overlay.py" \\\n'
+        "  --activate"
+    )
+
+    assert "PREACTIVATION_COMPOSE_ATTESTATION_OUTPUT" in script
+    assert compatibility_gate in script
+    assert activation in script
+    assert script.index(compatibility_gate) < script.index(activation)
+
+
 def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> None:
     script = (ROOT / "scripts" / "deploy_public_edge_portal.sh").read_text(encoding="utf-8")
 

@@ -291,14 +291,25 @@ ISOLATED_BUILD_IGNORED_NAMES = frozenset(
         "obj",
     }
 )
-# The CURRENT runtime proof is mounted at /proofs, outside the read-only /app
-# overlay. Its generated source-tree compatibility path remains excluded from
-# build-input identity, but no placeholder or fingerprint exclusion belongs in
-# the staged /app payload.
+# The authenticated CURRENT proof is mounted at both its private runtime
+# authority path and the public compatibility path. Docker cannot create the
+# nested file target after the parent /app bind has become read-only, so every
+# candidate overlay must carry an inert file at the exact destination before
+# cutover. The runtime bind replaces these bytes; no proof or secret content is
+# copied into the overlay.
 RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS = (
     Path("wwwroot") / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
 )
-REQUIRED_COMPOSE_MOUNTPOINTS: tuple[Path, ...] = ()
+REQUIRED_COMPOSE_MOUNTPOINTS: tuple[Path, ...] = (
+    Path("wwwroot")
+    / "proofs"
+    / "mac-codex-release"
+    / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+)
+COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES = b"{}\n"
+COMPOSE_MOUNTPOINT_COMPATIBILITY_CONTRACT_NAME = (
+    "chummer.public_edge_overlay_mountpoint_compatibility.v1"
+)
 REQUIRED_LANDING_MARKERS = {
     "buildPublicInstallHandoff": (
         'href="/build" data-mobile-app-handoff="build-mobile-app-handoff" '
@@ -2516,8 +2527,24 @@ def overlay_publish_lock(source_root: Path, active_root: Path | None = None):
         handle.close()
 
 
-def ignored_isolated_build_entries(_directory: str, names: list[str]) -> set[str]:
-    return {name for name in names if name in ISOLATED_BUILD_IGNORED_NAMES}
+def isolated_build_ignore(source_root: Path) -> Callable[[str, list[str]], set[str]]:
+    """Exclude mutable runtime-generated inputs before any workspace copy."""
+    excluded_sources = {
+        normalized_absolute_path(source_root / "Chummer.Run.Api" / relative_path)
+        for relative_path in RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS
+    }
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        directory_path = normalized_absolute_path(Path(directory))
+        ignored = {
+            name for name in names if name in ISOLATED_BUILD_IGNORED_NAMES
+        }
+        for excluded_source in excluded_sources:
+            if excluded_source.parent == directory_path:
+                ignored.add(excluded_source.name)
+        return ignored
+
+    return ignore
 
 
 def copy_file_with_hardlink_fallback(source: str | Path, destination: str | Path) -> str | os.PathLike[str]:
@@ -2877,6 +2904,7 @@ def materialize_isolated_build_workspace(source_root: Path, build_root: Path) ->
     workspace_root = source_root.parent.resolve()
     source_relative_root = relative_source_root(source_root, workspace_root)
     isolated_workspace_root = build_root / "workspace"
+    ignore_build_entry = isolated_build_ignore(source_root)
     copied_roots: list[str] = []
     copy_plan: list[tuple[Path, tuple[Path, ...]]] = []
     if source_relative_root == Path("chummer.run-services"):
@@ -2912,7 +2940,7 @@ def materialize_isolated_build_workspace(source_root: Path, build_root: Path) ->
                 shutil.copytree(
                     source_path,
                     destination_path,
-                    ignore=ignored_isolated_build_entries,
+                    ignore=ignore_build_entry,
                     copy_function=copy_file_with_hardlink_fallback,
                 )
             else:
@@ -2962,6 +2990,56 @@ def build_overlay_verification_env(base_url: str, dependency_base_url: str) -> d
     }
 
 
+def production_runtime_environment_compatibility(
+    environment: dict[str, str],
+) -> dict[str, Any]:
+    """Validate only public startup policy fields; never serialize ambient secrets."""
+    aspnet_environment = str(
+        environment.get("ASPNETCORE_ENVIRONMENT") or ""
+    ).strip()
+    canonical_origin = str(
+        environment.get("CHUMMER_PUBLIC_CANONICAL_ORIGIN") or ""
+    ).strip()
+    allowed_hosts_raw = str(
+        environment.get("CHUMMER_PUBLIC_ALLOWED_HOSTS")
+        or environment.get("AllowedHosts")
+        or ""
+    ).strip()
+    parsed = urlparse(canonical_origin)
+    canonical_host = (parsed.hostname or "").rstrip(".").lower()
+    allowed_hosts = {
+        token.strip().strip("[]").rstrip(".").lower()
+        for token in re.split(r"[;,]", allowed_hosts_raw)
+        if token.strip()
+    }
+    checks = {
+        "productionEnvironment": aspnet_environment == "Production",
+        "canonicalOriginPresent": bool(canonical_origin),
+        "canonicalOriginAbsoluteHttps": bool(
+            parsed.scheme.lower() == "https"
+            and parsed.netloc
+            and canonical_host
+            and not parsed.username
+            and not parsed.password
+            and parsed.path in {"", "/"}
+            and not parsed.params
+            and not parsed.query
+            and not parsed.fragment
+        ),
+        "canonicalHostAllowed": bool(
+            canonical_host and canonical_host in allowed_hosts
+        ),
+    }
+    return {
+        "contractName": "chummer.public_edge_production_runtime_compatibility.v1",
+        "status": "pass" if all(checks.values()) else "fail",
+        "checks": checks,
+        "canonicalOriginSha256": sha256_text(canonical_origin),
+        "allowedHostsSha256": sha256_text(allowed_hosts_raw),
+        "secretValuesPersisted": False,
+    }
+
+
 def build_isolated_overlay_process_env(
     inherited_env: dict[str, str],
     *,
@@ -2977,6 +3055,12 @@ def build_isolated_overlay_process_env(
     env["ASPNETCORE_ENVIRONMENT"] = "Development"
     env["ASPNETCORE_URLS"] = base_url
     env["URLS"] = base_url
+    # Exercise the same canonical-origin inputs used by the rendered Production
+    # service while keeping the broader local verifier isolated from durable
+    # production stores and credentials.
+    env["CHUMMER_PUBLIC_CANONICAL_ORIGIN"] = "https://chummer.run"
+    env["CHUMMER_PUBLIC_ALLOWED_HOSTS"] = "chummer.run;localhost;127.0.0.1"
+    env["AllowedHosts"] = "chummer.run;localhost;127.0.0.1"
     for name in ("HTTP_PORTS", "HTTPS_PORTS", "ASPNETCORE_HTTP_PORTS", "ASPNETCORE_HTTPS_PORTS"):
         env.pop(name, None)
     env["TMPDIR"] = str(temp_root)
@@ -3566,12 +3650,23 @@ def copy_optional_tree(source: Path, destination: Path) -> bool:
     return True
 
 
-def merge_optional_tree(source: Path, destination: Path) -> bool:
+def merge_optional_tree(
+    source: Path,
+    destination: Path,
+    *,
+    excluded_relative_paths: tuple[Path, ...] = (),
+) -> bool:
     if not source.exists():
         return False
     copied_any = False
     for source_path in source.rglob("*"):
         relative_path = source_path.relative_to(source)
+        if any(
+            relative_path == excluded
+            or excluded in relative_path.parents
+            for excluded in excluded_relative_paths
+        ):
+            continue
         destination_path = destination / relative_path
         if source_path.is_dir():
             destination_path.mkdir(parents=True, exist_ok=True)
@@ -3665,6 +3760,7 @@ def activate_overlay_tree(
     *,
     mode: str = "copy",
     backup_root: Path | None = None,
+    post_install_check_fn: Callable[[Path], None] | None = None,
 ) -> dict[str, Any]:
     assert_no_incomplete_activation_transaction(active_root)
     assert_no_symlink_components(active_root, label="active root")
@@ -3727,6 +3823,9 @@ def activate_overlay_tree(
     old_tree_moved = False
     recovery_path: Path | None = None
     transaction_committed = False
+    post_install_compatibility_status = (
+        "not_requested" if post_install_check_fn is None else "not_started"
+    )
     try:
         if active_existed:
             atomic_exchange_overlay_roots(candidate_root, active_root)
@@ -3756,6 +3855,11 @@ def activate_overlay_tree(
                 displaced_fingerprint,
             ) or displaced_identity != prior_active_identity:
                 raise RuntimeError("displaced active overlay does not match the exact prior tree")
+
+        if post_install_check_fn is not None:
+            post_install_compatibility_status = "running"
+            post_install_check_fn(active_root)
+            post_install_compatibility_status = "pass"
 
         if active_existed and old_tree_destination is not None:
             atomic_move_overlay_root(candidate_root, old_tree_destination)
@@ -3817,7 +3921,11 @@ def activate_overlay_tree(
             fsync_directory(journal_path.parent)
             if old_tree_destination is not None:
                 _remove_empty_transaction_parent(old_tree_destination.parent)
-        reason = "activation_transaction_failed"
+        reason = (
+            "activation_post_install_compatibility_failed"
+            if post_install_compatibility_status == "running"
+            else "activation_transaction_failed"
+        )
         if rollback_error is not None:
             reason = "activation_transaction_failed_and_rollback_failed"
         raise OverlayActivationError(
@@ -3856,6 +3964,9 @@ def activate_overlay_tree(
         "retiredRecoveryPath": retired_recovery_path,
         "transactionJournalPath": str(journal_path),
         "transactionCleanupStatus": transaction_cleanup_status,
+        "postInstallCompatibilityStatus": (
+            post_install_compatibility_status
+        ),
     }
 
 
@@ -3867,14 +3978,135 @@ def staging_overlay_ready(staging_root: Path) -> bool:
 
 
 def ensure_required_compose_mountpoints(root: Path) -> list[str]:
+    """Install inert targets needed by nested binds below the read-only /app mount."""
     created: list[str] = []
     for relative_path in REQUIRED_COMPOSE_MOUNTPOINTS:
         path = root / relative_path
+        assert_no_symlink_components(path, label="Compose mountpoint placeholder")
         path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            path.write_text("{}\n", encoding="utf-8")
+        try:
+            existing = path.lstat()
+        except FileNotFoundError:
+            existing = None
+        if existing is not None and not stat.S_ISREG(existing.st_mode):
+            raise RuntimeError(
+                f"Compose mountpoint target must be a regular file before activation: {path}"
+            )
+        if existing is None:
             created.append(str(relative_path).replace(os.sep, "/"))
+        # Always replace source-tree or prior-staging bytes with the same inert
+        # placeholder. The authenticated runtime bind supplies the proof bytes.
+        atomic_write_bytes(path, COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES)
+        placeholder = path.lstat()
+        if (
+            not stat.S_ISREG(placeholder.st_mode)
+            or placeholder.st_nlink != 1
+            or path.read_bytes() != COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES
+        ):
+            raise RuntimeError(
+                f"Compose mountpoint placeholder could not be materialized safely: {path}"
+            )
     return created
+
+
+def compose_mountpoint_compatibility(root: Path) -> dict[str, Any]:
+    entries: list[dict[str, Any]] = []
+    failures: list[str] = []
+    expected_sha256 = sha256_bytes(COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES)
+    for relative_path in REQUIRED_COMPOSE_MOUNTPOINTS:
+        normalized_relative_path = str(relative_path).replace(os.sep, "/")
+        path = root / relative_path
+        entry: dict[str, Any] = {
+            "relativePath": normalized_relative_path,
+            "containerTarget": f"/app/{normalized_relative_path}",
+            "kind": "file",
+            "modeExpected": "0644",
+            "placeholderSha256Expected": expected_sha256,
+            "placeholderSizeBytesExpected": len(
+                COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES
+            ),
+            "sourceContentCopied": False,
+        }
+        try:
+            assert_no_symlink_components(
+                path,
+                label="Compose mountpoint placeholder",
+            )
+            metadata = path.lstat()
+            payload, stable_metadata = read_stable_regular_bytes(
+                path,
+                label="Compose mountpoint placeholder",
+                maximum_bytes=4096,
+            )
+            actual_sha256 = sha256_bytes(payload)
+            actual_mode = f"{stat.S_IMODE(stable_metadata.st_mode):04o}"
+            valid = bool(
+                stat.S_ISREG(metadata.st_mode)
+                and metadata.st_nlink == 1
+                and stable_metadata.st_nlink == 1
+                and actual_mode == "0644"
+                and actual_sha256 == expected_sha256
+                and len(payload) == len(COMPOSE_MOUNTPOINT_PLACEHOLDER_BYTES)
+            )
+            entry.update(
+                {
+                    "status": "pass" if valid else "fail",
+                    "modeActual": actual_mode,
+                    "placeholderSha256Actual": actual_sha256,
+                    "placeholderSizeBytesActual": len(payload),
+                    "linkCount": stable_metadata.st_nlink,
+                }
+            )
+            if not valid:
+                failures.append(
+                    f"invalid inert Compose mountpoint placeholder: {normalized_relative_path}"
+                )
+        except Exception as exc:
+            entry.update(
+                {
+                    "status": "fail",
+                    "modeActual": "",
+                    "placeholderSha256Actual": "",
+                    "placeholderSizeBytesActual": None,
+                    "linkCount": None,
+                }
+            )
+            failures.append(
+                f"unavailable inert Compose mountpoint placeholder "
+                f"{normalized_relative_path}: {type(exc).__name__}"
+            )
+        entries.append(entry)
+    canonical_rows = [
+        {
+            "containerTarget": entry["containerTarget"],
+            "kind": entry["kind"],
+            "relativePath": entry["relativePath"],
+        }
+        for entry in entries
+    ]
+    return {
+        "contractName": COMPOSE_MOUNTPOINT_COMPATIBILITY_CONTRACT_NAME,
+        "status": "pass" if not failures else "fail",
+        "parentOverlayTarget": "/app",
+        "parentOverlayReadOnly": True,
+        "destinationSetSha256": sha256_text(
+            json.dumps(
+                canonical_rows,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        ),
+        "entries": entries,
+        "failures": failures,
+    }
+
+
+def verify_activated_overlay_mountpoint_compatibility(root: Path) -> None:
+    receipt = compose_mountpoint_compatibility(root)
+    if receipt["status"] != "pass":
+        raise RuntimeError(
+            "activated overlay is incompatible with its nested read-only Compose binds"
+        )
 
 
 def write_overlay_build_info(
@@ -3898,6 +4130,11 @@ def write_overlay_build_info(
             "overlay build-info cannot bind a payload with unsafe runtime modes"
         )
     built_staged_payload_fingerprint = staged_payload_fingerprint(root)
+    mountpoint_compatibility = compose_mountpoint_compatibility(root)
+    if mountpoint_compatibility["status"] != "pass":
+        raise RuntimeError(
+            "overlay build-info cannot bind incompatible Compose mountpoints"
+        )
     frontdoor_playwright_proof_closure = validate_frontdoor_playwright_proof_closure(
         root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT,
         expected_source_root=source_root,
@@ -3947,6 +4184,10 @@ def write_overlay_build_info(
         "productionExecutionEvidenceMatches": bool(
             verification.get("productionExecutionEvidenceMatches")
         ),
+        "productionRuntimeCompatibility": verification.get(
+            "productionRuntimeCompatibility"
+        )
+        or {},
         "verifierProgramSnapshotExecuted": str(
             verification.get("verifierProgramSnapshotExecuted") or ""
         ).strip(),
@@ -4033,6 +4274,7 @@ def write_overlay_build_info(
         "frontdoorPlaywrightProofClosure": frontdoor_playwright_proof_closure,
         "stagedPayloadFingerprint": built_staged_payload_fingerprint,
         "payloadModeReceipt": payload_mode_receipt,
+        "composeMountpointCompatibility": mountpoint_compatibility,
         "fullDeploymentDigest": full_deployment_digest(
             built_source_fingerprint,
             built_staged_payload_fingerprint,
@@ -5174,6 +5416,28 @@ def _verify_published_overlay_with_budget(
         source_root=source_root,
         downloads_source_root=downloads_source_root,
     )
+    production_rehearsal_environment = dict(env)
+    production_rehearsal_environment["ASPNETCORE_ENVIRONMENT"] = "Production"
+    production_runtime_compatibility = (
+        production_runtime_environment_compatibility(
+            production_rehearsal_environment
+        )
+    )
+    if production_runtime_compatibility["status"] != "pass":
+        return {
+            "status": "fail",
+            "reason": "production_runtime_environment_incompatible",
+            "baseUrl": "",
+            "receiptPath": str(verification_receipt_path),
+            "exitCode": None,
+            "receiptStatus": "",
+            "probeError": "",
+            "productionRuntimeCompatibility": (
+                production_runtime_compatibility
+            ),
+            "verificationPrograms": verification_programs_before,
+            "verificationProgramsMatch": True,
+        }
     try:
         with LocalPublicRuntimeDependencyStub() as dependency_stub:
             env.update(build_overlay_verification_env(base_url, dependency_stub.base_url))
@@ -5561,6 +5825,9 @@ def _verify_published_overlay_with_budget(
                         "localLiveSurfaceParity": local_live_surface_parity,
                         "startupLogPath": str(startup_log_path),
                         "startupLogTail": read_text_tail(startup_log_path),
+                        "productionRuntimeCompatibility": (
+                            production_runtime_compatibility
+                        ),
                         "receiptSummary": {
                             "statusRedirectHeading": receipt_payload.get("status_redirect_heading"),
                             "statusRedirectHeadingExpected": receipt_payload.get("status_redirect_heading_expected"),
@@ -6064,10 +6331,20 @@ def materialize(
     activation_retired_cleanup_status = "not_applicable"
     activation_retired_recovery_path = ""
     activation_transaction_cleanup_status = "not_started"
+    activation_post_install_compatibility_status = "not_started"
     activation_transaction_journal_path_value = str(
         activation_transaction_journal_path(active_root)
     )
     compose_mountpoints_created: list[str] = []
+    compose_mountpoint_compatibility_receipt: dict[str, Any] = {
+        "contractName": COMPOSE_MOUNTPOINT_COMPATIBILITY_CONTRACT_NAME,
+        "status": "not_checked",
+        "parentOverlayTarget": "/app",
+        "parentOverlayReadOnly": True,
+        "destinationSetSha256": "",
+        "entries": [],
+        "failures": [],
+    }
     staged_payload_integrity_check: dict[str, Any] = {
         "status": "not_checked",
         "reason": "publish_not_verified",
@@ -6089,7 +6366,14 @@ def materialize(
             overlay_payload_workspace_root / "chummer-hub-registry" / "black-ledger"
         )
         (staging_root / "state").mkdir(parents=True, exist_ok=True)
-        copied_source_wwwroot = merge_optional_tree(source_wwwroot, staging_root / "wwwroot")
+        copied_source_wwwroot = merge_optional_tree(
+            source_wwwroot,
+            staging_root / "wwwroot",
+            excluded_relative_paths=tuple(
+                relative_path.relative_to("wwwroot")
+                for relative_path in RUNTIME_GENERATED_BUILD_INPUT_EXCLUSIONS
+            ),
+        )
         copied_codex_design = copy_optional_tree(codex_design_source, staging_root / ".codex-design")
         copied_black_ledger = copy_optional_tree(black_ledger_source, staging_root / "black-ledger")
         frontdoor_playwright_proof_closure = (
@@ -6100,6 +6384,13 @@ def materialize(
         )
         compose_mountpoints_created = ensure_required_compose_mountpoints(staging_root)
         normalized_mode_receipt = normalize_payload_modes(staging_root)
+        compose_mountpoint_compatibility_receipt = (
+            compose_mountpoint_compatibility(staging_root)
+        )
+        if compose_mountpoint_compatibility_receipt["status"] != "pass":
+            raise RuntimeError(
+                "staged overlay is incompatible with nested read-only Compose binds"
+            )
         payload_mode_normalization = {
             "status": normalized_mode_receipt["status"],
             "changedEntryCount": normalized_mode_receipt["normalization"][
@@ -6341,6 +6632,9 @@ def materialize(
                     active_root,
                     mode=activation_mode,
                     backup_root=None if skip_backup_on_activate else backup_root,
+                    post_install_check_fn=(
+                        verify_activated_overlay_mountpoint_compatibility
+                    ),
                 )
                 backup_path_value = str(activation_result.get("backupPath") or "")
                 backup_path = Path(backup_path_value) if backup_path_value else None
@@ -6360,6 +6654,10 @@ def materialize(
                 )
                 activation_transaction_cleanup_status = str(
                     activation_result.get("transactionCleanupStatus") or "complete"
+                )
+                activation_post_install_compatibility_status = str(
+                    activation_result.get("postInstallCompatibilityStatus")
+                    or "not_checked"
                 )
                 if activation_transaction_cleanup_status == "complete":
                     activation_status = "activated"
@@ -6384,6 +6682,12 @@ def materialize(
                     if isinstance(exc, OverlayActivationError) and exc.recovery_path is not None
                     else ""
                 )
+                if (
+                    isinstance(exc, OverlayActivationError)
+                    and exc.reason
+                    == "activation_post_install_compatibility_failed"
+                ):
+                    activation_post_install_compatibility_status = "fail"
                 activation_status = (
                     "activation_failure_recovery_required"
                     if activation_rollback_status == "rollback_failed_recovery_required"
@@ -6419,7 +6723,7 @@ def materialize(
         "Discard this test-only receipt; rerun with the production publisher and verifier functions."
         if test_hooks_injected
         else
-        "Recreate chummer-portal from the refreshed mounted overlay and rerun local /status postdeploy proof."
+        "Complete the guarded blue/green cutover and postdeploy proof; never restart an incumbent container against the refreshed overlay."
         if status == "pass" and activate
         else "Overlay payload staged and verified; activate it explicitly before recreating chummer-portal."
         if status == "pass"
@@ -6467,6 +6771,10 @@ def materialize(
         "productionExecutionEvidenceMatches": bool(
             verification.get("productionExecutionEvidenceMatches")
         ),
+        "productionRuntimeCompatibility": verification.get(
+            "productionRuntimeCompatibility"
+        )
+        or {},
         "activateRequested": activate,
         "activationStatus": activation_status,
         "activationAtomicCutover": activation_atomic_cutover,
@@ -6477,6 +6785,9 @@ def materialize(
         "activationRetiredRecoveryPath": activation_retired_recovery_path,
         "activationTransactionJournalPath": activation_transaction_journal_path_value,
         "activationTransactionCleanupStatus": activation_transaction_cleanup_status,
+        "activationPostInstallCompatibilityStatus": (
+            activation_post_install_compatibility_status
+        ),
         "reuseStaging": reuse_staging,
         "skipBackupOnActivate": skip_backup_on_activate,
         "activationMode": activation_mode,
@@ -6499,6 +6810,9 @@ def materialize(
         },
         "stagingSourceFingerprintCheck": staging_source_fingerprint_check,
         "composeMountpointsCreated": compose_mountpoints_created,
+        "composeMountpointCompatibility": (
+            compose_mountpoint_compatibility_receipt
+        ),
         "copiedSourceWwwroot": copied_source_wwwroot,
         "copiedCodexDesign": copied_codex_design,
         "copiedBlackLedger": copied_black_ledger,
@@ -6661,7 +6975,15 @@ def main() -> int:
     resolved_source_root = args.source_root.resolve()
     normalized_active_root = normalized_absolute_path(args.active_root)
     path_plan: dict[str, Path] | None = None
+    shared_mutation_lock_token = str(
+        getattr(args, "shared_mutation_lock_token", "") or ""
+    ).strip()
     try:
+        if args.activate and not shared_mutation_lock_token:
+            raise RuntimeError(
+                "standalone overlay activation is forbidden; use the guarded "
+                "blue/green cutover with its durable shared mutation authority"
+            )
         try:
             publish_timeout_seconds = validated_timeout_seconds(
                 getattr(
@@ -6723,9 +7045,7 @@ def main() -> int:
         )
         with public_edge_mutation_lock(
             activate=bool(args.activate),
-            inherited_token=str(
-                getattr(args, "shared_mutation_lock_token", "") or ""
-            ),
+            inherited_token=shared_mutation_lock_token,
         ) as mutation_lock_path:
             with overlay_publish_lock(
                 path_plan["sourceRoot"],
@@ -6788,7 +7108,7 @@ def main() -> int:
                     "status": "held" if mutation_lock_path is not None else "not_required",
                     "path": str(mutation_lock_path or ""),
                     "inherited": bool(
-                        getattr(args, "shared_mutation_lock_token", "")
+                        shared_mutation_lock_token
                     ),
                     "acquiredBeforeOverlayPublishLock": True,
                 }
@@ -6869,6 +7189,7 @@ def main() -> int:
             "activationTransactionJournalPath": str(
                 activation_transaction_journal_path(normalized_active_root)
             ),
+            "activationPostInstallCompatibilityStatus": "not_started",
             "reuseStaging": args.reuse_staging,
             "skipBackupOnActivate": args.skip_backup_on_activate,
             "activationMode": args.activation_mode,
@@ -6883,6 +7204,15 @@ def main() -> int:
                 "skipReason": failure_reason,
             },
             "composeMountpointsCreated": [],
+            "composeMountpointCompatibility": {
+                "contractName": COMPOSE_MOUNTPOINT_COMPATIBILITY_CONTRACT_NAME,
+                "status": "not_checked",
+                "parentOverlayTarget": "/app",
+                "parentOverlayReadOnly": True,
+                "destinationSetSha256": "",
+                "entries": [],
+                "failures": [],
+            },
             "copiedSourceWwwroot": False,
             "copiedCodexDesign": False,
             "copiedBlackLedger": False,
@@ -6923,7 +7253,7 @@ def main() -> int:
                 "status": "unavailable" if mutation_lock_unavailable else "not_acquired",
                 "path": str(PUBLIC_EDGE_MUTATION_LOCK),
                 "inherited": bool(
-                    getattr(args, "shared_mutation_lock_token", "")
+                    shared_mutation_lock_token
                 ),
                 "acquiredBeforeOverlayPublishLock": True,
             },
