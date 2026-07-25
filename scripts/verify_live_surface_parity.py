@@ -219,26 +219,26 @@ def build_status_surface(
     }
 
 
-def build_public_download_surfaces(
+def build_landing_surface(
     *,
     release_review_required: bool,
     downloads_paused: bool,
     downloads_under_review: bool,
-) -> list[dict[str, Any]]:
-    landing_required_texts = [
+) -> dict[str, Any]:
+    required_texts = [
         "A Shadowrun character manager for clean sheets and faster tables.",
         "Download Chummer",
         "Help",
     ]
     if downloads_paused:
-        landing_required_texts.extend(
+        required_texts.extend(
             [
                 "No public installer right now.",
                 "Current public lane: Downloads paused.",
             ]
         )
     elif downloads_under_review:
-        landing_required_texts.extend(
+        required_texts.extend(
             [
                 "Listed for review:",
                 "Availability is not asserted.",
@@ -246,16 +246,18 @@ def build_public_download_surfaces(
             ]
         )
     else:
-        landing_required_texts.append("Current public installer")
-        landing_required_texts.append(
-            "Current public lane: Preview. Review required."
-            if release_review_required
-            else "Current public lane: Stable."
+        required_texts.extend(
+            [
+                "Current public installer",
+                "Current public lane: Preview. Review required."
+                if release_review_required
+                else "Current public lane: Stable.",
+            ]
         )
 
-    landing = {
+    return {
         "path": "/",
-        "required_texts": landing_required_texts,
+        "required_texts": required_texts,
         "required_html_texts": [
             'href="/build"',
             'href="/mobile/player"',
@@ -265,7 +267,10 @@ def build_public_download_surfaces(
             "Next move",
             "Need help?",
             "One compact rail for downloads, play, and public status.",
+            "Reel details",
+            "Keep it simple",
             "Get started",
+            "Worlds",
             "Flagship routes",
             "Signals and horizons",
             "Trust and support",
@@ -276,8 +281,20 @@ def build_public_download_surfaces(
             'data-disabled-target="/mobile/player"',
         ],
     }
+
+
+def build_public_download_surfaces(
+    *,
+    release_review_required: bool,
+    downloads_paused: bool,
+    downloads_under_review: bool,
+) -> list[dict[str, Any]]:
     return [
-        landing,
+        build_landing_surface(
+            release_review_required=release_review_required,
+            downloads_paused=downloads_paused,
+            downloads_under_review=downloads_under_review,
+        ),
         build_downloads_surface(
             release_review_required=release_review_required,
             downloads_paused=downloads_paused,
@@ -290,49 +307,60 @@ def build_public_download_surfaces(
     ]
 
 
+def build_mobile_install_surface(
+    path: str,
+    role_key: str,
+    *,
+    required_final_url_prefix: str | None = None,
+) -> dict[str, Any]:
+    surface: dict[str, Any] = {
+        "path": path,
+        "required_texts": [
+            "install shell",
+            "Public shell only",
+            "No table data loaded",
+            "No role granted",
+            "Install app",
+            "How to join",
+        ],
+        "required_html_texts": [
+            'data-play-surface="install-only"',
+            'data-live-session="unavailable"',
+            'data-authority="none"',
+            f'data-install-role="{role_key}"',
+            f'data-role-capabilities="{role_key}"',
+            f'data-role-privacy-warning="{role_key}"',
+            f'data-role-authority-warning="{role_key}"',
+            "/mobile-install-shell.js",
+        ],
+        "forbidden_texts": [
+            "Internal Error",
+            "Authorize Codex access.",
+            "OpenAI account in ChatGPT",
+        ],
+        "forbidden_html_texts": [
+            "data-turn-root",
+            'data-live-session="available"',
+        ],
+    }
+    if required_final_url_prefix:
+        surface["required_final_url_prefix"] = required_final_url_prefix
+    return surface
+
+
 def build_surfaces(
     require_brilliant_directories_checkout: bool,
     *,
     release_review_required: bool = True,
     downloads_paused: bool = False,
+    downloads_under_review: bool = False,
 ) -> list[dict[str, Any]]:
-    landing_required_texts = [
-        "A Shadowrun character manager for clean sheets and faster tables.",
-        "Download Chummer",
-        "No public installer right now."
-        if downloads_paused
-        else "Current public installer",
-        "Help",
-    ]
-    if downloads_paused:
-        landing_required_texts.append("Current public lane: Downloads paused.")
     return [
-        {
-            "path": "/",
-            "required_texts": landing_required_texts,
-            "required_html_texts": [
-                "data-disabled-target=\"/build\"",
-                "data-sign-in-href=\"/login?next=%2Fbuild\"",
-                "data-disabled-target=\"/mobile/player\"",
-                "data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\"",
-            ],
-            "forbidden_texts": [
-                "Next move",
-                "Need help?",
-                "One compact rail for downloads, play, and public status.",
-                "Reel details",
-                "Keep it simple",
-                "Get started",
-                "Worlds",
-                "Flagship routes",
-                "Signals and horizons",
-                "Trust and support",
-                "Account and quick actions",
-            ],
-            "forbidden_html_texts": [
-                'site-open-chummer-menu__button" href="/mobile/player"',
-            ],
-        },
+        build_landing_surface(
+            release_review_required=release_review_required,
+            downloads_paused=downloads_paused,
+            downloads_under_review=downloads_under_review,
+        ),
         build_downloads_surface(
             release_review_required=release_review_required,
             downloads_paused=downloads_paused,
@@ -340,6 +368,7 @@ def build_surfaces(
         build_status_surface(
             release_review_required=release_review_required,
             downloads_paused=downloads_paused,
+            downloads_under_review=downloads_under_review,
         ),
         build_billing_surface(require_brilliant_directories_checkout),
         {
@@ -350,7 +379,8 @@ def build_surfaces(
             "required_html_texts": [
                 "<title>Participate · Chummer</title>",
                 "data-chummer-participate-frame",
-                "productlift.dev",
+                'src="/participate/board?embed=1"',
+                'referrerpolicy="same-origin"',
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -366,6 +396,7 @@ def build_surfaces(
             "forbidden_html_texts": [
                 "data-chummer-board-skin",
                 "participate-preview-card",
+                "productlift.dev",
             ],
         },
         {
@@ -428,109 +459,15 @@ def build_surfaces(
                 "Network error while loading tab configuration",
             ],
         },
-        {
-            "path": "/mobile",
-            "required_texts": [
-                "Live-session turn companion",
-                "Device posture",
-                "Claimed player actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Player\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/player",
-            "required_texts": [
-                "Live-session turn companion",
-                "Claimed player actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Player\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/gm",
-            "required_texts": [
-                "Live-session turn companion",
-                "GM focus actor",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"GameMaster\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/mobile/observer",
-            "required_texts": [
-                "Live-session turn companion",
-                "Observer mirror",
-                "Player",
-                "GM",
-                "Observer",
-            ],
-            "required_html_texts": [
-                "<title>Chummer Mobile Turn Companion</title>",
-                "data-turn-root",
-                "data-role=\"Observer\"",
-                "mobile-turn-companion.js",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
-        {
-            "path": "/play",
-            "required_texts": [
-                "Player entry",
-                "Open Chummer",
-                "Install this app",
-                "Player, GM, and observer entry points meet in one shell.",
-            ],
-            "required_html_texts": [
-                "data-pwa-ledger-status",
-                "data-pwa-ledger-summary",
-            ],
-            "forbidden_texts": [
-                "Internal Error",
-                "Authorize Codex access.",
-                "OpenAI account in ChatGPT",
-            ],
-        },
+        build_mobile_install_surface("/mobile", "player"),
+        build_mobile_install_surface("/mobile/player", "player"),
+        build_mobile_install_surface("/mobile/gm", "gm"),
+        build_mobile_install_surface("/mobile/observer", "observer"),
+        build_mobile_install_surface(
+            "/play",
+            "player",
+            required_final_url_prefix="/mobile/player",
+        ),
         {
             "path": "/play/continuity",
             "required_texts": [
@@ -1004,6 +941,7 @@ def verify(
             require_brilliant_directories_checkout,
             release_review_required=bool(release_posture["review_required"]),
             downloads_paused=bool(release_posture["downloads_paused"]),
+            downloads_under_review=bool(release_posture["downloads_under_review"]),
         )
     results: list[dict[str, Any]] = []
     failures: list[str] = list(release_posture.get("expected_failures") or [])
