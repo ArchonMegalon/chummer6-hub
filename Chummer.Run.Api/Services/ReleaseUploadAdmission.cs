@@ -225,6 +225,10 @@ public sealed record ReleaseUploadAuthorizationContext(
            && string.Equals(Path, request.Path.Value, StringComparison.Ordinal);
 }
 
+public sealed record ReleaseUploadTicketRevocationProofEvaluation(
+    bool TicketAccepted,
+    string RevocationEpochSha256);
+
 public sealed class ReleaseUploadAuthorizationEvaluator
 {
     public const string CandidateManifestSha256Header =
@@ -260,15 +264,7 @@ public sealed class ReleaseUploadAuthorizationEvaluator
 
     public ReleaseUploadAuthorizationContext? Evaluate(HttpRequest request)
     {
-        string header = request.Headers.Authorization.ToString();
-        const string bearerPrefix = "Bearer ";
-        if (!header.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        string providedToken = header[bearerPrefix.Length..].Trim();
-        if (providedToken.Length == 0)
+        if (!TryReadBearerToken(request, out string providedToken))
         {
             return null;
         }
@@ -345,6 +341,30 @@ public sealed class ReleaseUploadAuthorizationEvaluator
             AuthorizationExpiresAtUtc: expiresAt,
             CandidateImportAuthority: candidate,
             AllowsPrivilegedReconciliation: false);
+    }
+
+    public ReleaseUploadTicketRevocationProofEvaluation EvaluateTicketRevocationProof(
+        HttpRequest request)
+    {
+        bool ticketAccepted = TryReadBearerToken(request, out string providedToken)
+                              && _releaseUploadTickets.TryValidate(providedToken, out _);
+        return new ReleaseUploadTicketRevocationProofEvaluation(
+            ticketAccepted,
+            _releaseUploadTickets.RevocationEpochSha256);
+    }
+
+    private static bool TryReadBearerToken(HttpRequest request, out string providedToken)
+    {
+        providedToken = string.Empty;
+        string header = request.Headers.Authorization.ToString();
+        const string bearerPrefix = "Bearer ";
+        if (!header.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        providedToken = header[bearerPrefix.Length..].Trim();
+        return providedToken.Length > 0;
     }
 
     private static bool TryReadCandidateRequest(
@@ -558,6 +578,12 @@ public sealed class ReleaseUploadAdmissionLease : IDisposable
 
 public sealed class ReleaseUploadRequestGateMiddleware
 {
+    internal const string TicketRevocationProofPath =
+        "/api/internal/releases/upload-ticket-revocation-proof";
+    internal const string TicketRevocationNonceHeader =
+        "X-Chummer-Release-Upload-Revocation-Nonce";
+    internal const string TicketRevocationProofContractName =
+        "chummer.release-upload-ticket-revocation-proof/v1";
     private readonly RequestDelegate _next;
 
     public ReleaseUploadRequestGateMiddleware(RequestDelegate next)
@@ -574,6 +600,12 @@ public sealed class ReleaseUploadRequestGateMiddleware
         if (!TryMatch(context.Request, out ReleaseUploadRoute route))
         {
             await _next(context);
+            return;
+        }
+
+        if (route == ReleaseUploadRoute.TicketRevocationProof)
+        {
+            await WriteTicketRevocationProofAsync(context, authorizationEvaluator);
             return;
         }
 
@@ -740,6 +772,12 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return true;
         }
 
+        if (path.Equals(TicketRevocationProofPath, StringComparison.OrdinalIgnoreCase))
+        {
+            route = ReleaseUploadRoute.TicketRevocationProof;
+            return true;
+        }
+
         const string generationPrefix = "/api/internal/releases/generations/";
         if (path.StartsWith(generationPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -804,6 +842,72 @@ public sealed class ReleaseUploadRequestGateMiddleware
     private static bool HasMultipartBody(ReleaseUploadRoute route)
         => route is ReleaseUploadRoute.DirectBundle or ReleaseUploadRoute.File or ReleaseUploadRoute.Chunk;
 
+    private static async Task WriteTicketRevocationProofAsync(
+        HttpContext context,
+        ReleaseUploadAuthorizationEvaluator authorizationEvaluator)
+    {
+        SetCredentialResponseHeaders(context.Response);
+        if (context.Request.Headers[TicketRevocationNonceHeader].Count != 1)
+        {
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status400BadRequest,
+                "Release upload revocation nonce required",
+                $"{TicketRevocationNonceHeader} must contain exactly one lowercase SHA-256 nonce.",
+                "https://chummer.run/problems/release-upload-ticket/revocation-nonce-required");
+            return;
+        }
+
+        string nonce = context.Request.Headers[TicketRevocationNonceHeader].ToString();
+        if (!IsLowercaseSha256(nonce))
+        {
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status400BadRequest,
+                "Invalid release upload revocation nonce",
+                $"{TicketRevocationNonceHeader} must contain exactly 64 lowercase hexadecimal characters.",
+                "https://chummer.run/problems/release-upload-ticket/revocation-nonce-invalid");
+            return;
+        }
+
+        ReleaseUploadTicketRevocationProofEvaluation evaluation =
+            authorizationEvaluator.EvaluateTicketRevocationProof(context.Request);
+        context.Response.StatusCode = evaluation.TicketAccepted
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status401Unauthorized;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        if (!evaluation.TicketAccepted)
+        {
+            context.Response.Headers.WWWAuthenticate = "Bearer";
+        }
+
+        var proof = new
+        {
+            contractName = TicketRevocationProofContractName,
+            status = "pass",
+            ticketAccepted = evaluation.TicketAccepted,
+            nonceSha256 = Convert.ToHexStringLower(
+                SHA256.HashData(Encoding.ASCII.GetBytes(nonce))),
+            revocationEpochSha256 = evaluation.RevocationEpochSha256
+        };
+        await JsonSerializer.SerializeAsync(
+            context.Response.Body,
+            proof,
+            cancellationToken: context.RequestAborted);
+    }
+
+    private static void SetCredentialResponseHeaders(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store";
+        response.Headers.Pragma = "no-cache";
+        response.Headers.Expires = "0";
+    }
+
+    private static bool IsLowercaseSha256(string value)
+        => value.Length == 64
+           && value.All(static character => character is >= '0' and <= '9'
+               or >= 'a' and <= 'f');
+
     private static async Task WriteProblemAsync(
         HttpContext context,
         int statusCode,
@@ -838,7 +942,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
         Stage,
         ActivateStaged,
         Reconcile,
-        AuthorityAdvance
+        AuthorityAdvance,
+        TicketRevocationProof
     }
 }
 

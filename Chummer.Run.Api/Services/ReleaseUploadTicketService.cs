@@ -33,11 +33,14 @@ public sealed class ReleaseUploadTicketService
         ArgumentNullException.ThrowIfNull(dataProtectionProvider);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        RevocationEpochSha256 = HashRevocationEpoch(configuration[RevocationEpochKey]);
         _protector = dataProtectionProvider.CreateProtector(
             Purpose,
-            $"revocation-epoch:{HashRevocationEpoch(configuration[RevocationEpochKey])}");
+            $"revocation-epoch:{RevocationEpochSha256}");
         _ticketLifetime = ResolveTicketLifetime(configuration);
     }
+
+    public string RevocationEpochSha256 { get; }
 
     public ReleaseUploadTicketIssueResult Issue(AuthenticatedHubSubject subject)
     {

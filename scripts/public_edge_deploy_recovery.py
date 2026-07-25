@@ -14,6 +14,7 @@ import secrets
 import subprocess
 import stat
 import sys
+import time
 from typing import Any, Callable, Protocol
 
 
@@ -56,6 +57,10 @@ PROOF_AUTHORITY_PATH = "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
 PROOF_PUBLIC_PATH = (
     "/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
 )
+CANONICAL_TUNNEL_RUNTIMES = (
+    ("chummer-run-cloudflared", "priorTunnel"),
+    ("chummer-run-cloudflared-replica", "priorTunnelReplica"),
+)
 
 
 class RuntimeAuthority(Protocol):
@@ -78,6 +83,8 @@ class RuntimeAuthority(Protocol):
     def container_image(self, container_id: str) -> str: ...
 
     def container_running(self, container_id: str) -> bool: ...
+
+    def wait_container_healthy(self, container_id: str) -> None: ...
 
     def set_container_running(self, container_id: str, running: bool) -> None: ...
 
@@ -337,6 +344,34 @@ class DockerRuntime:
             label=f"{verb} exact prior container",
         )
 
+    def wait_container_healthy(self, container_id: str) -> None:
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            value = self._run(
+                [
+                    *self.docker_base,
+                    "container",
+                    "inspect",
+                    "--format",
+                    "{{if .State.Health}}{{.State.Health.Status}}"
+                    "{{else}}none{{end}}",
+                    container_id,
+                ],
+                label="inspect restored connector health",
+            )
+            if value == "healthy":
+                return
+            if value in {"unhealthy", "none"}:
+                raise RuntimeError(
+                    "restored canonical connector is not health-authoritative"
+                )
+            if value != "starting":
+                raise RuntimeError(
+                    "restored canonical connector health is invalid"
+                )
+            time.sleep(1)
+        raise RuntimeError("restored canonical connector health timed out")
+
     def remove_container(self, container_id: str) -> None:
         self._run(
             [*self.docker_base, "container", "rm", "--force", container_id],
@@ -438,6 +473,8 @@ def _restore_service(
         raise RuntimeError(f"exact prior {service} cannot start before overlay recovery")
     if running != prior_was_running:
         runtime.set_container_running(current, prior_was_running)
+    if prior_was_running:
+        runtime.wait_container_healthy(current)
     if (
         runtime.service_container(service) != prior_container_id
         or runtime.container_image(prior_container_id) != prior_image_id
@@ -462,6 +499,39 @@ def reconcile(
 ) -> dict[str, Any]:
     prior = transaction.validate_runtime_prior_state(runtime_prior_state)
     checks: dict[str, dict[str, Any]] = {}
+
+    def stop_all_canonical_tunnels() -> None:
+        failures: list[str] = []
+        stopped: set[str] = set()
+        for service, field_prefix in CANONICAL_TUNNEL_RUNTIMES:
+            candidates: list[str] = []
+            try:
+                tunnel_id = runtime.service_container(service)
+                if tunnel_id:
+                    candidates.append(tunnel_id)
+            except Exception:
+                failures.append(f"{service}:lookup")
+            known_prior_id = str(
+                prior.get(f"{field_prefix}ContainerId") or ""
+            )
+            if known_prior_id:
+                candidates.append(known_prior_id)
+            for candidate_id in candidates:
+                try:
+                    if (
+                        candidate_id
+                        and candidate_id not in stopped
+                        and runtime.container_exists(candidate_id)
+                        and runtime.container_running(candidate_id)
+                    ):
+                        runtime.set_container_running(candidate_id, False)
+                        stopped.add(candidate_id)
+                except Exception:
+                    failures.append(f"{service}:{candidate_id[:12]}")
+        if failures:
+            raise RuntimeError(
+                "canonical tunnel stop is uncertain for: " + ", ".join(failures)
+            )
 
     def remove_candidate_portal() -> str:
         candidate_name = prior["candidatePortalContainerName"]
@@ -495,9 +565,7 @@ def reconcile(
             raise RuntimeError("candidate cleanup is uncertain before overlay recovery")
         if overlay_matches():
             return "already_exact"
-        tunnel_id = runtime.service_container("chummer-run-cloudflared")
-        if tunnel_id and runtime.container_running(tunnel_id):
-            runtime.set_container_running(tunnel_id, False)
+        stop_all_canonical_tunnels()
         prior_portal_id = prior["priorPortalContainerId"]
         if (
             prior_portal_id
@@ -627,25 +695,37 @@ def reconcile(
         verify_runtime_proof_mounts,
     )
 
-    def restore_tunnel() -> str:
+    def restore_tunnels() -> str:
         if not proof_mounts_passed:
-            current_tunnel = runtime.service_container("chummer-run-cloudflared")
-            if current_tunnel and runtime.container_running(current_tunnel):
-                runtime.set_container_running(current_tunnel, False)
+            stop_all_canonical_tunnels()
             raise RuntimeError(
-                "tunnel restoration is blocked by runtime proof verification"
+                "canonical tunnel restoration is blocked by runtime proof verification"
             )
-        return _restore_service(
-            runtime,
-            service="chummer-run-cloudflared",
-            prior_existed=prior["priorTunnelExisted"],
-            prior_container_id=prior["priorTunnelContainerId"],
-            prior_image_id=prior["priorTunnelImageId"],
-            prior_was_running=prior["priorTunnelWasRunning"],
-            may_start=True,
-        )
+        dispositions: list[str] = []
+        try:
+            for service, field_prefix in CANONICAL_TUNNEL_RUNTIMES:
+                dispositions.append(
+                    _restore_service(
+                        runtime,
+                        service=service,
+                        prior_existed=prior[f"{field_prefix}Existed"],
+                        prior_container_id=prior[f"{field_prefix}ContainerId"],
+                        prior_image_id=prior[f"{field_prefix}ImageId"],
+                        prior_was_running=prior[f"{field_prefix}WasRunning"],
+                        may_start=True,
+                    )
+                )
+        except Exception:
+            stop_all_canonical_tunnels()
+            raise
+        if len(dispositions) != len(CANONICAL_TUNNEL_RUNTIMES):
+            stop_all_canonical_tunnels()
+            raise RuntimeError("canonical tunnel restoration was incomplete")
+        return "both_canonical_tunnel_states_restored"
 
-    _component(checks, "tunnel", restore_tunnel)
+    # Preserve the v1 component key while strengthening its disposition to
+    # cover both canonical connectors.
+    _component(checks, "tunnel", restore_tunnels)
     passed = all(check["status"] == "pass" for check in checks.values())
     return {
         "contractName": CONTRACT_NAME,

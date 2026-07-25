@@ -15,20 +15,26 @@ fi
 
 DEPLOY_OPERATION="${1:-deploy}"
 if (($# > 1)); then
-  echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2
   exit 2
 fi
 case "$DEPLOY_OPERATION" in
-  deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
-  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2; exit 2 ;;
+  deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover|release-upload-ticket-epoch-rotate|release-upload-ticket-epoch-rotate-resume|initial-release-shelf-cutover|initial-release-shelf-cutover-recover|initial-release-shelf-public-download-cutover|initial-release-shelf-public-download-cutover-recover|initial-release-shelf-public-download-cutover-retire]" >&2; exit 2 ;;
 esac
 INITIAL_RELEASE_SHELF_CUTOVER=0
 INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=0
 PUBLIC_DOWNLOAD_ONLY_OPERATION=0
+RELEASE_UPLOAD_TICKET_EPOCH_ROTATION=0
+RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME=0
 if [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-cutover-recover ]]; then
   INITIAL_RELEASE_SHELF_CUTOVER_RECOVERY=1
+elif [[ "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate ]]; then
+  RELEASE_UPLOAD_TICKET_EPOCH_ROTATION=1
+elif [[ "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate-resume ]]; then
+  RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME=1
 elif [[ "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire ]]; then
@@ -152,6 +158,8 @@ CANONICAL_IMAGE_TAG="chummer-run-api:local"
 CANONICAL_OVERLAY_ROOT="/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app"
 CANONICAL_PUBLIC_EDGE_PORT="8091"
 CANONICAL_BASE_URL="https://chummer.run"
+CANONICAL_TUNNEL_PRIMARY_SERVICE="chummer-run-cloudflared"
+CANONICAL_TUNNEL_REPLICA_SERVICE="chummer-run-cloudflared-replica"
 CANONICAL_DOCKER_CONTEXT="default"
 CANONICAL_DOCKER_HOST="unix:///var/run/docker.sock"
 CANONICAL_DOCKER_CONFIG_ROOT="/docker/chummercomplete/.state/public-edge-docker-cli"
@@ -193,11 +201,21 @@ POSTDEPLOY_ATTEMPTS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS:-3}"
 POSTDEPLOY_RETRY_DELAY_SECONDS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS:-10}"
 PORTAL_READY_TIMEOUT_SECONDS="${CHUMMER_PUBLIC_EDGE_PORTAL_READY_TIMEOUT_SECONDS:-180}"
 PUBLIC_EDGE_PORT="${CHUMMER_PUBLIC_EDGE_PORT:-$CANONICAL_PUBLIC_EDGE_PORT}"
+RELEASE_UPLOAD_TICKET_NEXT_EPOCH="${CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_NEXT_EPOCH-}"
+RELEASE_UPLOAD_OLD_TICKET_PATH="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_PATH-}"
+RELEASE_UPLOAD_OLD_TICKET_SHA256="${CHUMMER_RELEASE_UPLOAD_OLD_TICKET_SHA256-}"
+RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT-}"
+RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256-}"
+RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE="${CHUMMER_RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE-}"
+RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID="${CHUMMER_RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID-}"
+RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_INPUT="${CHUMMER_RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE-}"
+RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256="${CHUMMER_RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256-}"
 DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"
 DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"
 CANONICAL_DEPLOY_LOCK_AUTH_ROOT="$DEPLOY_LOCK_ROOT/public-edge-lock-recovery-receipts"
 CANONICAL_DEPLOY_RECEIPT_ROOT="$DEPLOY_LOCK_ROOT/public-edge-deploy-receipts"
 CANONICAL_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-runtime-authority.json"
+CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/release-upload-ticket-epoch-authority.json"
 PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY="$CANONICAL_DEPLOY_RECEIPT_ROOT/public-download-active-runtime-authority.json"
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
 CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-cutover"
@@ -210,6 +228,39 @@ CUTOVER_RECOVERY_REEXEC=0
 CUTOVER_STEADY_HANDOFF=0
 CUTOVER_STATE_CLASSIFICATION=""
 RECOVERY_ROUTE_REQUESTED=0
+epoch_rotation_fail_forward_required=0
+epoch_rotation_precommit_refused=0
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1 \
+  || RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  if [[ ! "$RELEASE_UPLOAD_TICKET_NEXT_EPOCH" \
+    =~ ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$ ]]; then
+    echo "CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_NEXT_EPOCH must be an explicit safe epoch literal" >&2
+    exit 2
+  fi
+  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" \
+    || -n "$RELEASE_UPLOAD_OLD_TICKET_SHA256" ]]; then
+    if [[ "$RELEASE_UPLOAD_OLD_TICKET_PATH" != /* \
+      || ! "$RELEASE_UPLOAD_OLD_TICKET_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "hidden old-ticket proof requires an absolute owner-only path and exact SHA-256" >&2
+      exit 2
+    fi
+  fi
+fi
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  RECOVERY_ROUTE_REQUESTED=1
+  if [[ "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_INPUT" != /* \
+    || ! "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256" \
+      =~ ^[0-9a-f]{64}$ \
+    || ! "$RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE" =~ ^[0-9a-f]{64}$ \
+    || ! "$RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID" \
+      =~ ^sha256:[0-9a-f]{64}$ \
+    || "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_INPUT" != /* \
+    || ! "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256" \
+      =~ ^[0-9a-f]{64}$ ]]; then
+    echo "epoch-rotation resume requires exact receipt, old environment, image, and proof authority pins" >&2
+    exit 2
+  fi
+fi
 if [[ "$DEPLOY_OPERATION" == recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-recover \
   || "$DEPLOY_OPERATION" == initial-release-shelf-public-download-cutover-retire \
@@ -217,6 +268,7 @@ if [[ "$DEPLOY_OPERATION" == recover \
   RECOVERY_ROUTE_REQUESTED=1
 fi
 if [[ "$DEPLOY_OPERATION" == deploy \
+    || "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate \
     || "$DEPLOY_OPERATION" == initial-release-shelf-cutover ]] \
   && ((RECOVERY_ROUTE_REQUESTED == 0)) \
   && [[ -e "$PUBLIC_DOWNLOAD_ACTIVE_RUNTIME_AUTHORITY" \
@@ -317,6 +369,52 @@ RUNTIME_PROOF_BIND_SOURCE=""
 AUTHENTICATED_RUNTIME_PROOF_SHA256=""
 RELEASE_CHANNEL_RECEIPT=""
 AUTHENTICATED_RELEASE_CHANNEL_SHA256=""
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  if ! RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT="$(
+    "$TRUSTED_REALPATH" -e -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_INPUT"
+  )" \
+    || [[ "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      != "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_INPUT" \
+      || ! -f "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      || -L "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      || ! -O "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" ]]; then
+    echo "epoch-rotation resume receipt is unsafe or aliased" >&2
+    exit 2
+  fi
+  if ! RUNTIME_PROOF_BIND_SOURCE="$(
+    "$TRUSTED_REALPATH" -e -- "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_INPUT"
+  )" \
+    || [[ "$RUNTIME_PROOF_BIND_SOURCE" \
+      != "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_INPUT" \
+      || ! -f "$RUNTIME_PROOF_BIND_SOURCE" \
+      || -L "$RUNTIME_PROOF_BIND_SOURCE" \
+      || ! -O "$RUNTIME_PROOF_BIND_SOURCE" ]]; then
+    echo "epoch-rotation resume proof authority is unsafe or noncanonical" >&2
+    exit 2
+  fi
+  runtime_proof_resume_parent="$(
+    "$TRUSTED_DIRNAME" -- "$RUNTIME_PROOF_BIND_SOURCE"
+  )"
+  runtime_proof_resume_projection_id="${runtime_proof_resume_parent##*/}"
+  if [[ "${runtime_proof_resume_parent%/*}" != "$PROJECTION_SNAPSHOT_ROOT" \
+    || ! "$runtime_proof_resume_projection_id" \
+      =~ ^public-projection-[0-9a-f]{64}$ \
+    || "${RUNTIME_PROOF_BIND_SOURCE##*/}" \
+      != "HUB_LOCAL_RELEASE_PROOF.generated.json" ]]; then
+    echo "epoch-rotation resume proof authority is outside an exact immutable projection" >&2
+    exit 2
+  fi
+  runtime_proof_resume_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$RUNTIME_PROOF_BIND_SOURCE"
+  )"
+  runtime_proof_resume_sha256="${runtime_proof_resume_sha256%% *}"
+  if [[ "$runtime_proof_resume_sha256" \
+    != "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256" ]]; then
+    echo "epoch-rotation resume proof authority does not match its pin" >&2
+    exit 2
+  fi
+  RUNTIME_PROOF_BIND_SOURCE_SHA256="$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256"
+fi
 if ((RECOVERY_ROUTE_REQUESTED == 0)); then
 if [[ ! "$RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be externally supplied as a lowercase SHA-256" >&2
@@ -563,13 +661,18 @@ if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT")" \
   echo "public edge durable lock-authority root contains a symlink component" >&2
   exit 2
 fi
+lock_acquire_mode=acquire
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  lock_acquire_mode=resume
+fi
 if deploy_lock_metadata="$(
   "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
     "$TRUSTED_PYTHON" -I -c '
-import ctypes, errno, hashlib, os, secrets, stat, sys
+import ctypes, errno, hashlib, hmac, os, secrets, stat, sys
 lock_root = os.fsencode(sys.argv[1])
 lock_path = os.fsencode(sys.argv[2])
 authorization_root = os.fsencode(sys.argv[3])
+mode = sys.argv[4]
 lock_root_stat = os.lstat(lock_root)
 authorization_root_stat = os.lstat(authorization_root)
 for metadata in (lock_root_stat, authorization_root_stat):
@@ -580,6 +683,97 @@ for metadata in (lock_root_stat, authorization_root_stat):
         or stat.S_IMODE(metadata.st_mode) != 0o700
     ):
         raise SystemExit(70)
+if mode == "resume":
+    lock_stat = os.lstat(lock_path)
+    if (
+        not stat.S_ISDIR(lock_stat.st_mode)
+        or stat.S_ISLNK(lock_stat.st_mode)
+        or lock_stat.st_uid != os.getuid()
+        or stat.S_IMODE(lock_stat.st_mode) != 0o700
+        or os.listdir(lock_path) != [b"owner-token"]
+    ):
+        raise SystemExit(70)
+    token_path = os.path.join(lock_path, b"owner-token")
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(token_path, flags)
+    try:
+        token_stat = os.fstat(descriptor)
+        token_raw = os.read(descriptor, 66)
+        token_after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    token_path_stat = os.lstat(token_path)
+    token_identities = {
+        (
+            item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns,
+            item.st_ctime_ns, item.st_mode, item.st_nlink, item.st_uid,
+        )
+        for item in (token_stat, token_after, token_path_stat)
+    }
+    try:
+        token = token_raw.decode("ascii", errors="strict").rstrip("\n")
+    except UnicodeError:
+        raise SystemExit(70)
+    if (
+        len(token_identities) != 1
+        or not stat.S_ISREG(token_stat.st_mode)
+        or token_stat.st_nlink != 1
+        or token_stat.st_uid != os.getuid()
+        or stat.S_IMODE(token_stat.st_mode) != 0o600
+        or token_raw not in {
+            token.encode("ascii"),
+            (token + "\n").encode("ascii"),
+        }
+        or len(token) != 64
+        or any(character not in "0123456789abcdef" for character in token)
+    ):
+        raise SystemExit(70)
+    token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+    authorization_path = os.path.join(
+        authorization_root,
+        f"deploy-{token_digest}.owner-token".encode("ascii"),
+    )
+    authorization_descriptor = os.open(authorization_path, flags)
+    try:
+        authorization_stat = os.fstat(authorization_descriptor)
+        authorization_raw = os.read(authorization_descriptor, 66)
+        authorization_after = os.fstat(authorization_descriptor)
+    finally:
+        os.close(authorization_descriptor)
+    authorization_path_stat = os.lstat(authorization_path)
+    authorization_identities = {
+        (
+            item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns,
+            item.st_ctime_ns, item.st_mode, item.st_nlink, item.st_uid,
+        )
+        for item in (
+            authorization_stat,
+            authorization_after,
+            authorization_path_stat,
+        )
+    }
+    if (
+        len(authorization_identities) != 1
+        or not stat.S_ISREG(authorization_stat.st_mode)
+        or authorization_stat.st_nlink != 1
+        or authorization_stat.st_uid != os.getuid()
+        or stat.S_IMODE(authorization_stat.st_mode) != 0o600
+        or not hmac.compare_digest(authorization_raw, token_raw)
+    ):
+        raise SystemExit(70)
+    print(
+        f"{token}|{lock_stat.st_dev}:{lock_stat.st_ino}|"
+        f"{token_stat.st_dev}:{token_stat.st_ino}|"
+        f"{authorization_stat.st_dev}:{authorization_stat.st_ino}|"
+        f"{os.fsdecode(authorization_path)}"
+    )
+    raise SystemExit(0)
+if mode != "acquire":
+    raise SystemExit(70)
 token = secrets.token_hex(32)
 token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
 staging_path = os.path.join(
@@ -699,7 +893,8 @@ print(
     f"{authorization_stat.st_dev}:{authorization_stat.st_ino}|"
     f"{os.fsdecode(authorization_path)}"
 )
-' "$DEPLOY_LOCK_ROOT" "$DEPLOY_LOCK_DIR" "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT"
+' "$DEPLOY_LOCK_ROOT" "$DEPLOY_LOCK_DIR" "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" \
+    "$lock_acquire_mode"
 )"; then
   :
 else
@@ -729,6 +924,9 @@ if [[ ! "$deploy_lock_owner_token" =~ ^[0-9a-f]{64}$ \
   exit 70
 fi
 deploy_lock_active=1
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  epoch_rotation_fail_forward_required=1
+fi
 
 release_deploy_lock() {
   if ((deploy_lock_active == 0)); then
@@ -830,6 +1028,12 @@ finally:
 release_only_on_exit() {
   local failure_status="$?"
   trap - EXIT
+  if ((epoch_rotation_fail_forward_required == 1 \
+    && deploy_lock_active == 1)); then
+    deploy_lock_active=0
+    echo "release-upload ticket epoch outcome is uncertain; authenticated mutation lock retained" >&2
+    exit 76
+  fi
   if ! release_deploy_lock; then
     echo "failed to release public edge deployment lock" >&2
     exit 70
@@ -839,6 +1043,12 @@ release_only_on_exit() {
 
 exit_for_signal() {
   local signal_status="$1"
+  if ((epoch_rotation_fail_forward_required == 1 \
+    && deploy_lock_active == 1)); then
+    deploy_lock_active=0
+    echo "release-upload ticket epoch rotation interrupted; authenticated mutation lock retained" >&2
+    exit 76
+  fi
   if [[ "$DEPLOY_OPERATION" \
       == initial-release-shelf-public-download-cutover-retire ]] \
     && ((deploy_lock_active == 1)); then
@@ -1187,10 +1397,26 @@ if ((RECOVERY_ROUTE_REQUESTED == 0)); then
     exit 2
   fi
 fi
-DEPLOY_RECEIPT_DIR="$(
-  "$TRUSTED_MKTEMP" -d -- "$CANONICAL_DEPLOY_RECEIPT_ROOT/deploy.XXXXXXXX"
-)"
-"$TRUSTED_CHMOD" 0700 -- "$DEPLOY_RECEIPT_DIR"
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  DEPLOY_RECEIPT_DIR="$(
+    "$TRUSTED_DIRNAME" -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT"
+  )"
+  if [[ "${DEPLOY_RECEIPT_DIR%/*}" != "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
+    || ! "${DEPLOY_RECEIPT_DIR##*/}" =~ ^deploy\.[A-Za-z0-9]{8}$ \
+    || "${RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT##*/}" \
+      != "release-upload-ticket-epoch-rotation.json" \
+    || ! -d "$DEPLOY_RECEIPT_DIR" || -L "$DEPLOY_RECEIPT_DIR" \
+    || ! -O "$DEPLOY_RECEIPT_DIR" \
+    || "$("$TRUSTED_STAT" -c '%a' -- "$DEPLOY_RECEIPT_DIR")" != 700 ]]; then
+    echo "epoch-rotation resume receipt is outside its exact private deploy root" >&2
+    exit 2
+  fi
+else
+  DEPLOY_RECEIPT_DIR="$(
+    "$TRUSTED_MKTEMP" -d -- "$CANONICAL_DEPLOY_RECEIPT_ROOT/deploy.XXXXXXXX"
+  )"
+  "$TRUSTED_CHMOD" 0700 -- "$DEPLOY_RECEIPT_DIR"
+fi
 OVERLAY_STAGE_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-stage.json"
 OVERLAY_ACTIVATION_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-activation.json"
 OVERLAY_ROLLBACK_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-rollback.json"
@@ -1198,6 +1424,9 @@ OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.js
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
 PREACTIVATION_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/preactivation-compose-runtime-attestation.json"
 DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 0)); then
+  RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT="$DEPLOY_RECEIPT_DIR/release-upload-ticket-epoch-rotation.json"
+fi
 PRECOMPLETION_TRANSACTION_BACKUP="$DEPLOY_RECEIPT_DIR/precompletion-overlay-transaction.json"
 STEADY_COMPOSE_ATTESTATION_OUTPUT="$DEPLOY_RECEIPT_DIR/steady-compose-runtime-attestation.json"
 COMPOSE_SOURCE_SNAPSHOT="$DEPLOY_RECEIPT_DIR/docker-compose.public-edge.snapshot.yml"
@@ -1396,6 +1625,105 @@ trusted_source_python() {
     "$TRUSTED_PYTHON" -I "$@"
 }
 
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
+  if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" verify \
+    --source "$COMPOSE_FILE" \
+    --snapshot "$COMPOSE_SOURCE_SNAPSHOT" \
+    --receipt "$COMPOSE_SOURCE_BINDING_RECEIPT" >/dev/null; then
+    echo "epoch-rotation resume Compose authority is not the original immutable snapshot" >&2
+    exit 76
+  fi
+  resume_receipt_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT"
+  )"
+  resume_receipt_sha256="${resume_receipt_sha256%% *}"
+  if [[ "$resume_receipt_sha256" \
+    != "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256" ]]; then
+    echo "epoch-rotation resume receipt does not match its external pin" >&2
+    exit 76
+  fi
+  old_ticket_proof_args=()
+  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" ]]; then
+    old_ticket_proof_args=(
+      --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH"
+      --old-ticket-sha256 "$RELEASE_UPLOAD_OLD_TICKET_SHA256"
+    )
+  fi
+  epoch_rotation_status=0
+  printf '%s\n' "$deploy_lock_owner_token" \
+    | trusted_source_python \
+      "$SOURCE_ROOT/scripts/rotate_release_upload_ticket_epoch.py" \
+      --env-file "$ENV_FILE" \
+      --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
+      --epoch-authority-output \
+        "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY" \
+      --output "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      --expected-existing-receipt-sha256 \
+        "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_EXPECTED_SHA256" \
+      --expected-env-sha256-before \
+        "$RELEASE_UPLOAD_TICKET_ENV_SHA256_BEFORE" \
+      --expected-image-id "$RELEASE_UPLOAD_TICKET_EXPECTED_IMAGE_ID" \
+      --expected-proof-sha256 \
+        "$RELEASE_UPLOAD_TICKET_PROOF_BIND_SOURCE_SHA256" \
+      --image-tag "$IMAGE_TAG" \
+      --expected-source-head "${EXPECTED_HEAD,,}" \
+      --new-epoch "$RELEASE_UPLOAD_TICKET_NEXT_EPOCH" \
+      --expected-portal-replicas 1 \
+      --shared-mutation-lock-fd 0 \
+      --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT" \
+      --docker-context "$CANONICAL_DOCKER_CONTEXT" \
+      --compose-file "$COMPOSE_SOURCE_SNAPSHOT" \
+      --project-name "$COMPOSE_PROJECT" \
+      --source-root "$SOURCE_ROOT" \
+      --build-context "$BUILD_CONTEXT" \
+      --overlay-root "$OVERLAY_ROOT" \
+      --projection-root "$PROJECTION_SNAPSHOT_ROOT" \
+      --proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
+      --published-port "$PUBLIC_EDGE_PORT" \
+      --base-url "$BASE_URL" \
+      "${old_ticket_proof_args[@]}" \
+      >/dev/null || epoch_rotation_status=$?
+  RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="$(
+    "$TRUSTED_SHA256SUM" -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT"
+  )" || exit 76
+  RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="${RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256%% *}"
+  if [[ ! "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+    =~ ^[0-9a-f]{64}$ ]]; then
+    exit 76
+  fi
+  if ((epoch_rotation_status == 75)); then
+    epoch_rotation_fail_forward_required=0
+    if ! release_deploy_lock; then
+      echo "precommit epoch rotation refusal but failed to release its authenticated mutation lock" >&2
+      exit 70
+    fi
+    trap - EXIT HUP INT TERM
+    printf \
+      'release_upload_ticket_epoch_refused_before_commit receipt=%s receipt_sha256=%s\n' \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" >&2
+    exit 75
+  fi
+  if ((epoch_rotation_status != 0)); then
+    printf \
+      'release_upload_ticket_epoch_resume_incomplete receipt=%s receipt_sha256=%s\n' \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+      "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" >&2
+    exit "$epoch_rotation_status"
+  fi
+  epoch_rotation_fail_forward_required=0
+  if ! release_deploy_lock; then
+    echo "completed epoch rotation but failed to release its authenticated mutation lock" >&2
+    exit 70
+  fi
+  trap - EXIT HUP INT TERM
+  printf \
+    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s\n' \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256"
+  exit 0
+fi
+
 if ! trusted_source_python "$COMPOSE_SOURCE_ATTESTOR" capture \
   --source "$COMPOSE_FILE" \
   --snapshot "$COMPOSE_SOURCE_SNAPSHOT" \
@@ -1503,7 +1831,7 @@ case "$DEPLOY_OPERATION" in
       exit 2
     fi
     ;;
-  deploy)
+  deploy|release-upload-ticket-epoch-rotate)
     if [[ "$CUTOVER_STATE_CLASSIFICATION" == steady-handoff ]]; then
       CUTOVER_STEADY_HANDOFF=1
     elif [[ "$CUTOVER_STATE_CLASSIFICATION" == unknown-outcome ]]; then
@@ -1834,8 +2162,9 @@ if ((RECOVERY_ROUTE_REQUESTED == 1)); then
     echo "public_edge_deploy_runtime_recovery_complete; entering release-shelf recovery-only posture"
     exec "$SCRIPT_PATH" initial-release-shelf-cutover-recover
   fi
-  if [[ "$DEPLOY_OPERATION" == deploy ]]; then
-    echo "public_edge_deploy_recovered_interrupted_transaction; rerun deploy explicitly"
+  if [[ "$DEPLOY_OPERATION" == deploy \
+    || "$DEPLOY_OPERATION" == release-upload-ticket-epoch-rotate ]]; then
+    echo "public_edge_deploy_recovered_interrupted_transaction; rerun the requested deployment operation explicitly"
   else
     if [[ "$CUTOVER_STATE_CLASSIFICATION" == steady-handoff ]]; then
       echo "initial_release_shelf_cutover_committed_safe_handoff; run deploy for canonical true/false steady state"
@@ -3452,7 +3781,9 @@ if [[ -n "$existing_candidate_container_id" ]]; then
   exit 3
 fi
 
-if ! prior_tunnel_container_id="$(compose_cli ps --all -q chummer-run-cloudflared)"; then
+if ! prior_tunnel_container_id="$(
+  compose_cli ps --all -q "$CANONICAL_TUNNEL_PRIMARY_SERVICE"
+)"; then
   echo "could not query prior public-edge tunnel container" >&2
   exit 3
 fi
@@ -3475,6 +3806,45 @@ if [[ -n "$prior_tunnel_container_id" ]]; then
   [[ "$prior_tunnel_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 3
   case "$prior_tunnel_running_state" in
     true) prior_tunnel_was_running=1 ;;
+    false) ;;
+    *) exit 3 ;;
+  esac
+fi
+if ! prior_tunnel_replica_container_id="$(
+  compose_cli ps --all -q "$CANONICAL_TUNNEL_REPLICA_SERVICE"
+)"; then
+  echo "could not query prior public-edge tunnel replica container" >&2
+  exit 3
+fi
+if [[ "$prior_tunnel_replica_container_id" == *$'\n'* ]]; then
+  echo "public-edge tunnel replica resolved to more than one prior container" >&2
+  exit 3
+fi
+prior_tunnel_replica_image_id=""
+prior_tunnel_replica_was_running=0
+prior_tunnel_replica_existed=0
+if [[ -n "$prior_tunnel_replica_container_id" ]]; then
+  prior_tunnel_replica_existed=1
+  prior_tunnel_replica_container_id="$(
+    docker_cli container inspect --format '{{.Id}}' \
+      "$prior_tunnel_replica_container_id"
+  )" || exit 3
+  [[ "$prior_tunnel_replica_container_id" =~ ^[0-9a-f]{64}$ ]] || exit 3
+  if [[ "$prior_tunnel_replica_container_id" == "$prior_tunnel_container_id" ]]; then
+    echo "canonical Cloudflare connectors resolved to the same container" >&2
+    exit 3
+  fi
+  prior_tunnel_replica_image_id="$(
+    docker_cli container inspect --format '{{.Image}}' \
+      "$prior_tunnel_replica_container_id"
+  )" || exit 3
+  prior_tunnel_replica_running_state="$(
+    docker_cli container inspect --format '{{.State.Running}}' \
+      "$prior_tunnel_replica_container_id"
+  )" || exit 3
+  [[ "$prior_tunnel_replica_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 3
+  case "$prior_tunnel_replica_running_state" in
+    true) prior_tunnel_replica_was_running=1 ;;
     false) ;;
     *) exit 3 ;;
   esac
@@ -3513,6 +3883,10 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction
   --prior-tunnel-image-id "$prior_tunnel_image_id" \
   --prior-tunnel-existed "$prior_tunnel_existed" \
   --prior-tunnel-was-running "$prior_tunnel_was_running" \
+  --prior-tunnel-replica-container-id "$prior_tunnel_replica_container_id" \
+  --prior-tunnel-replica-image-id "$prior_tunnel_replica_image_id" \
+  --prior-tunnel-replica-existed "$prior_tunnel_replica_existed" \
+  --prior-tunnel-replica-was-running "$prior_tunnel_replica_was_running" \
   --staging-root "$OVERLAY_STAGING_ROOT" \
   --backup-root "$OVERLAY_BACKUP_ROOT" \
   --activation-receipt "$OVERLAY_ACTIVATION_OUTPUT" \
@@ -3533,12 +3907,20 @@ install_linking_materializer_invoked=0
 postquiesce_runner_invoked=0
 postquiesce_outcome_resolved=0
 retain_deploy_authority_on_exit=0
+epoch_rotation_fail_forward_required=0
+epoch_rotation_precommit_refused=0
 reconcile_transaction_on_exit() {
   local failure_status="$?"
   local recovery_failed=0
   local exit_reconciled_boundary_sha256
   local exit_postquiesce_classification
   trap - EXIT HUP INT TERM
+  if ((epoch_rotation_fail_forward_required == 1)); then
+    printf \
+      'release_upload_ticket_epoch_fail_forward_required lock=%s receipt=%s\n' \
+      "$DEPLOY_LOCK_DIR" "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" >&2
+    exit "$failure_status"
+  fi
   if ((deployment_transaction_active == 1 \
     && postquiesce_runner_invoked == 1 \
     && postquiesce_outcome_resolved == 0)); then
@@ -3678,10 +4060,13 @@ if ! predrain_boundary_verification="$(
 fi
 
 if ! compose_cli stop chummer-run-cloudflared; then
-  abort_portal_recreate "tunnel drain" 1
+  abort_portal_recreate "primary tunnel drain" 1
+fi
+if ! compose_cli stop chummer-run-cloudflared-replica; then
+  abort_portal_recreate "replica tunnel drain" 1
 fi
 if ! mark_deploy_phase tunnel_drained; then
-  abort_portal_recreate "tunnel drain journal" 1
+  abort_portal_recreate "canonical tunnel drain journal" 1
 fi
 if ((prior_portal_existed == 1 && prior_portal_was_running == 1)) \
   && ! docker_cli container stop "$prior_portal_container_id" >/dev/null; then
@@ -3701,7 +4086,8 @@ if ! INSTALL_LINKING_POSTQUIESCE_VOLUME_INVENTORY_SHA256="$(
   abort_portal_recreate "post-quiesce state-volume consumer inventory" 1
 fi
 
-# With the incumbent portal and tunnel quiesced, repeat the no-local-store,
+# With the incumbent portal and both canonical tunnel connectors quiesced,
+# repeat the no-local-store,
 # remote generation-zero, and runtime-role proofs from the exact retained
 # candidate tool image. The runner inherits this wrapper's canonical mutation
 # lease and preserves every job container/receipt on ambiguous outcomes.
@@ -4380,17 +4766,77 @@ if not any(
     && "$candidate_running" == true ]]
 }
 
+wait_for_exact_container_health() {
+  local container_id="$1"
+  local health_state
+  local -i health_attempt
+  for ((health_attempt = 1; health_attempt <= PORTAL_READY_TIMEOUT_SECONDS; health_attempt++)); do
+    health_state="$(
+      docker_cli container inspect --format \
+        '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+        "$container_id"
+    )" || return 1
+    case "$health_state" in
+      healthy) return 0 ;;
+      starting) "$TRUSTED_SLEEP" 1 ;;
+      unhealthy|none) return 1 ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+
 verify_candidate_tunnel_runtime() {
-  local candidate_tunnel_container_id candidate_tunnel_running_state
-  candidate_tunnel_container_id="$(compose_cli ps --all -q chummer-run-cloudflared)" || return 1
+  local candidate_tunnel_container_id candidate_tunnel_image_id
+  local candidate_tunnel_running_state candidate_tunnel_replica_container_id
+  local candidate_tunnel_replica_image_id candidate_tunnel_replica_running_state
+  candidate_tunnel_container_id="$(
+    compose_cli ps --all -q "$CANONICAL_TUNNEL_PRIMARY_SERVICE"
+  )" || return 1
   [[ -n "$candidate_tunnel_container_id" && "$candidate_tunnel_container_id" != *$'\n'* ]] || return 1
   if ((prior_tunnel_existed == 1)); then
     [[ "$candidate_tunnel_container_id" == "$prior_tunnel_container_id" ]] || return 1
   fi
+  candidate_tunnel_image_id="$(
+    docker_cli container inspect --format '{{.Image}}' "$candidate_tunnel_container_id"
+  )" || return 1
   candidate_tunnel_running_state="$(
     docker_cli container inspect --format '{{.State.Running}}' "$candidate_tunnel_container_id"
   )" || return 1
-  [[ "$candidate_tunnel_running_state" == "true" ]]
+  [[ "$candidate_tunnel_image_id" =~ ^sha256:[0-9a-f]{64}$ \
+    && "$candidate_tunnel_running_state" == "true" ]] || return 1
+  wait_for_exact_container_health "$candidate_tunnel_container_id" || return 1
+  if ((prior_tunnel_existed == 1)); then
+    [[ "$candidate_tunnel_image_id" == "$prior_tunnel_image_id" ]] || return 1
+  fi
+
+  candidate_tunnel_replica_container_id="$(
+    compose_cli ps --all -q "$CANONICAL_TUNNEL_REPLICA_SERVICE"
+  )" || return 1
+  [[ -n "$candidate_tunnel_replica_container_id" \
+    && "$candidate_tunnel_replica_container_id" != *$'\n'* \
+    && "$candidate_tunnel_replica_container_id" \
+      != "$candidate_tunnel_container_id" ]] || return 1
+  if ((prior_tunnel_replica_existed == 1)); then
+    [[ "$candidate_tunnel_replica_container_id" \
+      == "$prior_tunnel_replica_container_id" ]] || return 1
+  fi
+  candidate_tunnel_replica_image_id="$(
+    docker_cli container inspect --format '{{.Image}}' \
+      "$candidate_tunnel_replica_container_id"
+  )" || return 1
+  candidate_tunnel_replica_running_state="$(
+    docker_cli container inspect --format '{{.State.Running}}' \
+      "$candidate_tunnel_replica_container_id"
+  )" || return 1
+  [[ "$candidate_tunnel_replica_image_id" =~ ^sha256:[0-9a-f]{64}$ \
+    && "$candidate_tunnel_replica_running_state" == "true" ]] || return 1
+  wait_for_exact_container_health \
+    "$candidate_tunnel_replica_container_id" || return 1
+  if ((prior_tunnel_replica_existed == 1)); then
+    [[ "$candidate_tunnel_replica_image_id" \
+      == "$prior_tunnel_replica_image_id" ]] || return 1
+  fi
 }
 
 if ! verify_candidate_runtime_identity; then
@@ -4406,15 +4852,30 @@ if ((prior_tunnel_existed == 1)); then
     abort_portal_recreate "tunnel restart" 1
   fi
 else
-  if ! compose_cli up -d --no-build --no-deps chummer-run-cloudflared; then
-    abort_portal_recreate "tunnel creation" 1
+  if ! compose_cli up -d --no-build --no-deps \
+    "$CANONICAL_TUNNEL_PRIMARY_SERVICE"; then
+    abort_portal_recreate "primary tunnel creation" 1
+  fi
+fi
+if ((prior_tunnel_replica_existed == 1)); then
+  if ! docker_cli start "$prior_tunnel_replica_container_id" >/dev/null \
+    || [[ "$(
+      docker_cli container inspect --format '{{.State.Running}}' \
+        "$prior_tunnel_replica_container_id"
+    )" != "true" ]]; then
+    abort_portal_recreate "tunnel replica restart" 1
+  fi
+else
+  if ! compose_cli up -d --no-build --no-deps \
+    "$CANONICAL_TUNNEL_REPLICA_SERVICE"; then
+    abort_portal_recreate "tunnel replica creation" 1
   fi
 fi
 if ! verify_candidate_tunnel_runtime; then
-  abort_portal_recreate "candidate tunnel identity" 1
+  abort_portal_recreate "both candidate tunnel identities" 1
 fi
 if ! mark_deploy_phase tunnel_started; then
-  abort_portal_recreate "tunnel restart journal" 1
+  abort_portal_recreate "both tunnel restarts journal" 1
 fi
 
 postdeploy_command=(
@@ -4822,10 +5283,91 @@ if ((prior_portal_existed == 1)) \
       "$prior_portal_container_id" >&2
   fi
 fi
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
+  old_ticket_proof_args=()
+  if [[ -n "$RELEASE_UPLOAD_OLD_TICKET_PATH" ]]; then
+    old_ticket_proof_args=(
+      --old-ticket-path "$RELEASE_UPLOAD_OLD_TICKET_PATH"
+      --old-ticket-sha256 "$RELEASE_UPLOAD_OLD_TICKET_SHA256"
+    )
+  fi
+  epoch_rotation_status=0
+  # From this point an interrupt must retain the authenticated mutation lease.
+  # The child is the only authority that can distinguish a safe precommit
+  # refusal from an already-crossed credential boundary.
+  epoch_rotation_fail_forward_required=1
+  printf '%s\n' "$deploy_lock_owner_token" \
+    | trusted_source_python \
+      "$SOURCE_ROOT/scripts/rotate_release_upload_ticket_epoch.py" \
+    --env-file "$ENV_FILE" \
+    --active-runtime-authority "$CANONICAL_ACTIVE_RUNTIME_AUTHORITY" \
+    --epoch-authority-output \
+      "$CANONICAL_RELEASE_UPLOAD_TICKET_EPOCH_AUTHORITY" \
+    --output "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+    --expected-env-sha256-before "$INSTALL_LINKING_ENV_SHA256" \
+    --expected-image-id "$image_id" \
+    --expected-proof-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+    --image-tag "$IMAGE_TAG" \
+    --expected-source-head "${EXPECTED_HEAD,,}" \
+    --new-epoch "$RELEASE_UPLOAD_TICKET_NEXT_EPOCH" \
+    --expected-portal-replicas 1 \
+    --shared-mutation-lock-fd 0 \
+    --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    --docker-context "$CANONICAL_DOCKER_CONTEXT" \
+    --compose-file "$COMPOSE_SOURCE_SNAPSHOT" \
+    --project-name "$COMPOSE_PROJECT" \
+    --source-root "$SOURCE_ROOT" \
+    --build-context "$BUILD_CONTEXT" \
+    --overlay-root "$OVERLAY_ROOT" \
+    --projection-root "$PROJECTION_SNAPSHOT_ROOT" \
+    --proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
+    --published-port "$PUBLIC_EDGE_PORT" \
+    --base-url "$BASE_URL" \
+    "${old_ticket_proof_args[@]}" \
+    >/dev/null \
+    || epoch_rotation_status=$?
+  case "$epoch_rotation_status" in
+    0)
+      RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="$(
+        "$TRUSTED_SHA256SUM" -- "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT"
+      )" || exit 70
+      RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256="${RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256%% *}"
+      if [[ ! "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256" \
+        =~ ^[0-9a-f]{64}$ ]]; then
+        exit 70
+      fi
+      epoch_rotation_fail_forward_required=0
+      ;;
+    76)
+      exit 76
+      ;;
+    75)
+      epoch_rotation_fail_forward_required=0
+      epoch_rotation_precommit_refused=1
+      ;;
+    *)
+      echo "release-upload ticket epoch rotation outcome requires authenticated fail-forward resume; inspect the private receipt" >&2
+      exit "$epoch_rotation_status"
+      ;;
+  esac
+fi
 if ! release_deploy_lock; then
   echo "failed to release public edge deployment lock" >&2
   exit 70
 fi
 trap - EXIT HUP INT TERM
 
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1 \
+  && epoch_rotation_precommit_refused == 1)); then
+  printf \
+    'release_upload_ticket_epoch_refused_before_commit receipt=%s\n' \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" >&2
+  exit 75
+fi
+if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1)); then
+  printf \
+    'release_upload_ticket_epoch_rotated receipt=%s receipt_sha256=%s\n' \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT" \
+    "$RELEASE_UPLOAD_TICKET_EPOCH_RECEIPT_SHA256"
+fi
 printf 'public_edge_portal_deployed %s\n' "$image_id"

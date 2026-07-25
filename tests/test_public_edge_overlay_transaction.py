@@ -69,6 +69,10 @@ def runtime_prior_state() -> dict[str, object]:
         "priorTunnelImageId": "sha256:" + "4" * 64,
         "priorTunnelExisted": True,
         "priorTunnelWasRunning": True,
+        "priorTunnelReplicaContainerId": "",
+        "priorTunnelReplicaImageId": "",
+        "priorTunnelReplicaExisted": False,
+        "priorTunnelReplicaWasRunning": False,
     }
 
 
@@ -768,6 +772,39 @@ def test_deploy_snapshot_rejects_inconsistent_runtime_prior_state(
             shared_mutation_lock_token="3" * 64,
             runtime_prior_state=state,
         )
+
+
+def test_runtime_prior_state_rejects_legacy_unknown_replica_and_validates_replica() -> None:
+    module = load_module()
+    legacy = runtime_prior_state()
+    for field in (
+        "priorTunnelReplicaContainerId",
+        "priorTunnelReplicaImageId",
+        "priorTunnelReplicaExisted",
+        "priorTunnelReplicaWasRunning",
+    ):
+        legacy.pop(field)
+
+    with pytest.raises(
+        RuntimeError,
+        match="lacks canonical tunnel replica authority",
+    ):
+        module.validate_runtime_prior_state(legacy)
+
+    current = dict(legacy)
+    current.update(
+        {
+            "priorTunnelReplicaContainerId": "c" * 64,
+            "priorTunnelReplicaImageId": "sha256:" + "6" * 64,
+            "priorTunnelReplicaExisted": True,
+            "priorTunnelReplicaWasRunning": True,
+        }
+    )
+    assert module.validate_runtime_prior_state(current) == current
+
+    current["priorTunnelReplicaContainerId"] = ""
+    with pytest.raises(RuntimeError, match="tunnelreplica identities"):
+        module.validate_runtime_prior_state(current)
 
 
 def test_deploy_snapshot_rejects_unsealed_runtime_proof_authority(
@@ -1471,6 +1508,15 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
     assert "active-overlay-transaction.json" in script
     assert '--prior-tool-image-tag-id "$prior_tool_image_tag_id"' in script
     assert '--prior-tunnel-image-id "$prior_tunnel_image_id"' in script
+    assert (
+        '--prior-tunnel-replica-image-id "$prior_tunnel_replica_image_id"'
+        in script
+    )
+    assert "compose_cli stop chummer-run-cloudflared-replica" in script
+    assert (
+        'compose_cli ps --all -q "$CANONICAL_TUNNEL_REPLICA_SERVICE"'
+        in script
+    )
     assert "replacement_portal_may_exist" not in script
     assert 'proof.get("sha256")' in script
     assert "if before != after:" in script
