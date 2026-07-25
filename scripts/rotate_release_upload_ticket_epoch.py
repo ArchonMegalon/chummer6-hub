@@ -3352,7 +3352,11 @@ def run_rotation(
         failure_status, observed_environment_sha256 = observe_epoch_boundary(
             request
         )
-        if failure_status == 75 and prior_ids_for_recovery:
+        precommit_recovery_required = (
+            not committed and bool(prior_ids_for_recovery)
+        )
+        restored_old_portal = False
+        if precommit_recovery_required and failure_status == 75:
             try:
                 runtime.restart_portals(prior_ids_for_recovery)
                 inspect_exact_portals(
@@ -3362,29 +3366,31 @@ def run_rotation(
                     expected_epoch_sha256=old_epoch_sha256_for_recovery,
                     expected_proof_sha256=request.expected_proof_sha256,
                 )
+                restored_old_portal = True
             except Exception:
-                failure_status = 76
                 code = "precommit_portal_restart_failed"
-                try:
-                    receipt["failureContainment"] = (
-                        fail_closed_contain_precommit_portals(
-                            runtime,
-                            durable_prior_ids=prior_ids_for_recovery,
-                        )
+        if precommit_recovery_required and not restored_old_portal:
+            failure_status = 76
+            try:
+                receipt["failureContainment"] = (
+                    fail_closed_contain_precommit_portals(
+                        runtime,
+                        durable_prior_ids=prior_ids_for_recovery,
                     )
-                    if not receipt["failureContainment"][
-                        "portalQuiescenceProven"
-                    ]:
-                        failure_status = 70
-                        code = (
-                            "precommit_portal_quiescence_unproven_"
-                            "connectors_stopped"
-                        )
-                except Exception:
+                )
+                if not receipt["failureContainment"][
+                    "portalQuiescenceProven"
+                ]:
                     failure_status = 70
                     code = (
-                        "precommit_emergency_containment_not_proven"
+                        "precommit_portal_quiescence_unproven_"
+                        "connectors_stopped"
                     )
+            except Exception:
+                failure_status = 70
+                code = (
+                    "precommit_emergency_containment_not_proven"
+                )
         fail_forward_required = failure_status == 76
         if fail_forward_required and observed_environment_sha256:
             receipt["environmentSha256After"] = observed_environment_sha256

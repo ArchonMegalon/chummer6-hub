@@ -1423,6 +1423,71 @@ def test_empty_enumerations_do_not_replace_durable_prior_identity_proof(
     assert runtime.portal_running is False
 
 
+def test_third_epoch_drift_still_requires_durable_portal_containment(
+    rotation_fixture,
+) -> None:
+    module, request, runtime = rotation_fixture
+
+    def fail_before_stop(container_ids):
+        runtime.actions.append(
+            ("quiesce-failed-before-stop", container_ids)
+        )
+        request.env_file.write_text(
+            f"{module.EPOCH_KEY}=unexpected-third-epoch\n",
+            encoding="utf-8",
+        )
+        request.env_file.chmod(0o600)
+        raise module.RotationError("injected_quiesce_before_stop")
+
+    runtime.quiesce_portals = fail_before_stop
+
+    status, receipt = module.run_rotation(request, runtime)
+
+    assert status == 76
+    assert receipt["status"] == "fail_forward_required"
+    assert receipt["failureCode"] == "injected_quiesce_before_stop"
+    assert receipt["failureContainment"] == {
+        "portalQuiescenceProven": True,
+        "publicConnectorsStopped": False,
+    }
+    assert ("quiesce-known", (OLD_PORTAL_ID,)) in runtime.actions
+    assert runtime.portal_running is False
+
+
+def test_third_epoch_drift_and_unproven_stop_cut_connectors_with_70(
+    rotation_fixture,
+) -> None:
+    module, request, runtime = rotation_fixture
+    runtime.block_requiesce_after_restart = True
+
+    def fail_before_stop(container_ids):
+        runtime.actions.append(
+            ("quiesce-failed-before-stop", container_ids)
+        )
+        request.env_file.write_text(
+            f"{module.EPOCH_KEY}=unexpected-third-epoch\n",
+            encoding="utf-8",
+        )
+        request.env_file.chmod(0o600)
+        raise module.RotationError("injected_quiesce_before_stop")
+
+    runtime.quiesce_portals = fail_before_stop
+
+    status, receipt = module.run_rotation(request, runtime)
+
+    assert status == 70
+    assert receipt["status"] == "emergency_public_connectors_stopped"
+    assert receipt["failureCode"] == (
+        "precommit_portal_quiescence_unproven_connectors_stopped"
+    )
+    assert receipt["failureContainment"] == {
+        "portalQuiescenceProven": False,
+        "publicConnectorsStopped": True,
+    }
+    assert runtime.portal_running is True
+    assert runtime.connectors_running is False
+
+
 def test_empty_enumerations_and_unproven_prior_stop_require_connector_cut_70(
     rotation_fixture,
 ) -> None:
