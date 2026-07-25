@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
+import errno
 import hashlib
 import importlib.util
 import json
@@ -181,6 +182,24 @@ def exact_bundle(
     )
 
 
+def rebound_bundle(
+    proof: dict[str, Any],
+    terminal: dict[str, Any],
+    post_marker: dict[str, Any],
+) -> tuple[bytes, bytes, bytes]:
+    terminal_raw = json_bytes(terminal)
+    post_marker_raw = json_bytes(post_marker)
+    proof["committedBoundaryReceipt"] = {
+        "sha256": hashlib.sha256(terminal_raw).hexdigest(),
+        "sizeBytes": len(terminal_raw),
+    }
+    proof["postMarkerConvergenceReceipt"] = {
+        "sha256": hashlib.sha256(post_marker_raw).hexdigest(),
+        "sizeBytes": len(post_marker_raw),
+    }
+    return json_bytes(proof), terminal_raw, post_marker_raw
+
+
 def test_public_bundle_validator_accepts_exact_terminal_bound_proof() -> None:
     proof, proof_raw, _terminal, terminal_raw, _post, post_raw = (
         exact_bundle()
@@ -196,6 +215,52 @@ def test_public_bundle_validator_accepts_exact_terminal_bound_proof() -> None:
     )
 
     assert validated == proof
+
+
+def test_stale_envelope_refresh_policy_never_accepts_future_time() -> None:
+    observed = datetime.now(UTC).replace(microsecond=0)
+    (
+        _proof,
+        stale_proof_raw,
+        _terminal,
+        stale_terminal_raw,
+        _post,
+        stale_post_raw,
+    ) = exact_bundle(generated_at=observed - timedelta(days=2))
+
+    controller.validate_topology_b_public_retirement_bundle(
+        proof_bytes=stale_proof_raw,
+        committed_boundary_bytes=stale_terminal_raw,
+        post_marker_bytes=stale_post_raw,
+        expected_source_head="b" * 40,
+        expected_publisher_sha256="6" * 64,
+        cloudflare=cloudflare,
+        now=observed,
+        allow_expired=True,
+    )
+
+    (
+        _proof,
+        future_proof_raw,
+        _terminal,
+        future_terminal_raw,
+        _post,
+        future_post_raw,
+    ) = exact_bundle(generated_at=observed + timedelta(minutes=6))
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="stale or future-dated",
+    ):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=future_proof_raw,
+            committed_boundary_bytes=future_terminal_raw,
+            post_marker_bytes=future_post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+            now=observed,
+            allow_expired=True,
+        )
 
 
 @pytest.mark.parametrize(
@@ -222,6 +287,174 @@ def test_public_bundle_validator_rejects_boolean_integer_confusion(
             expected_source_head="b" * 40,
             expected_publisher_sha256="6" * 64,
             cloudflare=cloudflare,
+        )
+
+
+def test_public_bundle_validator_rejects_post_marker_boolean_version() -> None:
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = (
+        exact_bundle()
+    )
+    convergence = connector_gate(0)
+    post["restoredVersion"] = False
+    post["connectorConvergence"] = convergence
+    post["connectorConvergenceSha256"] = canonical_sha256(convergence)
+    terminal["restoredVersion"] = 0
+    terminal["postMarkerConnectorGateSha256"] = canonical_sha256(post)
+    terminal["latestConnectorGateSha256"] = canonical_sha256(post)
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="boundary drifted",
+    ):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "match"),
+    (
+        (
+            "original-post-marker-digest",
+            "original post-marker connector convergence digest drifted",
+        ),
+        (
+            "resume-equals-original",
+            "resume post-marker connector convergence digest drifted",
+        ),
+        (
+            "incumbent-observation",
+            "incumbent observation differs from baseline",
+        ),
+    ),
+)
+def test_public_bundle_validator_rejects_semantic_inconsistency(
+    mutation: str,
+    match: str,
+) -> None:
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = (
+        exact_bundle()
+    )
+    if mutation == "original-post-marker-digest":
+        terminal["postMarkerConnectorGateSha256"] = "f" * 64
+    elif mutation == "resume-equals-original":
+        post["boundary"] = "resume-post-marker"
+        digest = canonical_sha256(post)
+        terminal["postMarkerConnectorGateSha256"] = digest
+        terminal["latestConnectorGateSha256"] = digest
+    else:
+        terminal["incumbentObservationSha256"] = "e" * 64
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(controller.RecoveryUncertain, match=match):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+        )
+
+
+def test_resume_post_marker_may_follow_terminal_but_not_fresh_envelope() -> None:
+    terminal_time = datetime.now(UTC).replace(microsecond=0)
+    envelope_time = terminal_time + timedelta(hours=2)
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = exact_bundle(
+        generated_at=terminal_time
+    )
+    post["boundary"] = "resume-post-marker"
+    post["verifiedAtUtc"] = (
+        terminal_time + timedelta(hours=1)
+    ).isoformat().replace("+00:00", "Z")
+    terminal["postMarkerConnectorGateSha256"] = "f" * 64
+    terminal["latestConnectorGateSha256"] = canonical_sha256(post)
+    proof["generatedAt"] = envelope_time.isoformat().replace("+00:00", "Z")
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    controller.validate_topology_b_public_retirement_bundle(
+        proof_bytes=proof_raw,
+        committed_boundary_bytes=terminal_raw,
+        post_marker_bytes=post_raw,
+        expected_source_head="b" * 40,
+        expected_publisher_sha256="6" * 64,
+        cloudflare=cloudflare,
+        now=envelope_time,
+    )
+
+    post["verifiedAtUtc"] = (
+        envelope_time + timedelta(seconds=1)
+    ).isoformat().replace("+00:00", "Z")
+    terminal["latestConnectorGateSha256"] = canonical_sha256(post)
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="later than the fresh public envelope",
+    ):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+            now=envelope_time,
+        )
+
+
+def test_original_post_marker_must_not_follow_terminal_completion() -> None:
+    terminal_time = datetime.now(UTC).replace(microsecond=0)
+    envelope_time = terminal_time + timedelta(hours=2)
+    proof, _proof_raw, terminal, _terminal_raw, post, _post_raw = exact_bundle(
+        generated_at=terminal_time
+    )
+    post["verifiedAtUtc"] = (
+        terminal_time + timedelta(seconds=1)
+    ).isoformat().replace("+00:00", "Z")
+    digest = canonical_sha256(post)
+    terminal["postMarkerConnectorGateSha256"] = digest
+    terminal["latestConnectorGateSha256"] = digest
+    proof["generatedAt"] = envelope_time.isoformat().replace("+00:00", "Z")
+    proof_raw, terminal_raw, post_raw = rebound_bundle(
+        proof,
+        terminal,
+        post,
+    )
+
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="later than completion",
+    ):
+        controller.validate_topology_b_public_retirement_bundle(
+            proof_bytes=proof_raw,
+            committed_boundary_bytes=terminal_raw,
+            post_marker_bytes=post_raw,
+            expected_source_head="b" * 40,
+            expected_publisher_sha256="6" * 64,
+            cloudflare=cloudflare,
+            now=envelope_time,
         )
 
 
@@ -415,6 +648,20 @@ def shelf_reader(config: SimpleNamespace):
     return read
 
 
+def proof_time(
+    result: dict[str, Any],
+    *,
+    minutes: int = 1,
+) -> datetime:
+    completed = datetime.fromisoformat(
+        result["terminalReceipt"]["completedAtUtc"].replace(
+            "Z",
+            "+00:00",
+        )
+    )
+    return completed + timedelta(minutes=minutes)
+
+
 def test_materializer_commits_content_before_fixed_proof_and_is_idempotent(
     tmp_path: Path,
 ) -> None:
@@ -427,6 +674,7 @@ def test_materializer_commits_content_before_fixed_proof_and_is_idempotent(
         attempts=1,
         sleep_fn=lambda _seconds: None,
         interval_seconds=0,
+        now=proof_time(result),
     )
     proof_path = (
         config.shelf_root
@@ -443,6 +691,7 @@ def test_materializer_commits_content_before_fixed_proof_and_is_idempotent(
         attempts=1,
         sleep_fn=lambda _seconds: None,
         interval_seconds=0,
+        now=proof_time(result),
     )
 
     assert second == first
@@ -488,6 +737,7 @@ def test_materializer_prefers_latest_resume_post_marker_gate(
             attempts=1,
             sleep_fn=lambda _seconds: None,
             interval_seconds=0,
+            now=proof_time(result),
         )
     )
 
@@ -528,6 +778,7 @@ def test_materializer_recovers_after_interruption_before_commit_marker(
             attempts=1,
             sleep_fn=lambda _seconds: None,
             interval_seconds=0,
+            now=proof_time(result),
         )
     assert events[-1] == controller.TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME
     assert not (
@@ -555,11 +806,371 @@ def test_materializer_recovers_after_interruption_before_commit_marker(
         attempts=1,
         sleep_fn=lambda _seconds: None,
         interval_seconds=0,
+        now=proof_time(result),
     )
     assert (
         config.shelf_root
         / controller.TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME
     ).is_file()
+
+
+def test_materializer_refreshes_old_terminal_envelope_from_descendant_main(
+    tmp_path: Path,
+) -> None:
+    config, result = materialization_fixture(tmp_path)
+    current_head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    terminal_head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD^"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    terminal = result["terminalReceipt"]
+    terminal["controllerSourceHead"] = terminal_head
+    result["controllerSourceHead"] = terminal_head
+    journal = json.loads(config.operation_journal.read_text())
+    journal["receipts"]["retirement"] = terminal
+    config.operation_journal.write_bytes(json_bytes(journal))
+    config.retirement_receipt.write_bytes(json_bytes(terminal))
+    config.controller_source_head = current_head
+    immutable_terminal = config.retirement_receipt.read_bytes()
+    first_time = proof_time(result)
+    second_time = first_time + timedelta(days=2)
+
+    controller.materialize_topology_b_public_retirement_proof(
+        config,
+        result,
+        public_reader=shelf_reader(config),
+        attempts=1,
+        sleep_fn=lambda _seconds: None,
+        interval_seconds=0,
+        now=first_time,
+    )
+    proof_path = (
+        config.shelf_root
+        / controller.TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME
+    )
+    first_proof = proof_path.read_bytes()
+    refreshed = controller.materialize_topology_b_public_retirement_proof(
+        config,
+        result,
+        public_reader=shelf_reader(config),
+        attempts=1,
+        sleep_fn=lambda _seconds: None,
+        interval_seconds=0,
+        now=second_time,
+    )
+    second_proof = proof_path.read_bytes()
+    payload = json.loads(second_proof)
+
+    assert first_proof != second_proof
+    assert payload["generatedAt"] == second_time.isoformat().replace(
+        "+00:00",
+        "Z",
+    )
+    assert payload["source"]["commit"] == terminal_head
+    assert refreshed["sourceHead"] == terminal_head
+    assert refreshed["materializerSourceHead"] == current_head
+    assert config.retirement_receipt.read_bytes() == immutable_terminal
+
+
+def test_materializer_migrates_legacy_receipt_during_envelope_refresh(
+    tmp_path: Path,
+) -> None:
+    config, result = materialization_fixture(tmp_path)
+    first_time = proof_time(result)
+    first = controller.materialize_topology_b_public_retirement_proof(
+        config,
+        result,
+        public_reader=shelf_reader(config),
+        attempts=1,
+        sleep_fn=lambda _seconds: None,
+        interval_seconds=0,
+        now=first_time,
+    )
+    legacy = deepcopy(first)
+    legacy["contractName"] = (
+        "chummer.public-download-topology-b-retirement-"
+        "proof-materialization/v1"
+    )
+    legacy.pop("materializerSourceHead")
+    legacy.pop("terminalCompletedAt")
+    config.public_retirement_materialization_receipt.write_bytes(
+        json_bytes(legacy)
+    )
+
+    refreshed = controller.materialize_topology_b_public_retirement_proof(
+        config,
+        result,
+        public_reader=shelf_reader(config),
+        attempts=1,
+        sleep_fn=lambda _seconds: None,
+        interval_seconds=0,
+        now=first_time + timedelta(days=2),
+    )
+
+    assert refreshed["contractName"] == (
+        controller.TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT
+    )
+    assert refreshed["sourceHead"] == first["sourceHead"]
+    assert refreshed["committedBoundary"] == first["committedBoundary"]
+    assert (
+        refreshed["postMarkerConvergence"]
+        == first["postMarkerConvergence"]
+    )
+
+
+def test_public_content_publication_recovers_past_orphan_staging_without_links(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "downloads"
+    root.mkdir(mode=0o755)
+    target = root / f"committed-boundary-{'a' * 64}.json"
+    stale = root / f".{target.name}.deadbeef.staging"
+    stale.write_bytes(b"partial")
+    stale.chmod(0o600)
+
+    def unexpected_link(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("public publication must not create hard links")
+
+    monkeypatch.setattr(controller.os, "link", unexpected_link)
+    controller._atomic_public_retirement_write(
+        target,
+        b'{"status":"retired"}\n',
+        replace=False,
+    )
+
+    assert target.read_bytes() == b'{"status":"retired"}\n'
+    assert target.stat().st_nlink == 1
+    assert target.stat().st_mode & 0o777 == 0o444
+    assert stale.read_bytes() == b"partial"
+
+
+def test_public_content_publication_uses_macos_atomic_exclusive_rename(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[Any, ...]] = []
+
+    class Rename:
+        argtypes: Any = None
+        restype: Any = None
+
+        def __call__(self, *args: Any) -> int:
+            calls.append(args)
+            return 0
+
+    library = SimpleNamespace(renameatx_np=Rename())
+    monkeypatch.setattr(controller.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        controller.ctypes,
+        "CDLL",
+        lambda *_args, **_kwargs: library,
+    )
+
+    assert controller._rename_public_retirement_noreplace(
+        23,
+        ".proof.staging",
+        "proof.json",
+    )
+    assert calls == [
+        (
+            23,
+            b".proof.staging",
+            23,
+            b"proof.json",
+            0x00000004,
+        )
+    ]
+
+
+def test_public_content_publication_accepts_only_exact_atomic_race_winner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "downloads"
+    root.mkdir(mode=0o755)
+    target = root / f"post-marker-convergence-{'b' * 64}.json"
+    expected = b'{"status":"pass"}\n'
+
+    def publish_winner(
+        directory_descriptor: int,
+        _source_name: str,
+        target_name: str,
+    ) -> bool:
+        descriptor = os.open(
+            target_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=directory_descriptor,
+        )
+        try:
+            os.write(descriptor, expected)
+            os.fchmod(descriptor, 0o444)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        return False
+
+    monkeypatch.setattr(
+        controller,
+        "_rename_public_retirement_noreplace",
+        publish_winner,
+    )
+    controller._atomic_public_retirement_write(
+        target,
+        expected,
+        replace=False,
+    )
+
+    assert target.read_bytes() == expected
+    assert target.stat().st_nlink == 1
+    assert not any(path.name.endswith(".staging") for path in root.iterdir())
+
+
+def test_public_content_publication_rejects_different_atomic_race_winner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "downloads"
+    root.mkdir(mode=0o755)
+    target = root / f"committed-boundary-{'c' * 64}.json"
+
+    def publish_different_winner(
+        directory_descriptor: int,
+        _source_name: str,
+        target_name: str,
+    ) -> bool:
+        descriptor = os.open(
+            target_name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+            dir_fd=directory_descriptor,
+        )
+        try:
+            os.write(descriptor, b'{"forged":true}\n')
+            os.fchmod(descriptor, 0o444)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        return False
+
+    monkeypatch.setattr(
+        controller,
+        "_rename_public_retirement_noreplace",
+        publish_different_winner,
+    )
+    with pytest.raises(
+        controller.RecoveryUncertain,
+        match="race did not preserve exact bytes",
+    ):
+        controller._atomic_public_retirement_write(
+            target,
+            b'{"status":"retired"}\n',
+            replace=False,
+        )
+
+    assert target.read_bytes() == b'{"forged":true}\n'
+    assert not any(path.name.endswith(".staging") for path in root.iterdir())
+
+
+def test_public_content_publication_retries_after_pre_rename_interruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "downloads"
+    root.mkdir(mode=0o755)
+    target = root / f"committed-boundary-{'d' * 64}.json"
+    expected = b'{"status":"retired"}\n'
+    real_rename = controller._rename_public_retirement_noreplace
+
+    def interrupt(
+        _directory_descriptor: int,
+        _source_name: str,
+        _target_name: str,
+    ) -> bool:
+        raise RuntimeError("simulated pre-rename interruption")
+
+    monkeypatch.setattr(
+        controller,
+        "_rename_public_retirement_noreplace",
+        interrupt,
+    )
+    with pytest.raises(RuntimeError, match="simulated"):
+        controller._atomic_public_retirement_write(
+            target,
+            expected,
+            replace=False,
+        )
+    assert not target.exists()
+    assert not any(path.name.endswith(".staging") for path in root.iterdir())
+
+    monkeypatch.setattr(
+        controller,
+        "_rename_public_retirement_noreplace",
+        real_rename,
+    )
+    controller._atomic_public_retirement_write(
+        target,
+        expected,
+        replace=False,
+    )
+    assert target.read_bytes() == expected
+    assert target.stat().st_nlink == 1
+
+
+def test_public_directory_creation_never_chmods_raced_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "downloads"
+    root.mkdir(mode=0o755)
+    content = root / controller.TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY
+    victim = tmp_path / "victim"
+    victim.write_text("do not chmod", encoding="utf-8")
+    victim.chmod(0o600)
+    real_mkdir = controller.os.mkdir
+
+    def race_mkdir(
+        name: str | bytes,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> None:
+        if name == content.name and dir_fd is not None:
+            os.symlink(victim, name, dir_fd=dir_fd)
+            raise FileExistsError(errno.EEXIST, "raced")
+        real_mkdir(name, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(controller.os, "mkdir", race_mkdir)
+    with pytest.raises(controller.RecoveryUncertain):
+        controller._topology_b_public_directory(content, create=True)
+
+    assert victim.stat().st_mode & 0o777 == 0o600
+
+
+def test_provider_requires_terminal_source_ancestor_of_exact_checkout() -> None:
+    current_head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    ancestor = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD^"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    provider.require_protected_main_ancestry(ancestor, current_head)
+    with pytest.raises(provider.ProofError, match="not an ancestor"):
+        provider.require_protected_main_ancestry("f" * 40, current_head)
 
 
 def test_provider_context_requires_first_attempt_same_actor_main() -> None:
@@ -619,6 +1230,10 @@ def test_provider_capture_emits_exact_three_read_only_entries(
     result = provider.capture_public_bundle(
         source_sha="b" * 40,
         output_dir=output,
+        ancestry_verifier=lambda terminal, provider_head: (
+            terminal == provider_head == "b" * 40
+            or pytest.fail("provider ancestry binding drifted")
+        ),
     )
 
     assert result["status"] == "passed"
@@ -644,6 +1259,7 @@ def test_workflow_is_exact_protected_three_file_authority() -> None:
     assert "runs-on: ubuntu-24.04" in workflow
     assert "permissions:\n  contents: read" in workflow
     assert "persist-credentials: false" in workflow
+    assert "fetch-depth: 0" in workflow
     assert "topology-b-committed-retirement-proof-${{ github.run_id }}-1" in workflow
     assert "overwrite: false" in workflow
     assert "include-hidden-files: false" in workflow

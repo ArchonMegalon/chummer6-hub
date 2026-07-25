@@ -194,24 +194,48 @@ the active-authority marker by hand.
 
 After terminal adoption, the same locked controller writes two immutable,
 content-addressed receipt files and then atomically replaces
-`/downloads/TOPOLOGY_B_RETIREMENT.generated.json` as the commit marker. It
-performs redirect-free, identity-encoded public readback of all three exact
-byte streams before recording success. An interruption before the fixed proof
-write leaves the previous complete proof authoritative; a retry adopts the
-terminal local receipt and completes the public proof without contacting or
-mutating Cloudflare again.
+`/downloads/TOPOLOGY_B_RETIREMENT.generated.json` as the commit marker. The
+fixed file is a refreshable public envelope: its `generatedAt` records the
+current materialization, while its content bindings retain the exact immutable
+terminal completion receipt, latest post-marker receipt, retired authority,
+canonical publisher digest, and terminal controller source commit. The
+terminal source must be an ancestor of the clean current Hub `main` checkout;
+advancing protected `main` therefore cannot rewrite terminal evidence.
+
+Content files use the platform's atomic exclusive rename
+(`renameat2(RENAME_NOREPLACE)` on Linux or
+`renameatx_np(RENAME_EXCL)` on macOS) after an owner-only single-link staging
+file is fully written, set to `0444`, and fsynced. The target never has the
+two-link crash window of link-then-unlink publication. The fixed envelope uses
+an atomic replacement only after both content entries are durable. A crash
+before either rename can leave an inert randomized staging file, but it cannot
+block a retry or become the authoritative target. Directory creation and
+publication use no-follow directory descriptors rather than path-based chmod.
+The controller performs redirect-free, identity-encoded public readback of all
+three exact byte streams before recording success.
+
+An interruption before the fixed proof write leaves the previous complete
+proof authoritative. A retry adopts the terminal local receipt and emits a
+fresh envelope without contacting or mutating Cloudflare again. The 24-hour
+freshness gate applies to this renewable envelope, not to the immutable
+terminal completion time. The first refresh safely migrates an existing
+materialization receipt from v1 to v2 while preserving every immutable
+terminal and content binding.
 
 Once those bytes are live, dispatch
 `.github/workflows/topology-b-committed-retirement-proof.yml` from protected
 Hub `main`. Provision its
 `topology-b-committed-retirement-proof` environment for independent human
 review, prevent self-review and administrator bypass, and allow only `main`.
-The workflow has no secret and read-only repository permission. Its first
-attempt snapshots exactly three read-only files into the artifact
+The workflow has no secret and read-only repository permission. Its full
+checkout proves that the immutable terminal source commit is an ancestor of
+the exact protected `main` commit executing the workflow; equality is not
+required. Its first attempt snapshots exactly three read-only files into the artifact
 `topology-b-committed-retirement-proof-<run-id>-1`; the later UI publication
-transaction authenticates that workflow run, current Hub main, artifact
-metadata, archive digest, and exact bytes through a Hub-scoped read-only
-Actions token. Do not manually create, edit, or re-upload this artifact.
+transaction authenticates that workflow run, current Hub main, source
+ancestry, artifact metadata, archive digest, fresh envelope time, and exact
+bytes through a Hub-scoped read-only Actions token. Do not manually create,
+edit, or re-upload this artifact.
 
 ### Authenticated manual stale-lock recovery
 

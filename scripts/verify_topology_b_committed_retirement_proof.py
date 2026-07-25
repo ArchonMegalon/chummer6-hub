@@ -14,14 +14,16 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import cloudflare_public_download_transaction as cloudflare
 import deploy_public_download_only_cutover as controller
 
 
 ACTOR = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}[A-Za-z0-9])?$")
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class ProofError(RuntimeError):
@@ -73,10 +75,69 @@ def _preflight_binding(
     return digest
 
 
+def require_protected_main_ancestry(
+    terminal_source_sha: str,
+    provider_source_sha: str,
+) -> None:
+    if (
+        controller.COMMIT.fullmatch(terminal_source_sha) is None
+        or controller.COMMIT.fullmatch(provider_source_sha) is None
+    ):
+        fail("Hub source ancestry contains a malformed commit")
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+    try:
+        observed_head = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "rev-parse",
+                "--verify",
+                "HEAD^{commit}",
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout.strip()
+        ancestry = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "merge-base",
+                "--is-ancestor",
+                terminal_source_sha,
+                provider_source_sha,
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        fail(f"Hub protected-main ancestry could not be verified: {exc}")
+    if observed_head != provider_source_sha or ancestry.returncode != 0:
+        fail(
+            "retirement source is not an ancestor of the exact "
+            "provider-authenticated Hub main checkout"
+        )
+
+
 def capture_public_bundle(
     *,
     source_sha: str,
     output_dir: Path,
+    ancestry_verifier: Callable[[str, str], None] | None = None,
 ) -> dict[str, Any]:
     if controller.COMMIT.fullmatch(source_sha) is None:
         fail("Hub source SHA is invalid")
@@ -104,6 +165,21 @@ def capture_public_bundle(
         proof = controller._strict_json_object_bytes(
             proof_bytes,
             label="public topology-B retirement proof",
+        )
+        proof_source = proof.get("source")
+        terminal_source_sha = (
+            proof_source.get("commit")
+            if isinstance(proof_source, dict)
+            else None
+        )
+        if (
+            not isinstance(terminal_source_sha, str)
+            or controller.COMMIT.fullmatch(terminal_source_sha) is None
+        ):
+            fail("topology-B terminal source SHA is malformed")
+        (ancestry_verifier or require_protected_main_ancestry)(
+            terminal_source_sha,
+            source_sha,
         )
         committed_sha = _preflight_binding(
             proof,
@@ -144,7 +220,7 @@ def capture_public_bundle(
             proof_bytes=proof_bytes,
             committed_boundary_bytes=committed_bytes,
             post_marker_bytes=post_marker_bytes,
-            expected_source_head=source_sha,
+            expected_source_head=terminal_source_sha,
             expected_publisher_sha256=publisher_sha256,
             cloudflare=cloudflare,
         )
@@ -183,7 +259,8 @@ def capture_public_bundle(
             "chummer6-hub.topology-b-retirement-provider-snapshot.v1"
         ),
         "status": "passed",
-        "sourceSha": source_sha,
+        "sourceSha": terminal_source_sha,
+        "providerSourceSha": source_sha,
         "entryCount": len(entries),
         "entries": {
             name: {

@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import ctypes
 from dataclasses import dataclass, replace as dataclass_replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+import errno
 import hashlib
 import http.client
 import io
@@ -2698,7 +2700,7 @@ TOPOLOGY_B_PUBLIC_RETIREMENT_FILENAME = (
     "TOPOLOGY_B_RETIREMENT.generated.json"
 )
 TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT = (
-    "chummer.public-download-topology-b-retirement-proof-materialization/v1"
+    "chummer.public-download-topology-b-retirement-proof-materialization/v2"
 )
 TOPOLOGY_B_PUBLIC_RECEIPT_DIRECTORY = "topology-b-retirement"
 TOPOLOGY_B_SOURCE_REPOSITORY = "ArchonMegalon/chummer6-hub"
@@ -12107,39 +12109,282 @@ def _topology_b_utc_timestamp(value: Any, *, label: str) -> datetime:
 
 
 def _topology_b_public_directory(path: Path, *, create: bool) -> Path:
-    if create and not (path.exists() or path.is_symlink()):
-        try:
-            path.mkdir(mode=0o755)
-        except FileExistsError:
-            pass
-        path.chmod(0o755)
-        descriptor = os.open(
-            path.parent,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+    if not path.is_absolute() or path.name in {"", ".", ".."}:
+        raise RecoveryUncertain(
+            f"public retirement proof directory path is unsafe: {path}"
         )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
+    parent_descriptor: int | None = None
+    directory_descriptor: int | None = None
+    created = False
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
     try:
-        metadata = path.lstat()
+        if create:
+            parent_descriptor = os.open(path.parent, directory_flags)
+            parent_metadata = os.fstat(parent_descriptor)
+            parent_named_metadata = path.parent.lstat()
+            if (
+                not stat.S_ISDIR(parent_metadata.st_mode)
+                or parent_metadata.st_uid != os.getuid()
+                or stat.S_IMODE(parent_metadata.st_mode) & 0o022
+                or (
+                    parent_metadata.st_dev,
+                    parent_metadata.st_ino,
+                )
+                != (
+                    parent_named_metadata.st_dev,
+                    parent_named_metadata.st_ino,
+                )
+                or path.parent.resolve(strict=True) != path.parent
+            ):
+                raise RecoveryUncertain(
+                    "public retirement proof parent directory is unsafe: "
+                    f"{path.parent}"
+                )
+            try:
+                os.mkdir(path.name, mode=0o755, dir_fd=parent_descriptor)
+                created = True
+            except FileExistsError:
+                pass
+            directory_descriptor = os.open(
+                path.name,
+                directory_flags,
+                dir_fd=parent_descriptor,
+            )
+        else:
+            directory_descriptor = os.open(path, directory_flags)
+
+        if created:
+            # The descriptor was opened with O_DIRECTORY|O_NOFOLLOW. Even if
+            # the name is raced after mkdir, fchmod can never follow a symlink.
+            os.fchmod(directory_descriptor, 0o755)
+        metadata = os.fstat(directory_descriptor)
+        named_metadata = path.lstat()
         resolved = path.resolve(strict=True)
+        if (
+            resolved != path
+            or not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+            or (
+                metadata.st_dev,
+                metadata.st_ino,
+            )
+            != (
+                named_metadata.st_dev,
+                named_metadata.st_ino,
+            )
+            or (create and stat.S_IMODE(metadata.st_mode) != 0o755)
+        ):
+            raise RecoveryUncertain(
+                f"public retirement proof directory is unsafe: {path}"
+            )
+        if created:
+            os.fsync(directory_descriptor)
+            if parent_descriptor is None:
+                raise RecoveryUncertain(
+                    "public retirement proof parent descriptor is missing"
+                )
+            os.fsync(parent_descriptor)
     except OSError as exc:
         raise RecoveryUncertain(
             f"public retirement proof directory is unavailable: {path}"
         ) from exc
+    finally:
+        if directory_descriptor is not None:
+            os.close(directory_descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
+    return path
+
+
+def _topology_b_public_directory_descriptor(path: Path) -> int:
+    _topology_b_public_directory(path, create=False)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        descriptor = os.open(path, flags)
+        metadata = os.fstat(descriptor)
+        named_metadata = path.lstat()
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+            or (
+                metadata.st_dev,
+                metadata.st_ino,
+            )
+            != (
+                named_metadata.st_dev,
+                named_metadata.st_ino,
+            )
+            or path.resolve(strict=True) != path
+        ):
+            raise RecoveryUncertain(
+                f"public retirement proof directory changed: {path}"
+            )
+        return descriptor
+    except BaseException:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise
+
+
+def _stable_public_retirement_entry(
+    directory_descriptor: int,
+    name: str,
+    *,
+    maximum_bytes: int,
+) -> bytes | None:
     if (
-        resolved != path
-        or not stat.S_ISDIR(metadata.st_mode)
-        or stat.S_ISLNK(metadata.st_mode)
-        or metadata.st_uid != os.getuid()
-        or stat.S_IMODE(metadata.st_mode) & 0o022
-        or (create and stat.S_IMODE(metadata.st_mode) != 0o755)
+        not isinstance(name, str)
+        or not name
+        or Path(name).name != name
+        or "/" in name
+        or "\x00" in name
     ):
         raise RecoveryUncertain(
-            f"public retirement proof directory is unsafe: {path}"
+            "public retirement proof entry name is unsafe"
         )
-    return path
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    try:
+        descriptor = os.open(
+            name,
+            flags,
+            dir_fd=directory_descriptor,
+        )
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RecoveryUncertain(
+            f"public retirement proof entry is unsafe: {name}"
+        ) from exc
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.getuid()
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != 0o444
+            or before.st_size < 1
+            or before.st_size > maximum_bytes
+        ):
+            raise RecoveryUncertain(
+                f"public retirement proof entry metadata drifted: {name}"
+            )
+        chunks: list[bytes] = []
+        remaining = before.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                raise RecoveryUncertain(
+                    f"public retirement proof entry was truncated: {name}"
+                )
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if os.read(descriptor, 1):
+            raise RecoveryUncertain(
+                f"public retirement proof entry grew while read: {name}"
+            )
+        after = os.fstat(descriptor)
+        named = os.stat(
+            name,
+            dir_fd=directory_descriptor,
+            follow_symlinks=False,
+        )
+        identity = lambda value: (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_uid,
+            value.st_gid,
+            value.st_nlink,
+            value.st_size,
+            value.st_mtime_ns,
+            value.st_ctime_ns,
+        )
+        if identity(before) != identity(after) or identity(after) != identity(
+            named
+        ):
+            raise RecoveryUncertain(
+                f"public retirement proof entry changed while read: {name}"
+            )
+        return b"".join(chunks)
+    except OSError as exc:
+        raise RecoveryUncertain(
+            f"public retirement proof entry changed while read: {name}"
+        ) from exc
+    finally:
+        os.close(descriptor)
+
+
+def _rename_public_retirement_noreplace(
+    directory_descriptor: int,
+    source_name: str,
+    target_name: str,
+) -> bool:
+    """Atomically publish one single-link entry without replacing a winner."""
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if sys.platform == "darwin":
+            rename_noreplace = libc.renameatx_np
+            rename_noreplace.argtypes = (
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            )
+            rename_noreplace.restype = ctypes.c_int
+            result = rename_noreplace(
+                directory_descriptor,
+                os.fsencode(source_name),
+                directory_descriptor,
+                os.fsencode(target_name),
+                0x00000004,  # RENAME_EXCL
+            )
+        else:
+            rename_noreplace = libc.renameat2
+            rename_noreplace.argtypes = (
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            )
+            rename_noreplace.restype = ctypes.c_int
+            result = rename_noreplace(
+                directory_descriptor,
+                os.fsencode(source_name),
+                directory_descriptor,
+                os.fsencode(target_name),
+                1,  # RENAME_NOREPLACE
+            )
+    except (AttributeError, OSError) as exc:
+        raise RecoveryUncertain(
+            "atomic no-replace publication is unavailable"
+        ) from exc
+    if result == 0:
+        return True
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        return False
+    raise RecoveryUncertain(
+        "atomic no-replace public retirement publication failed"
+    ) from OSError(error_number, os.strerror(error_number))
 
 
 def _atomic_public_retirement_write(
@@ -12148,77 +12393,153 @@ def _atomic_public_retirement_write(
     *,
     replace: bool,
 ) -> None:
-    _topology_b_public_directory(path.parent, create=False)
-    if path.exists() or path.is_symlink():
-        existing = stable_regular_bytes(
-            path,
-            label=f"public retirement proof file {path.name}",
+    if not isinstance(value, bytes) or not value:
+        raise RecoveryUncertain(
+            "public retirement proof bytes are empty or malformed"
+        )
+    directory_descriptor = _topology_b_public_directory_descriptor(
+        path.parent
+    )
+    temporary_name = (
+        f".{path.name}.{secrets.token_hex(16)}.staging"
+    )
+    temporary_created = False
+    try:
+        existing = _stable_public_retirement_entry(
+            directory_descriptor,
+            path.name,
             maximum_bytes=16 * 1024 * 1024,
         )
-        metadata = path.lstat()
-        if stat.S_IMODE(metadata.st_mode) != 0o444:
-            raise RecoveryUncertain(
-                f"public retirement proof file mode drifted: {path.name}"
-            )
-        if not replace:
+        if existing is not None and not replace:
             if existing != value:
                 raise RecoveryUncertain(
-                    f"content-addressed public retirement proof drifted: "
+                    "content-addressed public retirement proof drifted: "
                     f"{path.name}"
                 )
             return
-    descriptor, raw_temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=path.parent,
-    )
-    temporary = Path(raw_temporary)
-    published = False
-    try:
-        with os.fdopen(descriptor, "wb", closefd=True) as handle:
-            handle.write(value)
-            handle.flush()
-            os.fsync(handle.fileno())
-            os.fchmod(handle.fileno(), 0o444)
-        if replace:
-            if path.is_symlink():
+
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        descriptor = os.open(
+            temporary_name,
+            flags,
+            0o600,
+            dir_fd=directory_descriptor,
+        )
+        temporary_created = True
+        try:
+            view = memoryview(value)
+            while view:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise RecoveryUncertain(
+                        "public retirement proof staging write was short"
+                    )
+                view = view[written:]
+            os.fchmod(descriptor, 0o444)
+            staged = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(staged.st_mode)
+                or staged.st_uid != os.getuid()
+                or staged.st_nlink != 1
+                or stat.S_IMODE(staged.st_mode) != 0o444
+                or staged.st_size != len(value)
+            ):
                 raise RecoveryUncertain(
-                    f"public retirement proof target is a symlink: "
+                    "public retirement proof staging metadata drifted"
+                )
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+        if replace:
+            try:
+                named = os.stat(
+                    path.name,
+                    dir_fd=directory_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError:
+                named = None
+            if named is not None and (
+                not stat.S_ISREG(named.st_mode)
+                or named.st_uid != os.getuid()
+                or named.st_nlink != 1
+                or stat.S_IMODE(named.st_mode) != 0o444
+            ):
+                raise RecoveryUncertain(
+                    "public retirement proof replacement target drifted: "
                     f"{path.name}"
                 )
-            os.replace(temporary, path)
+            os.replace(
+                temporary_name,
+                path.name,
+                src_dir_fd=directory_descriptor,
+                dst_dir_fd=directory_descriptor,
+            )
+            temporary_created = False
         else:
-            try:
-                os.link(temporary, path, follow_symlinks=False)
-            except FileExistsError:
-                existing = stable_regular_bytes(
-                    path,
-                    label=(
-                        "raced content-addressed public retirement proof "
-                        f"{path.name}"
-                    ),
+            renamed = _rename_public_retirement_noreplace(
+                directory_descriptor,
+                temporary_name,
+                path.name,
+            )
+            if renamed:
+                temporary_created = False
+            else:
+                winner = _stable_public_retirement_entry(
+                    directory_descriptor,
+                    path.name,
                     maximum_bytes=16 * 1024 * 1024,
                 )
-                if (
-                    existing != value
-                    or stat.S_IMODE(path.lstat().st_mode) != 0o444
-                ):
+                if winner != value:
                     raise RecoveryUncertain(
                         "content-addressed public retirement proof race "
                         "did not preserve exact bytes"
                     )
-        published = True
-    finally:
-        temporary.unlink(missing_ok=True)
-    if published:
-        descriptor = os.open(
-            path.parent,
-            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+
+        if temporary_created:
+            os.unlink(temporary_name, dir_fd=directory_descriptor)
+            temporary_created = False
+        os.fsync(directory_descriptor)
+        observed = _stable_public_retirement_entry(
+            directory_descriptor,
+            path.name,
+            maximum_bytes=16 * 1024 * 1024,
         )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
+        if observed != value:
+            raise RecoveryUncertain(
+                f"public retirement proof publication drifted: {path.name}"
+            )
+        directory_metadata = os.fstat(directory_descriptor)
+        named_directory = path.parent.lstat()
+        if (
+            directory_metadata.st_dev,
+            directory_metadata.st_ino,
+        ) != (
+            named_directory.st_dev,
+            named_directory.st_ino,
+        ):
+            raise RecoveryUncertain(
+                "public retirement proof directory changed during publication"
+            )
+    except OSError as exc:
+        raise RecoveryUncertain(
+            f"public retirement proof publication failed: {path.name}"
+        ) from exc
+    finally:
+        if temporary_created:
+            try:
+                os.unlink(temporary_name, dir_fd=directory_descriptor)
+                os.fsync(directory_descriptor)
+            except OSError:
+                pass
+        os.close(directory_descriptor)
 
 
 def strict_public_retirement_get(
@@ -12303,6 +12624,7 @@ def validate_topology_b_public_retirement_bundle(
     expected_publisher_sha256: str,
     cloudflare: Any,
     now: datetime | None = None,
+    allow_expired: bool = False,
 ) -> dict[str, Any]:
     if COMMIT.fullmatch(expected_source_head) is None:
         raise RecoveryUncertain(
@@ -12338,9 +12660,25 @@ def validate_topology_b_public_retirement_bundle(
         proof.get("generatedAt"),
         label="public topology-B retirement generatedAt",
     )
-    observed_now = (now or datetime.now(UTC)).astimezone(UTC)
+    if type(allow_expired) is not bool:
+        raise RecoveryUncertain(
+            "public retirement proof expiry policy is malformed"
+        )
+    if now is None:
+        observed_now = datetime.now(UTC)
+    elif (
+        not isinstance(now, datetime)
+        or now.tzinfo is None
+        or now.utcoffset() != timedelta(0)
+    ):
+        raise RecoveryUncertain(
+            "public retirement proof observation time is not UTC"
+        )
+    else:
+        observed_now = now.astimezone(UTC)
     if generated > observed_now + timedelta(minutes=5) or (
-        observed_now - generated > timedelta(hours=24)
+        not allow_expired
+        and observed_now - generated > timedelta(hours=24)
     ):
         raise RecoveryUncertain(
             "public topology-B retirement proof is stale or future-dated"
@@ -12461,9 +12799,9 @@ def validate_topology_b_public_retirement_bundle(
         terminal.get("completedAtUtc"),
         label="committed topology-B retirement completedAtUtc",
     )
-    if completed != generated:
+    if completed > generated:
         raise RecoveryUncertain(
-            "public topology-B retirement timestamp is not terminal-bound"
+            "public topology-B retirement envelope predates terminal completion"
         )
     post_marker = _strict_json_object_bytes(
         post_marker_bytes,
@@ -12490,6 +12828,7 @@ def validate_topology_b_public_retirement_bundle(
         not in {"post-marker", "resume-post-marker"}
         or post_marker.get("operationRoot")
         != terminal.get("operationRoot")
+        or type(post_marker.get("restoredVersion")) is not int
         or post_marker.get("restoredVersion")
         != terminal.get("restoredVersion")
         or post_marker.get("retiredAuthoritySha256")
@@ -12506,6 +12845,32 @@ def validate_topology_b_public_retirement_bundle(
     ):
         raise RecoveryUncertain(
             "post-marker connector convergence boundary drifted"
+        )
+    boundary = post_marker["boundary"]
+    post_marker_sha256 = _topology_b_canonical_sha256(post_marker)
+    original_post_marker_sha256 = terminal.get(
+        "postMarkerConnectorGateSha256"
+    )
+    latest_post_marker_sha256 = terminal.get("latestConnectorGateSha256")
+    if (
+        boundary == "post-marker"
+        and (
+            post_marker_sha256 != original_post_marker_sha256
+            or post_marker_sha256 != latest_post_marker_sha256
+        )
+    ):
+        raise RecoveryUncertain(
+            "original post-marker connector convergence digest drifted"
+        )
+    if (
+        boundary == "resume-post-marker"
+        and (
+            post_marker_sha256 != latest_post_marker_sha256
+            or post_marker_sha256 == original_post_marker_sha256
+        )
+    ):
+        raise RecoveryUncertain(
+            "resume post-marker connector convergence digest drifted"
         )
     try:
         convergence = (
@@ -12530,9 +12895,27 @@ def validate_topology_b_public_retirement_bundle(
         post_marker.get("verifiedAtUtc"),
         label="post-marker connector convergence verifiedAtUtc",
     )
-    if post_marker_verified > completed:
+    if boundary == "post-marker" and post_marker_verified > completed:
         raise RecoveryUncertain(
             "post-marker connector convergence is later than completion"
+        )
+    if (
+        boundary == "resume-post-marker"
+        and (
+            post_marker_verified > generated
+            or post_marker_verified > observed_now + timedelta(minutes=5)
+        )
+    ):
+        raise RecoveryUncertain(
+            "resume post-marker connector convergence is later than "
+            "the fresh public envelope"
+        )
+    if (
+        terminal.get("incumbentBaselineSha256")
+        != terminal.get("incumbentObservationSha256")
+    ):
+        raise RecoveryUncertain(
+            "committed topology-B incumbent observation differs from baseline"
         )
     canonical = proof.get("canonicalAuthority")
     if (
@@ -12558,6 +12941,47 @@ def validate_topology_b_public_retirement_bundle(
     return proof
 
 
+def _topology_b_require_git_ancestor(
+    source_root: Path,
+    ancestor: str,
+    descendant: str,
+) -> None:
+    if (
+        COMMIT.fullmatch(ancestor) is None
+        or COMMIT.fullmatch(descendant) is None
+    ):
+        raise RecoveryUncertain(
+            "public topology-B source ancestry is malformed"
+        )
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(source_root),
+                "merge-base",
+                "--is-ancestor",
+                ancestor,
+                descendant,
+            ],
+            env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RecoveryUncertain(
+            "public topology-B source ancestry could not be verified"
+        ) from exc
+    if result.returncode != 0:
+        raise RecoveryUncertain(
+            "terminal topology-B source is not an ancestor of "
+            "the current protected source"
+        )
+
+
 def materialize_topology_b_public_retirement_proof(
     config: SidecarConfig,
     retirement_result: Mapping[str, Any],
@@ -12566,16 +12990,24 @@ def materialize_topology_b_public_retirement_proof(
     attempts: int = 30,
     sleep_fn: Callable[[float], None] = time.sleep,
     interval_seconds: float = 2.0,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     if config.operation != RETIRE_OPERATION:
         raise RecoveryUncertain(
             "public topology-B retirement proof requires retirement"
         )
-    controller_source_head = (
+    materializer_source_head = (
         config.controller_source_head or config.source_head
     )
+    terminal_source_head = (
+        retirement_result.get("controllerSourceHead")
+        if isinstance(retirement_result, Mapping)
+        else None
+    )
     if (
-        COMMIT.fullmatch(controller_source_head) is None
+        COMMIT.fullmatch(materializer_source_head) is None
+        or not isinstance(terminal_source_head, str)
+        or COMMIT.fullmatch(terminal_source_head) is None
         or SHA256.fullmatch(config.canonical_publisher_sha256) is None
         or config.base_url.rstrip("/") != "https://chummer.run"
         or not isinstance(retirement_result, Mapping)
@@ -12583,8 +13015,6 @@ def materialize_topology_b_public_retirement_proof(
         or retirement_result.get("operation") != RETIRE_OPERATION
         or retirement_result.get("disposition")
         != "committed-sidecar-retired-to-incumbent"
-        or retirement_result.get("controllerSourceHead")
-        != controller_source_head
     ):
         raise RecoveryUncertain(
             "public topology-B retirement proof inputs are invalid"
@@ -12611,10 +13041,15 @@ def materialize_topology_b_public_retirement_proof(
         raise RecoveryUncertain(
             "public topology-B retirement source could not be verified"
         ) from exc
-    if observed_source_head != controller_source_head:
+    if observed_source_head != materializer_source_head:
         raise RecoveryUncertain(
             "public topology-B retirement source HEAD drifted"
         )
+    _topology_b_require_git_ancestor(
+        config.source_root,
+        terminal_source_head,
+        materializer_source_head,
+    )
     if (
         config.active_runtime_authority.exists()
         or config.active_runtime_authority.is_symlink()
@@ -12651,10 +13086,14 @@ def materialize_topology_b_public_retirement_proof(
     )
     receipts = journal.get("receipts")
     post_marker = None
+    original_post_marker = None
     if isinstance(receipts, dict):
+        original_post_marker = receipts.get(
+            "retirementPostMarkerConnectorGate"
+        )
         post_marker = receipts.get(
             "retirementConnectorResumeGate",
-            receipts.get("retirementPostMarkerConnectorGate"),
+            original_post_marker,
         )
     if (
         journal.get("schema") != TOPOLOGY_B_OPERATION_SCHEMA
@@ -12665,6 +13104,7 @@ def materialize_topology_b_public_retirement_proof(
             receipts.get("retirement"),
             terminal,
         )
+        or not isinstance(original_post_marker, dict)
         or not isinstance(post_marker, dict)
     ):
         raise RecoveryUncertain(
@@ -12683,15 +13123,32 @@ def materialize_topology_b_public_retirement_proof(
             "public topology-B retired authority digest drifted"
         )
     post_marker_bytes = _topology_b_json_bytes(post_marker)
+    if now is None:
+        observed_now = datetime.now(UTC)
+    elif (
+        not isinstance(now, datetime)
+        or now.tzinfo is None
+        or now.utcoffset() != timedelta(0)
+    ):
+        raise RecoveryUncertain(
+            "public topology-B materialization time is not UTC"
+        )
+    else:
+        observed_now = now.astimezone(UTC)
+    generated_at = (
+        observed_now.replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
     proof_payload = {
         "contractName": TOPOLOGY_B_PUBLIC_RETIREMENT_CONTRACT,
         "contractVersion": 1,
-        "generatedAt": terminal.get("completedAtUtc"),
+        "generatedAt": generated_at,
         "status": "passed",
         "source": {
             "repository": TOPOLOGY_B_SOURCE_REPOSITORY,
             "ref": TOPOLOGY_B_SOURCE_REF,
-            "commit": controller_source_head,
+            "commit": terminal_source_head,
         },
         "sidecarAuthorityRetired": True,
         "activeSidecarMarkerCount": 0,
@@ -12724,9 +13181,10 @@ def materialize_topology_b_public_retirement_proof(
         proof_bytes=proof_bytes,
         committed_boundary_bytes=terminal_bytes,
         post_marker_bytes=post_marker_bytes,
-        expected_source_head=controller_source_head,
+        expected_source_head=terminal_source_head,
         expected_publisher_sha256=config.canonical_publisher_sha256,
         cloudflare=cloudflare,
+        now=observed_now,
     )
     if (
         config.public_retirement_proof.exists()
@@ -12738,15 +13196,29 @@ def materialize_topology_b_public_retirement_proof(
             maximum_bytes=16 * 1024 * 1024,
             owner_only=True,
         )
-        if staged != proof_bytes:
-            raise RecoveryUncertain(
-                "staged public topology-B retirement proof drifted"
-            )
-    else:
-        write_private_json(
-            config.public_retirement_proof,
-            proof_payload,
+        staged_payload = _strict_json_object_bytes(
+            staged,
+            label="staged public topology-B retirement proof",
         )
+        staged_generated = _topology_b_utc_timestamp(
+            staged_payload.get("generatedAt"),
+            label="staged public topology-B retirement generatedAt",
+        )
+        validate_topology_b_public_retirement_bundle(
+            proof_bytes=staged,
+            committed_boundary_bytes=terminal_bytes,
+            post_marker_bytes=post_marker_bytes,
+            expected_source_head=terminal_source_head,
+            expected_publisher_sha256=config.canonical_publisher_sha256,
+            cloudflare=cloudflare,
+            now=observed_now,
+            allow_expired=True,
+        )
+    write_private_json(
+        config.public_retirement_proof,
+        proof_payload,
+        replace=True,
+    )
 
     _topology_b_public_directory(config.shelf_root, create=False)
     content_root = _topology_b_public_directory(
@@ -12839,7 +13311,9 @@ def materialize_topology_b_public_retirement_proof(
         ),
         "status": "pass",
         "operationRoot": str(config.operation_root),
-        "sourceHead": controller_source_head,
+        "sourceHead": terminal_source_head,
+        "materializerSourceHead": materializer_source_head,
+        "terminalCompletedAt": terminal.get("completedAtUtc"),
         "proof": {
             "path": str(proof_path),
             "url": proof_url,
@@ -12874,33 +13348,105 @@ def materialize_topology_b_public_retirement_proof(
             raw,
             label="public topology-B retirement materialization receipt",
         )
+        legacy_contract = (
+            "chummer.public-download-topology-b-retirement-"
+            "proof-materialization/v1"
+        )
+        contract_name = materialization.get("contractName")
+        if contract_name == TOPOLOGY_B_PUBLIC_RETIREMENT_MATERIALIZATION_CONTRACT:
+            expected_keys = {*receipt_expected, "verifiedAtUtc"}
+            immutable_keys = {
+                "contractName",
+                "status",
+                "operationRoot",
+                "sourceHead",
+                "terminalCompletedAt",
+                "committedBoundary",
+                "postMarkerConvergence",
+                "publisherSha256",
+            }
+            previous_materializer_source = materialization.get(
+                "materializerSourceHead"
+            )
+            immutable_expected = receipt_expected
+        elif contract_name == legacy_contract:
+            immutable_expected = {
+                key: value
+                for key, value in receipt_expected.items()
+                if key
+                not in {
+                    "materializerSourceHead",
+                    "terminalCompletedAt",
+                }
+            }
+            immutable_expected["contractName"] = legacy_contract
+            expected_keys = {*immutable_expected, "verifiedAtUtc"}
+            immutable_keys = {
+                "contractName",
+                "status",
+                "operationRoot",
+                "sourceHead",
+                "committedBoundary",
+                "postMarkerConvergence",
+                "publisherSha256",
+            }
+            previous_materializer_source = materialization.get("sourceHead")
+        else:
+            raise RecoveryUncertain(
+                "public topology-B retirement materialization contract drifted"
+            )
+        previous_proof = materialization.get("proof")
         if (
-            set(materialization)
-            != {*receipt_expected, "verifiedAtUtc"}
+            set(materialization) != expected_keys
             or any(
                 not _json_semantically_equal(
                     materialization.get(key),
-                    value,
+                    immutable_expected[key],
                 )
-                for key, value in receipt_expected.items()
+                for key in immutable_keys
             )
-            or not isinstance(
-                materialization.get("verifiedAtUtc"),
-                str,
+            or not isinstance(previous_materializer_source, str)
+            or COMMIT.fullmatch(previous_materializer_source) is None
+            or not isinstance(previous_proof, dict)
+            or set(previous_proof)
+            != {"path", "url", "sha256", "sizeBytes"}
+            or previous_proof.get("path")
+            != receipt_expected["proof"]["path"]
+            or previous_proof.get("url")
+            != receipt_expected["proof"]["url"]
+            or SHA256.fullmatch(
+                str(previous_proof.get("sha256") or "")
             )
+            is None
+            or type(previous_proof.get("sizeBytes")) is not int
+            or previous_proof["sizeBytes"] <= 0
+            or not isinstance(materialization.get("verifiedAtUtc"), str)
         ):
             raise RecoveryUncertain(
                 "public topology-B retirement materialization drifted"
             )
-    else:
-        materialization = {
-            **receipt_expected,
-            "verifiedAtUtc": utc_now(),
-        }
-        write_private_json(
-            materialization_path,
-            materialization,
+        previous_verified = _topology_b_utc_timestamp(
+            materialization["verifiedAtUtc"],
+            label="prior public topology-B materialization verifiedAtUtc",
         )
+        if previous_verified > observed_now + timedelta(minutes=5):
+            raise RecoveryUncertain(
+                "prior public topology-B materialization is future-dated"
+            )
+        _topology_b_require_git_ancestor(
+            config.source_root,
+            previous_materializer_source,
+            materializer_source_head,
+        )
+    materialization = {
+        **receipt_expected,
+        "verifiedAtUtc": generated_at,
+    }
+    write_private_json(
+        materialization_path,
+        materialization,
+        replace=True,
+    )
     return materialization
 
 
