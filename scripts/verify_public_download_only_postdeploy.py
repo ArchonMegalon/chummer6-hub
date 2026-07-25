@@ -2060,6 +2060,7 @@ def main(argv: list[str] | None = None) -> int:
                 live_confirmation_count=3,
                 live_confirmation_delay_seconds=2.0,
                 live_max_samples=6,
+                page_artifact_alignment_required=False,
             )
             if download_truth.get("status") != "pass":
                 raise ValueError("public download shelf truth gate failed")
