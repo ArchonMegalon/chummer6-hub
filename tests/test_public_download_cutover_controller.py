@@ -669,7 +669,12 @@ def test_wrapper_routes_public_profile_before_postgres_boundary() -> None:
     assert "--delivery-phase" in script
     assert "--transaction-journal" not in script[controller_branch:postgres_boundary]
     assert "--env-file" not in script[controller_branch:postgres_boundary]
-    assert 'if ((public_download_controller_status == 76)); then' in script
+    assert "if ((public_download_controller_status == 76)) \\" in script
+    assert (
+        '&& "$public_download_controller_status" != 0'
+        in script[controller_branch:postgres_boundary]
+    )
+    assert "exit_for_signal" in script
     assert "authenticated mutation lock retained" in script
     assert "if ((RECOVERY_ROUTE_REQUESTED == 0)); then" in script
     assert (

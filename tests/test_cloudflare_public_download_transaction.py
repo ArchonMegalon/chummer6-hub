@@ -141,6 +141,35 @@ class FakeApi:
         return {"success": True, "result": result}
 
 
+class ChangingConnectorApi:
+    def __init__(
+        self,
+        snapshots: list[Mapping[str, int | None]],
+    ) -> None:
+        self.snapshots = [dict(snapshot) for snapshot in snapshots]
+        self.list_calls = 0
+        self.current: dict[str, int | None] = {}
+
+    def list_connections(self) -> Mapping[str, Any]:
+        index = min(self.list_calls, len(self.snapshots) - 1)
+        self.current = dict(self.snapshots[index])
+        self.list_calls += 1
+        return {
+            "success": True,
+            "result": [
+                {"id": connector_id}
+                for connector_id in reversed(sorted(self.current))
+            ],
+        }
+
+    def get_connector(self, connector_id: str) -> Mapping[str, Any]:
+        result: dict[str, Any] = {"id": connector_id}
+        version = self.current[connector_id]
+        if version is not None:
+            result["config_version"] = version
+        return {"success": True, "result": result}
+
+
 def capture(
     tmp_path: Path, api: FakeApi, *, origin: str = "http://172.17.0.1:8080"
 ) -> tuple[Path, Path, dict[str, Any]]:
@@ -407,6 +436,97 @@ def test_capture_requires_at_least_one_preexisting_connector(
 
     with pytest.raises(transaction.ConvergenceError, match="no preexisting"):
         capture(tmp_path, api)
+
+
+def test_current_connector_convergence_tracks_additions_and_removals() -> None:
+    api = ChangingConnectorApi(
+        [
+            {"connector-original": 11},
+            {
+                "connector-added": 12,
+                "connector-original": 12,
+            },
+            {"connector-added": 12},
+            {"connector-added": 12},
+        ]
+    )
+
+    receipt = transaction.poll_current_connector_convergence(
+        api,
+        12,
+        attempts=4,
+        interval_seconds=0,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    assert receipt["connectorSetTransitions"] == [
+        ["connector-original"],
+        ["connector-added", "connector-original"],
+        ["connector-added"],
+    ]
+    assert receipt["attemptsUsed"] == 4
+    assert [
+        row["id"] for row in receipt["connectorSet"]
+    ] == ["connector-added"]
+    assert receipt["connectorConvergence"] == [
+        {
+            "id": "connector-added",
+            "configVersionAvailable": True,
+            "observedConfigVersion": 12,
+            "converged": True,
+        }
+    ]
+    assert (
+        transaction.validate_current_connector_convergence_receipt(
+            receipt
+        )
+        == receipt
+    )
+
+
+def test_current_connector_convergence_rejects_an_unstable_set() -> None:
+    api = ChangingConnectorApi(
+        [
+            {"connector-a": 12},
+            {"connector-b": 12},
+            {"connector-a": 12},
+            {"connector-b": 12},
+        ]
+    )
+
+    with pytest.raises(
+        transaction.ConvergenceError,
+        match="did not remain stable",
+    ):
+        transaction.poll_current_connector_convergence(
+            api,
+            12,
+            attempts=4,
+            interval_seconds=0,
+            sleep_fn=lambda _seconds: None,
+        )
+
+
+def test_current_connector_receipt_rejects_omitted_added_connector() -> None:
+    api = ChangingConnectorApi(
+        [
+            {"connector-a": 12, "connector-added": 12},
+            {"connector-a": 12, "connector-added": 12},
+        ]
+    )
+    receipt = transaction.poll_current_connector_convergence(
+        api,
+        12,
+        attempts=2,
+        interval_seconds=0,
+        sleep_fn=lambda _seconds: None,
+    )
+    receipt["connectorSet"] = receipt["connectorSet"][:1]
+
+    with pytest.raises(transaction.ValidationError):
+        transaction.validate_current_connector_convergence_receipt(
+            receipt
+        )
 
 
 def test_capture_is_no_replace_and_does_not_delete_existing_journal(

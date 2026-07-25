@@ -837,10 +837,22 @@ release_only_on_exit() {
   exit "$failure_status"
 }
 
+exit_for_signal() {
+  local signal_status="$1"
+  if [[ "$DEPLOY_OPERATION" \
+      == initial-release-shelf-public-download-cutover-retire ]] \
+    && ((deploy_lock_active == 1)); then
+    deploy_lock_active=0
+    echo "public-download retirement interrupted; authenticated mutation lock retained" >&2
+    exit 76
+  fi
+  exit "$signal_status"
+}
+
 trap release_only_on_exit EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
+trap 'exit_for_signal 129' HUP
+trap 'exit_for_signal 130' INT
+trap 'exit_for_signal 143' TERM
 
 if [[ -L "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
   || (-e "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
@@ -1115,7 +1127,10 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     "$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER" \
     "${public_download_controller_args[@]}" \
     || public_download_controller_status=$?
-  if ((public_download_controller_status == 76)); then
+  if ((public_download_controller_status == 76)) \
+    || [[ "$DEPLOY_OPERATION" \
+      == initial-release-shelf-public-download-cutover-retire \
+      && "$public_download_controller_status" != 0 ]]; then
     deploy_lock_active=0
     echo "public-download journaled operation is uncertain; authenticated mutation lock retained" >&2
     exit 76

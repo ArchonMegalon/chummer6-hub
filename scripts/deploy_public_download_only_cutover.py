@@ -26,6 +26,7 @@ from pathlib import Path, PurePosixPath
 import pwd
 import re
 import secrets
+import signal
 import shutil
 import ssl
 import stat
@@ -98,6 +99,14 @@ class CutoverError(RuntimeError):
 
 class RecoveryUncertain(CutoverError):
     pass
+
+
+class _RetirementInterrupted(BaseException):
+    def __init__(self, signal_number: int) -> None:
+        super().__init__(
+            f"retirement interrupted by signal {signal_number}"
+        )
+        self.signal_number = signal_number
 
 
 def _safe_stderr_summary(value: bytes) -> str:
@@ -8316,6 +8325,9 @@ class TopologyBActions:
                 "retirement-cloudflare-restored",
                 "retirement-incumbent-verified",
                 "retirement-evidence-committed",
+                "retirement-restoration-connectors-reverified",
+                "retirement-connectors-verified",
+                "retirement-connectors-reverified",
                 "retirement-authority-retired",
                 "cleaned",
                 "retired",
@@ -8454,6 +8466,7 @@ class TopologyBActions:
             "restoredResponseSha256",
             "connectorConvergence",
             "restoredAtUtc",
+            "connectorsVerifiedAtUtc",
         }
         if existing is not None and (
             not isinstance(existing, dict)
@@ -8473,12 +8486,34 @@ class TopologyBActions:
                 str(existing.get("restoredResponseSha256") or "")
             )
             is None
-            or not isinstance(existing.get("connectorConvergence"), list)
             or not isinstance(existing.get("restoredAtUtc"), str)
+            or not isinstance(
+                existing.get("connectorsVerifiedAtUtc"),
+                str,
+            )
         ):
             raise RecoveryUncertain(
                 "Cloudflare retirement restoration receipt drifted"
             )
+        if existing is not None:
+            try:
+                validated_connectors = (
+                    self.cloudflare
+                    .validate_current_connector_convergence_receipt(
+                        existing.get("connectorConvergence")
+                    )
+                )
+            except Exception as exc:
+                raise RecoveryUncertain(
+                    "Cloudflare retirement connector receipt drifted"
+                ) from exc
+            if (
+                validated_connectors.get("targetVersion")
+                != existing["restoredVersion"]
+            ):
+                raise RecoveryUncertain(
+                    "Cloudflare retirement connector version drifted"
+                )
         api = self._cloudflare_api()
         try:
             with self.cloudflare.ExclusiveFileLock(config.cloudflare_lock):
@@ -8493,51 +8528,60 @@ class TopologyBActions:
                         raise RecoveryUncertain(
                             "restored Cloudflare configuration drifted"
                         )
-                    return copy.deepcopy(existing)
-                target_matches = (
-                    current.sha256 == evidence["targetConfigSha256"]
-                    and current.version == evidence["targetVersion"]
-                )
-                if target_matches:
-                    restored = (
-                        self.cloudflare._configuration_after_put_or_reget(
-                            api,
-                            config=evidence["priorConfig"],
-                            expected_sha256=evidence[
-                                "priorConfigSha256"
-                            ],
-                            fallback_sha256=evidence[
-                                "targetConfigSha256"
-                            ],
-                            fallback_version=evidence["targetVersion"],
-                        )
-                    )
-                elif current.sha256 == evidence["priorConfigSha256"]:
-                    # A prior attempt may have completed the PUT before its
-                    # response or local receipt became durable.
                     restored = current
+                    converged = current
                 else:
-                    raise RecoveryUncertain(
-                        "Cloudflare target drifted before retirement PUT"
+                    target_matches = (
+                        current.sha256 == evidence["targetConfigSha256"]
+                        and current.version == evidence["targetVersion"]
                     )
-                converged = self.cloudflare.poll_configuration(
-                    api,
-                    expected_sha256=evidence["priorConfigSha256"],
-                    expected_version=restored.version,
-                    transitional=[
-                        (
-                            evidence["targetConfigSha256"],
-                            evidence["targetVersion"],
+                    if target_matches:
+                        restored = (
+                            self.cloudflare
+                            ._configuration_after_put_or_reget(
+                                api,
+                                config=evidence["priorConfig"],
+                                expected_sha256=evidence[
+                                    "priorConfigSha256"
+                                ],
+                                fallback_sha256=evidence[
+                                    "targetConfigSha256"
+                                ],
+                                fallback_version=evidence[
+                                    "targetVersion"
+                                ],
+                            )
                         )
-                    ],
-                    attempts=30,
-                    sleep_fn=time.sleep,
-                    interval_seconds=2.0,
-                )
-                connector_convergence = (
-                    self.cloudflare.poll_connector_convergence(
+                    elif (
+                        current.sha256
+                        == evidence["priorConfigSha256"]
+                    ):
+                        # A prior attempt may have completed the PUT before
+                        # its response or local receipt became durable.
+                        restored = current
+                    else:
+                        raise RecoveryUncertain(
+                            "Cloudflare target drifted before retirement PUT"
+                        )
+                    converged = self.cloudflare.poll_configuration(
                         api,
-                        evidence["preexistingConnectors"],
+                        expected_sha256=evidence[
+                            "priorConfigSha256"
+                        ],
+                        expected_version=restored.version,
+                        transitional=[
+                            (
+                                evidence["targetConfigSha256"],
+                                evidence["targetVersion"],
+                            )
+                        ],
+                        attempts=30,
+                        sleep_fn=time.sleep,
+                        interval_seconds=2.0,
+                    )
+                connector_convergence = (
+                    self.cloudflare.poll_current_connector_convergence(
+                        api,
                         restored.version,
                         attempts=30,
                         sleep_fn=time.sleep,
@@ -8564,8 +8608,20 @@ class TopologyBActions:
                         )
                     ),
                     "connectorConvergence": connector_convergence,
-                    "restoredAtUtc": utc_now(),
+                    "restoredAtUtc": (
+                        existing["restoredAtUtc"]
+                        if existing is not None
+                        else utc_now()
+                    ),
+                    "connectorsVerifiedAtUtc": utc_now(),
                 }
+                if existing is not None:
+                    self._record(
+                        "retirement-restoration-connectors-reverified",
+                        "retirementRestorationConnectorResumeGate",
+                        connector_convergence,
+                    )
+                    return copy.deepcopy(existing)
                 self._record(
                     "retirement-cloudflare-restored",
                     "cloudflareRetirement",
@@ -8616,6 +8672,29 @@ class TopologyBActions:
             raise RecoveryUncertain(
                 "retirement restoration is not bound to committed evidence"
             )
+        try:
+            connector_convergence = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    restoration.get("connectorConvergence")
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "retirement restoration connector evidence is invalid"
+            ) from exc
+        if (
+            connector_convergence.get("targetVersion")
+            != restoration["restoredVersion"]
+        ):
+            raise RecoveryUncertain(
+                "retirement restoration connector target drifted"
+            )
+        connector_convergence_sha256 = (
+            self.cloudflare.canonical_sha256(
+                connector_convergence
+            )
+        )
         api = self._cloudflare_api()
         try:
             with self.cloudflare.ExclusiveFileLock(config.cloudflare_lock):
@@ -8646,6 +8725,9 @@ class TopologyBActions:
                     ),
                     "restorationSha256": (
                         self.cloudflare.canonical_sha256(restoration)
+                    ),
+                    "connectorConvergenceSha256": (
+                        connector_convergence_sha256
                     ),
                     "targetConfigSha256": committed[
                         "targetConfigSha256"
@@ -8725,6 +8807,9 @@ class TopologyBActions:
             "evidenceSha256": sha256_bytes(raw),
             "priorConfigSha256": committed["priorConfigSha256"],
             "restoredVersion": restoration["restoredVersion"],
+            "connectorConvergenceSha256": (
+                connector_convergence_sha256
+            ),
             "incumbentBaselineSha256": (
                 self.cloudflare.canonical_sha256(baseline)
             ),
@@ -8812,6 +8897,27 @@ class TopologyBActions:
             raise RecoveryUncertain(
                 "retired authority journal contradicts the active marker"
             )
+        marker_connector_gate: dict[str, Any] | None = None
+        if authority_path == config.retired_active_authority:
+            recorded_gate = receipts.get("retirementConnectorGate")
+            try:
+                marker_connector_gate = copy.deepcopy(
+                    self.cloudflare
+                    .validate_current_connector_convergence_receipt(
+                        recorded_gate
+                    )
+                )
+            except Exception as exc:
+                raise RecoveryUncertain(
+                    "retired authority lacks its connector-set gate"
+                ) from exc
+            if (
+                marker_connector_gate.get("targetVersion")
+                != restoration.get("restoredVersion")
+            ):
+                raise RecoveryUncertain(
+                    "retired authority connector gate version drifted"
+                )
         api = self._cloudflare_api()
         try:
             with self.cloudflare.ExclusiveFileLock(config.cloudflare_lock):
@@ -8827,7 +8933,22 @@ class TopologyBActions:
                     raise RecoveryUncertain(
                         "Cloudflare prior config drifted before authority retirement"
                     )
+                current_connector_gate = (
+                    self.cloudflare.poll_current_connector_convergence(
+                        api,
+                        current.version,
+                        attempts=30,
+                        sleep_fn=time.sleep,
+                        interval_seconds=2.0,
+                    )
+                )
                 if authority_path == config.active_runtime_authority:
+                    marker_connector_gate = current_connector_gate
+                    self._record(
+                        "retirement-connectors-verified",
+                        "retirementConnectorGate",
+                        marker_connector_gate,
+                    )
                     if (
                         config.retired_active_authority.exists()
                         or config.retired_active_authority.is_symlink()
@@ -8845,6 +8966,11 @@ class TopologyBActions:
                     self._fsync_directory(config.operation_root)
                     disposition = "atomically-retired"
                 else:
+                    self._record(
+                        "retirement-connectors-reverified",
+                        "retirementConnectorResumeGate",
+                        current_connector_gate,
+                    )
                     disposition = "already-atomically-retired"
         except RecoveryUncertain:
             raise
@@ -8867,6 +8993,13 @@ class TopologyBActions:
             raise RecoveryUncertain(
                 "atomic topology-B authority retirement was not exact"
             )
+        if marker_connector_gate is None:
+            raise RecoveryUncertain(
+                "atomic topology-B authority retirement lacks connector proof"
+            )
+        connector_gate_sha256 = self.cloudflare.canonical_sha256(
+            marker_connector_gate
+        )
         if existing_receipt is not None:
             expected_existing = {
                 "contractName": (
@@ -8881,6 +9014,7 @@ class TopologyBActions:
                 ),
                 "activeAuthoritySha256": sha256_bytes(retired_raw),
                 "retirementEvidenceSha256": sha256_bytes(evidence_raw),
+                "connectorGateSha256": connector_gate_sha256,
             }
             if (
                 not isinstance(existing_receipt, dict)
@@ -8917,6 +9051,7 @@ class TopologyBActions:
             ),
             "activeAuthoritySha256": sha256_bytes(retired_raw),
             "retirementEvidenceSha256": sha256_bytes(evidence_raw),
+            "connectorGateSha256": connector_gate_sha256,
             "disposition": disposition,
             "retiredAtUtc": utc_now(),
         }
@@ -8975,6 +9110,43 @@ class TopologyBActions:
             raise RecoveryUncertain(
                 "retirement finalization lacks durable cleanup proof"
             )
+        try:
+            marker_connector_gate = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    receipts.get("retirementConnectorGate")
+                )
+            )
+            latest_connector_gate = (
+                self.cloudflare
+                .validate_current_connector_convergence_receipt(
+                    receipts.get(
+                        "retirementConnectorResumeGate",
+                        marker_connector_gate,
+                    )
+                )
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "retirement finalization lacks connector-set proof"
+            ) from exc
+        marker_connector_gate_sha256 = (
+            self.cloudflare.canonical_sha256(marker_connector_gate)
+        )
+        latest_connector_gate_sha256 = (
+            self.cloudflare.canonical_sha256(latest_connector_gate)
+        )
+        if (
+            marker_connector_gate.get("targetVersion")
+            != restoration.get("restoredVersion")
+            or latest_connector_gate.get("targetVersion")
+            != restoration.get("restoredVersion")
+            or retired_authority.get("connectorGateSha256")
+            != marker_connector_gate_sha256
+        ):
+            raise RecoveryUncertain(
+                "retirement connector-set proof drifted"
+            )
         api = self._cloudflare_api()
         try:
             with self.cloudflare.ExclusiveFileLock(config.cloudflare_lock):
@@ -9016,6 +9188,10 @@ class TopologyBActions:
                 config.cloudflare_retirement_evidence
             ),
             "retirementEvidenceSha256": sha256_bytes(evidence_raw),
+            "connectorGateSha256": marker_connector_gate_sha256,
+            "latestConnectorGateSha256": (
+                latest_connector_gate_sha256
+            ),
             "priorConfigSha256": restoration["priorConfigSha256"],
             "restoredVersion": restoration["restoredVersion"],
             "incumbentBaselineSha256": (
@@ -11507,8 +11683,23 @@ def retire_topology_b(
     journaled and uncertain; this path never silently reapplies the sidecar.
     """
 
-    action_boundary = actions if actions is not None else TopologyBActions(config)
+    previous_signal_handlers: dict[int, Any] = {}
+
+    def interrupt_retirement(
+        signal_number: int,
+        _frame: Any,
+    ) -> None:
+        raise _RetirementInterrupted(signal_number)
+
     try:
+        for signal_number in (signal.SIGINT, signal.SIGTERM):
+            previous_signal_handlers[signal_number] = signal.getsignal(
+                signal_number
+            )
+            signal.signal(signal_number, interrupt_retirement)
+        action_boundary = (
+            actions if actions is not None else TopologyBActions(config)
+        )
         authorization = action_boundary.authorize_committed_retirement(
             config
         )
@@ -11563,10 +11754,15 @@ def retire_topology_b(
         }
     except RecoveryUncertain:
         raise
-    except Exception as exc:
+    except BaseException as exc:
         raise RecoveryUncertain(
             "committed topology-B retirement could not establish exact state"
         ) from exc
+    finally:
+        for signal_number, previous_handler in (
+            previous_signal_handlers.items()
+        ):
+            signal.signal(signal_number, previous_handler)
 
 
 def execute(config: SidecarConfig) -> dict[str, Any]:

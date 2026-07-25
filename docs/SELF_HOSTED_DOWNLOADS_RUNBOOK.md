@@ -149,21 +149,32 @@ Do not search arbitrary secret roots or copy credentials into a release workspac
 The retirement controller first binds the active authority to terminal `cloudflare-committed.json`
 evidence and re-reads the live tunnel configuration at the exact committed target version and hash.
 It then durably authorizes retirement, re-reads immediately before the PUT, restores the captured
-`priorConfig` object and hash, polls bounded configuration and connector convergence, and proves HTTP 200 plus
-the exact captured body hashes and sizes for both `RELEASE_CHANNEL.generated.json` and
-`releases.json` on `chummer.run` and `www.chummer.run`. Only after a final Cloudflare re-read does it
-atomically move `public-download-active-runtime-authority.json` into the operation-private retired
-authority receipt and clean the exact sidecar Compose project, volumes, and candidate image.
+`priorConfig` object and hash, and polls bounded configuration convergence. Connector authority is
+the current Cloudflare connector set at each retirement transaction, not the set captured during
+the original cutover: the controller re-lists it on every poll, accepts safe additions and removals,
+and requires the same fully converged set in two consecutive observations. It repeats that
+connector-set gate on resume and immediately before moving the authority marker. The original
+committed restoration evidence stays immutable; later observations use separate resume receipts,
+and the terminal receipt binds both the marker-time and latest connector-gate hashes. It also
+proves HTTP 200 plus the exact captured body hashes and sizes for both
+`RELEASE_CHANNEL.generated.json` and `releases.json` on `chummer.run` and `www.chummer.run`. Only
+after these gates and a final Cloudflare re-read does it atomically move
+`public-download-active-runtime-authority.json` into the operation-private retired authority
+receipt and clean the exact sidecar Compose project, volumes, and candidate image.
 Cleanup reconstructs the original runtime inputs from the journal and verifies the historical
 Compose sources from the operation's captured Git commit, so a deleted sealed build workspace or a
 newer controller commit cannot silently redefine the cleanup boundary.
 
 An exit status of `76` means the outcome is intentionally uncertain and the authenticated shared
-mutation lock remains held. Inspect the durable receipts, recover that exact lock through the
-authenticated stale-lock procedure below, and rerun the same retirement operation ID. A resumed
-retirement accepts only the exact committed target or the exact restored prior config and never
-silently reapplies the sidecar target. Never delete, rename, or edit the active-authority marker by
-hand.
+mutation lock remains held. During retirement, `SIGINT`, `SIGTERM`, Python `BaseException`, and any
+nonzero controller result are all lock-retaining outcomes. `SIGKILL` cannot run a handler, so the
+wrapper relies on the durable authenticated lock directory, not an inherited process file
+descriptor; killing the wrapper cannot release that directory while a destructive child may still
+be running. Inspect the durable receipts and process inventory, recover that exact lock through the
+authenticated stale-lock procedure below only after every child has stopped, and rerun the same
+retirement operation ID. A resumed retirement accepts only the exact committed target or the exact
+restored prior config and never silently reapplies the sidecar target. Never delete, rename, or edit
+the active-authority marker by hand.
 
 ### Authenticated manual stale-lock recovery
 

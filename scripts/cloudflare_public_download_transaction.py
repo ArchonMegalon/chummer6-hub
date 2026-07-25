@@ -101,6 +101,21 @@ CONNECTOR_CAPTURE_FIELDS = frozenset(
 CONNECTOR_CONVERGENCE_FIELDS = frozenset(
     {"id", "configVersionAvailable", "observedConfigVersion", "converged"}
 )
+CURRENT_CONNECTOR_CONVERGENCE_CONTRACT = (
+    "cloudflare.current-connector-convergence/v1"
+)
+CURRENT_CONNECTOR_CONVERGENCE_FIELDS = frozenset(
+    {
+        "contractName",
+        "targetVersion",
+        "connectorSet",
+        "connectorSetSha256",
+        "connectorConvergence",
+        "connectorSetTransitions",
+        "attemptsUsed",
+        "stableObservationsRequired",
+    }
+)
 MAX_JSON_BYTES = 16 * 1024 * 1024
 
 
@@ -511,6 +526,120 @@ def poll_connector_convergence(
     return [observed[connector_id] for connector_id in connector_ids]
 
 
+def poll_current_connector_convergence(
+    api: TunnelApi,
+    target_version: int,
+    *,
+    attempts: int,
+    sleep_fn: Callable[[float], None],
+    interval_seconds: float,
+    stable_observations_required: int = 2,
+) -> dict[str, Any]:
+    """Re-list and converge the connector set that exists now.
+
+    Connector membership is not immutable across a tunnel configuration
+    transaction.  A connector captured by an older transaction may have been
+    removed, while a newly-added connector must not be omitted from a
+    destructive retirement decision.  Success therefore requires the same
+    sorted current connector set to be observed converged in consecutive
+    polls.  Set changes reset the stability count and are retained in the
+    receipt.
+    """
+
+    if attempts < 1:
+        raise ValidationError("poll attempts must be positive")
+    target_version = _require_version(target_version, "target version")
+    if (
+        isinstance(stable_observations_required, bool)
+        or not isinstance(stable_observations_required, int)
+        or stable_observations_required < 2
+        or stable_observations_required > attempts
+    ):
+        raise ValidationError(
+            "current connector convergence requires at least two bounded "
+            "stable observations"
+        )
+    transitions: list[list[str]] = []
+    stable_ids: list[str] | None = None
+    stable_observations = 0
+    final_capture: list[dict[str, Any]] | None = None
+    final_convergence: list[dict[str, Any]] | None = None
+    last_mismatch: dict[str, int | None] = {}
+    for attempt in range(attempts):
+        captured = capture_preexisting_connectors(api)
+        connector_ids = [str(row["id"]) for row in captured]
+        if not transitions or transitions[-1] != connector_ids:
+            transitions.append(connector_ids)
+        convergence: list[dict[str, Any]] = []
+        mismatch: dict[str, int | None] = {}
+        for row in captured:
+            connector_id = str(row["id"])
+            available = row["configVersionAvailable"]
+            observed_version = row["configVersion"]
+            converged = (
+                observed_version == target_version
+                if available
+                else None
+            )
+            convergence.append(
+                {
+                    "id": connector_id,
+                    "configVersionAvailable": available,
+                    "observedConfigVersion": observed_version,
+                    "converged": converged,
+                }
+            )
+            if available and not converged:
+                mismatch[connector_id] = observed_version
+        if mismatch:
+            stable_ids = None
+            stable_observations = 0
+            last_mismatch = mismatch
+        else:
+            if stable_ids == connector_ids:
+                stable_observations += 1
+            else:
+                stable_ids = connector_ids
+                stable_observations = 1
+            final_capture = captured
+            final_convergence = convergence
+            last_mismatch = {}
+            if stable_observations >= stable_observations_required:
+                receipt = {
+                    "contractName": (
+                        CURRENT_CONNECTOR_CONVERGENCE_CONTRACT
+                    ),
+                    "targetVersion": target_version,
+                    "connectorSet": copy.deepcopy(final_capture),
+                    "connectorSetSha256": canonical_sha256(
+                        final_capture
+                    ),
+                    "connectorConvergence": copy.deepcopy(
+                        final_convergence
+                    ),
+                    "connectorSetTransitions": copy.deepcopy(
+                        transitions
+                    ),
+                    "attemptsUsed": attempt + 1,
+                    "stableObservationsRequired": (
+                        stable_observations_required
+                    ),
+                }
+                return validate_current_connector_convergence_receipt(
+                    receipt
+                )
+        if attempt + 1 < attempts:
+            sleep_fn(interval_seconds)
+    if last_mismatch:
+        raise ConvergenceError(
+            "current connector config_version did not converge: "
+            f"{last_mismatch}"
+        )
+    raise ConvergenceError(
+        "current connector set did not remain stable while converged"
+    )
+
+
 def _utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -574,6 +703,113 @@ def _validate_connector_convergence(
     if ids != list(connector_ids):
         raise ValidationError("connector convergence does not cover captured connectors")
     return rows
+
+
+def validate_current_connector_convergence_receipt(
+    value: Any,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValidationError(
+            "current connector convergence receipt must be an object"
+        )
+    _require_exact_fields(
+        value,
+        CURRENT_CONNECTOR_CONVERGENCE_FIELDS,
+        "current connector convergence receipt",
+    )
+    if (
+        value["contractName"]
+        != CURRENT_CONNECTOR_CONVERGENCE_CONTRACT
+    ):
+        raise ValidationError(
+            "current connector convergence contract mismatch"
+        )
+    target_version = _require_version(
+        value["targetVersion"],
+        "current connector target version",
+    )
+    connector_set = _validate_connector_capture(value["connectorSet"])
+    connector_ids = [row["id"] for row in connector_set]
+    if not connector_ids:
+        raise ValidationError(
+            "current connector convergence set must not be empty"
+        )
+    if canonical_sha256(connector_set) != value["connectorSetSha256"]:
+        raise ValidationError(
+            "current connector set digest mismatch"
+        )
+    convergence = _validate_connector_convergence(
+        value["connectorConvergence"],
+        connector_ids,
+        target_version,
+    )
+    if len(convergence) != len(connector_set):
+        raise ValidationError(
+            "current connector convergence is incomplete"
+        )
+    for captured, observed in zip(
+        connector_set,
+        convergence,
+        strict=True,
+    ):
+        if (
+            captured["configVersionAvailable"]
+            != observed["configVersionAvailable"]
+            or captured["configVersion"]
+            != observed["observedConfigVersion"]
+            or (
+                captured["configVersionAvailable"]
+                and captured["configVersion"] != target_version
+            )
+        ):
+            raise ValidationError(
+                "current connector capture and convergence differ"
+            )
+    transitions = value["connectorSetTransitions"]
+    if not isinstance(transitions, list) or not transitions:
+        raise ValidationError(
+            "current connector set transitions must be non-empty"
+        )
+    previous: list[str] | None = None
+    for index, transition in enumerate(transitions):
+        if (
+            not isinstance(transition, list)
+            or not transition
+            or any(
+                _require_identifier(
+                    connector_id,
+                    f"connectorSetTransitions[{index}] id",
+                )
+                != connector_id
+                for connector_id in transition
+            )
+            or transition != sorted(transition)
+            or len(transition) != len(set(transition))
+            or transition == previous
+        ):
+            raise ValidationError(
+                "current connector set transition is malformed"
+            )
+        previous = transition
+    if transitions[-1] != connector_ids:
+        raise ValidationError(
+            "current connector set transition does not end at the "
+            "converged set"
+        )
+    attempts_used = value["attemptsUsed"]
+    stable_required = value["stableObservationsRequired"]
+    if (
+        isinstance(attempts_used, bool)
+        or not isinstance(attempts_used, int)
+        or isinstance(stable_required, bool)
+        or not isinstance(stable_required, int)
+        or stable_required < 2
+        or attempts_used < stable_required
+    ):
+        raise ValidationError(
+            "current connector convergence poll bounds are invalid"
+        )
+    return value
 
 
 def validate_journal(value: Any) -> dict[str, Any]:
