@@ -108,6 +108,10 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             parser,
         )
         self.assertIn(
+            "bind_exact_build_source_replay",
+            parser,
+        )
+        self.assertIn(
             "build_context.get(\"dockerignoreSha256\")",
             parser,
         )
@@ -115,6 +119,39 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             'provenance.get("canonical-build-context")',
             parser,
         )
+
+    def test_synthetic_replay_is_preflighted_and_forwarded_before_quiesce(
+        self,
+    ) -> None:
+        deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+        preflight = deploy.index("--source-replay-preflight")
+        quiesce = deploy.index(
+            "compose_cli stop chummer-run-cloudflared"
+        )
+        postquiesce = deploy.index("--post-quiesce-reproof")
+
+        self.assertLess(preflight, quiesce)
+        self.assertLess(quiesce, postquiesce)
+        self.assertIn(
+            '--source-root "$INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT"',
+            deploy,
+        )
+        self.assertGreaterEqual(
+            deploy.count('"${install_linking_source_replay_args[@]}"'),
+            2,
+        )
+        for option in (
+            "--synthetic-workspace-root",
+            "--build-context-root",
+            "--hub-registry-root",
+            "--design-product-root",
+            "--fleet-media-factory-root",
+            "--expected-run-services-content-sha256",
+            "--expected-hub-registry-content-sha256",
+            "--expected-design-product-content-sha256",
+            "--expected-fleet-media-factory-content-sha256",
+        ):
+            self.assertIn(option, deploy)
 
     def test_docker_context_includes_every_named_context_input(self) -> None:
         dockerignore = DOCKERIGNORE_PATH.read_text(encoding="utf-8")

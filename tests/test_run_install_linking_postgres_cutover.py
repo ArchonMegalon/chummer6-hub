@@ -871,6 +871,59 @@ def test_synthetic_git_dependency_rejects_content_drift_after_pin(
         )
 
 
+def test_source_replay_preflight_rejects_content_pin_mismatch_before_jobs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    runner = make_runner(
+        module,
+        tmp_path,
+        FakeCommands(lambda *_args: module.CommandResult(0, b"", b"")),
+    )
+    active_build_info = tmp_path / "candidate-build-info.json"
+    active_build_info.write_text("{}\n", encoding="utf-8")
+    active_build_info.chmod(0o600)
+    expected_digest = module.sha256_bytes(active_build_info.read_bytes())
+    observed = {
+        "synthetic-build-context": {
+            "dockerignoreSha256": "1" * 64,
+        },
+        "hub-registry": {
+            "contentSha256": "2" * 64,
+        },
+    }
+    recorded = copy.deepcopy(observed)
+    recorded["hub-registry"]["contentSha256"] = "3" * 64
+    runner._validate_source = lambda: None
+    runner._capture_build_source_provenance = lambda: copy.deepcopy(
+        observed
+    )
+    runner._run_job = lambda **_kwargs: pytest.fail(
+        "source replay preflight dispatched an operator job"
+    )
+    monkeypatch.setattr(
+        module,
+        "bind_active_build_info",
+        lambda *_args, **_kwargs: (
+            active_build_info,
+            expected_digest,
+            {"buildSourceProvenance": recorded},
+        ),
+    )
+
+    with pytest.raises(
+        module.CutoverError,
+        match="build-source replay binding drifted",
+    ):
+        runner.verify_source_replay(
+            active_build_info=active_build_info,
+            expected_active_build_info_sha256=expected_digest,
+            expected_candidate_image_id=IMAGE,
+            expected_candidate_tool_image_id=TOOL_IMAGE,
+        )
+
+
 def test_archive_source_mode_is_not_exposed() -> None:
     module = load_module()
 

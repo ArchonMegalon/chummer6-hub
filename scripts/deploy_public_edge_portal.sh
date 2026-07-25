@@ -175,6 +175,12 @@ INSTALL_LINKING_CUTOVER_BOUNDARY_INPUT="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDA
 INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256="${CHUMMER_INSTALL_LINKING_CUTOVER_BOUNDARY_SHA256-}"
 EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID="${CHUMMER_INSTALL_LINKING_CANDIDATE_IMAGE_ID-}"
 EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID="${CHUMMER_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID-}"
+INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT-}"
+INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT-}"
+INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT-}"
+INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT-}"
+INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT-}"
+INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT="${CHUMMER_INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT-}"
 FLEET_MEDIA_CONTRACTS="${CHUMMER_FLEET_MEDIA_CONTRACTS:-$CANONICAL_FLEET_MEDIA_CONTRACTS}"
 DESIGN_PRODUCT_ROOT="${CHUMMER_DESIGN_PRODUCT_ROOT:-$CANONICAL_DESIGN_PRODUCT_ROOT}"
 BUILD_CONCURRENCY="${CHUMMER_BUILD_CONCURRENCY:-1}"
@@ -1942,6 +1948,7 @@ import pathlib, re, sys
 scripts = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(scripts))
 from materialize_install_linking_cutover_boundary import (
+    bind_exact_build_source_replay,
     bind_active_build_info,
     select_exact_build_context_provenance,
 )
@@ -1960,11 +1967,33 @@ if not isinstance(provenance, dict):
 _build_context_name, build_context = (
     select_exact_build_context_provenance(provenance)
 )
+replay = bind_exact_build_source_replay(
+    provenance,
+    synthetic_workspace_root=sys.argv[7] or None,
+    build_context_root=sys.argv[8] or None,
+    run_services_root=sys.argv[9] or None,
+    hub_registry_root=sys.argv[10] or None,
+    design_product_root=sys.argv[11] or None,
+    fleet_media_factory_root=sys.argv[12] or None,
+)
+source_roots = replay["sourceRoots"]
+content_sha256 = replay["contentSha256"]
 values = (
     (provenance.get("hub-registry") or {}).get("head"),
     (provenance.get("design-product") or {}).get("head"),
     (provenance.get("fleet-media-factory-contracts") or {}).get("head"),
     build_context.get("dockerignoreSha256"),
+    replay["buildContextName"],
+    replay["syntheticWorkspaceRoot"] or "-",
+    replay["buildContextRoot"] or "-",
+    source_roots["run-services-source"] or "-",
+    source_roots["hub-registry"] or "-",
+    source_roots["design-product"] or "-",
+    source_roots["fleet-media-factory-contracts"] or "-",
+    content_sha256["run-services-source"] or "-",
+    content_sha256["hub-registry"] or "-",
+    content_sha256["design-product"] or "-",
+    content_sha256["fleet-media-factory-contracts"] or "-",
 )
 if (
     any(not isinstance(value, str) or "|" in value or "\n" in value for value in values)
@@ -1977,7 +2006,13 @@ print("|".join(values), end="")
     "$INSTALL_LINKING_CUTOVER_ID" \
     "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
     "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
-    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256"
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+    "$INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT" \
+    "$INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT" \
+    "$INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT" \
+    "$INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT" \
+    "$INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT" \
+    "$INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT"
 )"; then
   echo "InstallLinking candidate build-source provenance is invalid" >&2
   exit 2
@@ -1986,7 +2021,106 @@ IFS='|' read -r INSTALL_LINKING_EXPECTED_HUB_REGISTRY_HEAD \
   INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_HEAD \
   INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_HEAD \
   INSTALL_LINKING_EXPECTED_BUILD_CONTEXT_DOCKERIGNORE_SHA256 \
+  INSTALL_LINKING_BUILD_CONTEXT_NAME \
+  INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT \
+  INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT \
+  INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT \
+  INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT \
+  INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT \
+  INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT \
+  INSTALL_LINKING_EXPECTED_RUN_SERVICES_CONTENT_SHA256 \
+  INSTALL_LINKING_EXPECTED_HUB_REGISTRY_CONTENT_SHA256 \
+  INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_CONTENT_SHA256 \
+  INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_CONTENT_SHA256 \
   <<<"$install_linking_build_source_provenance"
+INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT="$SOURCE_ROOT"
+install_linking_source_replay_args=()
+case "$INSTALL_LINKING_BUILD_CONTEXT_NAME" in
+  canonical-build-context)
+    for canonical_sentinel in \
+      "$INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT" \
+      "$INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT" \
+      "$INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT" \
+      "$INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT" \
+      "$INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT" \
+      "$INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT" \
+      "$INSTALL_LINKING_EXPECTED_RUN_SERVICES_CONTENT_SHA256" \
+      "$INSTALL_LINKING_EXPECTED_HUB_REGISTRY_CONTENT_SHA256" \
+      "$INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_CONTENT_SHA256" \
+      "$INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_CONTENT_SHA256"; do
+      if [[ "$canonical_sentinel" != "-" ]]; then
+        echo "canonical InstallLinking provenance contains synthetic replay inputs" >&2
+        exit 2
+      fi
+    done
+    ;;
+  synthetic-build-context)
+    if [[ ! "$INSTALL_LINKING_EXPECTED_RUN_SERVICES_CONTENT_SHA256" \
+        =~ ^[0-9a-f]{64}$ \
+      || ! "$INSTALL_LINKING_EXPECTED_HUB_REGISTRY_CONTENT_SHA256" \
+        =~ ^[0-9a-f]{64}$ \
+      || ! "$INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_CONTENT_SHA256" \
+        =~ ^[0-9a-f]{64}$ \
+      || ! "$INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_CONTENT_SHA256" \
+        =~ ^[0-9a-f]{64}$ ]]; then
+      echo "synthetic InstallLinking content replay pins are invalid" >&2
+      exit 2
+    fi
+    INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT="$INSTALL_LINKING_REPLAY_RUN_SERVICES_ROOT"
+    install_linking_source_replay_args=(
+      --synthetic-workspace-root
+      "$INSTALL_LINKING_REPLAY_SYNTHETIC_WORKSPACE_ROOT"
+      --build-context-root "$INSTALL_LINKING_REPLAY_BUILD_CONTEXT_ROOT"
+      --hub-registry-root "$INSTALL_LINKING_REPLAY_HUB_REGISTRY_ROOT"
+      --design-product-root "$INSTALL_LINKING_REPLAY_DESIGN_PRODUCT_ROOT"
+      --fleet-media-factory-root
+      "$INSTALL_LINKING_REPLAY_FLEET_MEDIA_FACTORY_ROOT"
+      --expected-run-services-content-sha256
+      "$INSTALL_LINKING_EXPECTED_RUN_SERVICES_CONTENT_SHA256"
+      --expected-hub-registry-content-sha256
+      "$INSTALL_LINKING_EXPECTED_HUB_REGISTRY_CONTENT_SHA256"
+      --expected-design-product-content-sha256
+      "$INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_CONTENT_SHA256"
+      --expected-fleet-media-factory-content-sha256
+      "$INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_CONTENT_SHA256"
+    )
+    ;;
+  *)
+    echo "InstallLinking build-context replay kind is invalid" >&2
+    exit 2
+    ;;
+esac
+if ! trusted_source_python "$INSTALL_LINKING_CUTOVER_RUNNER" \
+  --source-replay-preflight \
+  --source-root "$INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT" \
+  "${install_linking_source_replay_args[@]}" \
+  --expected-head "${EXPECTED_HEAD,,}" \
+  --expected-compose-sha256 "$INSTALL_LINKING_COMPOSE_SHA256" \
+  --env-file "$ENV_FILE" \
+  --expected-env-sha256 "$INSTALL_LINKING_ENV_SHA256" \
+  --expected-runner-sha256 "$INSTALL_LINKING_RUNNER_SHA256" \
+  --expected-hub-registry-head \
+    "$INSTALL_LINKING_EXPECTED_HUB_REGISTRY_HEAD" \
+  --expected-design-product-head \
+    "$INSTALL_LINKING_EXPECTED_DESIGN_PRODUCT_HEAD" \
+  --expected-fleet-media-factory-head \
+    "$INSTALL_LINKING_EXPECTED_FLEET_MEDIA_FACTORY_HEAD" \
+  --expected-build-context-dockerignore-sha256 \
+    "$INSTALL_LINKING_EXPECTED_BUILD_CONTEXT_DOCKERIGNORE_SHA256" \
+  --cutover-id "$INSTALL_LINKING_CUTOVER_ID" \
+  --receipt-root "$INSTALL_LINKING_CUTOVER_RECEIPT_ROOT" \
+  --boundary-output "$INSTALL_LINKING_CUTOVER_BOUNDARY" \
+  --expected-candidate-image-id \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_IMAGE_ID" \
+  --expected-candidate-tool-image-id \
+    "$EXPECTED_INSTALL_LINKING_CANDIDATE_TOOL_IMAGE_ID" \
+  --active-build-info "$INSTALL_LINKING_ACTIVE_BUILD_INFO" \
+  --expected-active-build-info-sha256 \
+    "$INSTALL_LINKING_ACTIVE_BUILD_INFO_SHA256" \
+  >/dev/null; then
+  echo "InstallLinking candidate build-source replay preflight failed" >&2
+  exit 2
+fi
 if ! builder_identity="$(
   docker_cli buildx ls --format json \
     | "$TRUSTED_PYTHON" -I -c '
@@ -3541,7 +3675,8 @@ postquiesce_runner_invoked=1
 trusted_source_python "$INSTALL_LINKING_CUTOVER_RUNNER" \
   --post-quiesce-reproof \
   --reproof-attempt-id "$INSTALL_LINKING_REPROOF_ATTEMPT_ID" \
-  --source-root "$SOURCE_ROOT" \
+  --source-root "$INSTALL_LINKING_POSTQUIESCE_SOURCE_ROOT" \
+  "${install_linking_source_replay_args[@]}" \
   --expected-head "${EXPECTED_HEAD,,}" \
   --expected-compose-sha256 "$INSTALL_LINKING_COMPOSE_SHA256" \
   --env-file "$ENV_FILE" \
