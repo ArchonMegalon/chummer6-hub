@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -43,6 +44,89 @@ provider = load_module(
     ROOT / "scripts/verify_topology_b_committed_retirement_proof.py",
     "topology_b_public_retirement_provider",
 )
+
+
+@pytest.fixture(scope="module")
+def two_commit_git_authority(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> SimpleNamespace:
+    root = tmp_path_factory.mktemp("topology-b-git-authority")
+    scripts = root / "scripts"
+    scripts.mkdir()
+    for name in (
+        "cloudflare_public_download_transaction.py",
+        "deploy_public_download_only_cutover.py",
+        "verify_topology_b_committed_retirement_proof.py",
+    ):
+        shutil.copy2(ROOT / "scripts" / name, scripts / name)
+
+    environment = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "LANG": "C",
+        "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_AUTHOR_NAME": "Chummer topology-B test",
+        "GIT_AUTHOR_EMAIL": "topology-b-test@example.invalid",
+        "GIT_COMMITTER_NAME": "Chummer topology-B test",
+        "GIT_COMMITTER_EMAIL": "topology-b-test@example.invalid",
+    }
+
+    def git(
+        *arguments: str,
+        timestamp: str | None = None,
+    ) -> str:
+        command_environment = dict(environment)
+        if timestamp is not None:
+            command_environment["GIT_AUTHOR_DATE"] = timestamp
+            command_environment["GIT_COMMITTER_DATE"] = timestamp
+        return subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                *arguments,
+            ],
+            env=command_environment,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout.strip()
+
+    git("init", "--initial-branch=main")
+    git("add", "--force", "scripts")
+    git(
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Capture current topology-B source",
+        timestamp="2026-07-25T00:00:00+00:00",
+    )
+    terminal_head = git("rev-parse", "HEAD")
+    (root / "protected-main-descendant.txt").write_text(
+        "deterministic protected-main descendant\n",
+        encoding="utf-8",
+    )
+    git("add", "--force", "protected-main-descendant.txt")
+    git(
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Advance protected main",
+        timestamp="2026-07-25T00:01:00+00:00",
+    )
+    provider_head = git("rev-parse", "HEAD")
+    assert git("rev-list", "--count", "HEAD") == "2"
+    return SimpleNamespace(
+        root=root,
+        terminal_head=terminal_head,
+        provider_head=provider_head,
+    )
 
 
 def canonical_sha256(value: Any) -> str:
@@ -932,20 +1016,11 @@ def test_materializer_recovers_after_interruption_before_commit_marker(
 
 def test_materializer_refreshes_old_terminal_envelope_from_descendant_main(
     tmp_path: Path,
+    two_commit_git_authority: SimpleNamespace,
 ) -> None:
     config, result = materialization_fixture(tmp_path)
-    current_head = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
-    terminal_head = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD^"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+    current_head = two_commit_git_authority.provider_head
+    terminal_head = two_commit_git_authority.terminal_head
     terminal = result["terminalReceipt"]
     terminal["controllerSourceHead"] = terminal_head
     result["controllerSourceHead"] = terminal_head
@@ -953,6 +1028,7 @@ def test_materializer_refreshes_old_terminal_envelope_from_descendant_main(
     journal["receipts"]["retirement"] = terminal
     config.operation_journal.write_bytes(json_bytes(journal))
     config.retirement_receipt.write_bytes(json_bytes(terminal))
+    config.source_root = two_commit_git_authority.root
     config.controller_source_head = current_head
     immutable_terminal = config.retirement_receipt.read_bytes()
     first_time = proof_time(result)
@@ -1270,19 +1346,13 @@ def test_public_directory_creation_never_chmods_raced_symlink(
     assert victim.stat().st_mode & 0o777 == 0o600
 
 
-def test_provider_requires_terminal_source_ancestor_of_exact_checkout() -> None:
-    current_head = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
-    ancestor = subprocess.run(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD^"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+def test_provider_requires_terminal_source_ancestor_of_exact_checkout(
+    two_commit_git_authority: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current_head = two_commit_git_authority.provider_head
+    ancestor = two_commit_git_authority.terminal_head
+    monkeypatch.setattr(provider, "ROOT", two_commit_git_authority.root)
 
     provider.require_protected_main_ancestry(ancestor, current_head)
     with pytest.raises(provider.ProofError, match="not an ancestor"):
