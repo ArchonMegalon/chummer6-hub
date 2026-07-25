@@ -166,6 +166,7 @@ jobs:
             scripts/verify_public_edge_compose_operability.py \
             scripts/deploy_public_download_only_cutover.py \
             scripts/verify_topology_b_committed_retirement_proof.py \
+            scripts/quarantine_historical_release_bearer_configs.py \
             scripts/release/materialize_candidate_import_authority.py \
             scripts/release/verify_public_projection.py \
             scripts/verify_live_public_windows_installer.py
@@ -189,4 +190,5 @@ jobs:
             tests/test_mac_release_bootstrap_authority_closure.py \
             tests/test_mac_release_stage_only.py \
             tests/test_final_gold_janitor.py \
+            tests/test_quarantine_historical_release_bearer_configs.py \
             tests/test_hub_local_release_proof_materializer_sync.py
