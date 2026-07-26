@@ -41,6 +41,21 @@ def has_windows_native_root_blocker(module) -> bool:
     return not module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING
 
 
+def passing_windows_visual_intake_verifier_result() -> tuple[bool, dict[str, object]]:
+    return True, {
+        "status": "pass",
+        "issues": [],
+        "recovery_pack_pass": True,
+        "effective_status": "external_artifact_required",
+        "operator_action_still_required": True,
+        "current_windows_visual_audit_status": "fail",
+        "current_windows_visual_audit_effective_pass": False,
+        "current_windows_visual_audit_issues": [
+            "current_windows_visual_audit_status_not_pass"
+        ],
+    }
+
+
 def passing_operator_dashboard_payload(module):
     generated_at = module.now_iso()
     checks = {}
@@ -2573,7 +2588,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "waiting_for_artifact",
-                        "generated_at_utc": "2026-07-04T17:00:05Z",
+                        "generated_at_utc": generated_at_utc,
                         "import_failure": {
                             "type": "BadZipFile",
                             "message": "File is not a zip file",
@@ -2650,7 +2665,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             watcher_state_path.write_text(
                 json.dumps(
                     {
-                        "generated_at_utc": "2026-07-04T17:00:06Z",
+                        "generated_at_utc": generated_at_utc,
                         "status": "running",
                         "pid": 1866861,
                         "process_alive": True,
@@ -2668,6 +2683,11 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=passing_windows_visual_intake_verifier_result(),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
@@ -2924,6 +2944,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
     def test_payload_surfaces_windows_operator_missing_artifact_and_stale_ask(self) -> None:
         module = load_module()
         module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING = False
+        generated_at_utc = module.now_iso()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-windows-operator-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
@@ -2935,7 +2956,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "sent",
-                        "generated_at_utc": "2026-07-04T17:00:11Z",
+                        "generated_at_utc": generated_at_utc,
                         "message_ids": ["1"],
                         "text_sha256": "f" * 64,
                         "text_preview": "Older Windows operator ask",
@@ -2951,7 +2972,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = {
                         "contract_name": "chummer.teable_important_work.v1",
                         "status": "pass",
-                        "generated_at_utc": "2026-07-04T17:00:08Z",
+                        "generated_at_utc": generated_at_utc,
                         "row_count": 1,
                         "rows": [{"title": "row"}],
                         "sync": {"state": "passed", "attempted": True, "synced_count": 1, "failed_count": 0},
@@ -2964,7 +2985,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = {
                         **passing_required_receipt_payload(module, key),
                         "status": "fail",
-                        "generated_at_utc": "2026-07-04T17:00:09Z",
+                        "generated_at_utc": generated_at_utc,
                         "contract_name": module.WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME,
                         "artifact": {"sha256": "a" * 64, "actualSha256": "a" * 64},
                         "startupReceipt": {
@@ -3027,6 +3048,11 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
                 mock.patch.object(module, "TELEGRAM_TEXT_DELIVERY_ROOT", delivery_root),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=passing_windows_visual_intake_verifier_result(),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
