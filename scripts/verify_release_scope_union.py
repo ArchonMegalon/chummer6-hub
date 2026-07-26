@@ -10,9 +10,11 @@ import json
 import os
 from pathlib import Path
 import re
+import selectors
 import stat
 import subprocess
 import sys
+import time
 from typing import Any, Optional, Sequence
 
 import verify_release_scope_decision as decision_contract
@@ -31,6 +33,7 @@ UUID = re.compile(
 )
 POSITIVE_DECIMAL = re.compile(r"^[1-9][0-9]*$")
 MAX_JSON_BYTES = 16 * 1024 * 1024
+MAX_RELEASE_SOURCE_BYTES = 16 * 1024 * 1024
 PLATFORM_SPECS = {
     "linux": "linux-x64",
     "macos": "osx-arm64",
@@ -1002,6 +1005,8 @@ def _verify_registry_checkout(path: Path, expected_commit: str) -> None:
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_EXTERNAL_DIFF": "",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_PAGER": "cat",
         "GIT_TERMINAL_PROMPT": "0",
@@ -1041,6 +1046,266 @@ def _verify_registry_checkout(path: Path, expected_commit: str) -> None:
         repository_still_bound()
         return result
 
+    def open_protected_source(
+        source_path: str,
+    ) -> tuple[
+        int,
+        os.stat_result,
+        int,
+        str,
+        list[tuple[int, str, tuple[int, ...], int]],
+        list[int],
+    ]:
+        label = f"Registry release producer {source_path}"
+        components = Path(source_path).parts
+        if (
+            not components
+            or Path(source_path).is_absolute()
+            or any(component in {"", ".", ".."} for component in components)
+        ):
+            raise ScopeError("Registry protected source path is unsafe")
+        owned_directory_fds: list[int] = []
+        bindings: list[tuple[int, str, tuple[int, ...], int]] = []
+        parent_fd = repository_fd
+        descriptor: Optional[int] = None
+        try:
+            for component in components[:-1]:
+                before_path = os.stat(
+                    component,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                if not stat.S_ISDIR(before_path.st_mode):
+                    raise ScopeError(f"{label} must not traverse a symlink")
+                next_fd = os.open(component, directory_flags, dir_fd=parent_fd)
+                try:
+                    opened = os.fstat(next_fd)
+                except OSError:
+                    os.close(next_fd)
+                    raise
+                if _identity(before_path) != _identity(opened):
+                    os.close(next_fd)
+                    raise ScopeError(
+                        f"{label} parent changed while it was opened"
+                    )
+                owned_directory_fds.append(next_fd)
+                bindings.append(
+                    (parent_fd, component, _identity(opened), next_fd)
+                )
+                parent_fd = next_fd
+
+            file_name = components[-1]
+            before_path = os.stat(
+                file_name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            descriptor = os.open(
+                file_name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+            before = os.fstat(descriptor)
+            if _identity(before_path) != _identity(before):
+                raise ScopeError(f"{label} changed while it was opened")
+            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                raise ScopeError(f"{label} must be a single-link regular file")
+            if before.st_uid != os.geteuid():
+                raise ScopeError(
+                    f"{label} must be owned by the current release operator"
+                )
+            if before.st_mode & 0o022:
+                raise ScopeError(f"{label} must not be group/world writable")
+            if not 1 <= before.st_size <= MAX_RELEASE_SOURCE_BYTES:
+                raise ScopeError(
+                    f"{label} must be non-empty and no larger than "
+                    f"{MAX_RELEASE_SOURCE_BYTES} bytes"
+                )
+            return (
+                descriptor,
+                before,
+                parent_fd,
+                file_name,
+                bindings,
+                owned_directory_fds,
+            )
+        except OSError as error:
+            if descriptor is not None:
+                os.close(descriptor)
+            for directory_fd in reversed(owned_directory_fds):
+                os.close(directory_fd)
+            raise ScopeError(f"{label} could not be opened safely") from error
+        except BaseException:
+            if descriptor is not None:
+                os.close(descriptor)
+            for directory_fd in reversed(owned_directory_fds):
+                os.close(directory_fd)
+            raise
+
+    def read_held_source(
+        descriptor: int,
+        before: os.stat_result,
+        source_path: str,
+    ) -> bytes:
+        chunks: list[bytes] = []
+        remaining = before.st_size + 1
+        try:
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        except OSError as error:
+            raise ScopeError(
+                f"Registry release producer {source_path} could not be read safely"
+            ) from error
+        raw = b"".join(chunks)
+        if len(raw) != before.st_size:
+            raise ScopeError(
+                f"Registry release producer {source_path} changed during stable read"
+            )
+        return raw
+
+    def held_source_still_bound(
+        descriptor: int,
+        before: os.stat_result,
+        parent_fd: int,
+        file_name: str,
+        bindings: list[tuple[int, str, tuple[int, ...], int]],
+        source_path: str,
+    ) -> None:
+        label = f"Registry release producer {source_path}"
+        try:
+            current_file = os.stat(
+                file_name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            opened_file = os.fstat(descriptor)
+            for binding_parent_fd, component, expected, opened_fd in bindings:
+                current_directory = os.stat(
+                    component,
+                    dir_fd=binding_parent_fd,
+                    follow_symlinks=False,
+                )
+                opened_directory = os.fstat(opened_fd)
+                if (
+                    _identity(current_directory) != expected
+                    or _identity(opened_directory) != expected
+                ):
+                    raise ScopeError(
+                        f"{label} changed during protected source comparison"
+                    )
+        except OSError as error:
+            raise ScopeError(
+                f"{label} changed during protected source comparison"
+            ) from error
+        if (
+            _identity(current_file) != _identity(before)
+            or _identity(opened_file) != _identity(before)
+        ):
+            raise ScopeError(
+                f"{label} changed during protected source comparison"
+            )
+
+    def read_head_blob(source_path: str) -> bytes:
+        object_name = f"HEAD:{source_path}"
+        object_type = run("cat-file", "-t", object_name)
+        if object_type.returncode != 0 or object_type.stdout != "blob\n":
+            raise ScopeError(
+                f"Registry reviewed HEAD is missing required source path {source_path}"
+            )
+        object_size = run("cat-file", "-s", object_name)
+        size_text = object_size.stdout.strip()
+        if (
+            object_size.returncode != 0
+            or POSITIVE_DECIMAL.fullmatch(size_text) is None
+            or int(size_text) > MAX_RELEASE_SOURCE_BYTES
+        ):
+            raise ScopeError(
+                f"Registry reviewed source {source_path} has an invalid blob size"
+            )
+        expected_size = int(size_text)
+        repository_still_bound()
+        process: Optional[subprocess.Popen[bytes]] = None
+        stdout_pipe: Any = None
+        raw = bytearray()
+        deadline = time.monotonic() + 30
+        try:
+            process = subprocess.Popen(
+                [*command_prefix, "cat-file", "blob", object_name],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                env=git_environment,
+                close_fds=True,
+                pass_fds=(repository_fd,),
+            )
+            stdout_pipe = process.stdout
+            if stdout_pipe is None:
+                raise OSError("Git blob pipe is unavailable")
+            stdout_fd = stdout_pipe.fileno()
+            os.set_blocking(stdout_fd, False)
+            reached_eof = False
+            with selectors.DefaultSelector() as selector:
+                selector.register(stdout_fd, selectors.EVENT_READ)
+                while not reached_eof and len(raw) <= expected_size:
+                    remaining_time = deadline - time.monotonic()
+                    if remaining_time <= 0:
+                        raise subprocess.TimeoutExpired(
+                            process.args,
+                            30,
+                        )
+                    events = selector.select(remaining_time)
+                    if not events:
+                        raise subprocess.TimeoutExpired(
+                            process.args,
+                            30,
+                        )
+                    for _key, _mask in events:
+                        try:
+                            chunk = os.read(
+                                stdout_fd,
+                                min(
+                                    1024 * 1024,
+                                    expected_size + 1 - len(raw),
+                                ),
+                            )
+                        except BlockingIOError:
+                            continue
+                        if not chunk:
+                            reached_eof = True
+                            break
+                        raw.extend(chunk)
+            if len(raw) > expected_size and process.poll() is None:
+                process.kill()
+            return_code = process.wait(
+                timeout=max(0.001, deadline - time.monotonic())
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            if process is not None and process.poll() is None:
+                process.kill()
+            if process is not None:
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+            raise ScopeError(
+                f"Registry reviewed source {source_path} could not be read safely"
+            ) from error
+        finally:
+            if stdout_pipe is not None:
+                stdout_pipe.close()
+        repository_still_bound()
+        if return_code != 0 or len(raw) != expected_size:
+            raise ScopeError(
+                f"Registry reviewed source {source_path} changed during bounded read"
+            )
+        return bytes(raw)
+
     try:
         top_level = run("rev-parse", "--show-toplevel")
         if top_level.returncode != 0:
@@ -1066,23 +1331,51 @@ def _verify_registry_checkout(path: Path, expected_commit: str) -> None:
             "scripts/materialize_public_release_channel.py",
             "scripts/verify_public_release_channel.py",
         )
-        status_result = run(
-            "status",
-            "--porcelain=v1",
-            "--untracked-files=all",
-            "--",
-            *protected_paths,
-        )
-        if status_result.returncode != 0 or status_result.stdout:
-            raise ScopeError(
-                "Registry release producer paths must be clean at the reviewed HEAD"
-            )
         for source_path in protected_paths:
-            exists = run("cat-file", "-e", f"HEAD:{source_path}")
-            if exists.returncode != 0:
-                raise ScopeError(
-                    f"Registry reviewed HEAD is missing required source path {source_path}"
+            (
+                descriptor,
+                before,
+                parent_fd,
+                file_name,
+                bindings,
+                owned_directory_fds,
+            ) = open_protected_source(source_path)
+            try:
+                working_bytes = read_held_source(
+                    descriptor,
+                    before,
+                    source_path,
                 )
+                reviewed_bytes = read_head_blob(source_path)
+                held_source_still_bound(
+                    descriptor,
+                    before,
+                    parent_fd,
+                    file_name,
+                    bindings,
+                    source_path,
+                )
+            finally:
+                os.close(descriptor)
+                for directory_fd in reversed(owned_directory_fds):
+                    os.close(directory_fd)
+            working_sha256 = hashlib.sha256(working_bytes).digest()
+            reviewed_sha256 = hashlib.sha256(reviewed_bytes).digest()
+            if (
+                not hmac.compare_digest(working_sha256, reviewed_sha256)
+                or not hmac.compare_digest(working_bytes, reviewed_bytes)
+            ):
+                raise ScopeError(
+                    "Registry release producer paths must be clean at the reviewed HEAD"
+                )
+        head_after_comparison = run("rev-parse", "--verify", "HEAD^{commit}")
+        if (
+            head_after_comparison.returncode != 0
+            or head_after_comparison.stdout.strip() != expected_commit
+        ):
+            raise ScopeError(
+                "Registry reviewed HEAD changed during protected source comparison"
+            )
     finally:
         os.close(repository_fd)
 

@@ -26,6 +26,11 @@ GATES = {
     "workflow": "chummer6-ui.desktop_workflow_execution_gate",
     "executable": "chummer6-ui.desktop_executable_exit_gate",
 }
+REGISTRY_PROTECTED_PATHS = (
+    "scripts/release/promote_public_stable_release_channel.sh",
+    "scripts/materialize_public_release_channel.py",
+    "scripts/verify_public_release_channel.py",
+)
 BINDING_FIELDS = {
     "authority_snapshot_sha256",
     "contract_name",
@@ -110,6 +115,45 @@ def write_bytes(path: Path, raw: bytes, mode: int = 0o600) -> bytes:
 
 def write_json(path: Path, payload: object, mode: int = 0o600) -> bytes:
     return write_bytes(path, canonical(payload), mode)
+
+
+def create_registry_fixture(repository: Path) -> str:
+    for relative in REGISTRY_PROTECTED_PATHS:
+        write_bytes(repository / relative, f"{relative}\n".encode(), 0o644)
+    subprocess.run(
+        ["/usr/bin/git", "init", "-q", str(repository)],
+        check=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "add", "."],
+        check=True,
+    )
+    commit_environment = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Release Fixture",
+        "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+        "GIT_COMMITTER_NAME": "Release Fixture",
+        "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+    }
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+        env=commit_environment,
+    )
+    return subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
 
 
 def decision(platform: str, rid: str) -> dict[str, Any]:
@@ -263,11 +307,7 @@ def invoke(
     if mutate is not None:
         mutate(state)
     registry_repository = tmp_path / "registry-repository"
-    for relative in (
-        "scripts/release/promote_public_stable_release_channel.sh",
-        "scripts/materialize_public_release_channel.py",
-        "scripts/verify_public_release_channel.py",
-    ):
+    for relative in REGISTRY_PROTECTED_PATHS:
         write_bytes(
             registry_repository / relative,
             f"reviewed source: {relative}\n".encode(),
@@ -1493,6 +1533,191 @@ def test_rejects_registry_head_substitution_and_dirty_release_source(
     assert not output.exists()
 
 
+@pytest.mark.parametrize(
+    "index_flag",
+    ("--assume-unchanged", "--skip-worktree"),
+)
+def test_rejects_index_flags_hiding_dirty_release_source(
+    tmp_path: Path,
+    index_flag: str,
+) -> None:
+    def post(context: dict[str, Any]) -> None:
+        repository = context["registry_repository"]
+        relative = REGISTRY_PROTECTED_PATHS[0]
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "update-index",
+                index_flag,
+                "--",
+                relative,
+            ],
+            check=True,
+        )
+        (repository / relative).write_text(
+            "index flag hidden replacement\n",
+            encoding="utf-8",
+        )
+
+    result, output, _ = invoke(tmp_path, post_materialize=post)
+    assert result.returncode == 1
+    assert "release producer paths must be clean" in result.stderr
+    assert not output.exists()
+
+
+def test_rejects_hardlinked_release_source(tmp_path: Path) -> None:
+    def post(context: dict[str, Any]) -> None:
+        repository = context["registry_repository"]
+        source = repository / REGISTRY_PROTECTED_PATHS[0]
+        os.link(source, repository / "protected-source-hardlink")
+
+    result, output, _ = invoke(tmp_path, post_materialize=post)
+    assert result.returncode == 1
+    assert "must be a single-link regular file" in result.stderr
+    assert not output.exists()
+
+
+def test_registry_raw_comparison_ignores_attributes_and_filters(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "untrusted-filter-executed"
+    hook = tmp_path / "untrusted-filter"
+    write_bytes(
+        hook,
+        (
+            "#!/bin/sh\n"
+            f"printf touched > '{marker}'\n"
+            "cat\n"
+        ).encode(),
+        0o700,
+    )
+
+    def post(context: dict[str, Any]) -> None:
+        repository = context["registry_repository"]
+        relative = REGISTRY_PROTECTED_PATHS[0]
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "update-index",
+                "--assume-unchanged",
+                "--",
+                relative,
+            ],
+            check=True,
+        )
+        write_bytes(
+            repository / ".git/info/attributes",
+            b"scripts/release/* filter=release diff=release\n",
+            0o600,
+        )
+        for key in (
+            "filter.release.clean",
+            "filter.release.smudge",
+            "diff.release.command",
+        ):
+            subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(repository),
+                    "config",
+                    key,
+                    str(hook),
+                ],
+                check=True,
+            )
+        (repository / relative).write_text(
+            "attribute-filter hidden replacement\n",
+            encoding="utf-8",
+        )
+
+    result, output, _ = invoke(tmp_path / "fixture", post_materialize=post)
+    assert result.returncode == 1
+    assert "release producer paths must be clean" in result.stderr
+    assert not output.exists()
+    assert not marker.exists()
+
+
+def test_registry_raw_comparison_ignores_replace_refs(tmp_path: Path) -> None:
+    malicious_bytes = b"replacement-ref release producer\n"
+
+    def post(context: dict[str, Any]) -> None:
+        repository = context["registry_repository"]
+        original_commit = context["registry_commit"]
+        relative = REGISTRY_PROTECTED_PATHS[0]
+        (repository / relative).write_bytes(malicious_bytes)
+        subprocess.run(
+            ["/usr/bin/git", "-C", str(repository), "add", "--", relative],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "-c",
+                "user.name=Release Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "untrusted replacement commit",
+            ],
+            check=True,
+        )
+        replacement_commit = subprocess.run(
+            ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "update-ref",
+                "HEAD",
+                original_commit,
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "replace",
+                original_commit,
+                replacement_commit,
+            ],
+            check=True,
+        )
+        replaced_blob = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "cat-file",
+                "blob",
+                f"HEAD:{relative}",
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        assert replaced_blob == malicious_bytes
+
+    result, output, _ = invoke(tmp_path, post_materialize=post)
+    assert result.returncode == 1
+    assert "release producer paths must be clean" in result.stderr
+    assert not output.exists()
+
+
 def test_registry_inspection_ignores_path_and_global_git_config_injection(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1547,35 +1772,7 @@ def test_registry_inspection_holds_and_rechecks_checkout_identity(
 ) -> None:
     module = load_union_module()
     repository = tmp_path / "registry"
-    for relative in (
-        "scripts/release/promote_public_stable_release_channel.sh",
-        "scripts/materialize_public_release_channel.py",
-        "scripts/verify_public_release_channel.py",
-    ):
-        write_bytes(repository / relative, f"{relative}\n".encode(), 0o644)
-    subprocess.run(["/usr/bin/git", "init", "-q", str(repository)], check=True)
-    subprocess.run(
-        ["/usr/bin/git", "-C", str(repository), "add", "."],
-        check=True,
-    )
-    commit_environment = {
-        **os.environ,
-        "GIT_AUTHOR_NAME": "Release Fixture",
-        "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
-        "GIT_COMMITTER_NAME": "Release Fixture",
-        "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
-    }
-    subprocess.run(
-        ["/usr/bin/git", "-C", str(repository), "commit", "-q", "-m", "fixture"],
-        check=True,
-        env=commit_environment,
-    )
-    expected_commit = subprocess.run(
-        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-    ).stdout.strip()
+    expected_commit = create_registry_fixture(repository)
     real_run = module.subprocess.run
     call_count = 0
 
@@ -1590,6 +1787,47 @@ def test_registry_inspection_holds_and_rechecks_checkout_identity(
 
     monkeypatch.setattr(module.subprocess, "run", race_after_first_git)
     with pytest.raises(module.ScopeError, match="changed during Git inspection"):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rejects_subpath_replacement_during_comparison(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    real_popen = module.subprocess.Popen
+    swapped = False
+
+    def swap_release_subpath(*args: object, **kwargs: object) -> Any:
+        nonlocal swapped
+        command = args[0] if args else kwargs.get("args")
+        if (
+            not swapped
+            and isinstance(command, list)
+            and "cat-file" in command
+            and "blob" in command
+        ):
+            release_directory = repository / "scripts/release"
+            release_directory.rename(
+                repository / "scripts/release-held-original"
+            )
+            release_directory.mkdir()
+            write_bytes(
+                release_directory
+                / "promote_public_stable_release_channel.sh",
+                b"replacement release producer\n",
+                0o644,
+            )
+            swapped = True
+        return real_popen(*args, **kwargs)
+
+    monkeypatch.setattr(module.subprocess, "Popen", swap_release_subpath)
+    with pytest.raises(
+        module.ScopeError,
+        match="changed during protected source comparison",
+    ):
         module._verify_registry_checkout(repository, expected_commit)
 
 
