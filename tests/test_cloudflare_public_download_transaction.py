@@ -357,6 +357,31 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
     [
         (
             "chummer.run",
+            "/downloads",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/status",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/unapproved",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            "/status/",
+            "http://incumbent:8080",
+        ),
+        (
+            "chummer.run",
             "/downloads/install/avalonia-win-x64-installer",
             "http://host.docker.internal:8123",
         ),
@@ -645,6 +670,8 @@ def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
 @pytest.mark.parametrize(
     "path",
     [
+        "/downloads",
+        "/status",
         "/api/ready/public-downloads",
         "/api/ready",
         "/api/ready/publication",
@@ -682,8 +709,10 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/downloads",
         "/downloads/",
+        "/downloads/unapproved",
+        "/status/",
+        "/status/details",
         "/downloads/current.json",
         "/downloads/PUBLICATION_SCOPE.generated.json",
         "/downloads/install",
@@ -781,6 +810,21 @@ def test_managed_control_paths_close_the_strict_postdeploy_contract() -> None:
     assert set(transaction.MANAGED_CONTROL_PATHS) == required
     for path in required:
         assert transaction.managed_path_matches(path)
+        assert not transaction.managed_path_matches(f"{path}/extra")
+
+
+def test_managed_public_page_paths_are_exact() -> None:
+    assert (
+        transaction.MANAGED_PUBLIC_PAGE_PATHS
+        == postdeploy.PUBLIC_PAGE_PATHS
+    )
+    assert set(transaction.MANAGED_PUBLIC_PAGE_PATHS) == {
+        "/downloads",
+        "/status",
+    }
+    for path in transaction.MANAGED_PUBLIC_PAGE_PATHS:
+        assert transaction.managed_path_matches(path)
+        assert not transaction.managed_path_matches(f"{path}/")
         assert not transaction.managed_path_matches(f"{path}/extra")
 
 

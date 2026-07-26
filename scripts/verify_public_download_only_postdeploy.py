@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from html.parser import HTMLParser
 import importlib.util
 import json
 import os
@@ -23,6 +24,7 @@ GENERATION_HEADER = "X-Chummer-Release-Generation"
 SIDECAR_CONTRACT = "chummer6-ui.windows_bootstrap_payload"
 STREAM_CHUNK_BYTES = 64 * 1024
 MAXIMUM_MANIFEST_BYTES = 8 * 1024 * 1024
+MAXIMUM_PUBLIC_PAGE_BYTES = 2 * 1024 * 1024
 IMMUTABLE_GENERATION_CACHE_CONTROL = "public, max-age=31536000, immutable"
 PROBLEM = {
     "type": "https://chummer.run/problems/install-linking-unavailable",
@@ -49,6 +51,15 @@ CURRENT_RELEASE_TRUTH_PATHS = (
 GENERATION_RELEASE_TRUTH_PATH_TEMPLATES = (
     "/api/v1/public/release-truth/g/{generation_id}",
     "/api/public/release-truth/g/{generation_id}",
+)
+PUBLIC_PAGE_PATHS = (
+    "/downloads",
+    "/status",
+)
+PUBLIC_PAGE_MARKER_ATTRIBUTES = (
+    "data-downloads-release-version",
+    "data-downloads-release-generation",
+    "data-downloads-public-count",
 )
 FORBIDDEN_RESPONSE_HEADERS = (
     "Authorization",
@@ -140,6 +151,35 @@ class DownloadExpectation(NamedTuple):
     sidecar_sha256: str
     sidecar_size_bytes: int
     sidecar_bytes: bytes
+
+
+class PublicPageIdentityParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.markers: list[dict[str, list[str | None]]] = []
+
+    def _record_marker(self, attrs: list[tuple[str, str | None]]) -> None:
+        values: dict[str, list[str | None]] = {}
+        for name, value in attrs:
+            normalized_name = name.lower()
+            if normalized_name in PUBLIC_PAGE_MARKER_ATTRIBUTES:
+                values.setdefault(normalized_name, []).append(value)
+        if values:
+            self.markers.append(values)
+
+    def handle_starttag(
+        self,
+        _tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record_marker(attrs)
+
+    def handle_startendtag(
+        self,
+        _tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record_marker(attrs)
 
 
 class AnonymousAuth(requests.auth.AuthBase):
@@ -1291,6 +1331,240 @@ def _stream_manifest_get(
         response.close()
 
 
+def _public_page_identity(
+    *,
+    canonical: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+    generation_id: str,
+    release_truth: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    canonical_version = str(
+        canonical.get("version") or canonical.get("displayVersion") or ""
+    ).strip()
+    compatibility_version = str(
+        compatibility.get("version")
+        or compatibility.get("displayVersion")
+        or ""
+    ).strip()
+    if not canonical_version or canonical_version != compatibility_version:
+        raise ValueError(
+            "canonical and compatibility manifest release versions disagree"
+        )
+
+    canonical_generation = str(
+        canonical.get("generationId") or ""
+    ).strip()
+    compatibility_generation = str(
+        compatibility.get("generationId") or ""
+    ).strip()
+    if (
+        canonical_generation
+        and compatibility_generation
+        and canonical_generation != compatibility_generation
+    ):
+        raise ValueError(
+            "canonical and compatibility manifest generation ids disagree"
+        )
+    manifest_generation = canonical_generation or compatibility_generation
+    if manifest_generation:
+        manifest_generation = _canonical_generation_id(manifest_generation)
+        if manifest_generation != generation_id:
+            raise ValueError(
+                "manifest generation id disagrees with its serving header"
+            )
+
+    canonical_artifacts = _rows(
+        canonical,
+        "artifacts",
+        "live canonical manifest",
+    )
+    compatibility_downloads = _rows(
+        compatibility,
+        "downloads",
+        "live compatibility manifest",
+    )
+    artifact_count = len(compatibility_downloads)
+    if len(canonical_artifacts) != artifact_count:
+        raise ValueError(
+            "canonical and compatibility manifest artifact counts disagree"
+        )
+
+    if release_truth is not None:
+        truth_version = _required_text(
+            release_truth,
+            "releaseVersion",
+            "authenticated releaseTruth",
+        )
+        raw_truth_count = release_truth.get("artifactCount")
+        if (
+            not isinstance(raw_truth_count, int)
+            or isinstance(raw_truth_count, bool)
+            or raw_truth_count < 0
+        ):
+            raise ValueError(
+                "authenticated releaseTruth has invalid artifactCount"
+            )
+        if (
+            truth_version != canonical_version
+            or raw_truth_count != artifact_count
+        ):
+            raise ValueError(
+                "authenticated releaseTruth disagrees with canonical "
+                "release version or artifact count"
+            )
+
+    return {
+        "releaseVersion": canonical_version,
+        "generationId": manifest_generation or "legacy",
+        "artifactCount": artifact_count,
+        "releaseTruthBound": release_truth is not None,
+    }
+
+
+def _stream_public_page_identity(
+    *,
+    session: requests.Session,
+    url: str,
+    path: str,
+    timeout: float,
+    expected_identity: Mapping[str, Any],
+) -> dict[str, Any]:
+    response = anonymous_get(session, url, timeout, stream=True)
+    try:
+        if response.status_code != 200:
+            raise ValueError(
+                f"{path} expected HTTP 200, got {response.status_code}"
+            )
+        if getattr(response, "history", []):
+            raise ValueError(f"{path} followed an unexpected redirect")
+        response_url = str(getattr(response, "url", url) or url)
+        if response_url != url:
+            raise ValueError(f"{path} resolved to an unexpected URL")
+        _reject_credential_headers(response, path)
+        if _media_type(response.headers) != "text/html":
+            raise ValueError(f"{path} did not serve HTML")
+
+        length_present, raw_length = _header(
+            response.headers,
+            "Content-Length",
+        )
+        content_length: int | None = None
+        if length_present:
+            try:
+                content_length = int(raw_length)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{path} has invalid Content-Length"
+                ) from exc
+            if (
+                content_length <= 0
+                or content_length > MAXIMUM_PUBLIC_PAGE_BYTES
+            ):
+                raise ValueError(f"{path} has invalid Content-Length")
+
+        digest = hashlib.sha256()
+        size = 0
+        body_parts: list[bytes] = []
+        for chunk in response.iter_content(chunk_size=STREAM_CHUNK_BYTES):
+            if not chunk:
+                continue
+            digest.update(chunk)
+            body_parts.append(chunk)
+            size += len(chunk)
+            if size > MAXIMUM_PUBLIC_PAGE_BYTES:
+                raise ValueError(
+                    f"{path} exceeds the maximum permitted size"
+                )
+        if size == 0:
+            raise ValueError(f"{path} body is empty")
+        if content_length is not None and size != content_length:
+            raise ValueError(
+                f"{path} streamed size does not match Content-Length"
+            )
+        try:
+            body = b"".join(body_parts).decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"{path} is not valid UTF-8 HTML") from exc
+
+        parser = PublicPageIdentityParser()
+        parser.feed(body)
+        parser.close()
+        if len(parser.markers) != 1:
+            raise ValueError(
+                f"{path} must expose exactly one public release identity marker"
+            )
+        marker = parser.markers[0]
+        expected_markers = {
+            "data-downloads-release-version": (
+                f"Version {expected_identity['releaseVersion']}"
+            ),
+            "data-downloads-release-generation": str(
+                expected_identity["generationId"]
+            ),
+            "data-downloads-public-count": str(
+                expected_identity["artifactCount"]
+            ),
+        }
+        observed_markers: dict[str, str] = {}
+        for attribute, expected_value in expected_markers.items():
+            values = marker.get(attribute, [])
+            if len(values) != 1 or values[0] is None:
+                raise ValueError(
+                    f"{path} must expose {attribute} exactly once"
+                )
+            observed_value = str(values[0])
+            if observed_value != expected_value:
+                raise ValueError(
+                    f"{path} {attribute} disagrees with canonical "
+                    "release identity"
+                )
+            observed_markers[attribute] = observed_value
+
+        return {
+            "method": "GET",
+            "url": url,
+            "statusCode": 200,
+            "contentLength": content_length,
+            "sizeBytes": size,
+            "sha256": digest.hexdigest(),
+            "markers": observed_markers,
+        }
+    finally:
+        response.close()
+
+
+def _verify_public_pages(
+    *,
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+    canonical: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+    generation_id: str,
+    release_truth: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    identity = _public_page_identity(
+        canonical=canonical,
+        compatibility=compatibility,
+        generation_id=generation_id,
+        release_truth=release_truth,
+    )
+    surfaces = {
+        path: _stream_public_page_identity(
+            session=session,
+            url=f"{base_url}{path}",
+            path=path,
+            timeout=timeout,
+            expected_identity=identity,
+        )
+        for path in PUBLIC_PAGE_PATHS
+    }
+    return {
+        **identity,
+        "surfaces": surfaces,
+    }
+
+
 def _assert_review_required_artifact_handoff(
     artifact_handoff: Mapping[str, Any],
     *,
@@ -2077,6 +2351,16 @@ def verify_public_download_delivery(
             base,
         )
 
+    public_pages = _verify_public_pages(
+        session=session,
+        base_url=base,
+        timeout=timeout,
+        canonical=live_canonical,
+        compatibility=live_compatibility,
+        generation_id=generation_id,
+        release_truth=authenticated_release_truth,
+    )
+
     artifact_receipts: list[dict[str, Any]] = []
     for expected in expectations:
         generation_companion_payload_url = (
@@ -2221,6 +2505,7 @@ def verify_public_download_delivery(
         "compatibilityManifest": compatibility_receipt,
         "releaseTruthSha256": release_truth_sha256,
         "releaseTruthRoutes": release_truth_routes,
+        "publicPages": public_pages,
         "artifacts": artifact_receipts,
     }
 

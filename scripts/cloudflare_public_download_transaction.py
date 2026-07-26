@@ -72,9 +72,16 @@ MANAGED_CONTROL_PATHS = (
     "/account/access/install-link",
     "/downloads/install/public-download-only-probe",
 )
+MANAGED_PUBLIC_PAGE_PATHS = (
+    "/downloads",
+    "/status",
+)
 MANAGED_CONTROL_PATH_RE2 = "|".join(MANAGED_CONTROL_PATHS)
+MANAGED_PUBLIC_PAGE_PATH_RE2 = "|".join(MANAGED_PUBLIC_PAGE_PATHS)
 MANAGED_PATH_RE2 = (
     r"^("
+    + MANAGED_PUBLIC_PAGE_PATH_RE2
+    + r"|"
     + MANAGED_CONTROL_PATH_RE2
     + r"|"
     + PUBLIC_RELEASE_TRUTH_PATH_RE2
