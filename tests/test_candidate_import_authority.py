@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import zipfile
 
 import pytest
 
@@ -35,6 +36,12 @@ UNSIGNED_FRESH_DELTA_AUTHORITY_FIXTURE = (
     / "Chummer.Tests"
     / "Fixtures"
     / "unsigned_windows_fresh_delta_candidate_import_authority_v3.json.gz.b64"
+)
+UNSIGNED_NATIVE_V4_CONTRACT_FIXTURE = (
+    REPO_ROOT
+    / "Chummer.Tests"
+    / "Fixtures"
+    / "unsigned_native_evidence_v4_contract.json.gz.b64"
 )
 DEFAULT_HEADS = ("avalonia",)
 UNSIGNED_RETAINED_POINTER_KEYS = {
@@ -2039,6 +2046,463 @@ def load_unsigned_v3_authority_fixture() -> dict[str, object]:
         "+00:00", "Z"
     )
     return authority
+
+
+def load_unsigned_native_v4_contract_fixture() -> dict[str, object]:
+    encoded = "".join(UNSIGNED_NATIVE_V4_CONTRACT_FIXTURE.read_text().splitlines())
+    value = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    assert isinstance(value, dict)
+    return value
+
+
+def rehydrate_unsigned_native_v4_root(
+    tmp_path: Path,
+) -> tuple[
+    object,
+    Path,
+    dict[str, object],
+    list[dict[str, object]],
+    bytes,
+    bytes,
+    dict[str, object],
+    datetime,
+]:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_v4_materializer_test",
+    )
+    fixture = load_unsigned_native_v4_contract_fixture()
+    native = fixture["nativeEvidence"]
+    assert isinstance(native, dict)
+    root = tmp_path / "proof" / "windows-native"
+    root.mkdir(parents=True)
+    files = native["files"]
+    assert isinstance(files, list)
+    for row in files:
+        assert isinstance(row, dict)
+        path = root / str(row["path"])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(base64.b64decode(str(row["bytesBase64"]), validate=True))
+    (root / materializer.UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE).write_text(
+        json.dumps(native, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    candidate_rows = fixture["inventory"]
+    assert isinstance(candidate_rows, list)
+    canonical = base64.b64decode(
+        str(fixture["canonicalManifestBase64"]),
+        validate=True,
+    )
+    compatibility = base64.b64decode(
+        str(fixture["compatibilityManifestBase64"]),
+        validate=True,
+    )
+    canonical_document = json.loads(canonical)
+    scope = materializer._canonical_windows_scope(
+        canonical_document,
+        candidate_rows,
+        allow_ancillary_files=True,
+        expected_channel="preview",
+    )
+    now = datetime.fromisoformat(str(fixture["nowUtc"]).replace("Z", "+00:00"))
+    return (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    )
+
+
+def rewrite_unsigned_native_embedded_document(
+    root: Path,
+    outer: dict[str, object],
+    path: str,
+    document: dict[str, object],
+) -> bytes:
+    payload = (
+        json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+    ).encode("utf-8")
+    rows = outer["files"]
+    assert isinstance(rows, list)
+    row = next(
+        item
+        for item in rows
+        if isinstance(item, dict) and item.get("path") == path
+    )
+    row["bytesBase64"] = base64.b64encode(payload).decode("ascii")
+    row["sha256"] = hashlib.sha256(payload).hexdigest()
+    row["sizeBytes"] = len(payload)
+    (root / path).write_bytes(payload)
+    return payload
+
+
+def test_unsigned_native_v4_validator_accepts_exact_final_head_fixture(
+    tmp_path: Path,
+) -> None:
+    (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    source_sha = native["candidateContentInventory"]["sourceSha"]
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+
+    validated, oldest = materializer._validate_unsigned_native_evidence(
+        root,
+        candidate_rows=candidate_rows,
+        source_canonical_bytes=canonical,
+        source_compatibility_bytes=compatibility,
+        expected_content_rows=expected_content_rows,
+        scope=scope,
+        publication_source_sha=source_sha,
+        now=now,
+        max_age=timedelta(hours=24),
+    )
+
+    assert validated == native
+    assert oldest <= now
+    assert validated["captureSource"]["sha"] == validated["finalizationSource"]["sha"]
+    assert validated["captureSource"]["sha"] != source_sha
+
+
+@pytest.mark.parametrize(
+    ("native_bridge", "contract_name", "contract_version"),
+    [
+        (
+            False,
+            "chummer.release-upload.candidate-import-authority/v3",
+            3,
+        ),
+        (
+            True,
+            "chummer.release-upload.candidate-import-authority/v4",
+            4,
+        ),
+    ],
+)
+def test_unsigned_authority_shape_preserves_v3_and_adds_only_v4_bridge(
+    native_bridge: bool,
+    contract_name: str,
+    contract_version: int,
+) -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        f"unsigned_authority_shape_{contract_version}_test",
+    )
+    custody: dict[str, object] = {"unsignedPublicationEvidence": {"status": "passed"}}
+    if native_bridge:
+        custody["nativeWindowsFinalizedEvidence"] = {"status": "passed"}
+    now = datetime(2026, 7, 26, 22, 0, tzinfo=timezone.utc)
+
+    authority = materializer._build_candidate_authority(
+        unsigned_preview=True,
+        unsigned_native_bridge=native_bridge,
+        now=now,
+        expires_at=now + timedelta(hours=2),
+        candidate={"version": "run-test"},
+        custody=custody,
+    )
+
+    assert authority["contractName"] == contract_name
+    assert authority["contractVersion"] == contract_version
+    assert (
+        authority.get("ownerNativeFinalizationBridgeAuthority")
+        is True
+        if native_bridge
+        else "ownerNativeFinalizationBridgeAuthority" not in authority
+    )
+    assert (
+        "nativeWindowsFinalizedEvidence" in authority["custody"]
+    ) is native_bridge
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "missing_file",
+        "extra_file",
+        "embedded_bytes",
+        "candidate_windows",
+        "source_manifest",
+        "publication_source",
+        "capture_final_source",
+    ],
+)
+def test_unsigned_native_v4_validator_rejects_partial_or_mismatched_root(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    source_sha = native["candidateContentInventory"]["sourceSha"]
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+    if tamper == "missing_file":
+        (root / "startup-smoke/startup-smoke-avalonia-win-x64.log").unlink()
+    elif tamper == "extra_file":
+        (root / "smuggled.txt").write_bytes(b"smuggled")
+    elif tamper == "embedded_bytes":
+        outer_path = root / materializer.UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE
+        outer = json.loads(outer_path.read_text())
+        outer["files"][0]["bytesBase64"] = base64.b64encode(b"changed").decode()
+        outer_path.write_text(json.dumps(outer) + "\n")
+    elif tamper == "candidate_windows":
+        candidate_rows = [
+            {
+                **row,
+                "sha256": "0" * 64,
+            }
+            if row["path"].endswith("-installer.exe")
+            else row
+            for row in candidate_rows
+        ]
+    elif tamper == "source_manifest":
+        canonical = b'{"tampered":true}\n'
+    elif tamper == "publication_source":
+        source_sha = "0" * 40
+    elif tamper == "capture_final_source":
+        outer_path = root / materializer.UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE
+        outer = json.loads(outer_path.read_text())
+        outer["finalizationSource"]["sha"] = "0" * 40
+        outer_path.write_text(
+            json.dumps(outer, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    else:
+        raise AssertionError(tamper)
+
+    with pytest.raises(materializer.CandidateAuthorityBlocked):
+        materializer._validate_unsigned_native_evidence(
+            root,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=canonical,
+            source_compatibility_bytes=compatibility,
+            expected_content_rows=expected_content_rows,
+            scope=scope,
+            publication_source_sha=source_sha,
+            now=now,
+            max_age=timedelta(hours=24),
+        )
+
+
+def test_unsigned_native_v4_rejects_rehashed_unbound_composition_custody(
+    tmp_path: Path,
+) -> None:
+    (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+    outer_path = root / materializer.UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE
+    outer = json.loads(outer_path.read_text())
+    content_path = materializer.UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY
+    content = json.loads((root / content_path).read_text())
+    composition = next(
+        row
+        for row in content["files"]
+        if row["path"] == materializer.UNSIGNED_COMPOSITION_FILE
+    )
+    composition["sha256"] = "a" * 64
+    composition["sizeBytes"] = 1
+    content_payload = rewrite_unsigned_native_embedded_document(
+        root,
+        outer,
+        content_path,
+        content,
+    )
+    outer["candidateContentInventory"] = content
+    outer["candidateContentInventorySha256"] = hashlib.sha256(
+        content_payload
+    ).hexdigest()
+
+    export_path = materializer.UNSIGNED_CANDIDATE_PROVENANCE_EXPORT
+    export = json.loads((root / export_path).read_text())
+    export["exportedContent"] = content["files"]
+    export["compositionRequest"] = composition
+    export["inventory"]["sha256"] = hashlib.sha256(content_payload).hexdigest()
+    export["inventory"]["sizeBytes"] = len(content_payload)
+    rewrite_unsigned_native_embedded_document(
+        root,
+        outer,
+        export_path,
+        export,
+    )
+    outer_path.write_text(
+        json.dumps(outer, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="exact v3 and candidate custody",
+    ):
+        materializer._validate_unsigned_native_evidence(
+            root,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=canonical,
+            source_compatibility_bytes=compatibility,
+            expected_content_rows=expected_content_rows,
+            scope=scope,
+            publication_source_sha=native["candidateContentInventory"]["sourceSha"],
+            now=now,
+            max_age=timedelta(hours=24),
+        )
+
+
+def test_unsigned_native_v4_rejects_unbound_accountable_finalization_leaf(
+    tmp_path: Path,
+) -> None:
+    (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+    outer_path = root / materializer.UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE
+    outer = json.loads(outer_path.read_text())
+    finalization_path = materializer.UNSIGNED_NATIVE_FINALIZATION_FILE
+    finalization = json.loads((root / finalization_path).read_text())
+    finalization["accountableReviewConfirmed"] = False
+    rewrite_unsigned_native_embedded_document(
+        root,
+        outer,
+        finalization_path,
+        finalization,
+    )
+    outer_path.write_text(
+        json.dumps(outer, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="finalized inventory differs",
+    ):
+        materializer._validate_unsigned_native_evidence(
+            root,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=canonical,
+            source_compatibility_bytes=compatibility,
+            expected_content_rows=expected_content_rows,
+            scope=scope,
+            publication_source_sha=native["candidateContentInventory"]["sourceSha"],
+            now=now,
+            max_age=timedelta(hours=24),
+        )
+
+
+def test_unsigned_payload_executable_is_derived_from_exact_nofollow_zip(
+    tmp_path: Path,
+) -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_payload_executable_derivation_test",
+    )
+    bundle = tmp_path / "bundle"
+    payload_path = "files/chummer-avalonia-win-x64-payload.zip"
+    payload = bundle / payload_path
+    payload.parent.mkdir(parents=True)
+    executable = b"MZ-tiny-valid-executable"
+    with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("Chummer.Avalonia.exe", executable)
+    payload_bytes = payload.read_bytes()
+
+    binding = materializer._derive_unsigned_payload_executable(
+        bundle,
+        payload_path=payload_path,
+        payload_row={
+            "path": payload_path,
+            "sha256": hashlib.sha256(payload_bytes).hexdigest(),
+            "sizeBytes": len(payload_bytes),
+        },
+    )
+
+    assert binding == {
+        "fileName": "Chummer.Avalonia.exe",
+        "payloadEntry": "Chummer.Avalonia.exe",
+        "sha256": hashlib.sha256(executable).hexdigest(),
+        "sizeBytes": len(executable),
+    }
+
+
+def test_unsigned_native_v4_rejects_installed_executable_rebound_from_payload(
+    tmp_path: Path,
+) -> None:
+    (
+        materializer,
+        root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="exact candidate payload ZIP",
+    ):
+        materializer._validate_unsigned_native_evidence(
+            root,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=canonical,
+            source_compatibility_bytes=compatibility,
+            expected_content_rows=expected_content_rows,
+            expected_installed_executable={
+                "fileName": "Chummer.Avalonia.exe",
+                "payloadEntry": "Chummer.Avalonia.exe",
+                "sha256": hashlib.sha256(b"different executable").hexdigest(),
+                "sizeBytes": len(b"different executable"),
+            },
+            scope=scope,
+            publication_source_sha=native["candidateContentInventory"]["sourceSha"],
+            now=now,
+            max_age=timedelta(hours=24),
+        )
 
 
 def load_unsigned_fresh_delta_manifest_pair() -> dict[str, dict[str, object]]:

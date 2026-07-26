@@ -82,6 +82,93 @@ public sealed class InternalReleaseBundlesControllerTests
     }
 
     [Fact]
+    public void RollbackDeclaresDedicatedBoundedBodyAndConflictResponses()
+    {
+        System.Reflection.MethodInfo method = typeof(InternalReleaseBundlesController)
+            .GetMethod(nameof(InternalReleaseBundlesController.RollbackReleaseGeneration))
+            ?? throw new InvalidOperationException("release rollback action is missing.");
+        RequestSizeLimitAttribute requestSize = method
+            .GetCustomAttributes(typeof(RequestSizeLimitAttribute), inherit: true)
+            .Cast<RequestSizeLimitAttribute>()
+            .Single();
+        long? maximumBodyBytes =
+            ((Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata)requestSize)
+            .MaxRequestBodySize;
+
+        Assert.Equal(
+            InternalReleaseBundlesController.MaxReleaseGenerationRollbackRequestBodyBytes,
+            maximumBodyBytes);
+        int[] responseCodes = method
+            .GetCustomAttributes(typeof(ProducesResponseTypeAttribute), inherit: true)
+            .Cast<ProducesResponseTypeAttribute>()
+            .Select(attribute => attribute.StatusCode)
+            .ToArray();
+        Assert.Contains(StatusCodes.Status400BadRequest, responseCodes);
+        Assert.Contains(StatusCodes.Status403Forbidden, responseCodes);
+        Assert.Contains(StatusCodes.Status409Conflict, responseCodes);
+        Assert.Contains(StatusCodes.Status503ServiceUnavailable, responseCodes);
+    }
+
+    [Fact]
+    public async Task RollbackControllerRequiresPrivilegeAndExactRouteTarget()
+    {
+        using ControllerFixture fixture = new();
+        const string routeGeneration = "gen-20260726-target";
+        const string route =
+            "/api/internal/releases/generations/gen-20260726-target/rollback";
+        var request = new ReleaseGenerationRollbackRequest(
+            routeGeneration,
+            "gen-20260726-current",
+            new string('a', 64),
+            "revision-current",
+            "rollback-20260726");
+
+        void Prevalidate(bool privileged)
+        {
+            fixture.Controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+            HttpRequest httpRequest = fixture.Controller.Request;
+            httpRequest.Method = HttpMethods.Post;
+            httpRequest.Path = route;
+            httpRequest.HttpContext.Items[
+                ReleaseUploadAuthorizationContext.HttpContextItemKey] =
+                new ReleaseUploadAuthorizationContext(
+                    UploadTicketClaims: null,
+                    AuthorizationBinding: new string('b', 64),
+                    SingleUseAuthorization: false,
+                    Method: HttpMethods.Post,
+                    Path: route,
+                    AllowsPrivilegedReconciliation: privileged);
+        }
+
+        Prevalidate(privileged: false);
+        ActionResult<ReleaseBundlePromotionResult> forbidden =
+            await fixture.Controller.RollbackReleaseGeneration(
+                routeGeneration,
+                request,
+                CancellationToken.None);
+
+        ObjectResult forbiddenResult = Assert.IsType<ObjectResult>(forbidden.Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbiddenResult.StatusCode);
+
+        Prevalidate(privileged: true);
+        ActionResult<ReleaseBundlePromotionResult> mismatch =
+            await fixture.Controller.RollbackReleaseGeneration(
+                "gen-20260726-other",
+                request,
+                CancellationToken.None);
+
+        ObjectResult mismatchResult = Assert.IsType<ObjectResult>(mismatch.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, mismatchResult.StatusCode);
+        Assert.Contains(
+            "match exactly",
+            Assert.IsType<ProblemDetails>(mismatchResult.Value).Detail ?? string.Empty,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ControllerFailsClosedWhenPreBindingGateWasBypassed()
     {
         using ControllerFixture fixture = new();
@@ -1367,6 +1454,8 @@ public sealed class InternalReleaseBundlesControllerTests
         private readonly AccountService _accounts;
         private readonly InstallLinkingService _installLinking;
         private readonly IDataProtectionProvider _dataProtectionProvider;
+        private readonly ReleaseUploadSnapshotAuthorityTests.SnapshotFixture
+            _snapshotAuthorityFixture;
 
         public ControllerFixture(
             Action<ReleaseBundlePromotionService.PromotionCheckpoint>? promotionCheckpoint = null,
@@ -1387,6 +1476,14 @@ public sealed class InternalReleaseBundlesControllerTests
                     ["CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED"] = "true"
                 })
                 .Build();
+            _snapshotAuthorityFixture =
+                new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+            _snapshotAuthorityFixture.Publish("pass");
+            Configuration[PublicProjectionSnapshotService.SnapshotRootConfigurationKey] =
+                _snapshotAuthorityFixture.Configuration[
+                    PublicProjectionSnapshotService.SnapshotRootConfigurationKey];
+            Configuration[PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] =
+                "true";
             Configuration["CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"] = Path.Combine(_root, "sessions");
             Directory.CreateDirectory(Configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!);
 
@@ -1533,6 +1630,7 @@ public sealed class InternalReleaseBundlesControllerTests
 
         public void Dispose()
         {
+            _snapshotAuthorityFixture.Dispose();
             if (!Directory.Exists(_root))
             {
                 return;

@@ -57,6 +57,89 @@ public sealed record ReleaseStagedActivationRequest(
     string ExpectedSnapshotSha256,
     string ExpectedDecisionSha256);
 
+[JsonConverter(typeof(ReleaseGenerationRollbackRequestJsonConverter))]
+public sealed record ReleaseGenerationRollbackRequest(
+    string TargetGenerationId,
+    string ExpectedCurrentGenerationId,
+    string ExpectedCurrentSnapshotSha256,
+    string ExpectedCurrentRevisionId,
+    string IdempotencyKey);
+
+public sealed class ReleaseGenerationRollbackRequestJsonConverter
+    : JsonConverter<ReleaseGenerationRollbackRequest>
+{
+    private static readonly string[] ExactFields =
+    [
+        "targetGenerationId",
+        "expectedCurrentGenerationId",
+        "expectedCurrentSnapshotSha256",
+        "expectedCurrentRevisionId",
+        "idempotencyKey"
+    ];
+
+    public override ReleaseGenerationRollbackRequest Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        using JsonDocument document = JsonDocument.ParseValue(ref reader);
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException("Release generation rollback body must be a JSON object.");
+        }
+
+        var observed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (JsonProperty property in root.EnumerateObject())
+        {
+            if (!observed.Add(property.Name))
+            {
+                throw new JsonException(
+                    $"Release generation rollback body contains duplicate or case-shadowed field '{property.Name}'.");
+            }
+        }
+        if (observed.Count != ExactFields.Length
+            || ExactFields.Any(field => !root.TryGetProperty(field, out _)))
+        {
+            throw new JsonException(
+                "Release generation rollback body contains unexpected, missing, or noncanonical fields.");
+        }
+
+        return new ReleaseGenerationRollbackRequest(
+            RequiredString(root, "targetGenerationId"),
+            RequiredString(root, "expectedCurrentGenerationId"),
+            RequiredString(root, "expectedCurrentSnapshotSha256"),
+            RequiredString(root, "expectedCurrentRevisionId"),
+            RequiredString(root, "idempotencyKey"));
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        ReleaseGenerationRollbackRequest value,
+        JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("targetGenerationId", value.TargetGenerationId);
+        writer.WriteString("expectedCurrentGenerationId", value.ExpectedCurrentGenerationId);
+        writer.WriteString("expectedCurrentSnapshotSha256", value.ExpectedCurrentSnapshotSha256);
+        writer.WriteString("expectedCurrentRevisionId", value.ExpectedCurrentRevisionId);
+        writer.WriteString("idempotencyKey", value.IdempotencyKey);
+        writer.WriteEndObject();
+    }
+
+    private static string RequiredString(JsonElement root, string name)
+    {
+        JsonElement value = root.GetProperty(name);
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            throw new JsonException(
+                $"Release generation rollback field '{name}' must be a string.");
+        }
+
+        return value.GetString() ?? string.Empty;
+    }
+}
+
 public sealed record ReleaseStageProbeGrant(
     string StageReceiptId,
     string GenerationId,
@@ -85,7 +168,9 @@ public sealed record ReleaseActivationIntent(
     string? TargetPointerBase64 = null,
     string? ExactIncomingDesktopScope = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    bool ExactIncomingDesktopScopeIsFreshDelta = false);
+    bool ExactIncomingDesktopScopeIsFreshDelta = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? RollbackRequestSha256 = null);
 
 public sealed class ReleaseActivationOutcomeUnknownException : IOException
 {
@@ -605,8 +690,43 @@ public sealed class ReleaseBundlePromotionService
         return CaptureStagedSnapshot(receipt);
     }
 
+    internal ReleaseShelfSnapshot CaptureStagedSnapshot(
+        string stageReceiptId,
+        ReleaseUploadCandidateSessionBinding expectedCandidateBinding,
+        out string? expectedPredecessorPointerSha256)
+    {
+        ArgumentNullException.ThrowIfNull(expectedCandidateBinding);
+        StageReceiptDocument receipt = LoadStageReceipt(
+            ResolveDownloadsRoot(),
+            stageReceiptId);
+        RequireExactCandidateStageBinding(receipt, expectedCandidateBinding);
+        expectedPredecessorPointerSha256 = receipt.PreviousPointerSha256;
+        return CaptureStagedSnapshot(receipt);
+    }
+
     public Task<ReleaseBundlePromotionResult> ActivateStagedGenerationAsync(
         ReleaseStagedActivationRequest request,
+        CancellationToken cancellationToken)
+        => ActivateStagedGenerationCoreAsync(
+            request,
+            expectedCandidateBinding: null,
+            cancellationToken);
+
+    internal Task<ReleaseBundlePromotionResult> ActivateStagedGenerationAsync(
+        ReleaseStagedActivationRequest request,
+        ReleaseUploadCandidateSessionBinding expectedCandidateBinding,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expectedCandidateBinding);
+        return ActivateStagedGenerationCoreAsync(
+            request,
+            expectedCandidateBinding,
+            cancellationToken);
+    }
+
+    private Task<ReleaseBundlePromotionResult> ActivateStagedGenerationCoreAsync(
+        ReleaseStagedActivationRequest request,
+        ReleaseUploadCandidateSessionBinding? expectedCandidateBinding,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -615,6 +735,10 @@ public sealed class ReleaseBundlePromotionService
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
         StageReceiptDocument receipt = LoadStageReceipt(downloadsRoot, request.StageReceiptId);
+        if (expectedCandidateBinding is not null)
+        {
+            RequireExactCandidateStageBinding(receipt, expectedCandidateBinding);
+        }
         ReleaseShelfSnapshot targetShelf = CaptureStagedSnapshot(receipt);
         ValidateStagedAuthorityClosure(targetShelf, request);
         return Task.FromResult(CommitStagedActivationUnderLock(
@@ -622,6 +746,19 @@ public sealed class ReleaseBundlePromotionService
             receipt,
             targetShelf,
             cancellationToken));
+    }
+
+    private static void RequireExactCandidateStageBinding(
+        StageReceiptDocument receipt,
+        ReleaseUploadCandidateSessionBinding expectedCandidateBinding)
+    {
+        ValidateCandidateSessionBinding(expectedCandidateBinding);
+        if (expectedCandidateBinding.NativeEvidenceBinding is null
+            || receipt.CandidateImportBinding != expectedCandidateBinding)
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "staged generation is not bound to the exact finalized native candidate authority.");
+        }
     }
 
     /// <summary>
@@ -1171,8 +1308,40 @@ public sealed class ReleaseBundlePromotionService
     /// Atomically re-activates an already validated immutable generation. Rollback
     /// never rewrites generation bytes; its sole authority mutation is current.json.
     /// </summary>
-    public Task<ReleaseBundlePromotionResult> RollbackToGenerationAsync(
+    internal Task<ReleaseBundlePromotionResult> RollbackToGenerationAsync(
         string generationId,
+        CancellationToken cancellationToken)
+        => RollbackToGenerationCoreAsync(
+            generationId,
+            activationReceiptId: $"activation-{Guid.NewGuid():N}",
+            rollbackRequest: null,
+            rollbackRequestSha256: null,
+            cancellationToken);
+
+    /// <summary>
+    /// Performs a privileged compare-and-swap rollback against one exact committed
+    /// release-authority revision. One idempotency key owns one deterministic
+    /// activation receipt so an unknown response can reconcile the same mutation.
+    /// </summary>
+    public Task<ReleaseBundlePromotionResult> RollbackToGenerationAsync(
+        ReleaseGenerationRollbackRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ValidateRollbackRequest(request);
+        return RollbackToGenerationCoreAsync(
+            request.TargetGenerationId,
+            BuildRollbackActivationReceiptId(request.IdempotencyKey),
+            request,
+            ComputeRollbackRequestSha256(request),
+            cancellationToken);
+    }
+
+    private Task<ReleaseBundlePromotionResult> RollbackToGenerationCoreAsync(
+        string generationId,
+        string activationReceiptId,
+        ReleaseGenerationRollbackRequest? rollbackRequest,
+        string? rollbackRequestSha256,
         CancellationToken cancellationToken)
     {
         if (!IsSafeGenerationId(generationId))
@@ -1182,14 +1351,47 @@ public sealed class ReleaseBundlePromotionService
 
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
+        if (rollbackRequest is not null)
+        {
+            ReleaseActivationJournalDocument? prior =
+                TryLoadRollbackRequestJournal(downloadsRoot, activationReceiptId);
+            if (prior is not null)
+            {
+                return Task.FromResult(ReconcileExistingRollbackRequest(
+                    downloadsRoot,
+                    rollbackRequest,
+                    rollbackRequestSha256!,
+                    prior));
+            }
+        }
+
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        if (rollbackRequest is not null)
+        {
+            ReleaseActivationJournalDocument? prior =
+                TryLoadRollbackRequestJournal(downloadsRoot, activationReceiptId);
+            if (prior is not null)
+            {
+                return Task.FromResult(ResolveExistingRollbackRequestUnderLock(
+                    downloadsRoot,
+                    rollbackRequest,
+                    rollbackRequestSha256!,
+                    prior));
+            }
+        }
+
         ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         EnsureNoUnresolvedActivationIntent(downloadsRoot);
-        ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
+        var shelfStore = new ReleaseShelfGenerationStore(_configuration);
+        ReleaseShelfSnapshot activeShelf = shelfStore.Capture();
         if (activeShelf.IsLegacy)
         {
             throw new InvalidOperationException("release shelf rollback requires an activated layout-v1 generation.");
+        }
+        if (rollbackRequest is not null)
+        {
+            ValidateRollbackCompareAndSwap(activeShelf, rollbackRequest);
         }
 
         string generationsRoot = Path.GetFullPath(Path.Combine(downloadsRoot, GenerationsDirectoryName));
@@ -1204,10 +1406,6 @@ public sealed class ReleaseBundlePromotionService
         {
             throw new InvalidDataException($"retained release shelf generation does not exist: {generationId}");
         }
-
-        (ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-            bool exactIncomingDesktopScopeIsFreshDelta) =
-            RequireCommittedGenerationHistory(downloadsRoot, generationId);
 
         ActivationCandidateDocument candidate = JsonSerializer.Deserialize<ActivationCandidateDocument>(
                 File.ReadAllText(Path.Combine(generationRoot, ActivationCandidateName)),
@@ -1252,22 +1450,85 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException("retained release shelf activation inventory no longer matches immutable bytes.");
         }
 
-        DateTimeOffset activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
-        string activationReceiptId = $"activation-{Guid.NewGuid():N}";
-        CurrentPointerDocument pointer = BuildCurrentPointer(
-            generationId,
-            activationReceiptId,
-            activatedAt,
-            compatibilityManifest,
-            generationRoot,
-            inventoryDigest);
-        ValidatePreparedGeneration(
-            generationRoot,
-            pointer,
-            inventory,
-            artifactIds,
-            exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+        ReleaseShelfSnapshot retainedSnapshot =
+            shelfStore.CaptureGeneration(generationId);
+        if (!string.Equals(retainedSnapshot.GenerationId, generationId, StringComparison.Ordinal)
+            || !string.Equals(
+                retainedSnapshot.InventoryDigest,
+                inventoryDigest,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "retained release shelf generation failed explicit snapshot validation.");
+        }
+        _ = ReleaseAuthorityRevisionStore.TryResolveCommittedRevision(retainedSnapshot);
+
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope;
+        bool exactIncomingDesktopScopeIsFreshDelta;
+        byte[]? exactTargetPointerBytes = null;
+        CurrentPointerDocument pointer;
+        DateTimeOffset activatedAt;
+        if (rollbackRequest is null)
+        {
+            (exactIncomingDesktopScope, exactIncomingDesktopScopeIsFreshDelta) =
+                RequireCommittedGenerationHistory(downloadsRoot, generationId);
+            activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
+            pointer = BuildCurrentPointer(
+                generationId,
+                activationReceiptId,
+                activatedAt,
+                compatibilityManifest,
+                generationRoot,
+                inventoryDigest);
+        }
+        else
+        {
+            if (retainedSnapshot.PointerDigest is null)
+            {
+                throw new InvalidDataException(
+                    "retained rollback generation is missing its committed pointer digest.");
+            }
+
+            (exactIncomingDesktopScope,
+                exactIncomingDesktopScopeIsFreshDelta,
+                exactTargetPointerBytes,
+                pointer) = RequireExactCommittedGenerationPointer(
+                    downloadsRoot,
+                    generationId,
+                    retainedSnapshot.PointerDigest);
+            if (!DateTimeOffset.TryParse(
+                    pointer.ActivatedAt,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal,
+                    out activatedAt))
+            {
+                throw new InvalidDataException(
+                    "retained rollback pointer activation timestamp is invalid.");
+            }
+            activatedAt = activatedAt.ToUniversalTime();
+        }
+
+        if (rollbackRequest is null)
+        {
+            ValidatePreparedGeneration(
+                generationRoot,
+                pointer,
+                inventory,
+                artifactIds,
+                exactIncomingDesktopScope,
+                exactIncomingDesktopScopeIsFreshDelta);
+        }
+        else
+        {
+            ValidateRetainedGenerationForRollback(
+                generationRoot,
+                pointer,
+                candidate,
+                compatibilityManifest,
+                inventory,
+                exactIncomingDesktopScope,
+                exactIncomingDesktopScopeIsFreshDelta);
+        }
         cancellationToken.ThrowIfCancellationRequested();
 
         string baseUrl = ResolvePublicBaseUrl();
@@ -1298,12 +1559,15 @@ public sealed class ReleaseBundlePromotionService
         bool activationJournalPrepared = false;
         try
         {
-            pointerTempPath = PrepareCurrentPointerFile(downloadsRoot, pointer);
+            pointerTempPath = exactTargetPointerBytes is null
+                ? PrepareCurrentPointerFile(downloadsRoot, pointer)
+                : PrepareExactCurrentPointerFile(downloadsRoot, exactTargetPointerBytes);
             activationIntent = BuildActivationIntent(
                 "rollback",
                 activeShelf,
                 result,
-                pointerTempPath);
+                pointerTempPath,
+                rollbackRequestSha256);
             PrepareActivationIntentDurably(downloadsRoot, activationIntent, pointerTempPath);
             activationJournalPrepared = true;
             NotifyCheckpoint(PromotionCheckpoint.PointerPrepared);
@@ -1347,6 +1611,270 @@ public sealed class ReleaseBundlePromotionService
             {
                 TryDeleteFile(pointerTempPath);
             }
+        }
+    }
+
+    private static void ValidateRollbackRequest(
+        ReleaseGenerationRollbackRequest request)
+    {
+        if (!IsSafeGenerationId(request.TargetGenerationId)
+            || !IsSafeGenerationId(request.ExpectedCurrentGenerationId))
+        {
+            throw new InvalidDataException(
+                "rollback request generation IDs must be traversal-safe opaque tokens.");
+        }
+        if (string.Equals(
+                request.TargetGenerationId,
+                request.ExpectedCurrentGenerationId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "rollback target must differ from the expected current generation.");
+        }
+        if (!IsBareLowerSha256(request.ExpectedCurrentSnapshotSha256))
+        {
+            throw new InvalidDataException(
+                "rollback expected current snapshot digest must be lowercase SHA-256.");
+        }
+        if (request.ExpectedCurrentRevisionId.Length != 69
+            || !request.ExpectedCurrentRevisionId.StartsWith("auth-", StringComparison.Ordinal)
+            || !IsBareLowerSha256(request.ExpectedCurrentRevisionId[5..]))
+        {
+            throw new InvalidDataException(
+                "rollback expected current revision ID is invalid.");
+        }
+        if (!IsRollbackIdempotencyKey(request.IdempotencyKey))
+        {
+            throw new InvalidDataException(
+                "rollback idempotency key must be an 8-128 character portable token.");
+        }
+    }
+
+    private static bool IsRollbackIdempotencyKey(string? value)
+        => value is { Length: >= 8 and <= 128 }
+           && IsAsciiAlphaNumeric(value[0])
+           && value.All(static character =>
+               IsAsciiAlphaNumeric(character)
+               || character is '.' or '_' or '-');
+
+    private static string ComputeRollbackRequestSha256(
+        ReleaseGenerationRollbackRequest request)
+    {
+        byte[] requestBytes = JsonSerializer.SerializeToUtf8Bytes(request);
+        byte[] contractBytes = Encoding.UTF8.GetBytes(
+            "chummer.release-shelf.rollback-request/v1\n");
+        byte[] material = new byte[checked(contractBytes.Length + requestBytes.Length)];
+        contractBytes.CopyTo(material, 0);
+        requestBytes.CopyTo(material, contractBytes.Length);
+        return $"sha256:{Convert.ToHexStringLower(SHA256.HashData(material))}";
+    }
+
+    private static string BuildRollbackActivationReceiptId(string idempotencyKey)
+    {
+        byte[] material = Encoding.UTF8.GetBytes(
+            $"chummer.release-shelf.rollback-idempotency/v1\n{idempotencyKey}");
+        string digest = Convert.ToHexStringLower(SHA256.HashData(material));
+        return $"activation-{digest[..32]}";
+    }
+
+    private static ReleaseActivationJournalDocument? TryLoadRollbackRequestJournal(
+        string downloadsRoot,
+        string activationReceiptId)
+    {
+        string receiptRoot = ActivationJournalReceiptRoot(
+            downloadsRoot,
+            activationReceiptId);
+        ReleaseActivationJournalDocument? retained = null;
+        if (File.Exists(receiptRoot) && !Directory.Exists(receiptRoot))
+        {
+            throw new InvalidDataException(
+                "rollback activation receipt history path is not a directory.");
+        }
+        if (Directory.Exists(receiptRoot))
+        {
+            retained = LoadActivationHistoryJournal(
+                downloadsRoot,
+                activationReceiptId);
+        }
+
+        string activePath = Path.Combine(downloadsRoot, ActivationIntentName);
+        if (!File.Exists(activePath))
+        {
+            return retained;
+        }
+
+        ReleaseActivationJournalDocument active =
+            LoadActivationJournalFile(activePath);
+        if (!string.Equals(
+                active.Intent.ActivationReceiptId,
+                activationReceiptId,
+                StringComparison.Ordinal))
+        {
+            return retained;
+        }
+        if (retained is not null && retained != active)
+        {
+            throw new InvalidDataException(
+                "rollback active intent conflicts with its retained idempotency receipt.");
+        }
+
+        return active;
+    }
+
+    private ReleaseBundlePromotionResult ReconcileExistingRollbackRequest(
+        string downloadsRoot,
+        ReleaseGenerationRollbackRequest request,
+        string requestSha256,
+        ReleaseActivationJournalDocument journal)
+    {
+        ValidateExistingRollbackRequest(request, requestSha256, journal);
+        if (!TryReconcileActivation(
+                journal.Intent,
+                out ReleaseBundlePromotionResult? reconciled))
+        {
+            throw new ReleaseActivationAbortedException(
+                journal.Intent,
+                new InvalidOperationException(
+                    "the idempotent rollback was durably proven not activated."));
+        }
+        if (reconciled is null)
+        {
+            throw new ReleaseActivationOutcomeUnknownException(
+                journal.Intent,
+                new InvalidOperationException(
+                    "the idempotent rollback still has an unknown publication outcome."));
+        }
+
+        return RequireRollbackStillCurrent(
+            downloadsRoot,
+            request,
+            journal,
+            reconciled);
+    }
+
+    private ReleaseBundlePromotionResult ResolveExistingRollbackRequestUnderLock(
+        string downloadsRoot,
+        ReleaseGenerationRollbackRequest request,
+        string requestSha256,
+        ReleaseActivationJournalDocument journal)
+    {
+        ValidateExistingRollbackRequest(request, requestSha256, journal);
+        ReleaseActivationOutcomeDocument? outcome =
+            TryLoadActivationOutcome(downloadsRoot, journal);
+        if (outcome is null
+            || File.Exists(Path.Combine(downloadsRoot, ActivationIntentName)))
+        {
+            throw new ReleaseActivationOutcomeUnknownException(
+                journal.Intent,
+                new InvalidOperationException(
+                    "the idempotent rollback requires reconciliation before replay."));
+        }
+        if (string.Equals(outcome.State, "aborted", StringComparison.Ordinal))
+        {
+            throw new ReleaseActivationAbortedException(
+                journal.Intent,
+                new InvalidOperationException(
+                    "the idempotent rollback was durably aborted."));
+        }
+
+        ReleaseBundlePromotionResult result =
+            BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
+        return RequireRollbackStillCurrent(
+            downloadsRoot,
+            request,
+            journal,
+            result);
+    }
+
+    private static void ValidateExistingRollbackRequest(
+        ReleaseGenerationRollbackRequest request,
+        string requestSha256,
+        ReleaseActivationJournalDocument journal)
+    {
+        if (!string.Equals(journal.Intent.Operation, "rollback", StringComparison.Ordinal)
+            || !string.Equals(
+                journal.Intent.GenerationId,
+                request.TargetGenerationId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                journal.Intent.PreviousGenerationId,
+                request.ExpectedCurrentGenerationId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                journal.Intent.RollbackRequestSha256,
+                requestSha256,
+                StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "rollback idempotency key is already bound to a different request.");
+        }
+    }
+
+    private ReleaseBundlePromotionResult RequireRollbackStillCurrent(
+        string downloadsRoot,
+        ReleaseGenerationRollbackRequest request,
+        ReleaseActivationJournalDocument journal,
+        ReleaseBundlePromotionResult result)
+    {
+        ReleaseShelfSnapshot current =
+            new ReleaseShelfGenerationStore(_configuration).Capture();
+        if (!string.Equals(
+                current.GenerationId,
+                request.TargetGenerationId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                current.PointerDigest is null
+                    ? null
+                    : $"sha256:{current.PointerDigest}",
+                journal.Intent.PointerSha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                result.ActivationReceiptId,
+                journal.Intent.ActivationReceiptId,
+                StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "the idempotent rollback committed previously but is no longer the current shelf revision.");
+        }
+
+        return result;
+    }
+
+    private static void ValidateRollbackCompareAndSwap(
+        ReleaseShelfSnapshot activeShelf,
+        ReleaseGenerationRollbackRequest request)
+    {
+        if (!string.Equals(
+                activeShelf.GenerationId,
+                request.ExpectedCurrentGenerationId,
+                StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "rollback expected current generation does not match the active shelf.");
+        }
+
+        ReleaseAuthorityEnvelopeBytes authority =
+            ReleaseAuthorityRevisionStore.TryResolveCommittedRevision(activeShelf)
+            ?? throw new ReleaseShelfMutationConcurrencyException(
+                "rollback requires an exact committed authority revision for the active generation.");
+        if (authority.RevisionId is null
+            || !string.Equals(
+                authority.RevisionId,
+                request.ExpectedCurrentRevisionId,
+                StringComparison.Ordinal))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "rollback expected current authority revision does not match.");
+        }
+
+        string snapshotSha256 =
+            Convert.ToHexStringLower(SHA256.HashData(authority.SnapshotBytes));
+        if (!FixedTimeHexEquals(
+                snapshotSha256,
+                request.ExpectedCurrentSnapshotSha256))
+        {
+            throw new ReleaseShelfMutationConcurrencyException(
+                "rollback expected current authority snapshot does not match.");
         }
     }
 
@@ -1462,7 +1990,8 @@ public sealed class ReleaseBundlePromotionService
                     candidateSha256,
                     prepared.PromotedArtifactIds,
                     exactIncomingDesktopScope,
-                    exactIncomingDesktopScopeIsFreshDelta);
+                    exactIncomingDesktopScopeIsFreshDelta,
+                    candidateImportBinding);
                 CurrentPointerDocument existingTargetPointer = DeserializeStageTargetPointer(
                     existingReceipt);
                 EnsureExistingGenerationMatchesStaged(
@@ -1555,7 +2084,8 @@ public sealed class ReleaseBundlePromotionService
                 candidateSha256,
                 prepared.PromotedArtifactIds.OrderBy(static id => id, StringComparer.Ordinal).ToArray(),
                 exactIncomingDesktopScope?.ToTransport(),
-                exactIncomingDesktopScopeIsFreshDelta);
+                exactIncomingDesktopScopeIsFreshDelta,
+                candidateImportBinding);
             PersistStageReceiptIdempotently(downloadsRoot, receipt);
             NotifyCheckpoint(PromotionCheckpoint.StageReceiptDurable);
 
@@ -3666,6 +4196,92 @@ public sealed class ReleaseBundlePromotionService
         }
     }
 
+    private static void ValidateRetainedGenerationForRollback(
+        string generationRoot,
+        CurrentPointerDocument pointer,
+        ActivationCandidateDocument candidate,
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlyList<ActivationInventoryEntry> expectedInventory,
+        ReleaseDesktopTupleScope? exactIncomingDesktopScope,
+        bool exactIncomingDesktopScopeIsFreshDelta)
+    {
+        ValidateIncomingDesktopScopeProfile(
+            exactIncomingDesktopScope,
+            exactIncomingDesktopScopeIsFreshDelta);
+        if (!string.Equals(
+                compatibilityManifest.Version,
+                pointer.ReleaseVersion,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                compatibilityManifest.Channel,
+                pointer.Channel,
+                StringComparison.Ordinal)
+            || compatibilityManifest.PublishedAt.ToUniversalTime()
+               != DateTimeOffset.Parse(
+                   pointer.PublishedAt,
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.AssumeUniversal).ToUniversalTime()
+            || !string.Equals(
+                candidate.GenerationId,
+                pointer.GenerationId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.ReleaseVersion,
+                pointer.ReleaseVersion,
+                StringComparison.Ordinal)
+            || !string.Equals(candidate.Channel, pointer.Channel, StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.PublishedAt,
+                pointer.PublishedAt,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.InventoryDigest,
+                pointer.InventoryDigest,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.ExactIncomingDesktopScope,
+                exactIncomingDesktopScopeIsFreshDelta
+                    ? exactIncomingDesktopScope?.ToTransport()
+                    : null,
+                StringComparison.Ordinal)
+            || candidate.ExactIncomingDesktopScopeIsFreshDelta
+               != exactIncomingDesktopScopeIsFreshDelta
+            || !candidate.Inventory.SequenceEqual(expectedInventory))
+        {
+            throw new InvalidDataException(
+                "retained rollback generation identity differs from its exact committed pointer.");
+        }
+
+        ValidateCandidateManifestBindings(
+            generationRoot,
+            pointer.GenerationId,
+            candidate.Manifests);
+        if (!string.Equals(
+                Sha256For(Path.Combine(generationRoot, CanonicalManifestName)),
+                pointer.Manifests.Canonical.Sha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                Sha256For(Path.Combine(generationRoot, CompatibilityManifestName)),
+                pointer.Manifests.Compatibility.Sha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "retained rollback manifest binding digest mismatch.");
+        }
+
+        IReadOnlyList<ActivationInventoryEntry> actualInventory =
+            BuildActivationInventory(generationRoot);
+        if (!expectedInventory.SequenceEqual(actualInventory)
+            || !string.Equals(
+                pointer.InventoryDigest,
+                $"sha256:{ComputeInventoryDigest(actualInventory)}",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "retained rollback activation inventory digest mismatch.");
+        }
+    }
+
     private static string NewGenerationId(DateTimeOffset instant)
         => $"gen-{instant.ToUniversalTime():yyyyMMdd'T'HHmmss'Z'}-{Guid.NewGuid().ToString("N")[..16]}";
 
@@ -3853,7 +4469,8 @@ public sealed class ReleaseBundlePromotionService
         string operation,
         ReleaseShelfSnapshot activeShelf,
         ReleaseBundlePromotionResult result,
-        string preparedPointerPath)
+        string preparedPointerPath,
+        string? rollbackRequestSha256 = null)
     {
         if (string.IsNullOrWhiteSpace(result.GenerationId)
             || string.IsNullOrWhiteSpace(result.ActivationReceiptId)
@@ -3899,7 +4516,8 @@ public sealed class ReleaseBundlePromotionService
             TargetPointerBase64: Convert.ToBase64String(targetPointerBytes),
             ExactIncomingDesktopScope: result.ExactIncomingDesktopScope,
             ExactIncomingDesktopScopeIsFreshDelta:
-                result.ExactIncomingDesktopScopeIsFreshDelta);
+                result.ExactIncomingDesktopScopeIsFreshDelta,
+            RollbackRequestSha256: rollbackRequestSha256);
     }
 
     private static string NormalizeSha256Binding(string value)
@@ -4178,7 +4796,8 @@ public sealed class ReleaseBundlePromotionService
         string candidateSha256,
         IReadOnlyCollection<string> candidateArtifactIds,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        ReleaseUploadCandidateSessionBinding? candidateImportBinding)
     {
         string[] expectedArtifactIds = candidateArtifactIds
             .OrderBy(static id => id, StringComparer.Ordinal)
@@ -4196,7 +4815,8 @@ public sealed class ReleaseBundlePromotionService
             || !receipt.CandidateArtifactIds.SequenceEqual(expectedArtifactIds, StringComparer.Ordinal)
             || !string.Equals(receipt.ExactIncomingDesktopScope, expectedScope, StringComparison.Ordinal)
             || receipt.ExactIncomingDesktopScopeIsFreshDelta
-               != exactIncomingDesktopScopeIsFreshDelta)
+               != exactIncomingDesktopScopeIsFreshDelta
+            || receipt.CandidateImportBinding != candidateImportBinding)
         {
             throw new ReleaseShelfMutationConcurrencyException(
                 "existing stage receipt does not match the exact reconstructed candidate bytes.");
@@ -4297,6 +4917,7 @@ public sealed class ReleaseBundlePromotionService
         {
             throw new InvalidDataException("release stage receipt contract is invalid.");
         }
+        ValidateCandidateSessionBinding(receipt.CandidateImportBinding);
         ReleaseDesktopTupleScope? exactScope =
             ReleaseDesktopTupleScope.ParseOptionalCanonical(
                 receipt.ExactIncomingDesktopScope);
@@ -4333,6 +4954,60 @@ public sealed class ReleaseBundlePromotionService
                 StringComparison.Ordinal))
         {
             throw new InvalidDataException("release stage receipt pointer binding is invalid.");
+        }
+    }
+
+    private static void ValidateCandidateSessionBinding(
+        ReleaseUploadCandidateSessionBinding? binding)
+    {
+        if (binding is null)
+        {
+            return;
+        }
+        if (!IsBareLowerSha256(binding.SnapshotSha256)
+            || !IsBareLowerSha256(binding.AuthoritySha256)
+            || !IsBareLowerSha256(binding.BundleIdentitySha256)
+            || !IsBareLowerSha256(binding.CanonicalManifestSha256)
+            || !IsBareLowerSha256(binding.InventorySha256)
+            || binding.ExactIncomingDesktopScopeIsFreshDelta
+               != (binding.IncumbentBinding is not null)
+            || binding.IncumbentBinding is { } incumbent
+               && (!IsBareLowerSha256(incumbent.SnapshotSha256)
+                   || !IsBareLowerSha256(incumbent.FullShelfInventorySha256)
+                   || !IsBareLowerSha256(incumbent.ActiveInventorySha256)
+                   || !IsBareLowerSha256(incumbent.CanonicalManifestSha256)
+                   || !IsBareLowerSha256(incumbent.CompatibilityManifestSha256)))
+        {
+            throw new InvalidDataException(
+                "release stage receipt candidate binding is invalid.");
+        }
+
+        if (binding.NativeEvidenceBinding is not { } native)
+        {
+            return;
+        }
+        if (!IsBareLowerSha256(native.EvidenceSha256)
+            || !binding.ExactIncomingDesktopScopeIsFreshDelta
+            || !IsBareLowerSha256(native.CaptureInventorySha256)
+            || native.SourceCommit is not { Length: 40 }
+            || native.SourceCommit.Any(static character =>
+                character is not (>= '0' and <= '9')
+                    and not (>= 'a' and <= 'f'))
+            || !string.Equals(
+                native.BundleIdentitySha256,
+                binding.BundleIdentitySha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                native.CanonicalManifestSha256,
+                binding.CanonicalManifestSha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                native.InventorySha256,
+                binding.InventorySha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "release stage receipt native evidence binding is invalid.");
         }
     }
 
@@ -4960,6 +5635,10 @@ public sealed class ReleaseBundlePromotionService
         {
             intentProperties.Add("exactIncomingDesktopScopeIsFreshDelta");
         }
+        if (intentJson.ContainsKey("rollbackRequestSha256"))
+        {
+            intentProperties.Add("rollbackRequestSha256");
+        }
         RequireExactProperties(intentJson, intentProperties, "release activation intent");
         ReleaseActivationJournalDocument journal = json.Deserialize<ReleaseActivationJournalDocument>(JsonOptions)
             ?? throw new InvalidDataException("release activation journal is malformed.");
@@ -5028,10 +5707,24 @@ public sealed class ReleaseBundlePromotionService
             "release activation outcome");
         ReleaseActivationOutcomeDocument outcome = json.Deserialize<ReleaseActivationOutcomeDocument>(JsonOptions)
             ?? throw new InvalidDataException("release activation outcome is malformed.");
+        string intentPath = Path.Combine(
+            Path.GetDirectoryName(path)
+                ?? throw new InvalidDataException(
+                    "release activation outcome parent is unavailable."),
+            ActivationJournalIntentName);
+        EnsureOwnerOnlyRegularFile(intentPath, "release activation history intent");
+        byte[] exactIntentBytes = File.ReadAllBytes(intentPath);
+        if (exactIntentBytes.Length > 0
+            && exactIntentBytes[^1] == (byte)'\n')
+        {
+            Array.Resize(ref exactIntentBytes, exactIntentBytes.Length - 1);
+        }
+        string exactIntentSha256 =
+            $"sha256:{Convert.ToHexStringLower(SHA256.HashData(exactIntentBytes))}";
         if (!string.Equals(outcome.SchemaVersion, "chummer.release-shelf.activation-outcome/v1", StringComparison.Ordinal)
             || outcome.State is not "committed" and not "aborted"
             || !string.Equals(outcome.ActivationReceiptId, journal.Intent.ActivationReceiptId, StringComparison.Ordinal)
-            || !string.Equals(outcome.IntentSha256, ComputeActivationIntentDigest(journal), StringComparison.Ordinal)
+            || !string.Equals(outcome.IntentSha256, exactIntentSha256, StringComparison.Ordinal)
             || outcome.ResolvedAtUtc.Offset != TimeSpan.Zero)
         {
             throw new InvalidDataException("release activation outcome contract is invalid.");
@@ -5052,6 +5745,9 @@ public sealed class ReleaseBundlePromotionService
             || !IsSha256Binding(intent.InventoryDigest)
             || !IsSha256Binding(intent.PointerSha256)
             || (intent.PreviousPointerSha256 is not null && !IsSha256Binding(intent.PreviousPointerSha256))
+            || (intent.RollbackRequestSha256 is not null
+                && (!string.Equals(intent.Operation, "rollback", StringComparison.Ordinal)
+                    || !IsSha256Binding(intent.RollbackRequestSha256)))
             || intent.PublishedAt.Offset != TimeSpan.Zero
             || intent.PreparedAtUtc.Offset != TimeSpan.Zero)
         {
@@ -5142,13 +5838,33 @@ public sealed class ReleaseBundlePromotionService
             .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
             .ToArray();
         IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(generationRoot);
-        ValidatePreparedGeneration(
-            generationRoot,
-            pointer,
-            inventory,
-            artifactIds,
-            exactIncomingDesktopScope,
-            journal.Intent.ExactIncomingDesktopScopeIsFreshDelta);
+        if (string.Equals(journal.Intent.Operation, "rollback", StringComparison.Ordinal))
+        {
+            ActivationCandidateDocument candidate =
+                JsonSerializer.Deserialize<ActivationCandidateDocument>(
+                    File.ReadAllText(Path.Combine(generationRoot, ActivationCandidateName)),
+                    JsonOptions)
+                ?? throw new InvalidDataException(
+                    "retained rollback activation candidate is malformed.");
+            ValidateRetainedGenerationForRollback(
+                generationRoot,
+                pointer,
+                candidate,
+                manifest,
+                inventory,
+                exactIncomingDesktopScope,
+                journal.Intent.ExactIncomingDesktopScopeIsFreshDelta);
+        }
+        else
+        {
+            ValidatePreparedGeneration(
+                generationRoot,
+                pointer,
+                inventory,
+                artifactIds,
+                exactIncomingDesktopScope,
+                journal.Intent.ExactIncomingDesktopScopeIsFreshDelta);
+        }
         if (!string.Equals(journal.Intent.ReleaseVersion, manifest.Version, StringComparison.Ordinal)
             || !string.Equals(journal.Intent.Channel, manifest.Channel, StringComparison.Ordinal)
             || journal.Intent.PublishedAt != manifest.PublishedAt.ToUniversalTime())
@@ -5214,6 +5930,100 @@ public sealed class ReleaseBundlePromotionService
         throw new InvalidDataException("rollback target was never durably committed.");
     }
 
+    private (ReleaseDesktopTupleScope? ExactIncomingDesktopScope,
+        bool ExactIncomingDesktopScopeIsFreshDelta,
+        byte[] PointerBytes,
+        CurrentPointerDocument Pointer) RequireExactCommittedGenerationPointer(
+        string downloadsRoot,
+        string generationId,
+        string expectedPointerDigest)
+    {
+        if (!IsBareLowerSha256(expectedPointerDigest))
+        {
+            throw new InvalidDataException(
+                "retained rollback generation pointer digest is invalid.");
+        }
+
+        string historyRoot = ActivationJournalHistoryRoot(downloadsRoot);
+        if (!Directory.Exists(historyRoot))
+        {
+            throw new InvalidDataException(
+                "rollback target has no committed activation history.");
+        }
+
+        EnsureRegularDirectory(historyRoot, "release activation journal history");
+        ReleaseDesktopTupleScope? exactScope = null;
+        bool exactScopeIsFreshDelta = false;
+        byte[]? retainedPointerBytes = null;
+        CurrentPointerDocument? retainedPointer = null;
+        bool found = false;
+        foreach (string receiptRoot in Directory.EnumerateDirectories(historyRoot))
+        {
+            string receiptId = Path.GetFileName(receiptRoot);
+            ReleaseActivationJournalDocument journal =
+                LoadActivationHistoryJournal(downloadsRoot, receiptId);
+            if (!string.Equals(
+                    journal.Intent.GenerationId,
+                    generationId,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            ReleaseActivationOutcomeDocument? outcome =
+                TryLoadActivationOutcome(downloadsRoot, journal);
+            if (outcome is null
+                || !string.Equals(outcome.State, "committed", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            byte[] pointerBytes = DecodeRequiredPointerBytes(
+                journal.TargetPointerBase64,
+                "target");
+            if (!string.Equals(
+                    Sha256BindingForBytes(pointerBytes),
+                    $"sha256:{expectedPointerDigest}",
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            CurrentPointerDocument pointer = ValidateActivationJournalTarget(journal);
+            ReleaseDesktopTupleScope? candidateScope =
+                ReleaseDesktopTupleScope.ParseOptionalCanonical(
+                    journal.Intent.ExactIncomingDesktopScope);
+            if (found
+                && (candidateScope != exactScope
+                    || journal.Intent.ExactIncomingDesktopScopeIsFreshDelta
+                    != exactScopeIsFreshDelta
+                    || !BytesEqual(pointerBytes, retainedPointerBytes)))
+            {
+                throw new InvalidDataException(
+                    "committed rollback target history disagrees for the retained pointer.");
+            }
+
+            found = true;
+            exactScope = candidateScope;
+            exactScopeIsFreshDelta =
+                journal.Intent.ExactIncomingDesktopScopeIsFreshDelta;
+            retainedPointerBytes = pointerBytes;
+            retainedPointer = pointer;
+        }
+
+        if (!found || retainedPointerBytes is null || retainedPointer is null)
+        {
+            throw new InvalidDataException(
+                "rollback target retained pointer has no exact committed activation history.");
+        }
+
+        return (
+            exactScope,
+            exactScopeIsFreshDelta,
+            retainedPointerBytes,
+            retainedPointer);
+    }
+
     private static CurrentPointerDocument ValidateActivationJournalTarget(
         ReleaseActivationJournalDocument journal)
     {
@@ -5227,7 +6037,11 @@ public sealed class ReleaseBundlePromotionService
             ?? throw new InvalidDataException("release activation journal target pointer is malformed.");
         if (!string.Equals(pointer.SchemaVersion, CurrentPointerSchema, StringComparison.Ordinal)
             || !string.Equals(pointer.GenerationId, journal.Intent.GenerationId, StringComparison.Ordinal)
-            || !string.Equals(pointer.ActivationReceiptId, journal.Intent.ActivationReceiptId, StringComparison.Ordinal)
+            || (!string.Equals(journal.Intent.Operation, "rollback", StringComparison.Ordinal)
+                && !string.Equals(
+                    pointer.ActivationReceiptId,
+                    journal.Intent.ActivationReceiptId,
+                    StringComparison.Ordinal))
             || !string.Equals(pointer.ReleaseVersion, journal.Intent.ReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(pointer.Channel, journal.Intent.Channel, StringComparison.Ordinal)
             || !DateTimeOffset.TryParse(pointer.PublishedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset publishedAt)
@@ -10320,7 +11134,9 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<string> CandidateArtifactIds,
         string? ExactIncomingDesktopScope,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        bool ExactIncomingDesktopScopeIsFreshDelta = false);
+        bool ExactIncomingDesktopScopeIsFreshDelta = false,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        ReleaseUploadCandidateSessionBinding? CandidateImportBinding = null);
 
     private sealed record StageProbeDocument(
         string SchemaVersion,

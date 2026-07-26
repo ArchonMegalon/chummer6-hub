@@ -1786,7 +1786,27 @@ public sealed class ReleaseBundleUploadSessionService
                    || !IsBareSha256(incumbent.FullShelfInventorySha256)
                    || !IsBareSha256(incumbent.ActiveInventorySha256)
                    || !IsBareSha256(incumbent.CanonicalManifestSha256)
-                   || !IsBareSha256(incumbent.CompatibilityManifestSha256)))
+                   || !IsBareSha256(incumbent.CompatibilityManifestSha256))
+            || binding.NativeEvidenceBinding is { } native
+               && (!binding.ExactIncomingDesktopScopeIsFreshDelta
+                   || !IsBareSha256(native.EvidenceSha256)
+                   || !IsBareSha256(native.CaptureInventorySha256)
+                   || native.SourceCommit is not { Length: 40 }
+                   || native.SourceCommit.Any(static character =>
+                       character is not (>= '0' and <= '9')
+                           and not (>= 'a' and <= 'f'))
+                   || !string.Equals(
+                       native.BundleIdentitySha256,
+                       binding.BundleIdentitySha256,
+                       StringComparison.Ordinal)
+                   || !string.Equals(
+                       native.CanonicalManifestSha256,
+                       binding.CanonicalManifestSha256,
+                       StringComparison.Ordinal)
+                   || !string.Equals(
+                       native.InventorySha256,
+                       binding.InventorySha256,
+                       StringComparison.Ordinal)))
         {
             throw new InvalidDataException("upload session candidate binding is invalid.");
         }

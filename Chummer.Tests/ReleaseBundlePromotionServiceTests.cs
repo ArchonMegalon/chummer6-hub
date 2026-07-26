@@ -342,7 +342,8 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.True(fixture.TryCaptureStageProbe(
             staged.ProbeToken,
             staged.GenerationId,
-            out ReleaseShelfSnapshot? snapshot));
+            out ReleaseShelfSnapshot? snapshot,
+            evaluationInstant: DateTimeOffset.Parse("2026-04-01T20:05:00Z")));
         Assert.Equal(staged.GenerationId, snapshot!.GenerationId);
         Assert.False(fixture.TryCaptureStageProbe(
             "invalid-stage-probe-token",
@@ -391,7 +392,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             "run-staged-receipt-recovery",
             RequiredPreviewArtifacts());
         string sessionId = Guid.NewGuid().ToString("N");
-        DateTimeOffset firstInstant = DateTimeOffset.Parse("2026-07-21T01:00:00Z");
+        DateTimeOffset firstInstant = DateTimeOffset.Parse("2026-04-01T20:00:00Z");
         bool failed = false;
 
         await Assert.ThrowsAsync<IOException>(() => fixture.StageAsync(
@@ -537,7 +538,14 @@ public sealed class ReleaseBundlePromotionServiceTests
             CanonicalManifestSha256: new string('4', 64),
             InventorySha256: new string('5', 64),
             ExactIncomingDesktopScopeIsFreshDelta: true,
-            IncumbentBinding: incumbentBinding);
+            IncumbentBinding: incumbentBinding,
+            NativeEvidenceBinding: new ReleaseUploadCandidateNativeEvidenceBinding(
+                EvidenceSha256: new string('b', 64),
+                CaptureInventorySha256: new string('c', 64),
+                SourceCommit: new string('d', 40),
+                BundleIdentitySha256: new string('3', 64),
+                CanonicalManifestSha256: new string('4', 64),
+                InventorySha256: new string('5', 64)));
         string candidateBundle = fixture.CreateBundle(
             "run-candidate-incumbent-bound",
             CandidateRetainedCrossPlatformArtifacts());
@@ -552,6 +560,31 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         Assert.Equal(incumbent.GenerationId, staged.PreviousGenerationId);
         Assert.Equal($"sha256:{incumbent.PointerDigest}", staged.PreviousPointerSha256);
+        Assert.Equal(
+            staged.GenerationId,
+            fixture.CaptureNativeBoundStagedSnapshot(
+                staged.StageReceiptId,
+                candidateBinding).GenerationId);
+        JsonObject receipt = JsonNode.Parse(File.ReadAllBytes(Path.Combine(
+            fixture.DownloadsRoot,
+            ".release-shelf-stage-journal",
+            $"{staged.StageReceiptId}.json")))!.AsObject();
+        Assert.Equal(
+            candidateBinding.NativeEvidenceBinding.EvidenceSha256,
+            receipt["candidateImportBinding"]!["nativeEvidenceBinding"]![
+                "evidenceSha256"]!.GetValue<string>());
+
+        ReleaseUploadCandidateSessionBinding changedNative = candidateBinding with
+        {
+            NativeEvidenceBinding = candidateBinding.NativeEvidenceBinding with
+            {
+                EvidenceSha256 = new string('e', 64)
+            }
+        };
+        Assert.Throws<ReleaseShelfMutationConcurrencyException>(() =>
+            fixture.CaptureNativeBoundStagedSnapshot(
+                staged.StageReceiptId,
+                changedNative));
 
         ReleaseUploadCandidateSessionBinding staleBinding = candidateBinding with
         {
@@ -4662,6 +4695,22 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         public ReleaseShelfSnapshot CaptureActiveShelf()
             => new ReleaseShelfGenerationStore(CreateConfiguration()).Capture();
+
+        public ReleaseShelfSnapshot CaptureNativeBoundStagedSnapshot(
+            string stageReceiptId,
+            ReleaseUploadCandidateSessionBinding candidateBinding)
+        {
+            var service = new ReleaseBundlePromotionService(
+                CreateConfiguration(initialMigrationAllowed: true),
+                NullLogger<ReleaseBundlePromotionService>.Instance,
+                promotionCheckpoint: null,
+                new FixedTimeProvider(DateTimeOffset.Parse("2026-07-17T20:00:00Z")),
+                PrivacyLaunchGate.ClearForTests);
+            return service.CaptureStagedSnapshot(
+                stageReceiptId,
+                candidateBinding,
+                out _);
+        }
 
         public async Task ValidateBundleAsync(
             string bundlePath,

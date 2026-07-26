@@ -478,10 +478,37 @@ unset approved_runtime_proof_sha256
    2. Run `scripts/release/materialize_candidate_import_authority.py` with that bundle, its exact
       `RELEASE_CHANNEL.generated.json`, the summary and inventory, and the finalized native-Windows
       evidence root. The materializer derives the exact Windows proof scope from the canonical
-      `desktopTupleCoverage.requiredDesktopHeads` and requires fresh capture and human-finalization
-      provenance plus exact EXE, payload, candidate-inventory, and visual-proof bindings for that
-      set only. A fallback head is not added unless canonical release truth requires it. Wine,
-      stale evidence, a changed reviewer boundary, or any byte mismatch fails closed.
+      `desktopTupleCoverage.requiredDesktopHeads` and requires fresh capture and accountable
+      finalization provenance plus exact EXE, payload, candidate-inventory, and visual-proof
+      bindings for that set only. A fallback head is not added unless canonical release truth
+      requires it. Wine, stale evidence, a changed reviewer boundary, or any byte mismatch fails
+      closed.
+      For an unsigned stage-only v3 authority, omit `--windows-finalized-root`. For the owner-native
+      v4 bridge, place the complete finalized tree at the selected publication stage's exact
+      `proof/windows-native` directory and pass that same absolute directory through
+      `--windows-finalized-root`. The materializer rejects a different root, a partial tree, an
+      unlisted or extra file, changed embedded bytes, source-revision drift, or candidate manifest,
+      inventory, installer, payload, or sidecar mismatch. Supplying that exact root changes only the
+      authority contract to v4, adds `ownerNativeFinalizationBridgeAuthority=true`, and embeds
+      `custody.nativeWindowsFinalizedEvidence`; omission preserves the existing v3 output.
+      The v4 custody set has exactly ten content rows: the unsigned composition, four native
+      provenance documents, the source release-channel and registry manifests, and the three final
+      Windows candidate files. The two source manifests are the exact pre-projection bytes recorded
+      by the v3 publication evidence; the Windows installer, payload, and sidecar are the exact
+      final candidate bytes. The composition is also retained as an exact v4 publication-evidence
+      file so the Hub can rederive every native candidate-content row.
+      The native inventory and export bind the producer revision from
+      `unsignedPublicationEvidence.sourceSha`. The native capture and finalization revisions must
+      equal each other, but may be a later revision than that producer. The payload must be a valid
+      ZIP with exactly one unencrypted regular root entry named `Chummer.Avalonia.exe`; the
+      materializer streams that entry and derives its executable SHA-256 and size instead of
+      trusting the native receipt's installed-executable claim.
+      The finalization receipt's `captureArtifact.id` and `captureArtifact.sha256` remain
+      authenticated UI-finalization attestation metadata. The live operator receipt must back those
+      values with the GitHub API response and the downloaded artifact ZIP hash. The Hub validates
+      their exact schema and cross-evidence consistency, but does not independently derive those two
+      values from its local custody tree; do not describe that attestation boundary as
+      Hub-derived.
    3. Independently hand off the resulting authority file's lowercase SHA-256, then publish it with
       `scripts/release/verify_public_projection.py --candidate-import-authority <authority> --candidate-import-authority-sha256 <approved-sha256>`.
       This advances `CURRENT` only to `status=candidate_import_ready`, with
@@ -493,9 +520,62 @@ unset approved_runtime_proof_sha256
       single-use even for Fleet, cannot invoke reconciliation, and reject a second session after a
       durable completion. Only an exact retry of the same completed session may replay its durable
       completion result.
+      Candidate-authority v2 and v3 remain stage-only and cannot advance or activate a staged
+      generation. A v4 authority may bridge finalization only when its root has exact contract
+      `chummer.release-upload.candidate-import-authority/v4`,
+      `ownerNativeFinalizationBridgeAuthority=true`, and exact finalized native-Windows evidence
+      bound to the same candidate. The caller must use the Fleet internal token directly, not an
+      upload ticket, and must repeat all four exact bindings:
+      `X-Chummer-Candidate-Manifest-Sha256`,
+      `X-Chummer-Candidate-Inventory-Sha256`,
+      `X-Chummer-Candidate-Bundle-Identity-Sha256`, and
+      `X-Chummer-Release-Exact-Incoming-Scope: avalonia:windows:win-x64`.
+      That narrow owner bridge authorizes only
+      `POST /api/internal/releases/stages/{stageReceiptId}/authority-advances` and
+      `POST /api/internal/releases/upload-sessions/{sessionId}/activate-staged`.
+      It never authorizes ordinary generation authority advancement, completion, reconciliation,
+      direct bundle promotion, or rollback. The candidate binding is persisted in both stage and
+      session receipts and must compare exactly again at activation.
    5. Run live convergence against the promoted bytes and publish a new full-pass projection before
       treating upload authority as restored. Candidate import by itself is never release readiness,
       never advances a stable/current release pointer, and never authorizes another candidate.
+
+   Emergency rollback to a retained generation is a separate owner-only operation. First capture
+   the active generation id and the exact committed authority revision id and snapshot SHA-256 from
+   the server-owned active shelf while holding the normal operator boundary. Do not infer those CAS
+   values from a stale browser page, do not hand-edit `current.json`, and do not reuse an
+   idempotency key for different inputs. Rehearse the exact request without reading the owner token:
+
+```bash
+python3 scripts/rollback_release_generation.py \
+  --target-generation '<retained-generation-id>' \
+  --expected-current-generation '<active-generation-id>' \
+  --expected-current-snapshot-sha256 '<active-authority-snapshot-lowercase-sha256>' \
+  --expected-current-revision-id 'auth-<active-authority-revision-lowercase-sha256>' \
+  --idempotency-key 'rollback-<unique-portable-operation-id>' \
+  --dry-run \
+  --output '/absolute/new/operator-receipts/rollback-dry-run.json'
+```
+
+   For the live call, use the caller-owned, single-link regular Fleet token file with mode `0600`
+   and a new absolute receipt path:
+
+```bash
+python3 scripts/rollback_release_generation.py \
+  --target-generation '<retained-generation-id>' \
+  --expected-current-generation '<active-generation-id>' \
+  --expected-current-snapshot-sha256 '<active-authority-snapshot-lowercase-sha256>' \
+  --expected-current-revision-id 'auth-<active-authority-revision-lowercase-sha256>' \
+  --idempotency-key 'rollback-<unique-portable-operation-id>' \
+  --token-file '/absolute/owner-only/fleet-token' \
+  --output '/absolute/new/operator-receipts/rollback-receipt.json'
+```
+
+   The client accepts only canonical `https://chummer.run`, refuses redirects, never writes the
+   shelf or `current.json`, and creates the receipt with mode `0600` and no overwrite. A timeout or
+   transport failure has unknown outcome: retry only the identical request with the identical
+   idempotency key. Any changed current generation, authority revision, or authority snapshot fails
+   the server-side compare-and-swap.
 
    The isolated public-download sidecar seeds its projection volume from the authenticated authority
    root, not from a flattened snapshot directory. The initializer accepts only the exact

@@ -202,6 +202,170 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void RuntimeAcceptsFrozenUnsignedNativeV4AlternateShape()
+    {
+        using JsonDocument fixture = LoadUnsignedNativeEvidenceV4Contract();
+        JsonElement root = fixture.RootElement;
+        Assert.Equal(
+            "4400a3a95ad923d5615bfe93a58df9e24d5e5a76",
+            root.GetProperty("uiCommit").GetString());
+        Assert.Equal(
+            "789c19a9bad5fb03cf9ca06a51deb62659afba5648008a4c8775c5ae3a93279d",
+            root.GetProperty("nativeOuterFileSha256").GetString());
+        Assert.Equal(
+            "0494a20ad8820013601842d4aca5fec49c0ee205bd2707b11e5e6bdfa1942c41",
+            root.GetProperty("nativeCompactSha256").GetString());
+        Assert.Equal(
+            "5eefb891104780388a3ef14f4ff2dd9011fb7a7365c225edfbdac7194f449d4c",
+            root.GetProperty("visualProofSha256").GetString());
+        Assert.Equal(
+            "580b7b3c7e8d640fb6ec987ceac5443f75aa4eb0efaebf96c701ba316d52df4d",
+            root.GetProperty("hubEvidenceBindingSha256").GetString());
+        byte[] canonicalManifest = Convert.FromBase64String(
+            root.GetProperty("canonicalManifestBase64").GetString()!);
+        var inventory = root.GetProperty("inventory")
+            .EnumerateArray()
+            .Select(row => new ReleaseUploadCandidateInventoryRow(
+                row.GetProperty("path").GetString()!,
+                row.GetProperty("sizeBytes").GetInt64(),
+                row.GetProperty("sha256").GetString()!))
+            .ToArray();
+        string inventorySha256 =
+            ReleaseUploadSnapshotAuthorityService.ComputeInventoryDigest(inventory);
+        var candidate = new ReleaseUploadCandidateIdentity(
+            root.GetProperty("version").GetString()!,
+            root.GetProperty("canonicalManifestSha256").GetString()!,
+            inventorySha256,
+            inventory.Length,
+            inventory.Sum(static row => row.SizeBytes),
+            string.Empty);
+        candidate = candidate with
+        {
+            BundleIdentitySha256 =
+                ReleaseUploadSnapshotAuthorityService.ComputeBundleIdentity(candidate)
+        };
+        byte[] nativeEvidence = JsonSerializer.SerializeToUtf8Bytes(
+            root.GetProperty("nativeEvidence"));
+
+        ReleaseUploadCandidateNativeEvidenceBinding binding =
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedNativeEvidenceContract(
+                nativeEvidence,
+                canonicalManifest,
+                candidate,
+                inventory,
+                root.GetProperty("nowUtc").GetDateTimeOffset());
+
+        Assert.Equal(
+            "4400a3a95ad923d5615bfe93a58df9e24d5e5a76",
+            binding.SourceCommit);
+        Assert.Equal(candidate.BundleIdentitySha256, binding.BundleIdentitySha256);
+        Assert.Equal(
+            candidate.CanonicalManifestSha256,
+            binding.CanonicalManifestSha256);
+        Assert.Equal(candidate.InventorySha256, binding.InventorySha256);
+        Assert.Equal(
+            root.GetProperty("hubEvidenceBindingSha256").GetString(),
+            binding.EvidenceSha256);
+        Assert.Matches("^[0-9a-f]{64}$", binding.CaptureInventorySha256);
+        JsonElement visualProof = root
+            .GetProperty("nativeEvidence")
+            .GetProperty("files")
+            .EnumerateArray()
+            .Single(static row => string.Equals(
+                row.GetProperty("path").GetString(),
+                "UNSIGNED_WINDOWS_PREVIEW_VISUAL_PROOF-avalonia-win-x64.generated.json",
+                StringComparison.Ordinal));
+        Assert.Equal(
+            root.GetProperty("visualProofSha256").GetString(),
+            visualProof.GetProperty("sha256").GetString());
+    }
+
+    [Fact]
+    public void RuntimeAcceptsFullUnsignedNativeV4WithDistinctProducerAndCaptureSources()
+    {
+        byte[] authorityBytes = LoadUnsignedCandidateAuthorityV4DistinctSource();
+        using JsonDocument document = JsonDocument.Parse(authorityBytes);
+        JsonElement root = document.RootElement;
+        JsonElement custody = root.GetProperty("custody");
+        JsonElement publicationEvidence =
+            custody.GetProperty("unsignedPublicationEvidence");
+        JsonElement nativeEvidence =
+            custody.GetProperty("nativeWindowsFinalizedEvidence");
+        string producerSource =
+            publicationEvidence.GetProperty("sourceSha").GetString()!;
+        string captureSource =
+            nativeEvidence.GetProperty("captureSource").GetProperty("sha").GetString()!;
+        string finalizationSource =
+            nativeEvidence.GetProperty("finalizationSource").GetProperty("sha").GetString()!;
+        Assert.Equal(
+            producerSource,
+            nativeEvidence.GetProperty("candidateContentInventory")
+                .GetProperty("sourceSha")
+                .GetString());
+        Assert.Equal(captureSource, finalizationSource);
+        Assert.NotEqual(producerSource, captureSource);
+
+        DateTimeOffset evaluatedAt =
+            root.GetProperty("generatedAtUtc").GetDateTimeOffset().AddMinutes(1);
+        ReleaseUploadCandidateAuthority authority =
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                "distinct-source-v4",
+                new string('1', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes,
+                evaluatedAt);
+
+        Assert.True(authority.ExactIncomingDesktopScopeIsFreshDelta);
+        ReleaseUploadCandidateNativeEvidenceBinding binding =
+            Assert.IsType<ReleaseUploadCandidateNativeEvidenceBinding>(
+                authority.NativeEvidenceBinding);
+        Assert.Equal(captureSource, binding.SourceCommit);
+        Assert.Equal(
+            authority.Candidate.BundleIdentitySha256,
+            binding.BundleIdentitySha256);
+
+        JsonElement sourceCanonical = publicationEvidence.GetProperty("files")
+            .EnumerateArray()
+            .Single(static row => string.Equals(
+                row.GetProperty("path").GetString(),
+                "transport/source-publication/RELEASE_CHANNEL.generated.json",
+                StringComparison.Ordinal));
+        JsonElement nativeCanonical = nativeEvidence
+            .GetProperty("candidateContentInventory")
+            .GetProperty("files")
+            .EnumerateArray()
+            .Single(static row => string.Equals(
+                row.GetProperty("path").GetString(),
+                "publication/RELEASE_CHANNEL.generated.json",
+                StringComparison.Ordinal));
+        Assert.Equal(
+            sourceCanonical.GetProperty("sha256").GetString(),
+            nativeCanonical.GetProperty("sha256").GetString());
+        Assert.Equal(
+            sourceCanonical.GetProperty("sizeBytes").GetInt64(),
+            nativeCanonical.GetProperty("sizeBytes").GetInt64());
+        Assert.NotEqual(
+            authority.Candidate.CanonicalManifestSha256,
+            nativeCanonical.GetProperty("sha256").GetString());
+
+        JsonElement nativeInstaller = nativeEvidence
+            .GetProperty("candidateContentInventory")
+            .GetProperty("files")
+            .EnumerateArray()
+            .Single(static row => string.Equals(
+                row.GetProperty("path").GetString(),
+                "publication/files/chummer-avalonia-win-x64-installer.exe",
+                StringComparison.Ordinal));
+        ReleaseUploadCandidateInventoryRow candidateInstaller =
+            authority.Inventory.Single(static row => string.Equals(
+                row.Path,
+                "files/chummer-avalonia-win-x64-installer.exe",
+                StringComparison.Ordinal));
+        Assert.Equal(candidateInstaller.Sha256, nativeInstaller.GetProperty("sha256").GetString());
+        Assert.Equal(candidateInstaller.SizeBytes, nativeInstaller.GetProperty("sizeBytes").GetInt64());
+    }
+
+    [Fact]
     public void RuntimeAcceptsRegistryPinnedUnsignedWindowsFreshDeltaManifestPair()
     {
         (JsonObject canonical, JsonObject compatibility) =
@@ -743,7 +907,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         Assert.Null(rejected.Candidate);
     }
 
-    private static byte[] LoadUnsignedCandidateAuthorityV3()
+    internal static byte[] LoadUnsignedCandidateAuthorityV3()
     {
         string fixturePath = RepoPaths.FromRoot(
             "Chummer.Tests",
@@ -761,6 +925,34 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         authority["generatedAtUtc"] = now;
         authority["expiresAtUtc"] = now.AddHours(2);
         return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static JsonDocument LoadUnsignedNativeEvidenceV4Contract()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_native_evidence_v4_contract.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        return JsonDocument.Parse(gzip);
+    }
+
+    private static byte[] LoadUnsignedCandidateAuthorityV4DistinctSource()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "unsigned_candidate_import_authority_v4_distinct_source.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        return output.ToArray();
     }
 
     private static byte[] LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3()
@@ -2897,14 +3089,16 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             });
             var evidence = new Dictionary<string, byte[]>(StringComparer.Ordinal)
             {
-                ["WINDOWS_NATIVE_CAPTURE.generated.json"] = capture,
                 ["WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"] = captureInventory,
                 ["WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"] = finalization,
-                [CandidateProvenanceInventoryPath] = provenance,
-                [CandidateProvenanceExportPath] = export,
-                ["startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"] = startup,
-                [visualPath] = visual
+                ["PREVIEW_NIGHTLY_PUBLICATION_SCOPE_APPROVAL.generated.json"] =
+                    nativeApproval,
+                [visualPath] = visual,
             };
+            foreach ((string path, byte[] bytes) in captureSubjects)
+            {
+                evidence[path] = bytes;
+            }
             object[] finalizedRows = captureSubjects
                 .Concat(
                 [

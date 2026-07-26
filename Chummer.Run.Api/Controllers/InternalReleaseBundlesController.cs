@@ -12,6 +12,7 @@ public sealed class InternalReleaseBundlesController : ControllerBase
 {
     internal const long MaxReleaseAuthorityAdvanceRequestBodyBytes =
         ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes;
+    internal const long MaxReleaseGenerationRollbackRequestBodyBytes = 16L * 1024L;
 
     public const string ExactIncomingDesktopScopeHeader =
         "X-Chummer-Release-Exact-Incoming-Scope";
@@ -139,6 +140,102 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         }
     }
 
+    [HttpPost("/api/internal/releases/generations/{generationId}/rollback")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(MaxReleaseGenerationRollbackRequestBodyBytes)]
+    [ProducesResponseType<ReleaseBundlePromotionResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<ReleaseBundlePromotionResult>> RollbackReleaseGeneration(
+        [FromRoute] string generationId,
+        [FromBody] ReleaseGenerationRollbackRequest? request,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization =
+            RequirePrevalidatedAuthorization(out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        if (!authorization!.AllowsPrivilegedReconciliation)
+        {
+            return BuildProblem(
+                StatusCodes.Status403Forbidden,
+                "Privileged release rollback required",
+                "only the owner control authority may roll back the public release shelf.",
+                "https://chummer.run/problems/release-bundle/rollback-forbidden");
+        }
+
+        if (request is null
+            || string.IsNullOrWhiteSpace(generationId)
+            || !string.Equals(
+                request.TargetGenerationId,
+                generationId,
+                StringComparison.Ordinal))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release rollback rejected",
+                "the route generationId and rollback targetGenerationId must be present and match exactly.",
+                "https://chummer.run/problems/release-bundle/invalid-rollback-target");
+        }
+
+        try
+        {
+            ReleaseBundlePromotionResult result =
+                await _promotionService.RollbackToGenerationAsync(
+                    request,
+                    cancellationToken);
+            return Ok(result);
+        }
+        catch (ReleaseActivationOutcomeUnknownException)
+        {
+            return BuildPublicationOutcomeUnknown();
+        }
+        catch (ReleaseActivationAbortedException exception)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Release rollback aborted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/rollback-aborted");
+        }
+        catch (ReleaseShelfMutationConcurrencyException exception)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Release rollback conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/rollback-conflict");
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                          or InvalidOperationException
+                                          or JsonException
+                                          or NotSupportedException
+                                          or ArgumentException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release rollback rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-bundle/rollback-rejected");
+        }
+        catch (Exception exception) when (exception is IOException
+                                          or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release rollback unavailable",
+                "release rollback storage is unavailable.",
+                "https://chummer.run/problems/release-bundle/unavailable");
+        }
+    }
+
     [HttpPost("/api/internal/releases/stages/{stageReceiptId}/authority-advances")]
     [IgnoreAntiforgeryToken]
     [RequestSizeLimit(MaxReleaseAuthorityAdvanceRequestBodyBytes)]
@@ -182,9 +279,17 @@ public sealed class InternalReleaseBundlesController : ControllerBase
 
         try
         {
-            ReleaseShelfSnapshot target = _promotionService.CaptureStagedSnapshot(
-                stageReceiptId,
-                out string? expectedPredecessorPointerSha256);
+            ReleaseUploadCandidateSessionBinding? candidateBinding =
+                authorization.CandidateImportAuthority?.SessionBinding;
+            string? expectedPredecessorPointerSha256;
+            ReleaseShelfSnapshot target = candidateBinding is null
+                ? _promotionService.CaptureStagedSnapshot(
+                    stageReceiptId,
+                    out expectedPredecessorPointerSha256)
+                : _promotionService.CaptureStagedSnapshot(
+                    stageReceiptId,
+                    candidateBinding,
+                    out expectedPredecessorPointerSha256);
             if (!string.Equals(target.GenerationId, request.GenerationId, StringComparison.Ordinal))
             {
                 throw new InvalidDataException(
@@ -990,14 +1095,26 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 throw new InvalidDataException(
                     "staged activation request does not match the upload-session stage receipt.");
             }
+            ReleaseUploadCandidateSessionBinding? candidateBinding =
+                authorization.CandidateImportAuthority?.SessionBinding;
+            if (candidateBinding is not null
+                && activation.CandidateImportBinding != candidateBinding)
+            {
+                throw new ReleaseShelfMutationConcurrencyException(
+                    "staged activation session is not bound to the exact finalized native candidate authority.");
+            }
             if (activation.CompletedResult is { } completed)
             {
                 return Ok(completed);
             }
 
-            ReleaseBundlePromotionResult result =
-                await _promotionService.ActivateStagedGenerationAsync(
+            ReleaseBundlePromotionResult result = candidateBinding is null
+                ? await _promotionService.ActivateStagedGenerationAsync(
                     request,
+                    cancellationToken)
+                : await _promotionService.ActivateStagedGenerationAsync(
+                    request,
+                    candidateBinding,
                     cancellationToken);
             activation.MarkStagedActivated(result);
             return Ok(result);

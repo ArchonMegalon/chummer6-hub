@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Seal one upload candidate behind fresh finalized native-Windows proof.
+"""Seal one upload candidate behind exact publication and native-Windows proof.
 
 This command has no network or publication behavior.  It authenticates the
 candidate tree and the exact finalized UI evidence already in operator custody,
 then emits a bounded authority document whose embedded bytes can be placed in a
-digest-bound public-projection snapshot.
+digest-bound public-projection snapshot. Unsigned publication without a native
+root remains the stage-only v3 contract; an exact unsigned finalized native
+root emits the narrowly privileged owner-finalization v4 contract.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -20,10 +23,15 @@ import re
 import stat
 import tempfile
 from typing import Any, Iterable
+import zipfile
+import zlib
 
 
 AUTHORITY_CONTRACT = "chummer.release-upload.candidate-import-authority/v2"
 UNSIGNED_AUTHORITY_CONTRACT = "chummer.release-upload.candidate-import-authority/v3"
+UNSIGNED_NATIVE_AUTHORITY_CONTRACT = (
+    "chummer.release-upload.candidate-import-authority/v4"
+)
 INVENTORY_CONTRACT = "chummer.release-upload.candidate-inventory/v1"
 CAPTURE_CONTRACT = "chummer6-ui.preview-nightly-native-windows-capture"
 CAPTURE_INVENTORY_CONTRACT = "chummer6-ui.preview-nightly-native-windows-capture-inventory"
@@ -52,6 +60,12 @@ RETAINED_DESKTOP_HEADS = frozenset((*PROMOTED_HEADS, "blazor-desktop"))
 CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
 PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
+UNSIGNED_CAPTURE_WORKFLOW = (
+    ".github/workflows/unsigned-windows-preview-native-evidence-capture.yml"
+)
+UNSIGNED_FINALIZE_WORKFLOW = (
+    ".github/workflows/unsigned-windows-preview-native-evidence-finalize.yml"
+)
 UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 PRODUCER_REF = "refs/heads/main"
 RID = "win-x64"
@@ -78,6 +92,28 @@ UNSIGNED_SOURCE_CANONICAL_PATH = (
     "transport/source-publication/RELEASE_CHANNEL.generated.json"
 )
 UNSIGNED_SOURCE_COMPATIBILITY_PATH = "transport/source-publication/releases.json"
+UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE = (
+    "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZED_EVIDENCE.generated.json"
+)
+UNSIGNED_NATIVE_CAPTURE_FILE = (
+    "UNSIGNED_WINDOWS_PREVIEW_NATIVE_CAPTURE.generated.json"
+)
+UNSIGNED_NATIVE_CAPTURE_INVENTORY_FILE = (
+    "UNSIGNED_WINDOWS_PREVIEW_NATIVE_CAPTURE_INVENTORY.generated.json"
+)
+UNSIGNED_NATIVE_FINALIZATION_FILE = (
+    "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZATION.generated.json"
+)
+UNSIGNED_NATIVE_FINALIZED_INVENTORY_FILE = (
+    "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZED_INVENTORY.generated.json"
+)
+UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY = (
+    "candidate-provenance/"
+    "PREVIEW_NIGHTLY_UNSIGNED_CANDIDATE_CONTENT_INVENTORY.generated.json"
+)
+UNSIGNED_CANDIDATE_PROVENANCE_EXPORT = (
+    "candidate-provenance/PREVIEW_NIGHTLY_UNSIGNED_CANDIDATE_EXPORT.generated.json"
+)
 SIGNING_CONTRACT = "chummer6-ui.desktop_artifact_signing"
 AUTHENTICODE_CONTRACT = "chummer6-ui.windows-authenticode-verification"
 AUTHENTICODE_RECEIPT_PATH = (
@@ -1209,6 +1245,139 @@ def _scan_bundle_tree(
     return files, file_modes, directories, captured
 
 
+def _derive_unsigned_payload_executable(
+    bundle_root: Path,
+    *,
+    payload_path: str,
+    payload_row: dict[str, Any],
+) -> dict[str, Any]:
+    parts = _validate_relative_path(
+        payload_path,
+        label="unsigned candidate payload path",
+    ).split("/")
+    directory_flag = getattr(os, "O_DIRECTORY", 0)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", 0)
+    close_flag = getattr(os, "O_CLOEXEC", 0)
+    if directory_flag == 0 or nofollow_flag == 0:
+        _fail("payload ZIP custody requires openat no-follow support")
+    directory_descriptors: list[int] = []
+    payload_descriptor = -1
+    try:
+        current = os.open(
+            bundle_root,
+            os.O_RDONLY | directory_flag | nofollow_flag | close_flag,
+        )
+        directory_descriptors.append(current)
+        for part in parts[:-1]:
+            current = os.open(
+                part,
+                os.O_RDONLY | directory_flag | nofollow_flag | close_flag,
+                dir_fd=current,
+            )
+            directory_descriptors.append(current)
+        payload_descriptor = os.open(
+            parts[-1],
+            os.O_RDONLY | nofollow_flag | close_flag,
+            dir_fd=current,
+        )
+        before = os.fstat(payload_descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size != payload_row["sizeBytes"]
+        ):
+            _fail("unsigned candidate payload ZIP identity drifted")
+        digest = hashlib.sha256()
+        os.lseek(payload_descriptor, 0, os.SEEK_SET)
+        while True:
+            chunk = os.read(payload_descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        if digest.hexdigest() != payload_row["sha256"]:
+            _fail("unsigned candidate payload ZIP bytes drifted")
+
+        with os.fdopen(os.dup(payload_descriptor), "rb") as payload_handle:
+            try:
+                with zipfile.ZipFile(payload_handle, mode="r") as archive:
+                    executable_entries = [
+                        info
+                        for info in archive.infolist()
+                        if info.filename == "Chummer.Avalonia.exe"
+                    ]
+                    if len(executable_entries) != 1:
+                        _fail(
+                            "unsigned candidate payload ZIP must contain one "
+                            "exact Chummer.Avalonia.exe entry"
+                        )
+                    executable = executable_entries[0]
+                    if (
+                        executable.is_dir()
+                        or executable.flag_bits & 0x1
+                        or executable.file_size < 1
+                        or executable.file_size > 512 * 1024 * 1024
+                    ):
+                        _fail(
+                            "unsigned candidate payload executable entry drifted"
+                        )
+                    executable_digest = hashlib.sha256()
+                    executable_size = 0
+                    with archive.open(executable, mode="r") as entry:
+                        while True:
+                            chunk = entry.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            executable_size += len(chunk)
+                            if executable_size > executable.file_size:
+                                _fail(
+                                    "unsigned candidate payload executable "
+                                    "expanded beyond ZIP metadata"
+                                )
+                            executable_digest.update(chunk)
+                    if executable_size != executable.file_size:
+                        _fail(
+                            "unsigned candidate payload executable size drifted"
+                        )
+            except zipfile.BadZipFile as exc:
+                raise CandidateAuthorityBlocked(
+                    "unsigned candidate payload is not a valid ZIP"
+                ) from exc
+        after = os.fstat(payload_descriptor)
+        if (
+            before.st_dev,
+            before.st_ino,
+            before.st_mode,
+            before.st_nlink,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ):
+            _fail("unsigned candidate payload ZIP changed during inspection")
+        return {
+            "fileName": "Chummer.Avalonia.exe",
+            "payloadEntry": "Chummer.Avalonia.exe",
+            "sha256": executable_digest.hexdigest(),
+            "sizeBytes": executable_size,
+        }
+    except OSError as exc:
+        raise CandidateAuthorityBlocked(
+            "unsigned candidate payload ZIP could not be opened safely"
+        ) from exc
+    finally:
+        if payload_descriptor >= 0:
+            os.close(payload_descriptor)
+        for descriptor in reversed(directory_descriptors):
+            os.close(descriptor)
+
+
 def _matching_alias(value: dict[str, Any], first: str, second: str, *, label: str) -> str:
     if first in value and not isinstance(value[first], str):
         _fail(f"{label} alias type drifted")
@@ -1917,6 +2086,1709 @@ def _exact_tree_rows(root: Path, *, exclude: set[str]) -> list[dict[str, Any]]:
         if len(rows) > MAX_EVIDENCE_FILES:
             _fail("finalized native-Windows evidence file count is unbounded")
     return rows
+
+
+def _unsigned_native_source(
+    value: object,
+    *,
+    label: str,
+    workflow: str,
+) -> dict[str, Any]:
+    required = {
+        "repository",
+        "workflow",
+        "runId",
+        "runAttempt",
+        "ref",
+        "sha",
+        "actor",
+        "artifactName",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        _fail(f"{label} property set drifted")
+    if (
+        value.get("repository") != UI_REPOSITORY
+        or value.get("workflow") != workflow
+        or value.get("ref") != PRODUCER_REF
+        or not isinstance(value.get("sha"), str)
+        or COMMIT_RE.fullmatch(value["sha"]) is None
+    ):
+        _fail(f"{label} repository/workflow/source revision drifted")
+    run_id = _github_positive_integer(value.get("runId"), label=f"{label} runId")
+    run_attempt = _github_positive_integer(
+        value.get("runAttempt"), label=f"{label} runAttempt"
+    )
+    actor = value.get("actor")
+    artifact_name = value.get("artifactName")
+    if workflow == UNSIGNED_CAPTURE_WORKFLOW:
+        if actor != "github-actions[bot]":
+            _fail(f"{label} actor is invalid")
+        expected_artifact = (
+            f"unsigned-windows-preview-native-evidence-{run_id}-{run_attempt}"
+        )
+    else:
+        if not isinstance(actor, str) or REVIEWER_RE.fullmatch(actor) is None:
+            _fail(f"{label} actor is invalid")
+        expected_artifact = (
+            "unsigned-windows-preview-native-evidence-finalized-"
+            f"{run_id}-{run_attempt}"
+        )
+    if artifact_name != expected_artifact:
+        _fail(f"{label} artifact identity drifted")
+    return value
+
+
+def _decode_unsigned_native_files(
+    value: object,
+) -> tuple[list[dict[str, Any]], dict[str, bytes]]:
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > MAX_EVIDENCE_FILES
+    ):
+        _fail("unsigned native finalized files must be a bounded non-empty list")
+    rows: list[dict[str, Any]] = []
+    payloads: dict[str, bytes] = {}
+    for index, row in enumerate(value):
+        if not isinstance(row, dict) or set(row) != {
+            "path",
+            "sha256",
+            "sizeBytes",
+            "bytesBase64",
+        }:
+            _fail(f"unsigned native finalized file row {index} drifted")
+        path = _validate_relative_path(
+            row.get("path"),
+            label=f"unsigned native finalized file row {index} path",
+        )
+        digest = _sha256(
+            row.get("sha256"),
+            label=f"unsigned native finalized file row {index} sha256",
+        )
+        size = _positive_int(
+            row.get("sizeBytes"),
+            label=f"unsigned native finalized file row {index} sizeBytes",
+            allow_zero=True,
+        )
+        encoded = row.get("bytesBase64")
+        if not isinstance(encoded, str):
+            _fail(f"unsigned native finalized file row {index} bytes are missing")
+        try:
+            payload = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise CandidateAuthorityBlocked(
+                f"unsigned native finalized file row {index} is not strict base64"
+            ) from exc
+        if len(payload) != size or hashlib.sha256(payload).hexdigest() != digest:
+            _fail(
+                f"unsigned native finalized file row {index} byte binding drifted"
+            )
+        if path in payloads:
+            _fail("unsigned native finalized file paths are not unique")
+        rows.append({"path": path, "sha256": digest, "sizeBytes": size})
+        payloads[path] = payload
+    if rows != sorted(rows, key=lambda row: row["path"]):
+        _fail("unsigned native finalized file rows are not sorted")
+    return rows, payloads
+
+
+def _native_json(
+    payloads: dict[str, bytes],
+    path: str,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    payload = payloads.get(path)
+    if payload is None:
+        _fail(f"{label} is absent from finalized native custody")
+    return _strict_json_bytes(payload, label=label)
+
+
+def _native_payload_row(
+    payloads: dict[str, bytes],
+    path: str,
+) -> dict[str, Any]:
+    payload = payloads[path]
+    return {
+        "path": path,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "sizeBytes": len(payload),
+    }
+
+
+def _validate_native_policy(value: object, *, label: str) -> None:
+    if value != {
+        "authenticodeRequired": False,
+        "evidenceOnly": True,
+        "releaseChannel": "preview",
+        "signingRequirement": "preview_unsigned_allowed",
+    }:
+        _fail(f"{label} policy drifted")
+
+
+def _validate_native_no_authority(value: dict[str, Any], *, label: str) -> None:
+    if any(
+        value.get(field) is not False
+        for field in (
+            "deployAuthorized",
+            "publicationAuthorized",
+            "uiUploadAuthorized",
+            "uploadAuthorized",
+        )
+    ):
+        _fail(f"{label} gained publication authority")
+
+
+def _validate_native_full_source(
+    value: object,
+    projection: dict[str, Any],
+    *,
+    label: str,
+    expected_actor: str,
+) -> dict[str, Any]:
+    expected_keys = set(projection) | {"rerunPolicy", "triggeringActor"}
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        _fail(f"{label} source property set drifted")
+    if any(value.get(key) != projection[key] for key in projection):
+        _fail(f"{label} source differs from finalized provenance")
+    if (
+        value.get("rerunPolicy") != "same-actor-only"
+        or value.get("actor") != expected_actor
+        or value.get("triggeringActor") != expected_actor
+    ):
+        _fail(f"{label} actor or rerun policy drifted")
+    return value
+
+
+def _validate_native_byte_reference(
+    value: object,
+    *,
+    expected_path: str,
+    payloads: dict[str, bytes],
+    label: str,
+) -> dict[str, Any]:
+    reference = _byte_reference(
+        value,
+        label=label,
+        expected_path=expected_path,
+    )
+    if reference != _native_payload_row(payloads, expected_path):
+        _fail(f"{label} bytes drifted")
+    return reference
+
+
+def _validate_native_digest_reference(
+    value: object,
+    *,
+    expected_path: str,
+    payloads: dict[str, bytes],
+    label: str,
+) -> None:
+    if not isinstance(value, dict) or set(value) != {"path", "sha256"}:
+        _fail(f"{label} reference drifted")
+    if (
+        value.get("path") != expected_path
+        or _sha256(value.get("sha256"), label=f"{label} sha256")
+        != hashlib.sha256(payloads[expected_path]).hexdigest()
+    ):
+        _fail(f"{label} bytes drifted")
+
+
+def _validate_native_authenticode_reference(
+    value: object,
+    *,
+    expected_path: str,
+    payloads: dict[str, bytes],
+    label: str,
+) -> None:
+    if not isinstance(value, dict) or set(value) != {
+        "path",
+        "sha256",
+        "signatureStatus",
+        "signingRequired",
+        "sizeBytes",
+        "unsignedReason",
+    }:
+        _fail(f"{label} reference drifted")
+    if (
+        value.get("signatureStatus") != "unsigned"
+        or value.get("signingRequired") is not False
+        or value.get("unsignedReason") != "preview_policy"
+    ):
+        _fail(f"{label} unsigned policy drifted")
+    _validate_native_byte_reference(
+        {
+            key: value[key]
+            for key in ("path", "sha256", "sizeBytes")
+        },
+        expected_path=expected_path,
+        payloads=payloads,
+        label=label,
+    )
+
+
+def _validate_png(payload: bytes, *, label: str) -> tuple[int, int]:
+    if len(payload) < 57 or payload[:8] != b"\x89PNG\r\n\x1a\n":
+        _fail(f"{label} screenshot is not a complete PNG")
+    offset = 8
+    width = height = 0
+    bit_depth = color_type = -1
+    saw_ihdr = saw_idat = saw_iend = False
+    compressed = bytearray()
+    while offset < len(payload):
+        if offset + 12 > len(payload):
+            _fail(f"{label} PNG chunk framing drifted")
+        length = int.from_bytes(payload[offset : offset + 4], "big")
+        chunk_type = payload[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(payload):
+            _fail(f"{label} PNG chunk length drifted")
+        chunk_data = payload[data_start:data_end]
+        expected_crc = int.from_bytes(payload[data_end:crc_end], "big")
+        actual_crc = zlib.crc32(chunk_type)
+        actual_crc = zlib.crc32(chunk_data, actual_crc) & 0xFFFFFFFF
+        if expected_crc != actual_crc:
+            _fail(f"{label} PNG chunk CRC drifted")
+        if not saw_ihdr:
+            if chunk_type != b"IHDR" or length != 13:
+                _fail(f"{label} PNG IHDR drifted")
+            width = int.from_bytes(chunk_data[0:4], "big")
+            height = int.from_bytes(chunk_data[4:8], "big")
+            bit_depth = chunk_data[8]
+            color_type = chunk_data[9]
+            if (
+                chunk_data[10] != 0
+                or chunk_data[11] != 0
+                or chunk_data[12] != 0
+            ):
+                _fail(f"{label} PNG encoding mode drifted")
+            saw_ihdr = True
+        elif chunk_type == b"IHDR":
+            _fail(f"{label} PNG repeats IHDR")
+        elif chunk_type == b"IDAT":
+            if saw_iend:
+                _fail(f"{label} PNG data follows IEND")
+            saw_idat = True
+            compressed.extend(chunk_data)
+        elif chunk_type == b"IEND":
+            if length != 0 or not saw_idat or crc_end != len(payload):
+                _fail(f"{label} PNG IEND drifted")
+            saw_iend = True
+        offset = crc_end
+    if not saw_ihdr or not saw_idat or not saw_iend:
+        _fail(f"{label} PNG is incomplete")
+    if not 320 <= width <= 16_384 or not 200 <= height <= 16_384:
+        _fail(f"{label} screenshot PNG dimensions drifted")
+    channel_counts = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+    valid_depths = {
+        0: {1, 2, 4, 8, 16},
+        2: {8, 16},
+        3: {1, 2, 4, 8},
+        4: {8, 16},
+        6: {8, 16},
+    }
+    if color_type not in channel_counts or bit_depth not in valid_depths[color_type]:
+        _fail(f"{label} PNG color encoding drifted")
+    row_bytes = (
+        width * channel_counts[color_type] * bit_depth + 7
+    ) // 8
+    expected_decoded_size = (row_bytes + 1) * height
+    if expected_decoded_size > 256 * 1024 * 1024:
+        _fail(f"{label} PNG decoded size is unbounded")
+    try:
+        decompressor = zlib.decompressobj()
+        decoded = decompressor.decompress(
+            bytes(compressed),
+            expected_decoded_size + 1,
+        )
+        if (
+            len(decoded) > expected_decoded_size
+            or decompressor.unconsumed_tail
+        ):
+            _fail(f"{label} PNG decoded data exceeds its IHDR")
+        decoded += decompressor.flush(
+            expected_decoded_size + 1 - len(decoded)
+        )
+    except zlib.error as exc:
+        raise CandidateAuthorityBlocked(
+            f"{label} PNG image data is invalid"
+        ) from exc
+    if (
+        not decompressor.eof
+        or decompressor.unused_data
+        or len(decoded) != expected_decoded_size
+        or any(
+            decoded[offset] > 4
+            for offset in range(0, len(decoded), row_bytes + 1)
+        )
+    ):
+        _fail(f"{label} PNG decoded scanlines drifted")
+    return width, height
+
+
+def _validate_native_screenshot(
+    value: object,
+    *,
+    expected_path: str,
+    expected_role: str | None,
+    payloads: dict[str, bytes],
+    label: str,
+    include_dimensions: bool,
+) -> None:
+    expected_keys = {"path", "sha256"}
+    if expected_role is not None:
+        expected_keys.add("role")
+    if include_dimensions:
+        expected_keys.update({"width", "height"})
+    if not isinstance(value, dict) or set(value) != expected_keys:
+        _fail(f"{label} screenshot binding drifted")
+    if (
+        value.get("path") != expected_path
+        or _sha256(value.get("sha256"), label=f"{label} sha256")
+        != hashlib.sha256(payloads[expected_path]).hexdigest()
+        or expected_role is not None
+        and value.get("role") != expected_role
+    ):
+        _fail(f"{label} screenshot bytes drifted")
+    actual_width, actual_height = _validate_png(
+        payloads[expected_path],
+        label=label,
+    )
+    if include_dimensions:
+        width = _positive_int(value.get("width"), label=f"{label} width")
+        height = _positive_int(value.get("height"), label=f"{label} height")
+        if width != actual_width or height != actual_height:
+            _fail(f"{label} screenshot dimensions drifted")
+
+
+def _validate_native_host(value: object, *, label: str) -> None:
+    if not isinstance(value, dict) or set(value) not in (
+        {
+            "contractName",
+            "evidenceSource",
+            "hostPlatform",
+            "isNativeWindows",
+            "runner",
+            "status",
+        },
+        {
+            "contractName",
+            "evidenceSource",
+            "hostKernel",
+            "hostPlatform",
+            "isNativeWindows",
+            "runner",
+            "status",
+        },
+    ):
+        _fail(f"{label} native-host property set drifted")
+    if (
+        value.get("contractName") != "chummer6-ui.native_windows_host_evidence"
+        or value.get("evidenceSource") != "GitHub-hosted windows-latest"
+        or value.get("hostPlatform") != "windows"
+        or value.get("isNativeWindows") is not True
+        or value.get("runner") not in {"pwsh", "powershell.exe"}
+        or value.get("status") != "verified"
+    ):
+        _fail(f"{label} is not exact native-Windows evidence")
+    if "hostKernel" in value and (
+        not isinstance(value["hostKernel"], str) or not value["hostKernel"].strip()
+    ):
+        _fail(f"{label} native host kernel drifted")
+
+
+def _validate_native_inventory(
+    document: dict[str, Any],
+    *,
+    expected_contract: str,
+    expected_status: str,
+    expected_paths: set[str],
+    payloads: dict[str, bytes],
+    label: str,
+    extra_keys: set[str],
+) -> list[dict[str, Any]]:
+    if set(document) != {
+        "contractName",
+        "contractVersion",
+        "deployAuthorized",
+        "files",
+        "policy",
+        "publicationAuthorized",
+        "status",
+        "uiUploadAuthorized",
+        "uploadAuthorized",
+        *extra_keys,
+    }:
+        _fail(f"{label} property set drifted")
+    if (
+        document.get("contractName") != expected_contract
+        or type(document.get("contractVersion")) is not int
+        or document.get("contractVersion") != 1
+        or document.get("status") != expected_status
+    ):
+        _fail(f"{label} identity drifted")
+    _validate_native_policy(document.get("policy"), label=label)
+    _validate_native_no_authority(document, label=label)
+    rows = _inventory_rows(document.get("files"), label=label)
+    expected_rows = [
+        _native_payload_row(payloads, path)
+        for path in sorted(expected_paths)
+    ]
+    if rows != expected_rows:
+        _fail(f"{label} differs from exact finalized leaf bytes")
+    return rows
+
+
+def _validate_unsigned_native_logs(
+    payloads: dict[str, bytes],
+    *,
+    head: str,
+) -> None:
+    paths_and_markers = {
+        f"startup-smoke/startup-smoke-{head}-{RID}.log": [
+            "native startup passed"
+        ],
+        f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log": [
+            "candidate payload download passed"
+        ],
+        f"startup-smoke/windows-installer-progress-{head}-{RID}.log": [
+            "Bootstrap temp root:",
+            "Payload download target:",
+            "Downloading application files",
+            "Verifying payload size",
+            "Verifying payload checksum",
+            "Extracting application files",
+            "Install complete",
+        ],
+    }
+    for path, markers in paths_and_markers.items():
+        payload = payloads[path]
+        if not payload.endswith(b"\n") or len(payload) > 1024 * 1024:
+            _fail(f"unsigned native log {path} framing drifted")
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise CandidateAuthorityBlocked(
+                f"unsigned native log {path} is not UTF-8"
+            ) from exc
+        if any(
+            ord(character) < 0x20 and character not in "\r\n\t"
+            for character in text
+        ):
+            _fail(f"unsigned native log {path} contains control bytes")
+        offset = 0
+        for marker in markers:
+            marker_offset = text.find(marker, offset)
+            if marker_offset < 0:
+                _fail(f"unsigned native log {path} omits {marker!r}")
+            offset = marker_offset + len(marker)
+
+
+def _validate_unsigned_native_graph(
+    *,
+    payloads: dict[str, bytes],
+    scope: dict[str, Any],
+    content_rows: list[dict[str, Any]],
+    capture_source: dict[str, Any],
+    finalization_source: dict[str, Any],
+    reviewer: str,
+    capture_generated_at: object,
+    finalization_generated_at: object,
+    publication_source_sha: str,
+    expected_installed_executable: dict[str, Any] | None,
+    now: datetime,
+    max_age: timedelta,
+) -> dict[str, Any]:
+    capture = _native_json(
+        payloads,
+        UNSIGNED_NATIVE_CAPTURE_FILE,
+        label="unsigned native capture manifest",
+    )
+    capture_inventory = _native_json(
+        payloads,
+        UNSIGNED_NATIVE_CAPTURE_INVENTORY_FILE,
+        label="unsigned native capture inventory",
+    )
+    finalization = _native_json(
+        payloads,
+        UNSIGNED_NATIVE_FINALIZATION_FILE,
+        label="unsigned native finalization",
+    )
+    finalized_inventory = _native_json(
+        payloads,
+        UNSIGNED_NATIVE_FINALIZED_INVENTORY_FILE,
+        label="unsigned native finalized inventory",
+    )
+    visual_paths = {
+        f"UNSIGNED_WINDOWS_PREVIEW_VISUAL_PROOF-{head}-{RID}.generated.json"
+        for head in scope["heads"]
+    }
+    for head in scope["heads"]:
+        _validate_unsigned_native_logs(payloads, head=head)
+    finalized_paths = set(payloads) - {
+        UNSIGNED_NATIVE_FINALIZED_INVENTORY_FILE
+    }
+    _validate_native_inventory(
+        finalized_inventory,
+        expected_contract=(
+            "chummer6-ui.unsigned-preview-native-windows-finalized-inventory"
+        ),
+        expected_status="passed",
+        expected_paths=finalized_paths,
+        payloads=payloads,
+        label="unsigned native finalized inventory",
+        extra_keys={"captureInventorySha256", "finalization"},
+    )
+    capture_inventory_digest = hashlib.sha256(
+        payloads[UNSIGNED_NATIVE_CAPTURE_INVENTORY_FILE]
+    ).hexdigest()
+    if (
+        _sha256(
+            finalized_inventory.get("captureInventorySha256"),
+            label="unsigned finalized capture inventory sha256",
+        )
+        != capture_inventory_digest
+    ):
+        _fail("unsigned finalized inventory capture binding drifted")
+    _validate_native_byte_reference(
+        finalized_inventory.get("finalization"),
+        expected_path=UNSIGNED_NATIVE_FINALIZATION_FILE,
+        payloads=payloads,
+        label="unsigned finalized finalization",
+    )
+
+    capture_paths = finalized_paths - {
+        UNSIGNED_NATIVE_CAPTURE_INVENTORY_FILE,
+        UNSIGNED_NATIVE_FINALIZATION_FILE,
+        *visual_paths,
+    }
+    _validate_native_inventory(
+        capture_inventory,
+        expected_contract=(
+            "chummer6-ui.unsigned-preview-native-windows-capture-inventory"
+        ),
+        expected_status="captured",
+        expected_paths=capture_paths,
+        payloads=payloads,
+        label="unsigned native capture inventory",
+        extra_keys={"captureManifest"},
+    )
+    _validate_native_byte_reference(
+        capture_inventory.get("captureManifest"),
+        expected_path=UNSIGNED_NATIVE_CAPTURE_FILE,
+        payloads=payloads,
+        label="unsigned capture manifest",
+    )
+
+    finalization_keys = {
+        "accountableReviewConfirmed",
+        "authenticodeVerification",
+        "captureArtifact",
+        "captureInventorySha256",
+        "captureSource",
+        "confirmations",
+        "contractName",
+        "contractVersion",
+        "deployAuthorized",
+        "finalizationSource",
+        "generatedAt",
+        "policy",
+        "proofs",
+        "publicationAuthorized",
+        "reviewer",
+        "reviewerKind",
+        "reviewerWasCaptureActor",
+        "status",
+        "uiUploadAuthorized",
+        "uploadAuthorized",
+    }
+    if set(finalization) != finalization_keys:
+        _fail("unsigned native finalization property set drifted")
+    if (
+        finalization.get("contractName")
+        != "chummer6-ui.unsigned-preview-native-windows-finalization"
+        or type(finalization.get("contractVersion")) is not int
+        or finalization.get("contractVersion") != 1
+        or finalization.get("status") != "passed"
+        or finalization.get("accountableReviewConfirmed") is not True
+        or finalization.get("reviewer") != reviewer
+        or finalization.get("reviewerKind")
+        != "authenticated_account_owner_delegated_operator"
+        or finalization.get("reviewerWasCaptureActor") is not False
+        or finalization.get("generatedAt") != finalization_generated_at
+        or finalization.get("confirmations")
+        != {
+            "clipping": "passed",
+            "completion": "passed",
+            "contrast": "passed",
+            "progress": "passed",
+            "readability": "passed",
+            "startup": "passed",
+        }
+    ):
+        _fail("unsigned native accountable finalization drifted")
+    _validate_native_policy(finalization.get("policy"), label="unsigned finalization")
+    _validate_native_no_authority(finalization, label="unsigned finalization")
+    _validate_native_full_source(
+        finalization.get("captureSource"),
+        capture_source,
+        label="unsigned finalization capture",
+        expected_actor="github-actions[bot]",
+    )
+    _validate_native_full_source(
+        finalization.get("finalizationSource"),
+        finalization_source,
+        label="unsigned finalization reviewer",
+        expected_actor=reviewer,
+    )
+    if (
+        _sha256(
+            finalization.get("captureInventorySha256"),
+            label="unsigned finalization capture inventory sha256",
+        )
+        != capture_inventory_digest
+    ):
+        _fail("unsigned finalization capture inventory binding drifted")
+    capture_artifact = finalization.get("captureArtifact")
+    if (
+        not isinstance(capture_artifact, dict)
+        or set(capture_artifact) != {"id", "name", "sha256"}
+        or _positive_int(
+            int(capture_artifact["id"])
+            if isinstance(capture_artifact.get("id"), str)
+            and capture_artifact["id"].isdigit()
+            else capture_artifact.get("id"),
+            label="unsigned capture artifact id",
+        )
+        < 1
+        or capture_artifact.get("name") != capture_source["artifactName"]
+    ):
+        _fail("unsigned finalization capture artifact drifted")
+    _sha256(
+        capture_artifact.get("sha256"),
+        label="unsigned capture artifact sha256",
+    )
+    auth_path = (
+        "authenticode/"
+        "AUTHENTICODE_VERIFICATION-avalonia-win-x64.generated.json"
+    )
+    _validate_native_authenticode_reference(
+        finalization.get("authenticodeVerification"),
+        expected_path=auth_path,
+        payloads=payloads,
+        label="unsigned finalization Authenticode",
+    )
+    proofs = finalization.get("proofs")
+    if not isinstance(proofs, list) or len(proofs) != len(scope["heads"]):
+        _fail("unsigned finalization visual proof scope drifted")
+    for proof, head in zip(proofs, scope["heads"], strict=True):
+        expected_path = (
+            f"UNSIGNED_WINDOWS_PREVIEW_VISUAL_PROOF-{head}-{RID}.generated.json"
+        )
+        if not isinstance(proof, dict) or set(proof) != {
+            "headId",
+            "path",
+            "sha256",
+        }:
+            _fail("unsigned finalization visual proof binding drifted")
+        if (
+            proof.get("headId") != head
+            or proof.get("path") != expected_path
+            or _sha256(
+                proof.get("sha256"),
+                label="unsigned finalization visual proof sha256",
+            )
+            != hashlib.sha256(payloads[expected_path]).hexdigest()
+        ):
+            _fail("unsigned finalization visual proof bytes drifted")
+
+    capture_keys = {
+        "authenticodeVerification",
+        "candidate",
+        "captureMode",
+        "contractName",
+        "contractVersion",
+        "deployAuthorized",
+        "generatedAt",
+        "heads",
+        "nativeEvidence",
+        "policy",
+        "preservedCandidateFiles",
+        "publicationAuthorized",
+        "source",
+        "status",
+        "uiUploadAuthorized",
+        "uploadAuthorized",
+    }
+    if set(capture) != capture_keys:
+        _fail("unsigned native capture property set drifted")
+    if (
+        capture.get("contractName")
+        != "chummer6-ui.unsigned-preview-native-windows-capture"
+        or type(capture.get("contractVersion")) is not int
+        or capture.get("contractVersion") != 1
+        or capture.get("status") != "captured"
+        or capture.get("captureMode") != "hosted_native_windows"
+        or capture.get("generatedAt") != capture_generated_at
+    ):
+        _fail("unsigned native capture identity drifted")
+    _validate_native_policy(capture.get("policy"), label="unsigned capture")
+    _validate_native_no_authority(capture, label="unsigned capture")
+    capture_full_source = _validate_native_full_source(
+        capture.get("source"),
+        capture_source,
+        label="unsigned capture",
+        expected_actor="github-actions[bot]",
+    )
+    _validate_native_authenticode_reference(
+        capture.get("authenticodeVerification"),
+        expected_path=auth_path,
+        payloads=payloads,
+        label="unsigned capture Authenticode",
+    )
+
+    content_by_path = {row["path"]: row for row in content_rows}
+    capture_candidate = capture.get("candidate")
+    if not isinstance(capture_candidate, dict) or set(capture_candidate) != {
+        "artifact",
+        "compositionRequest",
+        "contentInventory",
+        "exportReceipt",
+        "installer",
+        "manifest",
+        "payload",
+        "platformScope",
+        "release",
+        "signature",
+        "source",
+        "sourceSha",
+        "validatedInventoryFileCount",
+        "validatedProposalSha256",
+        "validatedProposalSourceSha",
+    }:
+        _fail("unsigned capture candidate binding drifted")
+    if (
+        capture_candidate.get("platformScope") != "windows_only"
+        or capture_candidate.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
+        or capture_candidate.get("signature") != UNSIGNED_SIGNATURE_POLICY
+        or capture_candidate.get("sourceSha") != publication_source_sha
+        or capture_candidate.get("validatedProposalSourceSha")
+        != publication_source_sha
+        or capture_candidate.get("source")
+        != _native_json(
+            payloads,
+            UNSIGNED_CANDIDATE_PROVENANCE_EXPORT,
+            label="unsigned native candidate export receipt",
+        ).get("source")
+        or _positive_int(
+            capture_candidate.get("validatedInventoryFileCount"),
+            label="unsigned capture validated file count",
+        )
+        != len(content_rows)
+    ):
+        _fail("unsigned capture candidate identity drifted")
+    composition_row = content_by_path[UNSIGNED_COMPOSITION_FILE]
+    if (
+        capture_candidate.get("compositionRequest") != composition_row
+        or capture_candidate.get("validatedProposalSha256")
+        != composition_row["sha256"]
+    ):
+        _fail("unsigned capture composition custody drifted")
+    for property_name, document_path, binding_path in (
+        (
+            "contentInventory",
+            UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY,
+            "PREVIEW_NIGHTLY_UNSIGNED_CANDIDATE_CONTENT_INVENTORY.generated.json",
+        ),
+        (
+            "exportReceipt",
+            UNSIGNED_CANDIDATE_PROVENANCE_EXPORT,
+            "PREVIEW_NIGHTLY_UNSIGNED_CANDIDATE_EXPORT.generated.json",
+        ),
+    ):
+        expected = _native_payload_row(payloads, document_path)
+        expected["path"] = binding_path
+        if capture_candidate.get(property_name) != expected:
+            _fail(f"unsigned capture {property_name} custody drifted")
+    for property_name, content_path in (
+        (
+            "installer",
+            "publication/files/chummer-avalonia-win-x64-installer.exe",
+        ),
+        (
+            "payload",
+            "publication/files/chummer-avalonia-win-x64-payload.zip",
+        ),
+    ):
+        expected = {
+            **content_by_path[content_path],
+            "fileName": content_path.rsplit("/", 1)[1],
+        }
+        if capture_candidate.get(property_name) != expected:
+            _fail(f"unsigned capture candidate {property_name} drifted")
+    if (
+        capture_candidate.get("manifest")
+        != content_by_path["publication/RELEASE_CHANNEL.generated.json"]
+    ):
+        _fail("unsigned capture candidate source manifest drifted")
+
+    preserved = capture.get("preservedCandidateFiles")
+    expected_preserved = [
+        _native_payload_row(payloads, path)
+        for path in (
+            UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY,
+            UNSIGNED_CANDIDATE_PROVENANCE_EXPORT,
+        )
+    ]
+    if preserved != expected_preserved:
+        _fail("unsigned capture preserved candidate files drifted")
+
+    heads = capture.get("heads")
+    if not isinstance(heads, list) or len(heads) != len(scope["heads"]):
+        _fail("unsigned capture head scope drifted")
+    captured_screenshots: dict[str, list[dict[str, Any]]] = {}
+    for head_binding, head in zip(heads, scope["heads"], strict=True):
+        if not isinstance(head_binding, dict) or set(head_binding) != {
+            "authenticodeVerification",
+            "headId",
+            "installer",
+            "payload",
+            "progressLog",
+            "receipt",
+            "rid",
+            "screenshots",
+        }:
+            _fail("unsigned capture head property set drifted")
+        artifacts = scope["artifacts"][head]
+        if (
+            head_binding.get("headId") != head
+            or head_binding.get("rid") != RID
+            or head_binding.get("installer")
+            != {
+                key: artifacts["installer"][key]
+                for key in ("fileName", "sha256", "sizeBytes")
+            }
+            or head_binding.get("payload")
+            != {
+                key: artifacts["payload"][key]
+                for key in ("fileName", "sha256", "sizeBytes")
+            }
+        ):
+            _fail("unsigned capture head artifact binding drifted")
+        _validate_native_authenticode_reference(
+            head_binding.get("authenticodeVerification"),
+            expected_path=auth_path,
+            payloads=payloads,
+            label="unsigned capture head Authenticode",
+        )
+        receipt_path = f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"
+        progress_log_path = (
+            f"startup-smoke/windows-installer-progress-{head}-{RID}.log"
+        )
+        _validate_native_digest_reference(
+            head_binding.get("receipt"),
+            expected_path=receipt_path,
+            payloads=payloads,
+            label="unsigned capture startup receipt",
+        )
+        _validate_native_digest_reference(
+            head_binding.get("progressLog"),
+            expected_path=progress_log_path,
+            payloads=payloads,
+            label="unsigned capture progress log",
+        )
+        screenshots = head_binding.get("screenshots")
+        if not isinstance(screenshots, list) or len(screenshots) != 2:
+            _fail("unsigned capture installer screenshots drifted")
+        captured_screenshots[head] = screenshots
+        for screenshot, role in zip(
+            screenshots,
+            ("progress", "completion"),
+            strict=True,
+        ):
+            _validate_native_screenshot(
+                screenshot,
+                expected_path=(
+                    f"screenshots/windows-installer-{head}-{RID}-{role}.png"
+                ),
+                expected_role=role,
+                payloads=payloads,
+                label=f"unsigned capture {role}",
+                include_dimensions=True,
+            )
+
+    native_evidence = capture.get("nativeEvidence")
+    if not isinstance(native_evidence, dict) or set(native_evidence) != {
+        "authenticodeVerification",
+        "head",
+        "payloadHttpLog",
+        "screenshots",
+        "startupLog",
+        "startupVisual",
+    }:
+        _fail("unsigned capture native evidence property set drifted")
+    _validate_native_authenticode_reference(
+        native_evidence.get("authenticodeVerification"),
+        expected_path=auth_path,
+        payloads=payloads,
+        label="unsigned capture native Authenticode",
+    )
+    if native_evidence.get("head") != heads[0]:
+        _fail("unsigned capture native head differs from capture head")
+    head = scope["heads"][0]
+    for property_name, expected_path in (
+        (
+            "startupLog",
+            f"startup-smoke/startup-smoke-{head}-{RID}.log",
+        ),
+        (
+            "payloadHttpLog",
+            f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log",
+        ),
+    ):
+        _validate_native_byte_reference(
+            native_evidence.get(property_name),
+            expected_path=expected_path,
+            payloads=payloads,
+            label=f"unsigned capture {property_name}",
+        )
+    native_screenshots = native_evidence.get("screenshots")
+    if not isinstance(native_screenshots, list) or len(native_screenshots) != 3:
+        _fail("unsigned capture native screenshot scope drifted")
+    for screenshot, role, expected_path in zip(
+        native_screenshots,
+        ("startup", "progress", "completion"),
+        (
+            f"screenshots/windows-application-{head}-{RID}-startup.png",
+            f"screenshots/windows-installer-{head}-{RID}-progress.png",
+            f"screenshots/windows-installer-{head}-{RID}-completion.png",
+        ),
+        strict=True,
+    ):
+        _validate_native_screenshot(
+            screenshot,
+            expected_path=expected_path,
+            expected_role=role,
+            payloads=payloads,
+            label=f"unsigned capture native {role}",
+            include_dimensions=True,
+        )
+    if native_screenshots[1:] != captured_screenshots[head]:
+        _fail("unsigned capture native screenshots differ from head custody")
+    startup_visual_binding = native_evidence.get("startupVisual")
+    if not isinstance(startup_visual_binding, dict) or set(
+        startup_visual_binding
+    ) != {"installedExecutable", "receipt", "screenshot"}:
+        _fail("unsigned capture startup visual binding drifted")
+    startup_visual_path = (
+        f"startup-visual/windows-application-{head}-{RID}-startup.receipt.json"
+    )
+    _validate_native_byte_reference(
+        startup_visual_binding.get("receipt"),
+        expected_path=startup_visual_path,
+        payloads=payloads,
+        label="unsigned capture startup visual receipt",
+    )
+    expected_startup_visual_screenshot = {
+        key: native_screenshots[0][key]
+        for key in ("height", "path", "sha256", "width")
+    }
+    if (
+        startup_visual_binding.get("screenshot")
+        != expected_startup_visual_screenshot
+    ):
+        _fail("unsigned capture startup visual screenshot drifted")
+
+    authenticode = _native_json(
+        payloads,
+        auth_path,
+        label="unsigned Authenticode receipt",
+    )
+    if set(authenticode) != {
+        "artifact",
+        "contractName",
+        "contractVersion",
+        "generatedAt",
+        "nativeHostEvidence",
+        "signatureStatus",
+        "signingRequired",
+        "source",
+        "status",
+        "unsignedReason",
+        "verifier",
+    }:
+        _fail("unsigned Authenticode receipt property set drifted")
+    expected_installer = content_by_path[
+        "publication/files/chummer-avalonia-win-x64-installer.exe"
+    ]
+    if (
+        authenticode.get("contractName")
+        != "chummer6-ui.unsigned-preview-windows-authenticode-verification"
+        or type(authenticode.get("contractVersion")) is not int
+        or authenticode.get("contractVersion") != 1
+        or authenticode.get("status") != "verified"
+        or authenticode.get("signatureStatus") != "unsigned"
+        or authenticode.get("signingRequired") is not False
+        or authenticode.get("unsignedReason") != "preview_policy"
+        or authenticode.get("artifact")
+        != {
+            **expected_installer,
+            "fileName": expected_installer["path"].rsplit("/", 1)[1],
+        }
+    ):
+        _fail("unsigned Authenticode artifact or policy drifted")
+    _fresh_timestamp(
+        authenticode.get("generatedAt"),
+        label="unsigned Authenticode generatedAt",
+        now=now,
+        max_age=max_age,
+    )
+    _validate_native_full_source(
+        authenticode.get("source"),
+        capture_source,
+        label="unsigned Authenticode",
+        expected_actor="github-actions[bot]",
+    )
+    _validate_native_host(
+        authenticode.get("nativeHostEvidence"),
+        label="unsigned Authenticode",
+    )
+    if authenticode.get("verifier") != {
+        "authenticodeStatus": "NotSigned",
+        "implementation": "scripts/verify_unsigned_windows_preview_authenticode.ps1",
+        "platform": "windows",
+        "securityDirectoryEmpty": True,
+    }:
+        _fail("unsigned Authenticode verifier drifted")
+
+    startup = _native_json(
+        payloads,
+        f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json",
+        label="unsigned native startup receipt",
+    )
+    artifacts = scope["artifacts"][head]
+    if set(startup) != {
+        "artifactDigest",
+        "artifactFileName",
+        "bootstrapPayloadAcquisitionMode",
+        "bootstrapPayloadFileName",
+        "bootstrapPayloadSha256",
+        "bootstrapPayloadSizeBytes",
+        "channelId",
+        "executionEnvironment",
+        "headId",
+        "nativeHostEvidence",
+        "platform",
+        "readyCheckpoint",
+        "releaseVersion",
+        "rid",
+        "status",
+    } or (
+        startup.get("status") != "pass"
+        or startup.get("readyCheckpoint") != "pre_ui_event_loop"
+        or startup.get("executionEnvironment") != "native_windows"
+        or startup.get("headId") != head
+        or startup.get("platform") != "windows"
+        or startup.get("rid") != RID
+        or startup.get("releaseVersion") != scope["version"]
+        or startup.get("channelId") != scope["channel"]
+        or startup.get("artifactFileName")
+        != artifacts["installer"]["fileName"]
+        or startup.get("artifactDigest")
+        != f"sha256:{artifacts['installer']['sha256']}"
+        or startup.get("bootstrapPayloadAcquisitionMode") != "download"
+        or startup.get("bootstrapPayloadFileName")
+        != artifacts["payload"]["fileName"]
+        or startup.get("bootstrapPayloadSha256")
+        != artifacts["payload"]["sha256"]
+        or startup.get("bootstrapPayloadSizeBytes")
+        != artifacts["payload"]["sizeBytes"]
+    ):
+        _fail("unsigned native startup receipt drifted")
+    _validate_native_host(
+        startup.get("nativeHostEvidence"),
+        label="unsigned startup receipt",
+    )
+
+    startup_visual = _native_json(
+        payloads,
+        startup_visual_path,
+        label="unsigned startup visual receipt",
+    )
+    if set(startup_visual) != {
+        "candidate",
+        "contractName",
+        "contractVersion",
+        "generatedAtUtc",
+        "installedExecutable",
+        "nativeHostEvidence",
+        "source",
+        "startupScreenshot",
+        "status",
+    }:
+        _fail("unsigned startup visual property set drifted")
+    if (
+        startup_visual.get("contractName")
+        != "chummer6-ui.unsigned-preview-windows-startup-visual"
+        or type(startup_visual.get("contractVersion")) is not int
+        or startup_visual.get("contractVersion") != 1
+        or startup_visual.get("status") != "captured"
+    ):
+        _fail("unsigned startup visual identity drifted")
+    _fresh_timestamp(
+        startup_visual.get("generatedAtUtc"),
+        label="unsigned startup visual generatedAtUtc",
+        now=now,
+        max_age=max_age,
+    )
+    _validate_native_full_source(
+        startup_visual.get("source"),
+        capture_source,
+        label="unsigned startup visual",
+        expected_actor="github-actions[bot]",
+    )
+    _validate_native_host(
+        startup_visual.get("nativeHostEvidence"),
+        label="unsigned startup visual",
+    )
+    startup_candidate = startup_visual.get("candidate")
+    if not isinstance(startup_candidate, dict) or set(startup_candidate) != {
+        "installer",
+        "payload",
+        "release",
+        "signature",
+        "sourceSha",
+    } or (
+        startup_candidate.get("installer") != capture_candidate["installer"]
+        or startup_candidate.get("payload") != capture_candidate["payload"]
+        or startup_candidate.get("release") != capture_candidate["release"]
+        or startup_candidate.get("signature") != capture_candidate["signature"]
+        or startup_candidate.get("sourceSha") != publication_source_sha
+    ):
+        _fail("unsigned startup visual candidate binding drifted")
+    _validate_native_screenshot(
+        startup_visual.get("startupScreenshot"),
+        expected_path=f"screenshots/windows-application-{head}-{RID}-startup.png",
+        expected_role=None,
+        payloads=payloads,
+        label="unsigned startup visual",
+        include_dimensions=True,
+    )
+    installed_executable = startup_visual.get("installedExecutable")
+    if (
+        not isinstance(installed_executable, dict)
+        or set(installed_executable)
+        != {"fileName", "payloadEntry", "sha256", "sizeBytes"}
+        or not isinstance(installed_executable.get("fileName"), str)
+        or not installed_executable["fileName"]
+        or installed_executable.get("payloadEntry")
+        != installed_executable["fileName"]
+    ):
+        _fail("unsigned startup visual installed executable drifted")
+    _sha256(
+        installed_executable.get("sha256"),
+        label="unsigned startup executable sha256",
+    )
+    _positive_int(
+        installed_executable.get("sizeBytes"),
+        label="unsigned startup executable sizeBytes",
+    )
+    if (
+        expected_installed_executable is not None
+        and installed_executable != expected_installed_executable
+    ):
+        _fail(
+            "unsigned startup executable differs from exact candidate payload ZIP"
+        )
+    if startup_visual_binding.get("installedExecutable") != installed_executable:
+        _fail("unsigned capture startup executable binding drifted")
+
+    visual = _native_json(
+        payloads,
+        next(iter(visual_paths)),
+        label="unsigned native visual proof",
+    )
+    visual_keys = {
+        "artifactDigest",
+        "artifactFileName",
+        "authenticodeVerification",
+        "captureBinding",
+        "channel",
+        "channelId",
+        "checks",
+        "clippingReview",
+        "contractName",
+        "contractVersion",
+        "contrastReview",
+        "finalizationBinding",
+        "generatedAt",
+        "head",
+        "headId",
+        "platform",
+        "readabilityReview",
+        "releaseVersion",
+        "review",
+        "rid",
+        "screenshots",
+        "status",
+        "version",
+    }
+    if set(visual) != visual_keys or (
+        visual.get("contractName")
+        != "chummer6-ui.unsigned-preview-windows-installer-visual-proof"
+        or type(visual.get("contractVersion")) is not int
+        or visual.get("contractVersion") != 1
+        or visual.get("status") != "passed"
+        or visual.get("head") != head
+        or visual.get("headId") != head
+        or visual.get("platform") != "windows"
+        or visual.get("rid") != RID
+        or visual.get("version") != scope["version"]
+        or visual.get("releaseVersion") != scope["version"]
+        or visual.get("channel") != scope["channel"]
+        or visual.get("channelId") != scope["channel"]
+        or visual.get("artifactFileName")
+        != artifacts["installer"]["fileName"]
+        or visual.get("artifactDigest")
+        != f"sha256:{artifacts['installer']['sha256']}"
+        or visual.get("generatedAt") != finalization_generated_at
+    ):
+        _fail("unsigned native visual proof identity drifted")
+    if visual.get("checks") != {
+        "accountable_review_confirmed": True,
+        "capture_mode": "hosted_native_windows",
+    }:
+        _fail("unsigned native visual checks drifted")
+    for property_name in (
+        "clippingReview",
+        "contrastReview",
+        "readabilityReview",
+    ):
+        if visual.get(property_name) != {
+            "reviewer": reviewer,
+            "status": "passed",
+        }:
+            _fail(f"unsigned native {property_name} drifted")
+    review = visual.get("review")
+    if not isinstance(review, dict) or set(review) != {
+        "allowlistSource",
+        "authenticatedReviewer",
+        "captureActor",
+        "explicitConfirmations",
+    } or (
+        review.get("allowlistSource")
+        != "pinned contract identity plus protected environment and authenticated workflow actor"
+        or review.get("authenticatedReviewer") != reviewer
+        or review.get("captureActor") != "github-actions[bot]"
+        or review.get("explicitConfirmations") != finalization["confirmations"]
+    ):
+        _fail("unsigned native visual review authority drifted")
+    capture_binding = visual.get("captureBinding")
+    expected_capture_binding = {
+        key: capture_full_source[key]
+        for key in (
+            "artifactName",
+            "ref",
+            "repository",
+            "rerunPolicy",
+            "runAttempt",
+            "runId",
+            "sha",
+            "triggeringActor",
+            "workflow",
+        )
+    }
+    expected_capture_binding["inventorySha256"] = capture_inventory_digest
+    if capture_binding != expected_capture_binding:
+        _fail("unsigned visual capture binding drifted")
+    if visual.get("finalizationBinding") != finalization["finalizationSource"]:
+        _fail("unsigned visual finalization binding drifted")
+    _validate_native_authenticode_reference(
+        visual.get("authenticodeVerification"),
+        expected_path=auth_path,
+        payloads=payloads,
+        label="unsigned visual Authenticode",
+    )
+    visual_screenshots = visual.get("screenshots")
+    if not isinstance(visual_screenshots, list) or len(visual_screenshots) != 3:
+        _fail("unsigned visual screenshot scope drifted")
+    for screenshot, role, expected_path in zip(
+        visual_screenshots,
+        ("startup", "progress", "completion"),
+        (
+            f"screenshots/windows-application-{head}-{RID}-startup.png",
+            f"screenshots/windows-installer-{head}-{RID}-progress.png",
+            f"screenshots/windows-installer-{head}-{RID}-completion.png",
+        ),
+        strict=True,
+    ):
+        _validate_native_screenshot(
+            screenshot,
+            expected_path=expected_path,
+            expected_role=role,
+            payloads=payloads,
+            label=f"unsigned visual {role}",
+            include_dimensions=False,
+        )
+    return {
+        "capture": capture,
+        "captureInventory": capture_inventory,
+        "finalization": finalization,
+        "finalizedInventory": finalized_inventory,
+        "authenticode": authenticode,
+        "startup": startup,
+        "startupVisual": startup_visual,
+        "visualProof": visual,
+    }
+
+
+def _validate_unsigned_native_evidence(
+    root: Path,
+    *,
+    candidate_rows: list[dict[str, Any]],
+    source_canonical_bytes: bytes,
+    source_compatibility_bytes: bytes,
+    expected_content_rows: list[dict[str, Any]] | None = None,
+    expected_installed_executable: dict[str, Any] | None = None,
+    scope: dict[str, Any],
+    publication_source_sha: str,
+    now: datetime,
+    max_age: timedelta,
+) -> tuple[dict[str, Any], datetime]:
+    if root.is_symlink() or not root.is_dir():
+        _fail("unsigned finalized native-Windows evidence root must be a real directory")
+    outer, outer_bytes = _strict_json(
+        root / UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE,
+        label="unsigned finalized native-Windows evidence",
+    )
+    if set(outer) != {
+        "status",
+        "captureGeneratedAtUtc",
+        "finalizationGeneratedAtUtc",
+        "reviewer",
+        "captureSource",
+        "finalizationSource",
+        "candidateContentInventorySha256",
+        "candidateContentInventory",
+        "files",
+    } or outer.get("status") != "passed":
+        _fail("unsigned finalized native-Windows evidence contract drifted")
+
+    captured_at = _fresh_timestamp(
+        outer.get("captureGeneratedAtUtc"),
+        label="unsigned native captureGeneratedAtUtc",
+        now=now,
+        max_age=max_age,
+    )
+    finalized_at = _fresh_timestamp(
+        outer.get("finalizationGeneratedAtUtc"),
+        label="unsigned native finalizationGeneratedAtUtc",
+        now=now,
+        max_age=max_age,
+    )
+    if finalized_at < captured_at:
+        _fail("unsigned native finalization predates capture")
+    reviewer = outer.get("reviewer")
+    if (
+        not isinstance(reviewer, str)
+        or REVIEWER_RE.fullmatch(reviewer) is None
+        or reviewer != UI_REPOSITORY.split("/", 1)[0]
+    ):
+        _fail("unsigned native reviewer is invalid")
+    capture_source = _unsigned_native_source(
+        outer.get("captureSource"),
+        label="unsigned native capture source",
+        workflow=UNSIGNED_CAPTURE_WORKFLOW,
+    )
+    finalization_source = _unsigned_native_source(
+        outer.get("finalizationSource"),
+        label="unsigned native finalization source",
+        workflow=UNSIGNED_FINALIZE_WORKFLOW,
+    )
+    if (
+        finalization_source["actor"] != reviewer
+        or capture_source["actor"] == reviewer
+        or capture_source["sha"] != finalization_source["sha"]
+    ):
+        _fail("unsigned native finalized source/reviewer authority drifted")
+
+    rows, payloads = _decode_unsigned_native_files(outer.get("files"))
+    expected_paths = {
+        UNSIGNED_NATIVE_CAPTURE_FILE,
+        UNSIGNED_NATIVE_CAPTURE_INVENTORY_FILE,
+        UNSIGNED_NATIVE_FINALIZATION_FILE,
+        UNSIGNED_NATIVE_FINALIZED_INVENTORY_FILE,
+        UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY,
+        UNSIGNED_CANDIDATE_PROVENANCE_EXPORT,
+    }
+    for head in scope["heads"]:
+        expected_paths.update(
+            {
+                f"UNSIGNED_WINDOWS_PREVIEW_VISUAL_PROOF-{head}-{RID}.generated.json",
+                f"authenticode/AUTHENTICODE_VERIFICATION-{head}-{RID}.generated.json",
+                f"screenshots/windows-application-{head}-{RID}-startup.png",
+                f"screenshots/windows-installer-{head}-{RID}-completion.png",
+                f"screenshots/windows-installer-{head}-{RID}-progress.png",
+                f"startup-smoke/startup-smoke-{head}-{RID}.log",
+                f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json",
+                f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log",
+                f"startup-smoke/windows-installer-progress-{head}-{RID}.log",
+                f"startup-visual/windows-application-{head}-{RID}-startup.receipt.json",
+            }
+        )
+    if set(payloads) != expected_paths:
+        _fail("unsigned native finalized evidence file scope drifted")
+
+    actual_tree = _exact_tree_rows(root, exclude=set())
+    expected_tree = sorted(
+        [
+            *rows,
+            {
+                "path": UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE,
+                "sha256": hashlib.sha256(outer_bytes).hexdigest(),
+                "sizeBytes": len(outer_bytes),
+            },
+        ],
+        key=lambda row: row["path"],
+    )
+    if actual_tree != expected_tree:
+        _fail("unsigned native finalized evidence differs from its exact disk tree")
+
+    inventory_path = UNSIGNED_CANDIDATE_PROVENANCE_INVENTORY
+    inventory_raw = payloads[inventory_path]
+    inventory_digest = hashlib.sha256(inventory_raw).hexdigest()
+    if (
+        _sha256(
+            outer.get("candidateContentInventorySha256"),
+            label="unsigned native candidate content inventory sha256",
+        )
+        != inventory_digest
+    ):
+        _fail("unsigned native candidate content inventory digest drifted")
+    content_inventory = _strict_json_bytes(
+        inventory_raw,
+        label="unsigned native candidate content inventory",
+    )
+    if outer.get("candidateContentInventory") != content_inventory:
+        _fail("unsigned native candidate content inventory document drifted")
+    if (
+        set(content_inventory)
+        != {
+            "contractName",
+            "contractVersion",
+            "crossRunBitReproducible",
+            "files",
+            "platformScope",
+            "release",
+            "signature",
+            "sourceSha",
+        }
+        or content_inventory.get("contractName")
+        != "chummer6-ui.preview-nightly-unsigned-candidate-content-inventory"
+        or type(content_inventory.get("contractVersion")) is not int
+        or content_inventory.get("contractVersion") != 1
+        or content_inventory.get("crossRunBitReproducible") is not False
+        or content_inventory.get("platformScope") != "windows_only"
+        or content_inventory.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
+        or content_inventory.get("signature") != UNSIGNED_SIGNATURE_POLICY
+        or content_inventory.get("sourceSha") != publication_source_sha
+    ):
+        _fail("unsigned native candidate content inventory contract drifted")
+    content_rows = _inventory_rows(
+        content_inventory.get("files"),
+        label="unsigned native candidate content inventory",
+    )
+    content_by_path = {row["path"]: row for row in content_rows}
+    candidate_by_path = {row["path"]: row for row in candidate_rows}
+    expected_content_paths = {
+        UNSIGNED_COMPOSITION_FILE,
+        *UNSIGNED_PROVENANCE_PATHS.values(),
+        "publication/RELEASE_CHANNEL.generated.json",
+        "publication/releases.json",
+    }
+    for head in scope["heads"]:
+        installer = scope["artifacts"][head]["installer"]["path"]
+        payload = scope["artifacts"][head]["payload"]["path"]
+        expected_content_paths.update(
+            {
+                f"publication/{installer}",
+                f"publication/{payload}",
+                f"publication/{payload}.json",
+            }
+        )
+    if set(content_by_path) != expected_content_paths:
+        _fail("unsigned native candidate content path scope drifted")
+    if expected_content_rows is not None:
+        validated_expected_content_rows = _inventory_rows(
+            expected_content_rows,
+            label="expected unsigned native candidate content",
+        )
+        if content_rows != validated_expected_content_rows:
+            _fail(
+                "unsigned native candidate content differs from exact v3 "
+                "and candidate custody"
+            )
+    expected_source_mapping: dict[str, bytes] = {
+        "publication/RELEASE_CHANNEL.generated.json": source_canonical_bytes,
+        "publication/releases.json": source_compatibility_bytes,
+    }
+    for content_path, source_bytes in expected_source_mapping.items():
+        if content_by_path.get(content_path) != {
+            "path": content_path,
+            "sha256": hashlib.sha256(source_bytes).hexdigest(),
+            "sizeBytes": len(source_bytes),
+        }:
+            _fail(
+                "unsigned native evidence differs from preserved source "
+                "publication bytes"
+            )
+    expected_candidate_mapping: dict[str, str] = {}
+    for head in scope["heads"]:
+        installer = scope["artifacts"][head]["installer"]["path"]
+        payload = scope["artifacts"][head]["payload"]["path"]
+        expected_candidate_mapping[f"publication/{installer}"] = installer
+        expected_candidate_mapping[f"publication/{payload}"] = payload
+        expected_candidate_mapping[f"publication/{payload}.json"] = f"{payload}.json"
+    for content_path, candidate_path in expected_candidate_mapping.items():
+        candidate_row = candidate_by_path.get(candidate_path)
+        if candidate_row is None or content_by_path.get(content_path) != {
+            "path": content_path,
+            "sha256": candidate_row["sha256"],
+            "sizeBytes": candidate_row["sizeBytes"],
+        }:
+            _fail("unsigned native evidence differs from candidate upload bytes")
+
+    export_raw = payloads[UNSIGNED_CANDIDATE_PROVENANCE_EXPORT]
+    export = _strict_json_bytes(
+        export_raw,
+        label="unsigned native candidate export receipt",
+    )
+    exported_rows = _inventory_rows(
+        export.get("exportedContent"),
+        label="unsigned native candidate export content",
+    )
+    if (
+        set(export)
+        != {
+            "compositionRequest",
+            "contractName",
+            "contractVersion",
+            "crossRunBitReproducible",
+            "deployAuthorized",
+            "exportedContent",
+            "githubArtifactTransport",
+            "inventory",
+            "platformScope",
+            "publicationAuthorized",
+            "release",
+            "runnerNonce",
+            "signature",
+            "source",
+            "status",
+            "uiUploadAuthorized",
+            "uploadAuthorized",
+        }
+        or export.get("contractName")
+        != "chummer6-ui.preview-nightly-unsigned-candidate-export"
+        or type(export.get("contractVersion")) is not int
+        or export.get("contractVersion") != 1
+        or export.get("status") != "exported"
+        or export.get("crossRunBitReproducible") is not False
+        or export.get("platformScope") != "windows_only"
+        or export.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
+        or export.get("signature") != UNSIGNED_SIGNATURE_POLICY
+        or exported_rows != content_rows
+        or export.get("githubArtifactTransport") != "ephemeral_candidate_only"
+        or any(
+            export.get(field) is not False
+            for field in (
+                "deployAuthorized",
+                "publicationAuthorized",
+                "uiUploadAuthorized",
+                "uploadAuthorized",
+            )
+        )
+    ):
+        _fail("unsigned native candidate export receipt contract drifted")
+    inventory_reference = export.get("inventory")
+    if (
+        not isinstance(inventory_reference, dict)
+        or set(inventory_reference) != {"path", "sha256", "sizeBytes"}
+        or inventory_reference.get("path")
+        != "PREVIEW_NIGHTLY_UNSIGNED_CANDIDATE_CONTENT_INVENTORY.generated.json"
+        or _sha256(
+            inventory_reference.get("sha256"),
+            label="unsigned native candidate export inventory sha256",
+        )
+        != inventory_digest
+        or _positive_int(
+            inventory_reference.get("sizeBytes"),
+            label="unsigned native candidate export inventory sizeBytes",
+        )
+        != len(inventory_raw)
+    ):
+        _fail("unsigned native candidate export inventory binding drifted")
+    export_source = export.get("source")
+    if (
+        not isinstance(export_source, dict)
+        or set(export_source)
+        != {"actor", "ref", "repository", "runAttempt", "runId", "sha", "workflow"}
+        or export_source.get("repository") != UI_REPOSITORY
+        or export_source.get("ref") != PRODUCER_REF
+        or export_source.get("workflow")
+        != ".github/workflows/unsigned-windows-preview-nightly-candidate-export.yml"
+        or not isinstance(export_source.get("actor"), str)
+        or REVIEWER_RE.fullmatch(export_source["actor"]) is None
+        or not isinstance(export_source.get("sha"), str)
+        or COMMIT_RE.fullmatch(export_source["sha"]) is None
+        or content_inventory.get("sourceSha") != export_source["sha"]
+        or export_source["sha"] != publication_source_sha
+    ):
+        _fail("unsigned native candidate export source drifted")
+    _github_positive_integer(
+        export_source.get("runId"),
+        label="unsigned native candidate export source runId",
+    )
+    _github_positive_integer(
+        export_source.get("runAttempt"),
+        label="unsigned native candidate export source runAttempt",
+    )
+    runner_nonce = export.get("runnerNonce")
+    if (
+        not isinstance(runner_nonce, str)
+        or re.fullmatch(r"^[a-z0-9]{12,64}$", runner_nonce) is None
+    ):
+        _fail("unsigned native candidate export runner nonce drifted")
+    composition_reference = export.get("compositionRequest")
+    composition_row = content_by_path[UNSIGNED_COMPOSITION_FILE]
+    if composition_reference != composition_row:
+        _fail("unsigned native candidate export composition custody drifted")
+    validated_graph = _validate_unsigned_native_graph(
+        payloads=payloads,
+        scope=scope,
+        content_rows=content_rows,
+        capture_source=capture_source,
+        finalization_source=finalization_source,
+        reviewer=reviewer,
+        capture_generated_at=outer.get("captureGeneratedAtUtc"),
+        finalization_generated_at=outer.get("finalizationGeneratedAtUtc"),
+        publication_source_sha=publication_source_sha,
+        expected_installed_executable=expected_installed_executable,
+        now=now,
+        max_age=max_age,
+    )
+    if (
+        validated_graph["capture"].get("status") != "captured"
+        or validated_graph["finalization"].get("status") != "passed"
+        or validated_graph["visualProof"].get("status") != "passed"
+    ):
+        _fail("unsigned native validated graph lost its terminal posture")
+    return outer, min(captured_at, finalized_at)
 
 
 def _source(value: object, *, label: str, workflow: str) -> dict[str, Any]:
@@ -6180,6 +8052,60 @@ def _atomic_write(path: Path, payload: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _build_candidate_authority(
+    *,
+    unsigned_preview: bool,
+    unsigned_native_bridge: bool,
+    now: datetime,
+    expires_at: datetime,
+    candidate: dict[str, Any],
+    custody: dict[str, Any],
+) -> dict[str, Any]:
+    if unsigned_native_bridge and not unsigned_preview:
+        _fail("owner native finalization bridge requires unsigned preview authority")
+    authority: dict[str, Any] = {
+        "contractName": (
+            UNSIGNED_NATIVE_AUTHORITY_CONTRACT
+            if unsigned_native_bridge
+            else UNSIGNED_AUTHORITY_CONTRACT
+            if unsigned_preview
+            else AUTHORITY_CONTRACT
+        ),
+        "contractVersion": (
+            4 if unsigned_native_bridge else 3 if unsigned_preview else 2
+        ),
+        "status": "candidate_import_ready",
+        "candidateImportAuthority": True,
+        "candidateReviewAuthority": True,
+        "publicationEligible": False,
+        "releaseUploadAuthority": False,
+        "deployAuthority": False,
+        "routeAuthority": False,
+        "exactIncomingDesktopScope": EXACT_SCOPE_TUPLE,
+        "generatedAtUtc": now.isoformat().replace("+00:00", "Z"),
+        "expiresAtUtc": expires_at.isoformat().replace("+00:00", "Z"),
+        "candidate": candidate,
+        "custody": custody,
+    }
+    if unsigned_preview:
+        authority.update(
+            {
+                "publicationAuthorized": False,
+                "codeDeploymentAuthority": False,
+                "platformScope": "windows_only",
+                "crossRunBitReproducible": False,
+                "signaturePolicy": {
+                    "signatureStatus": "unsigned",
+                    "signingRequired": False,
+                    "unsignedReason": "preview_policy",
+                },
+            }
+        )
+        if unsigned_native_bridge:
+            authority["ownerNativeFinalizationBridgeAuthority"] = True
+    return authority
+
+
 def materialize(args: argparse.Namespace) -> dict[str, Any]:
     bundle_root = Path(args.bundle_root).resolve(strict=True)
     if not bundle_root.is_dir() or bundle_root.is_symlink():
@@ -6291,6 +8217,10 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
     ):
         _fail("candidate authority freshness budget exceeds its hard maximum")
 
+    unsigned_native_bridge = (
+        unsigned_preview
+        and bool(str(args.windows_finalized_root).strip())
+    )
     native_evidence: dict[str, Any] | None = None
     native_custody_files: list[tuple[str, bytes]] = []
     if unsigned_preview:
@@ -6374,6 +8304,117 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             scope=publication_scope,
         )
         publication_files.extend(candidate_validation["sourceFiles"])
+        if unsigned_native_bridge:
+            publication_file_by_path = dict(publication_files)
+            source_canonical_bytes = publication_file_by_path.get(
+                UNSIGNED_SOURCE_CANONICAL_PATH
+            )
+            source_compatibility_bytes = publication_file_by_path.get(
+                UNSIGNED_SOURCE_COMPATIBILITY_PATH
+            )
+            if (
+                source_canonical_bytes is None
+                or source_compatibility_bytes is None
+            ):
+                _fail(
+                    "unsigned v4 authority requires preserved source "
+                    "publication manifests"
+                )
+            expected_content_bytes: dict[str, bytes] = {
+                UNSIGNED_COMPOSITION_FILE: candidate_validation["compositionRaw"],
+                "publication/RELEASE_CHANNEL.generated.json":
+                    source_canonical_bytes,
+                "publication/releases.json": source_compatibility_bytes,
+            }
+            for provenance_path in UNSIGNED_PROVENANCE_PATHS.values():
+                provenance_bytes = publication_file_by_path.get(provenance_path)
+                if provenance_bytes is None:
+                    _fail(
+                        "unsigned v4 authority requires exact candidate "
+                        f"provenance bytes for {provenance_path}"
+                    )
+                expected_content_bytes[provenance_path] = provenance_bytes
+            expected_content_rows = [
+                {
+                    "path": path,
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "sizeBytes": len(payload),
+                }
+                for path, payload in expected_content_bytes.items()
+            ]
+            candidate_row_by_path = {
+                row["path"]: row
+                for row in candidate_rows
+            }
+            for head in scope["heads"]:
+                installer_path = scope["artifacts"][head]["installer"]["path"]
+                payload_path = scope["artifacts"][head]["payload"]["path"]
+                for candidate_path in (
+                    installer_path,
+                    payload_path,
+                    f"{payload_path}.json",
+                ):
+                    candidate_row = candidate_row_by_path.get(candidate_path)
+                    if candidate_row is None:
+                        _fail(
+                            "unsigned v4 authority requires exact candidate "
+                            f"bytes for {candidate_path}"
+                        )
+                    expected_content_rows.append(
+                        {
+                            **candidate_row,
+                            "path": f"publication/{candidate_path}",
+                        }
+                    )
+            expected_content_rows.sort(key=lambda row: row["path"])
+            payload_path = scope["artifacts"][scope["heads"][0]]["payload"][
+                "path"
+            ]
+            expected_installed_executable = _derive_unsigned_payload_executable(
+                bundle_root,
+                payload_path=payload_path,
+                payload_row=candidate_row_by_path[payload_path],
+            )
+            stage_native_root = stage_root / "proof" / "windows-native"
+            if stage_native_root.is_symlink():
+                _fail(
+                    "publication-stage unsigned Windows native evidence root "
+                    "must not be a symlink"
+                )
+            stage_native_root = stage_native_root.resolve(strict=True)
+            configured_native_root = Path(args.windows_finalized_root).resolve(
+                strict=True
+            )
+            if configured_native_root != stage_native_root:
+                _fail(
+                    "unsigned Windows finalized root must be publication-stage "
+                    "proof/windows-native"
+                )
+            native_evidence, oldest_native_proof = (
+                _validate_unsigned_native_evidence(
+                    stage_native_root,
+                    candidate_rows=candidate_rows,
+                    source_canonical_bytes=source_canonical_bytes,
+                    source_compatibility_bytes=source_compatibility_bytes,
+                    expected_content_rows=expected_content_rows,
+                    expected_installed_executable=(
+                        expected_installed_executable
+                    ),
+                    scope=scope,
+                    publication_source_sha=publication_evidence["sourceSha"],
+                    now=now,
+                    max_age=timedelta(seconds=max_age_seconds),
+                )
+            )
+            expires_at = min(
+                expires_at,
+                oldest_native_proof + timedelta(seconds=max_age_seconds),
+            )
+            if expires_at <= now + timedelta(minutes=1):
+                _fail(
+                    "fresh unsigned native-Windows evidence has insufficient "
+                    "remaining authority lifetime"
+                )
     else:
         _validate_registry_candidate_receipt(
             registry_candidate,
@@ -6430,6 +8471,13 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             scope_raw=publication_scope_bytes,
             stage_evidence_files=publication_files,
         )
+    if unsigned_native_bridge:
+        publication_files.append(
+            (
+                UNSIGNED_COMPOSITION_FILE,
+                candidate_validation["compositionRaw"],
+            )
+        )
 
     (
         final_candidate_rows,
@@ -6472,6 +8520,12 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
                 for path, payload in sorted(publication_files)
             ],
         }
+        if unsigned_native_bridge:
+            if native_evidence is None:
+                _fail(
+                    "unsigned v4 native evidence disappeared before custody sealing"
+                )
+            custody["nativeWindowsFinalizedEvidence"] = native_evidence
     else:
         if native_evidence is None:
             _fail("signed v2 native evidence disappeared before custody sealing")
@@ -6490,38 +8544,14 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
             ],
         }
 
-    authority: dict[str, Any] = {
-        "contractName": (
-            UNSIGNED_AUTHORITY_CONTRACT if unsigned_preview else AUTHORITY_CONTRACT
-        ),
-        "contractVersion": 3 if unsigned_preview else 2,
-        "status": "candidate_import_ready",
-        "candidateImportAuthority": True,
-        "candidateReviewAuthority": True,
-        "publicationEligible": False,
-        "releaseUploadAuthority": False,
-        "deployAuthority": False,
-        "routeAuthority": False,
-        "exactIncomingDesktopScope": EXACT_SCOPE_TUPLE,
-        "generatedAtUtc": now.isoformat().replace("+00:00", "Z"),
-        "expiresAtUtc": expires_at.isoformat().replace("+00:00", "Z"),
-        "candidate": candidate,
-        "custody": custody,
-    }
-    if unsigned_preview:
-        authority.update(
-            {
-                "publicationAuthorized": False,
-                "codeDeploymentAuthority": False,
-                "platformScope": "windows_only",
-                "crossRunBitReproducible": False,
-                "signaturePolicy": {
-                    "signatureStatus": "unsigned",
-                    "signingRequired": False,
-                    "unsignedReason": "preview_policy",
-                },
-            }
-        )
+    authority = _build_candidate_authority(
+        unsigned_preview=unsigned_preview,
+        unsigned_native_bridge=unsigned_native_bridge,
+        now=now,
+        expires_at=expires_at,
+        candidate=candidate,
+        custody=custody,
+    )
     rendered = (
         json.dumps(authority, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         + "\n"
@@ -6538,7 +8568,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--canonical-manifest", required=True)
     parser.add_argument("--candidate-summary", required=True)
     parser.add_argument("--candidate-inventory", required=True)
-    parser.add_argument("--windows-finalized-root", default="")
+    parser.add_argument(
+        "--windows-finalized-root",
+        default="",
+        help=(
+            "exact publication-stage proof/windows-native root; omit only for "
+            "stage-only unsigned v3 authority"
+        ),
+    )
     parser.add_argument("--publication-stage-root", required=True)
     parser.add_argument("--publication-scope", required=True)
     parser.add_argument("--registry-candidate-receipt", required=True)

@@ -436,6 +436,10 @@ public sealed class ReleaseShelfGenerationStore
         {
             identityProperties.Add("exactIncomingDesktopScopeIsFreshDelta");
         }
+        if (identity.TryGetProperty("rollbackRequestSha256", out _))
+        {
+            identityProperties.Add("rollbackRequestSha256");
+        }
         RequireExactProperties(
             identity,
             identityProperties,
@@ -571,6 +575,17 @@ public sealed class ReleaseShelfGenerationStore
 
         _ = RequireSha256Binding(intent.PointerSha256, "pointerSha256");
         _ = RequireSha256Binding(intent.InventoryDigest, "inventoryDigest");
+        if (intent.RollbackRequestSha256 is not null)
+        {
+            if (!string.Equals(intent.Operation, "rollback", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "Release activation journal rollback request binding is invalid.");
+            }
+            _ = RequireSha256Binding(
+                intent.RollbackRequestSha256,
+                "rollbackRequestSha256");
+        }
         _ = ReleaseDesktopTupleScope.ParseOptionalCanonical(
             intent.ExactIncomingDesktopScope);
         if (intent.ExactIncomingDesktopScopeIsFreshDelta
@@ -637,7 +652,11 @@ public sealed class ReleaseShelfGenerationStore
         string inventoryDigest = RequireInventoryDigest(pointer, "inventoryDigest");
         if (!string.Equals(RequireString(pointer, "schemaVersion"), CurrentSchemaVersion, StringComparison.Ordinal)
             || !string.Equals(generationId, intent.GenerationId, StringComparison.Ordinal)
-            || !string.Equals(activationReceiptId, intent.ActivationReceiptId, StringComparison.Ordinal)
+            || (!string.Equals(intent.Operation, "rollback", StringComparison.Ordinal)
+                && !string.Equals(
+                    activationReceiptId,
+                    intent.ActivationReceiptId,
+                    StringComparison.Ordinal))
             || !string.Equals(releaseVersion, intent.ReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(channel, intent.Channel, StringComparison.Ordinal)
             || publishedAt.ToUniversalTime() != intent.PublishedAt.ToUniversalTime()
@@ -2188,7 +2207,9 @@ public sealed class ReleaseShelfGenerationStore
         string? TargetPointerBase64,
         string? ExactIncomingDesktopScope = null,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        bool ExactIncomingDesktopScopeIsFreshDelta = false);
+        bool ExactIncomingDesktopScopeIsFreshDelta = false,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? RollbackRequestSha256 = null);
 
     private sealed record ReaderActivationOutcome(
         string SchemaVersion,
