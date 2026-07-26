@@ -2975,32 +2975,45 @@ infer_publish_mode() {
 }
 
 capture_release_upload_auth_value() {
+  set +x
   local output_value_variable="${1:-}"
   local output_source_variable="${2:-}"
   local captured_value=""
   local captured_source=""
+  local selected_value=""
+  local selected_source=""
+  local source_index=0
+  local source_count=0
+  local python_bin=""
+  local -a source_names=(
+    CHUMMER_RELEASE_UPLOAD_TOKEN
+    CHUMMER_RELEASE_UPLOAD_TICKET
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE
+    CHUMMER_RELEASE_UPLOAD_TOKEN_PATH
+    CHUMMER_RELEASE_UPLOAD_TICKET_FILE
+    CHUMMER_RELEASE_UPLOAD_TICKET_PATH
+  )
+  local -a source_values=(
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH:-}"
+  )
   export -n captured_value captured_source 2>/dev/null || true
   [[ -n "$output_value_variable" && -n "$output_source_variable" ]] || return 1
 
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
-    captured_value="$CHUMMER_RELEASE_UPLOAD_TOKEN"
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
-    captured_value="$CHUMMER_RELEASE_UPLOAD_TICKET"
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_PATH"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_FILE"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_PATH"
-  fi
+  for (( source_index = 0; source_index < ${#source_names[@]}; source_index += 1 )); do
+    if [[ -n "${source_values[$source_index]}" ]]; then
+      source_count=$(( source_count + 1 ))
+      selected_source="${source_names[$source_index]}"
+      selected_value="${source_values[$source_index]}"
+    fi
+  done
 
-  printf -v "$output_value_variable" '%s' "$captured_value"
-  printf -v "$output_source_variable" '%s' "$captured_source"
-  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
+  # Scrub every inherited credential source before validation starts or a child
+  # process is launched. The selected value remains only in a non-exported local.
   unset \
     CHUMMER_RELEASE_UPLOAD_TOKEN \
     CHUMMER_RELEASE_UPLOAD_TICKET \
@@ -3011,6 +3024,169 @@ capture_release_upload_auth_value() {
     FLEET_INTERNAL_API_TOKEN \
     CHUMMER_REGISTRY_CONTROL_API_KEY \
     REGISTRY_CONTROL_API_KEY
+  unset source_values
+
+  (( source_count <= 1 )) \
+    || die "set exactly one release-upload credential source; token/ticket and FILE/PATH sources may not be combined"
+
+  case "$selected_source" in
+    CHUMMER_RELEASE_UPLOAD_TOKEN|CHUMMER_RELEASE_UPLOAD_TICKET)
+      captured_value="$selected_value"
+      captured_source="$selected_source"
+      ;;
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE|CHUMMER_RELEASE_UPLOAD_TOKEN_PATH|CHUMMER_RELEASE_UPLOAD_TICKET_FILE|CHUMMER_RELEASE_UPLOAD_TICKET_PATH)
+      python_bin="$(resolve_release_python)" \
+        || die "Python 3.11 or newer is required to validate the release-upload credential file"
+      if ! captured_value="$(
+        printf '%s\n' "$selected_value" \
+          | "$python_bin" -I -S /dev/fd/3 3<<'PY_RELEASE_UPLOAD_AUTH_READER'
+from __future__ import annotations
+
+import os
+import stat
+import sys
+from typing import Callable
+
+MAX_CREDENTIAL_BYTES = 8192
+MAX_FILE_BYTES = MAX_CREDENTIAL_BYTES + 1
+MAX_PATH_BYTES = 4096
+
+
+class UnsafeCredentialFile(Exception):
+    pass
+
+
+def _reject() -> None:
+    raise UnsafeCredentialFile
+
+
+def _metadata_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _validate_metadata(metadata: os.stat_result) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or not 1 <= metadata.st_size <= MAX_FILE_BYTES
+    ):
+        _reject()
+
+
+def read_credential(
+    path: str,
+    *,
+    opener: Callable[[str, int], int] = os.open,
+    lstater: Callable[[str], os.stat_result] = os.lstat,
+    fstater: Callable[[int], os.stat_result] = os.fstat,
+    reader: Callable[[int, int], bytes] = os.read,
+    closer: Callable[[int], None] = os.close,
+) -> bytes:
+    if not os.path.isabs(path) or not hasattr(os, "O_NOFOLLOW"):
+        _reject()
+
+    before = lstater(path)
+    _validate_metadata(before)
+    flags = (
+        os.O_RDONLY
+        | os.O_CLOEXEC
+        | os.O_NOFOLLOW
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    descriptor = opener(path, flags)
+    try:
+        opened = fstater(descriptor)
+        _validate_metadata(opened)
+        if _metadata_identity(opened) != _metadata_identity(before):
+            _reject()
+
+        chunks: list[bytes] = []
+        remaining = MAX_FILE_BYTES + 1
+        while remaining > 0:
+            chunk = reader(descriptor, min(4096, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = fstater(descriptor)
+    finally:
+        closer(descriptor)
+
+    final = lstater(path)
+    _validate_metadata(after)
+    _validate_metadata(final)
+    if (
+        len(raw) != before.st_size
+        or _metadata_identity(after) != _metadata_identity(before)
+        or _metadata_identity(final) != _metadata_identity(before)
+    ):
+        _reject()
+
+    if raw.endswith(b"\n"):
+        raw = raw[:-1]
+    if (
+        not raw
+        or len(raw) > MAX_CREDENTIAL_BYTES
+        or b"\x00" in raw
+        or b"\r" in raw
+        or b"\n" in raw
+    ):
+        _reject()
+    raw.decode("utf-8", errors="strict")
+    return raw
+
+
+def _read_path_record() -> str:
+    record = sys.stdin.buffer.read(MAX_PATH_BYTES + 2)
+    if (
+        not record.endswith(b"\n")
+        or len(record) > MAX_PATH_BYTES + 1
+        or b"\x00" in record
+        or b"\r" in record
+        or b"\n" in record[:-1]
+    ):
+        _reject()
+    path_bytes = record[:-1]
+    if not path_bytes:
+        _reject()
+    return path_bytes.decode("utf-8", errors="strict")
+
+
+if __name__ == "__main__":
+    try:
+        sys.stdout.buffer.write(read_credential(_read_path_record()))
+    except Exception:
+        raise SystemExit(1)
+PY_RELEASE_UPLOAD_AUTH_READER
+      )"; then
+        die "release-upload credential file is unsafe or invalid"
+      fi
+      captured_source="$selected_source"
+      ;;
+    "")
+      ;;
+    *)
+      die "release-upload credential source could not be resolved"
+      ;;
+  esac
+
+  unset selected_value
+  printf -v "$output_value_variable" '%s' "$captured_value"
+  printf -v "$output_source_variable" '%s' "$captured_source"
+  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
 }
 
 prompt_for_release_upload_ticket() {
@@ -3031,6 +3207,7 @@ prompt_for_release_upload_ticket() {
 
 ensure_release_upload_token() {
   local auth_value="${1:-}"
+  local LC_ALL=C
   export -n auth_value 2>/dev/null || true
   [[ -n "$auth_value" ]] \
     || die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"

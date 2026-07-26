@@ -37,6 +37,14 @@ EXPECTED_COMMIT_SETTINGS = (
     "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT",
     "CHUMMER_LEGACY_EXPECTED_COMMIT",
 )
+RELEASE_UPLOAD_AUTH_SETTINGS = (
+    "CHUMMER_RELEASE_UPLOAD_TOKEN",
+    "CHUMMER_RELEASE_UPLOAD_TICKET",
+    "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE",
+    "CHUMMER_RELEASE_UPLOAD_TOKEN_PATH",
+    "CHUMMER_RELEASE_UPLOAD_TICKET_FILE",
+    "CHUMMER_RELEASE_UPLOAD_TICKET_PATH",
+)
 
 
 def test_release_generation_id_is_safe_and_operator_override_is_exact() -> None:
@@ -306,10 +314,11 @@ def make_wrapper_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     bootstrap.write_text(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
-        "printf 'stage=%s\\noutput=%s\\ntoken=%s\\nhub_ref=%s\\nhub_expected_commit=%s\\n' "
+        "printf 'stage=%s\\noutput=%s\\ntoken=%s\\ntoken_file=%s\\nhub_ref=%s\\nhub_expected_commit=%s\\n' "
         '"${CHUMMER_MAC_RELEASE_STAGE_ONLY:-}" '
         '"${CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR:-}" '
         '"${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" '
+        '"${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" '
         '"${CHUMMER_HUB_REF:-}" '
         '"${CHUMMER_HUB_EXPECTED_COMMIT:-}" >"$CAPTURE_PATH"\n'
         "printf 'arg=%s\\n' \"$@\" >>\"$CAPTURE_PATH\"\n",
@@ -466,47 +475,37 @@ def test_wrapper_disables_inherited_xtrace_before_secret_capture(tmp_path: Path)
     assert synthetic not in result.stderr
 
 
-def test_wrapper_accepts_only_owner_mode_0600_non_symlink_auth_files(tmp_path: Path) -> None:
+def test_wrapper_delegates_file_intake_without_exporting_credential_plaintext(
+    tmp_path: Path,
+) -> None:
     wrapper, _bootstrap, capture = make_wrapper_fixture(tmp_path)
-    secret = "synthetic-owner-only-token"
+    secret = "wrapper-must-never-load-this-file-credential"
     token_file = tmp_path / "token.txt"
     token_file.write_text(secret + "\n", encoding="utf-8")
-
-    def invoke(path: Path) -> subprocess.CompletedProcess[str]:
-        environment = clean_release_environment()
-        environment.update(
-            {
-                "CAPTURE_PATH": str(capture),
-                "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE": str(path),
-            }
-        )
-        return subprocess.run(
-            [str(wrapper)],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=environment,
-        )
-
-    token_file.chmod(0o644)
-    rejected_mode = invoke(token_file)
-    assert rejected_mode.returncode != 0
-    assert not capture.exists()
-    assert secret not in rejected_mode.stdout
-    assert secret not in rejected_mode.stderr
-
     token_file.chmod(0o600)
-    token_link = tmp_path / "token-link.txt"
-    token_link.symlink_to(token_file)
-    rejected_link = invoke(token_link)
-    assert rejected_link.returncode != 0
-    assert not capture.exists()
-    assert secret not in rejected_link.stdout
-    assert secret not in rejected_link.stderr
+    environment = clean_release_environment()
+    environment.update(
+        {
+            "CAPTURE_PATH": str(capture),
+            "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE": str(token_file),
+        }
+    )
 
-    accepted = invoke(token_file)
-    assert accepted.returncode == 0, accepted.stderr
-    assert f"token={secret}" in capture.read_text(encoding="utf-8")
+    result = subprocess.run(
+        [str(wrapper)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    captured = capture.read_text(encoding="utf-8")
+    assert f"token_file={token_file}" in captured
+    assert "token=" in captured
+    assert secret not in captured
+    assert secret not in result.stdout
+    assert secret not in result.stderr
 
 
 def run_sourced(command: str, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -517,6 +516,278 @@ def run_sourced(command: str, *arguments: str, env: dict[str, str] | None = None
         check=False,
         env=env or clean_release_environment(),
     )
+
+
+def invoke_release_upload_auth_capture(
+    environment: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return run_sourced(
+        r'''
+resolved_value=""
+resolved_source=""
+capture_release_upload_auth_value resolved_value resolved_source
+if [[
+  -z "${CHUMMER_RELEASE_UPLOAD_TOKEN+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH+x}"
+]]; then
+  scrubbed=1
+else
+  scrubbed=0
+fi
+python3 -c 'import os; names = [name for name in os.environ if name.startswith("CHUMMER_RELEASE_UPLOAD_TOKEN") or name.startswith("CHUMMER_RELEASE_UPLOAD_TICKET")]; raise SystemExit(0 if not names else 1)'
+printf 'source=%s\nvalue=%s\nscrubbed=%s\n' "$resolved_source" "$resolved_value" "$scrubbed"
+''',
+        env=environment,
+    )
+
+
+def test_bootstrap_accepts_each_owner_only_file_alias_and_scrubs_environment(
+    tmp_path: Path,
+) -> None:
+    secret = "synthetic-owner-only-file-credential"
+    credential_file = tmp_path / "release-upload-credential"
+    credential_file.write_text(secret + "\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+
+    for setting in RELEASE_UPLOAD_AUTH_SETTINGS[2:]:
+        environment = clean_release_environment()
+        environment[setting] = str(credential_file)
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode == 0, (setting, result.stderr)
+        assert f"source={setting}\n" in result.stdout
+        assert f"value={secret}\n" in result.stdout
+        assert "scrubbed=1\n" in result.stdout
+        assert secret not in result.stderr
+
+
+def test_bootstrap_rejects_every_credential_source_conflict_without_precedence(
+    tmp_path: Path,
+) -> None:
+    credential_file = tmp_path / "credential"
+    credential_file.write_text("unused-file-value\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+
+    for first_index, first_setting in enumerate(RELEASE_UPLOAD_AUTH_SETTINGS):
+        for second_setting in RELEASE_UPLOAD_AUTH_SETTINGS[first_index + 1 :]:
+            environment = clean_release_environment()
+            first_value = (
+                str(credential_file)
+                if first_setting.endswith(("_FILE", "_PATH"))
+                else "first-conflict-secret"
+            )
+            second_value = (
+                str(credential_file)
+                if second_setting.endswith(("_FILE", "_PATH"))
+                else "second-conflict-secret"
+            )
+            environment[first_setting] = first_value
+            environment[second_setting] = second_value
+
+            result = invoke_release_upload_auth_capture(environment)
+
+            assert result.returncode != 0, (first_setting, second_setting)
+            assert "set exactly one release-upload credential source" in result.stderr
+            assert "first-conflict-secret" not in result.stdout + result.stderr
+            assert "second-conflict-secret" not in result.stdout + result.stderr
+            assert str(credential_file) not in result.stdout + result.stderr
+
+
+def test_bootstrap_rejects_unsafe_credential_file_metadata_and_types(
+    tmp_path: Path,
+) -> None:
+    secret = "unsafe-metadata-must-stay-redacted"
+
+    def invoke(path_value: str) -> subprocess.CompletedProcess[str]:
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"] = path_value
+        return invoke_release_upload_auth_capture(environment)
+
+    wrong_mode = tmp_path / "wrong-mode"
+    wrong_mode.write_text(secret, encoding="utf-8")
+    wrong_mode.chmod(0o644)
+
+    regular = tmp_path / "regular"
+    regular.write_text(secret, encoding="utf-8")
+    regular.chmod(0o600)
+    symlink = tmp_path / "symlink"
+    symlink.symlink_to(regular)
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    directory.chmod(0o600)
+
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo, mode=0o600)
+
+    hardlink_source = tmp_path / "hardlink-source"
+    hardlink_source.write_text(secret, encoding="utf-8")
+    hardlink_source.chmod(0o600)
+    hardlink = tmp_path / "hardlink"
+    os.link(hardlink_source, hardlink)
+
+    unsafe_paths = (
+        str(wrong_mode),
+        str(symlink),
+        str(directory),
+        str(fifo),
+        str(hardlink_source),
+        regular.name,
+    )
+    for unsafe_path in unsafe_paths:
+        result = invoke(unsafe_path)
+        assert result.returncode != 0, unsafe_path
+        assert "release-upload credential file is unsafe or invalid" in result.stderr
+        assert secret not in result.stdout + result.stderr
+        assert unsafe_path not in result.stdout + result.stderr
+
+    if os.geteuid() == 0:
+        foreign_owner = tmp_path / "foreign-owner"
+        foreign_owner.write_text(secret, encoding="utf-8")
+        foreign_owner.chmod(0o600)
+        os.chown(foreign_owner, 65534, -1)
+        rejected_owner = invoke(str(foreign_owner))
+        assert rejected_owner.returncode != 0
+        assert secret not in rejected_owner.stdout + rejected_owner.stderr
+
+    source = BOOTSTRAP.read_text(encoding="utf-8")
+    assert "metadata.st_uid != os.geteuid()" in source
+    assert "metadata.st_nlink != 1" in source
+    assert "stat.S_IMODE(metadata.st_mode) != 0o600" in source
+    assert "os.O_NOFOLLOW" in source
+
+
+def test_bootstrap_rejects_empty_multiline_binary_and_oversize_credentials(
+    tmp_path: Path,
+) -> None:
+    invalid_payloads = (
+        b"",
+        b"\n",
+        b"first\nsecond",
+        b"first\r\n",
+        b"prefix\x00suffix",
+        b"\xff",
+        b"x" * 8193,
+        b"x" * 8193 + b"\n",
+    )
+
+    for index, payload in enumerate(invalid_payloads):
+        credential_file = tmp_path / f"invalid-{index}"
+        credential_file.write_bytes(payload)
+        credential_file.chmod(0o600)
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TICKET_PATH"] = str(credential_file)
+
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode != 0, index
+        assert "release-upload credential file is unsafe or invalid" in result.stderr
+        assert "first" not in result.stdout + result.stderr
+        assert str(credential_file) not in result.stdout + result.stderr
+
+
+def test_bootstrap_accepts_exact_file_size_boundaries(tmp_path: Path) -> None:
+    for index, payload in enumerate((b"x" * 8192, b"y" * 8192 + b"\n")):
+        credential_file = tmp_path / f"boundary-{index}"
+        credential_file.write_bytes(payload)
+        credential_file.chmod(0o600)
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TOKEN_PATH"] = str(credential_file)
+
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode == 0, result.stderr
+        expected = payload.rstrip(b"\n").decode("ascii")
+        assert f"value={expected}\n" in result.stdout
+        assert "scrubbed=1\n" in result.stdout
+
+
+def test_bootstrap_file_capture_disables_xtrace_and_redacts_failures(
+    tmp_path: Path,
+) -> None:
+    secret = "xtrace-file-secret-must-not-appear"
+    credential_file = tmp_path / "redaction-path-must-not-appear"
+    credential_file.write_text(secret + "\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+    environment = clean_release_environment()
+    environment["CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"] = str(credential_file)
+
+    accepted = subprocess.run(
+        [
+            "bash",
+            "-x",
+            "-c",
+            'source "$1"; capture_release_upload_auth_value value source; [[ -n "$value" ]]',
+            "credential-xtrace-test",
+            str(BOOTSTRAP),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert secret not in accepted.stdout + accepted.stderr
+    assert str(credential_file) not in accepted.stdout + accepted.stderr
+
+    credential_file.chmod(0o644)
+    rejected = invoke_release_upload_auth_capture(environment)
+    assert rejected.returncode != 0
+    assert secret not in rejected.stdout + rejected.stderr
+    assert str(credential_file) not in rejected.stdout + rejected.stderr
+
+
+def test_credential_reader_rejects_deletion_races(tmp_path: Path) -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    marker = "PY_RELEASE_UPLOAD_AUTH_READER"
+    start_token = f"3<<'{marker}'\n"
+    reader_start = bootstrap.index(start_token) + len(start_token)
+    reader_end = bootstrap.index(f"\n{marker}", reader_start)
+    reader_source = bootstrap[reader_start:reader_end]
+    namespace: dict[str, object] = {"__name__": "credential_reader_test"}
+    exec(compile(reader_source, "<credential-reader>", "exec"), namespace)
+    read_credential = namespace["read_credential"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+
+    before_open = tmp_path / "delete-before-open"
+    before_open.write_text("delete-race-secret", encoding="utf-8")
+    before_open.chmod(0o600)
+
+    def deleting_opener(path: str, flags: int) -> int:
+        os.unlink(path)
+        return os.open(path, flags)
+
+    try:
+        read_credential(str(before_open), opener=deleting_opener)
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("credential deletion between lstat and open was accepted")
+
+    during_read = tmp_path / "delete-during-read"
+    during_read.write_text("delete-race-secret", encoding="utf-8")
+    during_read.chmod(0o600)
+    deleted = False
+
+    def deleting_reader(descriptor: int, size: int) -> bytes:
+        nonlocal deleted
+        chunk = os.read(descriptor, size)
+        if chunk and not deleted:
+            during_read.unlink()
+            deleted = True
+        return chunk
+
+    try:
+        read_credential(str(during_read), reader=deleting_reader)
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("credential deletion during read was accepted")
 
 
 def make_remote_proof_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -1080,15 +1351,13 @@ def test_capture_release_upload_auth_scrubs_child_environment(tmp_path: Path) ->
     environment_log = tmp_path / "child-environment.json"
     secret_values = (
         "release-token-sentinel",
-        "release-ticket-sentinel",
         "fleet-token-sentinel",
     )
     environment = clean_release_environment()
     environment.update(
         {
             "CHUMMER_RELEASE_UPLOAD_TOKEN": secret_values[0],
-            "CHUMMER_RELEASE_UPLOAD_TICKET": secret_values[1],
-            "FLEET_INTERNAL_API_TOKEN": secret_values[2],
+            "FLEET_INTERNAL_API_TOKEN": secret_values[1],
             "ENVIRONMENT_LOG": str(environment_log),
         }
     )

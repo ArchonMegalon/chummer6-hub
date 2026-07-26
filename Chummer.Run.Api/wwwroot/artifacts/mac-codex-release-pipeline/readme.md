@@ -44,7 +44,7 @@ repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
 
-If one of the upload-auth `*_FILE` variants is set, the wrapper runs fully non-interactive and never prompts for input. Prefer an operator-owned, regular, non-symlink mode-`0600` file over exporting bearer plaintext.
+If one upload-auth file source is set, the wrapper runs fully non-interactive and never prompts for input. Prefer an operator-owned credential file over exporting bearer plaintext.
 
 ```bash
 ticket_file="$HOME/.chummer-release-upload-ticket"
@@ -58,6 +58,10 @@ export CHUMMER_RELEASE_UPLOAD_TICKET_FILE="$ticket_file"
 repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
+
+Credential-source selection is deliberately fail-closed. Set exactly one of `CHUMMER_RELEASE_UPLOAD_TOKEN`, `CHUMMER_RELEASE_UPLOAD_TICKET`, `CHUMMER_RELEASE_UPLOAD_TOKEN_FILE`, `CHUMMER_RELEASE_UPLOAD_TOKEN_PATH`, `CHUMMER_RELEASE_UPLOAD_TICKET_FILE`, or `CHUMMER_RELEASE_UPLOAD_TICKET_PATH`; the `*_PATH` names are aliases for their corresponding `*_FILE` names, not fallback precedence. Any combination, including both aliases with the same path, is rejected.
+
+A credential file must be an absolute path to a current-operator-owned regular file that is not a symlink, has exactly one hard link, and has exact mode `0600`. Its contents must be valid UTF-8, contain 1–8192 credential bytes, and may have one final LF; empty, multiline, CR/CRLF, NUL, oversized, replaced, or deleted-during-read files are rejected. The bootstrap opens it with no-follow semantics, validates the opened identity before and after a bounded read, revalidates the path, immediately unsets all inherited credential-source variables, and retains the credential only in a de-exported shell local. It never puts file credential plaintext in a process argument, child environment, log, URL, or persistent curl configuration; upload authorization continues to stream to `curl --config -` over stdin.
 
 Do not hardcode `/docker/chummercomplete/.../bootstrap.sh` on the Mac host. That path only exists in provisioned Linux control environments, not on a normal release workstation.
 
@@ -169,7 +173,9 @@ export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL="https://chummer.run/api/internal/rel
 export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"
 export CHUMMER_RELEASE_UPLOAD_TICKET=""                # optional interactive handoff code override for non-prompted runs
 export CHUMMER_RELEASE_UPLOAD_TICKET_FILE=""           # optional path to a one-line handoff code file
+export CHUMMER_RELEASE_UPLOAD_TICKET_PATH=""           # optional alias of TICKET_FILE; never set both
 export CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=""            # optional path to a one-line bearer token file
+export CHUMMER_RELEASE_UPLOAD_TOKEN_PATH=""            # optional alias of TOKEN_FILE; never set both
 export CHUMMER_RELEASE_UPLOAD_TOKEN=""                 # optional explicit bearer token for CI or non-interactive runs
 export CHUMMER_BOOTSTRAP_FORCE_LOCAL="0"               # set to 1 to force repo-local bootstrap execution (legacy behavior)
 export CHUMMER_RELEASE_CHANNEL="preview"
