@@ -5688,7 +5688,7 @@ if (
     raise SystemExit("Presentation request inputs do not bind one exact candidate")
 
 common_environment = {
-    "CHUMMER_CAMPAIGN_OPERABILITY_PREVIEW_MODE": "1",
+    "CHUMMER_CAMPAIGN_OPERABILITY_CANDIDATE_MODE": "1",
     "CHUMMER_CAMPAIGN_OPERABILITY_APPROVED_SCOPE_PATH": str(release_scope_path),
     "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_SCOPE_SHA256": release_scope_sha256,
     "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_RELEASE_VERSION": release_version,

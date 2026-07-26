@@ -219,14 +219,24 @@ def presentation_fixture(tmp_path: Path) -> dict[str, object]:
     registry_commit = "a" * 40
     support_owner = "chummer-release-operations"
     scope = {
+        "approvedAtUtc": "2026-07-26T01:28:38Z",
+        "approvedBy": "Chummer flagship release owner",
+        "channel": "public_stable",
+        "contractName": "chummer.release-scope-decision/v1",
+        "contractVersion": 1,
+        "decisionId": "scope-run-candidate-proof-macos-public-stable",
         "releaseVersion": release_version,
+        "releaseTarget": "stable",
+        "status": "approved",
         "supportOwner": support_owner,
         "platforms": [
             {
+                "artifactAccessClass": "open_public",
                 "platform": "macos",
                 "rid": "osx-arm64",
                 "primaryHead": "avalonia",
-                "fallbackHeads": ["blazor-desktop"],
+                "fallbackHeads": [],
+                "signingRequirement": "signed",
             }
         ],
     }
@@ -235,7 +245,18 @@ def presentation_fixture(tmp_path: Path) -> dict[str, object]:
     scope_path.write_bytes(scope_raw)
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_bytes(
-        (json.dumps({"version": release_version}, sort_keys=True) + "\n").encode()
+        (
+            json.dumps(
+                {
+                    "channel": "public_stable",
+                    "releaseVersion": release_version,
+                    "status": "published",
+                    "version": release_version,
+                },
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode()
     )
     decision_path = tmp_path / "decision.json"
     decision_path.write_bytes(b'{"status":"review_required"}\n')
@@ -245,9 +266,14 @@ def presentation_fixture(tmp_path: Path) -> dict[str, object]:
     snapshot_path.write_text(
         json.dumps(
             {
+                "channel": "public_stable",
                 "manifestSha256": manifest_sha256,
+                "releaseDecisionStatus": "review_required",
                 "releaseDecisionSha256": decision_sha256,
                 "registryCommit": registry_commit,
+                "rolloutState": "public_release_review_required",
+                "status": "published",
+                "supportabilityState": "review_required",
             },
             sort_keys=True,
         )
@@ -268,7 +294,7 @@ def presentation_fixture(tmp_path: Path) -> dict[str, object]:
         "platform": "macos",
         "rid": "osx-arm64",
         "primary_head": "avalonia",
-        "required_heads": ["avalonia", "blazor-desktop"],
+        "required_heads": ["avalonia"],
     }
     contracts = {
         "desktop_visual": "chummer6-ui.desktop_visual_familiarity_exit_gate",
@@ -337,6 +363,37 @@ def test_presentation_request_exposes_exact_post_build_binding_without_release_m
     assert payload["countsAsBuildEvidence"] is False
     assert payload["countsAsPublicationEvidence"] is False
     assert payload["candidateBinding"] == fixture["binding"]
+    assert payload["commonEnvironment"] == {
+        "CHUMMER_CAMPAIGN_OPERABILITY_CANDIDATE_MODE": "1",
+        "CHUMMER_CAMPAIGN_OPERABILITY_APPROVED_SCOPE_PATH": str(
+            fixture["scope_path"]
+        ),
+        "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_SCOPE_SHA256": fixture[
+            "scope_sha256"
+        ],
+        "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_RELEASE_VERSION": fixture[
+            "release_version"
+        ],
+        "CHUMMER_CAMPAIGN_OPERABILITY_REGISTRY_REVIEW_SEED_PATH": str(
+            fixture["snapshot_path"]
+        ),
+        "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_REGISTRY_REVIEW_SEED_SHA256": fixture[
+            "binding"
+        ]["authority_snapshot_sha256"],
+        "CHUMMER_CAMPAIGN_OPERABILITY_BOUNDED_OWNER": fixture["support_owner"],
+        "CHUMMER_CAMPAIGN_OPERABILITY_NEXT_ACTIONS_JSON": json.dumps(
+            [
+                "Complete owner-only review, Registry CAS, activation, and public "
+                "convergence for these exact bytes."
+            ],
+            separators=(",", ":"),
+        ),
+        "CHUMMER_CAMPAIGN_OPERABILITY_ALLOW_RAW_FAIL_DECLARATION": "0",
+    }
+    assert (
+        "CHUMMER_CAMPAIGN_OPERABILITY_PREVIEW_MODE"
+        not in payload["commonEnvironment"]
+    )
     assert [row["outputPath"] for row in payload["producers"]] == [
         str(path) for path in outputs
     ]
