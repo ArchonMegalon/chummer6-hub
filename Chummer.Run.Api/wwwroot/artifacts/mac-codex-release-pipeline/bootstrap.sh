@@ -3051,6 +3051,32 @@ from typing import Callable
 MAX_CREDENTIAL_BYTES = 8192
 MAX_FILE_BYTES = MAX_CREDENTIAL_BYTES + 1
 MAX_PATH_BYTES = 4096
+MACOS_ACL_RIGHTS = frozenset(
+    {
+        b"add_file",
+        b"add_subdirectory",
+        b"append",
+        b"chown",
+        b"delete",
+        b"delete_child",
+        b"directory_inherit",
+        b"execute",
+        b"file_inherit",
+        b"limit_inherit",
+        b"list",
+        b"only_inherit",
+        b"read",
+        b"readattr",
+        b"readextattr",
+        b"readsecurity",
+        b"search",
+        b"sync",
+        b"write",
+        b"writeattr",
+        b"writeextattr",
+        b"writesecurity",
+    }
+)
 
 
 class UnsafeCredentialFile(Exception):
@@ -3112,17 +3138,47 @@ def assert_no_macos_acl(descriptor: int) -> None:
         timeout=10,
     )
     lines = completed.stdout.splitlines()
-    permission_fields = lines[0].split(maxsplit=1) if len(lines) == 1 else []
+    permission_fields = lines[0].split(maxsplit=1) if lines else []
     permission_token = permission_fields[0] if permission_fields else b""
     if (
         completed.returncode != 0
         or completed.stderr
-        or len(lines) != 1
         or not permission_token
-        or b"+" in permission_token
-        or permission_token not in {b"-rw-------", b"-rw-------@"}
     ):
         _reject()
+    if len(lines) == 1:
+        if permission_token not in {b"-rw-------", b"-rw-------@"}:
+            _reject()
+        return
+    if permission_token != b"-rw-------+":
+        _reject()
+    for expected_index, raw_entry in enumerate(lines[1:]):
+        index, separator, entry = raw_entry.strip().partition(b":")
+        fields = entry.split()
+        if (
+            separator != b":"
+            or index != str(expected_index).encode("ascii")
+        ):
+            _reject()
+        if len(fields) == 3:
+            principal, disposition, rights = fields
+        elif len(fields) == 4 and fields[1] == b"inherited":
+            principal, _inherited, disposition, rights = fields
+        else:
+            _reject()
+        principal_kind, principal_separator, principal_name = principal.partition(b":")
+        parsed_rights = rights.split(b",")
+        if (
+            principal_separator != b":"
+            or principal_kind not in {b"user", b"group"}
+            or not principal_name
+            or b":" in principal_name
+            or any(byte <= 0x20 or byte == 0x7F for byte in principal_name)
+            or disposition != b"deny"
+            or any(right not in MACOS_ACL_RIGHTS for right in parsed_rights)
+            or len(set(parsed_rights)) != len(parsed_rights)
+        ):
+            _reject()
 
 
 def _pread_bounded(

@@ -850,7 +850,7 @@ def test_credential_reader_rejects_deletion_and_in_place_races(
     assert events == ["lstat", "lstat", "close"]
 
 
-def test_credential_reader_rejects_extended_macos_acls() -> None:
+def test_credential_reader_mac_acl_parser_boundaries() -> None:
     reader_source, namespace = load_credential_reader_namespace()
     acl_guard = namespace["assert_no_macos_acl"]
     unsafe_error = namespace["UnsafeCredentialFile"]
@@ -881,18 +881,201 @@ def test_credential_reader_rejects_extended_macos_acls() -> None:
     namespace["sys"] = Darwin()
     namespace["subprocess"] = FakeSubprocess()
     try:
-        acl_guard(42)
-        FakeResult.stdout = b"-rw-------@ credential\n"
-        acl_guard(42)
-        invalid_results = (
-            (1, b"-rw------- credential\n", b""),
-            (0, b"-rw------- credential\n", b"unexpected stderr"),
-            (0, b"", b""),
-            (0, b"-rw------- credential\n 0: everyone allow read\n", b""),
-            (0, b"malformed credential\n", b""),
-            (0, b"-rw-------+ credential\n", b""),
+        accepted_outputs = (
+            b"-rw------- credential\n",
+            b"-rw-------@ credential\n",
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:release-operator deny write,append\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone inherited deny delete\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny "
+                b"delete,file_inherit,directory_inherit,limit_inherit,only_inherit\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: user:_www deny "
+                b"read,write,execute,delete,append,delete_child,"
+                b"readattr,writeattr,readextattr,writeextattr,"
+                b"readsecurity,writesecurity,chown,sync,"
+                b"list,search,add_file,add_subdirectory,"
+                b"file_inherit,directory_inherit,limit_inherit,only_inherit\n"
+            ),
         )
-        for returncode, stdout, stderr in invalid_results:
+        for stdout in accepted_outputs:
+            FakeResult.returncode = 0
+            FakeResult.stdout = stdout
+            FakeResult.stderr = b""
+            acl_guard(42)
+
+        rejected_results = (
+            ("probe failure", 1, b"-rw------- credential\n", b""),
+            ("probe stderr", 0, b"-rw------- credential\n", b"unexpected stderr"),
+            ("empty output", 0, b"", b""),
+            (
+                "allow ACE",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone allow read\n",
+                b"",
+            ),
+            (
+                "mixed deny and allow ACEs",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:other allow read\n",
+                b"",
+            ),
+            (
+                "first index gap",
+                0,
+                b"-rw-------+ credential\n"
+                b" 1: group:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "duplicate index",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 0: user:release-operator deny write\n",
+                b"",
+            ),
+            (
+                "later index gap",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 2: user:release-operator deny write\n",
+                b"",
+            ),
+            (
+                "malformed principal kind",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: role:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "empty principal name",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group: deny delete\n",
+                b"",
+            ),
+            (
+                "principal whitespace",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:release operator deny delete\n",
+                b"",
+            ),
+            (
+                "principal control character",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every\x01one deny delete\n",
+                b"",
+            ),
+            (
+                "principal delete character",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every\x7fone deny delete\n",
+                b"",
+            ),
+            (
+                "principal extra separator",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every:one deny delete\n",
+                b"",
+            ),
+            (
+                "leading rights comma",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny ,delete\n",
+                b"",
+            ),
+            (
+                "trailing rights comma",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,\n",
+                b"",
+            ),
+            (
+                "empty rights component",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,,write\n",
+                b"",
+            ),
+            (
+                "invalid rights punctuation",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete-child\n",
+                b"",
+            ),
+            (
+                "invalid rights case",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny DELETE\n",
+                b"",
+            ),
+            (
+                "unknown right",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny unknown_right\n",
+                b"",
+            ),
+            (
+                "duplicate right",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,delete\n",
+                b"",
+            ),
+            (
+                "malformed inherited field",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone explicit deny delete\n",
+                b"",
+            ),
+            (
+                "inherited allow ACE",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone inherited allow read\n",
+                b"",
+            ),
+            (
+                "at suffix with ACL lines",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: group:everyone deny delete\n",
+                b"",
+            ),
+            ("malformed permission token", 0, b"malformed credential\n", b""),
+            ("ACL marker without ACE", 0, b"-rw-------+ credential\n", b""),
+        )
+        for label, returncode, stdout, stderr in rejected_results:
             FakeResult.returncode = returncode
             FakeResult.stdout = stdout
             FakeResult.stderr = stderr
@@ -902,7 +1085,7 @@ def test_credential_reader_rejects_extended_macos_acls() -> None:
                 pass
             else:
                 raise AssertionError(
-                    "unsafe or malformed macOS credential ACL probe was accepted"
+                    f"unsafe or malformed macOS credential ACL probe was accepted: {label}"
                 )
     finally:
         namespace["sys"] = original_sys
@@ -923,6 +1106,94 @@ def test_credential_reader_rejects_extended_macos_acls() -> None:
     assert reader_source.count("assert_no_macos_acl(descriptor)") == 2
     assert "os.pread" in reader_source
     assert "os.lseek" not in reader_source
+
+
+def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
+    tmp_path: Path,
+) -> None:
+    _reader_source, namespace = load_credential_reader_namespace()
+    read_credential = namespace["read_credential"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+
+    class FakeResult:
+        returncode = 0
+        stderr = b""
+
+        def __init__(self, stdout: bytes) -> None:
+            self.stdout = stdout
+
+    class Darwin:
+        platform = "darwin"
+
+    first_probe = (
+        b"-rw-------+ credential\n"
+        b" 0: group:everyone deny delete\n"
+    )
+    unsafe_second_probes = (
+        (
+            b"-rw-------+ credential\n"
+            b" 0: group:everyone allow read\n"
+        ),
+        (
+            b"-rw-------+ credential\n"
+            b" 0: group:everyone deny delete,\n"
+        ),
+    )
+    original_sys = namespace["sys"]
+    original_subprocess = namespace["subprocess"]
+    namespace["sys"] = Darwin()
+    try:
+        for index, unsafe_second_probe in enumerate(unsafe_second_probes):
+            credential_file = tmp_path / f"acl-transition-{index}"
+            credential_file.write_text("stable-credential\n", encoding="utf-8")
+            credential_file.chmod(0o600)
+            probe_results = iter((first_probe, unsafe_second_probe))
+            probe_count = 0
+            closed_descriptors: list[int] = []
+
+            class FakeSubprocess:
+                PIPE = object()
+                DEVNULL = object()
+
+                @staticmethod
+                def run(
+                    _arguments: tuple[object, ...],
+                    **_kwargs: object,
+                ) -> FakeResult:
+                    nonlocal probe_count
+                    probe_count += 1
+                    return FakeResult(next(probe_results))
+
+            def recording_closer(descriptor: int) -> None:
+                closed_descriptors.append(descriptor)
+                os.close(descriptor)
+
+            namespace["subprocess"] = FakeSubprocess()
+            try:
+                read_credential(
+                    str(credential_file),
+                    closer=recording_closer,
+                )
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    "credential ACL transition was accepted"
+                )
+
+            assert probe_count == 2
+            assert len(closed_descriptors) == 1
+            try:
+                os.fstat(closed_descriptors[0])
+            except OSError:
+                pass
+            else:
+                raise AssertionError(
+                    "credential descriptor remained open after ACL rejection"
+                )
+    finally:
+        namespace["sys"] = original_sys
+        namespace["subprocess"] = original_subprocess
 
 
 def test_credential_file_writer_contract_requires_atomic_publication() -> None:
