@@ -898,6 +898,13 @@ def test_credential_reader_mac_acl_parser_boundaries() -> None:
                 b" 0: group:everyone inherited deny delete\n"
             ),
             (
+                # Model native `ls -L -l -d -e` output when an xattr marker
+                # accompanies a restrictive ACL on the mode-0600 file.
+                b"-rw-------@ 1 release staff 24 Jul 26 08:00 /dev/fd/42\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:release-operator inherited deny write,append\n"
+            ),
+            (
                 b"-rw-------+ credential\n"
                 b" 0: group:everyone deny "
                 b"delete,file_inherit,directory_inherit,limit_inherit,only_inherit\n"
@@ -1066,10 +1073,31 @@ def test_credential_reader_mac_acl_parser_boundaries() -> None:
                 b"",
             ),
             (
-                "at suffix with ACL lines",
+                "at suffix with allow ACE",
                 0,
                 b"-rw-------@ credential\n"
-                b" 0: group:everyone deny delete\n",
+                b" 0: group:everyone allow read\n",
+                b"",
+            ),
+            (
+                "at suffix with malformed ACL index",
+                0,
+                b"-rw-------@ credential\n"
+                b" 1: group:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "at suffix with malformed ACL principal",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: role:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "at suffix with unknown ACL right",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: group:everyone deny unknown_right\n",
                 b"",
             ),
             ("malformed permission token", 0, b"malformed credential\n", b""),
@@ -1209,6 +1237,8 @@ def test_credential_file_writer_contract_requires_atomic_publication() -> None:
         assert "finite rereads" in runbook
         assert "arbitrary hostile" in runbook
         assert "same operator uid" in runbook or "same-uid writer" in runbook
+        assert "sequential deny-only acl" in runbook
+        assert "allow, mixed, malformed, or unknown" in runbook
     assert 'ticket_tmp="$(mktemp ' in served_runbook
     assert 'printf \'%s\\n\' "$ticket_value" > "$ticket_tmp"' in served_runbook
     assert 'mv "$ticket_tmp" "$ticket_file"' in served_runbook

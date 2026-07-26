@@ -3150,7 +3150,7 @@ def assert_no_macos_acl(descriptor: int) -> None:
         if permission_token not in {b"-rw-------", b"-rw-------@"}:
             _reject()
         return
-    if permission_token != b"-rw-------+":
+    if permission_token not in {b"-rw-------+", b"-rw-------@"}:
         _reject()
     for expected_index, raw_entry in enumerate(lines[1:]):
         index, separator, entry = raw_entry.strip().partition(b":")
