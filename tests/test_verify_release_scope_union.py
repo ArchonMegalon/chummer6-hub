@@ -188,6 +188,7 @@ def candidate_state() -> dict[str, Any]:
 
 Mutator = Callable[[dict[str, Any]], None]
 ReceiptMutator = Callable[[dict[tuple[str, str], dict[str, Any]]], None]
+SigningMutator = Callable[[dict[str, dict[str, Any]]], None]
 PostMaterialize = Callable[[dict[str, Any]], None]
 
 
@@ -196,6 +197,7 @@ def invoke(
     *,
     mutate: Mutator | None = None,
     mutate_receipts: ReceiptMutator | None = None,
+    mutate_signing: SigningMutator | None = None,
     post_materialize: PostMaterialize | None = None,
     precreate_output: bool = False,
 ) -> tuple[subprocess.CompletedProcess[str], Path, dict[str, Any]]:
@@ -255,6 +257,43 @@ def invoke(
         write_json(path, payload, 0o600)
         receipt_paths[key] = path
 
+    signing: dict[str, dict[str, Any]] = {}
+    signing_paths: dict[str, Path] = {}
+    signing_shas: dict[str, str] = {}
+    for platform, (rid, _) in PLATFORMS.items():
+        artifact_rows = [
+            row for row in state["manifest"]["artifacts"] if row["platform"] == platform
+        ]
+        signing[platform] = {
+            "contractName": "chummer6-ui.desktop_artifact_signing",
+            "generatedAt": "2026-07-26T12:30:00Z",
+            "platform": platform,
+            "app": "avalonia",
+            "rid": rid,
+            "releaseChannel": "stable",
+            "releaseVersion": VERSION,
+            "signingStatus": "pass",
+            "notarizationStatus": "pass" if platform == "macos" else None,
+            "reason": "",
+            "artifacts": [
+                {
+                    "fileName": row["fileName"],
+                    "sha256": row["sha256"],
+                    "kind": row["kind"],
+                    "signingStatus": "pass",
+                    "notarizationStatus": "pass" if platform == "macos" else None,
+                }
+                for row in artifact_rows
+            ],
+        }
+    if mutate_signing is not None:
+        mutate_signing(signing)
+    for platform, payload in signing.items():
+        path = tmp_path / "signing" / f"{platform}.receipt.json"
+        raw = write_json(path, payload, 0o600)
+        signing_paths[platform] = path
+        signing_shas[platform] = hashlib.sha256(raw).hexdigest()
+
     output = tmp_path / "GLOBAL_RELEASE_SCOPE_UNION_VERIFICATION.generated.json"
     if precreate_output:
         write_json(output, {"status": "old"})
@@ -287,6 +326,10 @@ def invoke(
                 sha,
                 f"--{platform}-decision-authority",
                 f"design://release-scope/{decision_id}/sha256/{sha}",
+                f"--{platform}-signing-receipt",
+                str(signing_paths[platform]),
+                f"--{platform}-signing-receipt-sha256",
+                signing_shas[platform],
             ]
         )
         for gate in GATES:
@@ -304,6 +347,7 @@ def invoke(
         "files_root": files_root,
         "decisions": decision_paths,
         "receipts": receipt_paths,
+        "signing": signing_paths,
         "command": command,
     }
     if post_materialize is not None:
@@ -332,6 +376,7 @@ def test_accepts_only_complete_exact_global_union_and_emits_closed_receipt(
     ]
     assert len(receipt["presentationReceipts"]) == 9
     assert len({row["sha256"] for row in receipt["presentationReceipts"]}) == 9
+    assert len(receipt["signingReceipts"]) == 3
     assert receipt["registryCommit"] == REGISTRY_COMMIT
     assert receipt["authoritySnapshotSha256"] == AUTHORITY_SNAPSHOT_SHA
     assert receipt["releaseDecisionSha256"] == RELEASE_DECISION_SHA
@@ -479,6 +524,68 @@ def test_rejects_incomplete_promotion_signing_or_notarization(
 
     result, output, _ = invoke(tmp_path, mutate=mutate)
     assert result.returncode == 1
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("platform", "field", "value"),
+    [
+        ("linux", "signingStatus", "unsigned"),
+        ("windows", "releaseVersion", "other-release"),
+        ("macos", "notarizationStatus", "skipped_preview"),
+        ("macos", "platform", "linux"),
+    ],
+)
+def test_rejects_forged_or_mismatched_platform_signing_receipts(
+    tmp_path: Path,
+    platform: str,
+    field: str,
+    value: object,
+) -> None:
+    def mutate_signing(signing: dict[str, dict[str, Any]]) -> None:
+        signing[platform][field] = value
+
+    result, output, _ = invoke(tmp_path, mutate_signing=mutate_signing)
+    assert result.returncode == 1
+    assert f"{platform} signing receipt" in result.stderr
+    assert not output.exists()
+
+
+def test_rejects_signing_receipt_artifact_digest_not_bound_to_manifest(
+    tmp_path: Path,
+) -> None:
+    def mutate_signing(signing: dict[str, dict[str, Any]]) -> None:
+        signing["windows"]["artifacts"][0]["sha256"] = "f" * 64
+
+    result, output, _ = invoke(tmp_path, mutate_signing=mutate_signing)
+    assert result.returncode == 1
+    assert "do not exactly bind manifest artifacts" in result.stderr
+    assert not output.exists()
+
+
+def test_rejects_signed_platform_claim_without_per_artifact_signing(
+    tmp_path: Path,
+) -> None:
+    def mutate_signing(signing: dict[str, dict[str, Any]]) -> None:
+        signing["linux"]["artifacts"][0]["signingStatus"] = "unsigned"
+
+    result, output, _ = invoke(tmp_path, mutate_signing=mutate_signing)
+    assert result.returncode == 1
+    assert "artifact" in result.stderr
+    assert "is not signed" in result.stderr
+    assert not output.exists()
+
+
+def test_rejects_signing_receipt_digest_drift_from_approved_pin(tmp_path: Path) -> None:
+    def post(context: dict[str, Any]) -> None:
+        path = context["signing"]["windows"]
+        payload = json.loads(path.read_text())
+        payload["reason"] = "receipt bytes replaced after approval"
+        write_json(path, payload, 0o600)
+
+    result, output, _ = invoke(tmp_path, post_materialize=post)
+    assert result.returncode == 1
+    assert "windows signing receipt SHA-256 does not match" in result.stderr
     assert not output.exists()
 
 

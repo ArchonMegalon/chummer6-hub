@@ -71,6 +71,8 @@ def _args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         parser.add_argument(f"--{platform}-decision", type=Path, required=True)
         parser.add_argument(f"--{platform}-decision-sha256", required=True)
         parser.add_argument(f"--{platform}-decision-authority", required=True)
+        parser.add_argument(f"--{platform}-signing-receipt", type=Path, required=True)
+        parser.add_argument(f"--{platform}-signing-receipt-sha256", required=True)
         for gate in GATE_SPECS:
             parser.add_argument(
                 f"--{platform}-{gate}-receipt",
@@ -626,6 +628,162 @@ def _verify_presentation(
     return output
 
 
+def _verify_signing_receipts(
+    args: argparse.Namespace,
+    manifest: dict[str, Any],
+) -> list[dict[str, str]]:
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise ScopeError("candidate manifest artifacts must be an array")
+    expected_by_platform: dict[str, list[dict[str, str]]] = {
+        platform: [] for platform in PLATFORM_SPECS
+    }
+    for index, artifact in enumerate(artifacts):
+        if not isinstance(artifact, dict):
+            raise ScopeError(f"candidate artifact row {index} must be an object")
+        platform = decision_contract._platform(
+            artifact.get("platform"),
+            f"artifacts[{index}].platform",
+        )
+        expected_by_platform[platform].append(
+            {
+                "fileName": _safe_basename(
+                    artifact.get("fileName"),
+                    f"artifacts[{index}].fileName",
+                ),
+                "sha256": _canonical_sha(
+                    artifact.get("sha256"),
+                    f"artifacts[{index}].sha256",
+                )
+                if isinstance(artifact.get("sha256"), str)
+                else "",
+                "kind": decision_contract._token(
+                    artifact.get("kind"),
+                    f"artifacts[{index}].kind",
+                ),
+            }
+        )
+    output: list[dict[str, str]] = []
+    observed_hashes: set[str] = set()
+    for platform, rid in PLATFORM_SPECS.items():
+        raw = _stable_bytes(
+            getattr(args, f"{platform}_signing_receipt"),
+            f"{platform} signing receipt",
+            private=True,
+        )
+        receipt_sha = hashlib.sha256(raw).hexdigest()
+        expected_receipt_sha = _canonical_sha(
+            getattr(args, f"{platform}_signing_receipt_sha256"),
+            f"{platform} signing receipt expected SHA-256",
+        )
+        if not hmac.compare_digest(receipt_sha, expected_receipt_sha):
+            raise ScopeError(f"{platform} signing receipt SHA-256 does not match")
+        if receipt_sha in observed_hashes:
+            raise ScopeError("platform signing receipts must be byte-distinct")
+        observed_hashes.add(receipt_sha)
+        payload = _strict_json(raw, f"{platform} signing receipt")
+        _exact_string(
+            payload.get("contractName"),
+            "chummer6-ui.desktop_artifact_signing",
+            f"{platform} signing receipt contractName",
+        )
+        _exact_string(payload.get("platform"), platform, f"{platform} signing receipt platform")
+        _exact_string(payload.get("app"), "avalonia", f"{platform} signing receipt app")
+        _exact_string(payload.get("rid"), rid, f"{platform} signing receipt rid")
+        _exact_string(
+            payload.get("releaseChannel"),
+            "stable",
+            f"{platform} signing receipt releaseChannel",
+        )
+        _exact_string(
+            payload.get("releaseVersion"),
+            args.expected_release_version,
+            f"{platform} signing receipt releaseVersion",
+        )
+        _exact_string(
+            payload.get("signingStatus"),
+            "pass",
+            f"{platform} signing receipt signingStatus",
+        )
+        notarization = payload.get("notarizationStatus")
+        if platform == "macos":
+            _exact_string(
+                notarization,
+                "pass",
+                "macos signing receipt notarizationStatus",
+            )
+        elif notarization not in (None, "not_applicable"):
+            raise ScopeError(
+                f"{platform} signing receipt notarizationStatus must be null/not_applicable"
+            )
+        rows = payload.get("artifacts")
+        if not isinstance(rows, list) or not rows:
+            raise ScopeError(f"{platform} signing receipt artifacts must be non-empty")
+        observed: list[dict[str, str]] = []
+        seen_names: set[str] = set()
+        for row_index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                raise ScopeError(
+                    f"{platform} signing receipt artifact row {row_index} must be an object"
+                )
+            file_name = _safe_basename(
+                row.get("fileName"),
+                f"{platform} signing receipt artifacts[{row_index}].fileName",
+            )
+            if file_name in seen_names:
+                raise ScopeError(f"{platform} signing receipt artifact file names must be unique")
+            seen_names.add(file_name)
+            signing = row.get("signingStatus")
+            if signing != "pass":
+                raise ScopeError(
+                    f"{platform} signing receipt artifact {file_name} is not signed"
+                )
+            row_notarization = row.get("notarizationStatus")
+            if platform == "macos" and row_notarization != "pass":
+                raise ScopeError(
+                    f"macos signing receipt artifact {file_name} is not notarized"
+                )
+            if platform != "macos" and row_notarization not in (None, "not_applicable"):
+                raise ScopeError(
+                    f"{platform} signing receipt artifact {file_name} has invalid notarization"
+                )
+            sha = row.get("sha256")
+            if not isinstance(sha, str):
+                raise ScopeError(
+                    f"{platform} signing receipt artifact {file_name} sha256 is missing"
+                )
+            observed.append(
+                {
+                    "fileName": file_name,
+                    "sha256": _canonical_sha(
+                        sha,
+                        f"{platform} signing receipt artifact {file_name} sha256",
+                    ),
+                    "kind": decision_contract._token(
+                        row.get("kind"),
+                        f"{platform} signing receipt artifact {file_name} kind",
+                    ),
+                }
+            )
+        expected = sorted(
+            expected_by_platform[platform],
+            key=lambda row: (row["fileName"], row["kind"], row["sha256"]),
+        )
+        observed.sort(key=lambda row: (row["fileName"], row["kind"], row["sha256"]))
+        if observed != expected:
+            raise ScopeError(
+                f"{platform} signing receipt artifacts do not exactly bind manifest artifacts"
+            )
+        output.append(
+            {
+                "platform": platform,
+                "contractName": "chummer6-ui.desktop_artifact_signing",
+                "sha256": receipt_sha,
+            }
+        )
+    return output
+
+
 def _write_new(path: Path, payload: dict[str, Any]) -> None:
     _path_without_symlinks(path.parent, "scope union output parent", allow_missing=True)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -702,6 +860,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if artifact_ids != verified_artifact_ids:
             raise ScopeError("candidate artifact verification produced inconsistent identities")
         manifest_sha = hashlib.sha256(manifest_raw).hexdigest()
+        signing_rows = _verify_signing_receipts(args, manifest)
         presentation_rows = _verify_presentation(
             args,
             manifest_sha,
@@ -729,6 +888,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "artifactIds": artifact_ids,
             "manifestSha256": manifest_sha,
             "promotionEvidenceSha256": hashlib.sha256(promotion_raw).hexdigest(),
+            "signingReceipts": signing_rows,
             "presentationReceipts": presentation_rows,
             "registryCommit": registry_commit,
             "authoritySnapshotSha256": authority_snapshot_sha,
