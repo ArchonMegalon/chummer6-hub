@@ -27,14 +27,18 @@ from verify_windows_installer_visual_audit_intake_request import (
     verify as verify_windows_visual_intake_request_receipt,
 )
 from public_edge_postdeploy_contract import (
-    PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
     PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS,
     normalize_public_edge_postdeploy_payload,
+    public_edge_authorizing_binding_failures,
     public_edge_v2_offline_failures,
     public_edge_v2_private_identity_failures,
     release_channel_trust_invariant_failures,
 )
 from verify_flagship_product_readiness_gate import current_release_truth_launch_blockers
+from verify_public_edge_observability_release import (
+    read_regular_file_bytes as read_stable_regular_file_bytes,
+)
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -322,7 +326,7 @@ PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS = {
 }
 PUBLIC_EDGE_REQUIRED_CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
-    "downloads": "chummer.downloads_version_marker.v1",
+    "downloads": "chummer.downloads_version_marker.bound.v1",
     "pwaStatic": "chummer.public_pwa_static_assets.v1",
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -1547,8 +1551,25 @@ def public_edge_postdeploy_release_channel_alignment_failures(
     return failures
 
 
-def public_edge_postdeploy_semantic_failures(payload: dict[str, Any]) -> list[str]:
+def public_edge_postdeploy_semantic_failures(
+    payload: dict[str, Any],
+    *,
+    current_release_channel_sha256: str = "",
+) -> list[str]:
     failures: list[str] = []
+    if not current_release_channel_sha256:
+        failures.append(
+            "public-edge postdeploy current release-channel authority is unavailable"
+        )
+    else:
+        failures.extend(
+            public_edge_authorizing_binding_failures(
+                payload,
+                current_release_channel_sha256=(
+                    current_release_channel_sha256
+                ),
+            )
+        )
     frontdoor_homepage_lane_disclosure_missing = public_edge_postdeploy_homepage_lane_disclosure_missing(payload)
     frontdoor_homepage_lane_copy_mismatch = public_edge_postdeploy_homepage_lane_copy_mismatch(payload)
     for field in sorted(PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS):
@@ -2985,6 +3006,16 @@ def build_payload(
     public_release_snapshot = load_json(PUBLIC_RELEASE_SNAPSHOT_PATH)
     release_channel_path = resolve_release_channel_path()
     release_channel = load_json(release_channel_path)
+    (
+        release_channel_authority_bytes,
+        release_channel_authority_error,
+    ) = read_stable_regular_file_bytes(release_channel_path)
+    current_release_channel_sha256 = (
+        hashlib.sha256(release_channel_authority_bytes).hexdigest()
+        if release_channel_authority_error is None
+        and release_channel_authority_bytes is not None
+        else ""
+    )
     mirror_path = PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json"
     mirror = load_json(mirror_path)
     ruleset_path = PUBLISHED_ROOT / "RULESET_READINESS.generated.json"
@@ -4063,7 +4094,12 @@ def build_payload(
             checks["public_edge_postdeploy_gate"]["failures"].append(
                 "missing postdeploy fields: " + ", ".join(missing_public_edge_fields)
             )
-        semantic_failures = public_edge_postdeploy_semantic_failures(public_edge_postdeploy)
+        semantic_failures = public_edge_postdeploy_semantic_failures(
+            public_edge_postdeploy,
+            current_release_channel_sha256=(
+                current_release_channel_sha256
+            ),
+        )
         frontdoor_homepage_lane_disclosure_missing = public_edge_postdeploy_homepage_lane_disclosure_missing(
             public_edge_postdeploy
         )
@@ -4099,7 +4135,10 @@ def build_payload(
             checks["public_edge_postdeploy_gate"]["status"] = "fail"
             for failure in public_edge_release_truth_runtime_failure_lines:
                 append_unique_failure(checks["public_edge_postdeploy_gate"], failure)
-        if public_edge_contract_name != PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME:
+        if (
+            public_edge_contract_name
+            != PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+        ):
             checks["public_edge_postdeploy_gate"]["pass"] = False
             checks["public_edge_postdeploy_gate"]["status"] = "fail"
             checks["public_edge_postdeploy_gate"].setdefault("failures", [])
@@ -4107,7 +4146,8 @@ def build_payload(
                 "unexpected public-edge postdeploy contract"
             )
         if (
-            public_edge_contract_name == PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME
+            public_edge_contract_name
+            == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
             and not missing_public_edge_fields
             and not semantic_failures
             and not public_edge_non_preflight_receipt_failures

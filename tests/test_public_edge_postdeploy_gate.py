@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -22,15 +23,58 @@ BRIDGE_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_blazor_execution_horizon_br
 READY_HANDOFF_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_ready_mobile_handoff_contract.py"
 
 
-def authenticated_preflight_args() -> list[str]:
+def authenticated_preflight_args(
+    release_channel_path: Path | None = None,
+) -> list[str]:
+    release_channel_sha256 = (
+        hashlib.sha256(release_channel_path.read_bytes()).hexdigest()
+        if release_channel_path is not None
+        else "e" * 64
+    )
     return [
         "--public-projection-snapshot-root",
         "/srv/chummer/public-projection",
         "--runtime-proof-bind-source-sha256",
         "d" * 64,
         "--release-channel-receipt-sha256",
-        "e" * 64,
+        release_channel_sha256,
     ]
+
+
+def bound_downloads_receipt(
+    receipt: dict[str, object],
+    release_channel_sha256: str,
+) -> dict[str, object]:
+    bound = dict(receipt)
+    bound.update(
+        {
+            "contractName": "chummer.downloads_version_marker.bound.v1",
+            "release_channel_receipt_sha256_expected": (
+                release_channel_sha256
+            ),
+            "release_channel_receipt_sha256_actual": (
+                release_channel_sha256
+            ),
+            "release_channel_receipt_sha256_matches": True,
+            "release_channel_receipt_binding_status": "pass",
+            "release_channel_version": "run-20260630",
+            "release_manifest_schema": "chummer.release-channel.v1",
+            "release_manifest_generation": "generation-20260630",
+            "downloads_generation_matches_served_manifest": True,
+            "status_redirect_generation_matches_served_manifest": True,
+        }
+    )
+    return bound
+
+
+def write_child_receipt(
+    path: Path,
+    payload: dict[str, object],
+) -> None:
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def load_module():
@@ -1034,6 +1078,9 @@ def test_review_required_code_deploy_postdeploy_passes_without_claiming_release_
         ),
         encoding="utf-8",
     )
+    release_channel_sha256 = hashlib.sha256(
+        release_channel.read_bytes()
+    ).hexdigest()
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
     commands: list[list[str]] = []
 
@@ -1043,7 +1090,12 @@ def test_review_required_code_deploy_postdeploy_passes_without_claiming_release_
         if "check_public_edge_deploy_preflight.py" in command_text:
             return preflight
         if "verify_downloads_version_marker.py" in command_text:
-            return downloads
+            bound = bound_downloads_receipt(
+                downloads,
+                release_channel_sha256,
+            )
+            write_child_receipt(output_path, bound)
+            return bound
         if "verify_public_pwa_static_assets.py" in command_text:
             return pwa_static
         if "verify_mobile_pwa_ledger_boundary.py" in command_text:
@@ -1072,7 +1124,7 @@ def test_review_required_code_deploy_postdeploy_passes_without_claiming_release_
             "--public-projection-purpose",
             "code-deploy",
             "--expect-code-deploy-review-required",
-            *authenticated_preflight_args(),
+            *authenticated_preflight_args(release_channel),
             "--output",
             str(output),
         ]
@@ -2372,6 +2424,184 @@ def test_trusted_build_info_digest_rejects_pathname_replacement_during_read(
         )
 
 
+def test_authorizing_gate_requires_independent_release_channel_pin(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    release_channel_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel_path.write_bytes(
+        b'{"channel":"public_stable","version":"run-20260630"}'
+    )
+    monkeypatch.setattr(
+        module,
+        "run_child",
+        lambda *args, **kwargs: pytest.fail(
+            "children must not run before release authority validation"
+        ),
+    )
+
+    with pytest.raises(SystemExit):
+        module.orchestrated_main(
+            [
+                "--base-url",
+                "https://chummer.run",
+                "--skip-preflight",
+                "--release-channel-receipt",
+                str(release_channel_path),
+            ]
+        )
+
+
+def test_bound_release_channel_loader_requires_exact_raw_digest(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    release_channel_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    raw = (
+        b'{"channel":"public_stable","version":"run-20260630"}'
+    )
+    release_channel_path.write_bytes(raw)
+
+    with pytest.raises(
+        RuntimeError,
+        match="does not match its independent SHA-256",
+    ):
+        module.load_bound_release_channel_receipt(
+            release_channel_path,
+            expected_sha256="f" * 64,
+        )
+
+    payload, observed_raw, observed_digest = (
+        module.load_bound_release_channel_receipt(
+            release_channel_path,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+        )
+    )
+    assert payload["version"] == "run-20260630"
+    assert observed_raw == raw
+    assert observed_digest == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "raw_payload",
+    [
+        b'{"version":"one","version":"two"}',
+        b'{"version":NaN}',
+        b'\xef\xbb\xbf{"version":"run-20260630"}',
+    ],
+    ids=["duplicate-key", "nan", "utf8-bom"],
+)
+def test_bound_release_channel_loader_rejects_non_strict_json(
+    tmp_path: Path,
+    raw_payload: bytes,
+) -> None:
+    module = load_module()
+    release_channel_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel_path.write_bytes(raw_payload)
+
+    with pytest.raises(
+        RuntimeError,
+        match="not one stable strict JSON object",
+    ):
+        module.load_bound_release_channel_receipt(
+            release_channel_path,
+            expected_sha256=hashlib.sha256(raw_payload).hexdigest(),
+        )
+
+
+def test_bound_release_channel_loader_rejects_symlink_and_oversize(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    target = tmp_path / "target.json"
+    target.write_bytes(b'{"version":"run-20260630"}')
+    symlink = tmp_path / "RELEASE_CHANNEL.generated.json"
+    symlink.symlink_to(target)
+    oversized = tmp_path / "oversized.json"
+    oversized.write_bytes(
+        b"{" + b" " * module.MAX_RELEASE_CHANNEL_RECEIPT_BYTES + b"}"
+    )
+
+    for path in (symlink, oversized):
+        with pytest.raises(
+            RuntimeError,
+            match="not one stable strict JSON object",
+        ):
+            module.load_bound_release_channel_receipt(
+                path,
+                expected_sha256=hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest(),
+            )
+
+
+def test_bound_release_channel_loader_rejects_fifo_swap_without_blocking(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    release_channel_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    raw = b'{"version":"run-20260630"}'
+    release_channel_path.write_bytes(raw)
+    real_open = module.os.open
+    swapped = False
+
+    def swap_before_open(path, flags, *args, **kwargs):  # noqa: ANN001
+        nonlocal swapped
+        if Path(path) == release_channel_path and not swapped:
+            assert flags & os.O_NONBLOCK
+            release_channel_path.unlink()
+            os.mkfifo(release_channel_path)
+            swapped = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", swap_before_open)
+
+    with pytest.raises(
+        RuntimeError,
+        match="not one stable strict JSON object",
+    ):
+        module.load_bound_release_channel_receipt(
+            release_channel_path,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+        )
+    assert swapped is True
+
+
+def test_bound_release_channel_loader_rejects_path_replacement(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    release_channel_path = tmp_path / "RELEASE_CHANNEL.generated.json"
+    raw = b'{"version":"run-20260630"}'
+    release_channel_path.write_bytes(raw)
+    replacement = tmp_path / "replacement.json"
+    replacement.write_bytes(raw)
+    real_close = module.os.close
+    replaced = False
+
+    def replace_after_close(descriptor: int) -> None:
+        nonlocal replaced
+        real_close(descriptor)
+        if not replaced:
+            replacement.replace(release_channel_path)
+            replaced = True
+
+    monkeypatch.setattr(module.os, "close", replace_after_close)
+
+    with pytest.raises(
+        RuntimeError,
+        match="not one stable strict JSON object",
+    ):
+        module.load_bound_release_channel_receipt(
+            release_channel_path,
+            expected_sha256=hashlib.sha256(raw).hexdigest(),
+        )
+    assert replaced is True
+
+
 def test_main_threads_preflight_deployment_digest_into_live_pwa_child(
     monkeypatch,
 ) -> None:
@@ -2389,10 +2619,25 @@ def test_main_threads_preflight_deployment_digest_into_live_pwa_child(
         return {}
 
     monkeypatch.setattr(module, "run_child", fake_run_child)
+    legacy_schema = module.load_exact_public_edge_postdeploy_schema()
+    composed_receipt = {
+        field: None
+        for field in legacy_schema["fields"]
+    }
+    composed_receipt.update(
+        {
+            "childReceipts": {},
+            "contractName": (
+                module.PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
+            ),
+            "failures": [],
+            "status": "pass",
+        }
+    )
     monkeypatch.setattr(
         module,
         "compose_status",
-        lambda *args, **kwargs: {"status": "pass", "failures": []},
+        lambda *args, **kwargs: dict(composed_receipt),
     )
     monkeypatch.setattr(
         module,
@@ -4413,6 +4658,9 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     preflight, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell = passing_receipts()
     release_channel = tmp_path / "custom-release-channel.json"
     release_channel.write_text('{"version":"run-20260630"}', encoding="utf-8")
+    release_channel_sha256 = hashlib.sha256(
+        release_channel.read_bytes()
+    ).hexdigest()
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
     commands: list[list[str]] = []
 
@@ -4422,7 +4670,12 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
         if "check_public_edge_deploy_preflight.py" in command_text:
             return preflight
         if "verify_downloads_version_marker.py" in command_text:
-            return downloads
+            bound = bound_downloads_receipt(
+                downloads,
+                release_channel_sha256,
+            )
+            write_child_receipt(output_path, bound)
+            return bound
         if "verify_public_pwa_static_assets.py" in command_text:
             return pwa_static
         if "verify_mobile_pwa_ledger_boundary.py" in command_text:
@@ -4444,7 +4697,7 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
             "https://chummer.run",
             "--release-channel-receipt",
             str(release_channel),
-            *authenticated_preflight_args(),
+            *authenticated_preflight_args(release_channel),
             "--output",
             str(output),
         ]
@@ -4470,7 +4723,11 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
     assert "--allow-non-launch-supported-release-channel" in downloads_command
     assert "--skip-release-version-match" not in downloads_command
     result = json.loads(output.read_text(encoding="utf-8"))
-    schema_authority = module.load_exact_public_edge_postdeploy_schema()
+    schema_authority = module.load_exact_public_edge_postdeploy_schema(
+        receipt_contract_name=(
+            module.PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+        )
+    )
     assert result["childReceipts"] == {}
     assert result["schemaContractName"] == schema_authority["contractName"]
     assert result["schemaSha256"] == schema_authority["sha256"]
@@ -4514,6 +4771,14 @@ def test_child_receipt_sanitizer_drops_secret_bearing_keys_recursively() -> None
 def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, tmp_path) -> None:
     module = load_module()
     preflight, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell = passing_receipts()
+    release_channel = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel.write_text(
+        '{"version":"run-20260630"}',
+        encoding="utf-8",
+    )
+    release_channel_sha256 = hashlib.sha256(
+        release_channel.read_bytes()
+    ).hexdigest()
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
     commands: list[list[str]] = []
 
@@ -4523,7 +4788,12 @@ def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, t
         if "check_public_edge_deploy_preflight.py" in command_text:
             return preflight
         if "verify_downloads_version_marker.py" in command_text:
-            return downloads
+            bound = bound_downloads_receipt(
+                downloads,
+                release_channel_sha256,
+            )
+            write_child_receipt(output_path, bound)
+            return bound
         if "verify_public_pwa_static_assets.py" in command_text:
             return pwa_static
         if "verify_mobile_pwa_ledger_boundary.py" in command_text:
@@ -4543,8 +4813,10 @@ def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, t
         [
             "--base-url",
             "https://chummer.run",
+            "--release-channel-receipt",
+            str(release_channel),
             "--strict-preflight",
-            *authenticated_preflight_args(),
+            *authenticated_preflight_args(release_channel),
             "--output",
             str(output),
         ]
@@ -4570,6 +4842,14 @@ def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, t
 def test_main_passes_custom_overlay_root_to_preflight_child(monkeypatch, tmp_path) -> None:
     module = load_module()
     preflight, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell = passing_receipts()
+    release_channel = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel.write_text(
+        '{"version":"run-20260630"}',
+        encoding="utf-8",
+    )
+    release_channel_sha256 = hashlib.sha256(
+        release_channel.read_bytes()
+    ).hexdigest()
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
     overlay_root = tmp_path / "overlay" / "app"
     commands: list[list[str]] = []
@@ -4580,7 +4860,12 @@ def test_main_passes_custom_overlay_root_to_preflight_child(monkeypatch, tmp_pat
         if "check_public_edge_deploy_preflight.py" in command_text:
             return preflight
         if "verify_downloads_version_marker.py" in command_text:
-            return downloads
+            bound = bound_downloads_receipt(
+                downloads,
+                release_channel_sha256,
+            )
+            write_child_receipt(output_path, bound)
+            return bound
         if "verify_public_pwa_static_assets.py" in command_text:
             return pwa_static
         if "verify_mobile_pwa_ledger_boundary.py" in command_text:
@@ -4600,9 +4885,11 @@ def test_main_passes_custom_overlay_root_to_preflight_child(monkeypatch, tmp_pat
         [
             "--base-url",
             "https://chummer.run",
+            "--release-channel-receipt",
+            str(release_channel),
             "--overlay-root",
             str(overlay_root),
-            *authenticated_preflight_args(),
+            *authenticated_preflight_args(release_channel),
             "--output",
             str(output),
         ]
@@ -4675,6 +4962,14 @@ def test_main_passes_release_match_skip_to_downloads_child(monkeypatch, tmp_path
 def test_main_records_skip_preflight_in_output(monkeypatch, tmp_path) -> None:
     module = load_module()
     _, downloads, pwa_static, mobile_ledger, ready_mobile_handoff, participate_iframe_shell = passing_receipts()
+    release_channel = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel.write_text(
+        '{"version":"run-20260630"}',
+        encoding="utf-8",
+    )
+    release_channel_sha256 = hashlib.sha256(
+        release_channel.read_bytes()
+    ).hexdigest()
     output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
 
     def fake_run_child(command, output_path, allow_failure=False):  # noqa: ANN001
@@ -4682,7 +4977,12 @@ def test_main_records_skip_preflight_in_output(monkeypatch, tmp_path) -> None:
         if "check_public_edge_deploy_preflight.py" in command_text:
             raise AssertionError("preflight child should not run when --skip-preflight is set")
         if "verify_downloads_version_marker.py" in command_text:
-            return downloads
+            bound = bound_downloads_receipt(
+                downloads,
+                release_channel_sha256,
+            )
+            write_child_receipt(output_path, bound)
+            return bound
         if "verify_public_pwa_static_assets.py" in command_text:
             return pwa_static
         if "verify_mobile_pwa_ledger_boundary.py" in command_text:
@@ -4702,12 +5002,16 @@ def test_main_records_skip_preflight_in_output(monkeypatch, tmp_path) -> None:
         [
             "--base-url",
             "https://chummer.run",
-                "--skip-preflight",
-                "--expected-full-deployment-digest-sha256",
-                "b" * 64,
-                "--expected-pwa-asset-inventory-sha256",
-                "c" * 64,
-                "--output",
+            "--skip-preflight",
+            "--release-channel-receipt",
+            str(release_channel),
+            "--release-channel-receipt-sha256",
+            release_channel_sha256,
+            "--expected-full-deployment-digest-sha256",
+            "b" * 64,
+            "--expected-pwa-asset-inventory-sha256",
+            "c" * 64,
+            "--output",
             str(output),
         ]
     )
