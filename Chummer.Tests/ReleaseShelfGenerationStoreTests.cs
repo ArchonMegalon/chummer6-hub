@@ -1426,25 +1426,48 @@ public sealed class ReleaseShelfGenerationStoreTests
             PropertyNameCaseInsensitive = true,
             WriteIndented = true
         };
-        string receiptRoot = Path.Combine(
+        string historyRoot = Path.Combine(
             downloadsRoot,
-            ".release-shelf-activation-journal",
-            receiptId);
+            ".release-shelf-activation-journal");
+        string receiptRoot = Path.Combine(historyRoot, receiptId);
         Directory.CreateDirectory(receiptRoot);
-        File.WriteAllBytes(
-            Path.Combine(receiptRoot, "intent.json"),
-            JsonSerializer.SerializeToUtf8Bytes(journal, options));
-        string intentSha = $"sha256:{Convert.ToHexStringLower(SHA256.HashData(
-            JsonSerializer.SerializeToUtf8Bytes(journal, options)))}";
+        if (!OperatingSystem.IsWindows())
+        {
+            const UnixFileMode directoryMode =
+                UnixFileMode.UserRead
+                | UnixFileMode.UserWrite
+                | UnixFileMode.UserExecute;
+            File.SetUnixFileMode(historyRoot, directoryMode);
+            File.SetUnixFileMode(receiptRoot, directoryMode);
+        }
+
+        byte[] intentBytes = JsonSerializer.SerializeToUtf8Bytes(journal, options);
+        string intentPath = Path.Combine(receiptRoot, "intent.json");
+        File.WriteAllBytes(intentPath, intentBytes);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                intentPath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        string intentSha =
+            $"sha256:{Convert.ToHexStringLower(SHA256.HashData(intentBytes))}";
         var outcome = new TestActivationOutcome(
             SchemaVersion: "chummer.release-shelf.activation-outcome/v1",
             State: "committed",
             ActivationReceiptId: receiptId,
             IntentSha256: intentSha,
             ResolvedAtUtc: activatedAt);
+        string outcomePath = Path.Combine(receiptRoot, "outcome.json");
         File.WriteAllBytes(
-            Path.Combine(receiptRoot, "outcome.json"),
+            outcomePath,
             JsonSerializer.SerializeToUtf8Bytes(outcome, options));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                outcomePath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
     }
 
     private sealed record TestActivationJournal(
