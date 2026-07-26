@@ -368,7 +368,7 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         (
             "www.chummer.run",
             "/downloads/",
-            "http://incumbent:8080",
+            "http://host.docker.internal:8123",
         ),
         (
             "www.chummer.run",
@@ -378,7 +378,37 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         (
             "www.chummer.run",
             "/status/",
-            "http://incumbent:8080",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/get/unknown-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/AVALONIA-WIN-X64-INSTALLER",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/GET/avalonia-win-x64-installer",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer/private",
+            "http_status:404",
         ),
         (
             "chummer.run",
@@ -671,7 +701,9 @@ def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
     "path",
     [
         "/downloads",
+        "/downloads/",
         "/status",
+        "/status/",
         "/api/ready/public-downloads",
         "/api/ready",
         "/api/ready/publication",
@@ -682,6 +714,7 @@ def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
         "/downloads/install/avalonia-win-x64-installer",
         "/downloads/install/avalonia-win-x64-installer/payload",
         "/downloads/install/avalonia-win-x64-installer/metadata",
+        "/downloads/get/avalonia-win-x64-installer",
         "/api/v1/public/release-truth",
         "/api/public/release-truth",
         f"/api/v1/public/release-truth/g/{GENERATION_ID}",
@@ -709,9 +742,7 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/downloads/",
         "/downloads/unapproved",
-        "/status/",
         "/status/details",
         "/downloads/current.json",
         "/downloads/PUBLICATION_SCOPE.generated.json",
@@ -727,6 +758,14 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         "/downloads/install/avalonia-win-x64-installer/payload/",
         "/downloads/install/avalonia-win-x64-installer/metadata/extra",
         "/downloads/install/avalonia-win-x64-installer?next=/admin",
+        "/downloads/get",
+        "/downloads/get/",
+        "/downloads/get/-invalid",
+        "/DOWNLOADS/GET/avalonia-win-x64-installer",
+        "/downloads/get/AVALONIA-WIN-X64-INSTALLER",
+        "/downloads/get/avalonia-win-x64-installer/",
+        "/downloads/get/avalonia-win-x64-installer/private",
+        "/downloads/get/avalonia-win-x64-installer?next=/admin",
         "/API/V1/PUBLIC/RELEASE-TRUTH",
         "/api/V1/public/release-truth",
         "/api/v1/Public/release-truth",
@@ -790,6 +829,9 @@ def test_safe_install_ids_reach_the_governed_runtime_for_authority_decision(
     assert transaction.managed_path_matches(
         f"/downloads/install/{artifact_id}"
     )
+    assert transaction.managed_path_matches(
+        f"/downloads/get/{artifact_id}"
+    )
 
 
 def test_managed_regex_uses_no_known_non_re2_constructs() -> None:
@@ -814,17 +856,19 @@ def test_managed_control_paths_close_the_strict_postdeploy_contract() -> None:
 
 
 def test_managed_public_page_paths_are_exact() -> None:
-    assert (
-        transaction.MANAGED_PUBLIC_PAGE_PATHS
-        == postdeploy.PUBLIC_PAGE_PATHS
-    )
     assert set(transaction.MANAGED_PUBLIC_PAGE_PATHS) == {
         "/downloads",
         "/status",
     }
+    assert set(postdeploy.PUBLIC_PAGE_PATHS) == {
+        "/downloads",
+        "/downloads/",
+        "/status",
+        "/status/",
+    }
     for path in transaction.MANAGED_PUBLIC_PAGE_PATHS:
         assert transaction.managed_path_matches(path)
-        assert not transaction.managed_path_matches(f"{path}/")
+        assert transaction.managed_path_matches(f"{path}/")
         assert not transaction.managed_path_matches(f"{path}/extra")
 
 

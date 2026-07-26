@@ -44,6 +44,7 @@ PRIVATE_PATHS = (
 INSTALL_ROUTE_DENIAL_PATHS = (
     "/downloads/install/public-download-only-probe",
 )
+PUBLIC_DOWNLOAD_ROUTE_TEMPLATE = "/downloads/get/{artifact_id}"
 CURRENT_RELEASE_TRUTH_PATHS = (
     "/api/v1/public/release-truth",
     "/api/public/release-truth",
@@ -54,12 +55,21 @@ GENERATION_RELEASE_TRUTH_PATH_TEMPLATES = (
 )
 PUBLIC_PAGE_PATHS = (
     "/downloads",
+    "/downloads/",
     "/status",
+    "/status/",
 )
+DOWNLOAD_PAGE_PATHS = frozenset(("/downloads", "/downloads/"))
 PUBLIC_PAGE_MARKER_ATTRIBUTES = (
     "data-downloads-release-version",
     "data-downloads-release-generation",
     "data-downloads-public-count",
+)
+PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES = (
+    "href",
+    "data-download-action",
+    "data-download-artifact",
+    "data-download-install-route",
 )
 FORBIDDEN_RESPONSE_HEADERS = (
     "Authorization",
@@ -157,6 +167,7 @@ class PublicPageIdentityParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.markers: list[dict[str, list[str | None]]] = []
+        self.download_actions: list[dict[str, list[str | None]]] = []
 
     def _record_marker(self, attrs: list[tuple[str, str | None]]) -> None:
         values: dict[str, list[str | None]] = {}
@@ -167,19 +178,36 @@ class PublicPageIdentityParser(HTMLParser):
         if values:
             self.markers.append(values)
 
+    def _record_download_action(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag.lower() != "a":
+            return
+        values: dict[str, list[str | None]] = {}
+        for name, value in attrs:
+            normalized_name = name.lower()
+            if normalized_name in PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES:
+                values.setdefault(normalized_name, []).append(value)
+        if values.get("data-download-action") == ["download-artifact"]:
+            self.download_actions.append(values)
+
     def handle_starttag(
         self,
-        _tag: str,
+        tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
         self._record_marker(attrs)
+        self._record_download_action(tag, attrs)
 
     def handle_startendtag(
         self,
-        _tag: str,
+        tag: str,
         attrs: list[tuple[str, str | None]],
     ) -> None:
         self._record_marker(attrs)
+        self._record_download_action(tag, attrs)
 
 
 class AnonymousAuth(requests.auth.AuthBase):
@@ -1388,6 +1416,66 @@ def _public_page_identity(
         raise ValueError(
             "canonical and compatibility manifest artifact counts disagree"
         )
+    expected_download_actions: list[dict[str, str]] = []
+    canonical_artifact_ids: list[str] = []
+    for artifact in canonical_artifacts:
+        artifact_id = _required_text(
+            artifact,
+            "artifactId",
+            "live canonical manifest artifact",
+        )
+        if (
+            not artifact_id
+            or len(artifact_id) > 128
+            or not (
+                artifact_id[0].isascii()
+                and (
+                    artifact_id[0].islower()
+                    or artifact_id[0].isdigit()
+                )
+            )
+            or any(
+                not (
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "-"
+                    )
+                )
+                for character in artifact_id
+            )
+        ):
+            raise ValueError(
+                "live canonical manifest has an unsafe public artifact id"
+            )
+        canonical_artifact_ids.append(artifact_id)
+        expected_download_actions.append(
+            {
+                "artifactId": artifact_id,
+                "installRoute": f"/downloads/install/{artifact_id}",
+                "downloadRoute": PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+                    artifact_id=artifact_id
+                ),
+            }
+        )
+    compatibility_artifact_ids = [
+        _required_text(
+            artifact,
+            "artifactId",
+            "live compatibility manifest artifact",
+        )
+        for artifact in compatibility_downloads
+    ]
+    if (
+        len(set(canonical_artifact_ids)) != len(canonical_artifact_ids)
+        or len(set(compatibility_artifact_ids))
+        != len(compatibility_artifact_ids)
+        or set(canonical_artifact_ids) != set(compatibility_artifact_ids)
+    ):
+        raise ValueError(
+            "canonical and compatibility manifest artifact ids disagree"
+        )
 
     if release_truth is not None:
         truth_version = _required_text(
@@ -1418,6 +1506,10 @@ def _public_page_identity(
         "generationId": manifest_generation or "legacy",
         "artifactCount": artifact_count,
         "releaseTruthBound": release_truth is not None,
+        "downloadActions": sorted(
+            expected_download_actions,
+            key=lambda row: row["artifactId"],
+        ),
     }
 
 
@@ -1520,6 +1612,83 @@ def _stream_public_page_identity(
                 )
             observed_markers[attribute] = observed_value
 
+        observed_download_actions: list[dict[str, str]] = []
+        if path in DOWNLOAD_PAGE_PATHS:
+            expected_actions = expected_identity.get("downloadActions")
+            if not isinstance(expected_actions, list):
+                raise ValueError(
+                    f"{path} has no canonical download-action contract"
+                )
+            expected_by_artifact = {
+                str(action.get("artifactId") or ""): action
+                for action in expected_actions
+                if isinstance(action, Mapping)
+            }
+            if (
+                len(expected_by_artifact) != len(expected_actions)
+                or len(parser.download_actions) != len(expected_actions)
+            ):
+                raise ValueError(
+                    f"{path} download actions do not match canonical artifacts"
+                )
+            seen_artifact_ids: set[str] = set()
+            for action in parser.download_actions:
+                values: dict[str, str] = {}
+                for attribute in PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES:
+                    attribute_values = action.get(attribute, [])
+                    if (
+                        len(attribute_values) != 1
+                        or attribute_values[0] is None
+                    ):
+                        raise ValueError(
+                            f"{path} download action must expose "
+                            f"{attribute} exactly once"
+                        )
+                    values[attribute] = str(attribute_values[0])
+                artifact_id = values["data-download-artifact"]
+                expected_action = expected_by_artifact.get(artifact_id)
+                if (
+                    expected_action is None
+                    or artifact_id in seen_artifact_ids
+                ):
+                    raise ValueError(
+                        f"{path} download actions do not match "
+                        "canonical artifacts"
+                    )
+                seen_artifact_ids.add(artifact_id)
+                install_route = str(
+                    expected_action.get("installRoute") or ""
+                )
+                download_route = str(
+                    expected_action.get("downloadRoute") or ""
+                )
+                if (
+                    values["data-download-action"] != "download-artifact"
+                    or values["data-download-install-route"]
+                    != install_route
+                    or values["href"]
+                    not in {install_route, download_route}
+                ):
+                    raise ValueError(
+                        f"{path} download action does not close over its "
+                        "governed install and byte routes"
+                    )
+                observed_download_actions.append(
+                    {
+                        "artifactId": artifact_id,
+                        "href": values["href"],
+                        "installRoute": install_route,
+                        "downloadRoute": download_route,
+                    }
+                )
+            if seen_artifact_ids != set(expected_by_artifact):
+                raise ValueError(
+                    f"{path} download actions do not match canonical artifacts"
+                )
+            observed_download_actions.sort(
+                key=lambda action: action["artifactId"]
+            )
+
         return {
             "method": "GET",
             "url": url,
@@ -1528,6 +1697,7 @@ def _stream_public_page_identity(
             "sizeBytes": size,
             "sha256": digest.hexdigest(),
             "markers": observed_markers,
+            "downloadActions": observed_download_actions,
         }
     finally:
         response.close()
@@ -1559,9 +1729,39 @@ def _verify_public_pages(
         )
         for path in PUBLIC_PAGE_PATHS
     }
+    parity: dict[str, dict[str, Any]] = {}
+    for canonical_path, slash_path in (
+        ("/downloads", "/downloads/"),
+        ("/status", "/status/"),
+    ):
+        canonical_surface = surfaces[canonical_path]
+        slash_surface = surfaces[slash_path]
+        same_bytes = (
+            canonical_surface["sha256"] == slash_surface["sha256"]
+            and canonical_surface["sizeBytes"]
+            == slash_surface["sizeBytes"]
+        )
+        same_markers = (
+            canonical_surface["markers"] == slash_surface["markers"]
+        )
+        same_actions = (
+            canonical_surface["downloadActions"]
+            == slash_surface["downloadActions"]
+        )
+        if not (same_bytes and same_markers and same_actions):
+            raise ValueError(
+                f"{canonical_path} and {slash_path} public surfaces drift"
+            )
+        parity[canonical_path] = {
+            "slashPath": slash_path,
+            "sameBytes": same_bytes,
+            "sameMarkers": same_markers,
+            "sameDownloadActions": same_actions,
+        }
     return {
         **identity,
         "surfaces": surfaces,
+        "trailingSlashParity": parity,
     }
 
 
@@ -2590,6 +2790,9 @@ def verify_control_plane(
         advertised_install_route = str(
             artifact_handoff.get("publicInstallRoute") or ""
         ).strip()
+        public_download_route = PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+            artifact_id=artifact_id
+        )
         if (
             not artifact_id
             or len(artifact_id) > 128
@@ -2617,8 +2820,12 @@ def verify_control_plane(
             raise ValueError(
                 f"{path} advertised an unsafe or unbound publicInstallRoute"
             )
-        if advertised_install_route not in install_route_paths:
-            install_route_paths.append(advertised_install_route)
+        for governed_route in (
+            advertised_install_route,
+            public_download_route,
+        ):
+            if governed_route not in install_route_paths:
+                install_route_paths.append(governed_route)
         release_truth_sha256 = _canonical_object_sha256(release_truth)
         if (
             install_route_release_truth_sha256 is not None
