@@ -3044,6 +3044,7 @@ from __future__ import annotations
 
 import os
 import stat
+import subprocess
 import sys
 from typing import Callable
 
@@ -3085,13 +3086,69 @@ def _validate_metadata(metadata: os.stat_result) -> None:
         _reject()
 
 
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    lines = completed.stdout.splitlines()
+    permission_fields = lines[0].split(maxsplit=1) if len(lines) == 1 else []
+    permission_token = permission_fields[0] if permission_fields else b""
+    if (
+        completed.returncode != 0
+        or completed.stderr
+        or len(lines) != 1
+        or not permission_token
+        or b"+" in permission_token
+        or permission_token not in {b"-rw-------", b"-rw-------@"}
+    ):
+        _reject()
+
+
+def _pread_bounded(
+    descriptor: int,
+    position_reader: Callable[[int, int, int], bytes],
+) -> bytes:
+    chunks: list[bytes] = []
+    offset = 0
+    remaining = MAX_FILE_BYTES + 1
+    while remaining > 0:
+        chunk = position_reader(descriptor, remaining, offset)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        offset += len(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
 def read_credential(
     path: str,
     *,
     opener: Callable[[str, int], int] = os.open,
     lstater: Callable[[str], os.stat_result] = os.lstat,
     fstater: Callable[[int], os.stat_result] = os.fstat,
-    reader: Callable[[int, int], bytes] = os.read,
+    position_reader: Callable[[int, int, int], bytes] = os.pread,
     closer: Callable[[int], None] = os.close,
 ) -> bytes:
     if not os.path.isabs(path) or not hasattr(os, "O_NOFOLLOW"):
@@ -3112,28 +3169,26 @@ def read_credential(
         if _metadata_identity(opened) != _metadata_identity(before):
             _reject()
 
-        chunks: list[bytes] = []
-        remaining = MAX_FILE_BYTES + 1
-        while remaining > 0:
-            chunk = reader(descriptor, min(4096, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        raw = b"".join(chunks)
+        assert_no_macos_acl(descriptor)
+        raw = _pread_bounded(descriptor, position_reader)
         after = fstater(descriptor)
+        confirmed_raw = _pread_bounded(descriptor, position_reader)
+        confirmed = fstater(descriptor)
+        assert_no_macos_acl(descriptor)
+        final = lstater(path)
+        _validate_metadata(after)
+        _validate_metadata(confirmed)
+        _validate_metadata(final)
+        if (
+            len(raw) != before.st_size
+            or confirmed_raw != raw
+            or _metadata_identity(after) != _metadata_identity(before)
+            or _metadata_identity(confirmed) != _metadata_identity(before)
+            or _metadata_identity(final) != _metadata_identity(before)
+        ):
+            _reject()
     finally:
         closer(descriptor)
-
-    final = lstater(path)
-    _validate_metadata(after)
-    _validate_metadata(final)
-    if (
-        len(raw) != before.st_size
-        or _metadata_identity(after) != _metadata_identity(before)
-        or _metadata_identity(final) != _metadata_identity(before)
-    ):
-        _reject()
 
     if raw.endswith(b"\n"):
         raw = raw[:-1]

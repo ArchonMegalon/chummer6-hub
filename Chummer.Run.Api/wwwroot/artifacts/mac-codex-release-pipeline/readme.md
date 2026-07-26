@@ -48,12 +48,14 @@ If one upload-auth file source is set, the wrapper runs fully non-interactive an
 
 ```bash
 ticket_file="$HOME/.chummer-release-upload-ticket"
-install -m 600 /dev/null "$ticket_file"
+ticket_tmp="$(mktemp "$(dirname "$ticket_file")/.chummer-release-upload-ticket.XXXXXX")"
+chmod 600 "$ticket_tmp"
 printf 'Release upload access code: ' >&2
 IFS= read -r -s ticket_value
 printf '\n' >&2
-printf '%s\n' "$ticket_value" > "$ticket_file"
+printf '%s\n' "$ticket_value" > "$ticket_tmp"
 unset ticket_value
+mv "$ticket_tmp" "$ticket_file"
 export CHUMMER_RELEASE_UPLOAD_TICKET_FILE="$ticket_file"
 repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
@@ -61,7 +63,9 @@ bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 
 Credential-source selection is deliberately fail-closed. Set exactly one of `CHUMMER_RELEASE_UPLOAD_TOKEN`, `CHUMMER_RELEASE_UPLOAD_TICKET`, `CHUMMER_RELEASE_UPLOAD_TOKEN_FILE`, `CHUMMER_RELEASE_UPLOAD_TOKEN_PATH`, `CHUMMER_RELEASE_UPLOAD_TICKET_FILE`, or `CHUMMER_RELEASE_UPLOAD_TICKET_PATH`; the `*_PATH` names are aliases for their corresponding `*_FILE` names, not fallback precedence. Any combination, including both aliases with the same path, is rejected.
 
-A credential file must be an absolute path to a current-operator-owned regular file that is not a symlink, has exactly one hard link, and has exact mode `0600`. Its contents must be valid UTF-8, contain 1–8192 credential bytes, and may have one final LF; empty, multiline, CR/CRLF, NUL, oversized, replaced, or deleted-during-read files are rejected. The bootstrap opens it with no-follow semantics, validates the opened identity before and after a bounded read, revalidates the path, immediately unsets all inherited credential-source variables, and retains the credential only in a de-exported shell local. It never puts file credential plaintext in a process argument, child environment, log, URL, or persistent curl configuration; upload authorization continues to stream to `curl --config -` over stdin.
+A credential file must be an absolute path to a current-operator-owned regular file that is not a symlink, has exactly one hard link, and has exact mode `0600`. Its contents must be valid UTF-8, contain 1–8192 credential bytes, and may have one final LF; empty, multiline, CR/CRLF, NUL, and oversized values are rejected. The bootstrap opens the file with no-follow semantics, rejects an extended macOS ACL, takes two bounded explicit-offset snapshots of the same open descriptor, and rejects identity, path, metadata, deletion, or byte disagreement observed across those checks. It immediately unsets all inherited credential-source variables and retains the credential only in a de-exported shell local. It never puts file credential plaintext in a process argument, child environment, log, URL, or persistent curl configuration; upload authorization continues to stream to `curl --config -` over stdin.
+
+Publish credential files before starting the bootstrap: create a new owner-only mode-`0600` single-link file, write and close it completely, then atomically rename it to the configured absolute path. Do not truncate, overwrite, replace, or otherwise mutate that path or inode while the bootstrap is running. The identity checks and two snapshots reject a single mutation they observe, but finite rereads are not synchronization against an arbitrary hostile process running as the same operator UID.
 
 Do not hardcode `/docker/chummercomplete/.../bootstrap.sh` on the Mac host. That path only exists in provisioned Linux control environments, not on a normal release workstation.
 

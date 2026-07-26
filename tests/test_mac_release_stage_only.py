@@ -545,6 +545,18 @@ printf 'source=%s\nvalue=%s\nscrubbed=%s\n' "$resolved_source" "$resolved_value"
     )
 
 
+def load_credential_reader_namespace() -> tuple[str, dict[str, object]]:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    marker = "PY_RELEASE_UPLOAD_AUTH_READER"
+    start_token = f"3<<'{marker}'\n"
+    reader_start = bootstrap.index(start_token) + len(start_token)
+    reader_end = bootstrap.index(f"\n{marker}", reader_start)
+    reader_source = bootstrap[reader_start:reader_end]
+    namespace: dict[str, object] = {"__name__": "credential_reader_test"}
+    exec(compile(reader_source, "<credential-reader>", "exec"), namespace)
+    return reader_source, namespace
+
+
 def test_bootstrap_accepts_each_owner_only_file_alias_and_scrubs_environment(
     tmp_path: Path,
 ) -> None:
@@ -742,15 +754,10 @@ def test_bootstrap_file_capture_disables_xtrace_and_redacts_failures(
     assert str(credential_file) not in rejected.stdout + rejected.stderr
 
 
-def test_credential_reader_rejects_deletion_races(tmp_path: Path) -> None:
-    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
-    marker = "PY_RELEASE_UPLOAD_AUTH_READER"
-    start_token = f"3<<'{marker}'\n"
-    reader_start = bootstrap.index(start_token) + len(start_token)
-    reader_end = bootstrap.index(f"\n{marker}", reader_start)
-    reader_source = bootstrap[reader_start:reader_end]
-    namespace: dict[str, object] = {"__name__": "credential_reader_test"}
-    exec(compile(reader_source, "<credential-reader>", "exec"), namespace)
+def test_credential_reader_rejects_deletion_and_in_place_races(
+    tmp_path: Path,
+) -> None:
+    _reader_source, namespace = load_credential_reader_namespace()
     read_credential = namespace["read_credential"]
     unsafe_error = namespace["UnsafeCredentialFile"]
 
@@ -774,20 +781,167 @@ def test_credential_reader_rejects_deletion_races(tmp_path: Path) -> None:
     during_read.chmod(0o600)
     deleted = False
 
-    def deleting_reader(descriptor: int, size: int) -> bytes:
+    def deleting_reader(descriptor: int, size: int, offset: int) -> bytes:
         nonlocal deleted
-        chunk = os.read(descriptor, size)
+        chunk = os.pread(descriptor, size, offset)
         if chunk and not deleted:
             during_read.unlink()
             deleted = True
         return chunk
 
     try:
-        read_credential(str(during_read), reader=deleting_reader)
+        read_credential(str(during_read), position_reader=deleting_reader)
     except (OSError, unsafe_error):
         pass
     else:
         raise AssertionError("credential deletion during read was accepted")
+
+    in_place = tmp_path / "same-size-in-place"
+    in_place.write_bytes(b"a" * 6000)
+    in_place.chmod(0o600)
+    frozen_metadata = os.lstat(in_place)
+    overwritten = False
+
+    def overwriting_reader(descriptor: int, size: int, offset: int) -> bytes:
+        nonlocal overwritten
+        chunk = os.pread(descriptor, size, offset)
+        if chunk and not overwritten:
+            writer = os.open(in_place, os.O_WRONLY)
+            try:
+                os.pwrite(writer, b"b" * 6000, 0)
+            finally:
+                os.close(writer)
+            overwritten = True
+        return chunk
+
+    try:
+        read_credential(
+            str(in_place),
+            lstater=lambda _path: frozen_metadata,
+            fstater=lambda _descriptor: frozen_metadata,
+            position_reader=overwriting_reader,
+        )
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("same-size credential rewrite during read was accepted")
+
+    event_order = tmp_path / "event-order"
+    event_order.write_text("stable-credential\n", encoding="utf-8")
+    event_order.chmod(0o600)
+    events: list[str] = []
+
+    def recording_lstater(path: str) -> os.stat_result:
+        events.append("lstat")
+        return os.lstat(path)
+
+    def recording_closer(descriptor: int) -> None:
+        events.append("close")
+        os.close(descriptor)
+
+    assert (
+        read_credential(
+            str(event_order),
+            lstater=recording_lstater,
+            closer=recording_closer,
+        )
+        == b"stable-credential"
+    )
+    assert events == ["lstat", "lstat", "close"]
+
+
+def test_credential_reader_rejects_extended_macos_acls() -> None:
+    reader_source, namespace = load_credential_reader_namespace()
+    acl_guard = namespace["assert_no_macos_acl"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    class FakeResult:
+        returncode = 0
+        stdout = b"-rw------- credential\n"
+        stderr = b""
+
+    class FakeSubprocess:
+        PIPE = object()
+        DEVNULL = object()
+
+        @staticmethod
+        def run(
+            arguments: tuple[object, ...],
+            **kwargs: object,
+        ) -> FakeResult:
+            calls.append((arguments, kwargs))
+            return FakeResult()
+
+    class Darwin:
+        platform = "darwin"
+
+    original_sys = namespace["sys"]
+    original_subprocess = namespace["subprocess"]
+    namespace["sys"] = Darwin()
+    namespace["subprocess"] = FakeSubprocess()
+    try:
+        acl_guard(42)
+        FakeResult.stdout = b"-rw-------@ credential\n"
+        acl_guard(42)
+        invalid_results = (
+            (1, b"-rw------- credential\n", b""),
+            (0, b"-rw------- credential\n", b"unexpected stderr"),
+            (0, b"", b""),
+            (0, b"-rw------- credential\n 0: everyone allow read\n", b""),
+            (0, b"malformed credential\n", b""),
+            (0, b"-rw-------+ credential\n", b""),
+        )
+        for returncode, stdout, stderr in invalid_results:
+            FakeResult.returncode = returncode
+            FakeResult.stdout = stdout
+            FakeResult.stderr = stderr
+            try:
+                acl_guard(42)
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    "unsafe or malformed macOS credential ACL probe was accepted"
+                )
+    finally:
+        namespace["sys"] = original_sys
+        namespace["subprocess"] = original_subprocess
+
+    for arguments, kwargs in calls:
+        assert arguments[-1] == "/dev/fd/42"
+        assert kwargs["stdin"] is FakeSubprocess.DEVNULL
+        assert kwargs["stdout"] is FakeSubprocess.PIPE
+        assert kwargs["stderr"] is FakeSubprocess.PIPE
+        assert kwargs["pass_fds"] == (42,)
+        assert kwargs["env"] == {
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        }
+    assert reader_source.count("assert_no_macos_acl(descriptor)") == 2
+    assert "os.pread" in reader_source
+    assert "os.lseek" not in reader_source
+
+
+def test_credential_file_writer_contract_requires_atomic_publication() -> None:
+    served_runbook = RUNBOOK.read_text(encoding="utf-8").lower()
+    operator_runbook = (
+        REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
+    ).read_text(encoding="utf-8").lower()
+
+    for runbook in (served_runbook, operator_runbook):
+        assert "atomically rename" in runbook
+        assert "do not" in runbook
+        assert "mutate that path or inode while the bootstrap" in runbook
+        assert "finite rereads" in runbook
+        assert "arbitrary hostile" in runbook
+        assert "same operator uid" in runbook or "same-uid writer" in runbook
+    assert 'ticket_tmp="$(mktemp ' in served_runbook
+    assert 'printf \'%s\\n\' "$ticket_value" > "$ticket_tmp"' in served_runbook
+    assert 'mv "$ticket_tmp" "$ticket_file"' in served_runbook
+    assert 'printf \'%s\\n\' "$ticket_value" > "$ticket_file"' not in served_runbook
 
 
 def make_remote_proof_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
