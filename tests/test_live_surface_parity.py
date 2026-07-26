@@ -156,7 +156,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 body = (
                     b"<html><body><h1>Downloads</h1>"
                     b"Chummer selects the best installer when it can. "
-                    b"<h2>No build is available right now</h2><a>Help</a>"
+                    b"<h2>No public build is available right now</h2><a>Help</a>"
                     b"<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
                     b"</body></html>"
                 )
@@ -526,7 +526,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         status = next(item for item in payload["results"] if item["path"] == "/status")
         self.assertIn("No public installer right now.", home["required_texts"])
         self.assertIn("Current public lane: Downloads paused.", home["required_texts"])
-        self.assertIn("No build is available right now", downloads["required_texts"])
+        self.assertIn("No public build is available right now", downloads["required_texts"])
         self.assertIn("Build from source", downloads["forbidden_texts"])
         self.assertIn("Downloads paused", status["required_texts"])
 
@@ -539,7 +539,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
         self.assertEqual("fail", payload["status"])
         downloads = next(item for item in payload["results"] if item["path"] == "/downloads")
-        self.assertIn("No build is available right now", downloads["missing_required_texts"])
+        self.assertIn("No public build is available right now", downloads["missing_required_texts"])
         self.assertIn("Build from source", downloads["forbidden_hits"])
         self.assertIn("Preview build. Review required.", downloads["forbidden_hits"])
 

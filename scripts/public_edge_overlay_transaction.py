@@ -107,7 +107,7 @@ TRANSACTION_PHASES = (
 )
 IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 CONTAINER_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-RUNTIME_PRIOR_STATE_FIELDS = {
+LEGACY_RUNTIME_PRIOR_STATE_FIELDS = {
     "candidatePortalContainerName",
     "expectedRuntimeProofBindSourceSha256",
     "publicProjectionManifestSha256",
@@ -126,6 +126,12 @@ RUNTIME_PRIOR_STATE_FIELDS = {
     "priorTunnelImageId",
     "priorTunnelExisted",
     "priorTunnelWasRunning",
+}
+RUNTIME_PRIOR_STATE_FIELDS = LEGACY_RUNTIME_PRIOR_STATE_FIELDS | {
+    "priorTunnelReplicaContainerId",
+    "priorTunnelReplicaImageId",
+    "priorTunnelReplicaExisted",
+    "priorTunnelReplicaWasRunning",
 }
 DEPLOY_OVERLAY_AUTHORITY_FIELDS = {
     "activationReceipt",
@@ -198,9 +204,19 @@ APPARENT_SECRET_PATTERNS = (
 
 
 def validate_runtime_prior_state(value: object) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) != RUNTIME_PRIOR_STATE_FIELDS:
+    if not isinstance(value, dict) or set(value) not in (
+        LEGACY_RUNTIME_PRIOR_STATE_FIELDS,
+        RUNTIME_PRIOR_STATE_FIELDS,
+    ):
         raise RuntimeError("overlay transaction runtime prior-state fields are invalid")
     state = dict(value)
+    if set(state) == LEGACY_RUNTIME_PRIOR_STATE_FIELDS:
+        # Absence was never observed by these journals.  Synthesizing it would
+        # let recovery delete a live canonical replica that the old writer did
+        # not know to snapshot.
+        raise RuntimeError(
+            "legacy overlay transaction lacks canonical tunnel replica authority"
+        )
     expected_proof_sha256 = state["expectedRuntimeProofBindSourceSha256"]
     if (
         not isinstance(expected_proof_sha256, str)
@@ -236,7 +252,7 @@ def validate_runtime_prior_state(value: object) -> dict[str, Any]:
             image_id and IMAGE_ID_PATTERN.fullmatch(image_id) is None
         ):
             raise RuntimeError(f"overlay transaction {field} is invalid")
-    for prefix in ("Portal", "Tunnel"):
+    for prefix in ("Portal", "Tunnel", "TunnelReplica"):
         existed = state[f"prior{prefix}Existed"]
         was_running = state[f"prior{prefix}WasRunning"]
         container_id = state[f"prior{prefix}ContainerId"]
@@ -327,6 +343,10 @@ def active_runtime_authority_payload(
         "priorTunnelImageId": "",
         "priorTunnelExisted": False,
         "priorTunnelWasRunning": False,
+        "priorTunnelReplicaContainerId": "",
+        "priorTunnelReplicaImageId": "",
+        "priorTunnelReplicaExisted": False,
+        "priorTunnelReplicaWasRunning": False,
     }
     validate_runtime_prior_state(synthetic_state)
     return {
@@ -1892,6 +1912,18 @@ def parse_args() -> argparse.Namespace:
     snapshot_parser.add_argument("--prior-tunnel-image-id", default="")
     snapshot_parser.add_argument("--prior-tunnel-existed", choices=("0", "1"), required=True)
     snapshot_parser.add_argument("--prior-tunnel-was-running", choices=("0", "1"), required=True)
+    snapshot_parser.add_argument("--prior-tunnel-replica-container-id", default="")
+    snapshot_parser.add_argument("--prior-tunnel-replica-image-id", default="")
+    snapshot_parser.add_argument(
+        "--prior-tunnel-replica-existed",
+        choices=("0", "1"),
+        required=True,
+    )
+    snapshot_parser.add_argument(
+        "--prior-tunnel-replica-was-running",
+        choices=("0", "1"),
+        required=True,
+    )
     snapshot_parser.add_argument("--staging-root", type=Path, required=True)
     snapshot_parser.add_argument("--backup-root", type=Path, required=True)
     snapshot_parser.add_argument("--activation-receipt", type=Path, required=True)
@@ -1988,6 +2020,18 @@ def main() -> int:
                     "priorTunnelImageId": args.prior_tunnel_image_id,
                     "priorTunnelExisted": args.prior_tunnel_existed == "1",
                     "priorTunnelWasRunning": args.prior_tunnel_was_running == "1",
+                    "priorTunnelReplicaContainerId": (
+                        args.prior_tunnel_replica_container_id
+                    ),
+                    "priorTunnelReplicaImageId": (
+                        args.prior_tunnel_replica_image_id
+                    ),
+                    "priorTunnelReplicaExisted": (
+                        args.prior_tunnel_replica_existed == "1"
+                    ),
+                    "priorTunnelReplicaWasRunning": (
+                        args.prior_tunnel_replica_was_running == "1"
+                    ),
                 },
                 staging_root=args.staging_root,
                 backup_root=args.backup_root,

@@ -48,11 +48,13 @@ PUBLIC_EDGE_BUILD_KEYS_BY_SERVICE = {
 }
 PUBLIC_EDGE_COMPOSE_TOP_LEVEL_KEYS = frozenset(
     {
+        "name",
         "networks",
         "services",
         "volumes",
     }
 )
+PUBLIC_EDGE_COMPOSE_PROJECT_NAME = "chummer6-hub"
 PUBLIC_EDGE_RAW_SERVICE_KEYS_BY_SERVICE = {
     "chummer-portal": frozenset(
         {
@@ -782,7 +784,16 @@ def public_edge_compose_build_syntax_failures(
             global_failures.append(
                 f"Compose top-level key must be an unquoted literal: {key}"
             )
-        if value or _uses_yaml_indirection(value):
+        if key == "name":
+            if (
+                value != PUBLIC_EDGE_COMPOSE_PROJECT_NAME
+                or _uses_yaml_indirection(value)
+            ):
+                global_failures.append(
+                    "Compose top-level name must use the exact canonical "
+                    f"literal: {PUBLIC_EDGE_COMPOSE_PROJECT_NAME}"
+                )
+        elif value or _uses_yaml_indirection(value):
             global_failures.append(
                 f"Compose top-level key must use a direct mapping: {key}"
             )

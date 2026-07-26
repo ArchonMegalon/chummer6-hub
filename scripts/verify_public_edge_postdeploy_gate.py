@@ -56,15 +56,27 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
 
 try:
     from scripts.public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        build_public_edge_downloads_authority_binding,
         load_exact_public_edge_postdeploy_schema,
+        public_edge_authorizing_binding_failures,
         public_edge_forbidden_secret_key,
+        public_edge_postdeploy_schema_failures,
     )
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from public_edge_postdeploy_contract import (
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME,
         PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        build_public_edge_downloads_authority_binding,
         load_exact_public_edge_postdeploy_schema,
+        public_edge_authorizing_binding_failures,
         public_edge_forbidden_secret_key,
+        public_edge_postdeploy_schema_failures,
     )
 
 
@@ -317,10 +329,24 @@ def _read_runtime_regular_file(path: Path, *, label: str, max_bytes: int) -> byt
         or identity.st_size > max_bytes
     ):
         raise RuntimeError(f"{label} is not one bounded regular file")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     descriptor = os.open(path, flags)
     try:
         before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or before.st_size <= 0
+            or before.st_size > max_bytes
+        ):
+            raise RuntimeError(
+                f"{label} is not one bounded regular file"
+            )
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -334,6 +360,12 @@ def _read_runtime_regular_file(path: Path, *, label: str, max_bytes: int) -> byt
         after = os.fstat(descriptor)
     finally:
         os.close(descriptor)
+    try:
+        path_after = path.lstat()
+    except OSError as exc:
+        raise RuntimeError(
+            f"{label} pathname changed after read"
+        ) from exc
     expected_identity = (
         identity.st_dev,
         identity.st_ino,
@@ -358,7 +390,76 @@ def _read_runtime_regular_file(path: Path, *, label: str, max_bytes: int) -> byt
         after.st_nlink,
     ) or total != identity.st_size:
         raise RuntimeError(f"{label} changed while it was read")
+    if expected_identity != (
+        path_after.st_dev,
+        path_after.st_ino,
+        path_after.st_size,
+        path_after.st_mtime_ns,
+        path_after.st_ctime_ns,
+        path_after.st_nlink,
+    ):
+        raise RuntimeError(
+            f"{label} pathname changed after read"
+        )
     return b"".join(chunks)
+
+
+def load_bound_release_channel_receipt(
+    path: Path,
+    *,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], bytes, str]:
+    expected = str(expected_sha256 or "").strip()
+    if re.fullmatch(r"[0-9a-f]{64}", expected) is None:
+        raise RuntimeError(
+            "release-channel receipt requires an independent lowercase SHA-256"
+        )
+    try:
+        raw = _read_runtime_regular_file(
+            path,
+            label="release-channel receipt",
+            max_bytes=MAX_RELEASE_CHANNEL_RECEIPT_BYTES,
+        )
+        payload = strict_json_object(
+            raw,
+            label="release-channel receipt",
+        )
+    except (OSError, StrictJsonContractError, RuntimeError) as exc:
+        raise RuntimeError(
+            "release-channel receipt is not one stable strict JSON object"
+        ) from exc
+    observed = hashlib.sha256(raw).hexdigest()
+    if observed != expected:
+        raise RuntimeError(
+            "release-channel receipt does not match its independent SHA-256"
+        )
+    return payload, raw, observed
+
+
+def exact_downloads_child_receipt_sha256(
+    path: Path,
+    *,
+    expected_sanitized_receipt: dict[str, Any],
+) -> str:
+    try:
+        raw = _read_runtime_regular_file(
+            path,
+            label="downloads child receipt",
+            max_bytes=MAX_DOWNLOADS_CHILD_RECEIPT_BYTES,
+        )
+        parsed = strict_json_object(
+            raw,
+            label="downloads child receipt",
+        )
+    except (OSError, StrictJsonContractError, RuntimeError) as exc:
+        raise RuntimeError(
+            "downloads child receipt is not one stable strict JSON object"
+        ) from exc
+    if sanitize_child_receipt(parsed) != expected_sanitized_receipt:
+        raise RuntimeError(
+            "downloads child receipt changed between validation and binding"
+        )
+    return hashlib.sha256(raw).hexdigest()
 
 
 def resolve_pinned_playwright_node_modules_root() -> Path | None:
@@ -1593,6 +1694,8 @@ OVERLAY_BUILD_INFO_RELATIVE_PATH = (
     / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
 )
 MAX_OVERLAY_BUILD_INFO_BYTES = 1024 * 1024
+MAX_RELEASE_CHANNEL_RECEIPT_BYTES = 1024 * 1024
+MAX_DOWNLOADS_CHILD_RECEIPT_BYTES = 4 * 1024 * 1024
 CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
     "downloads": "chummer.downloads_version_marker.v1",
@@ -1600,6 +1703,10 @@ CORE_CHILD_CONTRACTS = {
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
     "participateIframeShell": "chummer.participate_iframe_shell.v1",
+}
+BOUND_CORE_CHILD_CONTRACTS = {
+    **CORE_CHILD_CONTRACTS,
+    "downloads": "chummer.downloads_version_marker.bound.v1",
 }
 ONLINE_LAUNCH_CONTRACT = "chummer.online_character_roster_launch.v1"
 ONLINE_LAUNCH_PATH = "/app"
@@ -3313,6 +3420,9 @@ def compose_status(
     role_alias_routes: dict[str, Any] | None = None,
     online_launch: dict[str, Any] | None = None,
     expected_full_deployment_digest_sha256: str = "",
+    release_channel_authorization_capable: bool = False,
+    downloads_receipt_sha256: str = "",
+    release_channel_receipt_sha256: str = "",
 ) -> dict[str, Any]:
     failures: list[str] = []
     core_child_receipts = {
@@ -3323,7 +3433,12 @@ def compose_status(
         "readyMobileHandoff": ready_mobile_handoff,
         "participateIframeShell": participate_iframe_shell,
     }
-    for name, expected_contract in CORE_CHILD_CONTRACTS.items():
+    expected_core_contracts = (
+        BOUND_CORE_CHILD_CONTRACTS
+        if release_channel_authorization_capable
+        else CORE_CHILD_CONTRACTS
+    )
+    for name, expected_contract in expected_core_contracts.items():
         child = core_child_receipts[name]
         actual_contract = str(child.get("contractName") or child.get("contract_name") or "").strip()
         if actual_contract != expected_contract:
@@ -4020,8 +4135,26 @@ def compose_status(
             "public-edge preflight overlay build info source fingerprint does not match current source: "
             + ", ".join(preflight_overlay_fingerprint_mismatched_keys)
         )
+    downloads_authority_binding: dict[str, str] = {}
+    if release_channel_authorization_capable:
+        try:
+            downloads_authority_binding = (
+                build_public_edge_downloads_authority_binding(
+                    downloads,
+                    downloads_receipt_sha256=downloads_receipt_sha256,
+                    release_channel_receipt_sha256=(
+                        release_channel_receipt_sha256
+                    ),
+                )
+            )
+        except ValueError as exc:
+            failures.append(str(exc))
     result = {
-        "contractName": "chummer.public_edge_postdeploy_gate.v1",
+        "contractName": (
+            PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+            if release_channel_authorization_capable
+            else PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
+        ),
         "generatedAtUtc": datetime.now(UTC).isoformat(),
         "status": "pass" if not failures else "fail",
         "baseUrl": downloads.get("base_url") or pwa_static.get("base_url") or "",
@@ -4115,6 +4248,20 @@ def compose_status(
         "failures": failures,
         "childReceipts": {},
     }
+    if release_channel_authorization_capable:
+        result.update(
+            {
+                "downloadsAuthorityBinding": downloads_authority_binding,
+                "releaseChannelAuthorizationCapable": True,
+                "releaseChannelReceiptBindingRequired": True,
+                "releaseManifestGeneration": downloads.get(
+                    "release_manifest_generation"
+                ),
+                "releaseManifestSchema": downloads.get(
+                    "release_manifest_schema"
+                ),
+            }
+        )
     if online_launch is not None:
         result["onlineLaunchStatus"] = online_launch.get("status")
         result["onlineLaunchContract"] = receipt_contract(online_launch)
@@ -4844,7 +4991,7 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--release-channel-receipt-sha256",
         default="",
-        help="Independent lowercase SHA-256 for the release-channel receipt used by strict preflight.",
+        help="Independent lowercase SHA-256 for the exact release-channel receipt; required for authorizing verification.",
     )
     parser.add_argument(
         "--public-projection-snapshot-root",
@@ -4885,11 +5032,21 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         help="Sealed preflight PWA asset inventory digest; mandatory when preflight is skipped.",
     )
     args = parser.parse_args(argv)
+    release_channel_authorization_capable = (
+        args.skip_release_version_match is False
+    )
+    receipt_contract_name = (
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+        if release_channel_authorization_capable
+        else PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
+    )
     try:
         postdeploy_schema_authority = (
-            load_exact_public_edge_postdeploy_schema()
+            load_exact_public_edge_postdeploy_schema(
+                receipt_contract_name=receipt_contract_name,
+            )
         )
-    except RuntimeError as exc:
+    except (OSError, RuntimeError) as exc:
         parser.error(str(exc))
     if args.skip_preflight and args.strict_preflight:
         parser.error("--strict-preflight cannot be combined with --skip-preflight")
@@ -4913,7 +5070,22 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             parser.error(
                 "postdeploy preflight requires --release-channel-receipt-sha256"
             )
-    release_channel = {} if args.skip_release_version_match else load_optional_json(Path(args.release_channel_receipt))
+    if args.skip_release_version_match:
+        release_channel = {}
+        release_channel_receipt_raw = b""
+        observed_release_channel_receipt_sha256 = ""
+    else:
+        try:
+            (
+                release_channel,
+                release_channel_receipt_raw,
+                observed_release_channel_receipt_sha256,
+            ) = load_bound_release_channel_receipt(
+                Path(args.release_channel_receipt),
+                expected_sha256=args.release_channel_receipt_sha256,
+            )
+        except RuntimeError as exc:
+            parser.error(str(exc))
     expected_release_version = "" if args.skip_release_version_match else str(release_channel.get("version") or "").strip()
     expected_release_status = "" if args.skip_release_version_match else str(release_channel.get("status") or "").strip()
     expected_release_channel = "" if args.skip_release_version_match else str(
@@ -5129,14 +5301,41 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             args.release_channel_receipt,
         ]
         if args.skip_release_version_match:
-            downloads_command.append("--skip-release-version-match")
+            downloads_command.extend(
+                [
+                    "--skip-release-version-match",
+                    "--allow-unbound-release-channel",
+                ]
+            )
         else:
-            downloads_command.append("--allow-non-launch-supported-release-channel")
+            downloads_command.extend(
+                [
+                    "--release-channel-receipt-sha256",
+                    observed_release_channel_receipt_sha256,
+                    "--allow-non-launch-supported-release-channel",
+                ]
+            )
+        downloads_output_path = temp / "downloads.json"
         downloads = run_child(
             downloads_command,
-            temp / "downloads.json",
+            downloads_output_path,
             allow_failure=True,
         )
+        downloads_receipt_sha256 = ""
+        if release_channel_authorization_capable:
+            try:
+                downloads_receipt_sha256 = (
+                    exact_downloads_child_receipt_sha256(
+                        downloads_output_path,
+                        expected_sanitized_receipt=downloads,
+                    )
+                )
+            except RuntimeError:
+                downloads = {
+                    **downloads,
+                    "status": "fail",
+                    "receiptBindingStatus": "fail",
+                }
         pwa_static = run_child(
             [
                 sys.executable,
@@ -5276,9 +5475,18 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         expected_full_deployment_digest_sha256=(
             expected_full_deployment_digest_sha256
         ),
+        release_channel_authorization_capable=(
+            release_channel_authorization_capable
+        ),
+        downloads_receipt_sha256=downloads_receipt_sha256,
+        release_channel_receipt_sha256=(
+            observed_release_channel_receipt_sha256
+        ),
     )
     result["schemaContractName"] = (
-        PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME
+        if release_channel_authorization_capable
+        else PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
     )
     result["schemaSha256"] = postdeploy_schema_authority["sha256"]
     result["skipPreflight"] = args.skip_preflight
@@ -5358,6 +5566,37 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         result["visibleVersionMatchesReleaseChannel"] = False
         result["statusRedirectVersionMatchesReleaseChannel"] = False
         result["failures"].append("release channel version is missing")
+        result["status"] = "fail"
+    result = {
+        field: result.get(field)
+        for field in postdeploy_schema_authority["fields"]
+    }
+    if release_channel_authorization_capable:
+        contract_failures = public_edge_authorizing_binding_failures(
+            result,
+            expected_release_channel_sha256=(
+                args.release_channel_receipt_sha256
+            ),
+            current_release_channel_sha256=(
+                observed_release_channel_receipt_sha256
+            ),
+        )
+    else:
+        contract_failures = public_edge_postdeploy_schema_failures(
+            result,
+            receipt_contract_name=(
+                PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
+            ),
+        )
+    if contract_failures:
+        existing_failures = (
+            result.get("failures")
+            if isinstance(result.get("failures"), list)
+            else []
+        )
+        result["failures"] = list(
+            dict.fromkeys([*existing_failures, *contract_failures])
+        )
         result["status"] = "fail"
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:

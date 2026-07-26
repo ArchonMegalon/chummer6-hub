@@ -231,18 +231,18 @@ app.Use(async (context, next) =>
 });
 // Register private-response and indexing headers before HTTPS redirection so a
 // redirect cannot bypass the account/admin cache boundary.
+app.Use((context, next) =>
+    PublicReleaseResponseCachePolicy.InvokeNoStoreBoundaryAsync(
+        context,
+        next,
+        RequiresNoStoreHeaders(context.Request.Path)));
 app.Use(async (context, next) =>
 {
-    bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
     string robotsPolicy = ResolveRobotsPolicy(context.Request.Path);
     context.Response.OnStarting(() =>
     {
         HubSecurityHeaders.Apply(context.Response.Headers);
         context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
-        if (requiresNoStore)
-        {
-            PrivateResponseCacheHeaders.Apply(context.Response.Headers);
-        }
         if (RequiresNoReferrerHeaders(context.Request.Path))
         {
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
@@ -641,6 +641,7 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.Equals("/manifest.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/proofs", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/current.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/release-evidence", StringComparison.OrdinalIgnoreCase)
@@ -651,6 +652,8 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/api/v1/public/release-truth", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/api/public/release-truth", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/sitemap.xml", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase)

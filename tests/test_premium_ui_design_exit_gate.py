@@ -137,7 +137,7 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
   <h1>Downloads</h1>
   <p>Current note: Use Help if setup blocks your table.</p>
   <p>Sign in later only if you want to attach this installed copy</p>
-  <section class="minimal-empty"><h2>No build is available right now</h2><a href="/help">Help</a></section>
+  <section class="minimal-empty"><h2>No public build is available right now</h2><a href="/help">Help</a></section>
   <div class="downloads-choice-list">
     <article class="downloads-choice-card"><h2>Stable</h2><a href="/help" data-release-lane="stable">Help</a></article>
     <article class="downloads-choice-card"><h2>Nightly</h2><a href="/nightly" data-release-lane="nightly">Nightly</a></article>

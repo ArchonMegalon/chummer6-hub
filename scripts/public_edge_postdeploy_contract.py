@@ -26,13 +26,50 @@ except ModuleNotFoundError:
         strict_json_object,
     )
 
-PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = "chummer.public_edge_postdeploy_gate.v1"
+PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME = (
+    "chummer.public_edge_postdeploy_gate.v1"
+)
+PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME = (
+    "chummer.public_edge_postdeploy_gate.v2"
+)
+PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME
 PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME = (
     "chummer.public_edge_postdeploy_gate.schema.v1"
+)
+PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME = (
+    "chummer.public_edge_postdeploy_gate.schema.v2"
 )
 PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH = (
     Path(__file__).resolve().parent
     / "public_edge_postdeploy_gate.v1.schema.json"
+)
+PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_PATH = (
+    Path(__file__).resolve().parent
+    / "public_edge_postdeploy_gate.v2.schema.json"
+)
+PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME = (
+    "chummer.downloads_version_marker.bound.v1"
+)
+PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_CONTRACT_NAME = (
+    "chummer.public_edge_downloads_authority_binding.v1"
+)
+PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS = frozenset(
+    {
+        "bindingSha256",
+        "contractName",
+        "downloadsReceiptContractName",
+        "downloadsReceiptSha256",
+        "releaseChannel",
+        "releaseChannelReceiptSha256",
+        "releaseManifestChannel",
+        "releaseManifestGeneration",
+        "releaseManifestSchema",
+        "releaseManifestVersion",
+        "releaseVersion",
+    }
+)
+PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}"
 )
 PUBLIC_EDGE_OFFLINE_STATIC_PATHS = {
     "/manifest.player.webmanifest",
@@ -294,8 +331,32 @@ PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS = {
 
 
 def load_exact_public_edge_postdeploy_schema(
-    path: Path = PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH,
+    path: Path | None = None,
+    *,
+    receipt_contract_name: str = PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
 ) -> dict[str, Any]:
+    if receipt_contract_name == PUBLIC_EDGE_POSTDEPLOY_LEGACY_CONTRACT_NAME:
+        expected_schema_contract_name = (
+            PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+        )
+        expected_schema_path = PUBLIC_EDGE_POSTDEPLOY_SCHEMA_PATH
+        expected_schema_id = (
+            "urn:chummer:public-edge-postdeploy-gate:schema:v1"
+        )
+    elif receipt_contract_name == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME:
+        expected_schema_contract_name = (
+            PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_CONTRACT_NAME
+        )
+        expected_schema_path = PUBLIC_EDGE_POSTDEPLOY_BOUND_SCHEMA_PATH
+        expected_schema_id = (
+            "urn:chummer:public-edge-postdeploy-gate:schema:v2"
+        )
+    else:
+        raise RuntimeError(
+            "public-edge postdeploy receipt contract is unsupported"
+        )
+    if path is None:
+        path = expected_schema_path
     normalized = Path(os.path.abspath(path))
     if path != normalized or not path.is_absolute():
         raise RuntimeError(
@@ -412,10 +473,10 @@ def load_exact_public_edge_postdeploy_schema(
             "type": "object",
         },
         "contractName": {
-            "const": PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+            "const": receipt_contract_name,
         },
         "schemaContractName": {
-            "const": PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+            "const": expected_schema_contract_name,
         },
         "schemaSha256": {
             "pattern": "^[0-9a-f]{64}$",
@@ -423,10 +484,32 @@ def load_exact_public_edge_postdeploy_schema(
         },
         "status": {"enum": ["fail", "pass"]},
     }
+    if receipt_contract_name == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME:
+        expected_properties.update(
+            {
+                "downloadsAuthorityBinding": {
+                    "additionalProperties": False,
+                    "maxProperties": len(
+                        PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS
+                    ),
+                    "minProperties": len(
+                        PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS
+                    ),
+                    "propertyNames": {
+                        "enum": sorted(
+                            PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS
+                        )
+                    },
+                    "type": "object",
+                },
+                "releaseChannelAuthorizationCapable": {"const": True},
+                "releaseChannelReceiptBindingRequired": {"const": True},
+            }
+        )
     if (
         set(schema) != expected_top_level_keys
         or schema.get("$id")
-        != "urn:chummer:public-edge-postdeploy-gate:schema:v1"
+        != expected_schema_id
         or schema.get("$schema")
         != "https://json-schema.org/draft/2020-12/schema"
         or schema.get("type") != "object"
@@ -435,9 +518,9 @@ def load_exact_public_edge_postdeploy_schema(
         != {"^[A-Za-z][A-Za-z0-9]*$": {}}
         or schema.get("properties") != expected_properties
         or schema.get("x-chummer-receipt-contract")
-        != PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME
+        != receipt_contract_name
         or schema.get("x-chummer-schema-contract")
-        != PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME
+        != expected_schema_contract_name
         or not isinstance(fields, list)
         or not fields
         or fields != sorted(fields)
@@ -462,12 +545,373 @@ def load_exact_public_edge_postdeploy_schema(
             "public-edge postdeploy schema contract is invalid"
         )
     return {
-        "contractName": PUBLIC_EDGE_POSTDEPLOY_SCHEMA_CONTRACT_NAME,
+        "contractName": expected_schema_contract_name,
         "fields": frozenset(fields),
         "path": normalized,
-        "receiptContractName": PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+        "receiptContractName": receipt_contract_name,
         "sha256": hashlib.sha256(raw).hexdigest(),
     }
+
+
+def _lower_sha256(value: Any) -> str:
+    normalized = str(value or "").strip()
+    return (
+        normalized
+        if re.fullmatch(r"[0-9a-f]{64}", normalized) is not None
+        else ""
+    )
+
+
+def _required_binding_text(
+    payload: dict[str, Any],
+    field: str,
+) -> str:
+    value = str(payload.get(field) or "").strip()
+    if (
+        not value
+        or PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN.fullmatch(
+            value
+        )
+        is None
+    ):
+        raise ValueError(
+            f"downloads authority binding {field} is not a safe release identity"
+        )
+    return value
+
+
+def build_public_edge_downloads_authority_binding(
+    downloads_receipt: dict[str, Any],
+    *,
+    downloads_receipt_sha256: str,
+    release_channel_receipt_sha256: str,
+) -> dict[str, str]:
+    """Build the only public child-authority summary.
+
+    The raw child receipt stays private. The public receipt carries only exact
+    receipt digests plus the non-secret release identity needed to validate
+    that the selected channel and served manifest are the same authority.
+    """
+
+    if (
+        str(downloads_receipt.get("contractName") or "").strip()
+        != PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME
+    ):
+        raise ValueError(
+            "downloads authority binding requires the bound downloads contract"
+        )
+    if str(downloads_receipt.get("status") or "").strip().lower() != "pass":
+        raise ValueError(
+            "downloads authority binding requires a passing downloads receipt"
+        )
+    child_digest = _lower_sha256(downloads_receipt_sha256)
+    channel_digest = _lower_sha256(release_channel_receipt_sha256)
+    if not child_digest:
+        raise ValueError(
+            "downloads authority binding receipt digest is invalid"
+        )
+    if not channel_digest:
+        raise ValueError(
+            "downloads authority binding release-channel digest is invalid"
+        )
+    if (
+        _lower_sha256(
+            downloads_receipt.get(
+                "release_channel_receipt_sha256_expected"
+            )
+        )
+        != channel_digest
+        or _lower_sha256(
+            downloads_receipt.get(
+                "release_channel_receipt_sha256_actual"
+            )
+        )
+        != channel_digest
+        or downloads_receipt.get(
+            "release_channel_receipt_sha256_matches"
+        )
+        is not True
+        or str(
+            downloads_receipt.get(
+                "release_channel_receipt_binding_status"
+            )
+            or ""
+        ).strip()
+        != "pass"
+    ):
+        raise ValueError(
+            "downloads authority binding does not match the selected release channel"
+        )
+    release_version = _required_binding_text(
+        downloads_receipt,
+        "release_channel_version",
+    )
+    release_channel = _required_binding_text(
+        downloads_receipt,
+        "expected_release_channel",
+    )
+    release_manifest_schema = _required_binding_text(
+        downloads_receipt,
+        "release_manifest_schema",
+    )
+    release_manifest_version = _required_binding_text(
+        downloads_receipt,
+        "release_manifest_version",
+    )
+    release_manifest_channel = _required_binding_text(
+        downloads_receipt,
+        "release_manifest_channel",
+    )
+    release_manifest_generation = _required_binding_text(
+        downloads_receipt,
+        "release_manifest_generation",
+    )
+    if (
+        downloads_receipt.get(
+            "release_manifest_version_matches_release_channel"
+        )
+        is not True
+        or downloads_receipt.get(
+            "release_manifest_channel_matches_release_channel"
+        )
+        is not True
+        or downloads_receipt.get(
+            "downloads_generation_matches_served_manifest"
+        )
+        is not True
+        or downloads_receipt.get(
+            "status_redirect_generation_matches_served_manifest"
+        )
+        is not True
+        or release_manifest_version != release_version
+        or release_manifest_channel != release_channel
+    ):
+        raise ValueError(
+            "downloads authority binding release identity is inconsistent"
+        )
+    body = {
+        "contractName": (
+            PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_CONTRACT_NAME
+        ),
+        "downloadsReceiptContractName": (
+            PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME
+        ),
+        "downloadsReceiptSha256": child_digest,
+        "releaseChannel": release_channel,
+        "releaseChannelReceiptSha256": channel_digest,
+        "releaseManifestChannel": release_manifest_channel,
+        "releaseManifestGeneration": release_manifest_generation,
+        "releaseManifestSchema": release_manifest_schema,
+        "releaseManifestVersion": release_manifest_version,
+        "releaseVersion": release_version,
+    }
+    body["bindingSha256"] = hashlib.sha256(
+        canonical_json_bytes(
+            body,
+            label="public-edge downloads authority binding",
+        )
+    ).hexdigest()
+    return body
+
+
+def public_edge_postdeploy_schema_failures(
+    payload: dict[str, Any],
+    *,
+    receipt_contract_name: str,
+) -> list[str]:
+    failures: list[str] = []
+    try:
+        schema = load_exact_public_edge_postdeploy_schema(
+            receipt_contract_name=receipt_contract_name,
+        )
+    except (OSError, RuntimeError):
+        return [
+            "public-edge postdeploy local schema authority is invalid"
+        ]
+    if str(payload.get("contractName") or "").strip() != receipt_contract_name:
+        failures.append(
+            "public-edge postdeploy receipt contract does not match schema authority"
+        )
+    if (
+        str(payload.get("schemaContractName") or "").strip()
+        != schema["contractName"]
+    ):
+        failures.append(
+            "public-edge postdeploy schema contract does not match local authority"
+        )
+    if _lower_sha256(payload.get("schemaSha256")) != schema["sha256"]:
+        failures.append(
+            "public-edge postdeploy schema digest does not match local authority"
+        )
+    actual_fields = set(payload)
+    expected_fields = set(schema["fields"])
+    if actual_fields != expected_fields:
+        if expected_fields - actual_fields:
+            failures.append(
+                "public-edge postdeploy receipt is missing schema fields"
+            )
+        if actual_fields - expected_fields:
+            failures.append(
+                "public-edge postdeploy receipt contains fields outside the schema"
+            )
+    if payload.get("childReceipts") != {}:
+        failures.append(
+            "public-edge postdeploy public childReceipts must be empty"
+        )
+    return failures
+
+
+def public_edge_authorizing_binding_failures(
+    payload: dict[str, Any],
+    *,
+    expected_release_channel_sha256: str = "",
+    current_release_channel_sha256: str = "",
+) -> list[str]:
+    """Validate the shared fail-closed v2 authority contract."""
+
+    failures = public_edge_postdeploy_schema_failures(
+        payload,
+        receipt_contract_name=PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+    )
+    if payload.get("releaseChannelAuthorizationCapable") is not True:
+        failures.append(
+            "public-edge postdeploy receipt is not release-channel authorization capable"
+        )
+    if payload.get("releaseChannelReceiptBindingRequired") is not True:
+        failures.append(
+            "public-edge postdeploy receipt does not require channel binding"
+        )
+    core_contracts = (
+        payload.get("coreChildContracts")
+        if isinstance(payload.get("coreChildContracts"), dict)
+        else {}
+    )
+    if (
+        str(core_contracts.get("downloads") or "").strip()
+        != PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME
+    ):
+        failures.append(
+            "public-edge postdeploy downloads child is not the bound contract"
+        )
+    binding = (
+        payload.get("downloadsAuthorityBinding")
+        if isinstance(payload.get("downloadsAuthorityBinding"), dict)
+        else {}
+    )
+    if set(binding) != PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_FIELDS:
+        failures.append(
+            "public-edge postdeploy downloads authority binding schema is invalid"
+        )
+        return list(dict.fromkeys(failures))
+    if (
+        str(binding.get("contractName") or "").strip()
+        != PUBLIC_EDGE_DOWNLOADS_AUTHORITY_BINDING_CONTRACT_NAME
+        or str(binding.get("downloadsReceiptContractName") or "").strip()
+        != PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME
+    ):
+        failures.append(
+            "public-edge postdeploy downloads authority binding contract is invalid"
+        )
+    for field in (
+        "bindingSha256",
+        "downloadsReceiptSha256",
+        "releaseChannelReceiptSha256",
+    ):
+        if not _lower_sha256(binding.get(field)):
+            failures.append(
+                "public-edge postdeploy downloads authority binding digest is invalid"
+            )
+            break
+    for field in (
+        "releaseChannel",
+        "releaseManifestChannel",
+        "releaseManifestGeneration",
+        "releaseManifestSchema",
+        "releaseManifestVersion",
+        "releaseVersion",
+    ):
+        if (
+            PUBLIC_EDGE_DOWNLOADS_AUTHORITY_IDENTITY_PATTERN.fullmatch(
+                str(binding.get(field) or "").strip()
+            )
+            is None
+        ):
+            failures.append(
+                "public-edge postdeploy downloads authority binding release identity is unsafe"
+            )
+            break
+    binding_body = {
+        key: value
+        for key, value in binding.items()
+        if key != "bindingSha256"
+    }
+    try:
+        expected_binding_digest = hashlib.sha256(
+            canonical_json_bytes(
+                binding_body,
+                label="public-edge downloads authority binding",
+            )
+        ).hexdigest()
+    except StrictJsonContractError:
+        expected_binding_digest = ""
+        failures.append(
+            "public-edge postdeploy downloads authority binding encoding is invalid"
+        )
+    if (
+        not expected_binding_digest
+        or _lower_sha256(binding.get("bindingSha256"))
+        != expected_binding_digest
+    ):
+        failures.append(
+            "public-edge postdeploy downloads authority binding digest mismatches"
+        )
+    expected_digest = _lower_sha256(expected_release_channel_sha256)
+    current_digest = _lower_sha256(current_release_channel_sha256)
+    bound_digest = _lower_sha256(
+        binding.get("releaseChannelReceiptSha256")
+    )
+    if expected_release_channel_sha256 and not expected_digest:
+        failures.append(
+            "public-edge postdeploy expected release-channel digest is invalid"
+        )
+    if current_release_channel_sha256 and not current_digest:
+        failures.append(
+            "public-edge postdeploy current release-channel digest is invalid"
+        )
+    if expected_digest and bound_digest != expected_digest:
+        failures.append(
+            "public-edge postdeploy release-channel binding mismatches expected authority"
+        )
+    if current_digest and bound_digest != current_digest:
+        failures.append(
+            "public-edge postdeploy release-channel binding is stale"
+        )
+    identity_fields = (
+        ("releaseVersion", "expectedReleaseVersion"),
+        ("releaseChannel", "expectedReleaseChannel"),
+        ("releaseManifestSchema", "releaseManifestSchema"),
+        ("releaseManifestVersion", "releaseManifestVersion"),
+        ("releaseManifestChannel", "releaseManifestChannel"),
+        ("releaseManifestGeneration", "releaseManifestGeneration"),
+    )
+    for binding_field, payload_field in identity_fields:
+        binding_value = str(binding.get(binding_field) or "").strip()
+        payload_value = str(payload.get(payload_field) or "").strip()
+        if not binding_value or binding_value != payload_value:
+            failures.append(
+                "public-edge postdeploy release identity does not match its authority binding"
+            )
+            break
+    if (
+        str(binding.get("releaseManifestVersion") or "").strip()
+        != str(binding.get("releaseVersion") or "").strip()
+        or str(binding.get("releaseManifestChannel") or "").strip()
+        != str(binding.get("releaseChannel") or "").strip()
+    ):
+        failures.append(
+            "public-edge postdeploy manifest identity contradicts the selected release"
+        )
+    return list(dict.fromkeys(failures))
 
 
 def public_edge_receipt_key_parts(value: Any) -> tuple[str, ...]:
@@ -874,6 +1318,14 @@ def normalize_public_edge_postdeploy_payload(payload: dict[str, Any] | None) -> 
     if private_identity_was_raw:
         normalized["privateIdentityWasRaw"] = True
     child_receipts = normalized.get("childReceipts")
+    if (
+        receipt_contract(normalized)
+        == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+    ):
+        # V2 is exact and authorizing: preserve any invalid public child
+        # content so every consumer can reject it. Only legacy receipts are
+        # flattened and scrubbed for non-authorizing compatibility views.
+        return normalized
     normalized["childReceipts"] = {}
     if not isinstance(child_receipts, dict):
         return normalized

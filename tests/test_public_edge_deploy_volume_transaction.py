@@ -24,9 +24,11 @@ MISMATCH_PORTAL_IMAGE_ID = "sha256:" + "3" * 64
 PRIOR_TOOL_IMAGE_ID = "sha256:" + "4" * 64
 PRIOR_TUNNEL_IMAGE_ID = "sha256:" + "5" * 64
 CANDIDATE_TOOL_IMAGE_ID = "sha256:" + "6" * 64
+PRIOR_TUNNEL_REPLICA_IMAGE_ID = "sha256:" + "7" * 64
 PRIOR_PORTAL_CONTAINER_ID = "a" * 64
 CANDIDATE_PORTAL_CONTAINER_ID = "b" * 64
 PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
+PRIOR_TUNNEL_REPLICA_CONTAINER_ID = "f" * 64
 POSTQUIESCE_PROOF_CONTAINER_ID = "d" * 64
 ORPHAN_STATE_CONSUMER_CONTAINER_ID = "e" * 64
 TOPOLOGY_B_GUARD_MESSAGE = (
@@ -415,11 +417,19 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("FAKE_MISMATCH_PORTAL_IMAGE_ID", MISMATCH_PORTAL_IMAGE_ID)
     monkeypatch.setenv("FAKE_PRIOR_TOOL_IMAGE_ID", PRIOR_TOOL_IMAGE_ID)
     monkeypatch.setenv("FAKE_PRIOR_TUNNEL_IMAGE_ID", PRIOR_TUNNEL_IMAGE_ID)
+    monkeypatch.setenv(
+        "FAKE_PRIOR_TUNNEL_REPLICA_IMAGE_ID",
+        PRIOR_TUNNEL_REPLICA_IMAGE_ID,
+    )
     monkeypatch.setenv("FAKE_PRIOR_PORTAL_CONTAINER_ID", PRIOR_PORTAL_CONTAINER_ID)
     monkeypatch.setenv(
         "FAKE_CANDIDATE_PORTAL_CONTAINER_ID", CANDIDATE_PORTAL_CONTAINER_ID
     )
     monkeypatch.setenv("FAKE_PRIOR_TUNNEL_CONTAINER_ID", PRIOR_TUNNEL_CONTAINER_ID)
+    monkeypatch.setenv(
+        "FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID",
+        PRIOR_TUNNEL_REPLICA_CONTAINER_ID,
+    )
     monkeypatch.setenv(
         "FAKE_POSTQUIESCE_PROOF_CONTAINER_ID",
         POSTQUIESCE_PROOF_CONTAINER_ID,
@@ -516,6 +526,14 @@ def configure_fake_public_download_retirement(
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID",
         "11111111-1111-1111-1111-111111111111",
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF",
+        "refs/remotes/origin/main",
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256",
+        "9" * 64,
     )
 
 
@@ -744,6 +762,8 @@ case "$*" in
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID";;
   *" ps --all -q chummer-run-cloudflared")
     printf '%s\n' "$FAKE_PRIOR_TUNNEL_CONTAINER_ID";;
+  *" ps --all -q chummer-run-cloudflared-replica")
+    printf '%s\n' "$FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID";;
   "container inspect --format {{.Id}} $FAKE_PRIOR_PORTAL_CONTAINER_ID")
     printf '%s\n' "$FAKE_PRIOR_PORTAL_CONTAINER_ID";;
   "container inspect --format {{.Image}} $FAKE_PRIOR_PORTAL_CONTAINER_ID")
@@ -771,10 +791,30 @@ case "$*" in
     printf '%s\n' "$FAKE_PRIOR_TUNNEL_IMAGE_ID";;
   "container inspect --format {{.State.Running}} $FAKE_PRIOR_TUNNEL_CONTAINER_ID")
     printf '%s\n' true;;
+  "container inspect --format {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} $FAKE_PRIOR_TUNNEL_CONTAINER_ID")
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = tunnel_health ]; then
+      printf '%s\n' unhealthy
+    else
+      printf '%s\n' healthy
+    fi;;
+  "container inspect --format {{.Id}} $FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID")
+    printf '%s\n' "$FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID";;
+  "container inspect --format {{.Image}} $FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID")
+    printf '%s\n' "$FAKE_PRIOR_TUNNEL_REPLICA_IMAGE_ID";;
+  "container inspect --format {{.State.Running}} $FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID")
+    printf '%s\n' true;;
+  "container inspect --format {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} $FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID")
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = tunnel_replica_health ]; then
+      printf '%s\n' unhealthy
+    else
+      printf '%s\n' healthy
+    fi;;
   "buildx build "*)
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = build ]; then exit 44; fi;;
   *" stop chummer-run-cloudflared")
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = tunnel_stop ]; then exit 43; fi;;
+  *" stop chummer-run-cloudflared-replica")
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = tunnel_replica_stop ]; then exit 43; fi;;
   "container stop $FAKE_PRIOR_PORTAL_CONTAINER_ID")
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = portal_stop ]; then exit 43; fi
     printf '%s\n' false > "$FAKE_PRIOR_PORTAL_RUNNING_STATE";;
@@ -832,6 +872,7 @@ case "$*" in
   "container inspect --format {{json .NetworkSettings.Networks}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     printf '%s\n' '{"default":{"Aliases":["chummer-portal"]}}';;
   "container start $FAKE_PRIOR_TUNNEL_CONTAINER_ID") ;;
+  "container start $FAKE_PRIOR_TUNNEL_REPLICA_CONTAINER_ID") ;;
   "container update --restart unless-stopped $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     if [ "$(/usr/bin/cat "$FAKE_AUTO_REMOVE_STATE")" = true ]; then exit 64; fi
     printf '%s\n' 'candidate:restart-policy:unless-stopped' >> "$FAKE_EVENT_LOG";;
@@ -2717,6 +2758,8 @@ def test_guarded_deploy_never_removes_tokenless_existing_fixed_lock(
         "candidate_creation",
         "candidate_readiness",
         "publication_readiness",
+        "tunnel_health",
+        "tunnel_replica_health",
     ],
 )
 def test_guarded_deploy_uses_named_candidate_and_durable_recovery_on_failure(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -36,6 +37,14 @@ EXPECTED_COMMIT_SETTINGS = (
     "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT",
     "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT",
     "CHUMMER_LEGACY_EXPECTED_COMMIT",
+)
+RELEASE_UPLOAD_AUTH_SETTINGS = (
+    "CHUMMER_RELEASE_UPLOAD_TOKEN",
+    "CHUMMER_RELEASE_UPLOAD_TICKET",
+    "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE",
+    "CHUMMER_RELEASE_UPLOAD_TOKEN_PATH",
+    "CHUMMER_RELEASE_UPLOAD_TICKET_FILE",
+    "CHUMMER_RELEASE_UPLOAD_TICKET_PATH",
 )
 
 
@@ -179,6 +188,11 @@ def clean_release_environment() -> dict[str, str]:
         "CHUMMER_RELEASE_SCOPE_DECISION_PATH",
         "CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256",
         "CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY",
+        "CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH",
+        "CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH",
+        "CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH",
+        "CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS",
+        "CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS",
         "CHUMMER_RELEASE_SSH_TARGET",
         "CHUMMER_REMOTE_STAGING_DIR",
         "CHUMMER_REMOTE_UI_REPO_DIR",
@@ -301,10 +315,11 @@ def make_wrapper_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     bootstrap.write_text(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
-        "printf 'stage=%s\\noutput=%s\\ntoken=%s\\nhub_ref=%s\\nhub_expected_commit=%s\\n' "
+        "printf 'stage=%s\\noutput=%s\\ntoken=%s\\ntoken_file=%s\\nhub_ref=%s\\nhub_expected_commit=%s\\n' "
         '"${CHUMMER_MAC_RELEASE_STAGE_ONLY:-}" '
         '"${CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR:-}" '
         '"${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" '
+        '"${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" '
         '"${CHUMMER_HUB_REF:-}" '
         '"${CHUMMER_HUB_EXPECTED_COMMIT:-}" >"$CAPTURE_PATH"\n'
         "printf 'arg=%s\\n' \"$@\" >>\"$CAPTURE_PATH\"\n",
@@ -461,47 +476,37 @@ def test_wrapper_disables_inherited_xtrace_before_secret_capture(tmp_path: Path)
     assert synthetic not in result.stderr
 
 
-def test_wrapper_accepts_only_owner_mode_0600_non_symlink_auth_files(tmp_path: Path) -> None:
+def test_wrapper_delegates_file_intake_without_exporting_credential_plaintext(
+    tmp_path: Path,
+) -> None:
     wrapper, _bootstrap, capture = make_wrapper_fixture(tmp_path)
-    secret = "synthetic-owner-only-token"
+    secret = "wrapper-must-never-load-this-file-credential"
     token_file = tmp_path / "token.txt"
     token_file.write_text(secret + "\n", encoding="utf-8")
-
-    def invoke(path: Path) -> subprocess.CompletedProcess[str]:
-        environment = clean_release_environment()
-        environment.update(
-            {
-                "CAPTURE_PATH": str(capture),
-                "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE": str(path),
-            }
-        )
-        return subprocess.run(
-            [str(wrapper)],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=environment,
-        )
-
-    token_file.chmod(0o644)
-    rejected_mode = invoke(token_file)
-    assert rejected_mode.returncode != 0
-    assert not capture.exists()
-    assert secret not in rejected_mode.stdout
-    assert secret not in rejected_mode.stderr
-
     token_file.chmod(0o600)
-    token_link = tmp_path / "token-link.txt"
-    token_link.symlink_to(token_file)
-    rejected_link = invoke(token_link)
-    assert rejected_link.returncode != 0
-    assert not capture.exists()
-    assert secret not in rejected_link.stdout
-    assert secret not in rejected_link.stderr
+    environment = clean_release_environment()
+    environment.update(
+        {
+            "CAPTURE_PATH": str(capture),
+            "CHUMMER_RELEASE_UPLOAD_TOKEN_FILE": str(token_file),
+        }
+    )
 
-    accepted = invoke(token_file)
-    assert accepted.returncode == 0, accepted.stderr
-    assert f"token={secret}" in capture.read_text(encoding="utf-8")
+    result = subprocess.run(
+        [str(wrapper)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
+    captured = capture.read_text(encoding="utf-8")
+    assert f"token_file={token_file}" in captured
+    assert "token=" in captured
+    assert secret not in captured
+    assert secret not in result.stdout
+    assert secret not in result.stderr
 
 
 def run_sourced(command: str, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -512,6 +517,822 @@ def run_sourced(command: str, *arguments: str, env: dict[str, str] | None = None
         check=False,
         env=env or clean_release_environment(),
     )
+
+
+def invoke_release_upload_auth_capture(
+    environment: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return run_sourced(
+        r'''
+resolved_value=""
+resolved_source=""
+capture_release_upload_auth_value resolved_value resolved_source
+if [[
+  -z "${CHUMMER_RELEASE_UPLOAD_TOKEN+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE+x}"
+  && -z "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH+x}"
+]]; then
+  scrubbed=1
+else
+  scrubbed=0
+fi
+python3 -c 'import os; names = [name for name in os.environ if name.startswith("CHUMMER_RELEASE_UPLOAD_TOKEN") or name.startswith("CHUMMER_RELEASE_UPLOAD_TICKET")]; raise SystemExit(0 if not names else 1)'
+printf 'source=%s\nvalue=%s\nscrubbed=%s\n' "$resolved_source" "$resolved_value" "$scrubbed"
+''',
+        env=environment,
+    )
+
+
+def load_credential_reader_namespace() -> tuple[str, dict[str, object]]:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    marker = "PY_RELEASE_UPLOAD_AUTH_READER"
+    start_token = f"3<<'{marker}'\n"
+    reader_start = bootstrap.index(start_token) + len(start_token)
+    reader_end = bootstrap.index(f"\n{marker}", reader_start)
+    reader_source = bootstrap[reader_start:reader_end]
+    namespace: dict[str, object] = {"__name__": "credential_reader_test"}
+    exec(compile(reader_source, "<credential-reader>", "exec"), namespace)
+    return reader_source, namespace
+
+
+def test_bootstrap_accepts_each_owner_only_file_alias_and_scrubs_environment(
+    tmp_path: Path,
+) -> None:
+    secret = "synthetic-owner-only-file-credential"
+    credential_file = tmp_path / "release-upload-credential"
+    credential_file.write_text(secret + "\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+
+    for setting in RELEASE_UPLOAD_AUTH_SETTINGS[2:]:
+        environment = clean_release_environment()
+        environment[setting] = str(credential_file)
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode == 0, (setting, result.stderr)
+        assert f"source={setting}\n" in result.stdout
+        assert f"value={secret}\n" in result.stdout
+        assert "scrubbed=1\n" in result.stdout
+        assert secret not in result.stderr
+
+
+def test_bootstrap_rejects_every_credential_source_conflict_without_precedence(
+    tmp_path: Path,
+) -> None:
+    credential_file = tmp_path / "credential"
+    credential_file.write_text("unused-file-value\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+
+    for first_index, first_setting in enumerate(RELEASE_UPLOAD_AUTH_SETTINGS):
+        for second_setting in RELEASE_UPLOAD_AUTH_SETTINGS[first_index + 1 :]:
+            environment = clean_release_environment()
+            first_value = (
+                str(credential_file)
+                if first_setting.endswith(("_FILE", "_PATH"))
+                else "first-conflict-secret"
+            )
+            second_value = (
+                str(credential_file)
+                if second_setting.endswith(("_FILE", "_PATH"))
+                else "second-conflict-secret"
+            )
+            environment[first_setting] = first_value
+            environment[second_setting] = second_value
+
+            result = invoke_release_upload_auth_capture(environment)
+
+            assert result.returncode != 0, (first_setting, second_setting)
+            assert "set exactly one release-upload credential source" in result.stderr
+            assert "first-conflict-secret" not in result.stdout + result.stderr
+            assert "second-conflict-secret" not in result.stdout + result.stderr
+            assert str(credential_file) not in result.stdout + result.stderr
+
+
+def test_bootstrap_rejects_unsafe_credential_file_metadata_and_types(
+    tmp_path: Path,
+) -> None:
+    secret = "unsafe-metadata-must-stay-redacted"
+
+    def invoke(path_value: str) -> subprocess.CompletedProcess[str]:
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"] = path_value
+        return invoke_release_upload_auth_capture(environment)
+
+    wrong_mode = tmp_path / "wrong-mode"
+    wrong_mode.write_text(secret, encoding="utf-8")
+    wrong_mode.chmod(0o644)
+
+    regular = tmp_path / "regular"
+    regular.write_text(secret, encoding="utf-8")
+    regular.chmod(0o600)
+    symlink = tmp_path / "symlink"
+    symlink.symlink_to(regular)
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    directory.chmod(0o600)
+
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo, mode=0o600)
+
+    hardlink_source = tmp_path / "hardlink-source"
+    hardlink_source.write_text(secret, encoding="utf-8")
+    hardlink_source.chmod(0o600)
+    hardlink = tmp_path / "hardlink"
+    os.link(hardlink_source, hardlink)
+
+    unsafe_paths = (
+        str(wrong_mode),
+        str(symlink),
+        str(directory),
+        str(fifo),
+        str(hardlink_source),
+        regular.name,
+    )
+    for unsafe_path in unsafe_paths:
+        result = invoke(unsafe_path)
+        assert result.returncode != 0, unsafe_path
+        assert "release-upload credential file is unsafe or invalid" in result.stderr
+        assert secret not in result.stdout + result.stderr
+        assert unsafe_path not in result.stdout + result.stderr
+
+    if os.geteuid() == 0:
+        foreign_owner = tmp_path / "foreign-owner"
+        foreign_owner.write_text(secret, encoding="utf-8")
+        foreign_owner.chmod(0o600)
+        os.chown(foreign_owner, 65534, -1)
+        rejected_owner = invoke(str(foreign_owner))
+        assert rejected_owner.returncode != 0
+        assert secret not in rejected_owner.stdout + rejected_owner.stderr
+
+    source = BOOTSTRAP.read_text(encoding="utf-8")
+    assert "metadata.st_uid != os.geteuid()" in source
+    assert "metadata.st_nlink != 1" in source
+    assert "stat.S_IMODE(metadata.st_mode) != 0o600" in source
+    assert "os.O_NOFOLLOW" in source
+
+
+def test_bootstrap_rejects_empty_multiline_binary_and_oversize_credentials(
+    tmp_path: Path,
+) -> None:
+    invalid_payloads = (
+        b"",
+        b"\n",
+        b"first\nsecond",
+        b"first\r\n",
+        b"prefix\x00suffix",
+        b"\xff",
+        b"x" * 8193,
+        b"x" * 8193 + b"\n",
+    )
+
+    for index, payload in enumerate(invalid_payloads):
+        credential_file = tmp_path / f"invalid-{index}"
+        credential_file.write_bytes(payload)
+        credential_file.chmod(0o600)
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TICKET_PATH"] = str(credential_file)
+
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode != 0, index
+        assert "release-upload credential file is unsafe or invalid" in result.stderr
+        assert "first" not in result.stdout + result.stderr
+        assert str(credential_file) not in result.stdout + result.stderr
+
+
+def test_bootstrap_accepts_exact_file_size_boundaries(tmp_path: Path) -> None:
+    for index, payload in enumerate((b"x" * 8192, b"y" * 8192 + b"\n")):
+        credential_file = tmp_path / f"boundary-{index}"
+        credential_file.write_bytes(payload)
+        credential_file.chmod(0o600)
+        environment = clean_release_environment()
+        environment["CHUMMER_RELEASE_UPLOAD_TOKEN_PATH"] = str(credential_file)
+
+        result = invoke_release_upload_auth_capture(environment)
+
+        assert result.returncode == 0, result.stderr
+        expected = payload.rstrip(b"\n").decode("ascii")
+        assert f"value={expected}\n" in result.stdout
+        assert "scrubbed=1\n" in result.stdout
+
+
+def test_bootstrap_file_capture_disables_xtrace_and_redacts_failures(
+    tmp_path: Path,
+) -> None:
+    secret = "xtrace-file-secret-must-not-appear"
+    credential_file = tmp_path / "redaction-path-must-not-appear"
+    credential_file.write_text(secret + "\n", encoding="utf-8")
+    credential_file.chmod(0o600)
+    environment = clean_release_environment()
+    environment["CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"] = str(credential_file)
+
+    accepted = subprocess.run(
+        [
+            "bash",
+            "-x",
+            "-c",
+            'source "$1"; capture_release_upload_auth_value value source; [[ -n "$value" ]]',
+            "credential-xtrace-test",
+            str(BOOTSTRAP),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert secret not in accepted.stdout + accepted.stderr
+    assert str(credential_file) not in accepted.stdout + accepted.stderr
+
+    credential_file.chmod(0o644)
+    rejected = invoke_release_upload_auth_capture(environment)
+    assert rejected.returncode != 0
+    assert secret not in rejected.stdout + rejected.stderr
+    assert str(credential_file) not in rejected.stdout + rejected.stderr
+
+
+def test_credential_reader_rejects_deletion_and_in_place_races(
+    tmp_path: Path,
+) -> None:
+    _reader_source, namespace = load_credential_reader_namespace()
+    read_credential = namespace["read_credential"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+
+    before_open = tmp_path / "delete-before-open"
+    before_open.write_text("delete-race-secret", encoding="utf-8")
+    before_open.chmod(0o600)
+
+    def deleting_opener(path: str, flags: int) -> int:
+        os.unlink(path)
+        return os.open(path, flags)
+
+    try:
+        read_credential(str(before_open), opener=deleting_opener)
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("credential deletion between lstat and open was accepted")
+
+    during_read = tmp_path / "delete-during-read"
+    during_read.write_text("delete-race-secret", encoding="utf-8")
+    during_read.chmod(0o600)
+    deleted = False
+
+    def deleting_reader(descriptor: int, size: int, offset: int) -> bytes:
+        nonlocal deleted
+        chunk = os.pread(descriptor, size, offset)
+        if chunk and not deleted:
+            during_read.unlink()
+            deleted = True
+        return chunk
+
+    try:
+        read_credential(str(during_read), position_reader=deleting_reader)
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("credential deletion during read was accepted")
+
+    in_place = tmp_path / "same-size-in-place"
+    in_place.write_bytes(b"a" * 6000)
+    in_place.chmod(0o600)
+    frozen_metadata = os.lstat(in_place)
+    overwritten = False
+
+    def overwriting_reader(descriptor: int, size: int, offset: int) -> bytes:
+        nonlocal overwritten
+        chunk = os.pread(descriptor, size, offset)
+        if chunk and not overwritten:
+            writer = os.open(in_place, os.O_WRONLY)
+            try:
+                os.pwrite(writer, b"b" * 6000, 0)
+            finally:
+                os.close(writer)
+            overwritten = True
+        return chunk
+
+    try:
+        read_credential(
+            str(in_place),
+            lstater=lambda _path: frozen_metadata,
+            fstater=lambda _descriptor: frozen_metadata,
+            position_reader=overwriting_reader,
+        )
+    except (OSError, unsafe_error):
+        pass
+    else:
+        raise AssertionError("same-size credential rewrite during read was accepted")
+
+    event_order = tmp_path / "event-order"
+    event_order.write_text("stable-credential\n", encoding="utf-8")
+    event_order.chmod(0o600)
+    events: list[str] = []
+
+    def recording_lstater(path: str) -> os.stat_result:
+        events.append("lstat")
+        return os.lstat(path)
+
+    def recording_closer(descriptor: int) -> None:
+        events.append("close")
+        os.close(descriptor)
+
+    assert (
+        read_credential(
+            str(event_order),
+            lstater=recording_lstater,
+            closer=recording_closer,
+        )
+        == b"stable-credential"
+    )
+    assert events == ["lstat", "lstat", "close"]
+
+
+def test_credential_reader_mac_acl_parser_boundaries() -> None:
+    reader_source, namespace = load_credential_reader_namespace()
+    acl_guard = namespace["assert_no_macos_acl"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    class FakeResult:
+        returncode = 0
+        stdout = b"-rw------- credential\n"
+        stderr = b""
+
+    class FakeSubprocess:
+        PIPE = object()
+        DEVNULL = object()
+
+        @staticmethod
+        def run(
+            arguments: tuple[object, ...],
+            **kwargs: object,
+        ) -> FakeResult:
+            calls.append((arguments, kwargs))
+            return FakeResult()
+
+    class Darwin:
+        platform = "darwin"
+
+    original_sys = namespace["sys"]
+    original_subprocess = namespace["subprocess"]
+    namespace["sys"] = Darwin()
+    namespace["subprocess"] = FakeSubprocess()
+    try:
+        accepted_outputs = (
+            b"-rw------- credential\n",
+            b"-rw-------@ credential\n",
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:release-operator deny write,append\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone inherited deny delete\n"
+            ),
+            (
+                # Model native `ls -L -l -d -e` output when an xattr marker
+                # accompanies a restrictive ACL on the mode-0600 file.
+                b"-rw-------@ 1 release staff 24 Jul 26 08:00 /dev/fd/42\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:release-operator inherited deny write,append\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny "
+                b"delete,file_inherit,directory_inherit,limit_inherit,only_inherit\n"
+            ),
+            (
+                b"-rw-------+ credential\n"
+                b" 0: user:_www deny "
+                b"read,write,execute,delete,append,delete_child,"
+                b"readattr,writeattr,readextattr,writeextattr,"
+                b"readsecurity,writesecurity,chown,sync,"
+                b"list,search,add_file,add_subdirectory,"
+                b"file_inherit,directory_inherit,limit_inherit,only_inherit\n"
+            ),
+        )
+        for stdout in accepted_outputs:
+            FakeResult.returncode = 0
+            FakeResult.stdout = stdout
+            FakeResult.stderr = b""
+            acl_guard(42)
+
+        rejected_results = (
+            ("probe failure", 1, b"-rw------- credential\n", b""),
+            ("probe stderr", 0, b"-rw------- credential\n", b"unexpected stderr"),
+            ("empty output", 0, b"", b""),
+            (
+                "allow ACE",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone allow read\n",
+                b"",
+            ),
+            (
+                "mixed deny and allow ACEs",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 1: user:other allow read\n",
+                b"",
+            ),
+            (
+                "first index gap",
+                0,
+                b"-rw-------+ credential\n"
+                b" 1: group:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "duplicate index",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 0: user:release-operator deny write\n",
+                b"",
+            ),
+            (
+                "later index gap",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete\n"
+                b" 2: user:release-operator deny write\n",
+                b"",
+            ),
+            (
+                "malformed principal kind",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: role:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "empty principal name",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group: deny delete\n",
+                b"",
+            ),
+            (
+                "principal whitespace",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:release operator deny delete\n",
+                b"",
+            ),
+            (
+                "principal control character",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every\x01one deny delete\n",
+                b"",
+            ),
+            (
+                "principal delete character",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every\x7fone deny delete\n",
+                b"",
+            ),
+            (
+                "principal extra separator",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:every:one deny delete\n",
+                b"",
+            ),
+            (
+                "leading rights comma",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny ,delete\n",
+                b"",
+            ),
+            (
+                "trailing rights comma",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,\n",
+                b"",
+            ),
+            (
+                "empty rights component",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,,write\n",
+                b"",
+            ),
+            (
+                "invalid rights punctuation",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete-child\n",
+                b"",
+            ),
+            (
+                "invalid rights case",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny DELETE\n",
+                b"",
+            ),
+            (
+                "unknown right",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny unknown_right\n",
+                b"",
+            ),
+            (
+                "duplicate right",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone deny delete,delete\n",
+                b"",
+            ),
+            (
+                "malformed inherited field",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone explicit deny delete\n",
+                b"",
+            ),
+            (
+                "inherited allow ACE",
+                0,
+                b"-rw-------+ credential\n"
+                b" 0: group:everyone inherited allow read\n",
+                b"",
+            ),
+            (
+                "at suffix with allow ACE",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: group:everyone allow read\n",
+                b"",
+            ),
+            (
+                "at suffix with malformed ACL index",
+                0,
+                b"-rw-------@ credential\n"
+                b" 1: group:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "at suffix with malformed ACL principal",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: role:everyone deny delete\n",
+                b"",
+            ),
+            (
+                "at suffix with unknown ACL right",
+                0,
+                b"-rw-------@ credential\n"
+                b" 0: group:everyone deny unknown_right\n",
+                b"",
+            ),
+            ("malformed permission token", 0, b"malformed credential\n", b""),
+            ("ACL marker without ACE", 0, b"-rw-------+ credential\n", b""),
+        )
+        for label, returncode, stdout, stderr in rejected_results:
+            FakeResult.returncode = returncode
+            FakeResult.stdout = stdout
+            FakeResult.stderr = stderr
+            try:
+                acl_guard(42)
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    f"unsafe or malformed macOS credential ACL probe was accepted: {label}"
+                )
+    finally:
+        namespace["sys"] = original_sys
+        namespace["subprocess"] = original_subprocess
+
+    for arguments, kwargs in calls:
+        assert arguments[-1] == "/dev/fd/42"
+        assert kwargs["stdin"] is FakeSubprocess.DEVNULL
+        assert kwargs["stdout"] is FakeSubprocess.PIPE
+        assert kwargs["stderr"] is FakeSubprocess.PIPE
+        assert kwargs["pass_fds"] == (42,)
+        assert kwargs["env"] == {
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        }
+    assert reader_source.count("assert_macos_acl_is_nonpermissive(descriptor)") == 2
+    assert "os.pread" in reader_source
+    assert "os.lseek" not in reader_source
+
+
+def test_credential_reader_native_macos_acl_policy_boundaries() -> None:
+    reader_source, namespace = load_credential_reader_namespace()
+    acl_guard = namespace["assert_macos_acl_is_nonpermissive"]
+    acl_is_absent = namespace["_macos_acl_is_absent"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+    owner_uuid = b"o" * 16
+    non_owner_uuid = b"n" * 16
+
+    class Darwin:
+        platform = "darwin"
+
+    original_sys = namespace["sys"]
+    namespace["sys"] = Darwin()
+    try:
+        accepted_entries = (
+            (),
+            ((2, non_owner_uuid),),
+            ((1, owner_uuid),),
+            ((2, non_owner_uuid), (1, owner_uuid)),
+        )
+        for entries in accepted_entries:
+            acl_guard(
+                42,
+                acl_reader=lambda _descriptor, entries=entries: (
+                    owner_uuid,
+                    entries,
+                ),
+            )
+
+        rejected_entries = (
+            ((1, non_owner_uuid),),
+            ((3, owner_uuid),),
+            ((2, b"short"),),
+        )
+        for entries in rejected_entries:
+            try:
+                acl_guard(
+                    42,
+                    acl_reader=lambda _descriptor, entries=entries: (
+                        owner_uuid,
+                        entries,
+                    ),
+                )
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    "permissive, unknown, or malformed native macOS ACL "
+                    "was accepted"
+                )
+
+        try:
+            acl_guard(
+                42,
+                acl_reader=lambda _descriptor: (
+                    b"short",
+                    (),
+                ),
+            )
+        except unsafe_error:
+            pass
+        else:
+            raise AssertionError("malformed owner UUID was accepted")
+    finally:
+        namespace["sys"] = original_sys
+
+    assert "acl_get_fd_np" in reader_source
+    assert "acl_valid_fd_np" in reader_source
+    assert "mbr_uid_to_uuid" in reader_source
+    assert "qualifier_uuid == owner_uuid" in reader_source
+    assert acl_is_absent(0)
+    assert acl_is_absent(errno.ENOENT)
+    if hasattr(errno, "ENOATTR"):
+        assert acl_is_absent(errno.ENOATTR)
+    if hasattr(errno, "ENODATA"):
+        assert acl_is_absent(errno.ENODATA)
+    assert not acl_is_absent(errno.EBADF)
+
+
+def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
+    tmp_path: Path,
+) -> None:
+    _reader_source, namespace = load_credential_reader_namespace()
+    read_credential = namespace["read_credential"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+
+    class FakeResult:
+        returncode = 0
+        stderr = b""
+
+        def __init__(self, stdout: bytes) -> None:
+            self.stdout = stdout
+
+    class Darwin:
+        platform = "darwin"
+
+    first_probe = (
+        b"-rw-------+ credential\n"
+        b" 0: group:everyone deny delete\n"
+    )
+    unsafe_second_probes = (
+        (
+            b"-rw-------+ credential\n"
+            b" 0: group:everyone allow read\n"
+        ),
+        (
+            b"-rw-------+ credential\n"
+            b" 0: group:everyone deny delete,\n"
+        ),
+    )
+    original_sys = namespace["sys"]
+    original_subprocess = namespace["subprocess"]
+    original_acl_guard = namespace["assert_macos_acl_is_nonpermissive"]
+    namespace["sys"] = Darwin()
+    try:
+        for index, unsafe_second_probe in enumerate(unsafe_second_probes):
+            credential_file = tmp_path / f"acl-transition-{index}"
+            credential_file.write_text("stable-credential\n", encoding="utf-8")
+            credential_file.chmod(0o600)
+            probe_results = iter((first_probe, unsafe_second_probe))
+            probe_count = 0
+            closed_descriptors: list[int] = []
+
+            class FakeSubprocess:
+                PIPE = object()
+                DEVNULL = object()
+
+                @staticmethod
+                def run(
+                    _arguments: tuple[object, ...],
+                    **_kwargs: object,
+                ) -> FakeResult:
+                    nonlocal probe_count
+                    probe_count += 1
+                    return FakeResult(next(probe_results))
+
+            def fake_acl_guard(_descriptor: int) -> None:
+                nonlocal probe_count
+                probe_count += 1
+                probe = next(probe_results)
+                if probe == unsafe_second_probe:
+                    raise unsafe_error
+
+            def recording_closer(descriptor: int) -> None:
+                closed_descriptors.append(descriptor)
+                os.close(descriptor)
+
+            namespace["subprocess"] = FakeSubprocess()
+            namespace["assert_macos_acl_is_nonpermissive"] = fake_acl_guard
+            try:
+                read_credential(
+                    str(credential_file),
+                    closer=recording_closer,
+                )
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    "credential ACL transition was accepted"
+                )
+
+            assert probe_count == 2
+            assert len(closed_descriptors) == 1
+            try:
+                os.fstat(closed_descriptors[0])
+            except OSError:
+                pass
+            else:
+                raise AssertionError(
+                    "credential descriptor remained open after ACL rejection"
+                )
+    finally:
+        namespace["sys"] = original_sys
+        namespace["subprocess"] = original_subprocess
+        namespace["assert_macos_acl_is_nonpermissive"] = original_acl_guard
+
+
+def test_credential_file_writer_contract_requires_atomic_publication() -> None:
+    served_runbook = RUNBOOK.read_text(encoding="utf-8").lower()
+    operator_runbook = (
+        REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
+    ).read_text(encoding="utf-8").lower()
+
+    for runbook in (served_runbook, operator_runbook):
+        assert "atomically rename" in runbook
+        assert "do not" in runbook
+        assert "mutate that path or inode while the bootstrap" in runbook
+        assert "finite rereads" in runbook
+        assert "arbitrary hostile" in runbook
+        assert "same operator uid" in runbook or "same-uid writer" in runbook
+        assert "sequential deny-only acl" in runbook
+        assert "allow, mixed, malformed, or unknown" in runbook
+    assert 'ticket_tmp="$(mktemp ' in served_runbook
+    assert 'printf \'%s\\n\' "$ticket_value" > "$ticket_tmp"' in served_runbook
+    assert 'mv "$ticket_tmp" "$ticket_file"' in served_runbook
+    assert 'printf \'%s\\n\' "$ticket_value" > "$ticket_file"' not in served_runbook
 
 
 def make_remote_proof_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -1075,15 +1896,13 @@ def test_capture_release_upload_auth_scrubs_child_environment(tmp_path: Path) ->
     environment_log = tmp_path / "child-environment.json"
     secret_values = (
         "release-token-sentinel",
-        "release-ticket-sentinel",
         "fleet-token-sentinel",
     )
     environment = clean_release_environment()
     environment.update(
         {
             "CHUMMER_RELEASE_UPLOAD_TOKEN": secret_values[0],
-            "CHUMMER_RELEASE_UPLOAD_TICKET": secret_values[1],
-            "FLEET_INTERNAL_API_TOKEN": secret_values[2],
+            "FLEET_INTERNAL_API_TOKEN": secret_values[1],
             "ENVIRONMENT_LOG": str(environment_log),
         }
     )

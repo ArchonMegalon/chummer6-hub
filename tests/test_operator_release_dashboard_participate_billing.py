@@ -10,6 +10,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
+from scripts.public_edge_postdeploy_contract import (
+    PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+    build_public_edge_downloads_authority_binding,
+    load_exact_public_edge_postdeploy_schema,
+)
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_operator_release_dashboard.py"
 WINDOWS_INTAKE_SCRIPT_PATH = (
@@ -211,9 +218,44 @@ def write_receipts(receipts: dict[Path, dict[str, object]]) -> None:
             published_root / "PUBLIC_EDGE_OBSERVABILITY_RELEASE_GATE.generated.json",
             passing_public_edge_observability_release_gate_payload(),
         )
-    for path, payload in receipts_to_write.items():
+    stamped_receipts = {
+        path: with_fresh_timestamp(path, payload)
+        for path, payload in receipts_to_write.items()
+    }
+    release_channel_path = next(
+        (
+            path
+            for path in stamped_receipts
+            if path.name == "RELEASE_CHANNEL.generated.json"
+        ),
+        None,
+    )
+    if release_channel_path is not None:
+        release_channel_raw = (
+            json.dumps(stamped_receipts[release_channel_path]) + "\n"
+        ).encode("utf-8")
+        release_channel_digest = hashlib.sha256(
+            release_channel_raw
+        ).hexdigest()
+        for path, payload in tuple(stamped_receipts.items()):
+            if (
+                path.name
+                == "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+                and payload.get("contractName")
+                == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+            ):
+                try:
+                    stamped_receipts[path] = bind_public_edge_postdeploy_payload(
+                        payload,
+                        release_channel_digest,
+                    )
+                except ValueError:
+                    # Invalid-receipt tests intentionally violate identity
+                    # fields that make an authorizing binding impossible.
+                    pass
+    for path, payload in stamped_receipts.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(with_fresh_timestamp(path, payload)) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
 def test_windows_visual_audit_is_release_blocking_by_default_but_explicit_dev_override_remains(
@@ -256,13 +298,13 @@ def test_expected_visible_version_candidates_allow_blank_status_for_stable_lane(
 
 
 def passing_public_edge_postdeploy_payload() -> dict[str, object]:
-    return {
-        "contractName": "chummer.public_edge_postdeploy_gate.v1",
+    payload = {
+        "contractName": PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
         "status": "pass",
         "generatedAtUtc": fresh_timestamp(),
         "coreChildContracts": {
             "preflight": "chummer.public_edge_deploy_preflight.v1",
-            "downloads": "chummer.downloads_version_marker.v1",
+            "downloads": PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
             "pwaStatic": "chummer.public_pwa_static_assets.v1",
             "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
             "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -307,6 +349,8 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
         "releaseManifestStatusMatchesReleaseChannel": True,
         "releaseManifestChannel": "public_stable",
         "releaseManifestChannelMatchesReleaseChannel": True,
+        "releaseManifestGeneration": "generation-run-test",
+        "releaseManifestSchema": "chummer.release-channel.v1",
         "releaseManifestVersion": "run-test",
         "releaseManifestVersionMatchesReleaseChannel": True,
         "releaseManifestSupportabilityState": "gold_supported",
@@ -540,6 +584,89 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
         "frontdoorNavigationAnchorDeviceContextPresent": True,
         "frontdoorNavigationAnchorFailure": "",
     }
+    return bind_public_edge_postdeploy_payload(payload, "a" * 64)
+
+
+def bind_public_edge_postdeploy_payload(
+    payload: dict[str, object],
+    release_channel_receipt_sha256: str,
+) -> dict[str, object]:
+    payload = dict(payload)
+    core_child_contracts = dict(payload.get("coreChildContracts") or {})
+    core_child_contracts["downloads"] = (
+        PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME
+    )
+    payload["coreChildContracts"] = core_child_contracts
+    payload["contractName"] = PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+    payload.setdefault(
+        "releaseManifestGeneration",
+        "generation-run-test",
+    )
+    payload.setdefault(
+        "releaseManifestSchema",
+        "chummer.release-channel.v1",
+    )
+    downloads_receipt = {
+        "contractName": PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
+        "status": "pass",
+        "release_channel_receipt_sha256_expected": (
+            release_channel_receipt_sha256
+        ),
+        "release_channel_receipt_sha256_actual": (
+            release_channel_receipt_sha256
+        ),
+        "release_channel_receipt_sha256_matches": True,
+        "release_channel_receipt_binding_status": "pass",
+        "release_channel_version": payload.get(
+            "expectedReleaseVersion"
+        ),
+        "expected_release_channel": payload.get(
+            "expectedReleaseChannel"
+        ),
+        "release_manifest_schema": payload.get(
+            "releaseManifestSchema"
+        ),
+        "release_manifest_version": payload.get(
+            "releaseManifestVersion"
+        ),
+        "release_manifest_channel": payload.get(
+            "releaseManifestChannel"
+        ),
+        "release_manifest_generation": payload.get(
+            "releaseManifestGeneration"
+        ),
+        "release_manifest_version_matches_release_channel": True,
+        "release_manifest_channel_matches_release_channel": True,
+        "downloads_generation_matches_served_manifest": True,
+        "status_redirect_generation_matches_served_manifest": True,
+    }
+    payload.update(
+        {
+            "childReceipts": {},
+            "downloadsAuthorityBinding": (
+                build_public_edge_downloads_authority_binding(
+                    downloads_receipt,
+                    downloads_receipt_sha256="b" * 64,
+                    release_channel_receipt_sha256=(
+                        release_channel_receipt_sha256
+                    ),
+                )
+            ),
+            "releaseChannelAuthorizationCapable": True,
+            "releaseChannelReceiptBindingRequired": True,
+            "skipReleaseVersionMatch": False,
+        }
+    )
+    payload.setdefault("failures", [])
+    schema = load_exact_public_edge_postdeploy_schema(
+        receipt_contract_name=PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+    )
+    payload["schemaContractName"] = schema["contractName"]
+    payload["schemaSha256"] = schema["sha256"]
+    return {
+        field: payload.get(field)
+        for field in schema["fields"]
+    }
 
 
 def passing_teable_important_work_payload() -> dict[str, object]:
@@ -567,6 +694,18 @@ def passing_teable_important_work_payload() -> dict[str, object]:
 
 def nested_public_edge_postdeploy_anchor_payload() -> dict[str, object]:
     payload = passing_public_edge_postdeploy_payload()
+    payload["contractName"] = "chummer.public_edge_postdeploy_gate.v1"
+    payload["coreChildContracts"]["downloads"] = (
+        "chummer.downloads_version_marker.v1"
+    )
+    for field in (
+        "downloadsAuthorityBinding",
+        "releaseChannelAuthorizationCapable",
+        "releaseChannelReceiptBindingRequired",
+        "schemaContractName",
+        "schemaSha256",
+    ):
+        payload.pop(field, None)
     anchor_artifact = {
         "contractName": payload.pop("frontdoorNavigationAnchorArtifactContract"),
         "entry_url": payload.pop("frontdoorNavigationAnchorEntryUrl"),
@@ -3652,7 +3791,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn("public_edge_postdeploy_gate", payload["failures"])
         self.assertEqual("chummer.public_edge_postdeploy_gate.preview", public_edge_check["summary"]["contract_name"])
         self.assertIn("unexpected public-edge postdeploy contract", public_edge_check["failures"])
-        self.assertIn("failures: unexpected public-edge postdeploy contract", markdown)
+        self.assertIn("unexpected public-edge postdeploy contract", markdown)
 
     def test_dashboard_blocks_public_edge_postdeploy_semantic_contradictions(self) -> None:
         module = load_module()
@@ -6547,7 +6686,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             markdown,
         )
 
-    def test_dashboard_accepts_nested_current_public_edge_anchor_shape(self) -> None:
+    def test_dashboard_rejects_nested_legacy_public_edge_anchor_shape(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="operator-dashboard-legacy-public-edge-anchor-") as temp_dir:
             published = Path(temp_dir) / "published"
@@ -6588,19 +6727,19 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 markdown = module.build_markdown(payload)
 
         public_edge = payload["checks"]["public_edge_postdeploy_gate"]
-        self.assertEqual("pass", payload["status"])
-        self.assertTrue(public_edge["pass"])
-        self.assertEqual("pass", public_edge["status"])
-        self.assertNotIn("missing postdeploy fields", "\n".join(public_edge.get("failures", [])))
-        self.assertEqual(
-            "chummer.frontdoor_mobile_anchor_redirect.v2",
-            public_edge["summary"]["frontdoor_navigation_anchor_artifact_contract"],
+        self.assertEqual("fail", payload["status"])
+        self.assertFalse(public_edge["pass"])
+        self.assertEqual("fail", public_edge["status"])
+        self.assertIn(
+            "unexpected public-edge postdeploy contract",
+            public_edge["failures"],
         )
-        self.assertEqual(
-            "/mobile/player",
-            public_edge["summary"]["frontdoor_navigation_anchor_final_path"],
+        self.assertNotIn("anchorArtifact", markdown)
+        self.assertNotIn(
+            "https://chummer.run/mobile/player#turn-runsite-card",
+            markdown,
         )
-        self.assertIn("- PASS `public_edge_postdeploy_gate`: `pass`", markdown)
+        self.assertIn("- FAIL `public_edge_postdeploy_gate`: `fail`", markdown)
 
     def test_dashboard_marks_stale_ea_operator_readiness_as_stale_info_not_release_blocker(self) -> None:
         module = load_module()

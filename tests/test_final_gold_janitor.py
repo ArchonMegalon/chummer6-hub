@@ -11,6 +11,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
+from scripts.public_edge_postdeploy_contract import (
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+    build_public_edge_downloads_authority_binding,
+    load_exact_public_edge_postdeploy_schema,
+)
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "final_gold_janitor.py"
 
@@ -33,6 +39,21 @@ def expected_release_ready_blockers_for_final_gold(module) -> list[str]:
 
 def has_windows_native_root_blocker(module) -> bool:
     return not module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING
+
+
+def passing_windows_visual_intake_verifier_result() -> tuple[bool, dict[str, object]]:
+    return True, {
+        "status": "pass",
+        "issues": [],
+        "recovery_pack_pass": True,
+        "effective_status": "external_artifact_required",
+        "operator_action_still_required": True,
+        "current_windows_visual_audit_status": "fail",
+        "current_windows_visual_audit_effective_pass": False,
+        "current_windows_visual_audit_issues": [
+            "current_windows_visual_audit_status_not_pass"
+        ],
+    }
 
 
 def passing_operator_dashboard_payload(module):
@@ -97,15 +118,18 @@ def test_expected_visible_version_candidates_allow_blank_status_for_stable_lane(
     ) == ["Version 2026.06.30", "Version run-20260630"]
 
 
-def passing_public_edge_postdeploy_payload(module):
-    return {
+def passing_public_edge_postdeploy_payload(
+    module,
+    release_channel_receipt_sha256: str = "a" * 64,
+):
+    payload = {
         "contractName": module.PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
         "status": "pass",
         "generatedAtUtc": module.now_iso(),
         "baseUrl": "https://chummer.run",
         "coreChildContracts": {
             "preflight": "chummer.public_edge_deploy_preflight.v1",
-            "downloads": "chummer.downloads_version_marker.v1",
+            "downloads": "chummer.downloads_version_marker.bound.v1",
             "pwaStatic": "chummer.public_pwa_static_assets.v1",
             "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
             "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -139,6 +163,8 @@ def passing_public_edge_postdeploy_payload(module):
         "releaseManifestStatusMatchesReleaseChannel": True,
         "releaseManifestChannel": "public_stable",
         "releaseManifestChannelMatchesReleaseChannel": True,
+        "releaseManifestGeneration": "generation-run-test",
+        "releaseManifestSchema": "chummer.release-channel.v1",
         "releaseManifestVersion": "run-test",
         "releaseManifestVersionMatchesReleaseChannel": True,
         "releaseManifestSupportabilityState": "gold_supported",
@@ -372,6 +398,126 @@ def passing_public_edge_postdeploy_payload(module):
         "frontdoorNavigationAnchorDeviceContextPresent": True,
         "frontdoorNavigationAnchorFailure": "",
     }
+    return bind_public_edge_postdeploy_payload(
+        module,
+        payload,
+        release_channel_receipt_sha256,
+    )
+
+
+def bind_public_edge_postdeploy_payload(
+    module,
+    payload,
+    release_channel_receipt_sha256: str,
+):
+    payload = dict(payload)
+    core_child_contracts = dict(payload.get("coreChildContracts") or {})
+    core_child_contracts["downloads"] = (
+        "chummer.downloads_version_marker.bound.v1"
+    )
+    payload["coreChildContracts"] = core_child_contracts
+    payload.setdefault(
+        "releaseManifestGeneration",
+        "generation-run-test",
+    )
+    payload.setdefault(
+        "releaseManifestSchema",
+        "chummer.release-channel.v1",
+    )
+    downloads_receipt = {
+        "contractName": "chummer.downloads_version_marker.bound.v1",
+        "status": "pass",
+        "release_channel_receipt_sha256_expected": (
+            release_channel_receipt_sha256
+        ),
+        "release_channel_receipt_sha256_actual": (
+            release_channel_receipt_sha256
+        ),
+        "release_channel_receipt_sha256_matches": True,
+        "release_channel_receipt_binding_status": "pass",
+        "release_channel_version": payload["expectedReleaseVersion"],
+        "expected_release_channel": payload["expectedReleaseChannel"],
+        "release_manifest_schema": payload["releaseManifestSchema"],
+        "release_manifest_version": payload["releaseManifestVersion"],
+        "release_manifest_channel": payload["releaseManifestChannel"],
+        "release_manifest_generation": payload[
+            "releaseManifestGeneration"
+        ],
+        "release_manifest_version_matches_release_channel": True,
+        "release_manifest_channel_matches_release_channel": True,
+        "downloads_generation_matches_served_manifest": True,
+        "status_redirect_generation_matches_served_manifest": True,
+    }
+    payload.update(
+        {
+            "childReceipts": {},
+            "downloadsAuthorityBinding": (
+                build_public_edge_downloads_authority_binding(
+                    downloads_receipt,
+                    downloads_receipt_sha256="b" * 64,
+                    release_channel_receipt_sha256=(
+                        release_channel_receipt_sha256
+                    ),
+                )
+            ),
+            "releaseChannelAuthorizationCapable": True,
+            "releaseChannelReceiptBindingRequired": True,
+            "skipReleaseVersionMatch": False,
+        }
+    )
+    payload.setdefault("failures", [])
+    schema = load_exact_public_edge_postdeploy_schema(
+        receipt_contract_name=(
+            PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+        )
+    )
+    payload["schemaContractName"] = schema["contractName"]
+    payload["schemaSha256"] = schema["sha256"]
+    return {
+        field: payload.get(field)
+        for field in schema["fields"]
+    }
+
+
+def bind_published_public_edge_to_release_channel(
+    module,
+    published: Path,
+) -> None:
+    public_edge_path = (
+        published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+    )
+    release_channel_path = published / "RELEASE_CHANNEL.generated.json"
+    if not public_edge_path.is_file():
+        return
+    payload = json.loads(public_edge_path.read_text(encoding="utf-8"))
+    if not release_channel_path.is_file():
+        release_channel_path.write_text(
+            json.dumps(
+                {
+                    "status": payload.get("expectedReleaseStatus"),
+                    "version": payload.get("expectedReleaseVersion"),
+                    "channel": payload.get("expectedReleaseChannel"),
+                    "channelId": payload.get("expectedReleaseChannel"),
+                    "supportabilityState": payload.get(
+                        "expectedReleaseSupportabilityState"
+                    ),
+                    "rolloutState": payload.get(
+                        "expectedReleaseRolloutState"
+                    ),
+                    "generatedAtUtc": module.now_iso(),
+                }
+            ),
+            encoding="utf-8",
+        )
+    release_channel_digest = hashlib.sha256(
+        release_channel_path.read_bytes()
+    ).hexdigest()
+    payload = bind_public_edge_postdeploy_payload(
+        module,
+        payload,
+        release_channel_digest,
+    )
+    public_edge_path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_normalized_release_ready_snapshot_truth_audit_rejects_pass_shaped_failed_gates() -> None:
@@ -1411,7 +1557,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertLess(dashboard_index, release_ready_index)
 
-    def test_postdeploy_materializer_binds_expected_release_channel(self) -> None:
+    def test_postdeploy_materializer_binds_exact_release_channel_receipt(self) -> None:
         module = load_module()
         command = next(
             " ".join(item)
@@ -1420,9 +1566,13 @@ class FinalGoldJanitorTests(unittest.TestCase):
         )
 
         self.assertIn(
-            f"--expected-release-channel {module.EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL}",
+            (
+                "--release-channel-receipt "
+                f"{module.REGISTRY_ROOT / 'RELEASE_CHANNEL.generated.json'}"
+            ),
             command,
         )
+        self.assertIn("--release-channel-receipt-sha256", command)
 
     def test_materializers_refresh_mobile_projection_before_blazor_bridge(self) -> None:
         module = load_module()
@@ -2438,7 +2588,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "waiting_for_artifact",
-                        "generated_at_utc": "2026-07-04T17:00:05Z",
+                        "generated_at_utc": generated_at_utc,
                         "import_failure": {
                             "type": "BadZipFile",
                             "message": "File is not a zip file",
@@ -2515,7 +2665,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             watcher_state_path.write_text(
                 json.dumps(
                     {
-                        "generated_at_utc": "2026-07-04T17:00:06Z",
+                        "generated_at_utc": generated_at_utc,
                         "status": "running",
                         "pid": 1866861,
                         "process_alive": True,
@@ -2533,6 +2683,11 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=passing_windows_visual_intake_verifier_result(),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
@@ -2789,6 +2944,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
     def test_payload_surfaces_windows_operator_missing_artifact_and_stale_ask(self) -> None:
         module = load_module()
         module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING = False
+        generated_at_utc = module.now_iso()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-windows-operator-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
@@ -2800,7 +2956,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "sent",
-                        "generated_at_utc": "2026-07-04T17:00:11Z",
+                        "generated_at_utc": generated_at_utc,
                         "message_ids": ["1"],
                         "text_sha256": "f" * 64,
                         "text_preview": "Older Windows operator ask",
@@ -2816,7 +2972,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = {
                         "contract_name": "chummer.teable_important_work.v1",
                         "status": "pass",
-                        "generated_at_utc": "2026-07-04T17:00:08Z",
+                        "generated_at_utc": generated_at_utc,
                         "row_count": 1,
                         "rows": [{"title": "row"}],
                         "sync": {"state": "passed", "attempted": True, "synced_count": 1, "failed_count": 0},
@@ -2829,7 +2985,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     payload = {
                         **passing_required_receipt_payload(module, key),
                         "status": "fail",
-                        "generated_at_utc": "2026-07-04T17:00:09Z",
+                        "generated_at_utc": generated_at_utc,
                         "contract_name": module.WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME,
                         "artifact": {"sha256": "a" * 64, "actualSha256": "a" * 64},
                         "startupReceipt": {
@@ -2892,6 +3048,11 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
                 mock.patch.object(module, "REQUIRED_RECEIPTS", required),
                 mock.patch.object(module, "TELEGRAM_TEXT_DELIVERY_ROOT", delivery_root),
+                mock.patch.object(
+                    module,
+                    "verify_windows_visual_intake_request_receipt",
+                    return_value=passing_windows_visual_intake_verifier_result(),
+                ),
             ):
                 payload = module.build_payload([])
                 markdown = module.build_verdict_markdown(payload)
@@ -3972,6 +4133,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         }
                     )
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -4087,6 +4252,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         "release_ready",
                     ]
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -4204,6 +4373,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 json.dumps(release_channel_payload),
                 encoding="utf-8",
             )
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -4254,6 +4427,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload(
@@ -4639,6 +4816,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
             play_surface_horizon_path.write_text(
                 json.dumps(passing_blazor_play_surface_horizon_payload()),
                 encoding="utf-8",
+            )
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
             )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch.object(module, "WORKSPACE_PLAY_SURFACE_HORIZON_CANDIDATES", (play_surface_horizon_path,)):
@@ -5337,6 +5518,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         "release channel rollout is blocking: coverage_incomplete",
                     ]
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -6051,6 +6236,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                     }
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
 
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with (
                 mock.patch.object(module, "PUBLISHED_ROOT", published),
@@ -6241,6 +6430,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stdout = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -6300,9 +6493,13 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stdout = io.StringIO()
-            with mock.patch.object(module, "DEFAULT_PUBLISHED_ROOT", published), mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "FLEET_COMPLETION_ROOT", fleet_completion_root), mock.patch.object(module, "FLEET_ARTIFACT_ROOT", fleet_artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
+            with mock.patch.object(module, "DEFAULT_PUBLISHED_ROOT", published), mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "REGISTRY_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "FLEET_COMPLETION_ROOT", fleet_completion_root), mock.patch.object(module, "FLEET_ARTIFACT_ROOT", fleet_artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
                 with redirect_stdout(stdout):
                     self.assertEqual(0, module.main())
 
@@ -6366,6 +6563,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stdout = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -6727,6 +6928,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -6790,6 +6995,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -6836,6 +7045,10 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 if key == "operator_release_dashboard":
                     payload = passing_operator_dashboard_payload(module)
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            bind_published_public_edge_to_release_channel(
+                module,
+                published,
+            )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])

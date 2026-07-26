@@ -45,6 +45,10 @@ COMPOSE_BASE = detect_compose_base()
 def compose_env():
     env = os.environ.copy()
     env.setdefault("TUNNEL_TOKEN", "dummy")
+    env.setdefault(
+        "CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE",
+        "/tmp/chummer-cloudflared-test.token",
+    )
     if "COMPOSE_FILE" not in env and DEFAULT_COMPOSE_FILE is not None:
         env["COMPOSE_FILE"] = str(DEFAULT_COMPOSE_FILE.relative_to(REPO_ROOT))
     return env
@@ -268,18 +272,23 @@ class StackConfigSmokeTests(unittest.TestCase):
             msg="the portal should publish the host-facing public-edge surface on 8091 by default",
         )
 
-    def test_runbook_bootstraps_cloudflare_tunnel_from_public_edge_compose(self):
+    def test_runbook_delegates_cloudflare_lifecycle_to_guarded_tool(self):
         runbook = (REPO_ROOT / "scripts" / "runbook.sh").read_text(encoding="utf-8")
 
         self.assertIn(
-            'local compose_file="$REPO_ROOT/docker-compose.public-edge.yml"',
+            "legacy_raw_token_requires_guarded_migration",
             runbook,
-            msg="tunnel bootstrap should target the public-edge compose file instead of the legacy stack",
+            msg="the runbook should refuse a legacy raw-token state",
         )
         self.assertIn(
-            'run_compose_with_optional_env_file -f "$compose_file" up -d chummer-run-cloudflared',
+            "token-file HA tunnel is already healthy; no lifecycle mutation performed",
             runbook,
-            msg="tunnel bootstrap should start the public-edge tunnel sidecar directly without legacy profiles",
+            msg="the runbook should be a proof-only gate after guarded migration",
+        )
+        self.assertNotIn(
+            'up -d \\\n    chummer-run-cloudflared',
+            runbook,
+            msg="the runbook must not blindly recreate tunnel connectors",
         )
 
     def test_public_edge_promotes_windows_installer_on_main_shelf(self):

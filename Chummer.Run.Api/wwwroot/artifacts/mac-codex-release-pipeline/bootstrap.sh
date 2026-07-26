@@ -2975,32 +2975,45 @@ infer_publish_mode() {
 }
 
 capture_release_upload_auth_value() {
+  set +x
   local output_value_variable="${1:-}"
   local output_source_variable="${2:-}"
   local captured_value=""
   local captured_source=""
+  local selected_value=""
+  local selected_source=""
+  local source_index=0
+  local source_count=0
+  local python_bin=""
+  local -a source_names=(
+    CHUMMER_RELEASE_UPLOAD_TOKEN
+    CHUMMER_RELEASE_UPLOAD_TICKET
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE
+    CHUMMER_RELEASE_UPLOAD_TOKEN_PATH
+    CHUMMER_RELEASE_UPLOAD_TICKET_FILE
+    CHUMMER_RELEASE_UPLOAD_TICKET_PATH
+  )
+  local -a source_values=(
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}"
+    "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH:-}"
+  )
   export -n captured_value captured_source 2>/dev/null || true
   [[ -n "$output_value_variable" && -n "$output_source_variable" ]] || return 1
 
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
-    captured_value="$CHUMMER_RELEASE_UPLOAD_TOKEN"
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
-    captured_value="$CHUMMER_RELEASE_UPLOAD_TICKET"
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_PATH"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_FILE"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH:-}" ]]; then
-    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_PATH"
-  fi
+  for (( source_index = 0; source_index < ${#source_names[@]}; source_index += 1 )); do
+    if [[ -n "${source_values[$source_index]}" ]]; then
+      source_count=$(( source_count + 1 ))
+      selected_source="${source_names[$source_index]}"
+      selected_value="${source_values[$source_index]}"
+    fi
+  done
 
-  printf -v "$output_value_variable" '%s' "$captured_value"
-  printf -v "$output_source_variable" '%s' "$captured_source"
-  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
+  # Scrub every inherited credential source before validation starts or a child
+  # process is launched. The selected value remains only in a non-exported local.
   unset \
     CHUMMER_RELEASE_UPLOAD_TOKEN \
     CHUMMER_RELEASE_UPLOAD_TICKET \
@@ -3011,6 +3024,422 @@ capture_release_upload_auth_value() {
     FLEET_INTERNAL_API_TOKEN \
     CHUMMER_REGISTRY_CONTROL_API_KEY \
     REGISTRY_CONTROL_API_KEY
+  unset source_values
+
+  (( source_count <= 1 )) \
+    || die "set exactly one release-upload credential source; token/ticket and FILE/PATH sources may not be combined"
+
+  case "$selected_source" in
+    CHUMMER_RELEASE_UPLOAD_TOKEN|CHUMMER_RELEASE_UPLOAD_TICKET)
+      captured_value="$selected_value"
+      captured_source="$selected_source"
+      ;;
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE|CHUMMER_RELEASE_UPLOAD_TOKEN_PATH|CHUMMER_RELEASE_UPLOAD_TICKET_FILE|CHUMMER_RELEASE_UPLOAD_TICKET_PATH)
+      python_bin="$(resolve_release_python)" \
+        || die "Python 3.11 or newer is required to validate the release-upload credential file"
+      if ! captured_value="$(
+        printf '%s\n' "$selected_value" \
+          | "$python_bin" -I -S /dev/fd/3 3<<'PY_RELEASE_UPLOAD_AUTH_READER'
+from __future__ import annotations
+
+import ctypes
+import errno
+import os
+import stat
+import subprocess
+import sys
+from typing import Callable
+
+MAX_CREDENTIAL_BYTES = 8192
+MAX_FILE_BYTES = MAX_CREDENTIAL_BYTES + 1
+MAX_PATH_BYTES = 4096
+MACOS_ACL_TYPE_EXTENDED = 0x00000100
+MACOS_ACL_FIRST_ENTRY = 0
+MACOS_ACL_NEXT_ENTRY = -1
+MACOS_ACL_EXTENDED_ALLOW = 1
+MACOS_ACL_EXTENDED_DENY = 2
+MACOS_ACL_MAX_ENTRIES = 128
+MACOS_UUID_BYTES = 16
+MACOS_ACL_RIGHTS = frozenset(
+    {
+        b"add_file",
+        b"add_subdirectory",
+        b"append",
+        b"chown",
+        b"delete",
+        b"delete_child",
+        b"directory_inherit",
+        b"execute",
+        b"file_inherit",
+        b"limit_inherit",
+        b"list",
+        b"only_inherit",
+        b"read",
+        b"readattr",
+        b"readextattr",
+        b"readsecurity",
+        b"search",
+        b"sync",
+        b"write",
+        b"writeattr",
+        b"writeextattr",
+        b"writesecurity",
+    }
+)
+
+
+class UnsafeCredentialFile(Exception):
+    pass
+
+
+def _reject() -> None:
+    raise UnsafeCredentialFile
+
+
+def _metadata_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _validate_metadata(metadata: os.stat_result) -> None:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or not 1 <= metadata.st_size <= MAX_FILE_BYTES
+    ):
+        _reject()
+
+
+def _macos_acl_is_absent(error_number: int) -> bool:
+    return error_number in {
+        0,
+        errno.ENOENT,
+        getattr(errno, "ENOATTR", -1),
+        getattr(errno, "ENODATA", -1),
+    }
+
+
+def _read_native_macos_acl(
+    descriptor: int,
+) -> tuple[bytes, tuple[tuple[int, bytes], ...]]:
+    try:
+        library = ctypes.CDLL(None, use_errno=True)
+        library.acl_get_fd_np.argtypes = (ctypes.c_int, ctypes.c_int)
+        library.acl_get_fd_np.restype = ctypes.c_void_p
+        library.acl_valid_fd_np.argtypes = (
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_void_p,
+        )
+        library.acl_valid_fd_np.restype = ctypes.c_int
+        library.acl_get_entry.argtypes = (
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_void_p),
+        )
+        library.acl_get_entry.restype = ctypes.c_int
+        library.acl_get_tag_type.argtypes = (
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_int),
+        )
+        library.acl_get_tag_type.restype = ctypes.c_int
+        library.acl_get_qualifier.argtypes = (ctypes.c_void_p,)
+        library.acl_get_qualifier.restype = ctypes.c_void_p
+        library.acl_free.argtypes = (ctypes.c_void_p,)
+        library.acl_free.restype = ctypes.c_int
+        library.mbr_uid_to_uuid.argtypes = (
+            ctypes.c_uint,
+            ctypes.POINTER(ctypes.c_ubyte),
+        )
+        library.mbr_uid_to_uuid.restype = ctypes.c_int
+    except (AttributeError, OSError):
+        _reject()
+
+    ctypes.set_errno(0)
+    acl = library.acl_get_fd_np(descriptor, MACOS_ACL_TYPE_EXTENDED)
+    if not acl:
+        if _macos_acl_is_absent(ctypes.get_errno()):
+            return bytes(MACOS_UUID_BYTES), ()
+        _reject()
+
+    owner_buffer = (ctypes.c_ubyte * MACOS_UUID_BYTES)()
+    if library.mbr_uid_to_uuid(os.geteuid(), owner_buffer) != 0:
+        _reject()
+    owner_uuid = bytes(owner_buffer)
+
+    entries: list[tuple[int, bytes]] = []
+    try:
+        if (
+            library.acl_valid_fd_np(
+                descriptor,
+                MACOS_ACL_TYPE_EXTENDED,
+                acl,
+            )
+            != 0
+        ):
+            _reject()
+
+        entry = ctypes.c_void_p()
+        entry_selector = MACOS_ACL_FIRST_ENTRY
+        for _entry_index in range(MACOS_ACL_MAX_ENTRIES + 1):
+            result = library.acl_get_entry(
+                acl,
+                entry_selector,
+                ctypes.byref(entry),
+            )
+            if result == 0:
+                break
+            if result != 1 or len(entries) == MACOS_ACL_MAX_ENTRIES:
+                _reject()
+
+            tag = ctypes.c_int()
+            if library.acl_get_tag_type(entry, ctypes.byref(tag)) != 0:
+                _reject()
+            qualifier = library.acl_get_qualifier(entry)
+            if not qualifier:
+                _reject()
+            try:
+                qualifier_uuid = ctypes.string_at(
+                    qualifier,
+                    MACOS_UUID_BYTES,
+                )
+            finally:
+                if library.acl_free(qualifier) != 0:
+                    _reject()
+            entries.append((tag.value, qualifier_uuid))
+            entry_selector = MACOS_ACL_NEXT_ENTRY
+        else:
+            _reject()
+    finally:
+        if library.acl_free(acl) != 0:
+            _reject()
+
+    return owner_uuid, tuple(entries)
+
+
+def assert_macos_acl_is_nonpermissive(
+    descriptor: int,
+    *,
+    acl_reader: Callable[
+        [int],
+        tuple[bytes, tuple[tuple[int, bytes], ...]],
+    ] = _read_native_macos_acl,
+) -> None:
+    if sys.platform != "darwin":
+        return
+    owner_uuid, entries = acl_reader(descriptor)
+    if len(owner_uuid) != MACOS_UUID_BYTES:
+        _reject()
+    for tag, qualifier_uuid in entries:
+        if len(qualifier_uuid) != MACOS_UUID_BYTES:
+            _reject()
+        if tag == MACOS_ACL_EXTENDED_DENY:
+            continue
+        if (
+            tag == MACOS_ACL_EXTENDED_ALLOW
+            and qualifier_uuid == owner_uuid
+        ):
+            continue
+        _reject()
+
+
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    lines = completed.stdout.splitlines()
+    permission_fields = lines[0].split(maxsplit=1) if lines else []
+    permission_token = permission_fields[0] if permission_fields else b""
+    if (
+        completed.returncode != 0
+        or completed.stderr
+        or not permission_token
+    ):
+        _reject()
+    if len(lines) == 1:
+        if permission_token not in {b"-rw-------", b"-rw-------@"}:
+            _reject()
+        return
+    if permission_token not in {b"-rw-------+", b"-rw-------@"}:
+        _reject()
+    for expected_index, raw_entry in enumerate(lines[1:]):
+        index, separator, entry = raw_entry.strip().partition(b":")
+        fields = entry.split()
+        if (
+            separator != b":"
+            or index != str(expected_index).encode("ascii")
+        ):
+            _reject()
+        if len(fields) == 3:
+            principal, disposition, rights = fields
+        elif len(fields) == 4 and fields[1] == b"inherited":
+            principal, _inherited, disposition, rights = fields
+        else:
+            _reject()
+        principal_kind, principal_separator, principal_name = principal.partition(b":")
+        parsed_rights = rights.split(b",")
+        if (
+            principal_separator != b":"
+            or principal_kind not in {b"user", b"group"}
+            or not principal_name
+            or b":" in principal_name
+            or any(byte <= 0x20 or byte == 0x7F for byte in principal_name)
+            or disposition != b"deny"
+            or any(right not in MACOS_ACL_RIGHTS for right in parsed_rights)
+            or len(set(parsed_rights)) != len(parsed_rights)
+        ):
+            _reject()
+
+
+def _pread_bounded(
+    descriptor: int,
+    position_reader: Callable[[int, int, int], bytes],
+) -> bytes:
+    chunks: list[bytes] = []
+    offset = 0
+    remaining = MAX_FILE_BYTES + 1
+    while remaining > 0:
+        chunk = position_reader(descriptor, remaining, offset)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        offset += len(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def read_credential(
+    path: str,
+    *,
+    opener: Callable[[str, int], int] = os.open,
+    lstater: Callable[[str], os.stat_result] = os.lstat,
+    fstater: Callable[[int], os.stat_result] = os.fstat,
+    position_reader: Callable[[int, int, int], bytes] = os.pread,
+    closer: Callable[[int], None] = os.close,
+) -> bytes:
+    if not os.path.isabs(path) or not hasattr(os, "O_NOFOLLOW"):
+        _reject()
+
+    before = lstater(path)
+    _validate_metadata(before)
+    flags = (
+        os.O_RDONLY
+        | os.O_CLOEXEC
+        | os.O_NOFOLLOW
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    descriptor = opener(path, flags)
+    try:
+        opened = fstater(descriptor)
+        _validate_metadata(opened)
+        if _metadata_identity(opened) != _metadata_identity(before):
+            _reject()
+
+        assert_macos_acl_is_nonpermissive(descriptor)
+        raw = _pread_bounded(descriptor, position_reader)
+        after = fstater(descriptor)
+        confirmed_raw = _pread_bounded(descriptor, position_reader)
+        confirmed = fstater(descriptor)
+        assert_macos_acl_is_nonpermissive(descriptor)
+        final = lstater(path)
+        _validate_metadata(after)
+        _validate_metadata(confirmed)
+        _validate_metadata(final)
+        if (
+            len(raw) != before.st_size
+            or confirmed_raw != raw
+            or _metadata_identity(after) != _metadata_identity(before)
+            or _metadata_identity(confirmed) != _metadata_identity(before)
+            or _metadata_identity(final) != _metadata_identity(before)
+        ):
+            _reject()
+    finally:
+        closer(descriptor)
+
+    if raw.endswith(b"\n"):
+        raw = raw[:-1]
+    if (
+        not raw
+        or len(raw) > MAX_CREDENTIAL_BYTES
+        or b"\x00" in raw
+        or b"\r" in raw
+        or b"\n" in raw
+    ):
+        _reject()
+    raw.decode("utf-8", errors="strict")
+    return raw
+
+
+def _read_path_record() -> str:
+    record = sys.stdin.buffer.read(MAX_PATH_BYTES + 2)
+    if (
+        not record.endswith(b"\n")
+        or len(record) > MAX_PATH_BYTES + 1
+        or b"\x00" in record
+        or b"\r" in record
+        or b"\n" in record[:-1]
+    ):
+        _reject()
+    path_bytes = record[:-1]
+    if not path_bytes:
+        _reject()
+    return path_bytes.decode("utf-8", errors="strict")
+
+
+if __name__ == "__main__":
+    try:
+        sys.stdout.buffer.write(read_credential(_read_path_record()))
+    except Exception:
+        raise SystemExit(1)
+PY_RELEASE_UPLOAD_AUTH_READER
+      )"; then
+        die "release-upload credential file is unsafe or invalid"
+      fi
+      captured_source="$selected_source"
+      ;;
+    "")
+      ;;
+    *)
+      die "release-upload credential source could not be resolved"
+      ;;
+  esac
+
+  unset selected_value
+  printf -v "$output_value_variable" '%s' "$captured_value"
+  printf -v "$output_source_variable" '%s' "$captured_source"
+  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
 }
 
 prompt_for_release_upload_ticket() {
@@ -3031,6 +3460,7 @@ prompt_for_release_upload_ticket() {
 
 ensure_release_upload_token() {
   local auth_value="${1:-}"
+  local LC_ALL=C
   export -n auth_value 2>/dev/null || true
   [[ -n "$auth_value" ]] \
     || die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
@@ -5313,6 +5743,524 @@ PY
   printf 'release_stage_only_path=%s\n' "$output_path"
 }
 
+write_presentation_candidate_receipt_request() {
+  local output_path="$1"
+  local release_scope_path="$2"
+  local release_scope_sha256="$3"
+  local manifest_path="$4"
+  local snapshot_path="$5"
+  local decision_path="$6"
+  local release_version="$7"
+  local registry_commit="$8"
+  local support_owner="$9"
+  local presentation_repo="${10}"
+  local visual_output="${11}"
+  local workflow_output="${12}"
+  local executable_output="${13}"
+
+  command "$RELEASE_PYTHON_BIN" - \
+    "$output_path" \
+    "$release_scope_path" \
+    "$release_scope_sha256" \
+    "$manifest_path" \
+    "$snapshot_path" \
+    "$decision_path" \
+    "$release_version" \
+    "$registry_commit" \
+    "$support_owner" \
+    "$presentation_repo" \
+    "$visual_output" \
+    "$workflow_output" \
+    "$executable_output" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+
+(
+    output_path,
+    release_scope_path,
+    release_scope_sha256,
+    manifest_path,
+    snapshot_path,
+    decision_path,
+    release_version,
+    registry_commit,
+    support_owner,
+    presentation_repo,
+    visual_output,
+    workflow_output,
+    executable_output,
+) = (Path(value) if index in {0, 1, 3, 4, 5, 9, 10, 11, 12} else value
+     for index, value in enumerate(sys.argv[1:]))
+
+sha256 = re.compile(r"^[0-9a-f]{64}$")
+git_sha = re.compile(r"^[0-9a-f]{40}$")
+
+def reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def reject_non_finite(value):
+    raise ValueError(f"non-finite JSON value: {value}")
+
+def load_json(raw):
+    return json.loads(
+        raw,
+        object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_non_finite,
+    )
+
+if not sha256.fullmatch(release_scope_sha256):
+    raise SystemExit("Presentation request release-scope SHA-256 is invalid")
+if not git_sha.fullmatch(registry_commit):
+    raise SystemExit("Presentation request Registry commit is invalid")
+if any(not path.is_absolute() for path in (visual_output, workflow_output, executable_output)):
+    raise SystemExit("Presentation receipt output paths must be absolute")
+if len({visual_output, workflow_output, executable_output}) != 3:
+    raise SystemExit("Presentation receipt output paths must be distinct")
+
+scope_raw = release_scope_path.read_bytes()
+if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
+    raise SystemExit("Presentation request release-scope bytes do not match authority")
+scope = load_json(scope_raw)
+manifest_raw = manifest_path.read_bytes()
+snapshot_raw = snapshot_path.read_bytes()
+decision_raw = decision_path.read_bytes()
+manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
+snapshot_sha256 = hashlib.sha256(snapshot_raw).hexdigest()
+decision_sha256 = hashlib.sha256(decision_raw).hexdigest()
+manifest = load_json(manifest_raw)
+snapshot = load_json(snapshot_raw)
+decision = load_json(decision_raw)
+platforms = scope.get("platforms") if isinstance(scope, dict) else None
+if (
+    not isinstance(platforms, list)
+    or len(platforms) != 1
+    or not isinstance(platforms[0], dict)
+):
+    raise SystemExit("Presentation request requires one exact approved platform")
+platform = platforms[0]
+fallback_heads = platform.get("fallbackHeads")
+if (
+    type(platform.get("platform")) is not str
+    or type(platform.get("rid")) is not str
+    or type(platform.get("primaryHead")) is not str
+    or not isinstance(fallback_heads, list)
+    or any(type(value) is not str for value in fallback_heads)
+):
+    raise SystemExit("Presentation request platform binding is malformed")
+required_heads = [platform["primaryHead"], *fallback_heads]
+binding = {
+    "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+    "contract_version": 1,
+    "release_version": release_version,
+    "release_scope_decision_sha256": release_scope_sha256,
+    "manifest_sha256": manifest_sha256,
+    "authority_snapshot_sha256": snapshot_sha256,
+    "release_decision_sha256": decision_sha256,
+    "registry_commit": registry_commit,
+    "platform": platform.get("platform"),
+    "rid": platform.get("rid"),
+    "primary_head": platform.get("primaryHead"),
+    "required_heads": required_heads,
+}
+if (
+    scope.get("releaseVersion") != release_version
+    or scope.get("supportOwner") != support_owner
+    or not isinstance(manifest, dict)
+    or manifest.get("version") != release_version
+    or not isinstance(decision, dict)
+    or snapshot.get("manifestSha256") != manifest_sha256
+    or snapshot.get("releaseDecisionSha256") != decision_sha256
+    or snapshot.get("registryCommit") != registry_commit
+):
+    raise SystemExit("Presentation request inputs do not bind one exact candidate")
+
+common_environment = {
+    "CHUMMER_CAMPAIGN_OPERABILITY_CANDIDATE_MODE": "1",
+    "CHUMMER_CAMPAIGN_OPERABILITY_APPROVED_SCOPE_PATH": str(release_scope_path),
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_SCOPE_SHA256": release_scope_sha256,
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_RELEASE_VERSION": release_version,
+    "CHUMMER_CAMPAIGN_OPERABILITY_REGISTRY_REVIEW_SEED_PATH": str(snapshot_path),
+    "CHUMMER_CAMPAIGN_OPERABILITY_EXPECTED_REGISTRY_REVIEW_SEED_SHA256": snapshot_sha256,
+    "CHUMMER_CAMPAIGN_OPERABILITY_BOUNDED_OWNER": support_owner,
+    "CHUMMER_CAMPAIGN_OPERABILITY_NEXT_ACTIONS_JSON": json.dumps(
+        ["Complete owner-only review, Registry CAS, activation, and public convergence for these exact bytes."],
+        separators=(",", ":"),
+    ),
+    "CHUMMER_CAMPAIGN_OPERABILITY_ALLOW_RAW_FAIL_DECLARATION": "0",
+}
+payload = {
+    "contractName": "chummer.presentation-candidate-receipt-request/v1",
+    "contractVersion": 1,
+    "status": "action_required",
+    "releaseVersion": release_version,
+    "candidateBinding": binding,
+    "commonEnvironment": common_environment,
+    "presentationRepository": str(presentation_repo),
+    "proofInputRoot": str(presentation_repo / ".codex-studio" / "published"),
+    "producers": [
+        {
+            "evidenceId": "desktop_visual",
+            "script": "scripts/ai/milestones/materialize-desktop-visual-familiarity-exit-gate.sh",
+            "outputPath": str(visual_output),
+            "environment": {
+                "CHUMMER_DESKTOP_VISUAL_OUTPUT_PATH": str(visual_output),
+                "CHUMMER_DESKTOP_VISUAL_RELEASE_CHANNEL_PATH": str(manifest_path),
+            },
+        },
+        {
+            "evidenceId": "desktop_workflow",
+            "script": "scripts/ai/milestones/materialize-desktop-workflow-execution-gate.sh",
+            "outputPath": str(workflow_output),
+            "environment": {
+                "CHUMMER_DESKTOP_WORKFLOW_OUTPUT_PATH": str(workflow_output),
+                "CHUMMER_DESKTOP_WORKFLOW_EXTERNAL_RELEASE_CHANNEL_PATH": str(manifest_path),
+                "CHUMMER_DESKTOP_WORKFLOW_PROOF_INPUT_ROOT": str(
+                    presentation_repo / ".codex-studio" / "published"
+                ),
+            },
+        },
+        {
+            "evidenceId": "desktop_executable",
+            "script": "scripts/ai/milestones/materialize-desktop-executable-exit-gate.sh",
+            "outputPath": str(executable_output),
+            "environment": {
+                "CHUMMER_DESKTOP_EXECUTABLE_GATE_PATH": str(executable_output),
+                "CHUMMER_DESKTOP_EXECUTABLE_RELEASE_CHANNEL_PATH": str(manifest_path),
+            },
+        },
+    ],
+    "countsAsBuildEvidence": False,
+    "countsAsPublicationEvidence": False,
+    "operatorAction": (
+        "Run all three reviewed Presentation producers with the common and producer-specific "
+        "environment, then leave their distinct passing receipts at the declared output paths."
+    ),
+}
+output_path.parent.mkdir(parents=True, exist_ok=True)
+raw = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+descriptor = os.open(
+    output_path,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+    0o600,
+)
+with os.fdopen(descriptor, "wb") as handle:
+    handle.write(raw)
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+}
+
+wait_for_presentation_candidate_receipts() {
+  local request_path="$1"
+  local wait_seconds="$2"
+  local poll_seconds="$3"
+  shift 3
+  local receipt_paths=("$@")
+
+  [[ "$wait_seconds" =~ ^[0-9]+$ ]] \
+    && (( wait_seconds >= 0 && wait_seconds <= 86400 )) \
+    || die "CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS must be an integer from 0 through 86400"
+  [[ "$poll_seconds" =~ ^[0-9]+$ ]] \
+    && (( poll_seconds >= 1 && poll_seconds <= 60 )) \
+    || die "CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS must be an integer from 1 through 60"
+
+  local deadline=$(( SECONDS + wait_seconds ))
+  local receipt_path
+  log "waiting up to ${wait_seconds}s for exact candidate-bound Presentation receipts; request: $request_path"
+  while true; do
+    local ready=1
+    for receipt_path in "${receipt_paths[@]}"; do
+      if [[ -L "$receipt_path" || ( -e "$receipt_path" && ! -f "$receipt_path" ) ]]; then
+        die "Presentation candidate receipt path became unsafe: $receipt_path"
+      fi
+      [[ -f "$receipt_path" ]] || ready=0
+    done
+    if (( ready == 1 )); then
+      return 0
+    fi
+    (( SECONDS < deadline )) \
+      || die "Presentation candidate receipts were not materialized before timeout. Request: $request_path"
+    sleep "$poll_seconds"
+  done
+}
+
+pin_presentation_candidate_receipts() {
+  local visual_source="$1"
+  local visual_target="$2"
+  local workflow_source="$3"
+  local workflow_target="$4"
+  local executable_source="$5"
+  local executable_target="$6"
+  local release_scope_path="$7"
+  local release_scope_sha256="$8"
+  local manifest_path="$9"
+  local snapshot_path="${10}"
+  local decision_path="${11}"
+  local release_version="${12}"
+  local registry_commit="${13}"
+  local expected_manifest_sha256="${14}"
+  local expected_authority_snapshot_sha256="${15}"
+  local expected_release_decision_sha256="${16}"
+
+  command "$RELEASE_PYTHON_BIN" - \
+    "$visual_source" "$visual_target" \
+    "$workflow_source" "$workflow_target" \
+    "$executable_source" "$executable_target" \
+    "$release_scope_path" "$release_scope_sha256" \
+    "$manifest_path" "$snapshot_path" "$decision_path" \
+    "$release_version" "$registry_commit" \
+    "$expected_manifest_sha256" "$expected_authority_snapshot_sha256" \
+    "$expected_release_decision_sha256" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+
+pairs = [
+    (
+        Path(sys.argv[1]),
+        Path(sys.argv[2]),
+        "desktop_visual",
+        "chummer6-ui.desktop_visual_familiarity_exit_gate",
+    ),
+    (
+        Path(sys.argv[3]),
+        Path(sys.argv[4]),
+        "desktop_workflow",
+        "chummer6-ui.desktop_workflow_execution_gate",
+    ),
+    (
+        Path(sys.argv[5]),
+        Path(sys.argv[6]),
+        "desktop_executable",
+        "chummer6-ui.desktop_executable_exit_gate",
+    ),
+]
+release_scope_path = Path(sys.argv[7])
+release_scope_sha256 = sys.argv[8]
+manifest_path = Path(sys.argv[9])
+snapshot_path = Path(sys.argv[10])
+decision_path = Path(sys.argv[11])
+release_version = sys.argv[12]
+registry_commit = sys.argv[13]
+expected_manifest_sha256 = sys.argv[14]
+expected_authority_snapshot_sha256 = sys.argv[15]
+expected_release_decision_sha256 = sys.argv[16]
+
+def reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def reject_non_finite(value):
+    raise ValueError(f"non-finite JSON value: {value}")
+
+def load_json(raw):
+    return json.loads(
+        raw,
+        object_pairs_hook=reject_duplicate_keys,
+        parse_constant=reject_non_finite,
+    )
+
+def exact_json_equal(actual, expected):
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return (
+            set(actual) == set(expected)
+            and all(exact_json_equal(actual[key], expected[key]) for key in expected)
+        )
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            exact_json_equal(left, right) for left, right in zip(actual, expected)
+        )
+    return actual == expected
+
+if any(
+    len(value) != 64 or any(character not in "0123456789abcdef" for character in value)
+    for value in (
+        release_scope_sha256,
+        expected_manifest_sha256,
+        expected_authority_snapshot_sha256,
+        expected_release_decision_sha256,
+    )
+):
+    raise SystemExit("Presentation candidate digest authority is invalid")
+
+scope_raw = release_scope_path.read_bytes()
+if hashlib.sha256(scope_raw).hexdigest() != release_scope_sha256:
+    raise SystemExit("Presentation release-scope bytes do not match authority")
+scope = load_json(scope_raw)
+platforms = scope.get("platforms") if isinstance(scope, dict) else None
+if (
+    not isinstance(platforms, list)
+    or len(platforms) != 1
+    or not isinstance(platforms[0], dict)
+):
+    raise SystemExit("Presentation receipts require one exact approved platform")
+platform = platforms[0]
+fallback_heads = platform.get("fallbackHeads")
+if (
+    type(platform.get("platform")) is not str
+    or type(platform.get("rid")) is not str
+    or type(platform.get("primaryHead")) is not str
+    or not isinstance(fallback_heads, list)
+    or any(type(value) is not str for value in fallback_heads)
+):
+    raise SystemExit("Presentation receipt platform binding is malformed")
+manifest_raw = manifest_path.read_bytes()
+snapshot_raw = snapshot_path.read_bytes()
+decision_raw = decision_path.read_bytes()
+if (
+    hashlib.sha256(manifest_raw).hexdigest() != expected_manifest_sha256
+    or hashlib.sha256(snapshot_raw).hexdigest() != expected_authority_snapshot_sha256
+    or hashlib.sha256(decision_raw).hexdigest() != expected_release_decision_sha256
+):
+    raise SystemExit("Presentation candidate changed while awaiting external receipts")
+manifest = load_json(manifest_raw)
+snapshot = load_json(snapshot_raw)
+decision = load_json(decision_raw)
+if (
+    not isinstance(manifest, dict)
+    or manifest.get("version") != release_version
+    or not isinstance(snapshot, dict)
+    or snapshot.get("manifestSha256") != expected_manifest_sha256
+    or snapshot.get("releaseDecisionSha256") != expected_release_decision_sha256
+    or snapshot.get("registryCommit") != registry_commit
+    or not isinstance(decision, dict)
+):
+    raise SystemExit("Presentation candidate authority documents are inconsistent")
+expected_binding = {
+    "contract_name": "chummer6-ui.campaign_operability_candidate_binding",
+    "contract_version": 1,
+    "release_version": release_version,
+    "release_scope_decision_sha256": release_scope_sha256,
+    "manifest_sha256": expected_manifest_sha256,
+    "authority_snapshot_sha256": expected_authority_snapshot_sha256,
+    "release_decision_sha256": expected_release_decision_sha256,
+    "registry_commit": registry_commit,
+    "platform": platform.get("platform"),
+    "rid": platform.get("rid"),
+    "primary_head": platform.get("primaryHead"),
+    "required_heads": [platform["primaryHead"], *fallback_heads],
+}
+
+validated: list[tuple[Path, bytes]] = []
+digests: set[str] = set()
+for source, target, evidence_id, expected_contract in pairs:
+    before = source.lstat()
+    if (
+        not source.is_absolute()
+        or not stat.S_ISREG(before.st_mode)
+        or stat.S_ISLNK(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or before.st_nlink != 1
+        or before.st_mode & 0o022
+        or not 1 <= before.st_size <= 8 * 1024 * 1024
+    ):
+        raise SystemExit(f"unsafe Presentation candidate receipt: {source.name}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(source, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+        ):
+            raise SystemExit(f"Presentation candidate receipt changed before read: {source.name}")
+        chunks: list[bytes] = []
+        remaining = 8 * 1024 * 1024 + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (
+        len(raw) != before.st_size
+        or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+        != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+    ):
+        raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
+    try:
+        payload = load_json(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise SystemExit(f"{evidence_id} Presentation receipt is not valid JSON") from error
+    release_aliases = [
+        payload[name]
+        for name in ("releaseVersion", "release_version")
+        if name in payload
+    ] if isinstance(payload, dict) else []
+    if (
+        not isinstance(payload, dict)
+        or payload.get("status") != "pass"
+        or payload.get("contract_name") != expected_contract
+        or (
+            "contractName" in payload
+            and payload.get("contractName") != expected_contract
+        )
+        or not release_aliases
+        or any(type(value) is not str or value != release_version for value in release_aliases)
+        or not exact_json_equal(
+            payload.get("campaign_operability_candidate_binding"),
+            expected_binding,
+        )
+    ):
+        raise SystemExit(
+            f"{evidence_id} Presentation receipt does not bind the exact passing candidate"
+        )
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest in digests:
+        raise SystemExit("Presentation visual, workflow, and executable receipts must be distinct")
+    digests.add(digest)
+    validated.append((target, raw))
+
+created: list[Path] = []
+try:
+    for target, raw in validated:
+        output = os.open(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+            0o600,
+        )
+        created.append(target)
+        with os.fdopen(output, "wb") as handle:
+            handle.write(raw)
+            handle.flush()
+            os.fsync(handle.fileno())
+except BaseException:
+    for target in created:
+        try:
+            target.unlink()
+        except FileNotFoundError:
+            pass
+    raise
+PY
+}
+
 main() {
   install_bootstrap_cleanup_traps
 
@@ -5394,12 +6342,6 @@ main() {
     fi
     [[ "$publish_mode" == "http" ]] \
       || die "same-generation release-authority closure requires staged HTTP publication"
-    [[ "$presentation_desktop_visual_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
-    [[ "$presentation_desktop_workflow_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
-    [[ "$presentation_desktop_executable_source" == /* ]] \
-      || die "CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH must name an absolute caller-owned candidate receipt"
   fi
 
   require_all_reviewed_commit_pins
@@ -5427,6 +6369,35 @@ main() {
   require_cmd ditto
 
   local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
+  local presentation_receipt_intake_dir="$work_root/.c/presentation-candidate-receipts"
+  local presentation_receipt_wait_seconds="${CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS:-1800}"
+  local presentation_receipt_poll_seconds="${CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS:-5}"
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    presentation_desktop_visual_source="${presentation_desktop_visual_source:-$presentation_receipt_intake_dir/DESKTOP_VISUAL_CANDIDATE.generated.json}"
+    presentation_desktop_workflow_source="${presentation_desktop_workflow_source:-$presentation_receipt_intake_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json}"
+    presentation_desktop_executable_source="${presentation_desktop_executable_source:-$presentation_receipt_intake_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json}"
+    local presentation_source_path
+    for presentation_source_path in \
+      "$presentation_desktop_visual_source" \
+      "$presentation_desktop_workflow_source" \
+      "$presentation_desktop_executable_source"; do
+      [[ "$presentation_source_path" == /* ]] \
+        || die "Presentation candidate receipt paths must be absolute"
+      [[ ! -L "$presentation_source_path" \
+          && ( ! -e "$presentation_source_path" || -f "$presentation_source_path" ) ]] \
+        || die "Presentation candidate receipt path is unsafe: $presentation_source_path"
+    done
+    [[ "$presentation_desktop_visual_source" != "$presentation_desktop_workflow_source" \
+        && "$presentation_desktop_visual_source" != "$presentation_desktop_executable_source" \
+        && "$presentation_desktop_workflow_source" != "$presentation_desktop_executable_source" ]] \
+      || die "Presentation candidate receipt paths must be distinct"
+    [[ "$presentation_receipt_wait_seconds" =~ ^[0-9]+$ ]] \
+      && (( presentation_receipt_wait_seconds >= 0 && presentation_receipt_wait_seconds <= 86400 )) \
+      || die "CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS must be an integer from 0 through 86400"
+    [[ "$presentation_receipt_poll_seconds" =~ ^[0-9]+$ ]] \
+      && (( presentation_receipt_poll_seconds >= 1 && presentation_receipt_poll_seconds <= 60 )) \
+      || die "CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS must be an integer from 1 through 60"
+  fi
   local ui_ref="${CHUMMER_UI_REF:-main}"
   local core_ref="${CHUMMER_CORE_REF:-main}"
   local hub_ref="${CHUMMER_HUB_REF:-main}"
@@ -5543,6 +6514,9 @@ main() {
 
   mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos" "$temp_root"
   chmod 700 "$work_root" "$work_root/.c" 2>/dev/null || true
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    mkdir -m 700 "$presentation_receipt_intake_dir"
+  fi
   local pinned_executed_bootstrap="$work_root/.c/mac-release-bootstrap.executed.sh"
   command "$RELEASE_PYTHON_BIN" - "$executed_bootstrap_path" "$pinned_executed_bootstrap" <<'PY'
 from __future__ import annotations
@@ -6472,6 +7446,65 @@ PY
     return 0
   fi
 
+  local expected_manifest_sha256
+  local expected_release_decision_sha256
+  local expected_authority_snapshot_sha256
+  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
+  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  expected_authority_snapshot_sha256="$(file_sha256 "$ui_repo/$release_evidence_dir/SNAPSHOT.json")"
+  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_authority_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "candidate identity lacks immutable manifest, authority snapshot, or review-decision bindings"
+
+  local presentation_receipt_request="$ui_repo/$release_evidence_dir/PRESENTATION_CANDIDATE_RECEIPT_REQUEST.generated.json"
+  log "materializing the exact candidate-bound Presentation receipt request before any upload"
+  write_presentation_candidate_receipt_request \
+    "$presentation_receipt_request" \
+    "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    "$release_scope_expected_sha256" \
+    "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    "$release_version" \
+    "$release_authority_registry_commit" \
+    "$approved_release_support_owner" \
+    "$ui_repo" \
+    "$presentation_desktop_visual_source" \
+    "$presentation_desktop_workflow_source" \
+    "$presentation_desktop_executable_source"
+  wait_for_presentation_candidate_receipts \
+    "$presentation_receipt_request" \
+    "$presentation_receipt_wait_seconds" \
+    "$presentation_receipt_poll_seconds" \
+    "$presentation_desktop_visual_source" \
+    "$presentation_desktop_workflow_source" \
+    "$presentation_desktop_executable_source"
+
+  local staged_presentation_dir="$ui_repo/$release_evidence_dir/presentation/$release_version"
+  local staged_desktop_visual_receipt="$staged_presentation_dir/DESKTOP_VISUAL_CANDIDATE.generated.json"
+  local staged_desktop_workflow_receipt="$staged_presentation_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
+  local staged_desktop_executable_receipt="$staged_presentation_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
+  [[ ! -e "$staged_presentation_dir" && ! -L "$staged_presentation_dir" ]] \
+    || die "staged Presentation receipt directory already exists: $staged_presentation_dir"
+  mkdir -p "$(dirname "$staged_presentation_dir")"
+  mkdir -m 700 "$staged_presentation_dir"
+  log "validating and pinning exact Presentation receipts before any upload"
+  pin_presentation_candidate_receipts \
+    "$presentation_desktop_visual_source" "$staged_desktop_visual_receipt" \
+    "$presentation_desktop_workflow_source" "$staged_desktop_workflow_receipt" \
+    "$presentation_desktop_executable_source" "$staged_desktop_executable_receipt" \
+    "$ui_repo/$release_evidence_dir/RELEASE_SCOPE_DECISION.approved.json" \
+    "$release_scope_expected_sha256" \
+    "$ui_repo/$dist_dir/RELEASE_CHANNEL.generated.json" \
+    "$ui_repo/$release_evidence_dir/SNAPSHOT.json" \
+    "$ui_repo/$release_evidence_dir/RELEASE_DECISION.json" \
+    "$release_version" \
+    "$release_authority_registry_commit" \
+    "$expected_manifest_sha256" \
+    "$expected_authority_snapshot_sha256" \
+    "$expected_release_decision_sha256"
+
   case "$publish_mode" in
     http)
       log "uploading release bundle via staged HTTP session"
@@ -6567,14 +7600,6 @@ PY
     || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_RETRY_SECONDS must be an integer from 1 through 10"
   [[ -f "$live_convergence_verifier" && ! -L "$live_convergence_verifier" ]] \
     || die "live release convergence verifier is missing or unsafe: $live_convergence_verifier"
-  local expected_manifest_sha256
-  local expected_release_decision_sha256
-  expected_manifest_sha256="$(jq -r '.canonicalManifestSha256 // empty' "$generation_projection_path")"
-  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
-  [[ "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
-      && "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "staged release identity lacks immutable manifest or review-decision bindings"
-
   local staged_probe_token_path
   staged_probe_token_path="$(mktemp "$TMPDIR/chummer-staged-probe-token.XXXXXX")"
   chmod 600 "$staged_probe_token_path"
@@ -6627,10 +7652,6 @@ PY
   require_cmd node
   require_cmd npm
   require_cmd npx
-  local expected_authority_snapshot_sha256
-  expected_authority_snapshot_sha256="$(file_sha256 "$ui_repo/$release_evidence_dir/SNAPSHOT.json")"
-  [[ "$expected_authority_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
-    || die "staged release identity lacks the exact predecessor authority snapshot digest"
   local staged_ui_frame_output_dir="$ui_repo/$release_evidence_dir/ui-frame/$release_version"
   local staged_ui_frame_receipt="$staged_ui_frame_output_dir/UI_FRAME_INTEGRITY.generated.json"
   [[ ! -e "$staged_ui_frame_output_dir" && ! -L "$staged_ui_frame_output_dir" ]] \
@@ -6660,83 +7681,6 @@ PY
   [[ "$(jq -r '.status // empty' "$staged_ui_frame_receipt")" == "pass" \
       && "$(jq -r '.verdict // empty' "$staged_ui_frame_receipt")" == "READY" ]] \
     || die "candidate-bound staged UI-frame receipt did not pass"
-  local staged_presentation_dir="$ui_repo/$release_evidence_dir/presentation/$release_version"
-  local staged_desktop_visual_receipt="$staged_presentation_dir/DESKTOP_VISUAL_CANDIDATE.generated.json"
-  local staged_desktop_workflow_receipt="$staged_presentation_dir/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
-  local staged_desktop_executable_receipt="$staged_presentation_dir/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
-  [[ ! -e "$staged_presentation_dir" && ! -L "$staged_presentation_dir" ]] \
-    || die "staged Presentation receipt directory already exists: $staged_presentation_dir"
-  mkdir -p "$(dirname "$staged_presentation_dir")"
-  mkdir -m 700 "$staged_presentation_dir"
-  log "pinning external Presentation visual, workflow, and executable candidate receipts"
-  command "$RELEASE_PYTHON_BIN" - \
-    "$presentation_desktop_visual_source" "$staged_desktop_visual_receipt" \
-    "$presentation_desktop_workflow_source" "$staged_desktop_workflow_receipt" \
-    "$presentation_desktop_executable_source" "$staged_desktop_executable_receipt" <<'PY'
-from __future__ import annotations
-
-import os
-from pathlib import Path
-import stat
-import sys
-
-if len(sys.argv) != 7:
-    raise SystemExit("exactly three Presentation source/target pairs are required")
-
-for source_text, target_text in zip(sys.argv[1::2], sys.argv[2::2], strict=True):
-    source = Path(source_text)
-    target = Path(target_text)
-    before = source.lstat()
-    if (
-        not stat.S_ISREG(before.st_mode)
-        or stat.S_ISLNK(before.st_mode)
-        or before.st_uid != os.geteuid()
-        or before.st_nlink != 1
-        or before.st_mode & 0o022
-        or not 1 <= before.st_size <= 8 * 1024 * 1024
-    ):
-        raise SystemExit(f"unsafe Presentation candidate receipt: {source.name}")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(source, flags)
-    try:
-        opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino, opened.st_size) != (
-            before.st_dev,
-            before.st_ino,
-            before.st_size,
-        ):
-            raise SystemExit(f"Presentation candidate receipt changed before read: {source.name}")
-        chunks: list[bytes] = []
-        remaining = 8 * 1024 * 1024 + 1
-        while remaining > 0:
-            chunk = os.read(descriptor, min(65536, remaining))
-            if not chunk:
-                break
-            chunks.append(chunk)
-            remaining -= len(chunk)
-        raw = b"".join(chunks)
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    if (
-        len(raw) != before.st_size
-        or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-        != (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-    ):
-        raise SystemExit(f"Presentation candidate receipt changed during read: {source.name}")
-    output = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(output, "wb") as handle:
-            handle.write(raw)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except BaseException:
-        try:
-            target.unlink()
-        except FileNotFoundError:
-            pass
-        raise
-PY
   rm -f "$staged_probe_token_path"
 
   local durable_stage_response="$release_evidence_dir/RELEASE_STAGE_RESPONSE.generated.json"
@@ -6800,6 +7744,444 @@ PY
   return 0
 }
 
+validate_inherited_release_root_publisher_lock() {
+  local python_bin="$1"
+  local work_root="$2"
+  local lock_fd="$3"
+  command "$python_bin" -I -S - "$lock_fd" "$work_root" <<'PY'
+from __future__ import annotations
+
+import fcntl
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+LOCK_NAME = ".chummer-release-publisher.lock"
+LOCK_CONTRACT = b"chummer.mac-release-root-publisher-lock/v1\n"
+
+
+def directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+
+
+def open_absolute_directory(path: Path) -> int:
+    if not path.is_absolute():
+        raise SystemExit("inherited publisher lock release root is not absolute")
+    descriptor = os.open(os.sep, directory_flags())
+    try:
+        for component in path.parts[1:]:
+            if component in ("", ".", ".."):
+                raise SystemExit(
+                    "inherited publisher lock release root is not canonical"
+                )
+            next_descriptor = os.open(
+                component,
+                directory_flags(),
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise SystemExit(
+                "inherited publisher lock release root is unsafe"
+            )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    if completed.returncode != 0 or len(completed.stdout.splitlines()) != 1:
+        raise SystemExit(
+            "inherited publisher lock has an unverifiable or extended macOS ACL"
+        )
+
+
+if len(sys.argv) != 3 or not sys.argv[1].isdigit():
+    raise SystemExit("inherited publisher lock descriptor is invalid")
+lock_descriptor = int(sys.argv[1], 10)
+work_root = Path(sys.argv[2])
+if (
+    str(lock_descriptor) != sys.argv[1]
+    or lock_descriptor < 3
+    or lock_descriptor > 255
+    or not work_root.is_absolute()
+    or not work_root.name.startswith("run-")
+    or work_root.name in ("", ".", "..")
+):
+    raise SystemExit("inherited publisher lock descriptor is invalid")
+
+root_descriptor = open_absolute_directory(work_root.parent)
+probe_descriptor: int | None = None
+try:
+    metadata = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    access_mode = fcntl.fcntl(lock_descriptor, fcntl.F_GETFL) & os.O_ACCMODE
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.geteuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or metadata.st_nlink != 1
+        or linked.st_dev != metadata.st_dev
+        or linked.st_ino != metadata.st_ino
+        or access_mode != os.O_RDWR
+        or os.pread(lock_descriptor, 257, 0) != LOCK_CONTRACT
+    ):
+        raise SystemExit(
+            "inherited publisher lock does not match the canonical authority"
+        )
+    assert_no_macos_acl(lock_descriptor)
+
+    probe_descriptor = os.open(
+        LOCK_NAME,
+        os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+        dir_fd=root_descriptor,
+    )
+    try:
+        fcntl.flock(probe_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pass
+    else:
+        fcntl.flock(probe_descriptor, fcntl.LOCK_UN)
+        raise SystemExit(
+            "inherited publisher descriptor has no held lock authority"
+        )
+
+    fcntl.flock(lock_descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    after = os.fstat(lock_descriptor)
+    linked_after = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        after.st_dev != metadata.st_dev
+        or after.st_ino != metadata.st_ino
+        or after.st_nlink != 1
+        or linked_after.st_dev != after.st_dev
+        or linked_after.st_ino != after.st_ino
+        or os.pread(lock_descriptor, 257, 0) != LOCK_CONTRACT
+    ):
+        raise SystemExit("inherited publisher lock identity changed")
+finally:
+    if probe_descriptor is not None:
+        os.close(probe_descriptor)
+    os.close(root_descriptor)
+PY
+}
+
+
+run_main_under_release_root_publisher_lock() {
+  [[ -z "${CHUMMER_RELEASE_PUBLISHER_LOCK_HELD+x}" ]] \
+    || die "CHUMMER_RELEASE_PUBLISHER_LOCK_HELD is not publisher-lock authority"
+
+  local python_bin
+  python_bin="$(resolve_release_python)" \
+    || die "release bootstrap requires Python 3.11 or newer before acquiring the release-root publisher lock"
+  local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
+  [[ "$work_root" == /* ]] \
+    || die "CHUMMER_MAC_RELEASE_WORK_ROOT must be absolute before acquiring the release-root publisher lock"
+  [[ "${work_root##*/}" == run-* ]] \
+    || die "CHUMMER_MAC_RELEASE_WORK_ROOT must name a run-* child of the shared release root"
+  if [[ -n "${CHUMMER_RELEASE_PUBLISHER_LOCK_FD+x}" ]]; then
+    [[ "$CHUMMER_RELEASE_PUBLISHER_LOCK_FD" =~ ^[0-9]+$ ]] \
+      || die "CHUMMER_RELEASE_PUBLISHER_LOCK_FD must identify an inherited descriptor"
+    validate_inherited_release_root_publisher_lock \
+      "$python_bin" \
+      "$work_root" \
+      "$CHUMMER_RELEASE_PUBLISHER_LOCK_FD" \
+      || die "inherited release-root publisher lock validation failed"
+    main "$@"
+    return
+  fi
+  local executed_bootstrap_path
+  executed_bootstrap_path="$(resolve_executed_bootstrap_path)" \
+    || die "executed bootstrap must be an absolute regular file before acquiring the release-root publisher lock"
+  export CHUMMER_MAC_RELEASE_WORK_ROOT="$work_root"
+
+  command "$python_bin" -I -S - "$executed_bootstrap_path" "$work_root" "$@" 3<&0 <<'PY'
+from __future__ import annotations
+
+import errno
+import fcntl
+import os
+from pathlib import Path
+import resource
+import stat
+import subprocess
+import sys
+
+LOCK_NAME = ".chummer-release-publisher.lock"
+LOCK_CONTRACT = b"chummer.mac-release-root-publisher-lock/v1\n"
+
+try:
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+except (OSError, ValueError) as error:
+    raise SystemExit(
+        "unable to disable core dumps before holding release credentials"
+    ) from error
+
+
+def directory_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+
+
+def open_or_create_release_root(path: Path) -> int:
+    if not path.is_absolute():
+        raise SystemExit("release root must be absolute")
+    descriptor = os.open(os.sep, directory_flags())
+    try:
+        for component in path.parts[1:]:
+            if component in ("", ".", ".."):
+                raise SystemExit("release root is not canonical")
+            try:
+                next_descriptor = os.open(
+                    component,
+                    directory_flags(),
+                    dir_fd=descriptor,
+                )
+            except FileNotFoundError:
+                os.mkdir(component, 0o700, dir_fd=descriptor)
+                next_descriptor = os.open(
+                    component,
+                    directory_flags(),
+                    dir_fd=descriptor,
+                )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise SystemExit(
+                "release root must be caller-owned and non-writable by other principals"
+            )
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def assert_no_macos_acl(descriptor: int) -> None:
+    if sys.platform != "darwin":
+        return
+    completed = subprocess.run(
+        (
+            "/bin/ls",
+            "-L",
+            "-l",
+            "-d",
+            "-e",
+            f"/dev/fd/{descriptor}",
+        ),
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "TMPDIR": "/tmp",
+        },
+        pass_fds=(descriptor,),
+        timeout=10,
+    )
+    if completed.returncode != 0 or len(completed.stdout.splitlines()) != 1:
+        raise SystemExit(
+            "release-root publisher lock has an unverifiable or extended macOS ACL"
+        )
+
+
+def read_exact(descriptor: int, maximum: int) -> bytes:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    chunks: list[bytes] = []
+    remaining = maximum + 1
+    while remaining:
+        chunk = os.read(descriptor, remaining)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    value = b"".join(chunks)
+    if len(value) > maximum:
+        raise SystemExit("release-root publisher lock contract is oversized")
+    return value
+
+
+def fsync_directory(descriptor: int) -> None:
+    try:
+        os.fsync(descriptor)
+    except OSError as error:
+        if error.errno not in {
+            errno.EINVAL,
+            getattr(errno, "ENOTSUP", errno.EINVAL),
+            getattr(errno, "EOPNOTSUPP", errno.EINVAL),
+        }:
+            raise
+
+
+def write_all(descriptor: int, value: bytes) -> None:
+    offset = 0
+    while offset < len(value):
+        written = os.write(descriptor, value[offset:])
+        if written <= 0:
+            raise SystemExit(
+                "release-root publisher lock initialization was incomplete"
+            )
+        offset += written
+
+
+script = Path(sys.argv[1])
+work_root = Path(sys.argv[2])
+child_arguments = sys.argv[3:]
+if (
+    not script.is_absolute()
+    or not work_root.is_absolute()
+    or work_root.name in ("", ".", "..")
+    or not work_root.name.startswith("run-")
+):
+    raise SystemExit("publisher lock bootstrap arguments are invalid")
+
+release_root = work_root.parent
+root_descriptor = open_or_create_release_root(release_root)
+lock_descriptor: int | None = None
+try:
+    flags = (
+        os.O_RDWR
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    created = False
+    try:
+        lock_descriptor = os.open(
+            LOCK_NAME,
+            flags | os.O_EXCL,
+            0o600,
+            dir_fd=root_descriptor,
+        )
+        created = True
+    except FileExistsError:
+        lock_descriptor = os.open(
+            LOCK_NAME,
+            flags & ~os.O_CREAT,
+            dir_fd=root_descriptor,
+        )
+    if created:
+        os.fchmod(lock_descriptor, 0o600)
+    initial = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        not stat.S_ISREG(initial.st_mode)
+        or initial.st_uid != os.geteuid()
+        or stat.S_IMODE(initial.st_mode) != 0o600
+        or initial.st_nlink != 1
+        or linked.st_dev != initial.st_dev
+        or linked.st_ino != initial.st_ino
+    ):
+        raise SystemExit("release-root publisher lock is unsafe")
+    assert_no_macos_acl(lock_descriptor)
+    fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+    content = read_exact(lock_descriptor, 256)
+    if not content:
+        os.lseek(lock_descriptor, 0, os.SEEK_SET)
+        write_all(lock_descriptor, LOCK_CONTRACT)
+        os.ftruncate(lock_descriptor, len(LOCK_CONTRACT))
+        os.fsync(lock_descriptor)
+        fsync_directory(root_descriptor)
+    elif content != LOCK_CONTRACT:
+        raise SystemExit("release-root publisher lock contract is invalid")
+    fcntl.flock(lock_descriptor, fcntl.LOCK_SH)
+    held = os.fstat(lock_descriptor)
+    linked = os.stat(
+        LOCK_NAME,
+        dir_fd=root_descriptor,
+        follow_symlinks=False,
+    )
+    if (
+        held.st_dev != initial.st_dev
+        or held.st_ino != initial.st_ino
+        or held.st_nlink != 1
+        or linked.st_dev != held.st_dev
+        or linked.st_ino != held.st_ino
+    ):
+        raise SystemExit("release-root publisher lock identity changed")
+    environment = os.environ.copy()
+    environment.pop("CHUMMER_RELEASE_PUBLISHER_LOCK_HELD", None)
+    environment["CHUMMER_RELEASE_PUBLISHER_LOCK_FD"] = str(lock_descriptor)
+    completed = subprocess.run(
+        ("/bin/bash", str(script), *child_arguments),
+        check=False,
+        stdin=3,
+        env=environment,
+        pass_fds=(lock_descriptor,),
+    )
+    raise SystemExit(completed.returncode)
+finally:
+    if lock_descriptor is not None:
+        try:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_descriptor)
+    os.close(root_descriptor)
+PY
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  main "$@"
+  run_main_under_release_root_publisher_lock "$@"
 fi

@@ -2,6 +2,7 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed class InstallLinkingRequestAdmissionMiddleware(RequestDelegate next)
 {
+    private const string PublicInstallDispatchPrefix = "/downloads/install/";
     private const string UnavailableMessage = "Install-linking is temporarily unavailable.";
 
     public async Task InvokeAsync(
@@ -53,8 +54,39 @@ public sealed class InstallLinkingRequestAdmissionMiddleware(RequestDelegate nex
         string value = path.Value ?? string.Empty;
         return path.StartsWithSegments("/api/v1/install-linking", StringComparison.OrdinalIgnoreCase)
             || path.Equals("/account/access/install-link", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+            || (path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+                && !IsCanonicalPublicInstallRoute(value))
             || (value.StartsWith("/install-", StringComparison.OrdinalIgnoreCase)
                 && value.EndsWith(".sh", StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static bool IsCanonicalPublicInstallRoute(string path)
+    {
+        if (PublicReleaseContractRequestPolicy.IsCanonicalCurrentCompanionPath(path))
+        {
+            return true;
+        }
+
+        if (!path.StartsWith(PublicInstallDispatchPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> artifactId = path.AsSpan(PublicInstallDispatchPrefix.Length);
+        if (artifactId.Length is < 1 or > 128
+            || artifactId[0] is not (>= 'a' and <= 'z' or >= '0' and <= '9'))
+        {
+            return false;
+        }
+
+        foreach (char character in artifactId)
+        {
+            if (character is not (>= 'a' and <= 'z' or >= '0' and <= '9' or '-'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -221,7 +221,12 @@ def read_regular_file_bytes(
 ) -> tuple[bytes | None, str | None]:
     """Capture one stable regular-file snapshot without following a final symlink."""
 
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         fd = os.open(path, flags)
     except FileNotFoundError:
@@ -232,7 +237,7 @@ def read_regular_file_bytes(
         return None, "unreadable"
     try:
         before = os.fstat(fd)
-        if not stat.S_ISREG(before.st_mode):
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
             return None, "not_a_regular_file"
         if before.st_size > max_bytes:
             return None, "too_large"
@@ -249,9 +254,25 @@ def read_regular_file_bytes(
                 return None, "too_large"
 
         after = os.fstat(fd)
-        stable_fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+        try:
+            path_after = path.lstat()
+        except OSError:
+            return None, "pathname_changed"
+        stable_fields = (
+            "st_dev",
+            "st_ino",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+            "st_nlink",
+        )
         if any(getattr(before, field) != getattr(after, field) for field in stable_fields):
             return None, "changed_during_read"
+        if any(
+            getattr(before, field) != getattr(path_after, field)
+            for field in stable_fields
+        ):
+            return None, "pathname_changed"
         return b"".join(chunks), None
     except OSError:
         return None, "unreadable"

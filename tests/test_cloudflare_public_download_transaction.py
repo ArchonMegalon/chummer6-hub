@@ -9,6 +9,7 @@ import re
 import stat
 import sys
 from typing import Any, Mapping
+import urllib.parse
 
 import pytest
 
@@ -70,6 +71,30 @@ def base_config() -> dict[str, Any]:
             {"service": "http_status:404"},
         ],
     }
+
+
+def resolve_ingress_service(
+    config: Mapping[str, Any],
+    hostname: str,
+    path: str,
+) -> str:
+    for rule in config["ingress"]:
+        rule_hostname = str(rule.get("hostname") or "")
+        if rule_hostname:
+            hostname_matches = (
+                hostname == rule_hostname
+                or (
+                    rule_hostname.startswith("*.")
+                    and hostname.endswith(rule_hostname[1:])
+                )
+            )
+            if not hostname_matches:
+                continue
+        rule_path = str(rule.get("path") or "")
+        if rule_path and re.fullmatch(rule_path, path) is None:
+            continue
+        return str(rule["service"])
+    raise AssertionError("validated ingress must end with a catch-all")
 
 
 class FakeApi:
@@ -300,16 +325,385 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         }
         assert "originRequest" not in rule
         assert "httpHostHeader" not in rule
-    assert target["ingress"][2:] == prior["ingress"]
+    fail_closed_rules = target["ingress"][
+        2 : 2
+        + len(transaction.FAIL_CLOSED_PATHS_RE2)
+        * len(transaction.MANAGED_HOSTS)
+    ]
+    assert fail_closed_rules == [
+        {
+            "hostname": hostname,
+            "path": path,
+            "service": "http_status:404",
+        }
+        for path in transaction.FAIL_CLOSED_PATHS_RE2
+        for hostname in transaction.MANAGED_HOSTS
+    ]
+    for rule in fail_closed_rules:
+        assert "originRequest" not in rule
+        assert "httpHostHeader" not in rule
+    preserved_offset = 2 + len(fail_closed_rules)
+    assert target["ingress"][preserved_offset:] == prior["ingress"]
     assert target["originRequest"] == prior["originRequest"]
-    assert transaction.canonical_json_bytes(target["ingress"][2:]) == (
+    assert transaction.canonical_json_bytes(
+        target["ingress"][preserved_offset:]
+    ) == (
         transaction.canonical_json_bytes(prior["ingress"])
+    )
+
+
+@pytest.mark.parametrize(
+    ("hostname", "path", "expected_service"),
+    [
+        (
+            "chummer.run",
+            "/downloads",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/status",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/unapproved",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            "/status/",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/get/unknown-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/AVALONIA-WIN-X64-INSTALLER",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/GET/avalonia-win-x64-installer",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/get/avalonia-win-x64-installer/private",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/avalonia-win-x64-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/unknown-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/unknown-installer/payload",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/metadata",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/UNKNOWN-INSTALLER/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/INSTALL/unknown-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/PAYLOAD",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/payload/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/unknown-installer/metadata/extra",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/AVALONIA-WIN-X64-INSTALLER",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/DOWNLOADS/INSTALL/avalonia-win-x64-installer",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/-invalid",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/..",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/install/../admin",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/../admin",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/install/avalonia-win-x64-installer/bootstrap.sh",
+            "http://incumbent:8080",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/DOWNLOADS/g/{GENERATION_ID}/install/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/INSTALL/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/TEST-INSTALLER/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/payload/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install/test-installer/private",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/install",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/g/foo/bar/install/test-installer/payload",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/files",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/DOWNLOADS/FILES/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/files/private/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/downloads/g/{GENERATION_ID}/files/Chummer.zip/",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/FILES/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/downloads/g/foo/bar/files/Chummer.zip",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/downloads/file/incumbent-artifact",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            f"/downloads/g/{GENERATION_ID}/index.json",
+            "http://incumbent:8080",
+        ),
+        (
+            "chummer.run",
+            "/api/v1/public/release-truth",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            "/api/public/release-truth",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            f"/api/v1/public/release-truth/g/{GENERATION_ID}",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "www.chummer.run",
+            f"/api/public/release-truth/g/{GENERATION_ID}",
+            "http://host.docker.internal:8123",
+        ),
+        (
+            "chummer.run",
+            "/API/V1/PUBLIC/RELEASE-TRUTH",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            "/api/v1/public/release-truth/",
+            "http_status:404",
+        ),
+        (
+            "chummer.run",
+            f"/api/v1/public/release-truth/g/{GENERATION_ID}/extra",
+            "http_status:404",
+        ),
+        (
+            "www.chummer.run",
+            "/api/v1/public/weekly-pulse",
+            "http://incumbent:8080",
+        ),
+        (
+            "www.chummer.run",
+            "/unrelated",
+            "http://incumbent:8080",
+        ),
+        (
+            "private.chummer.run",
+            "/preserved/value",
+            "http://legacy:8123",
+        ),
+    ],
+)
+def test_composed_ingress_routes_canonical_installs_and_denies_fallthrough(
+    hostname: str,
+    path: str,
+    expected_service: str,
+) -> None:
+    target = transaction.plan_public_download_config(
+        base_config(),
+        "http://host.docker.internal:8123/",
+    )
+
+    assert resolve_ingress_service(target, hostname, path) == expected_service
+
+
+@pytest.mark.parametrize("rule_index", [2, 4])
+def test_fail_closed_rules_cannot_move_behind_preserved_incumbent(
+    rule_index: int,
+) -> None:
+    prior = base_config()
+    target = transaction.plan_public_download_config(
+        prior,
+        "http://host.docker.internal:8123",
+    )
+    displaced = target["ingress"].pop(rule_index)
+    target["ingress"].insert(-1, displaced)
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="fail-closed rules are missing or not first",
+    ):
+        transaction.validate_planned_config(
+            prior,
+            target,
+            "http://host.docker.internal:8123",
+        )
+
+
+@pytest.mark.parametrize(
+    "raw_path",
+    [
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/avalonia-win-x64-installer%2f..%2fadmin",
+        "/DOWNLOADS/INSTALL/%2E%2E%2Fadmin",
+    ],
+)
+def test_cloudflared_decoded_dot_segment_traversal_is_denied_before_incumbent(
+    raw_path: str,
+) -> None:
+    target = transaction.plan_public_download_config(
+        base_config(),
+        "http://host.docker.internal:8123",
+    )
+    decoded_path = urllib.parse.unquote(raw_path)
+
+    assert decoded_path != raw_path
+    assert (
+        resolve_ingress_service(target, "chummer.run", decoded_path)
+        == "http_status:404"
     )
 
 
 @pytest.mark.parametrize(
     "path",
     [
+        "/downloads",
+        "/downloads/",
+        "/status",
+        "/status/",
         "/api/ready/public-downloads",
         "/api/ready",
         "/api/ready/publication",
@@ -317,8 +711,19 @@ def test_plan_prepends_exact_scoped_rules_and_preserves_prior_semantics() -> Non
         "/api/v1/install-linking/me",
         "/account/access/install-link",
         "/downloads/install/public-download-only-probe",
+        "/downloads/install/avalonia-win-x64-installer",
+        "/downloads/install/avalonia-win-x64-installer/payload",
+        "/downloads/install/avalonia-win-x64-installer/metadata",
+        "/downloads/get/avalonia-win-x64-installer",
+        "/api/v1/public/release-truth",
+        "/api/public/release-truth",
+        f"/api/v1/public/release-truth/g/{GENERATION_ID}",
+        f"/api/public/release-truth/g/{GENERATION_ID}",
         f"/downloads/g/{GENERATION_ID}/releases.json",
         f"/downloads/g/{GENERATION_ID}/RELEASE_CHANNEL.generated.json",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-installer.msi",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-payload.zip",
         f"/downloads/g/{GENERATION_ID}/files/Chummer6-payload.zip.json",
@@ -337,11 +742,38 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "/downloads",
-        "/downloads/",
+        "/downloads/unapproved",
+        "/status/details",
         "/downloads/current.json",
         "/downloads/PUBLICATION_SCOPE.generated.json",
         "/downloads/install",
+        "/downloads/install/-invalid",
+        "/DOWNLOADS/INSTALL/avalonia-win-x64-installer",
+        "/downloads/install/AVALONIA-WIN-X64-INSTALLER",
+        "/downloads/install/../admin",
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/avalonia-win-x64-installer/extra",
+        "/downloads/install/avalonia-win-x64-installer/PAYLOAD",
+        "/downloads/install/avalonia-win-x64-installer/METADATA",
+        "/downloads/install/avalonia-win-x64-installer/payload/",
+        "/downloads/install/avalonia-win-x64-installer/metadata/extra",
+        "/downloads/install/avalonia-win-x64-installer?next=/admin",
+        "/downloads/get",
+        "/downloads/get/",
+        "/downloads/get/-invalid",
+        "/DOWNLOADS/GET/avalonia-win-x64-installer",
+        "/downloads/get/AVALONIA-WIN-X64-INSTALLER",
+        "/downloads/get/avalonia-win-x64-installer/",
+        "/downloads/get/avalonia-win-x64-installer/private",
+        "/downloads/get/avalonia-win-x64-installer?next=/admin",
+        "/API/V1/PUBLIC/RELEASE-TRUTH",
+        "/api/V1/public/release-truth",
+        "/api/v1/Public/release-truth",
+        "/api/v1/public/Release-Truth",
+        "/api/v1/public/release-truth/",
+        "/api/v2/public/release-truth",
+        "/api/v1/public/release-truth/private",
+        f"/api/v1/public/release-truth/g/{GENERATION_ID}/extra",
         "/downloads/claim/token",
         "/downloads/upload/file",
         "/downloads/personalized/alice",
@@ -360,8 +792,11 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
         f"/downloads/g/{GENERATION_ID}/files/private/Chummer.zip",
         f"/downloads/g/{GENERATION_ID}/files/Chummer%2fprivate.zip",
         f"/downloads/g/{GENERATION_ID}/install/Chummer.zip",
-        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload",
-        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata",
+        f"/downloads/g/{GENERATION_ID}/install/TEST-INSTALLER",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/PAYLOAD",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/METADATA",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/payload/",
+        f"/downloads/g/{GENERATION_ID}/install/test-installer/metadata/extra",
         f"/downloads/g/{GENERATION_ID}/payload/Chummer.zip",
         "/downloads/files/private/Chummer.zip",
         "/downloads/files/payload/Chummer.zip",
@@ -377,6 +812,26 @@ def test_managed_regex_includes_only_approved_paths(path: str) -> None:
 )
 def test_managed_regex_excludes_all_unapproved_surfaces(path: str) -> None:
     assert not transaction.managed_path_matches(path)
+
+
+@pytest.mark.parametrize(
+    "artifact_id",
+    [
+        "avalonia-win-x64-installer",
+        "unknown-installer",
+        "disabled-installer",
+        "revoked-installer",
+    ],
+)
+def test_safe_install_ids_reach_the_governed_runtime_for_authority_decision(
+    artifact_id: str,
+) -> None:
+    assert transaction.managed_path_matches(
+        f"/downloads/install/{artifact_id}"
+    )
+    assert transaction.managed_path_matches(
+        f"/downloads/get/{artifact_id}"
+    )
 
 
 def test_managed_regex_uses_no_known_non_re2_constructs() -> None:
@@ -400,6 +855,23 @@ def test_managed_control_paths_close_the_strict_postdeploy_contract() -> None:
         assert not transaction.managed_path_matches(f"{path}/extra")
 
 
+def test_managed_public_page_paths_are_exact() -> None:
+    assert set(transaction.MANAGED_PUBLIC_PAGE_PATHS) == {
+        "/downloads",
+        "/status",
+    }
+    assert set(postdeploy.PUBLIC_PAGE_PATHS) == {
+        "/downloads",
+        "/downloads/",
+        "/status",
+        "/status/",
+    }
+    for path in transaction.MANAGED_PUBLIC_PAGE_PATHS:
+        assert transaction.managed_path_matches(path)
+        assert transaction.managed_path_matches(f"{path}/")
+        assert not transaction.managed_path_matches(f"{path}/extra")
+
+
 @pytest.mark.parametrize(
     "bad_config",
     [
@@ -417,13 +889,22 @@ def test_malformed_tunnel_configs_fail_closed(bad_config: Any) -> None:
         transaction.validate_tunnel_config(bad_config)
 
 
-def test_existing_managed_rule_is_rejected_instead_of_duplicated() -> None:
+@pytest.mark.parametrize(
+    "path",
+    [
+        transaction.MANAGED_PATH_RE2,
+        *transaction.FAIL_CLOSED_PATHS_RE2,
+    ],
+)
+def test_existing_managed_rule_is_rejected_instead_of_duplicated(
+    path: str,
+) -> None:
     prior = base_config()
     prior["ingress"].insert(
         0,
         {
             "hostname": "chummer.run",
-            "path": transaction.MANAGED_PATH_RE2,
+            "path": path,
             "service": "http://old:8080",
         },
     )

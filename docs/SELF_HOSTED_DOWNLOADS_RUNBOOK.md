@@ -146,6 +146,14 @@ retirement receipts print credential content. If that governed credential path i
 retirement is blocked until an operator restores or supplies it through the approved secret lane.
 Do not search arbitrary secret roots or copy credentials into a release workspace.
 
+The retirement clean launcher must additionally use
+`CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF=refs/remotes/origin/main` and supply
+`CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256` as the independently
+computed SHA-256 of the exact UI
+`scripts/publish-download-bundle-http.sh` that the flagship transaction will
+use. This digest is public binding data, not a credential. A branch commit,
+missing digest, or malformed digest blocks before the controller starts.
+
 The retirement controller first binds the active authority to terminal `cloudflare-committed.json`
 evidence and re-reads the live tunnel configuration at the exact committed target version and hash.
 It then durably authorizes retirement, re-reads immediately before the PUT, restores the captured
@@ -183,6 +191,60 @@ authenticated stale-lock procedure below only after every child has stopped, and
 retirement operation ID. A resumed retirement accepts only the exact committed target or the exact
 restored prior config and never silently reapplies the sidecar target. Never delete, rename, or edit
 the active-authority marker by hand.
+
+After terminal adoption, the same locked controller writes two immutable,
+content-addressed receipt files and then atomically replaces
+`/downloads/TOPOLOGY_B_RETIREMENT.generated.json` as the commit marker. The
+fixed file is a refreshable public envelope: its `generatedAt` records the
+current materialization, while its content bindings retain the exact immutable
+terminal completion receipt, latest post-marker receipt, retired authority,
+canonical publisher digest, and terminal controller source commit. The
+terminal source must be an ancestor of the clean current Hub `main` checkout;
+advancing protected `main` therefore cannot rewrite terminal evidence.
+Validation is type-exact: source heads and digests must be lowercase fixed
+width strings, versions must be JSON integers (never booleans), timestamps
+must be whole-second canonical UTC, and terminal paths must be normalized
+absolute paths under the operation root.
+Both the original post-marker connector receipt and an optional resume
+post-marker receipt are pre-terminal evidence: their `verifiedAtUtc` must be
+no later than the immutable terminal `completedAtUtc`. Envelope refresh only
+revalidates and republishes those exact bytes; it never performs or invents a
+later Cloudflare gate.
+
+Content files use the platform's atomic exclusive rename
+(`renameat2(RENAME_NOREPLACE)` on Linux or
+`renameatx_np(RENAME_EXCL)` on macOS) after an owner-only single-link staging
+file is fully written, set to `0444`, and fsynced. The target never has the
+two-link crash window of link-then-unlink publication. The fixed envelope uses
+an atomic replacement only after both content entries are durable. A crash
+before either rename can leave an inert randomized staging file, but it cannot
+block a retry or become the authoritative target. Directory creation and
+publication use no-follow directory descriptors rather than path-based chmod.
+The controller performs redirect-free, identity-encoded public readback of all
+three exact byte streams before recording success.
+
+An interruption before the fixed proof write leaves the previous complete
+proof authoritative. A retry adopts the terminal local receipt and emits a
+fresh envelope without contacting or mutating Cloudflare again. The 24-hour
+freshness gate applies to this renewable envelope, not to the immutable
+terminal completion time. The first refresh safely migrates an existing
+materialization receipt from v1 to v2 while preserving every immutable
+terminal and content binding.
+
+Once those bytes are live, dispatch
+`.github/workflows/topology-b-committed-retirement-proof.yml` from protected
+Hub `main`. Provision its
+`topology-b-committed-retirement-proof` environment for independent human
+review, prevent self-review and administrator bypass, and allow only `main`.
+The workflow has no secret and read-only repository permission. Its full
+checkout proves that the immutable terminal source commit is an ancestor of
+the exact protected `main` commit executing the workflow; equality is not
+required. Its first attempt snapshots exactly three read-only files into the artifact
+`topology-b-committed-retirement-proof-<run-id>-1`; the later UI publication
+transaction authenticates that workflow run, current Hub main, source
+ancestry, artifact metadata, archive digest, fresh envelope time, and exact
+bytes through a Hub-scoped read-only Actions token. Do not manually create,
+edit, or re-upload this artifact.
 
 ### Authenticated manual stale-lock recovery
 
@@ -464,6 +526,7 @@ unset approved_runtime_proof_sha256
 2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
 `bash scripts/verify-live-mac-bootstrap.sh`
 3. For a Mac release runner, open `https://chummer.run/downloads/release-upload` in a signed-in browser, confirm the displayed authenticated `CURRENT` snapshot id and SHA-256, copy the generated `Command` block, and paste that exact command into the Mac shell. The command contains no upload ticket; mint a fresh short-lived code on the page and enter it only at the hidden prompt (or through the documented mode-`0600` ticket file). Do not run the raw `bootstrap.sh` URL for promotion because it has neither the upload credential nor the authenticated authority handoff.
+   - For non-interactive intake, set exactly one token/ticket inline or `*_FILE`/`*_PATH` source. File aliases do not have precedence: multiple sources are rejected. The file must be absolute, operator-owned, regular, non-symlink, single-link, exact mode `0600`, and contain one UTF-8 value of at most 8192 bytes with at most one final LF. Its macOS ACL probe permits either no ACL or a sequential deny-only ACL made only of recognized entries and rights; it accepts the `@` permission suffix used when xattrs are present, including when followed by those deny-only ACL entries, and rejects allow, mixed, malformed, or unknown entries. Before launch, write and close a new compliant file and atomically rename it to the configured path; do not mutate that path or inode while the bootstrap runs. The bootstrap compares identity plus two bounded explicit-offset snapshots and rejects a single mutation observed by those checks, but finite rereads do not synchronize against an arbitrary hostile same-UID writer. The captured value is streamed to curl without persisting it in argv, a child environment, logs, or a config file.
    - The generated command derives and supplies these 17 immutable Hub-proof settings from the displayed snapshot: `CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT`, `CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT`, and the `PATH`, `EXPECTED_SHA256`, and `AUTHORITY` triplets for `CHUMMER_HUB_RELEASE_CHANNEL`, `CHUMMER_FLAGSHIP_PRODUCT_READINESS`, `CHUMMER_FLEET_QUEUE_STAGING`, `CHUMMER_DESIGN_QUEUE_STAGING`, and `CHUMMER_DESIGN_SUCCESSOR_REGISTRY`.
    - Do not export or override those 17 values on the Mac. The command creates owner-only temporary authority files, the bootstrap verifies every digest before invoking the local Hub generator, and the exit trap removes the files. Refresh the signed-in page whenever `CURRENT` advances.
    - The seven source repository `EXPECTED_COMMIT` pins remain independent, reviewed build inputs and must be exported before running the command. If the authenticated snapshot is missing, invalid, or lacks its complete authority inventory, the page and `.command` endpoint return `503` instead of falling back to a static proof or ambient sibling checkout.

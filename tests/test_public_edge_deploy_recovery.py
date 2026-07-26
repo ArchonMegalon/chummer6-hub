@@ -8,6 +8,8 @@ from pathlib import Path
 import shutil
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "public_edge_deploy_recovery.py"
@@ -19,10 +21,12 @@ CANDIDATE_PORTAL_NAME = "chummer-public-edge-candidate-test"
 PRIOR_PORTAL_IMAGE = "sha256:" + "1" * 64
 PRIOR_TOOL_IMAGE = "sha256:" + "2" * 64
 PRIOR_TUNNEL_IMAGE = "sha256:" + "3" * 64
+PRIOR_TUNNEL_REPLICA_IMAGE = "sha256:" + "6" * 64
 CANDIDATE_PORTAL_IMAGE = "sha256:" + "4" * 64
 CANDIDATE_TOOL_IMAGE = "sha256:" + "5" * 64
 PRIOR_PORTAL = "a" * 64
 PRIOR_TUNNEL = "b" * 64
+PRIOR_TUNNEL_REPLICA = "d" * 64
 CANDIDATE_PORTAL = "c" * 64
 CANDIDATE_PROOF_BYTES = b"candidate-proof-authority\n"
 PRIOR_PROOF_BYTES = b"prior-proof-authority\n"
@@ -143,6 +147,7 @@ class FakeRuntime:
             "chummer-portal": PRIOR_PORTAL,
             "chummer-run-cloudflared": PRIOR_TUNNEL,
         }
+        self.service_lookup_failures: set[str] = set()
         self.names = {PRIOR_PORTAL_NAME: PRIOR_PORTAL}
         self.containers = {
             PRIOR_PORTAL: {
@@ -157,6 +162,7 @@ class FakeRuntime:
             PRIOR_TUNNEL: {
                 "image": PRIOR_TUNNEL_IMAGE,
                 "running": True,
+                "health": "healthy",
                 "labels": {
                     "com.docker.compose.project": PROJECT_NAME,
                     "com.docker.compose.service": "chummer-run-cloudflared",
@@ -204,6 +210,8 @@ class FakeRuntime:
         self.tags.pop(tag, None)
 
     def service_container(self, service: str) -> str:
+        if service in self.service_lookup_failures:
+            raise RuntimeError("injected service lookup failure")
         return self.services.get(service, "")
 
     def container_by_name(self, name: str) -> str:
@@ -224,6 +232,10 @@ class FakeRuntime:
     def set_container_running(self, container_id: str, running: bool) -> None:
         self.actions.append(("running", container_id, running))
         self.containers[container_id]["running"] = running
+
+    def wait_container_healthy(self, container_id: str) -> None:
+        if self.containers[container_id].get("health") != "healthy":
+            raise RuntimeError("injected unhealthy container")
 
     def remove_container(self, container_id: str) -> None:
         self.actions.append(("remove-container", container_id))
@@ -274,6 +286,10 @@ def prior_state(
         "priorTunnelImageId": PRIOR_TUNNEL_IMAGE if tunnel_existed else "",
         "priorTunnelExisted": tunnel_existed,
         "priorTunnelWasRunning": tunnel_running if tunnel_existed else False,
+        "priorTunnelReplicaContainerId": "",
+        "priorTunnelReplicaImageId": "",
+        "priorTunnelReplicaExisted": False,
+        "priorTunnelReplicaWasRunning": False,
     }
 
 
@@ -301,6 +317,32 @@ def run_reconcile(module, runtime: FakeRuntime, state: dict[str, object], overla
         portal_image_tag=PORTAL_TAG,
         tool_image_tag=TOOL_TAG,
         project_name=PROJECT_NAME,
+    )
+
+
+def add_tunnel_replica(
+    runtime: FakeRuntime,
+    state: dict[str, object],
+) -> None:
+    runtime.images.add(PRIOR_TUNNEL_REPLICA_IMAGE)
+    runtime.services["chummer-run-cloudflared-replica"] = PRIOR_TUNNEL_REPLICA
+    runtime.containers[PRIOR_TUNNEL_REPLICA] = {
+        "image": PRIOR_TUNNEL_REPLICA_IMAGE,
+        "running": True,
+        "health": "healthy",
+        "labels": {
+            "com.docker.compose.project": PROJECT_NAME,
+            "com.docker.compose.service": "chummer-run-cloudflared-replica",
+            "com.docker.compose.oneoff": "False",
+        },
+    }
+    state.update(
+        {
+            "priorTunnelReplicaContainerId": PRIOR_TUNNEL_REPLICA,
+            "priorTunnelReplicaImageId": PRIOR_TUNNEL_REPLICA_IMAGE,
+            "priorTunnelReplicaExisted": True,
+            "priorTunnelReplicaWasRunning": True,
+        }
     )
 
 
@@ -572,6 +614,29 @@ def test_recovery_is_idempotent_after_exact_state_is_restored() -> None:
         ("proof-sha256", PRIOR_PORTAL, module.PROOF_AUTHORITY_PATH),
         ("proof-sha256", PRIOR_PORTAL, module.PROOF_PUBLIC_PATH),
     ]
+
+
+def test_legacy_journal_with_unknown_replica_is_rejected_before_runtime_mutation() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    state = prior_state()
+    add_tunnel_replica(runtime, state)
+    for field in (
+        "priorTunnelReplicaContainerId",
+        "priorTunnelReplicaImageId",
+        "priorTunnelReplicaExisted",
+        "priorTunnelReplicaWasRunning",
+    ):
+        state.pop(field)
+
+    with pytest.raises(
+        RuntimeError,
+        match="lacks canonical tunnel replica authority",
+    ):
+        run_reconcile(module, runtime, state, [True])
+
+    assert runtime.container_running(PRIOR_TUNNEL_REPLICA) is True
+    assert runtime.actions == []
 
 
 def test_recovery_command_consumes_journal_and_writes_prior_runtime_authority(
@@ -913,3 +978,66 @@ def test_recovery_restores_s1_while_preserving_advanced_s2_current(
     assert not journal.exists()
     assert (projection_root / "CURRENT.json").read_bytes() == advanced_current
     assert public_projection_identity(projection_root) == s2_identity
+
+
+def test_recovery_quiesces_and_restores_both_canonical_tunnel_connectors() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    state = prior_state()
+    add_tunnel_replica(runtime, state)
+
+    result = run_reconcile(module, runtime, state, [False])
+
+    assert result["status"] == "pass"
+    assert result["componentChecks"]["tunnel"] == {
+        "status": "pass",
+        "disposition": "both_canonical_tunnel_states_restored",
+    }
+    for container_id in (PRIOR_TUNNEL, PRIOR_TUNNEL_REPLICA):
+        stopped = runtime.actions.index(("running", container_id, False))
+        restarted = runtime.actions.index(("running", container_id, True))
+        assert stopped < restarted
+
+
+def test_recovery_stops_both_connectors_if_replica_identity_is_unavailable() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    state = prior_state()
+    add_tunnel_replica(runtime, state)
+    runtime.services.pop("chummer-run-cloudflared-replica")
+
+    result = run_reconcile(module, runtime, state, [True])
+
+    assert result["status"] == "fail"
+    assert result["componentChecks"]["tunnel"]["status"] == "fail"
+    assert runtime.container_running(PRIOR_TUNNEL) is False
+    assert runtime.container_running(PRIOR_TUNNEL_REPLICA) is False
+
+
+def test_recovery_stops_known_prior_connector_when_service_lookup_throws() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    state = prior_state()
+    add_tunnel_replica(runtime, state)
+    runtime.service_lookup_failures.add("chummer-run-cloudflared-replica")
+
+    result = run_reconcile(module, runtime, state, [False])
+
+    assert result["status"] == "fail"
+    assert ("running", PRIOR_TUNNEL_REPLICA, False) in runtime.actions
+    assert runtime.container_running(PRIOR_TUNNEL_REPLICA) is False
+
+
+def test_recovery_fails_closed_and_stops_both_when_connector_is_unhealthy() -> None:
+    module = load_module()
+    runtime = FakeRuntime()
+    state = prior_state()
+    add_tunnel_replica(runtime, state)
+    runtime.containers[PRIOR_TUNNEL_REPLICA]["health"] = "unhealthy"
+
+    result = run_reconcile(module, runtime, state, [True])
+
+    assert result["status"] == "fail"
+    assert result["componentChecks"]["tunnel"]["status"] == "fail"
+    assert runtime.container_running(PRIOR_TUNNEL) is False
+    assert runtime.container_running(PRIOR_TUNNEL_REPLICA) is False

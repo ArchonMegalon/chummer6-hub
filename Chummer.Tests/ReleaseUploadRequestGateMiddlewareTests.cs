@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using Chummer.Run.Api.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -364,6 +367,231 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         Assert.Equal(StatusCodes.Status429TooManyRequests, fixture.Context.Response.StatusCode);
         Assert.Equal(0, body.ReadCount);
         Assert.False(fixture.NextCalled);
+    }
+
+    [Fact]
+    public async Task RotatedTicketReturnsExactBoundUnauthorizedProofWithoutMutation()
+    {
+        const string nonce =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        using TicketProofFixture fixture = new(currentEpoch: "release-epoch-b");
+        string oldTicket = fixture.IssueTicket("release-epoch-a");
+        CountingStream body = fixture.PrepareRequest(oldTicket, nonce);
+
+        await fixture.InvokeAsync();
+
+        string expectedNonceSha256 = HashAscii(nonce);
+        string expectedEpochSha256 = HashUtf8("release-epoch-b");
+        Assert.Equal(StatusCodes.Status401Unauthorized, fixture.Context.Response.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", fixture.Context.Response.ContentType);
+        Assert.Equal("no-store", fixture.Context.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", fixture.Context.Response.Headers.Pragma.ToString());
+        Assert.Equal("0", fixture.Context.Response.Headers.Expires.ToString());
+        Assert.Equal("Bearer", fixture.Context.Response.Headers.WWWAuthenticate.ToString());
+        Assert.Equal(
+            $$"""{"contractName":"chummer.release-upload-ticket-revocation-proof/v1","status":"pass","ticketAccepted":false,"nonceSha256":"{{expectedNonceSha256}}","revocationEpochSha256":"{{expectedEpochSha256}}"}""",
+            await fixture.ReadResponseBodyAsync());
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(fixture.NextCalled);
+        Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(fixture.Context));
+        Assert.False(Directory.Exists(fixture.SessionRoot));
+    }
+
+    [Fact]
+    public async Task CurrentTicketReturnsDeterministicBoundSuccessWithoutMutation()
+    {
+        const string nonce =
+            "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        using TicketProofFixture fixture = new(currentEpoch: "release-epoch-b");
+        string currentTicket = fixture.IssueTicket("release-epoch-b");
+        CountingStream body = fixture.PrepareRequest(currentTicket, nonce);
+
+        await fixture.InvokeAsync();
+
+        string expectedNonceSha256 = HashAscii(nonce);
+        string expectedEpochSha256 = HashUtf8("release-epoch-b");
+        Assert.Equal(StatusCodes.Status200OK, fixture.Context.Response.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", fixture.Context.Response.ContentType);
+        Assert.Equal("no-store", fixture.Context.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", fixture.Context.Response.Headers.Pragma.ToString());
+        Assert.Equal("0", fixture.Context.Response.Headers.Expires.ToString());
+        Assert.False(fixture.Context.Response.Headers.ContainsKey("WWW-Authenticate"));
+        Assert.Equal(
+            $$"""{"contractName":"chummer.release-upload-ticket-revocation-proof/v1","status":"pass","ticketAccepted":true,"nonceSha256":"{{expectedNonceSha256}}","revocationEpochSha256":"{{expectedEpochSha256}}"}""",
+            await fixture.ReadResponseBodyAsync());
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(fixture.NextCalled);
+        Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(fixture.Context));
+        Assert.False(Directory.Exists(fixture.SessionRoot));
+    }
+
+    [Fact]
+    public async Task FleetTokenIsNotAcceptedAsAReleaseUploadTicketProof()
+    {
+        const string nonce =
+            "1111111111111111111111111111111111111111111111111111111111111111";
+        using TicketProofFixture fixture = new(currentEpoch: "release-epoch-b");
+        CountingStream body = fixture.PrepareRequest(TicketProofFixture.InternalToken, nonce);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, fixture.Context.Response.StatusCode);
+        Assert.Contains(
+            "\"ticketAccepted\":false",
+            await fixture.ReadResponseBodyAsync(),
+            StringComparison.Ordinal);
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(fixture.NextCalled);
+        Assert.False(Directory.Exists(fixture.SessionRoot));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")]
+    [InlineData("0123456789abcdef")]
+    public async Task InvalidNonceIsRejectedWithoutTicketEvaluationOrMutation(string nonce)
+    {
+        using TicketProofFixture fixture = new(currentEpoch: "release-epoch-b");
+        string currentTicket = fixture.IssueTicket("release-epoch-b");
+        CountingStream body = fixture.PrepareRequest(currentTicket, nonce);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status400BadRequest, fixture.Context.Response.StatusCode);
+        Assert.Equal("no-store", fixture.Context.Response.Headers.CacheControl.ToString());
+        Assert.Equal("no-cache", fixture.Context.Response.Headers.Pragma.ToString());
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(fixture.NextCalled);
+        Assert.False(Directory.Exists(fixture.SessionRoot));
+    }
+
+    private static string HashAscii(string value)
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.ASCII.GetBytes(value)));
+
+    private static string HashUtf8(string value)
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private sealed class TicketProofFixture : IDisposable
+    {
+        public const string InternalToken = "fleet-test-token";
+        private readonly string _root;
+        private readonly IDataProtectionProvider _provider;
+        private readonly ReleaseUploadAuthorizationEvaluator _authorization;
+        private readonly ReleaseUploadAdmissionService _admission;
+        private readonly ReleaseUploadQuotaOptions _options;
+        private readonly ReleaseUploadRequestGateMiddleware _middleware;
+
+        public TicketProofFixture(string currentEpoch)
+        {
+            _root = Path.Combine(
+                Path.GetTempPath(),
+                "release-upload-ticket-proof-tests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(_root);
+            SessionRoot = Path.Combine(_root, "sessions");
+            _provider = DataProtectionProvider.Create(
+                new DirectoryInfo(Path.Combine(_root, "keys")));
+            IConfiguration configuration = CreateConfiguration(currentEpoch);
+            var ticketService = new ReleaseUploadTicketService(_provider, configuration);
+            _authorization = new ReleaseUploadAuthorizationEvaluator(
+                configuration,
+                ticketService);
+            _options = new ReleaseUploadQuotaOptions
+            {
+                MaxChunkBytes = 64,
+                MaxRequestBytes = 128,
+                MaxPathBytes = 64,
+                MaxFileBytes = 512,
+                MaxChunksPerFile = 8,
+                MaxFilesPerSession = 8,
+                MaxSessionBytes = 1024,
+                MaxActiveSessions = 1,
+                MaxActiveSessionsPerAuthorization = 1,
+                MaxSharedBytes = 2048,
+                MinimumFreeBytes = 0,
+                MinimumFreeFraction = 0,
+                JanitorInterval = TimeSpan.FromMinutes(1),
+                CompletedReceiptRetention = TimeSpan.FromMinutes(1)
+            };
+            _options.Validate();
+            _admission = new ReleaseUploadAdmissionService(configuration, _options);
+            _middleware = new ReleaseUploadRequestGateMiddleware(context =>
+            {
+                NextCalled = true;
+                context.Response.StatusCode = StatusCodes.Status204NoContent;
+                return Task.CompletedTask;
+            });
+            Context = new DefaultHttpContext();
+            Context.Response.Body = new MemoryStream();
+        }
+
+        public DefaultHttpContext Context { get; }
+        public string SessionRoot { get; }
+        public bool NextCalled { get; private set; }
+
+        public string IssueTicket(string epoch)
+        {
+            var service = new ReleaseUploadTicketService(
+                _provider,
+                CreateConfiguration(epoch));
+            return service.Issue(new AuthenticatedHubSubject(
+                SubjectId: "subject-archon",
+                DisplayName: "Archon",
+                Email: "archon@example.com",
+                Roles: ["operator"],
+                AccessToken: "token")).Ticket;
+        }
+
+        public CountingStream PrepareRequest(string bearer, string nonce)
+        {
+            Context.Request.Method = HttpMethods.Post;
+            Context.Request.Path =
+                ReleaseUploadRequestGateMiddleware.TicketRevocationProofPath;
+            Context.Request.Headers.Authorization = $"Bearer {bearer}";
+            if (nonce.Length > 0)
+            {
+                Context.Request.Headers[
+                    ReleaseUploadRequestGateMiddleware.TicketRevocationNonceHeader] = nonce;
+            }
+
+            Context.Request.ContentLength = 16;
+            var body = new CountingStream(new byte[16]);
+            Context.Request.Body = body;
+            return body;
+        }
+
+        public Task InvokeAsync()
+            => _middleware.InvokeAsync(Context, _authorization, _admission, _options);
+
+        public async Task<string> ReadResponseBodyAsync()
+        {
+            Context.Response.Body.Position = 0;
+            using var reader = new StreamReader(
+                Context.Response.Body,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                leaveOpen: true);
+            return await reader.ReadToEndAsync();
+        }
+
+        private IConfiguration CreateConfiguration(string epoch)
+            => new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["FLEET_INTERNAL_API_TOKEN"] = InternalToken,
+                    ["CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"] = SessionRoot,
+                    ["CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_EPOCH"] = epoch
+                })
+                .Build();
+
+        public void Dispose()
+        {
+            Context.Response.Body.Dispose();
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+        }
     }
 
     private sealed class Fixture : IDisposable

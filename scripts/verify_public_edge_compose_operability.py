@@ -24,9 +24,23 @@ HEALTHCHECK_CONTRACTS: dict[str, tuple[str, ...]] = {
         "/api/ready",
     ),
     "chummer-run-cloudflared": ("cloudflared", "tunnel", "127.0.0.1:2000", "ready"),
+    "chummer-run-cloudflared-replica": (
+        "cloudflared",
+        "tunnel",
+        "127.0.0.1:2000",
+        "ready",
+    ),
 }
 
-CLOUDFLARED_DEFAULT_IMAGE = "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2026.7.0}"
+CLOUDFLARED_DEFAULT_IMAGE = (
+    "cloudflare/cloudflared:2026.7.0@"
+    "sha256:8c70a8c2d373e93caac1ee79fcc615908a49ccf3f3975775d1e10d24e41327af"
+)
+CLOUDFLARED_SERVICES = (
+    "chummer-run-cloudflared",
+    "chummer-run-cloudflared-replica",
+)
+CLOUDFLARED_TOKEN_TARGET = "/run/secrets/chummer-run-cloudflared.token"
 CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS = ("--metrics", "0.0.0.0:2000", "run")
 CORE_GM_WORKSPACE_CONFIGURATION_KEY = (
     "Chummer__CoreGmCharacterEdits__WorkspaceStorePath"
@@ -41,6 +55,7 @@ DEPENDENCY_CONTRACTS = {
         "support-progress-mock",
     },
     "chummer-run-cloudflared": {"chummer-portal"},
+    "chummer-run-cloudflared-replica": {"chummer-portal"},
 }
 
 MEMORY_LIMIT_CONTRACTS = {
@@ -51,6 +66,7 @@ MEMORY_LIMIT_CONTRACTS = {
     "chummer-run-identity": "${CHUMMER_IDENTITY_MEMORY_LIMIT:-512m}",
     "chummer-portal": "${CHUMMER_PORTAL_MEMORY_LIMIT:-1536m}",
     "chummer-run-cloudflared": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
+    "chummer-run-cloudflared-replica": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
 }
 
 CURL_RUNTIME_DOCKERFILES = (
@@ -175,23 +191,77 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 f"{service_name} mem_limit must be overrideable with default {expected_limit}"
             )
 
-    cloudflared = services.get("chummer-run-cloudflared")
-    if isinstance(cloudflared, dict):
+    for service_name in CLOUDFLARED_SERVICES:
+        cloudflared = services.get(service_name)
+        if not isinstance(cloudflared, dict):
+            continue
         if cloudflared.get("image") != CLOUDFLARED_DEFAULT_IMAGE:
             failures.append(
-                "chummer-run-cloudflared image must use the current versioned default "
+                f"{service_name} image must use the current digest-pinned default "
                 f"{CLOUDFLARED_DEFAULT_IMAGE}"
+            )
+        if cloudflared.get("platform") != "linux/amd64":
+            failures.append(f"{service_name} platform must be linux/amd64")
+        if cloudflared.get("container_name") != service_name:
+            failures.append(
+                f"{service_name} must use an independent exact container name"
+            )
+        if (
+            cloudflared.get("read_only") is not True
+            or "ALL" not in (cloudflared.get("cap_drop") or [])
+            or "no-new-privileges:true"
+            not in (cloudflared.get("security_opt") or [])
+        ):
+            failures.append(
+                f"{service_name} must retain the read-only no-capability security contract"
             )
         runtime_command = cloudflared.get("command")
         if not isinstance(runtime_command, list):
-            failures.append("chummer-run-cloudflared command must use exec-list syntax")
+            failures.append(f"{service_name} command must use exec-list syntax")
         else:
             for fragment in CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS:
                 if fragment not in runtime_command:
                     failures.append(
-                        "chummer-run-cloudflared runtime command is missing required fragment: "
+                        f"{service_name} runtime command is missing required fragment: "
                         f"{fragment}"
                     )
+            if (
+                "--token-file" not in runtime_command
+                or "--token" in runtime_command
+                or CLOUDFLARED_TOKEN_TARGET not in runtime_command
+            ):
+                failures.append(
+                    f"{service_name} must consume only the mounted token file"
+                )
+        environment = cloudflared.get("environment") or {}
+        if any("TOKEN" in str(key).upper() for key in dict(environment)):
+            failures.append(
+                f"{service_name} must not receive token environment variables"
+            )
+        token_mounts = [
+            mount
+            for mount in (cloudflared.get("volumes") or [])
+            if isinstance(mount, dict)
+            and mount.get("target") == CLOUDFLARED_TOKEN_TARGET
+        ]
+        if len(token_mounts) != 1:
+            failures.append(
+                f"{service_name} must have exactly one token-file mount"
+            )
+        else:
+            token_mount = token_mounts[0]
+            bind = token_mount.get("bind") or {}
+            if (
+                token_mount.get("type") != "bind"
+                or token_mount.get("read_only") is not True
+                or not isinstance(bind, dict)
+                or bind.get("create_host_path") is not False
+                or "CHUMMER_RUN_CF_TUNNEL_TOKEN_FILE"
+                not in str(token_mount.get("source") or "")
+            ):
+                failures.append(
+                    f"{service_name} token-file mount is not fail-closed"
+                )
 
     portal = services.get("chummer-portal")
     if isinstance(portal, dict):

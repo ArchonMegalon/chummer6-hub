@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from html.parser import HTMLParser
 import importlib.util
 import json
 import os
@@ -23,6 +24,8 @@ GENERATION_HEADER = "X-Chummer-Release-Generation"
 SIDECAR_CONTRACT = "chummer6-ui.windows_bootstrap_payload"
 STREAM_CHUNK_BYTES = 64 * 1024
 MAXIMUM_MANIFEST_BYTES = 8 * 1024 * 1024
+MAXIMUM_PUBLIC_PAGE_BYTES = 2 * 1024 * 1024
+IMMUTABLE_GENERATION_CACHE_CONTROL = "public, max-age=31536000, immutable"
 PROBLEM = {
     "type": "https://chummer.run/problems/install-linking-unavailable",
     "title": "Install-linking unavailable.",
@@ -40,6 +43,33 @@ PRIVATE_PATHS = (
 )
 INSTALL_ROUTE_DENIAL_PATHS = (
     "/downloads/install/public-download-only-probe",
+)
+PUBLIC_DOWNLOAD_ROUTE_TEMPLATE = "/downloads/get/{artifact_id}"
+CURRENT_RELEASE_TRUTH_PATHS = (
+    "/api/v1/public/release-truth",
+    "/api/public/release-truth",
+)
+GENERATION_RELEASE_TRUTH_PATH_TEMPLATES = (
+    "/api/v1/public/release-truth/g/{generation_id}",
+    "/api/public/release-truth/g/{generation_id}",
+)
+PUBLIC_PAGE_PATHS = (
+    "/downloads",
+    "/downloads/",
+    "/status",
+    "/status/",
+)
+DOWNLOAD_PAGE_PATHS = frozenset(("/downloads", "/downloads/"))
+PUBLIC_PAGE_MARKER_ATTRIBUTES = (
+    "data-downloads-release-version",
+    "data-downloads-release-generation",
+    "data-downloads-public-count",
+)
+PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES = (
+    "href",
+    "data-download-action",
+    "data-download-artifact",
+    "data-download-install-route",
 )
 FORBIDDEN_RESPONSE_HEADERS = (
     "Authorization",
@@ -125,11 +155,59 @@ class DownloadExpectation(NamedTuple):
     payload_sha256: str
     payload_size_bytes: int
     sidecar_file_name: str
+    manifest_metadata_url: str | None
     sidecar_url: str
     sidecar_probe_url: str
     sidecar_sha256: str
     sidecar_size_bytes: int
     sidecar_bytes: bytes
+
+
+class PublicPageIdentityParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.markers: list[dict[str, list[str | None]]] = []
+        self.download_actions: list[dict[str, list[str | None]]] = []
+
+    def _record_marker(self, attrs: list[tuple[str, str | None]]) -> None:
+        values: dict[str, list[str | None]] = {}
+        for name, value in attrs:
+            normalized_name = name.lower()
+            if normalized_name in PUBLIC_PAGE_MARKER_ATTRIBUTES:
+                values.setdefault(normalized_name, []).append(value)
+        if values:
+            self.markers.append(values)
+
+    def _record_download_action(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag.lower() != "a":
+            return
+        values: dict[str, list[str | None]] = {}
+        for name, value in attrs:
+            normalized_name = name.lower()
+            if normalized_name in PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES:
+                values.setdefault(normalized_name, []).append(value)
+        if values.get("data-download-action") == ["download-artifact"]:
+            self.download_actions.append(values)
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record_marker(attrs)
+        self._record_download_action(tag, attrs)
+
+    def handle_startendtag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        self._record_marker(attrs)
+        self._record_download_action(tag, attrs)
 
 
 class AnonymousAuth(requests.auth.AuthBase):
@@ -333,6 +411,41 @@ def _download_url(base_url: str, value: Any, label: str) -> str:
     return resolved
 
 
+def _optional_download_url(
+    base_url: str,
+    value: Any,
+    label: str,
+) -> str | None:
+    raw = str(value or "").strip()
+    return _download_url(base_url, raw, label) if raw else None
+
+
+def _canonical_generation_id(value: Any) -> str:
+    generation_id = str(value or "").strip()
+    if (
+        not generation_id
+        or len(generation_id) > 128
+        or generation_id in {".", ".."}
+        or ".." in generation_id
+        or not (
+            generation_id[0].isascii()
+            and generation_id[0].isalnum()
+        )
+        or any(
+            not (
+                character.isascii()
+                and (
+                    character.isalnum()
+                    or character in "._-"
+                )
+            )
+            for character in generation_id
+        )
+    ):
+        raise ValueError("release generation id is not a canonical route token")
+    return generation_id
+
+
 def _canonical_payload_url(base_url: str, value: Any, label: str) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -392,11 +505,6 @@ def _host_local_mirror_url(base_url: str, canonical_url: str) -> str:
         netloc=base.netloc,
         path=_decoded_payload_path(canonical_url),
     ).geturl()
-
-
-def _sidecar_url(payload_url: str) -> str:
-    parsed = urlparse(payload_url)
-    return parsed._replace(path=parsed.path + ".json").geturl()
 
 
 def _required_text(payload: Mapping[str, Any], key: str, label: str) -> str:
@@ -465,6 +573,102 @@ def _canonical_object_sha256(payload: Mapping[str, Any]) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return hashlib.sha256(body).hexdigest()
+
+
+def _verify_release_truth_routes(
+    *,
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+    expected_release_truth: Mapping[str, Any],
+    generation_id: str | None,
+    include_current: bool,
+) -> dict[str, dict[str, Any]]:
+    expected = dict(expected_release_truth)
+    expected_sha256 = _canonical_object_sha256(expected)
+    paths = list(CURRENT_RELEASE_TRUTH_PATHS) if include_current else []
+    if generation_id is not None:
+        canonical_generation = _canonical_generation_id(generation_id)
+        paths.extend(
+            template.format(generation_id=canonical_generation)
+            for template in GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
+        )
+
+    receipts: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        response = get(session, base_url, path, timeout)
+        _reject_credential_headers(response, path)
+        payload = require_json(response, path)
+        if (
+            response.status_code != 200
+            or _media_type(response.headers) != "application/json"
+            or payload != expected
+        ):
+            raise ValueError(
+                f"{path} did not serve the exact authenticated releaseTruth"
+            )
+        _require_private_no_store_headers(response, path)
+        receipts[path] = {
+            "statusCode": response.status_code,
+            "sha256": expected_sha256,
+        }
+    return receipts
+
+
+def _require_private_no_store_headers(
+    response: requests.Response,
+    label: str,
+) -> None:
+    required = {
+        "Cache-Control": "private, no-store, max-age=0",
+        "CDN-Cache-Control": "no-store, max-age=0",
+        "Cloudflare-CDN-Cache-Control": "no-store, max-age=0",
+        "Surrogate-Control": "no-store",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    for name, expected in required.items():
+        present, actual = _header(response.headers, name)
+        if not present or actual != expected:
+            raise ValueError(
+                f"{label} did not enforce private no-store header {name}"
+            )
+
+
+def _verify_current_companion_denials(
+    *,
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+    artifact_id: str,
+    expected_release_truth: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    expected = dict(expected_release_truth)
+    expected_sha256 = _canonical_object_sha256(expected)
+    receipts: dict[str, dict[str, Any]] = {}
+    for role in ("payload", "metadata"):
+        path = f"/downloads/install/{artifact_id}/{role}"
+        response = get(session, base_url, path, timeout)
+        _reject_credential_headers(response, path)
+        payload = require_json(response, path)
+        if (
+            response.status_code != 409
+            or _media_type(response.headers) != "application/json"
+            or set(payload) != {"message", "releaseTruth", "status"}
+            or payload.get("status") != "review_required"
+            or not str(payload.get("message") or "").strip()
+            or payload.get("releaseTruth") != expected
+        ):
+            raise ValueError(
+                f"{path} did not enforce the exact authenticated review denial"
+            )
+        _require_private_no_store_headers(response, path)
+        receipts[role] = {
+            "path": path,
+            "statusCode": response.status_code,
+            "releaseTruthSha256": expected_sha256,
+        }
+    return receipts
 
 
 def _regular_file_bytes(path: Path, label: str) -> bytes:
@@ -777,6 +981,30 @@ def derive_download_expectations(
     for artifact in canonical_rows:
         _assert_manifest_policy(canonical, artifact)
         artifact_id = _required_text(artifact, "artifactId", "Windows artifact")
+        if (
+            len(artifact_id) > 128
+            or not (
+                artifact_id[0].isascii()
+                and (
+                    artifact_id[0].islower()
+                    or artifact_id[0].isdigit()
+                )
+            )
+            or any(
+                not (
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "-"
+                    )
+                )
+                for character in artifact_id
+            )
+        ):
+            raise ValueError(
+                "Windows artifact id is not a canonical public route token"
+            )
         head = _required_text(artifact, "head", artifact_id)
         rid = _required_text(artifact, "rid", artifact_id)
         arch = _required_text(artifact, "arch", artifact_id)
@@ -805,18 +1033,58 @@ def derive_download_expectations(
             raise ValueError(
                 f"{artifact_id} payload URL cannot be generation-bound without a generation id"
             )
-        expected_payload_path = (
+        expected_generation = _canonical_generation_id(expected_generation)
+        expected_raw_payload_path = (
             f"/downloads/g/{expected_generation}/files/{payload_file_name}"
         )
-        if payload_path != expected_payload_path:
+        expected_companion_payload_path = (
+            f"/downloads/g/{expected_generation}/install/"
+            f"{artifact_id}/payload"
+        )
+        if payload_path not in {
+            expected_raw_payload_path,
+            expected_companion_payload_path,
+        }:
             raise ValueError(
-                f"{artifact_id} open_public payload URL must be the generation-bound files route"
+                f"{artifact_id} payload URL must be the exact generation-bound "
+                "files or installer companion route"
             )
 
         installer_sha256 = _required_sha256(artifact, "sha256", artifact_id)
         installer_size = _required_size(artifact, "sizeBytes", artifact_id)
         payload_sha256 = _required_sha256(artifact, "payloadSha256", artifact_id)
         payload_size = _required_size(artifact, "payloadSizeBytes", artifact_id)
+        sidecar_file_name = payload_file_name + ".json"
+        metadata_file_name = str(
+            artifact.get("payloadMetadataFileName") or ""
+        ).strip()
+        if metadata_file_name and metadata_file_name != sidecar_file_name:
+            raise ValueError(
+                f"{artifact_id} payload metadata filename disagrees with payload"
+            )
+        manifest_metadata_url = _optional_download_url(
+            base,
+            artifact.get("payloadMetadataUrl"),
+            f"{artifact_id} manifest payload metadata",
+        )
+        if manifest_metadata_url is not None:
+            metadata_path = _decoded_payload_path(manifest_metadata_url)
+            expected_raw_metadata_path = (
+                f"/downloads/g/{expected_generation}/files/"
+                f"{sidecar_file_name}"
+            )
+            expected_companion_metadata_path = (
+                f"/downloads/g/{expected_generation}/install/"
+                f"{artifact_id}/metadata"
+            )
+            if metadata_path not in {
+                expected_raw_metadata_path,
+                expected_companion_metadata_path,
+            }:
+                raise ValueError(
+                    f"{artifact_id} payload metadata URL must be the exact "
+                    "generation-bound files or installer companion route"
+                )
 
         compatibility_values = {
             "installer_file_name": str(compatibility_row.get("fileName") or "").strip(),
@@ -835,6 +1103,14 @@ def derive_download_expectations(
             ),
             "payload_sha256": str(compatibility_row.get("payloadSha256") or "").strip().lower(),
             "payload_size": int(compatibility_row.get("payloadSizeBytes") or 0),
+            "metadata_file_name": str(
+                compatibility_row.get("payloadMetadataFileName") or ""
+            ).strip(),
+            "manifest_metadata_url": _optional_download_url(
+                base,
+                compatibility_row.get("payloadMetadataUrl"),
+                f"{artifact_id} compatibility payload metadata",
+            ),
             "access": str(compatibility_row.get("installAccessClass") or "").strip().lower(),
             "mode": str(compatibility_row.get("installerMode") or "").strip().lower(),
         }
@@ -847,13 +1123,14 @@ def derive_download_expectations(
             "manifest_payload_url": manifest_payload_url,
             "payload_sha256": payload_sha256,
             "payload_size": payload_size,
+            "metadata_file_name": metadata_file_name,
+            "manifest_metadata_url": manifest_metadata_url,
             "access": "open_public",
             "mode": "bootstrap",
         }
         if compatibility_values != expected_values:
             raise ValueError(f"canonical and compatibility metadata disagree for {artifact_id}")
 
-        sidecar_file_name = payload_file_name + ".json"
         sidecar_bytes = _find_sidecar_bytes(
             local_manifest_path,
             local_canonical_manifest_path,
@@ -877,6 +1154,10 @@ def derive_download_expectations(
                 f"{artifact_id} sidecar payload URL disagrees with manifest"
             )
         payload_url = manifest_payload_url
+        sidecar_url = manifest_metadata_url or (
+            f"{base}/downloads/g/{expected_generation}/files/"
+            f"{sidecar_file_name}"
+        )
         expectation = DownloadExpectation(
             artifact_id=artifact_id,
             release_version=version,
@@ -894,10 +1175,11 @@ def derive_download_expectations(
             payload_sha256=payload_sha256,
             payload_size_bytes=payload_size,
             sidecar_file_name=sidecar_file_name,
-            sidecar_url=_sidecar_url(payload_url),
+            manifest_metadata_url=manifest_metadata_url,
+            sidecar_url=sidecar_url,
             sidecar_probe_url=_host_local_mirror_url(
                 base,
-                _sidecar_url(payload_url),
+                sidecar_url,
             ),
             sidecar_sha256=hashlib.sha256(sidecar_bytes).hexdigest(),
             sidecar_size_bytes=len(sidecar_bytes),
@@ -921,6 +1203,7 @@ def _stream_exact_get(
     timeout: float,
     generation_id: str | None,
     capture: bool,
+    expected_cache_control: str | None = None,
 ) -> tuple[dict[str, Any], bytes]:
     response = anonymous_get(session, url, timeout, stream=True)
     try:
@@ -956,6 +1239,20 @@ def _stream_exact_get(
                 f"{generation_id!r}"
             )
 
+        observed_cache_control: str | None = None
+        if expected_cache_control is not None:
+            present, observed_cache_control = _header(
+                response.headers,
+                "Cache-Control",
+            )
+            if (
+                not present
+                or observed_cache_control != expected_cache_control
+            ):
+                raise ValueError(
+                    f"{label} did not enforce immutable Cache-Control"
+                )
+
         digest = hashlib.sha256()
         size = 0
         body_parts: list[bytes] = []
@@ -973,18 +1270,18 @@ def _stream_exact_get(
             raise ValueError(f"{label} streamed size {size} does not match Content-Length")
         if observed_sha256 != expected_sha256:
             raise ValueError(f"{label} streamed sha256 does not match expected bytes")
-        return (
-            {
-                "method": "GET",
-                "url": url,
-                "statusCode": 200,
-                "contentLength": content_length,
-                "sizeBytes": size,
-                "sha256": observed_sha256,
-                "generationId": observed_generation,
-            },
-            b"".join(body_parts),
-        )
+        receipt: dict[str, Any] = {
+            "method": "GET",
+            "url": url,
+            "statusCode": 200,
+            "contentLength": content_length,
+            "sizeBytes": size,
+            "sha256": observed_sha256,
+            "generationId": observed_generation,
+        }
+        if observed_cache_control is not None:
+            receipt["cacheControl"] = observed_cache_control
+        return receipt, b"".join(body_parts)
     finally:
         response.close()
 
@@ -1060,6 +1357,412 @@ def _stream_manifest_get(
         )
     finally:
         response.close()
+
+
+def _public_page_identity(
+    *,
+    canonical: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+    generation_id: str,
+    release_truth: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    canonical_version = str(
+        canonical.get("version") or canonical.get("displayVersion") or ""
+    ).strip()
+    compatibility_version = str(
+        compatibility.get("version")
+        or compatibility.get("displayVersion")
+        or ""
+    ).strip()
+    if not canonical_version or canonical_version != compatibility_version:
+        raise ValueError(
+            "canonical and compatibility manifest release versions disagree"
+        )
+
+    canonical_generation = str(
+        canonical.get("generationId") or ""
+    ).strip()
+    compatibility_generation = str(
+        compatibility.get("generationId") or ""
+    ).strip()
+    if (
+        canonical_generation
+        and compatibility_generation
+        and canonical_generation != compatibility_generation
+    ):
+        raise ValueError(
+            "canonical and compatibility manifest generation ids disagree"
+        )
+    manifest_generation = canonical_generation or compatibility_generation
+    if manifest_generation:
+        manifest_generation = _canonical_generation_id(manifest_generation)
+        if manifest_generation != generation_id:
+            raise ValueError(
+                "manifest generation id disagrees with its serving header"
+            )
+
+    canonical_artifacts = _rows(
+        canonical,
+        "artifacts",
+        "live canonical manifest",
+    )
+    compatibility_downloads = _rows(
+        compatibility,
+        "downloads",
+        "live compatibility manifest",
+    )
+    artifact_count = len(compatibility_downloads)
+    if len(canonical_artifacts) != artifact_count:
+        raise ValueError(
+            "canonical and compatibility manifest artifact counts disagree"
+        )
+    expected_download_actions: list[dict[str, str]] = []
+    canonical_artifact_ids: list[str] = []
+    for artifact in canonical_artifacts:
+        artifact_id = _required_text(
+            artifact,
+            "artifactId",
+            "live canonical manifest artifact",
+        )
+        if (
+            not artifact_id
+            or len(artifact_id) > 128
+            or not (
+                artifact_id[0].isascii()
+                and (
+                    artifact_id[0].islower()
+                    or artifact_id[0].isdigit()
+                )
+            )
+            or any(
+                not (
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "-"
+                    )
+                )
+                for character in artifact_id
+            )
+        ):
+            raise ValueError(
+                "live canonical manifest has an unsafe public artifact id"
+            )
+        canonical_artifact_ids.append(artifact_id)
+        expected_download_actions.append(
+            {
+                "artifactId": artifact_id,
+                "installRoute": f"/downloads/install/{artifact_id}",
+                "downloadRoute": PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+                    artifact_id=artifact_id
+                ),
+            }
+        )
+    compatibility_artifact_ids = [
+        _required_text(
+            artifact,
+            "artifactId",
+            "live compatibility manifest artifact",
+        )
+        for artifact in compatibility_downloads
+    ]
+    if (
+        len(set(canonical_artifact_ids)) != len(canonical_artifact_ids)
+        or len(set(compatibility_artifact_ids))
+        != len(compatibility_artifact_ids)
+        or set(canonical_artifact_ids) != set(compatibility_artifact_ids)
+    ):
+        raise ValueError(
+            "canonical and compatibility manifest artifact ids disagree"
+        )
+
+    if release_truth is not None:
+        truth_version = _required_text(
+            release_truth,
+            "releaseVersion",
+            "authenticated releaseTruth",
+        )
+        raw_truth_count = release_truth.get("artifactCount")
+        if (
+            not isinstance(raw_truth_count, int)
+            or isinstance(raw_truth_count, bool)
+            or raw_truth_count < 0
+        ):
+            raise ValueError(
+                "authenticated releaseTruth has invalid artifactCount"
+            )
+        if (
+            truth_version != canonical_version
+            or raw_truth_count != artifact_count
+        ):
+            raise ValueError(
+                "authenticated releaseTruth disagrees with canonical "
+                "release version or artifact count"
+            )
+
+    return {
+        "releaseVersion": canonical_version,
+        "generationId": manifest_generation or "legacy",
+        "artifactCount": artifact_count,
+        "releaseTruthBound": release_truth is not None,
+        "downloadActions": sorted(
+            expected_download_actions,
+            key=lambda row: row["artifactId"],
+        ),
+    }
+
+
+def _stream_public_page_identity(
+    *,
+    session: requests.Session,
+    url: str,
+    path: str,
+    timeout: float,
+    expected_identity: Mapping[str, Any],
+) -> dict[str, Any]:
+    response = anonymous_get(session, url, timeout, stream=True)
+    try:
+        if response.status_code != 200:
+            raise ValueError(
+                f"{path} expected HTTP 200, got {response.status_code}"
+            )
+        if getattr(response, "history", []):
+            raise ValueError(f"{path} followed an unexpected redirect")
+        response_url = str(getattr(response, "url", url) or url)
+        if response_url != url:
+            raise ValueError(f"{path} resolved to an unexpected URL")
+        _reject_credential_headers(response, path)
+        if _media_type(response.headers) != "text/html":
+            raise ValueError(f"{path} did not serve HTML")
+
+        length_present, raw_length = _header(
+            response.headers,
+            "Content-Length",
+        )
+        content_length: int | None = None
+        if length_present:
+            try:
+                content_length = int(raw_length)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{path} has invalid Content-Length"
+                ) from exc
+            if (
+                content_length <= 0
+                or content_length > MAXIMUM_PUBLIC_PAGE_BYTES
+            ):
+                raise ValueError(f"{path} has invalid Content-Length")
+
+        digest = hashlib.sha256()
+        size = 0
+        body_parts: list[bytes] = []
+        for chunk in response.iter_content(chunk_size=STREAM_CHUNK_BYTES):
+            if not chunk:
+                continue
+            digest.update(chunk)
+            body_parts.append(chunk)
+            size += len(chunk)
+            if size > MAXIMUM_PUBLIC_PAGE_BYTES:
+                raise ValueError(
+                    f"{path} exceeds the maximum permitted size"
+                )
+        if size == 0:
+            raise ValueError(f"{path} body is empty")
+        if content_length is not None and size != content_length:
+            raise ValueError(
+                f"{path} streamed size does not match Content-Length"
+            )
+        try:
+            body = b"".join(body_parts).decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"{path} is not valid UTF-8 HTML") from exc
+
+        parser = PublicPageIdentityParser()
+        parser.feed(body)
+        parser.close()
+        if len(parser.markers) != 1:
+            raise ValueError(
+                f"{path} must expose exactly one public release identity marker"
+            )
+        marker = parser.markers[0]
+        expected_markers = {
+            "data-downloads-release-version": (
+                f"Version {expected_identity['releaseVersion']}"
+            ),
+            "data-downloads-release-generation": str(
+                expected_identity["generationId"]
+            ),
+            "data-downloads-public-count": str(
+                expected_identity["artifactCount"]
+            ),
+        }
+        observed_markers: dict[str, str] = {}
+        for attribute, expected_value in expected_markers.items():
+            values = marker.get(attribute, [])
+            if len(values) != 1 or values[0] is None:
+                raise ValueError(
+                    f"{path} must expose {attribute} exactly once"
+                )
+            observed_value = str(values[0])
+            if observed_value != expected_value:
+                raise ValueError(
+                    f"{path} {attribute} disagrees with canonical "
+                    "release identity"
+                )
+            observed_markers[attribute] = observed_value
+
+        observed_download_actions: list[dict[str, str]] = []
+        if path in DOWNLOAD_PAGE_PATHS:
+            expected_actions = expected_identity.get("downloadActions")
+            if not isinstance(expected_actions, list):
+                raise ValueError(
+                    f"{path} has no canonical download-action contract"
+                )
+            expected_by_artifact = {
+                str(action.get("artifactId") or ""): action
+                for action in expected_actions
+                if isinstance(action, Mapping)
+            }
+            if (
+                len(expected_by_artifact) != len(expected_actions)
+                or len(parser.download_actions) != len(expected_actions)
+            ):
+                raise ValueError(
+                    f"{path} download actions do not match canonical artifacts"
+                )
+            seen_artifact_ids: set[str] = set()
+            for action in parser.download_actions:
+                values: dict[str, str] = {}
+                for attribute in PUBLIC_DOWNLOAD_ACTION_ATTRIBUTES:
+                    attribute_values = action.get(attribute, [])
+                    if (
+                        len(attribute_values) != 1
+                        or attribute_values[0] is None
+                    ):
+                        raise ValueError(
+                            f"{path} download action must expose "
+                            f"{attribute} exactly once"
+                        )
+                    values[attribute] = str(attribute_values[0])
+                artifact_id = values["data-download-artifact"]
+                expected_action = expected_by_artifact.get(artifact_id)
+                if (
+                    expected_action is None
+                    or artifact_id in seen_artifact_ids
+                ):
+                    raise ValueError(
+                        f"{path} download actions do not match "
+                        "canonical artifacts"
+                    )
+                seen_artifact_ids.add(artifact_id)
+                install_route = str(
+                    expected_action.get("installRoute") or ""
+                )
+                download_route = str(
+                    expected_action.get("downloadRoute") or ""
+                )
+                if (
+                    values["data-download-action"] != "download-artifact"
+                    or values["data-download-install-route"]
+                    != install_route
+                    or values["href"]
+                    not in {install_route, download_route}
+                ):
+                    raise ValueError(
+                        f"{path} download action does not close over its "
+                        "governed install and byte routes"
+                    )
+                observed_download_actions.append(
+                    {
+                        "artifactId": artifact_id,
+                        "href": values["href"],
+                        "installRoute": install_route,
+                        "downloadRoute": download_route,
+                    }
+                )
+            if seen_artifact_ids != set(expected_by_artifact):
+                raise ValueError(
+                    f"{path} download actions do not match canonical artifacts"
+                )
+            observed_download_actions.sort(
+                key=lambda action: action["artifactId"]
+            )
+
+        return {
+            "method": "GET",
+            "url": url,
+            "statusCode": 200,
+            "contentLength": content_length,
+            "sizeBytes": size,
+            "sha256": digest.hexdigest(),
+            "markers": observed_markers,
+            "downloadActions": observed_download_actions,
+        }
+    finally:
+        response.close()
+
+
+def _verify_public_pages(
+    *,
+    session: requests.Session,
+    base_url: str,
+    timeout: float,
+    canonical: Mapping[str, Any],
+    compatibility: Mapping[str, Any],
+    generation_id: str,
+    release_truth: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    identity = _public_page_identity(
+        canonical=canonical,
+        compatibility=compatibility,
+        generation_id=generation_id,
+        release_truth=release_truth,
+    )
+    surfaces = {
+        path: _stream_public_page_identity(
+            session=session,
+            url=f"{base_url}{path}",
+            path=path,
+            timeout=timeout,
+            expected_identity=identity,
+        )
+        for path in PUBLIC_PAGE_PATHS
+    }
+    parity: dict[str, dict[str, Any]] = {}
+    for canonical_path, slash_path in (
+        ("/downloads", "/downloads/"),
+        ("/status", "/status/"),
+    ):
+        canonical_surface = surfaces[canonical_path]
+        slash_surface = surfaces[slash_path]
+        same_bytes = (
+            canonical_surface["sha256"] == slash_surface["sha256"]
+            and canonical_surface["sizeBytes"]
+            == slash_surface["sizeBytes"]
+        )
+        same_markers = (
+            canonical_surface["markers"] == slash_surface["markers"]
+        )
+        same_actions = (
+            canonical_surface["downloadActions"]
+            == slash_surface["downloadActions"]
+        )
+        if not (same_bytes and same_markers and same_actions):
+            raise ValueError(
+                f"{canonical_path} and {slash_path} public surfaces drift"
+            )
+        parity[canonical_path] = {
+            "slashPath": slash_path,
+            "sameBytes": same_bytes,
+            "sameMarkers": same_markers,
+            "sameDownloadActions": same_actions,
+        }
+    return {
+        **identity,
+        "surfaces": surfaces,
+        "trailingSlashParity": parity,
+    }
 
 
 def _assert_review_required_artifact_handoff(
@@ -1772,6 +2475,8 @@ def verify_public_download_delivery(
 
     expectations: list[DownloadExpectation] = []
     release_truth_sha256: str | None = None
+    release_truth_routes: dict[str, dict[str, Any]] = {}
+    authenticated_release_truth: dict[str, Any] | None = None
     if delivery_phase == DELIVERY_PHASE_WINDOWS_PREVIEW:
         _canonical_bytes, _generation, expectations = (
             derive_download_expectations(
@@ -1830,6 +2535,15 @@ def verify_public_download_delivery(
         release_truth_sha256 = _canonical_object_sha256(
             canonical_release_truth
         )
+        authenticated_release_truth = canonical_release_truth
+        release_truth_routes = _verify_release_truth_routes(
+            session=session,
+            base_url=base,
+            timeout=timeout,
+            expected_release_truth=canonical_release_truth,
+            generation_id=generation_id,
+            include_current=False,
+        )
         _validate_live_canonical_manifest(
             live_canonical,
             expectations,
@@ -1837,8 +2551,26 @@ def verify_public_download_delivery(
             base,
         )
 
+    public_pages = _verify_public_pages(
+        session=session,
+        base_url=base,
+        timeout=timeout,
+        canonical=live_canonical,
+        compatibility=live_compatibility,
+        generation_id=generation_id,
+        release_truth=authenticated_release_truth,
+    )
+
     artifact_receipts: list[dict[str, Any]] = []
     for expected in expectations:
+        generation_companion_payload_url = (
+            f"{base}/downloads/g/{generation_id}/install/"
+            f"{expected.artifact_id}/payload"
+        )
+        generation_companion_metadata_url = (
+            f"{base}/downloads/g/{generation_id}/install/"
+            f"{expected.artifact_id}/metadata"
+        )
         installer_receipt, installer_bytes = _stream_exact_get(
             session=session,
             url=expected.installer_url,
@@ -1858,6 +2590,12 @@ def verify_public_download_delivery(
             timeout=timeout,
             generation_id=generation_id,
             capture=False,
+            expected_cache_control=(
+                IMMUTABLE_GENERATION_CACHE_CONTROL
+                if expected.payload_probe_url
+                == generation_companion_payload_url
+                else None
+            ),
         )
         sidecar_receipt, sidecar_bytes = _stream_exact_get(
             session=session,
@@ -1868,6 +2606,55 @@ def verify_public_download_delivery(
             timeout=timeout,
             generation_id=generation_id,
             capture=True,
+            expected_cache_control=(
+                IMMUTABLE_GENERATION_CACHE_CONTROL
+                if expected.sidecar_probe_url
+                == generation_companion_metadata_url
+                else None
+            ),
+        )
+        if expected.payload_probe_url == generation_companion_payload_url:
+            generation_companion_payload_receipt = payload_receipt
+        else:
+            generation_companion_payload_receipt, _ = _stream_exact_get(
+                session=session,
+                url=generation_companion_payload_url,
+                label=f"{expected.artifact_id} generation payload companion",
+                expected_sha256=expected.payload_sha256,
+                expected_size_bytes=expected.payload_size_bytes,
+                timeout=timeout,
+                generation_id=generation_id,
+                capture=False,
+                expected_cache_control=(
+                    IMMUTABLE_GENERATION_CACHE_CONTROL
+                ),
+            )
+        if expected.sidecar_probe_url == generation_companion_metadata_url:
+            generation_companion_metadata_receipt = sidecar_receipt
+        else:
+            generation_companion_metadata_receipt, _ = _stream_exact_get(
+                session=session,
+                url=generation_companion_metadata_url,
+                label=f"{expected.artifact_id} generation metadata companion",
+                expected_sha256=expected.sidecar_sha256,
+                expected_size_bytes=expected.sidecar_size_bytes,
+                timeout=timeout,
+                generation_id=generation_id,
+                capture=False,
+                expected_cache_control=(
+                    IMMUTABLE_GENERATION_CACHE_CONTROL
+                ),
+            )
+        if authenticated_release_truth is None:
+            raise ValueError(
+                "current companion denials require authenticated releaseTruth"
+            )
+        current_companion_denials = _verify_current_companion_denials(
+            session=session,
+            base_url=base,
+            timeout=timeout,
+            artifact_id=expected.artifact_id,
+            expected_release_truth=authenticated_release_truth,
         )
         _validate_sidecar(
             _json_object(sidecar_bytes, f"live {expected.sidecar_file_name}"),
@@ -1892,6 +2679,11 @@ def verify_public_download_delivery(
                 "installer": installer_receipt,
                 "payload": payload_receipt,
                 "sidecar": sidecar_receipt,
+                "generationCompanions": {
+                    "payload": generation_companion_payload_receipt,
+                    "metadata": generation_companion_metadata_receipt,
+                },
+                "currentCompanionDenials": current_companion_denials,
                 "embeddedInstallerMetadataAgrees": True,
             }
         )
@@ -1912,6 +2704,8 @@ def verify_public_download_delivery(
         "canonicalManifest": canonical_receipt,
         "compatibilityManifest": compatibility_receipt,
         "releaseTruthSha256": release_truth_sha256,
+        "releaseTruthRoutes": release_truth_routes,
+        "publicPages": public_pages,
         "artifacts": artifact_receipts,
     }
 
@@ -1967,7 +2761,12 @@ def verify_control_plane(
 
     install_route_denial_statuses: dict[str, int] = {}
     install_route_release_truth_sha256: str | None = None
-    for path in INSTALL_ROUTE_DENIAL_PATHS:
+    install_route_release_truth: dict[str, Any] | None = None
+    install_route_paths = list(INSTALL_ROUTE_DENIAL_PATHS)
+    route_index = 0
+    while route_index < len(install_route_paths):
+        path = install_route_paths[route_index]
+        route_index += 1
         response = get(session, base_url, path, timeout)
         _reject_credential_headers(response, path)
         install_route_denial_statuses[path] = response.status_code
@@ -1984,6 +2783,49 @@ def verify_control_plane(
             raise ValueError(
                 f"{path} did not enforce the review-required install denial"
             )
+        artifact_handoff = release_truth["artifactHandoff"]
+        artifact_id = str(
+            artifact_handoff.get("artifactId") or ""
+        ).strip()
+        advertised_install_route = str(
+            artifact_handoff.get("publicInstallRoute") or ""
+        ).strip()
+        public_download_route = PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+            artifact_id=artifact_id
+        )
+        if (
+            not artifact_id
+            or len(artifact_id) > 128
+            or not (
+                artifact_id[0].isascii()
+                and (
+                    artifact_id[0].islower()
+                    or artifact_id[0].isdigit()
+                )
+            )
+            or any(
+                not (
+                    character.isascii()
+                    and (
+                        character.islower()
+                        or character.isdigit()
+                        or character == "-"
+                    )
+                )
+                for character in artifact_id
+            )
+            or advertised_install_route
+            != f"/downloads/install/{artifact_id}"
+        ):
+            raise ValueError(
+                f"{path} advertised an unsafe or unbound publicInstallRoute"
+            )
+        for governed_route in (
+            advertised_install_route,
+            public_download_route,
+        ):
+            if governed_route not in install_route_paths:
+                install_route_paths.append(governed_route)
         release_truth_sha256 = _canonical_object_sha256(release_truth)
         if (
             install_route_release_truth_sha256 is not None
@@ -1994,6 +2836,7 @@ def verify_control_plane(
                 "install denial routes disagree on releaseTruth"
             )
         install_route_release_truth_sha256 = release_truth_sha256
+        install_route_release_truth = release_truth
         if (
             response.status_code != 409
             or _media_type(response.headers) != "application/json"
@@ -2021,6 +2864,16 @@ def verify_control_plane(
             raise ValueError(
                 f"{path} did not enforce the review-required install denial"
             )
+    if install_route_release_truth is None:
+        raise ValueError("install denial releaseTruth was not observed")
+    current_release_truth_routes = _verify_release_truth_routes(
+        session=session,
+        base_url=base_url,
+        timeout=timeout,
+        expected_release_truth=install_route_release_truth,
+        generation_id=None,
+        include_current=True,
+    )
     return {
         "servingReadiness": serving_payload,
         "unavailableReadinessStatuses": readiness_statuses,
@@ -2029,6 +2882,7 @@ def verify_control_plane(
         "installRouteReleaseTruthSha256": (
             install_route_release_truth_sha256
         ),
+        "currentReleaseTruthRoutes": current_release_truth_routes,
     }
 
 

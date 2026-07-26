@@ -30,9 +30,10 @@ from verify_windows_installer_visual_audit_intake_request import (
     verify as verify_windows_visual_intake_request_receipt,
 )
 from public_edge_postdeploy_contract import (
-    PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
     PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS,
     normalize_public_edge_postdeploy_payload,
+    public_edge_authorizing_binding_failures,
     public_edge_v2_artifact_contract_failures,
     public_edge_v2_offline_failures,
     public_edge_v2_private_identity_failures,
@@ -253,9 +254,13 @@ RELEASE_LAUNCHER_AUTHORITY_IDENTITY_FIELDS = frozenset(
 RELEASE_GATE_EXECUTION_PREBINDING_CONTRACT = "chummer.release_gate_execution_prebinding.v1"
 RELEASE_GATE_EXECUTION_BINDING_CONTRACT = "chummer.release_gate_execution_binding.v1"
 RELEASE_EXECUTION_PLAN_MAX_AGE = timedelta(hours=6)
+EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV = (
+    "CHUMMER_EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256"
+)
 RELEASE_EXECUTION_ENV_KEYS = (
     "CHUMMER_PUBLIC_BASE_URL",
     "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD",
+    EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV,
     "CHUMMER_RUN_SERVICES_ROOT",
     "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
     "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",
@@ -1174,6 +1179,10 @@ def canonical_release_gate_specs(
     guide_timeout = int(environment["CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS"])
     public_edge_timeout = int(environment["CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS"])
     public_edge_reuse = int(environment["CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS"])
+    release_channel_receipt = shlex.quote(str(REGISTRY_RELEASE_CHANNEL))
+    expected_release_channel_receipt_sha256 = shlex.quote(
+        environment[EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV]
+    )
     skip_google = environment["CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH"] == "1"
     skip_windows = environment["CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH"] == "1"
     require_blazor_local_e2e = environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"] == "1"
@@ -1450,7 +1459,7 @@ def canonical_release_gate_specs(
         spec("verify_windows_installer_visual_audit_intake_request", windows_command, *windows_entrypoints),
         spec("verify_ruleset_readiness", f"cd {services} && {python} {services}/scripts/classify_ruleset_readiness.py --output .codex-studio/published/RULESET_READINESS.generated.json", f"{services}/scripts/classify_ruleset_readiness.py"),
         spec("verify_flagship_product_readiness", f"cd {services} && {python} {services}/scripts/verify_flagship_product_readiness_gate.py", f"{services}/scripts/verify_flagship_product_readiness_gate.py"),
-        spec("verify_public_edge_postdeploy_gate", f"cd {services} && {python} {services}/scripts/verify_public_edge_postdeploy_gate.py --base-url {public_base} --timeout-seconds {public_edge_timeout}{public_edge_preflight} --require-downloads-status-playwright --require-mobile-pwa-viewport-playwright --require-pwa-offline-cache-playwright --require-blazor-new-runner-menu-playwright --require-frontdoor-navigation-playwright --reuse-existing-playwright-artifacts --reuse-artifact-max-age-hours {public_edge_reuse} --playwright-artifact-dir {published_browser_root}/downloads-status --mobile-pwa-viewport-artifact-dir {published_browser_root}/mobile-viewport --pwa-offline-cache-artifact-dir {published_browser_root}/offline-cache --blazor-new-runner-menu-artifact-dir {published_browser_root}/blazor-new-runner-menu --frontdoor-navigation-artifact-dir {published_browser_root}/frontdoor-navigation --output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", f"{services}/scripts/verify_public_edge_postdeploy_gate.py"),
+        spec("verify_public_edge_postdeploy_gate", f"cd {services} && {python} {services}/scripts/verify_public_edge_postdeploy_gate.py --base-url {public_base} --timeout-seconds {public_edge_timeout}{public_edge_preflight} --release-channel-receipt {release_channel_receipt} --release-channel-receipt-sha256 {expected_release_channel_receipt_sha256} --require-downloads-status-playwright --require-mobile-pwa-viewport-playwright --require-pwa-offline-cache-playwright --require-blazor-new-runner-menu-playwright --require-frontdoor-navigation-playwright --reuse-existing-playwright-artifacts --reuse-artifact-max-age-hours {public_edge_reuse} --playwright-artifact-dir {published_browser_root}/downloads-status --mobile-pwa-viewport-artifact-dir {published_browser_root}/mobile-viewport --pwa-offline-cache-artifact-dir {published_browser_root}/offline-cache --blazor-new-runner-menu-artifact-dir {published_browser_root}/blazor-new-runner-menu --frontdoor-navigation-artifact-dir {published_browser_root}/frontdoor-navigation --output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", f"{services}/scripts/verify_public_edge_postdeploy_gate.py"),
         spec("verify_public_portal_e2e", f"cd {services} && CHUMMER_PORTAL_BASE_URL={public_base} CHUMMER_PORTAL_PUBLIC_HOST= CHUMMER_PORTAL_FORWARDED_PROTO= CHUMMER_PORTAL_REQUIRE_BLAZOR=1 {node} {services}/scripts/e2e-portal.cjs", f"{services}/scripts/e2e-portal.cjs"),
         spec("verify_partizipate_runtime_fallback", f"cd {services} && {node} {services}/scripts/verify_partizipate_runtime_fallback.cjs --base-url {public_base}", f"{services}/scripts/verify_partizipate_runtime_fallback.cjs"),
         spec("verify_participate_billing_honesty", f"cd {services} && {python} {services}/scripts/materialize_participate_billing_honesty.py --completion-dir .codex-studio/published && {python} {services}/scripts/verify_participate_billing_honesty.py --completion-dir .codex-studio/published", f"{services}/scripts/materialize_participate_billing_honesty.py", f"{services}/scripts/verify_participate_billing_honesty.py"),
@@ -1529,7 +1538,7 @@ RELEASE_VERIFIER_GATE_RECEIPTS = (
         "verify_public_edge_postdeploy_gate",
         "public_edge_postdeploy_gate",
         PUBLISHED_ROOT / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
-        PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+        PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
         ("expectedReleaseVersion",),
         ("expectedReleaseChannel",),
     ),
@@ -1953,6 +1962,7 @@ def direct_receipt_semantic_validation_failures(
     receipt_path: Path,
     *,
     observed_at: datetime,
+    expected_current_release_channel_sha256: str = "",
 ) -> list[str]:
     """Apply each direct receipt's available contract-specific verifier."""
 
@@ -1973,7 +1983,13 @@ def direct_receipt_semantic_validation_failures(
     elif gate_name == "verify_flagship_product_readiness":
         failures = flagship_product_readiness_gate_semantic_failures(payload)
     elif gate_name == "verify_public_edge_postdeploy_gate":
-        failures = public_edge_postdeploy_release_blocking_reasons(payload)
+        failures = public_edge_postdeploy_release_blocking_reasons(
+            payload,
+            release_channel_path=REGISTRY_RELEASE_CHANNEL,
+            expected_current_release_channel_sha256=(
+                expected_current_release_channel_sha256
+            ),
+        )
     elif gate_name == "verify_google_oauth_linking_proof":
         failures = google_oauth_receipt_validation_failures(receipt_path)
     else:
@@ -3569,18 +3585,29 @@ def windows_visual_audit_release_blocking_reasons(payload: dict[str, object]) ->
     return reasons
 
 
-def public_edge_postdeploy_release_blocking_reasons(payload: dict[str, object]) -> list[str]:
+def public_edge_postdeploy_release_blocking_reasons(
+    payload: dict[str, object],
+    *,
+    release_channel_path: Path | None = None,
+    expected_current_release_channel_sha256: str = "",
+) -> list[str]:
+    release_channel_path = (
+        release_channel_path
+        if release_channel_path is not None
+        else REGISTRY_RELEASE_CHANNEL
+    )
     payload = normalize_public_edge_postdeploy_payload(payload)
     reasons = receipt_failure_reasons(payload, "public_edge_postdeploy_gate receipt is not pass")
     if normalized_token(payload.get("status")) in PASS_STATES and reasons == ["public_edge_postdeploy_gate receipt is not pass"]:
         reasons = []
     contract_name = str(payload.get("contractName") or payload.get("contract_name") or "").strip()
     status_is_pass = normalized_token(payload.get("status")) in PASS_STATES
-    if status_is_pass and contract_name != PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME:
+    if status_is_pass and contract_name != PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME:
         reasons.append(
-            "public_edge_postdeploy_gate receipt contract is not " + PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME
+            "public_edge_postdeploy_gate receipt contract is not "
+            + PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
         )
-    if status_is_pass and contract_name == PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME:
+    if status_is_pass and contract_name == PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME:
         missing_fields = sorted(
             field
             for field in PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS
@@ -3591,6 +3618,43 @@ def public_edge_postdeploy_release_blocking_reasons(payload: dict[str, object]) 
         reasons.extend(public_edge_v2_artifact_contract_failures(payload))
         reasons.extend(public_edge_v2_offline_failures(payload))
         reasons.extend(public_edge_v2_private_identity_failures(payload))
+    if status_is_pass:
+        release_channel_bytes, release_channel_error = (
+            read_stable_regular_file_bytes(release_channel_path)
+        )
+        current_release_channel_sha256 = ""
+        if (
+            release_channel_error is not None
+            or release_channel_bytes is None
+        ):
+            reasons.append(
+                "public_edge_postdeploy_gate current release channel "
+                "is unreadable or unstable"
+            )
+        else:
+            current_release_channel_sha256 = hashlib.sha256(
+                release_channel_bytes
+            ).hexdigest()
+            if (
+                expected_current_release_channel_sha256
+                and current_release_channel_sha256
+                != expected_current_release_channel_sha256
+            ):
+                reasons.append(
+                    "public_edge_postdeploy_gate current release channel "
+                    "changed across authority reads"
+                )
+        reasons.extend(
+            public_edge_authorizing_binding_failures(
+                payload,
+                expected_release_channel_sha256=(
+                    expected_current_release_channel_sha256
+                ),
+                current_release_channel_sha256=(
+                    current_release_channel_sha256
+                ),
+            )
+        )
     non_preflight = [
         reason
         for reason in reasons
@@ -3879,7 +3943,10 @@ def collect_current_blocking_failures(*, refresh_windows_runtime_receipts: bool 
                 or bool(flagship_semantic_failures)
             )
             public_edge_receipt_reasons = (
-                public_edge_postdeploy_release_blocking_reasons(payload)
+                public_edge_postdeploy_release_blocking_reasons(
+                    payload,
+                    release_channel_path=release_channel_path,
+                )
                 if gate == "public_edge_postdeploy_gate"
                 else []
             )
@@ -4318,8 +4385,35 @@ def authoritative_controller_environment(
             "release controller launcher authority identity is empty"
         )
 
+    release_channel_bytes, release_channel_error = (
+        read_stable_regular_file_bytes(REGISTRY_RELEASE_CHANNEL)
+    )
+    if (
+        release_channel_error is not None
+        or release_channel_bytes is None
+    ):
+        raise ValueError(
+            "release controller current release channel is "
+            + (release_channel_error or "unreadable")
+        )
+    release_channel_sha256 = hashlib.sha256(
+        release_channel_bytes
+    ).hexdigest()
+    supplied_release_channel_sha256 = str(
+        ambient.get(EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV) or ""
+    ).strip()
+    if (
+        supplied_release_channel_sha256
+        and supplied_release_channel_sha256 != release_channel_sha256
+    ):
+        raise ValueError(
+            "release controller expected release channel digest is stale"
+        )
     controlled_defaults = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+        EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV: (
+            release_channel_sha256
+        ),
         "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
         "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
@@ -4427,6 +4521,14 @@ def validate_release_execution_environment(environment: dict[str, object]) -> di
         raise ValueError("release execution public base URL is not a clean HTTP(S) origin")
     if normalized["PATH"] != TRUSTED_PATH:
         raise ValueError(f"release execution PATH must equal trusted PATH {TRUSTED_PATH}")
+    if re.fullmatch(
+        r"[0-9a-f]{64}",
+        normalized[EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV],
+    ) is None:
+        raise ValueError(
+            "release execution expected release-channel receipt digest "
+            "is not lowercase SHA-256"
+        )
     for key in (
         "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS",
         "CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS",
@@ -5874,6 +5976,9 @@ def current_release_gate_receipt_binding(
         payload,
         receipt_path,
         observed_at=observed_at,
+        expected_current_release_channel_sha256=str(
+            release_binding.get("release_channel_sha256") or ""
+        ),
     )
     if semantic_failures:
         raise ValueError("; ".join(semantic_failures))

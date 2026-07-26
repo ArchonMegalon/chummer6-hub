@@ -72,11 +72,19 @@ public sealed class PrivateResponseCacheHeadersTests
     {
         string program = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs"));
         int privateHeaders = program.IndexOf(
-            "bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);",
+            "PublicReleaseResponseCachePolicy.InvokeNoStoreBoundaryAsync(",
+            StringComparison.Ordinal);
+        Assert.True(privateHeaders >= 0, "Private response header middleware is missing.");
+
+        int noStoreClassifier = program.IndexOf(
+            "RequiresNoStoreHeaders(context.Request.Path)",
+            privateHeaders,
             StringComparison.Ordinal);
         int httpsRedirection = program.IndexOf("app.UseHttpsRedirection();", StringComparison.Ordinal);
 
-        Assert.True(privateHeaders >= 0, "Private response header middleware is missing.");
+        Assert.True(
+            noStoreClassifier > privateHeaders,
+            "The response-aware boundary must retain the production no-store classifier.");
         Assert.True(httpsRedirection > privateHeaders,
             "HTTPS redirects must pass through the private no-store/referrer middleware.");
         Assert.Contains(

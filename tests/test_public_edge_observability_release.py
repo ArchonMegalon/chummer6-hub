@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -347,6 +348,71 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
         self.assertEqual("fail", receipt["status"])
         self.assertEqual("symlink_rejected", receipt["operator_proof"]["load_status"])
         self.assertIsNone(receipt["operator_proof"]["sha256"])
+
+    def test_regular_reader_rejects_fifo_swap_without_blocking(self) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="observability-release-fifo-swap-"
+        ) as temp_dir:
+            path = Path(temp_dir) / "receipt.json"
+            path.write_text('{"status":"pass"}', encoding="utf-8")
+            real_open = self.module.os.open
+            swapped = False
+
+            def swap_before_open(candidate, flags, *args, **kwargs):  # noqa: ANN001
+                nonlocal swapped
+                if Path(candidate) == path and not swapped:
+                    self.assertTrue(flags & os.O_NONBLOCK)
+                    path.unlink()
+                    os.mkfifo(path)
+                    swapped = True
+                return real_open(candidate, flags, *args, **kwargs)
+
+            with mock.patch.object(
+                self.module.os,
+                "open",
+                side_effect=swap_before_open,
+            ):
+                raw, error = self.module.read_regular_file_bytes(path)
+
+        self.assertTrue(swapped)
+        self.assertIsNone(raw)
+        self.assertEqual("not_a_regular_file", error)
+
+    def test_regular_reader_rejects_path_replacement(self) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="observability-release-path-swap-"
+        ) as temp_dir:
+            path = Path(temp_dir) / "receipt.json"
+            replacement = Path(temp_dir) / "replacement.json"
+            path.write_text('{"status":"pass"}', encoding="utf-8")
+            replacement.write_text(
+                '{"status":"pass"}',
+                encoding="utf-8",
+            )
+            real_read = self.module.os.read
+            replaced = False
+
+            def replace_after_read(descriptor, amount):  # noqa: ANN001
+                nonlocal replaced
+                chunk = real_read(descriptor, amount)
+                if chunk and not replaced:
+                    replacement.replace(path)
+                    replaced = True
+                return chunk
+
+            with mock.patch.object(
+                self.module.os,
+                "read",
+                side_effect=replace_after_read,
+            ):
+                raw, error = self.module.read_regular_file_bytes(path)
+
+        self.assertTrue(replaced)
+        self.assertIsNone(raw)
+        self.assertIn(
+            error,
+            {"changed_during_read", "pathname_changed"},
+        )
 
     def test_gate_rejects_unknown_secret_bearing_proof_fields(self) -> None:
         with tempfile.TemporaryDirectory(prefix="observability-release-secret-field-") as temp_dir:

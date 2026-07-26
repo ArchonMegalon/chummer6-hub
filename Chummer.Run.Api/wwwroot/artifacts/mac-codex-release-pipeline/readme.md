@@ -44,20 +44,28 @@ repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
 
-If one of the upload-auth `*_FILE` variants is set, the wrapper runs fully non-interactive and never prompts for input. Prefer an operator-owned, regular, non-symlink mode-`0600` file over exporting bearer plaintext.
+If one upload-auth file source is set, the wrapper runs fully non-interactive and never prompts for input. Prefer an operator-owned credential file over exporting bearer plaintext.
 
 ```bash
 ticket_file="$HOME/.chummer-release-upload-ticket"
-install -m 600 /dev/null "$ticket_file"
+ticket_tmp="$(mktemp "$(dirname "$ticket_file")/.chummer-release-upload-ticket.XXXXXX")"
+chmod 600 "$ticket_tmp"
 printf 'Release upload access code: ' >&2
 IFS= read -r -s ticket_value
 printf '\n' >&2
-printf '%s\n' "$ticket_value" > "$ticket_file"
+printf '%s\n' "$ticket_value" > "$ticket_tmp"
 unset ticket_value
+mv "$ticket_tmp" "$ticket_file"
 export CHUMMER_RELEASE_UPLOAD_TICKET_FILE="$ticket_file"
 repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
+
+Credential-source selection is deliberately fail-closed. Set exactly one of `CHUMMER_RELEASE_UPLOAD_TOKEN`, `CHUMMER_RELEASE_UPLOAD_TICKET`, `CHUMMER_RELEASE_UPLOAD_TOKEN_FILE`, `CHUMMER_RELEASE_UPLOAD_TOKEN_PATH`, `CHUMMER_RELEASE_UPLOAD_TICKET_FILE`, or `CHUMMER_RELEASE_UPLOAD_TICKET_PATH`; the `*_PATH` names are aliases for their corresponding `*_FILE` names, not fallback precedence. Any combination, including both aliases with the same path, is rejected.
+
+A credential file must be an absolute path to a current-operator-owned regular file that is not a symlink, has exactly one hard link, and has exact mode `0600`. Its contents must be valid UTF-8, contain 1–8192 credential bytes, and may have one final LF; empty, multiline, CR/CRLF, NUL, and oversized values are rejected. The bootstrap opens the file with no-follow semantics. Its macOS ACL probe permits either no ACL or a sequential deny-only ACL made only of recognized entries and rights; it accepts the `@` permission suffix used when xattrs are present, including when followed by those deny-only ACL entries, and rejects allow, mixed, malformed, or unknown entries. The bootstrap takes two bounded explicit-offset snapshots of the same open descriptor and rejects identity, path, metadata, deletion, or byte disagreement observed across those checks. It immediately unsets all inherited credential-source variables and retains the credential only in a de-exported shell local. It never puts file credential plaintext in a process argument, child environment, log, URL, or persistent curl configuration; upload authorization continues to stream to `curl --config -` over stdin.
+
+Publish credential files before starting the bootstrap: create a new owner-only mode-`0600` single-link file, write and close it completely, then atomically rename it to the configured absolute path. Do not truncate, overwrite, replace, or otherwise mutate that path or inode while the bootstrap is running. The identity checks and two snapshots reject a single mutation they observe, but finite rereads are not synchronization against an arbitrary hostile process running as the same operator UID.
 
 Do not hardcode `/docker/chummercomplete/.../bootstrap.sh` on the Mac host. That path only exists in provisioned Linux control environments, not on a normal release workstation.
 
@@ -128,12 +136,13 @@ The hosted/bootstrap entry points above now:
 7. resolves or regenerates fresh release proof only after the candidate exists, using the reviewed Python runtime and a private per-run mutation lock under `$TMPDIR`
 8. generates both `releases.json` and `RELEASE_CHANNEL.generated.json`, projects them to one caller-declared immutable generation, and records their exact byte digests
 9. rejects candidate inventory, access, and signing posture outside the approved scope, then materializes a Registry-bound `review_required` authority envelope for that exact candidate
-10. uploads every governed file through a durable session rooted at `https://chummer.run/api/internal/releases/upload-sessions`, then seals that same session as an immutable inert generation through `/stage`
+10. before uploading anything, emits an exact candidate-bound Presentation receipt request, waits for the reviewed visual/workflow/executable producers to materialize three distinct passing receipts, validates their manifest/scope/Registry bindings, and stable-copies them into a mode-`0700` release-version directory
+11. uploads every governed file through a durable session rooted at `https://chummer.run/api/internal/releases/upload-sessions`, then seals that same session as an immutable inert generation through `/stage`
    - on any 400/401/403 upload response, the script prints parsed `Problem+JSON` fields plus `x-request-id` and actionable remediation hints.
-11. rejects an upload response unless its generation id and both manifest digests exactly match the locally projected bytes
-12. privately verifies the staged projection and immutable-generation routes against the exact manifest and review-decision digests without changing public `CURRENT`
-13. captures the candidate-bound staged UI-frame receipt and stable-copies the three caller-owned external Presentation visual/workflow/executable receipts into a mode-`0700` release-version directory, removes the private probe grant only after those bytes are pinned, then emits a mode-`0600`, secret-redacted owner-finalizer handoff that pins every input and helper byte
-14. logs the executing bootstrap source path and SHA-256 so drift is visible in the transcript, then exits `review_required`
+12. rejects an upload response unless its generation id and both manifest digests exactly match the locally projected bytes
+13. privately verifies the staged projection and immutable-generation routes against the exact manifest and review-decision digests without changing public `CURRENT`
+14. captures the candidate-bound staged UI-frame receipt, removes the private probe grant, then emits a mode-`0600`, secret-redacted owner-finalizer handoff that pins every input and helper byte
+15. logs the executing bootstrap source path and SHA-256 so drift is visible in the transcript, then exits `review_required`
 
 The initial authority envelope is intentionally `review_required`; a successful stage is not a publication and is not by itself a `preview_ready`, stable, or gold claim. Installer availability remains fail-closed until the non-public owner finalizer accepts the exact scorecard, prepares the staged Hub authority, advances Registry by CAS, activates that exact generation, and verifies public convergence.
 
@@ -168,7 +177,9 @@ export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL="https://chummer.run/api/internal/rel
 export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"
 export CHUMMER_RELEASE_UPLOAD_TICKET=""                # optional interactive handoff code override for non-prompted runs
 export CHUMMER_RELEASE_UPLOAD_TICKET_FILE=""           # optional path to a one-line handoff code file
+export CHUMMER_RELEASE_UPLOAD_TICKET_PATH=""           # optional alias of TICKET_FILE; never set both
 export CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=""            # optional path to a one-line bearer token file
+export CHUMMER_RELEASE_UPLOAD_TOKEN_PATH=""            # optional alias of TOKEN_FILE; never set both
 export CHUMMER_RELEASE_UPLOAD_TOKEN=""                 # optional explicit bearer token for CI or non-interactive runs
 export CHUMMER_BOOTSTRAP_FORCE_LOCAL="0"               # set to 1 to force repo-local bootstrap execution (legacy behavior)
 export CHUMMER_RELEASE_CHANNEL="preview"
@@ -176,9 +187,11 @@ export CHUMMER_RELEASE_VERSION="<exact-version-in-approved-scope>"
 export CHUMMER_RELEASE_SCOPE_DECISION_PATH="/absolute/path/to/RELEASE_SCOPE_DECISION.approved.json"
 export CHUMMER_RELEASE_SCOPE_DECISION_EXPECTED_SHA256="<sha256-of-exact-json-bytes>"
 export CHUMMER_RELEASE_SCOPE_DECISION_AUTHORITY="design://release-scope/<decision-id>/sha256/<sha256>"
-export CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH="/absolute/external/path/DESKTOP_VISUAL_CANDIDATE.generated.json"
-export CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH="/absolute/external/path/DESKTOP_WORKFLOW_CANDIDATE.generated.json"
-export CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH="/absolute/external/path/DESKTOP_EXECUTABLE_CANDIDATE.generated.json"
+export CHUMMER_PRESENTATION_DESKTOP_VISUAL_RECEIPT_PATH=""      # optional absolute output override
+export CHUMMER_PRESENTATION_DESKTOP_WORKFLOW_RECEIPT_PATH=""    # optional absolute output override
+export CHUMMER_PRESENTATION_DESKTOP_EXECUTABLE_RECEIPT_PATH=""  # optional absolute output override
+export CHUMMER_PRESENTATION_RECEIPT_WAIT_SECONDS="1800"         # bounded pre-upload handoff window
+export CHUMMER_PRESENTATION_RECEIPT_POLL_SECONDS="5"
 export CHUMMER_RELEASE_GENERATION_ID=""              # optional reviewed safe id; normally generated once per candidate
 export CHUMMER_RELEASE_SUPPORT_OWNER="chummer-release-operations"
 export CHUMMER_RELEASE_APP="avalonia,blazor-desktop"
@@ -222,6 +235,15 @@ export CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256="" # required exact diges
 export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL=""   # optional remote gate URL when CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS=1
 export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_EXPECTED_SHA256="" # required exact digest when the localization gate URL is enabled
 ```
+
+When the three Presentation paths are empty, the bootstrap reserves distinct mode-`0600`
+destinations under the mode-`0700` run workspace. After build, manifest projection, and
+review-required Registry authority materialization—but before any upload—it writes
+`PRESENTATION_CANDIDATE_RECEIPT_REQUEST.generated.json`. That request contains the exact
+scope, manifest, authority-snapshot, decision, Registry commit, reviewed producer scripts,
+and output paths needed by the Presentation operator. The bootstrap waits only for the
+bounded interval above and fails before upload if any receipt is missing, unsafe, non-passing,
+duplicated, or bound to different candidate bytes.
 
 Notes:
 

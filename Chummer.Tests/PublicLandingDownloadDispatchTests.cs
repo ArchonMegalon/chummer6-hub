@@ -13,6 +13,7 @@ using Chummer.Run.Registry.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.WebUtilities;
@@ -142,11 +143,109 @@ public sealed class PublicLandingDownloadDispatchTests
         };
         fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
         fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+        fixture.Controller.ControllerContext.HttpContext.Request.Path =
+            "/downloads/install/avalonia-win-x64-installer";
 
         IActionResult result = await fixture.Controller.DownloadDispatchPage("avalonia-win-x64-installer", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("/downloads/get/avalonia-win-x64-installer", redirect.Url);
+    }
+
+    [Theory]
+    [InlineData("unknown-installer")]
+    [InlineData("AVALONIA-WIN-X64-INSTALLER")]
+    [InlineData("../avalonia-win-x64-installer")]
+    [InlineData("%2e%2e%2favalonia-win-x64-installer")]
+    public async Task UnknownOrTraversalInstallDispatchNeverResolves(
+        string artifactId)
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path =
+            $"/downloads/install/{artifactId}";
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage(
+            artifactId,
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Theory]
+    [InlineData("/DOWNLOADS/INSTALL/avalonia-win-x64-installer", "")]
+    [InlineData("/downloads/install/avalonia-win-x64-installer/", "")]
+    [InlineData("/downloads/install/%61valonia-win-x64-installer", "")]
+    [InlineData("/downloads/install/avalonia-win-x64-installer", "?ticket=secret")]
+    public async Task NonCanonicalInstallDispatchRouteNeverResolves(
+        string path,
+        string query)
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = path;
+        fixture.Controller.ControllerContext.HttpContext.Request.QueryString =
+            new QueryString(query);
+        fixture.Controller.ControllerContext.HttpContext.Features
+            .Get<IHttpRequestFeature>()!
+            .RawTarget = path + query;
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage(
+            "avalonia-win-x64-installer",
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task DisabledInstallDispatchNeverReachesArtifactBytes()
+    {
+        using Fixture fixture = new(
+            authenticated: false,
+            configureSettings: settings =>
+                settings["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] =
+                    "avalonia-win-x64-installer");
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path =
+            "/downloads/install/avalonia-win-x64-installer";
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage(
+            "avalonia-win-x64-installer",
+            CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RevokedInstallDispatchReturnsGoneWithoutRedirect()
+    {
+        using Fixture fixture = new(
+            authenticated: false,
+            configureSettings: settings =>
+                settings["CHUMMER_RELEASE_REVOKED_ARTIFACT_IDS"] =
+                    "avalonia-win-x64-installer");
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path =
+            "/downloads/install/avalonia-win-x64-installer";
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage(
+            "avalonia-win-x64-installer",
+            CancellationToken.None);
+
+        var gone = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status410Gone, gone.StatusCode);
     }
 
     [Fact]
@@ -159,6 +258,8 @@ public sealed class PublicLandingDownloadDispatchTests
         };
         fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
         fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+        fixture.Controller.ControllerContext.HttpContext.Request.Path =
+            "/downloads/install/avalonia-osx-arm64-installer";
 
         IActionResult result = await fixture.Controller.DownloadDispatchPage("avalonia-osx-arm64-installer", CancellationToken.None);
 
@@ -1151,7 +1252,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/runbook/primers/{primerId}/export", payload.RootElement.GetProperty("PublicBoard").GetProperty("ExportDispatchHrefTemplate").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
-        Assert.Null(sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal(
+            "/api/v1/public/horizons/capabilities?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export",
+            sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
@@ -1421,7 +1524,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("runbook-press", payload.RootElement.GetProperty("horizon_id").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
-        Assert.Null(sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal(
+            "/api/v1/public/horizons/capabilities?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export",
+            sharedArtifacts.GetProperty("public_capability_health_href").GetString());
         Assert.Null(sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
@@ -3136,7 +3241,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("karma-forge:public-intake", model.DiscoveryCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
-        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Equal(
+            "/api/v1/public/horizons/capabilities?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery",
+            model.SharedArtifacts.PublicCapabilityHealthHref);
         Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInCapabilityCatalogHref);
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInQuotaCatalogHref);
@@ -3160,12 +3267,14 @@ public sealed class PublicLandingDownloadDispatchTests
         KarmaForgeSubmittedPageViewModel model = Assert.IsType<KarmaForgeSubmittedPageViewModel>(view.Model);
         Assert.Equal("karma-forge", model.DiscoveryCapability.HorizonId);
         Assert.Equal("karma-forge-discovery", model.DiscoveryCapability.CapabilityId);
-        Assert.Equal("disabled", model.DiscoveryCapability.Status);
+        Assert.Equal("configured", model.DiscoveryCapability.Status);
         Assert.False(model.DiscoveryCapability.RequestSupported);
         Assert.Equal("karma-forge:sample-submission-id", model.DiscoveryCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
-        Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
+        Assert.Equal(
+            "/api/v1/public/horizons/capabilities?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery",
+            model.SharedArtifacts.PublicCapabilityHealthHref);
         Assert.Null(model.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInCapabilityCatalogHref);
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", model.SharedArtifacts.SignedInQuotaCatalogHref);
@@ -4237,7 +4346,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/participate/karma-forge/discovery", payload.RootElement.GetProperty("PublicBoard").GetProperty("DiscoveryDispatchHref").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
-        Assert.Null(sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal(
+            "/api/v1/public/horizons/capabilities?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery",
+            sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());

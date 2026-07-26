@@ -34,6 +34,9 @@ class Response:
             self.headers = {
                 "Content-Type": content_type,
                 "Cache-Control": "private, no-store, max-age=0",
+                "CDN-Cache-Control": "no-store, max-age=0",
+                "Cloudflare-CDN-Cache-Control": "no-store, max-age=0",
+                "Surrogate-Control": "no-store",
                 "Pragma": "no-cache",
                 "Expires": "0",
             }
@@ -74,6 +77,62 @@ class StreamResponse:
         self.closed = True
 
 
+def public_page_marker(
+    *,
+    release_version: str,
+    generation_id: str,
+    artifact_count: int,
+) -> str:
+    return (
+        '<span data-downloads-release-version="'
+        f"Version {release_version}"
+        '" data-downloads-release-generation="'
+        f"{generation_id}"
+        '" data-downloads-public-count="'
+        f'{artifact_count}" hidden></span>'
+    )
+
+
+def public_page_html(
+    *,
+    release_version: str,
+    generation_id: str,
+    artifact_count: int,
+    artifact_id: str = "avalonia-win-x64-installer",
+    artifact_ids: tuple[str, ...] | None = None,
+    href: str | None = None,
+    install_route: str | None = None,
+    include_download_action: bool | None = None,
+) -> bytes:
+    marker = public_page_marker(
+        release_version=release_version,
+        generation_id=generation_id,
+        artifact_count=artifact_count,
+    )
+    if include_download_action is None:
+        include_download_action = artifact_count > 0
+    actions: list[str] = []
+    if include_download_action:
+        for action_artifact_id in artifact_ids or (artifact_id,):
+            resolved_install_route = (
+                install_route
+                or f"/downloads/install/{action_artifact_id}"
+            )
+            resolved_href = (
+                href or f"/downloads/get/{action_artifact_id}"
+            )
+            actions.append(
+                f'<a href="{resolved_href}" '
+                'data-download-action="download-artifact" '
+                f'data-download-artifact="{action_artifact_id}" '
+                'data-download-install-route="'
+                f'{resolved_install_route}">Download</a>'
+            )
+    return (
+        f"<!doctype html><html><body>{marker}{''.join(actions)}</body></html>"
+    ).encode("utf-8")
+
+
 class DeliveryFixture:
     def __init__(
         self,
@@ -81,6 +140,7 @@ class DeliveryFixture:
         *,
         embed_metadata: bool = True,
         semantic_payload_route: bool = False,
+        advertise_metadata_route: bool = False,
         payload_name: str = "chummer-avalonia-win-x64-payload.zip",
     ) -> None:
         self.base_url = "https://chummer.run"
@@ -101,15 +161,41 @@ class DeliveryFixture:
             else self.payload_url
         )
         self.sidecar_url = self.payload_url + ".json"
+        self.current_payload_alias_url = (
+            f"{self.base_url}/downloads/install/"
+            f"{self.artifact_id}/payload"
+        )
+        self.current_sidecar_alias_url = (
+            f"{self.base_url}/downloads/install/"
+            f"{self.artifact_id}/metadata"
+        )
+        self.manifest_metadata_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/metadata"
+            if advertise_metadata_route
+            else None
+        )
+        self.generation_payload_companion_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/payload"
+        )
+        self.generation_metadata_companion_url = (
+            f"{self.base_url}/downloads/g/{self.generation}/install/"
+            f"{self.artifact_id}/metadata"
+        )
         self.canonical_url = (
             f"{self.base_url}/downloads/RELEASE_CHANNEL.generated.json"
         )
         self.compatibility_url = f"{self.base_url}/downloads/releases.json"
+        self.public_page_urls = {
+            path: f"{self.base_url}{path}"
+            for path in postdeploy.PUBLIC_PAGE_PATHS
+        }
         self.payload_bytes = b"payload-body-v1"
         self.payload_sha256 = hashlib.sha256(self.payload_bytes).hexdigest()
         metadata = (
             b"payloadDownloadUrl\x00"
-            + self.payload_url.encode()
+            + self.manifest_payload_url.encode()
             + b"\x00payloadSha256\x00"
             + self.payload_sha256.encode()
             + b"\x00payloadSizeBytes\x00"
@@ -120,7 +206,7 @@ class DeliveryFixture:
         self.installer_bytes = b"MZ\x00" + metadata
         self.sidecar: dict[str, object] = {
             "contractName": postdeploy.SIDECAR_CONTRACT,
-            "downloadUrl": self.payload_url,
+            "downloadUrl": self.manifest_payload_url,
             "fileName": self.payload_name,
             "installerFileName": self.installer_name,
             "payloadAcquisitionMode": "download",
@@ -162,6 +248,13 @@ class DeliveryFixture:
             "payloadSha256": self.payload_sha256,
             "payloadSizeBytes": len(self.payload_bytes),
         }
+        if self.manifest_metadata_url is not None:
+            self.artifact["payloadMetadataFileName"] = (
+                f"{self.payload_name}.json"
+            )
+            self.artifact["payloadMetadataUrl"] = (
+                self.manifest_metadata_url.removeprefix(self.base_url)
+            )
         self.route: dict[str, object] = {
             "artifactId": self.artifact_id,
             "platform": "windows",
@@ -207,6 +300,8 @@ class DeliveryFixture:
         self.local_manifest = self.root / "releases.json"
         self.local_canonical = self.root / "RELEASE_CHANNEL.generated.json"
         self.responses: dict[str, StreamResponse] = {}
+        self.release_truth_responses: dict[str, Response] = {}
+        self.release_truth_route_calls: list[str] = []
         self.rewrite()
 
     @staticmethod
@@ -356,17 +451,78 @@ class DeliveryFixture:
                 self.installer_bytes,
                 generation=self.generation,
             ),
-            self.payload_url: StreamResponse(
-                self.payload_url,
+            self.manifest_payload_url: StreamResponse(
+                self.manifest_payload_url,
                 self.payload_bytes,
                 generation=self.generation,
             ),
-            self.sidecar_url: StreamResponse(
-                self.sidecar_url,
+            (self.manifest_metadata_url or self.sidecar_url): StreamResponse(
+                self.manifest_metadata_url or self.sidecar_url,
                 sidecar_bytes,
                 generation=self.generation,
             ),
+            self.generation_payload_companion_url: StreamResponse(
+                self.generation_payload_companion_url,
+                self.payload_bytes,
+                generation=self.generation,
+                headers={
+                    "Cache-Control": (
+                        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+                    )
+                },
+            ),
+            self.generation_metadata_companion_url: StreamResponse(
+                self.generation_metadata_companion_url,
+                sidecar_bytes,
+                generation=self.generation,
+                headers={
+                    "Cache-Control": (
+                        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+                    )
+                },
+            ),
+            **{
+                url: StreamResponse(
+                    url,
+                    public_page_html(
+                        release_version=self.version,
+                        generation_id=self.generation,
+                        artifact_count=1,
+                    ),
+                    generation=self.generation,
+                    headers={
+                        "Content-Type": "text/html; charset=utf-8",
+                    },
+                )
+                for url in self.public_page_urls.values()
+            },
         }
+        release_truth_paths = (
+            *postdeploy.CURRENT_RELEASE_TRUTH_PATHS,
+            *(
+                template.format(generation_id=self.generation)
+                for template in (
+                    postdeploy.GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
+                )
+            ),
+        )
+        self.release_truth_responses = {
+            path: Response(200, self.release_truth, private=True)
+            for path in release_truth_paths
+        }
+        for path in (
+            self.current_payload_alias_url.removeprefix(self.base_url),
+            self.current_sidecar_alias_url.removeprefix(self.base_url),
+        ):
+            self.release_truth_responses[path] = Response(
+                409,
+                {
+                    "message": "Install handoff is withheld.",
+                    "status": "review_required",
+                    "releaseTruth": self.release_truth,
+                },
+                private=True,
+            )
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, bool]]:
         calls: list[tuple[str, bool]] = []
@@ -383,6 +539,18 @@ class DeliveryFixture:
             return self.responses[url]
 
         monkeypatch.setattr(postdeploy, "anonymous_get", fake_get)
+        self.release_truth_route_calls.clear()
+
+        def fake_route_get(
+            _session: object,
+            _base: str,
+            path: str,
+            _timeout: float,
+        ) -> Response:
+            self.release_truth_route_calls.append(path)
+            return self.release_truth_responses[path]
+
+        monkeypatch.setattr(postdeploy, "get", fake_route_get)
         return calls
 
     def verify(self) -> dict[str, object]:
@@ -443,6 +611,23 @@ def control_release_truth() -> dict[str, object]:
     }
 
 
+def install_route_denial_paths() -> tuple[str, ...]:
+    handoff = control_release_truth()["artifactHandoff"]
+    advertised = str(handoff["publicInstallRoute"])
+    public_download = postdeploy.PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+        artifact_id=handoff["artifactId"]
+    )
+    return tuple(
+        dict.fromkeys(
+            (
+                *postdeploy.INSTALL_ROUTE_DENIAL_PATHS,
+                advertised,
+                public_download,
+            )
+        )
+    )
+
+
 def responses() -> dict[str, Response]:
     serving = {
         "contractName": postdeploy.READINESS_CONTRACT,
@@ -481,7 +666,11 @@ def responses() -> dict[str, Response]:
                 private=True,
                 content_type="application/json; charset=utf-8",
             )
-            for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
+            for path in install_route_denial_paths()
+        },
+        **{
+            path: Response(200, control_release_truth(), private=True)
+            for path in postdeploy.CURRENT_RELEASE_TRUTH_PATHS
         },
     }
     return result
@@ -506,10 +695,13 @@ def test_control_plane_accepts_serving_only_and_private_fail_closed(
         path: 503 for path in postdeploy.PRIVATE_PATHS
     }
     assert result["installRouteDenialStatuses"] == {
-        path: 409 for path in postdeploy.INSTALL_ROUTE_DENIAL_PATHS
+        path: 409 for path in install_route_denial_paths()
     }
     assert result["installRouteReleaseTruthSha256"] == (
         postdeploy._canonical_object_sha256(control_release_truth())
+    )
+    assert set(result["currentReleaseTruthRoutes"]) == set(
+        postdeploy.CURRENT_RELEASE_TRUTH_PATHS
     )
 
 
@@ -549,6 +741,159 @@ def test_control_plane_rejects_install_route_without_review_denial(
     )
     with postdeploy.anonymous_session() as session:
         with pytest.raises(ValueError, match="review-required install denial"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_advertised_install_route_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    advertised = str(
+        control_release_truth()["artifactHandoff"]["publicInstallRoute"]
+    )
+    fixture[advertised] = Response(
+        404,
+        {"status": 404},
+        private=True,
+        content_type="application/problem+json; charset=utf-8",
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="review-required install denial",
+        ):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_public_download_route_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    artifact_id = str(
+        control_release_truth()["artifactHandoff"]["artifactId"]
+    )
+    public_download = postdeploy.PUBLIC_DOWNLOAD_ROUTE_TEMPLATE.format(
+        artifact_id=artifact_id
+    )
+    fixture[public_download] = Response(
+        404,
+        {"status": 404},
+        private=True,
+        content_type="application/problem+json; charset=utf-8",
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="review-required install denial",
+        ):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+def test_control_plane_rejects_advertised_install_route_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = responses()
+    advertised = str(
+        control_release_truth()["artifactHandoff"]["publicInstallRoute"]
+    )
+    fixture[advertised].headers["Location"] = (
+        "https://evil.example/installer"
+    )
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="forbidden response header"):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+@pytest.mark.parametrize(
+    "path",
+    postdeploy.CURRENT_RELEASE_TRUTH_PATHS,
+)
+def test_control_plane_rejects_unreachable_current_release_truth_route(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    fixture = responses()
+    fixture[path] = Response(404, {"status": "not_found"})
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, request_path, _timeout: fixture[
+            request_path
+        ],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(
+            ValueError,
+            match="did not serve the exact authenticated releaseTruth",
+        ):
+            postdeploy.verify_control_plane(
+                session,
+                "https://chummer.run",
+                1,
+            )
+
+
+@pytest.mark.parametrize(
+    "advertised_route",
+    [
+        "/downloads/install/../admin",
+        "/downloads/install/%2e%2e%2fadmin",
+        "/downloads/install/unrelated-installer",
+        "https://evil.example/installer",
+    ],
+)
+def test_control_plane_rejects_unsafe_or_unbound_advertised_install_route(
+    monkeypatch: pytest.MonkeyPatch,
+    advertised_route: str,
+) -> None:
+    fixture = responses()
+    probe = fixture["/downloads/install/public-download-only-probe"]
+    probe._payload["releaseTruth"]["artifactHandoff"][
+        "publicInstallRoute"
+    ] = advertised_route
+    monkeypatch.setattr(
+        postdeploy,
+        "get",
+        lambda _session, _base, path, _timeout: fixture[path],
+    )
+
+    with postdeploy.anonymous_session() as session:
+        with pytest.raises(ValueError, match="unsafe or unbound"):
             postdeploy.verify_control_plane(
                 session,
                 "https://chummer.run",
@@ -790,6 +1135,62 @@ def _exact_incumbent_bootstrap(
                 compatibility_bytes,
                 generation=generation,
             ),
+            "https://chummer.run/downloads": StreamResponse(
+                "https://chummer.run/downloads",
+                public_page_html(
+                    release_version="run-20260715-140426",
+                    generation_id="legacy",
+                    artifact_count=len(compatibility["downloads"]),
+                    artifact_ids=tuple(
+                        row["artifactId"]
+                        for row in compatibility["downloads"]
+                    ),
+                ),
+                generation=generation,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            ),
+            "https://chummer.run/downloads/": StreamResponse(
+                "https://chummer.run/downloads/",
+                public_page_html(
+                    release_version="run-20260715-140426",
+                    generation_id="legacy",
+                    artifact_count=len(compatibility["downloads"]),
+                    artifact_ids=tuple(
+                        row["artifactId"]
+                        for row in compatibility["downloads"]
+                    ),
+                ),
+                generation=generation,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            ),
+            "https://chummer.run/status": StreamResponse(
+                "https://chummer.run/status",
+                public_page_html(
+                    release_version="run-20260715-140426",
+                    generation_id="legacy",
+                    artifact_count=len(compatibility["downloads"]),
+                    artifact_ids=tuple(
+                        row["artifactId"]
+                        for row in compatibility["downloads"]
+                    ),
+                ),
+                generation=generation,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            ),
+            "https://chummer.run/status/": StreamResponse(
+                "https://chummer.run/status/",
+                public_page_html(
+                    release_version="run-20260715-140426",
+                    generation_id="legacy",
+                    artifact_count=len(compatibility["downloads"]),
+                    artifact_ids=tuple(
+                        row["artifactId"]
+                        for row in compatibility["downloads"]
+                    ),
+                ),
+                generation=generation,
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            ),
         },
     )
 
@@ -832,9 +1233,19 @@ def test_bootstrap_phase_accepts_exact_no_windows_incumbent(
     assert result["canonicalManifest"]["generationId"] == (
         result["compatibilityManifest"]["generationId"]
     )
+    assert result["publicPages"]["releaseVersion"] == (
+        "run-20260715-140426"
+    )
+    assert result["publicPages"]["generationId"] == "legacy"
+    assert result["publicPages"]["artifactCount"] == 4
+    assert result["publicPages"]["releaseTruthBound"] is False
     assert calls == [
         "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json",
         "https://chummer.run/downloads/releases.json",
+        "https://chummer.run/downloads",
+        "https://chummer.run/downloads/",
+        "https://chummer.run/status",
+        "https://chummer.run/status/",
     ]
 
 
@@ -955,18 +1366,389 @@ def test_strict_delivery_accepts_exact_anonymous_gets(
     assert result["releaseTruthSha256"] == (
         postdeploy._canonical_object_sha256(fixture.release_truth)
     )
+    assert result["publicPages"]["releaseVersion"] == fixture.version
+    assert result["publicPages"]["generationId"] == fixture.generation
+    assert result["publicPages"]["artifactCount"] == 1
+    assert result["publicPages"]["releaseTruthBound"] is True
+    assert set(result["publicPages"]["surfaces"]) == set(
+        postdeploy.PUBLIC_PAGE_PATHS
+    )
+    expected_page_markers = {
+        "data-downloads-release-version": f"Version {fixture.version}",
+        "data-downloads-release-generation": fixture.generation,
+        "data-downloads-public-count": "1",
+    }
+    for path in postdeploy.PUBLIC_PAGE_PATHS:
+        assert (
+            result["publicPages"]["surfaces"][path]["markers"]
+            == expected_page_markers
+        )
+        actions = result["publicPages"]["surfaces"][path][
+            "downloadActions"
+        ]
+        if path in postdeploy.DOWNLOAD_PAGE_PATHS:
+            assert actions == [
+                {
+                    "artifactId": fixture.artifact_id,
+                    "href": (
+                        f"/downloads/get/{fixture.artifact_id}"
+                    ),
+                    "installRoute": (
+                        f"/downloads/install/{fixture.artifact_id}"
+                    ),
+                    "downloadRoute": (
+                        f"/downloads/get/{fixture.artifact_id}"
+                    ),
+                }
+            ]
+        else:
+            assert actions == []
+    assert result["publicPages"]["trailingSlashParity"] == {
+        "/downloads": {
+            "slashPath": "/downloads/",
+            "sameBytes": True,
+            "sameMarkers": True,
+            "sameDownloadActions": True,
+        },
+        "/status": {
+            "slashPath": "/status/",
+            "sameBytes": True,
+            "sameMarkers": True,
+            "sameDownloadActions": True,
+        },
+    }
+    expected_release_truth_paths = [
+        template.format(generation_id=fixture.generation)
+        for template in (
+            postdeploy.GENERATION_RELEASE_TRUTH_PATH_TEMPLATES
+        )
+    ]
+    expected_current_companion_paths = [
+        fixture.current_payload_alias_url.removeprefix(fixture.base_url),
+        fixture.current_sidecar_alias_url.removeprefix(fixture.base_url),
+    ]
+    assert fixture.release_truth_route_calls == (
+        expected_release_truth_paths + expected_current_companion_paths
+    )
+    assert set(result["releaseTruthRoutes"]) == set(
+        expected_release_truth_paths
+    )
     assert [url for url, _ in calls] == [
         fixture.canonical_url,
         fixture.compatibility_url,
+        *fixture.public_page_urls.values(),
         fixture.installer_url,
         fixture.payload_url,
         fixture.sidecar_url,
+        fixture.generation_payload_companion_url,
+        fixture.generation_metadata_companion_url,
     ]
     assert all(stream for _, stream in calls)
     artifact = result["artifacts"][0]
     assert artifact["policy"]["stable"] is False
     assert artifact["policy"]["update"] is False
     assert artifact["embeddedInstallerMetadataAgrees"] is True
+    denials = artifact["currentCompanionDenials"]
+    assert denials["payload"]["path"] == expected_current_companion_paths[0]
+    assert denials["metadata"]["path"] == expected_current_companion_paths[1]
+    assert denials["payload"]["statusCode"] == 409
+    assert denials["metadata"]["statusCode"] == 409
+    companions = artifact["generationCompanions"]
+    assert companions["payload"]["url"] == (
+        fixture.generation_payload_companion_url
+    )
+    assert companions["metadata"]["url"] == (
+        fixture.generation_metadata_companion_url
+    )
+    assert companions["payload"]["cacheControl"] == (
+        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+    )
+    assert companions["metadata"]["cacheControl"] == (
+        postdeploy.IMMUTABLE_GENERATION_CACHE_CONTROL
+    )
+
+
+@pytest.mark.parametrize("path", sorted(postdeploy.DOWNLOAD_PAGE_PATHS))
+@pytest.mark.parametrize(
+    "body",
+    [
+        public_page_html(
+            release_version="run-test",
+            generation_id="generation-a",
+            artifact_count=1,
+            include_download_action=False,
+        ),
+        public_page_html(
+            release_version="run-test",
+            generation_id="generation-a",
+            artifact_count=1,
+            artifact_id="other-installer",
+        ),
+        public_page_html(
+            release_version="run-test",
+            generation_id="generation-a",
+            artifact_count=1,
+            href="/downloads/files/unbound.exe",
+        ),
+        public_page_html(
+            release_version="run-test",
+            generation_id="generation-a",
+            artifact_count=1,
+            install_route="/downloads/install/other-installer",
+        ),
+    ],
+)
+def test_strict_delivery_requires_governed_download_action_closure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    body: bytes,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    url = fixture.public_page_urls[path]
+    fixture.responses[url] = StreamResponse(
+        url,
+        body,
+        generation=fixture.generation,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "download actions do not match canonical artifacts"
+            "|download action does not close over its governed"
+        ),
+    ):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    ("canonical_path", "slash_path"),
+    [
+        ("/downloads", "/downloads/"),
+        ("/status", "/status/"),
+    ],
+)
+def test_strict_delivery_rejects_trailing_slash_page_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    canonical_path: str,
+    slash_path: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    slash_url = fixture.public_page_urls[slash_path]
+    fixture.responses[slash_url] = StreamResponse(
+        slash_url,
+        fixture.responses[slash_url].body + b"<!-- drift -->",
+        generation=fixture.generation,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"{canonical_path} and {slash_path} public surfaces drift"
+        ),
+    ):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("path", postdeploy.PUBLIC_PAGE_PATHS)
+@pytest.mark.parametrize(
+    ("release_version", "generation_id", "artifact_count"),
+    [
+        ("run-other", "generation-a", 1),
+        ("run-test", "generation-b", 1),
+        ("run-test", "generation-a", 2),
+    ],
+)
+def test_strict_delivery_rejects_public_page_identity_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    release_version: str,
+    generation_id: str,
+    artifact_count: int,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    url = fixture.public_page_urls[path]
+    fixture.responses[url] = StreamResponse(
+        url,
+        public_page_html(
+            release_version=release_version,
+            generation_id=generation_id,
+            artifact_count=artifact_count,
+        ),
+        generation=fixture.generation,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match="disagrees with canonical release identity",
+    ):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("path", postdeploy.PUBLIC_PAGE_PATHS)
+def test_strict_delivery_requires_each_public_page_identity_marker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    url = fixture.public_page_urls[path]
+    fixture.responses[url] = StreamResponse(
+        url,
+        b"<!doctype html><html><body>missing marker</body></html>",
+        generation=fixture.generation,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(
+        ValueError,
+        match="must expose exactly one public release identity marker",
+    ):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("path", postdeploy.PUBLIC_PAGE_PATHS)
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        (
+            (
+                "<!doctype html><html><body>"
+                + public_page_marker(
+                    release_version="run-test",
+                    generation_id="generation-a",
+                    artifact_count=1,
+                )
+                + public_page_marker(
+                    release_version="run-test",
+                    generation_id="generation-a",
+                    artifact_count=1,
+                )
+                + "</body></html>"
+            ).encode("utf-8"),
+            "must expose exactly one public release identity marker",
+        ),
+        (
+            (
+                "<!doctype html><html><body>"
+                '<span data-downloads-release-version="Version run-test">'
+                "</span>"
+                '<span data-downloads-release-generation="generation-a">'
+                "</span>"
+                '<span data-downloads-public-count="1"></span>'
+                "</body></html>"
+            ).encode("utf-8"),
+            "must expose exactly one public release identity marker",
+        ),
+        (
+            (
+                "<!doctype html><html><body>"
+                '<span data-downloads-release-version="Version run-test" '
+                'data-downloads-release-version="Version run-test" '
+                'data-downloads-release-generation="generation-a" '
+                'data-downloads-public-count="1"></span>'
+                "</body></html>"
+            ).encode("utf-8"),
+            "must expose data-downloads-release-version exactly once",
+        ),
+    ],
+)
+def test_strict_delivery_rejects_duplicate_or_split_page_markers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    body: bytes,
+    message: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    url = fixture.public_page_urls[path]
+    fixture.responses[url] = StreamResponse(
+        url,
+        body,
+        generation=fixture.generation,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match=message):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("path", postdeploy.PUBLIC_PAGE_PATHS)
+@pytest.mark.parametrize(
+    ("failure_mode", "message"),
+    [
+        ("non-html", "did not serve HTML"),
+        ("redirect", "followed an unexpected redirect"),
+        ("oversize", "has invalid Content-Length"),
+        ("response-credential", "exposed forbidden response header"),
+        ("request-credential", "request carried credential header"),
+    ],
+)
+def test_strict_delivery_rejects_unsafe_public_page_transport(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    failure_mode: str,
+    message: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    response = fixture.responses[fixture.public_page_urls[path]]
+    if failure_mode == "non-html":
+        response.headers["Content-Type"] = "application/json"
+    elif failure_mode == "redirect":
+        response.history = [object()]
+    elif failure_mode == "oversize":
+        response.headers["Content-Length"] = str(
+            postdeploy.MAXIMUM_PUBLIC_PAGE_BYTES + 1
+        )
+    elif failure_mode == "response-credential":
+        response.headers["Set-Cookie"] = "session=forbidden"
+    elif failure_mode == "request-credential":
+        response.request.headers["Authorization"] = "Bearer forbidden"
+    else:
+        raise AssertionError(f"unknown failure mode {failure_mode}")
+    fixture.install(monkeypatch)
+
+    with pytest.raises(ValueError, match=message):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("releaseVersion", "run-other"),
+        ("artifactCount", 2),
+    ],
+)
+def test_public_page_identity_rejects_release_truth_mismatch(
+    tmp_path: Path,
+    key: str,
+    value: object,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    release_truth = {**fixture.release_truth, key: value}
+
+    with pytest.raises(
+        ValueError,
+        match="authenticated releaseTruth disagrees",
+    ):
+        postdeploy._public_page_identity(
+            canonical=fixture.canonical,
+            compatibility=fixture.compatibility,
+            generation_id=fixture.generation,
+            release_truth=release_truth,
+        )
 
 
 def test_strict_delivery_accepts_sealed_legacy_rows_with_release_truth(
@@ -998,6 +1780,32 @@ def test_strict_delivery_accepts_sealed_legacy_rows_with_release_truth(
     assert result["artifacts"][0]["policy"]["update"] is False
 
 
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/api/v1/public/release-truth/g/generation-a",
+        "/api/public/release-truth/g/generation-a",
+    ),
+)
+def test_strict_delivery_rejects_unreachable_or_drifted_release_truth_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    fixture.release_truth_responses[path] = Response(
+        404,
+        {"status": "not_found"},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="did not serve the exact authenticated releaseTruth",
+    ):
+        fixture.verify()
+
+
 def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1022,24 +1830,133 @@ def test_strict_delivery_rejects_legacy_install_route_for_other_artifact(
         fixture.verify()
 
 
-def test_strict_delivery_rejects_unroutable_semantic_manifest_payload_route(
+def test_strict_delivery_probes_advertised_generation_companion_routes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = DeliveryFixture(tmp_path, semantic_payload_route=True)
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+        advertise_metadata_route=True,
+    )
     calls = fixture.install(monkeypatch)
 
-    with pytest.raises(
-        ValueError,
-        match="open_public payload URL must be the generation-bound files route",
-    ):
-        fixture.verify()
+    result = fixture.verify()
 
     requested_urls = [url for url, _stream in calls]
     assert fixture.manifest_payload_url != fixture.payload_url
-    assert fixture.payload_url in fixture.responses
+    assert fixture.manifest_metadata_url is not None
     assert fixture.payload_url not in requested_urls
-    assert fixture.manifest_payload_url not in requested_urls
+    assert fixture.sidecar_url not in requested_urls
+    assert fixture.manifest_payload_url in requested_urls
+    assert fixture.manifest_metadata_url in requested_urls
+    assert fixture.current_payload_alias_url not in requested_urls
+    assert fixture.current_sidecar_alias_url not in requested_urls
+    artifact = result["artifacts"][0]
+    assert artifact["payload"]["url"] == fixture.manifest_payload_url
+    assert artifact["sidecar"]["url"] == fixture.manifest_metadata_url
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_current_companion_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.current_payload_alias_url
+        if role == "payload"
+        else fixture.current_sidecar_alias_url
+    )
+    path = url.removeprefix(fixture.base_url)
+    fixture.release_truth_responses[path] = Response(
+        404,
+        {"status": "not_found"},
+        private=True,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="did not enforce the exact authenticated review denial",
+    ):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_advertised_companion_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(
+        tmp_path,
+        semantic_payload_route=True,
+        advertise_metadata_route=True,
+    )
+    fixture.install(monkeypatch)
+    url = (
+        fixture.manifest_payload_url
+        if role == "payload"
+        else fixture.manifest_metadata_url
+    )
+    assert url is not None
+    fixture.responses[url].status_code = 404
+
+    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize("role", ("payload", "metadata"))
+def test_strict_delivery_rejects_unreachable_generation_companion_route(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.generation_payload_companion_url
+        if role == "payload"
+        else fixture.generation_metadata_companion_url
+    )
+    fixture.responses[url].status_code = 404
+
+    with pytest.raises(ValueError, match="expected HTTP 200, got 404"):
+        fixture.verify()
+
+
+@pytest.mark.parametrize(
+    ("role", "cache_control"),
+    (
+        ("payload", None),
+        ("metadata", "public, max-age=60"),
+    ),
+)
+def test_strict_delivery_rejects_generation_companion_without_immutable_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+    cache_control: str | None,
+) -> None:
+    fixture = DeliveryFixture(tmp_path)
+    fixture.install(monkeypatch)
+    url = (
+        fixture.generation_payload_companion_url
+        if role == "payload"
+        else fixture.generation_metadata_companion_url
+    )
+    if cache_control is None:
+        fixture.responses[url].headers.pop("Cache-Control")
+    else:
+        fixture.responses[url].headers["Cache-Control"] = cache_control
+
+    with pytest.raises(
+        ValueError,
+        match="did not enforce immutable Cache-Control",
+    ):
+        fixture.verify()
 
 
 def test_www_delivery_accepts_canonical_apex_sidecar_url(
@@ -1297,7 +2214,7 @@ def test_strict_delivery_rejects_cross_generation_payload_file_route(
 
     with pytest.raises(
         ValueError,
-        match="open_public payload URL must be the generation-bound files route",
+        match="payload URL must be the exact generation-bound",
     ):
         fixture.verify()
 

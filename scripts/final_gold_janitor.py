@@ -23,9 +23,14 @@ from verify_windows_installer_visual_audit_intake_request import (
     verify as verify_windows_visual_intake_request_receipt,
 )
 from public_edge_postdeploy_contract import (
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
     normalize_public_edge_postdeploy_payload,
+    public_edge_authorizing_binding_failures,
     public_edge_v2_offline_failures,
     public_edge_v2_private_identity_failures,
+)
+from verify_public_edge_observability_release import (
+    read_regular_file_bytes as read_stable_regular_file_bytes,
 )
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -62,13 +67,15 @@ LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 FLEET_COMPLETION_ROOT = Path(os.environ.get("CHUMMER_FLEET_COMPLETION_ROOT", "/docker/fleet/_completion"))
 FLEET_ARTIFACT_ROOT = FLEET_COMPLETION_ROOT / ARTIFACT_ROOT_NAME
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
-EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL = os.environ.get(
-    "CHUMMER_FINAL_GOLD_EXPECTED_RELEASE_CHANNEL",
-    "nightly",
-)
+EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256 = os.environ.get(
+    "CHUMMER_EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256",
+    "",
+).strip()
 PUBLIC_EDGE_POSTDEPLOY_PREFLIGHT_ARGS = [
-    "--expected-release-channel",
-    EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL,
+    "--release-channel-receipt",
+    str(REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json"),
+    "--release-channel-receipt-sha256",
+    EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256,
 ]
 PUBLIC_EDGE_BROWSER_PROOF_ROOT = PUBLISHED_ROOT / "public-edge-browser-proofs"
 PUBLIC_EDGE_DOWNLOADS_STATUS_ARTIFACT_DIR = PUBLIC_EDGE_BROWSER_PROOF_ROOT / "downloads-status"
@@ -142,7 +149,9 @@ DESIGN_READY_VERDICT = "DESIGN_READY"
 FLAGSHIP_PRODUCT_READY_VERDICT = "FLAGSHIP_PRODUCT_READY"
 FLAGSHIP_PRODUCT_NOT_READY_VERDICT = "NOT_FLAGSHIP_PRODUCT_READY"
 OPERATOR_DASHBOARD_CONTRACT_NAME = "chummer.operator_release_dashboard"
-PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = "chummer.public_edge_postdeploy_gate.v1"
+PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME = (
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+)
 WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME = "chummer.windows_installer_visual_audit"
 PASS_VERDICT_EXPECTATIONS: dict[str, set[str]] = {
     "desktop_native_model_depth": {"DESKTOP_NATIVE_MODEL_READY"},
@@ -596,7 +605,7 @@ PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS = {
 }
 PUBLIC_EDGE_REQUIRED_CORE_CHILD_CONTRACTS = {
     "preflight": "chummer.public_edge_deploy_preflight.v1",
-    "downloads": "chummer.downloads_version_marker.v1",
+    "downloads": "chummer.downloads_version_marker.bound.v1",
     "pwaStatic": "chummer.public_pwa_static_assets.v1",
     "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
     "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
@@ -1688,8 +1697,25 @@ def public_edge_postdeploy_release_channel_alignment_failures(
     return failures
 
 
-def public_edge_postdeploy_semantic_failures(payload: dict[str, Any]) -> list[str]:
+def public_edge_postdeploy_semantic_failures(
+    payload: dict[str, Any],
+    *,
+    current_release_channel_sha256: str = "",
+) -> list[str]:
     failures: list[str] = []
+    if not current_release_channel_sha256:
+        failures.append(
+            "public-edge postdeploy current release-channel authority is unavailable"
+        )
+    else:
+        failures.extend(
+            public_edge_authorizing_binding_failures(
+                payload,
+                current_release_channel_sha256=(
+                    current_release_channel_sha256
+                ),
+            )
+        )
     frontdoor_homepage_lane_disclosure_missing = public_edge_postdeploy_homepage_lane_disclosure_missing(payload)
     frontdoor_homepage_lane_copy_mismatch = public_edge_postdeploy_homepage_lane_copy_mismatch(payload)
     for field in sorted(PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS):
@@ -3198,12 +3224,44 @@ def suppress_dependent_summary_gate_failures_for_final_gold(
 def run_materializers() -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for command in MATERIALIZERS:
-        timeout_seconds = materializer_timeout_seconds(command)
+        effective_command = list(command)
+        if (
+            "scripts/verify_public_edge_postdeploy_gate.py"
+            in effective_command
+            and "--release-channel-receipt-sha256"
+            in effective_command
+        ):
+            digest_index = (
+                effective_command.index(
+                    "--release-channel-receipt-sha256"
+                )
+                + 1
+            )
+            configured_digest = str(
+                effective_command[digest_index] or ""
+            ).strip()
+            if not configured_digest:
+                release_channel_bytes, release_channel_error = (
+                    read_stable_regular_file_bytes(
+                        REGISTRY_ROOT
+                        / "RELEASE_CHANNEL.generated.json"
+                    )
+                )
+                if (
+                    release_channel_error is None
+                    and release_channel_bytes is not None
+                ):
+                    effective_command[digest_index] = hashlib.sha256(
+                        release_channel_bytes
+                    ).hexdigest()
+        timeout_seconds = materializer_timeout_seconds(
+            effective_command
+        )
         started_at_utc = now_iso()
         stdout_file = tempfile.TemporaryFile()
         stderr_file = tempfile.TemporaryFile()
         process = subprocess.Popen(
-            command,
+            effective_command,
             cwd=RUN_SERVICES_ROOT,
             stdout=stdout_file,
             stderr=stderr_file,
@@ -3221,7 +3279,7 @@ def run_materializers() -> list[dict[str, Any]]:
             process.wait(timeout=timeout_seconds)
             results.append(
                 {
-                    "command": " ".join(command),
+                    "command": " ".join(effective_command),
                     "started_at_utc": started_at_utc,
                     "completed_at_utc": now_iso(),
                     "returncode": process.returncode or 0,
@@ -3246,7 +3304,7 @@ def run_materializers() -> list[dict[str, Any]]:
                 process.wait()
             results.append(
                 {
-                    "command": " ".join(command),
+                    "command": " ".join(effective_command),
                     "started_at_utc": started_at_utc,
                     "completed_at_utc": now_iso(),
                     "returncode": 124,
@@ -3645,6 +3703,21 @@ def build_payload(
     effective_freshness_required_gates = _effective_freshness_required_gates()
     public_release_snapshot = load_json(PUBLIC_RELEASE_SNAPSHOT_PATH)
     release_channel = load_json(PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json")
+    release_channel_authority_path = (
+        REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json"
+        if PUBLISHED_ROOT == DEFAULT_PUBLISHED_ROOT
+        else PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json"
+    )
+    (
+        release_channel_authority_bytes,
+        release_channel_authority_error,
+    ) = read_stable_regular_file_bytes(release_channel_authority_path)
+    current_release_channel_sha256 = (
+        hashlib.sha256(release_channel_authority_bytes).hexdigest()
+        if release_channel_authority_error is None
+        and release_channel_authority_bytes is not None
+        else ""
+    )
     root_release_blockers = load_json(ROOT_RELEASE_BLOCKERS_PATH)
     blazor_play_surface_horizon_path = first_candidate_path(WORKSPACE_PLAY_SURFACE_HORIZON_CANDIDATES)
     blazor_play_surface_horizon = (
@@ -3940,7 +4013,14 @@ def build_payload(
                 required_gates[name]["pass"] = False
                 if status_value in {"pass", "passed", "ready"}:
                     required_gates[name]["status"] = "fail"
-            postdeploy_semantic_failures = public_edge_postdeploy_semantic_failures(payload)
+            postdeploy_semantic_failures = (
+                public_edge_postdeploy_semantic_failures(
+                    payload,
+                    current_release_channel_sha256=(
+                        current_release_channel_sha256
+                    ),
+                )
+            )
             postdeploy_release_channel_alignment_failures = public_edge_postdeploy_release_channel_alignment_failures(
                 payload,
                 release_channel,

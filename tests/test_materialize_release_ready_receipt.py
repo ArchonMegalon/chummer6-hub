@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
@@ -12,6 +13,13 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
+
+from scripts.public_edge_postdeploy_contract import (
+    PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
+    PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+    build_public_edge_downloads_authority_binding,
+    load_exact_public_edge_postdeploy_schema,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_release_ready_receipt.py"
@@ -52,6 +60,9 @@ def load_module():
     module._test_release_execution_environment = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
         "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "a" * 40,
+        module.EXPECTED_RELEASE_CHANNEL_RECEIPT_SHA256_ENV: hashlib.sha256(
+            module.REGISTRY_RELEASE_CHANNEL.read_bytes()
+        ).hexdigest(),
         "CHUMMER_RUN_SERVICES_ROOT": str(module.RUN_SERVICES_ROOT),
         "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
         "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
@@ -112,13 +123,40 @@ def load_module():
     return module
 
 
-def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
+def passing_public_edge_postdeploy_payload(
+    module,
+    release_channel_path: Path,
+) -> dict[str, object]:
+    release_channel_sha256 = hashlib.sha256(
+        release_channel_path.read_bytes()
+    ).hexdigest()
+    schema = load_exact_public_edge_postdeploy_schema(
+        receipt_contract_name=PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME
+    )
     payload: dict[str, object] = {
-        field: None for field in module.PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS
+        field: None
+        for field in schema["fields"]
     }
     payload.update(
         {
-            "contractName": module.PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+            "childReceipts": {},
+            "contractName": PUBLIC_EDGE_POSTDEPLOY_BOUND_CONTRACT_NAME,
+            "coreChildContracts": {
+                "downloads": PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
+            },
+            "expectedReleaseChannel": "public_stable",
+            "expectedReleaseVersion": "run-test",
+            "failures": [],
+            "generatedAtUtc": module.now_iso(),
+            "releaseChannelAuthorizationCapable": True,
+            "releaseChannelReceiptBindingRequired": True,
+            "releaseManifestChannel": "public_stable",
+            "releaseManifestGeneration": "generation-run-test",
+            "releaseManifestSchema": "chummer.release-channel.v1",
+            "releaseManifestVersion": "run-test",
+            "schemaContractName": schema["contractName"],
+            "schemaSha256": schema["sha256"],
+            "skipReleaseVersionMatch": False,
             "status": "pass",
             "pwaOfflineCacheStatus": "pass",
             "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
@@ -190,6 +228,37 @@ def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
         "frontdoorNavigationAnchorDeviceContextPresent",
     ):
         payload[field] = True
+    downloads_receipt = {
+        "contractName": PUBLIC_EDGE_DOWNLOADS_BOUND_CONTRACT_NAME,
+        "downloads_generation_matches_served_manifest": True,
+        "expected_release_channel": payload["expectedReleaseChannel"],
+        "release_channel_receipt_binding_status": "pass",
+        "release_channel_receipt_sha256_actual": (
+            release_channel_sha256
+        ),
+        "release_channel_receipt_sha256_expected": (
+            release_channel_sha256
+        ),
+        "release_channel_receipt_sha256_matches": True,
+        "release_channel_version": payload["expectedReleaseVersion"],
+        "release_manifest_channel": payload["releaseManifestChannel"],
+        "release_manifest_channel_matches_release_channel": True,
+        "release_manifest_generation": payload[
+            "releaseManifestGeneration"
+        ],
+        "release_manifest_schema": payload["releaseManifestSchema"],
+        "release_manifest_version": payload["releaseManifestVersion"],
+        "release_manifest_version_matches_release_channel": True,
+        "status": "pass",
+        "status_redirect_generation_matches_served_manifest": True,
+    }
+    payload["downloadsAuthorityBinding"] = (
+        build_public_edge_downloads_authority_binding(
+            downloads_receipt,
+            downloads_receipt_sha256="b" * 64,
+            release_channel_receipt_sha256=release_channel_sha256,
+        )
+    )
     return payload
 
 
@@ -2349,6 +2418,9 @@ launch()
                 + "\n",
                 encoding="utf-8",
             )
+            release_channel_sha256 = hashlib.sha256(
+                (registry / "RELEASE_CHANNEL.generated.json").read_bytes()
+            ).hexdigest()
             receipt = {
                 "contract_name": "test.direct_gate.v1",
                 "status": "pass",
@@ -2394,6 +2466,9 @@ launch()
                     receipt,
                     receipt_path,
                     observed_at=observed_at,
+                    expected_current_release_channel_sha256=(
+                        release_channel_sha256
+                    ),
                 )
                 receipt["projection"] = "mutated after PASS"
                 receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
@@ -3588,7 +3663,7 @@ launch()
             )
             (published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json").write_text("{not json}\n", encoding="utf-8")
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5260,7 +5335,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5359,7 +5434,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5405,7 +5480,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5492,7 +5567,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5550,7 +5625,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5608,7 +5683,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5688,7 +5763,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5746,7 +5821,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -5851,7 +5926,7 @@ launch()
 
         self.assertEqual([], failures)
 
-    def test_collect_current_blocking_failures_rejects_stale_pass_public_edge_schema(self) -> None:
+    def test_collect_current_blocking_failures_rejects_legacy_pass_public_edge_schema_as_non_authorizing(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-ready-public-edge-stale-schema-") as temp_dir:
             root = Path(temp_dir)
@@ -5902,16 +5977,21 @@ launch()
             ):
                 failures = module.collect_current_blocking_failures()
 
-        self.assertTrue(any("public_edge_postdeploy_gate receipt missing current fields:" in item for item in failures))
-        self.assertTrue(any("frontdoorNavigationAnchorArtifactContract" in item for item in failures))
-        self.assertTrue(any("frontdoorNavigationAnchorFinalPath" in item for item in failures))
+        self.assertTrue(
+            any(
+                "public_edge_postdeploy_gate receipt contract is not "
+                "chummer.public_edge_postdeploy_gate.v2"
+                in item
+                for item in failures
+            )
+        )
 
-    def test_public_edge_release_blocking_reasons_reject_v1_raw_identity_and_private_cache(self) -> None:
+    def test_public_edge_release_blocking_reasons_reject_v1_as_non_authorizing(self) -> None:
         module = load_module()
         payload = {field: None for field in module.PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS}
         payload.update(
             {
-                "contractName": module.PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+                "contractName": "chummer.public_edge_postdeploy_gate.v1",
                 "status": "pass",
                 "pwaOfflineCacheStatus": "pass",
                 "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v1",
@@ -5931,16 +6011,10 @@ launch()
         reasons = module.public_edge_postdeploy_release_blocking_reasons(payload)
 
         self.assertIn(
-            "public_edge_postdeploy_gate pwaOfflineCacheArtifactContract is not chummer.pwa_offline_cache.v2",
+            "public_edge_postdeploy_gate receipt contract is not "
+            "chummer.public_edge_postdeploy_gate.v2",
             reasons,
         )
-        self.assertIn(
-            "public_edge_postdeploy_gate frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2",
-            reasons,
-        )
-        self.assertIn("public-edge postdeploy front-door evidence contains raw private identity", reasons)
-        self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", reasons)
-        self.assertIn("public-edge postdeploy PWA offline cache did not prove private API responses remain uncached", reasons)
 
     def test_public_edge_release_blocking_reasons_reject_unexpected_gate_contract(self) -> None:
         module = load_module()
@@ -5949,8 +6023,9 @@ launch()
             {"contractName": "chummer.public_edge_postdeploy_gate.v0", "status": "pass"}
         )
 
-        self.assertEqual(
-            ["public_edge_postdeploy_gate receipt contract is not chummer.public_edge_postdeploy_gate.v1"],
+        self.assertIn(
+            "public_edge_postdeploy_gate receipt contract is not "
+            "chummer.public_edge_postdeploy_gate.v2",
             reasons,
         )
 
@@ -5998,7 +6073,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -6081,7 +6156,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -6161,7 +6236,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -6258,7 +6333,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
@@ -6328,7 +6403,7 @@ launch()
                 encoding="utf-8",
             )
             (published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json").write_text(
-                json.dumps(passing_public_edge_postdeploy_payload(module)),
+                json.dumps(passing_public_edge_postdeploy_payload(module, registry / "RELEASE_CHANNEL.generated.json")),
                 encoding="utf-8",
             )
             (published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json").write_text(
