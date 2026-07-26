@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Decrypt and securely materialize a sealed historical incident ticket.
 
-This Linux-only command validates the pinned EnvelopedData recipient and the
-pinned inner SignedData signer before it publishes any plaintext.  It
+This Linux-only command requires the independently pinned six-artifact handoff
+verification transaction, validates the pinned EnvelopedData recipient and the
+pinned inner SignedData signer from the same held handoff descriptors, then
 transactionally publishes one complete owner-only raw ticket, one owner-only
 authority file, and a commit marker.  The ticket digest is present only in the
 private authority file; the epoch deploy must inherit an already-open
 descriptor for that file and must never place the digest in argv or the
-environment.
+environment.  The materializer and verifier must themselves be invoked from
+the independently reviewed launcher/checkout; their initial Python loader is
+an explicit external trust boundary, not a self-attested claim.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -23,11 +27,14 @@ import subprocess
 import sys
 from typing import Any, Mapping, Sequence
 
-import seal_historical_release_upload_incident_ticket as seal
+import verify_historical_release_upload_incident_handoff as handoff
+
+
+seal: Any = None
 
 
 CONTRACT_NAME = (
-    "chummer.release-upload-incident-ticket-materialization-authority/v1"
+    "chummer.release-upload-incident-ticket-materialization-authority/v2"
 )
 COMMIT_CONTRACT_NAME = (
     "chummer.release-upload-incident-ticket-materialization-commit/v1"
@@ -69,14 +76,43 @@ AUTHORITY_FIELDS = {
     "signerCertificateSha256",
     "opensslExecutableSha256",
     "materializationOpensslExecutableSha256",
+    "handoffContextSha256",
+    "handoffTransactionId",
+    "handoffVerificationReceiptSha256",
+    "handoffVerificationCommitSha256",
+    "handoffVerificationTransactionId",
+    "handoffVerifierSourceCommit",
+    "handoffVerifierScriptSha256",
+    "handoffSealHelperSha256",
+    "handoffVerifierScriptGitBlobOid",
+    "handoffSealHelperGitBlobOid",
+    "handoffVerifierPythonIdentitySource",
+    "handoffSealHelperLoadMode",
+    "handoffInputArtifactsSha256",
     "materializationTransactionId",
     "quarantineStatus",
     "revocationStatus",
 }
+COMMIT_MARKER_FIELDS = {
+    "contractName",
+    "status",
+    "transactionId",
+    "contextSha256",
+    "artifacts",
+}
+COMMIT_ARTIFACT_FIELDS = {"sha256", "sizeBytes"}
 
 
 class MaterializeError(RuntimeError):
     """The authenticated ticket could not be safely materialized."""
+
+
+def _utc_now() -> str:
+    return (
+        dt.datetime.now(dt.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _is_canonical_utc_timestamp(value: Any) -> bool:
@@ -316,8 +352,39 @@ def _read_committed_authority(
                 "signerCertificateSha256",
                 "opensslExecutableSha256",
                 "materializationOpensslExecutableSha256",
+                "handoffContextSha256",
+                "handoffVerificationReceiptSha256",
+                "handoffVerificationCommitSha256",
+                "handoffVerifierScriptSha256",
+                "handoffSealHelperSha256",
+                "handoffInputArtifactsSha256",
             )
         )
+        or any(
+            type(authority.get(field)) is not str
+            or seal.TRANSACTION_ID.fullmatch(authority[field]) is None
+            for field in (
+                "handoffTransactionId",
+                "handoffVerificationTransactionId",
+            )
+        )
+        or type(authority.get("handoffVerifierSourceCommit")) is not str
+        or handoff.GIT_COMMIT.fullmatch(
+            authority["handoffVerifierSourceCommit"]
+        )
+        is None
+        or any(
+            type(authority.get(field)) is not str
+            or handoff.GIT_COMMIT.fullmatch(authority[field]) is None
+            for field in (
+                "handoffVerifierScriptGitBlobOid",
+                "handoffSealHelperGitBlobOid",
+            )
+        )
+        or authority.get("handoffVerifierPythonIdentitySource")
+        != handoff.PYTHON_IDENTITY_SOURCE
+        or authority.get("handoffSealHelperLoadMode")
+        != handoff.SEAL_HELPER_LOAD_MODE
     ):
         raise MaterializeError("materialization authority is invalid")
     # The transaction context is intentionally not a field in the epoch
@@ -333,6 +400,7 @@ def _validate_final_materialization(
     authority_path: Path,
     commit_marker_path: Path,
     authority: Mapping[str, Any],
+    expected_ticket: bytes | bytearray,
     transaction_id: str,
     context_sha256: str,
 ) -> None:
@@ -362,14 +430,29 @@ def _validate_final_materialization(
         marker = json.loads(marker_bytes)
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise MaterializeError("materialization marker is malformed") from exc
+    expected_artifacts = {
+        ticket_path.name: {
+            "sha256": hashlib.sha256(ticket).hexdigest(),
+            "sizeBytes": len(ticket),
+        },
+        authority_path.name: {
+            "sha256": hashlib.sha256(authority_bytes).hexdigest(),
+            "sizeBytes": len(authority_bytes),
+        },
+    }
+    artifacts = marker.get("artifacts") if isinstance(marker, dict) else None
     if (
         seal._canonical_json_bytes(dict(authority)) != authority_bytes
         or not isinstance(marker, dict)
+        or set(marker) != COMMIT_MARKER_FIELDS
         or seal._canonical_json_bytes(marker) != marker_bytes
         or marker.get("contractName") != COMMIT_CONTRACT_NAME
         or marker.get("status") != "committed"
         or marker.get("transactionId") != transaction_id
         or marker.get("contextSha256") != context_sha256
+        or not isinstance(artifacts, dict)
+        or set(artifacts) != set(expected_artifacts)
+        or not hmac.compare_digest(ticket, expected_ticket)
         or authority.get("ticketSha256")
         != hashlib.sha256(ticket).hexdigest()
         or authority.get("ticketSizeBytes") != len(ticket)
@@ -377,10 +460,305 @@ def _validate_final_materialization(
         != hashlib.sha256(str(ticket_path).encode("utf-8")).hexdigest()
     ):
         raise MaterializeError("committed materialization binding is invalid")
+    for name, expected in expected_artifacts.items():
+        artifact = artifacts[name]
+        if (
+            not isinstance(artifact, dict)
+            or set(artifact) != COMMIT_ARTIFACT_FIELDS
+            or type(artifact.get("sha256")) is not str
+            or type(artifact.get("sizeBytes")) is not int
+            or artifact["sha256"] != expected["sha256"]
+            or artifact["sizeBytes"] != expected["sizeBytes"]
+        ):
+            raise MaterializeError(
+                "committed materialization artifact binding is invalid"
+            )
+
+
+def _borrow_held_input(item: handoff.HeldInput) -> seal.PinnedFile:
+    descriptor = os.dup(item.descriptor)
+    try:
+        os.set_inheritable(descriptor, False)
+        metadata = os.fstat(descriptor)
+        return seal.PinnedFile(
+            path=item.path,
+            descriptor=descriptor,
+            metadata=metadata,
+            content=item.content,
+            sha256=item.sha256,
+        )
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _verification_authority(
+    receipt: Mapping[str, Any],
+) -> handoff.IndependentAuthority:
+    return handoff._authority(
+        argparse.Namespace(
+            expected_hub_commit=receipt.get("hubCommit"),
+            expected_bootstrap_sha256=receipt.get("bootstrapSha256"),
+            expected_seal_script_sha256=receipt.get("sealScriptSha256"),
+            expected_seal_context_sha256=receipt.get("sealContextSha256"),
+            expected_inventory_commitment_sha256=receipt.get(
+                "inventoryCommitmentSha256"
+            ),
+            expected_recipient_cert_sha256=receipt.get(
+                "recipientCertificateSha256"
+            ),
+            expected_signer_cert_sha256=receipt.get(
+                "signerCertificateSha256"
+            ),
+            expected_openssl_path=receipt.get("producerOpensslPath"),
+            expected_openssl_sha256=receipt.get("producerOpensslSha256"),
+            expected_python_path=receipt.get("producerPythonPath"),
+            expected_python_sha256=receipt.get("producerPythonSha256"),
+            expected_verifier_source_commit=receipt.get(
+                "verifierSourceCommit"
+            ),
+            expected_verifier_repository_path=receipt.get(
+                "verifierRepositoryPath"
+            ),
+            expected_verifier_git_path=receipt.get("verifierGitPath"),
+            expected_verifier_git_sha256=receipt.get("verifierGitSha256"),
+            expected_verifier_script_path=receipt.get("verifierScriptPath"),
+            expected_verifier_script_sha256=receipt.get(
+                "verifierScriptSha256"
+            ),
+            expected_seal_helper_path=receipt.get("sealHelperPath"),
+            expected_seal_helper_sha256=receipt.get("sealHelperSha256"),
+            expected_verifier_python_path=receipt.get("verifierPythonPath"),
+            expected_verifier_python_sha256=receipt.get(
+                "verifierPythonSha256"
+            ),
+        )
+    )
+
+
+def _validate_verification_evidence(
+    *,
+    verification_receipt: handoff.HeldInput,
+    verification_commit: handoff.HeldInput,
+    inputs: Mapping[str, handoff.HeldInput],
+) -> tuple[
+    Mapping[str, Any],
+    handoff.IndependentAuthority,
+    handoff.ValidatedHandoff,
+]:
+    receipt = handoff._strict_json(
+        verification_receipt.content,
+        label="handoff verification receipt",
+    )
+    commit = handoff._strict_json(
+        verification_commit.content,
+        label="handoff verification commit",
+    )
+    if set(receipt) != handoff.VERIFICATION_RECEIPT_FIELDS:
+        raise MaterializeError("handoff verification receipt fields are not exact")
+    handoff._timestamp(receipt.get("generatedAtUtc"))
+    authority = _verification_authority(receipt)
+    validated = handoff._validate_handoff(inputs, authority)
+    expected_artifacts = {
+        name: inputs[name].artifact()
+        for name in handoff.INPUT_NAMES
+    }
+    if (
+        not isinstance(receipt.get("inputArtifacts"), dict)
+        or set(receipt["inputArtifacts"]) != set(expected_artifacts)
+    ):
+        raise MaterializeError(
+            "handoff verification input artifacts are not exact"
+        )
+    for name, artifact in expected_artifacts.items():
+        handoff._artifact_record(
+            receipt["inputArtifacts"].get(name),
+            expected=artifact,
+            label=f"handoff verification {name}",
+        )
+
+    context_sha256 = handoff._sha256(
+        receipt.get("contextSha256"),
+        label="handoff verification context",
+    )
+    transaction_id = handoff._transaction_id(
+        receipt.get("transactionId"),
+        label="handoff verification transaction",
+    )
+    handoff_context = handoff._sha256(
+        receipt.get("handoffContextSha256"),
+        label="handoff context",
+    )
+    handoff_transaction = handoff._transaction_id(
+        receipt.get("handoffTransactionId"),
+        label="handoff transaction",
+    )
+    seal_transaction = handoff._transaction_id(
+        receipt.get("sealTransactionId"),
+        label="seal transaction",
+    )
+    expected_context = handoff._verification_context(
+        output=verification_receipt.path,
+        commit_marker=verification_commit.path,
+        authority=authority,
+        handoff_context_sha256=handoff_context,
+    )
+    if (
+        receipt.get("contractName") != handoff.CONTRACT_NAME
+        or receipt.get("status")
+        != "verified_pending_cryptographic_materialization"
+        or context_sha256 != expected_context
+        or transaction_id != context_sha256[:32]
+        or handoff_context
+        != validated.response.get("handoffContextSha256")
+        or handoff_transaction
+        != validated.response.get("handoffTransactionId")
+        or receipt.get("sealContextSha256")
+        != authority.seal_context_sha256
+        or seal_transaction
+        != validated.seal_receipt.get("transactionId")
+        or receipt.get("candidateCount") != handoff.EXPECTED_CANDIDATE_COUNT
+        or type(receipt.get("candidateCount")) is not int
+        or receipt.get("inventoryCommitmentSha256")
+        != authority.inventory_commitment_sha256
+        or receipt.get("hubCommit") != authority.hub_commit
+        or receipt.get("bootstrapSha256") != authority.bootstrap_sha256
+        or receipt.get("sealScriptSha256")
+        != authority.seal_script_sha256
+        or receipt.get("recipientCertificateSha256")
+        != authority.recipient_certificate_sha256
+        or receipt.get("signerCertificateSha256")
+        != authority.signer_certificate_sha256
+        or receipt.get("producerOpensslPath") != authority.openssl_path
+        or receipt.get("producerOpensslSha256") != authority.openssl_sha256
+        or receipt.get("producerPythonPath") != authority.python_path
+        or receipt.get("producerPythonSha256") != authority.python_sha256
+        or receipt.get("verifierSourceCommit")
+        != authority.verifier_source_commit
+        or receipt.get("verifierRepositoryPath")
+        != authority.verifier_repository_path
+        or receipt.get("verifierGitPath") != authority.verifier_git_path
+        or receipt.get("verifierGitSha256")
+        != authority.verifier_git_sha256
+        or receipt.get("verifierScriptPath")
+        != authority.verifier_script_path
+        or receipt.get("verifierScriptSha256")
+        != authority.verifier_script_sha256
+        or receipt.get("sealHelperPath") != authority.seal_helper_path
+        or receipt.get("sealHelperSha256")
+        != authority.seal_helper_sha256
+        or receipt.get("verifierScriptGitBlobOid")
+        != authority.verifier_script_git_blob_oid
+        or receipt.get("sealHelperGitBlobOid")
+        != authority.seal_helper_git_blob_oid
+        or receipt.get("verifierPythonIdentitySource")
+        != authority.verifier_python_identity_source
+        or receipt.get("sealHelperLoadMode")
+        != authority.seal_helper_load_mode
+        or receipt.get("verifierPythonPath")
+        != authority.verifier_python_path
+        or receipt.get("verifierPythonSha256")
+        != authority.verifier_python_sha256
+        or receipt.get("transportReadbackPassed") is not True
+        or receipt.get("producerReportedSourceCandidatesLeftUntouched")
+        is not True
+        or receipt.get("producerReportedPublishersStopped") is not True
+        or receipt.get("producerReportedContainsSecretValues") is not False
+        or receipt.get("verifierOutputContainsSecretValues") is not False
+        or receipt.get("cmsCryptographicVerificationStatus")
+        != "pending_linux_materialization"
+    ):
+        raise MaterializeError("handoff verification authority is invalid")
+    handoff._validate_transaction(
+        commit,
+        contract_name=handoff.COMMIT_CONTRACT_NAME,
+        transaction_id=transaction_id,
+        context_sha256=context_sha256,
+        expected_artifacts={
+            verification_receipt.path.name: verification_receipt.artifact()
+        },
+        label="handoff verification commit",
+    )
+    return receipt, authority, validated
+
+
+def _materialization_handoff_binding(
+    *,
+    verification_receipt: handoff.HeldInput,
+    verification_commit: handoff.HeldInput,
+    verification: Mapping[str, Any],
+    authority: handoff.IndependentAuthority,
+    validated: handoff.ValidatedHandoff,
+) -> dict[str, str]:
+    return {
+        "handoffContextSha256": validated.response["handoffContextSha256"],
+        "handoffTransactionId": validated.response["handoffTransactionId"],
+        "handoffVerificationReceiptSha256": verification_receipt.sha256,
+        "handoffVerificationCommitSha256": verification_commit.sha256,
+        "handoffVerificationTransactionId": verification["transactionId"],
+        "handoffVerifierSourceCommit": authority.verifier_source_commit,
+        "handoffVerifierScriptSha256": authority.verifier_script_sha256,
+        "handoffSealHelperSha256": authority.seal_helper_sha256,
+        "handoffVerifierScriptGitBlobOid": (
+            authority.verifier_script_git_blob_oid
+        ),
+        "handoffSealHelperGitBlobOid": authority.seal_helper_git_blob_oid,
+        "handoffVerifierPythonIdentitySource": (
+            authority.verifier_python_identity_source
+        ),
+        "handoffSealHelperLoadMode": authority.seal_helper_load_mode,
+        "handoffInputArtifactsSha256": handoff._canonical_json_sha256(
+            validated.artifacts
+        ),
+    }
+
+
+def _validate_authority_handoff_binding(
+    authority: Mapping[str, Any],
+    *,
+    expected: Mapping[str, str],
+) -> None:
+    if any(authority.get(field) != value for field, value in expected.items()):
+        raise MaterializeError(
+            "materialization authority handoff binding is invalid"
+        )
+
+
+def _validate_authority_request_binding(
+    authority: Mapping[str, Any],
+    *,
+    expected: Mapping[str, Any],
+) -> None:
+    if (
+        set(expected) != AUTHORITY_FIELDS - {"generatedAtUtc"}
+        or any(authority.get(field) != value for field, value in expected.items())
+    ):
+        raise MaterializeError(
+            "materialization authority request binding is invalid"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--handoff-directory", type=Path, required=True)
+    parser.add_argument(
+        "--handoff-verification-receipt",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--handoff-verification-receipt-sha256",
+        required=True,
+    )
+    parser.add_argument(
+        "--handoff-verification-commit",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--handoff-verification-commit-sha256",
+        required=True,
+    )
     parser.add_argument("--openssl-path", type=Path, required=True)
     parser.add_argument("--openssl-sha256", required=True)
     parser.add_argument("--seal-openssl-sha256", required=True)
@@ -403,53 +781,73 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
-    seal._disable_core_dumps()
+    global seal
+    handoff._disable_core_dumps()
     if not sys.platform.startswith("linux"):
         raise MaterializeError("ticket materialization is Linux-only")
     if options.confirm != CONFIRMATION:
         raise MaterializeError(f"--confirm requires {CONFIRMATION}")
-    openssl_sha256 = seal._validate_sha256(
+    verification_receipt_sha256 = handoff._sha256(
+        options.handoff_verification_receipt_sha256,
+        label="handoff verification receipt SHA-256",
+    )
+    verification_commit_sha256 = handoff._sha256(
+        options.handoff_verification_commit_sha256,
+        label="handoff verification commit SHA-256",
+    )
+    openssl_sha256 = handoff._sha256(
         options.openssl_sha256,
-        "materialization OpenSSL executable SHA-256",
+        label="materialization OpenSSL executable SHA-256",
     )
-    seal_openssl_sha256 = seal._validate_sha256(
+    seal_openssl_sha256 = handoff._sha256(
         options.seal_openssl_sha256,
-        "sealing OpenSSL executable SHA-256",
+        label="sealing OpenSSL executable SHA-256",
     )
-    envelope_sha256 = seal._validate_sha256(
+    envelope_sha256 = handoff._sha256(
         options.envelope_sha256,
-        "envelope SHA-256",
+        label="envelope SHA-256",
     )
-    seal_receipt_sha256 = seal._validate_sha256(
+    seal_receipt_sha256 = handoff._sha256(
         options.seal_receipt_sha256,
-        "seal receipt SHA-256",
+        label="seal receipt SHA-256",
     )
-    inventory_commitment = seal._validate_sha256(
+    inventory_commitment = handoff._sha256(
         options.inventory_commitment_sha256,
-        "inventory commitment SHA-256",
+        label="inventory commitment SHA-256",
     )
-    recipient_sha256 = seal._validate_sha256(
+    recipient_sha256 = handoff._sha256(
         options.recipient_cert_sha256,
-        "recipient certificate SHA-256",
+        label="recipient certificate SHA-256",
     )
-    recipient_key_sha256 = seal._validate_sha256(
+    recipient_key_sha256 = handoff._sha256(
         options.recipient_key_sha256,
-        "recipient key SHA-256",
+        label="recipient key SHA-256",
     )
-    signer_sha256 = seal._validate_sha256(
+    signer_sha256 = handoff._sha256(
         options.signer_cert_sha256,
-        "signer certificate SHA-256",
+        label="signer certificate SHA-256",
     )
-    _parent, validation_descriptor = seal._ensure_same_private_parent(
-        (
-            options.ticket_output,
-            options.authority_output,
-            options.commit_marker,
-        )
-    )
-    os.close(validation_descriptor)
-
+    expected_handoff_paths = {
+        name: options.handoff_directory / name
+        for name in handoff.INPUT_NAMES
+    }
+    if (
+        not options.handoff_directory.is_absolute()
+        or options.envelope != expected_handoff_paths[handoff.CMS_NAME]
+        or options.seal_receipt
+        != expected_handoff_paths[handoff.SEAL_RECEIPT_NAME]
+        or options.signer_cert
+        != expected_handoff_paths[handoff.SIGNER_CERT_NAME]
+        or not options.handoff_verification_receipt.is_absolute()
+        or not options.handoff_verification_commit.is_absolute()
+        or options.handoff_verification_receipt.name in {"", ".", ".."}
+        or options.handoff_verification_commit.name in {"", ".", ".."}
+    ):
+        raise MaterializeError("handoff materialization paths are not exact")
     executable: seal.PinnedFile | None = None
+    verification_receipt_input: handoff.HeldInput | None = None
+    verification_commit_input: handoff.HeldInput | None = None
+    handoff_inputs: dict[str, handoff.HeldInput] = {}
     envelope: seal.PinnedFile | None = None
     seal_receipt: seal.PinnedFile | None = None
     recipient_certificate: seal.PinnedFile | None = None
@@ -457,23 +855,73 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
     signer_certificate: seal.PinnedFile | None = None
     ticket = bytearray()
     try:
+        verification_receipt_input = handoff._open_held_input(
+            options.handoff_verification_receipt,
+            maximum_bytes=2 * 1024 * 1024,
+        )
+        verification_commit_input = handoff._open_held_input(
+            options.handoff_verification_commit,
+            maximum_bytes=2 * 1024 * 1024,
+        )
+        if (
+            verification_receipt_input.sha256
+            != verification_receipt_sha256
+            or verification_commit_input.sha256
+            != verification_commit_sha256
+        ):
+            raise MaterializeError(
+                "handoff verification artifact pin mismatch"
+            )
+        for name in handoff.INPUT_NAMES:
+            handoff_inputs[name] = handoff._open_held_input(
+                expected_handoff_paths[name],
+                maximum_bytes=handoff.MAXIMUM_BYTES[name],
+            )
+        if (
+            handoff_inputs[handoff.CMS_NAME].sha256 != envelope_sha256
+            or handoff_inputs[handoff.SEAL_RECEIPT_NAME].sha256
+            != seal_receipt_sha256
+            or handoff_inputs[handoff.SIGNER_CERT_NAME].sha256
+            != signer_sha256
+        ):
+            raise MaterializeError("handoff input pin mismatch")
+        verification, verification_authority, validated_handoff = (
+            _validate_verification_evidence(
+                verification_receipt=verification_receipt_input,
+                verification_commit=verification_commit_input,
+                inputs=handoff_inputs,
+            )
+        )
+        seal = handoff.seal
+        if seal is None:
+            raise MaterializeError("reviewed seal helper was not loaded")
+        _parent, validation_descriptor = seal._ensure_same_private_parent(
+            (
+                options.ticket_output,
+                options.authority_output,
+                options.commit_marker,
+            )
+        )
+        os.close(validation_descriptor)
         executable = seal._open_pinned_executable(
             options.openssl_path,
             openssl_sha256,
         )
-        envelope = seal._open_pinned_file(
-            options.envelope,
-            envelope_sha256,
-            label="CMS envelope",
-            maximum_bytes=seal.MAX_CMS_BYTES,
-            owner_only=False,
+        handoff_binding = _materialization_handoff_binding(
+            verification_receipt=verification_receipt_input,
+            verification_commit=verification_commit_input,
+            verification=verification,
+            authority=verification_authority,
+            validated=validated_handoff,
         )
-        seal_receipt = seal._open_pinned_file(
-            options.seal_receipt,
-            seal_receipt_sha256,
-            label="seal receipt",
-            maximum_bytes=8192,
-            owner_only=True,
+        envelope = _borrow_held_input(
+            handoff_inputs[handoff.CMS_NAME]
+        )
+        seal_receipt = _borrow_held_input(
+            handoff_inputs[handoff.SEAL_RECEIPT_NAME]
+        )
+        signer_certificate = _borrow_held_input(
+            handoff_inputs[handoff.SIGNER_CERT_NAME]
         )
         receipt = _strict_private_json(
             seal_receipt,
@@ -502,13 +950,6 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             owner_only=True,
             retain_content=False,
         )
-        signer_certificate = seal._open_pinned_file(
-            options.signer_cert,
-            signer_sha256,
-            label="signer certificate",
-            maximum_bytes=256 * 1024,
-            owner_only=False,
-        )
         _validate_envelope_structure(
             executable=executable,
             envelope=envelope.content,
@@ -524,6 +965,14 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             executable=executable,
             signed=signed,
             signer_certificate=signer_certificate,
+        )
+        for name, item in handoff_inputs.items():
+            item.readback(maximum_bytes=handoff.MAXIMUM_BYTES[name])
+        verification_receipt_input.readback(
+            maximum_bytes=seal.MAX_TRANSACTION_FILE_BYTES
+        )
+        verification_commit_input.readback(
+            maximum_bytes=seal.MAX_TRANSACTION_FILE_BYTES
         )
         ticket_path = options.ticket_output
         context_sha256 = seal._canonical_json_sha256(
@@ -541,9 +990,29 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
                 "ticketOutputName": ticket_path.name,
                 "authorityOutputName": options.authority_output.name,
                 "commitMarkerName": options.commit_marker.name,
+                **handoff_binding,
             }
         )
         transaction_id = context_sha256[:32]
+        authority_binding = {
+            "contractName": CONTRACT_NAME,
+            "status": "materialized_pending_revocation",
+            "ticketPathSha256": hashlib.sha256(
+                str(ticket_path).encode("utf-8")
+            ).hexdigest(),
+            "ticketSha256": hashlib.sha256(ticket).hexdigest(),
+            "ticketSizeBytes": len(ticket),
+            "envelopeSha256": envelope_sha256,
+            "inventoryCommitmentSha256": inventory_commitment,
+            "recipientCertificateSha256": recipient_sha256,
+            "signerCertificateSha256": signer_sha256,
+            "opensslExecutableSha256": seal_openssl_sha256,
+            "materializationOpensslExecutableSha256": openssl_sha256,
+            **handoff_binding,
+            "materializationTransactionId": transaction_id,
+            "quarantineStatus": "pending",
+            "revocationStatus": "pending",
+        }
         seal._recover_fully_linked_transaction(
             final_paths=(
                 ticket_path,
@@ -559,11 +1028,20 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             context_sha256=context_sha256,
         )
         if existing is not None:
+            _validate_authority_handoff_binding(
+                existing,
+                expected=handoff_binding,
+            )
+            _validate_authority_request_binding(
+                existing,
+                expected=authority_binding,
+            )
             _validate_final_materialization(
                 ticket_path=ticket_path,
                 authority_path=options.authority_output,
                 commit_marker_path=options.commit_marker,
                 authority=existing,
+                expected_ticket=ticket,
                 transaction_id=transaction_id,
                 context_sha256=context_sha256,
             )
@@ -577,23 +1055,8 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             }
 
         authority = {
-            "contractName": CONTRACT_NAME,
             "generatedAtUtc": seal._utc_now(),
-            "status": "materialized_pending_revocation",
-            "ticketPathSha256": hashlib.sha256(
-                str(ticket_path).encode("utf-8")
-            ).hexdigest(),
-            "ticketSha256": hashlib.sha256(ticket).hexdigest(),
-            "ticketSizeBytes": len(ticket),
-            "envelopeSha256": envelope_sha256,
-            "inventoryCommitmentSha256": inventory_commitment,
-            "recipientCertificateSha256": recipient_sha256,
-            "signerCertificateSha256": signer_sha256,
-            "opensslExecutableSha256": seal_openssl_sha256,
-            "materializationOpensslExecutableSha256": openssl_sha256,
-            "materializationTransactionId": transaction_id,
-            "quarantineStatus": "pending",
-            "revocationStatus": "pending",
+            **authority_binding,
         }
         if set(authority) != AUTHORITY_FIELDS:
             raise MaterializeError("materialization authority fields changed")
@@ -614,11 +1077,20 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
         )
         if committed is None:
             raise MaterializeError("materialization authority was not committed")
+        _validate_authority_handoff_binding(
+            committed,
+            expected=handoff_binding,
+        )
+        _validate_authority_request_binding(
+            committed,
+            expected=authority_binding,
+        )
         _validate_final_materialization(
             ticket_path=ticket_path,
             authority_path=options.authority_output,
             commit_marker_path=options.commit_marker,
             authority=committed,
+            expected_ticket=ticket,
             transaction_id=transaction_id,
             context_sha256=context_sha256,
         )
@@ -645,18 +1117,25 @@ def materialize(options: argparse.Namespace) -> Mapping[str, Any]:
             envelope.close()
         if executable is not None:
             executable.close()
+        for item in reversed(tuple(handoff_inputs.values())):
+            item.close()
+        if verification_commit_input is not None:
+            verification_commit_input.close()
+        if verification_receipt_input is not None:
+            verification_receipt_input.close()
 
 
 def run(arguments: Sequence[str] | None = None) -> int:
     try:
-        seal._disable_core_dumps()
+        handoff._disable_core_dumps()
         options = build_parser().parse_args(arguments)
         result = materialize(options)
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
         return 0
     except (
         MaterializeError,
-        seal.SealError,
+        handoff.VerificationError,
+        RuntimeError,
         OSError,
         subprocess.SubprocessError,
         ValueError,
@@ -665,7 +1144,7 @@ def run(arguments: Sequence[str] | None = None) -> int:
             json.dumps(
                 {
                     "contractName": CONTRACT_NAME,
-                    "generatedAtUtc": seal._utc_now(),
+                    "generatedAtUtc": _utc_now(),
                     "status": "error",
                     "error": "secure incident-ticket materialization failed",
                 },
