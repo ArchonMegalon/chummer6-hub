@@ -3042,6 +3042,8 @@ capture_release_upload_auth_value() {
           | "$python_bin" -I -S /dev/fd/3 3<<'PY_RELEASE_UPLOAD_AUTH_READER'
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
 import stat
 import subprocess
@@ -3051,6 +3053,13 @@ from typing import Callable
 MAX_CREDENTIAL_BYTES = 8192
 MAX_FILE_BYTES = MAX_CREDENTIAL_BYTES + 1
 MAX_PATH_BYTES = 4096
+MACOS_ACL_TYPE_EXTENDED = 0x00000100
+MACOS_ACL_FIRST_ENTRY = 0
+MACOS_ACL_NEXT_ENTRY = -1
+MACOS_ACL_EXTENDED_ALLOW = 1
+MACOS_ACL_EXTENDED_DENY = 2
+MACOS_ACL_MAX_ENTRIES = 128
+MACOS_UUID_BYTES = 16
 MACOS_ACL_RIGHTS = frozenset(
     {
         b"add_file",
@@ -3109,6 +3118,135 @@ def _validate_metadata(metadata: os.stat_result) -> None:
         or metadata.st_nlink != 1
         or not 1 <= metadata.st_size <= MAX_FILE_BYTES
     ):
+        _reject()
+
+
+def _read_native_macos_acl(
+    descriptor: int,
+) -> tuple[bytes, tuple[tuple[int, bytes], ...]]:
+    try:
+        library = ctypes.CDLL(None, use_errno=True)
+        library.acl_get_fd_np.argtypes = (ctypes.c_int, ctypes.c_int)
+        library.acl_get_fd_np.restype = ctypes.c_void_p
+        library.acl_valid_fd_np.argtypes = (
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_void_p,
+        )
+        library.acl_valid_fd_np.restype = ctypes.c_int
+        library.acl_get_entry.argtypes = (
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_void_p),
+        )
+        library.acl_get_entry.restype = ctypes.c_int
+        library.acl_get_tag_type.argtypes = (
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_int),
+        )
+        library.acl_get_tag_type.restype = ctypes.c_int
+        library.acl_get_qualifier.argtypes = (ctypes.c_void_p,)
+        library.acl_get_qualifier.restype = ctypes.c_void_p
+        library.acl_free.argtypes = (ctypes.c_void_p,)
+        library.acl_free.restype = ctypes.c_int
+        library.mbr_uid_to_uuid.argtypes = (
+            ctypes.c_uint,
+            ctypes.POINTER(ctypes.c_ubyte),
+        )
+        library.mbr_uid_to_uuid.restype = ctypes.c_int
+    except (AttributeError, OSError):
+        _reject()
+
+    owner_buffer = (ctypes.c_ubyte * MACOS_UUID_BYTES)()
+    if library.mbr_uid_to_uuid(os.geteuid(), owner_buffer) != 0:
+        _reject()
+    owner_uuid = bytes(owner_buffer)
+
+    ctypes.set_errno(0)
+    acl = library.acl_get_fd_np(descriptor, MACOS_ACL_TYPE_EXTENDED)
+    if not acl:
+        no_acl_errors = {
+            0,
+            getattr(errno, "ENOATTR", -1),
+            getattr(errno, "ENODATA", -1),
+        }
+        if ctypes.get_errno() in no_acl_errors:
+            return owner_uuid, ()
+        _reject()
+
+    entries: list[tuple[int, bytes]] = []
+    try:
+        if (
+            library.acl_valid_fd_np(
+                descriptor,
+                MACOS_ACL_TYPE_EXTENDED,
+                acl,
+            )
+            != 0
+        ):
+            _reject()
+
+        entry = ctypes.c_void_p()
+        entry_selector = MACOS_ACL_FIRST_ENTRY
+        for _entry_index in range(MACOS_ACL_MAX_ENTRIES + 1):
+            result = library.acl_get_entry(
+                acl,
+                entry_selector,
+                ctypes.byref(entry),
+            )
+            if result == 0:
+                break
+            if result != 1 or len(entries) == MACOS_ACL_MAX_ENTRIES:
+                _reject()
+
+            tag = ctypes.c_int()
+            if library.acl_get_tag_type(entry, ctypes.byref(tag)) != 0:
+                _reject()
+            qualifier = library.acl_get_qualifier(entry)
+            if not qualifier:
+                _reject()
+            try:
+                qualifier_uuid = ctypes.string_at(
+                    qualifier,
+                    MACOS_UUID_BYTES,
+                )
+            finally:
+                if library.acl_free(qualifier) != 0:
+                    _reject()
+            entries.append((tag.value, qualifier_uuid))
+            entry_selector = MACOS_ACL_NEXT_ENTRY
+        else:
+            _reject()
+    finally:
+        if library.acl_free(acl) != 0:
+            _reject()
+
+    return owner_uuid, tuple(entries)
+
+
+def assert_macos_acl_is_nonpermissive(
+    descriptor: int,
+    *,
+    acl_reader: Callable[
+        [int],
+        tuple[bytes, tuple[tuple[int, bytes], ...]],
+    ] = _read_native_macos_acl,
+) -> None:
+    if sys.platform != "darwin":
+        return
+    owner_uuid, entries = acl_reader(descriptor)
+    if len(owner_uuid) != MACOS_UUID_BYTES:
+        _reject()
+    for tag, qualifier_uuid in entries:
+        if len(qualifier_uuid) != MACOS_UUID_BYTES:
+            _reject()
+        if tag == MACOS_ACL_EXTENDED_DENY:
+            continue
+        if (
+            tag == MACOS_ACL_EXTENDED_ALLOW
+            and qualifier_uuid == owner_uuid
+        ):
+            continue
         _reject()
 
 
@@ -3225,12 +3363,12 @@ def read_credential(
         if _metadata_identity(opened) != _metadata_identity(before):
             _reject()
 
-        assert_no_macos_acl(descriptor)
+        assert_macos_acl_is_nonpermissive(descriptor)
         raw = _pread_bounded(descriptor, position_reader)
         after = fstater(descriptor)
         confirmed_raw = _pread_bounded(descriptor, position_reader)
         confirmed = fstater(descriptor)
-        assert_no_macos_acl(descriptor)
+        assert_macos_acl_is_nonpermissive(descriptor)
         final = lstater(path)
         _validate_metadata(after)
         _validate_metadata(confirmed)

@@ -1131,9 +1131,80 @@ def test_credential_reader_mac_acl_parser_boundaries() -> None:
             "PATH": "/usr/bin:/bin",
             "TMPDIR": "/tmp",
         }
-    assert reader_source.count("assert_no_macos_acl(descriptor)") == 2
+    assert reader_source.count("assert_macos_acl_is_nonpermissive(descriptor)") == 2
     assert "os.pread" in reader_source
     assert "os.lseek" not in reader_source
+
+
+def test_credential_reader_native_macos_acl_policy_boundaries() -> None:
+    reader_source, namespace = load_credential_reader_namespace()
+    acl_guard = namespace["assert_macos_acl_is_nonpermissive"]
+    unsafe_error = namespace["UnsafeCredentialFile"]
+    owner_uuid = b"o" * 16
+    non_owner_uuid = b"n" * 16
+
+    class Darwin:
+        platform = "darwin"
+
+    original_sys = namespace["sys"]
+    namespace["sys"] = Darwin()
+    try:
+        accepted_entries = (
+            (),
+            ((2, non_owner_uuid),),
+            ((1, owner_uuid),),
+            ((2, non_owner_uuid), (1, owner_uuid)),
+        )
+        for entries in accepted_entries:
+            acl_guard(
+                42,
+                acl_reader=lambda _descriptor, entries=entries: (
+                    owner_uuid,
+                    entries,
+                ),
+            )
+
+        rejected_entries = (
+            ((1, non_owner_uuid),),
+            ((3, owner_uuid),),
+            ((2, b"short"),),
+        )
+        for entries in rejected_entries:
+            try:
+                acl_guard(
+                    42,
+                    acl_reader=lambda _descriptor, entries=entries: (
+                        owner_uuid,
+                        entries,
+                    ),
+                )
+            except unsafe_error:
+                pass
+            else:
+                raise AssertionError(
+                    "permissive, unknown, or malformed native macOS ACL "
+                    "was accepted"
+                )
+
+        try:
+            acl_guard(
+                42,
+                acl_reader=lambda _descriptor: (
+                    b"short",
+                    (),
+                ),
+            )
+        except unsafe_error:
+            pass
+        else:
+            raise AssertionError("malformed owner UUID was accepted")
+    finally:
+        namespace["sys"] = original_sys
+
+    assert "acl_get_fd_np" in reader_source
+    assert "acl_valid_fd_np" in reader_source
+    assert "mbr_uid_to_uuid" in reader_source
+    assert "qualifier_uuid == owner_uuid" in reader_source
 
 
 def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
@@ -1169,6 +1240,7 @@ def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
     )
     original_sys = namespace["sys"]
     original_subprocess = namespace["subprocess"]
+    original_acl_guard = namespace["assert_macos_acl_is_nonpermissive"]
     namespace["sys"] = Darwin()
     try:
         for index, unsafe_second_probe in enumerate(unsafe_second_probes):
@@ -1192,11 +1264,19 @@ def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
                     probe_count += 1
                     return FakeResult(next(probe_results))
 
+            def fake_acl_guard(_descriptor: int) -> None:
+                nonlocal probe_count
+                probe_count += 1
+                probe = next(probe_results)
+                if probe == unsafe_second_probe:
+                    raise unsafe_error
+
             def recording_closer(descriptor: int) -> None:
                 closed_descriptors.append(descriptor)
                 os.close(descriptor)
 
             namespace["subprocess"] = FakeSubprocess()
+            namespace["assert_macos_acl_is_nonpermissive"] = fake_acl_guard
             try:
                 read_credential(
                     str(credential_file),
@@ -1222,6 +1302,7 @@ def test_credential_reader_rejects_acl_transition_and_closes_descriptor(
     finally:
         namespace["sys"] = original_sys
         namespace["subprocess"] = original_subprocess
+        namespace["assert_macos_acl_is_nonpermissive"] = original_acl_guard
 
 
 def test_credential_file_writer_contract_requires_atomic_publication() -> None:
