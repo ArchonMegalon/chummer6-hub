@@ -3943,7 +3943,10 @@ def collect_current_blocking_failures(*, refresh_windows_runtime_receipts: bool 
                 or bool(flagship_semantic_failures)
             )
             public_edge_receipt_reasons = (
-                public_edge_postdeploy_release_blocking_reasons(payload)
+                public_edge_postdeploy_release_blocking_reasons(
+                    payload,
+                    release_channel_path=release_channel_path,
+                )
                 if gate == "public_edge_postdeploy_gate"
                 else []
             )

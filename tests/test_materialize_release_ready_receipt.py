@@ -2418,6 +2418,9 @@ launch()
                 + "\n",
                 encoding="utf-8",
             )
+            release_channel_sha256 = hashlib.sha256(
+                (registry / "RELEASE_CHANNEL.generated.json").read_bytes()
+            ).hexdigest()
             receipt = {
                 "contract_name": "test.direct_gate.v1",
                 "status": "pass",
@@ -2463,6 +2466,9 @@ launch()
                     receipt,
                     receipt_path,
                     observed_at=observed_at,
+                    expected_current_release_channel_sha256=(
+                        release_channel_sha256
+                    ),
                 )
                 receipt["projection"] = "mutated after PASS"
                 receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
@@ -5920,7 +5926,7 @@ launch()
 
         self.assertEqual([], failures)
 
-    def test_collect_current_blocking_failures_rejects_stale_pass_public_edge_schema(self) -> None:
+    def test_collect_current_blocking_failures_rejects_legacy_pass_public_edge_schema_as_non_authorizing(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-ready-public-edge-stale-schema-") as temp_dir:
             root = Path(temp_dir)
@@ -5971,11 +5977,16 @@ launch()
             ):
                 failures = module.collect_current_blocking_failures()
 
-        self.assertTrue(any("public_edge_postdeploy_gate receipt missing current fields:" in item for item in failures))
-        self.assertTrue(any("frontdoorNavigationAnchorArtifactContract" in item for item in failures))
-        self.assertTrue(any("frontdoorNavigationAnchorFinalPath" in item for item in failures))
+        self.assertTrue(
+            any(
+                "public_edge_postdeploy_gate receipt contract is not "
+                "chummer.public_edge_postdeploy_gate.v2"
+                in item
+                for item in failures
+            )
+        )
 
-    def test_public_edge_release_blocking_reasons_reject_v1_raw_identity_and_private_cache(self) -> None:
+    def test_public_edge_release_blocking_reasons_reject_v1_as_non_authorizing(self) -> None:
         module = load_module()
         payload = {field: None for field in module.PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS}
         payload.update(
@@ -6000,16 +6011,10 @@ launch()
         reasons = module.public_edge_postdeploy_release_blocking_reasons(payload)
 
         self.assertIn(
-            "public_edge_postdeploy_gate pwaOfflineCacheArtifactContract is not chummer.pwa_offline_cache.v2",
+            "public_edge_postdeploy_gate receipt contract is not "
+            "chummer.public_edge_postdeploy_gate.v2",
             reasons,
         )
-        self.assertIn(
-            "public_edge_postdeploy_gate frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2",
-            reasons,
-        )
-        self.assertIn("public-edge postdeploy front-door evidence contains raw private identity", reasons)
-        self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", reasons)
-        self.assertIn("public-edge postdeploy PWA offline cache did not prove private API responses remain uncached", reasons)
 
     def test_public_edge_release_blocking_reasons_reject_unexpected_gate_contract(self) -> None:
         module = load_module()
