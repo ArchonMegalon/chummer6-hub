@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -142,6 +143,207 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         Assert.Equal(0, body.ReadCount);
         Assert.False(nextCalled);
         Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(context));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task V2AndV3CandidateImportAuthorityCannotFinalizeStagedCandidateBeforeBodyRead(
+        bool unsignedV3)
+    {
+        using var snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+        byte[]? candidateAuthority = unsignedV3
+            ? ReleaseUploadSnapshotAuthorityTests.LoadUnsignedCandidateAuthorityV3()
+            : ReleaseUploadSnapshotAuthorityTests.SnapshotFixture.BuildCandidateAuthority();
+        _ = ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+            "public-projection-" + new string('0', 64),
+            new string('0', 64),
+            new string('1', 64),
+            candidateAuthority);
+        snapshot.Publish(
+            "candidate_import_ready",
+            candidateAuthority);
+        ReleaseUploadSnapshotAuthority loaded = snapshot.Authority.Load();
+        Assert.True(loaded.IsValid, loaded.FailureReason);
+        ReleaseUploadCandidateAuthority candidate = Assert.IsType<ReleaseUploadCandidateAuthority>(
+            loaded.Candidate);
+        ReleaseUploadQuotaOptions options = ReleaseUploadQuotaOptions.FromConfiguration(
+            snapshot.Configuration);
+        var admission = new ReleaseUploadAdmissionService(snapshot.Configuration, options);
+        bool nextCalled = false;
+        var middleware = new ReleaseUploadRequestGateMiddleware(context =>
+        {
+            nextCalled = true;
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        });
+
+        foreach (string path in new[]
+                 {
+                     "/api/internal/releases/stages/stage-receipt/authority-advances",
+                     $"/api/internal/releases/upload-sessions/{Guid.NewGuid():N}/activate-staged"
+                 })
+        {
+            nextCalled = false;
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path = path;
+            context.Request.ContentType = "application/json";
+            context.Request.ContentLength = 16;
+            context.Request.Headers.Authorization = "Bearer fleet-test-token";
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateManifestSha256Header] =
+                candidate.Candidate.CanonicalManifestSha256;
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateInventorySha256Header] =
+                candidate.Candidate.InventorySha256;
+            context.Request.Headers[
+                ReleaseUploadAuthorizationEvaluator.CandidateBundleIdentitySha256Header] =
+                candidate.Candidate.BundleIdentitySha256;
+            context.Request.Headers[
+                "X-Chummer-Release-Exact-Incoming-Scope"] =
+                ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope;
+            using var body = new CountingStream(new byte[256]);
+            context.Request.Body = body;
+
+            await middleware.InvokeAsync(context, snapshot.Evaluator, admission, options);
+
+            Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+            Assert.Equal(0, body.ReadCount);
+            Assert.False(nextCalled);
+            Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(context));
+        }
+    }
+
+    [Fact]
+    public async Task RollbackRequiresOwnerAuthorityAndEnforcesDedicatedBodyLimitBeforeBodyRead()
+    {
+        using var snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+        snapshot.Publish("pass");
+        ReleaseUploadQuotaOptions options = ReleaseUploadQuotaOptions.FromConfiguration(
+            snapshot.Configuration);
+        var admission = new ReleaseUploadAdmissionService(snapshot.Configuration, options);
+        bool nextCalled = false;
+        var middleware = new ReleaseUploadRequestGateMiddleware(context =>
+        {
+            nextCalled = true;
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        });
+
+        DefaultHttpContext Request(string bearer, long? contentLength)
+        {
+            var context = new DefaultHttpContext();
+            context.Response.Body = new MemoryStream();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path =
+                "/api/internal/releases/generations/gen-20260726/rollback";
+            context.Request.ContentType = "application/json";
+            context.Request.ContentLength = contentLength;
+            context.Request.Headers.Authorization = $"Bearer {bearer}";
+            context.Request.Body = new CountingStream(new byte[256]);
+            return context;
+        }
+
+        ReleaseUploadTicketIssueResult ticket = snapshot.IssueTicket("operator");
+        DefaultHttpContext delegated = Request(ticket.Ticket, 16);
+        await middleware.InvokeAsync(delegated, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, delegated.Response.StatusCode);
+        Assert.Equal(0, Assert.IsType<CountingStream>(delegated.Request.Body).ReadCount);
+        Assert.False(nextCalled);
+        Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(delegated));
+
+        DefaultHttpContext oversized = Request(
+            "fleet-test-token",
+            InternalReleaseBundlesController.MaxReleaseGenerationRollbackRequestBodyBytes + 1);
+        await middleware.InvokeAsync(oversized, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, oversized.Response.StatusCode);
+        Assert.Equal(0, Assert.IsType<CountingStream>(oversized.Request.Body).ReadCount);
+        Assert.False(nextCalled);
+
+        DefaultHttpContext admitted = Request("fleet-test-token", 16);
+        await middleware.InvokeAsync(admitted, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status200OK, admitted.Response.StatusCode);
+        Assert.Equal(0, Assert.IsType<CountingStream>(admitted.Request.Body).ReadCount);
+        Assert.True(nextCalled);
+        ReleaseUploadAuthorizationContext authorization =
+            Assert.IsType<ReleaseUploadAuthorizationContext>(
+                ReleaseUploadRequestGateMiddleware.RequireAuthorization(admitted));
+        Assert.True(authorization.AllowsPrivilegedReconciliation);
+    }
+
+    [Fact]
+    public void OwnerNativeBridgePrivilegeIsLimitedToFleetAndTwoStagedRoutes()
+    {
+        var identity = new ReleaseUploadCandidateIdentity(
+            "run-20260726-215000",
+            new string('a', 64),
+            new string('b', 64),
+            3,
+            1024,
+            new string('c', 64));
+        var native = new ReleaseUploadCandidateNativeEvidenceBinding(
+            new string('d', 64),
+            new string('e', 64),
+            new string('f', 40),
+            identity.BundleIdentitySha256,
+            identity.CanonicalManifestSha256,
+            identity.InventorySha256);
+        var candidate = new ReleaseUploadCandidateAuthority(
+            "public-projection-" + new string('1', 64),
+            new string('1', 64),
+            new string('2', 64),
+            DateTimeOffset.UtcNow.AddHours(1),
+            identity,
+            "{}"u8.ToArray(),
+            [],
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            NativeEvidenceBinding: native);
+        using var snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+        ReleaseUploadTicketClaims ticket = snapshot.IssueTicket("operator").Claims;
+
+        bool Allows(string path, ReleaseUploadTicketClaims? claims = null)
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Method = HttpMethods.Post;
+            context.Request.Path = path;
+            return ReleaseUploadAuthorizationEvaluator
+                .AllowsOwnerCandidateFinalizationBridge(
+                    claims,
+                    candidate,
+                    context.Request);
+        }
+
+        Assert.True(Allows(
+            "/api/internal/releases/stages/stage-receipt/authority-advances"));
+        Assert.True(Allows(
+            $"/api/internal/releases/upload-sessions/{Guid.NewGuid():N}/activate-staged"));
+        Assert.False(Allows(
+            "/api/internal/releases/generations/generation-a/authority-advances"));
+        Assert.False(Allows(
+            "/api/internal/releases/generations/generation-a/rollback"));
+        Assert.False(Allows(
+            "/api/internal/releases/stages/stage-receipt/authority-advances",
+            ticket));
+
+        ReleaseUploadCandidateAuthority withoutNative = candidate with
+        {
+            NativeEvidenceBinding = null
+        };
+        var staged = new DefaultHttpContext();
+        staged.Request.Method = HttpMethods.Post;
+        staged.Request.Path =
+            "/api/internal/releases/stages/stage-receipt/authority-advances";
+        Assert.False(
+            ReleaseUploadAuthorizationEvaluator
+                .AllowsOwnerCandidateFinalizationBridge(
+                    null,
+                    withoutNative,
+                    staged.Request));
     }
 
     [Fact]

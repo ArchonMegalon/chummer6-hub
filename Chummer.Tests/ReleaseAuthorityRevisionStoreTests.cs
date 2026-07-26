@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -51,6 +52,102 @@ public sealed class ReleaseAuthorityRevisionStoreTests
                 "\"predecessorCurrentBytes\":\"AQ==\"",
                 "\"predecessorCurrentBytes\":\"AQ== \"",
                 StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void RollbackRequestJsonRequiresExactCanonicalFields()
+    {
+        var request = new ReleaseGenerationRollbackRequest(
+            "generation-b",
+            "generation-a",
+            new string('a', 64),
+            "auth-" + new string('b', 64),
+            "rollback-test-0001");
+        string canonical = JsonSerializer.Serialize(request);
+
+        Assert.Equal(
+            request,
+            JsonSerializer.Deserialize<ReleaseGenerationRollbackRequest>(canonical));
+        Assert.Throws<JsonException>(() =>
+            JsonSerializer.Deserialize<ReleaseGenerationRollbackRequest>(
+                canonical.Insert(canonical.Length - 1, ",\"unexpected\":true")));
+        Assert.Throws<JsonException>(() =>
+            JsonSerializer.Deserialize<ReleaseGenerationRollbackRequest>(
+                canonical.Insert(
+                    canonical.Length - 1,
+                    ",\"TargetGenerationId\":\"case-shadow\"")));
+    }
+
+    [Fact]
+    public async Task PrivilegedRollbackRestoresExactRetainedPointerAndIsCasIdempotent()
+    {
+        using var fixture = new AuthorityFixture();
+        fixture.Shelf.WriteGeneration("generation-b", "run-b", "artifact-b");
+        fixture.Shelf.Activate("generation-b", "run-b");
+        byte[] retainedPointer = File.ReadAllBytes(fixture.Shelf.PointerPath);
+        fixture.Shelf.Activate(
+            AuthorityFixture.GenerationId,
+            CandidateReleaseVersion);
+
+        ReleaseShelfSnapshot active = fixture.ShelfStore.Capture();
+        ReleaseAuthorityRevisionAdvanceRequest rebound = fixture.Request with
+        {
+            ExpectedShelfPointerSha256 =
+                Digest(File.ReadAllBytes(fixture.Shelf.PointerPath)),
+            ExpectedShelfInventoryDigest = "sha256:" + active.InventoryDigest
+        };
+        ReleaseAuthorityRevisionAdvanceResult authority =
+            await fixture.CreateStore().AdvancePreviewReadyAsync(
+                rebound,
+                CancellationToken.None);
+        var service = new ReleaseBundlePromotionService(
+            fixture.Shelf.Configuration,
+            NullLogger<ReleaseBundlePromotionService>.Instance,
+            promotionCheckpoint: null,
+            TimeProvider.System,
+            PrivacyLaunchGate.ClearForTests);
+        var request = new ReleaseGenerationRollbackRequest(
+            "generation-b",
+            AuthorityFixture.GenerationId,
+            authority.SnapshotSha256,
+            authority.RevisionId,
+            "rollback-authority-test-0001");
+
+        await Assert.ThrowsAsync<ReleaseShelfMutationConcurrencyException>(() =>
+            service.RollbackToGenerationAsync(
+                request with
+                {
+                    ExpectedCurrentSnapshotSha256 = new string('f', 64)
+                },
+                CancellationToken.None));
+        Assert.Equal(
+            AuthorityFixture.GenerationId,
+            fixture.ShelfStore.Capture().GenerationId);
+
+        ReleaseBundlePromotionResult committed =
+            await service.RollbackToGenerationAsync(
+                request,
+                CancellationToken.None);
+
+        Assert.Equal("generation-b", committed.GenerationId);
+        Assert.Equal(retainedPointer, File.ReadAllBytes(fixture.Shelf.PointerPath));
+        Assert.Equal("generation-b", fixture.ShelfStore.Capture().GenerationId);
+
+        ReleaseBundlePromotionResult retried =
+            await service.RollbackToGenerationAsync(
+                request,
+                CancellationToken.None);
+        Assert.Equal(committed.ActivationReceiptId, retried.ActivationReceiptId);
+        Assert.Equal(retainedPointer, File.ReadAllBytes(fixture.Shelf.PointerPath));
+
+        await Assert.ThrowsAsync<ReleaseShelfMutationConcurrencyException>(() =>
+            service.RollbackToGenerationAsync(
+                request with
+                {
+                    ExpectedCurrentRevisionId =
+                        "auth-" + new string('e', 64)
+                },
+                CancellationToken.None));
     }
 
     [Fact]

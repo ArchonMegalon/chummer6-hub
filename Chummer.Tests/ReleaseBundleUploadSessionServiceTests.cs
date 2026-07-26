@@ -406,6 +406,65 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     }
 
     [Fact]
+    public void NativeEvidenceCandidateBindingIsDurableAndComparedExactly()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddHours(2);
+        var candidate = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: new ReleaseUploadCandidateIncumbentBinding(
+                SnapshotSha256: new string('6', 64),
+                FullShelfInventorySha256: new string('7', 64),
+                ActiveInventorySha256: new string('8', 64),
+                CanonicalManifestSha256: new string('9', 64),
+                CompatibilityManifestSha256: new string('a', 64)),
+            NativeEvidenceBinding: new ReleaseUploadCandidateNativeEvidenceBinding(
+                EvidenceSha256: new string('b', 64),
+                CaptureInventorySha256: new string('c', 64),
+                SourceCommit: new string('d', 40),
+                BundleIdentitySha256: new string('3', 64),
+                CanonicalManifestSha256: new string('4', 64),
+                InventorySha256: new string('5', 64)));
+        ReleaseDesktopTupleScope scope = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        ReleaseUploadSession created = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+        ReleaseUploadSession reloaded = fixture.CreateService().CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+        Assert.Equal(created.SessionId, reloaded.SessionId);
+        Assert.Equal(candidate, reloaded.CandidateImportBinding);
+
+        InvalidOperationException mismatch = Assert.Throws<InvalidOperationException>(() =>
+            fixture.CreateService().CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidate with
+                {
+                    NativeEvidenceBinding = candidate.NativeEvidenceBinding! with
+                    {
+                        EvidenceSha256 = new string('e', 64)
+                    }
+                },
+                scope));
+        Assert.Contains("candidate binding changed", mismatch.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CompletedSessionRejectsFurtherWrites()
     {
         using Fixture fixture = new();

@@ -340,8 +340,20 @@ public sealed class ReleaseUploadAuthorizationEvaluator
             request.Path.Value ?? string.Empty,
             AuthorizationExpiresAtUtc: expiresAt,
             CandidateImportAuthority: candidate,
-            AllowsPrivilegedReconciliation: false);
+            AllowsPrivilegedReconciliation:
+                AllowsOwnerCandidateFinalizationBridge(
+                    ticketClaims,
+                    candidate,
+                    request));
     }
+
+    internal static bool AllowsOwnerCandidateFinalizationBridge(
+        ReleaseUploadTicketClaims? ticketClaims,
+        ReleaseUploadCandidateAuthority candidate,
+        HttpRequest request)
+        => ticketClaims is null
+           && candidate.NativeEvidenceBinding is not null
+           && IsOwnerCandidateBridgeRoute(request);
 
     public ReleaseUploadTicketRevocationProofEvaluation EvaluateTicketRevocationProof(
         HttpRequest request)
@@ -408,6 +420,41 @@ public sealed class ReleaseUploadAuthorizationEvaluator
         => value.Length == 64
            && value.All(static character => character is >= '0' and <= '9'
                or >= 'a' and <= 'f');
+
+    private static bool IsOwnerCandidateBridgeRoute(HttpRequest request)
+    {
+        if (!HttpMethods.IsPost(request.Method))
+        {
+            return false;
+        }
+
+        string path = (request.Path.Value ?? string.Empty).TrimEnd('/');
+        const string stagePrefix = "/api/internal/releases/stages/";
+        if (path.StartsWith(stagePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string[] suffix = path[stagePrefix.Length..]
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            return suffix.Length == 2
+                   && suffix[0].Length > 0
+                   && suffix[1].Equals(
+                       "authority-advances",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        const string sessionPrefix = "/api/internal/releases/upload-sessions/";
+        if (!path.StartsWith(sessionPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string[] sessionSuffix = path[sessionPrefix.Length..]
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return sessionSuffix.Length == 2
+               && sessionSuffix[0].Length > 0
+               && sessionSuffix[1].Equals(
+                   "activate-staged",
+                   StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool FixedTimeEquals(string left, string right)
     {
@@ -623,9 +670,9 @@ public sealed class ReleaseUploadRequestGateMiddleware
 
         if (authorization.CandidateImportAuthority is not null
             && route is (ReleaseUploadRoute.AuthorityAdvance
+                or ReleaseUploadRoute.Rollback
                 or ReleaseUploadRoute.Complete
-                or ReleaseUploadRoute.Reconcile
-                or ReleaseUploadRoute.ActivateStaged))
+                or ReleaseUploadRoute.Reconcile))
         {
             await WriteProblemAsync(
                 context,
@@ -633,6 +680,32 @@ public sealed class ReleaseUploadRequestGateMiddleware
                 "Full release promotion authority required",
                 "candidate-import authority cannot advance release authority.",
                 "https://chummer.run/problems/release-authority/full-authority-required");
+            return;
+        }
+
+        if (authorization.CandidateImportAuthority is not null
+            && route is (ReleaseUploadRoute.StagedAuthorityAdvance
+                or ReleaseUploadRoute.ActivateStaged)
+            && !authorization.AllowsPrivilegedReconciliation)
+        {
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                "Owner candidate finalization authority required",
+                "candidate-import authority may stage exact bytes, but only the internal owner token may advance or activate that staged candidate.",
+                "https://chummer.run/problems/release-authority/owner-candidate-finalization-required");
+            return;
+        }
+
+        if (route == ReleaseUploadRoute.Rollback
+            && !authorization.AllowsPrivilegedReconciliation)
+        {
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                "Privileged release rollback required",
+                "only the owner control authority may roll back the public release shelf.",
+                "https://chummer.run/problems/release-bundle/rollback-forbidden");
             return;
         }
 
@@ -651,7 +724,9 @@ public sealed class ReleaseUploadRequestGateMiddleware
 
         bool hasMultipartBody = HasMultipartBody(route);
         bool hasAuthorityJsonBody = route is ReleaseUploadRoute.AuthorityAdvance
-            or ReleaseUploadRoute.ActivateStaged;
+            or ReleaseUploadRoute.StagedAuthorityAdvance
+            or ReleaseUploadRoute.ActivateStaged
+            or ReleaseUploadRoute.Rollback;
         if (!hasMultipartBody
             && !hasAuthorityJsonBody
             && route is not ReleaseUploadRoute.Complete and not ReleaseUploadRoute.Reconcile)
@@ -672,9 +747,11 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return;
         }
 
-        long maximumBodyBytes = hasAuthorityJsonBody
-            ? ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes
-            : options.MaxRequestBytes;
+        long maximumBodyBytes = route == ReleaseUploadRoute.Rollback
+            ? InternalReleaseBundlesController.MaxReleaseGenerationRollbackRequestBodyBytes
+            : hasAuthorityJsonBody
+                ? ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes
+                : options.MaxRequestBytes;
         if ((hasMultipartBody || hasAuthorityJsonBody)
             && (context.Request.ContentLength <= 0
                 || context.Request.ContentLength > maximumBodyBytes))
@@ -784,13 +861,22 @@ public sealed class ReleaseUploadRequestGateMiddleware
             string[] generationSuffix = path[generationPrefix.Length..]
                 .Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (generationSuffix.Length == 2
-                && generationSuffix[0].Length > 0
-                && generationSuffix[1].Equals(
-                    "authority-advances",
-                    StringComparison.OrdinalIgnoreCase))
+                && generationSuffix[0].Length > 0)
             {
-                route = ReleaseUploadRoute.AuthorityAdvance;
-                return true;
+                if (generationSuffix[1].Equals(
+                        "authority-advances",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    route = ReleaseUploadRoute.AuthorityAdvance;
+                    return true;
+                }
+                if (generationSuffix[1].Equals(
+                        "rollback",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    route = ReleaseUploadRoute.Rollback;
+                    return true;
+                }
             }
 
             return false;
@@ -807,7 +893,7 @@ public sealed class ReleaseUploadRequestGateMiddleware
                     "authority-advances",
                     StringComparison.OrdinalIgnoreCase))
             {
-                route = ReleaseUploadRoute.AuthorityAdvance;
+                route = ReleaseUploadRoute.StagedAuthorityAdvance;
                 return true;
             }
 
@@ -943,6 +1029,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
         ActivateStaged,
         Reconcile,
         AuthorityAdvance,
+        StagedAuthorityAdvance,
+        Rollback,
         TicketRevocationProof
     }
 }
