@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import importlib.util
 import json
+import mmap
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 from typing import Any, Callable
+import zlib
 
 import pytest
 
@@ -45,6 +49,27 @@ BINDING_FIELDS = {
     "required_heads",
     "rid",
 }
+
+
+class ProcessAfterWait:
+    def __init__(
+        self,
+        process: Any,
+        callback: Callable[[], None],
+    ) -> None:
+        self._process = process
+        self._callback = callback
+        self._called = False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._process, name)
+
+    def wait(self, *args: object, **kwargs: object) -> int:
+        return_code = self._process.wait(*args, **kwargs)
+        if not self._called:
+            self._called = True
+            self._callback()
+        return return_code
 
 
 def load_real_ui_candidate_routing() -> Any:
@@ -970,6 +995,7 @@ def invoke(
     write_json(mac_aggregate_path, mac_aggregate, 0o600)
 
     output = tmp_path / "GLOBAL_RELEASE_SCOPE_UNION_VERIFICATION.generated.json"
+    artifact_snapshot_root = tmp_path / "artifact-snapshot"
     if precreate_output:
         write_json(output, {"status": "old"})
     command = [
@@ -981,6 +1007,8 @@ def invoke(
         str(promotion_path),
         "--files-root",
         str(files_root),
+        "--artifact-snapshot-root",
+        str(artifact_snapshot_root),
         "--registry-repository",
         str(registry_repository),
         "--expected-release-version",
@@ -1040,6 +1068,7 @@ def invoke(
         "manifest": manifest_path,
         "promotion": promotion_path,
         "files_root": files_root,
+        "artifact_snapshot_root": artifact_snapshot_root,
         "decisions": decision_paths,
         "review_manifests": review_manifests,
         "authority_currents": authority_currents,
@@ -1060,14 +1089,18 @@ def invoke(
     return result, output, context
 
 
-def test_accepts_only_complete_exact_global_union_and_emits_closed_receipt(
+def test_accepts_only_complete_exact_global_union_and_emits_preparation_receipt(
     tmp_path: Path,
 ) -> None:
     result, output, context = invoke(tmp_path)
     assert result.returncode == 0, result.stderr
     receipt = json.loads(output.read_text())
-    assert receipt["contractName"] == "chummer.release-scope-union-verification/v1"
-    assert receipt["status"] == "pass"
+    assert receipt["contractName"] == "chummer.release-scope-union-preparation/v1"
+    assert receipt["status"] == "prepared"
+    assert receipt["authorizesCandidateProduction"] is False
+    assert receipt["authorizationStatus"] == (
+        "requires_publisher_consumption_receipt"
+    )
     assert receipt["verificationPhase"] == "global_candidate_inventory_and_presentation"
     assert receipt["exactIncomingDesktopScope"] == (
         "avalonia:linux:linux-x64,avalonia:macos:osx-arm64,"
@@ -1091,6 +1124,72 @@ def test_accepts_only_complete_exact_global_union_and_emits_closed_receipt(
         {row["authoritySnapshotSha256"] for row in receipt["reviewAuthorities"]}
     ) == 3
     assert len(receipt["filesRootInventorySha256"]) == 64
+    snapshot_root = context["artifact_snapshot_root"]
+    snapshot_binding = receipt["artifactSnapshot"]
+    assert snapshot_binding["contractName"] == (
+        "chummer.release-scope-union-artifact-snapshot/v1"
+    )
+    assert snapshot_binding["root"] == str(snapshot_root)
+    assert snapshot_binding["authorizesCandidateProduction"] is False
+    assert snapshot_binding["storagePosture"] == "mutable_audit_snapshot"
+    assert snapshot_binding["consumerRequirement"] == (
+        "rehash_and_seal_before_publication"
+    )
+    assert set(path.name for path in snapshot_root.iterdir()) == {
+        "objects",
+        "ARTIFACT_SNAPSHOT.generated.json",
+        "ARTIFACT_SNAPSHOT_COMMIT.generated.json",
+    }
+    snapshot_manifest_raw = (
+        snapshot_root / snapshot_binding["manifestFileName"]
+    ).read_bytes()
+    snapshot_commit_raw = (
+        snapshot_root / snapshot_binding["commitFileName"]
+    ).read_bytes()
+    assert hashlib.sha256(snapshot_manifest_raw).hexdigest() == (
+        snapshot_binding["manifestSha256"]
+    )
+    assert hashlib.sha256(snapshot_commit_raw).hexdigest() == (
+        snapshot_binding["commitSha256"]
+    )
+    snapshot_manifest = json.loads(snapshot_manifest_raw)
+    snapshot_commit = json.loads(snapshot_commit_raw)
+    assert snapshot_manifest["status"] == "prepared"
+    assert snapshot_manifest["authorizesCandidateProduction"] is False
+    assert snapshot_manifest["storagePosture"] == "mutable_audit_snapshot"
+    assert snapshot_manifest["consumerRequirement"] == (
+        "rehash_and_seal_before_publication"
+    )
+    assert snapshot_commit["status"] == "committed"
+    assert snapshot_commit["authorizesCandidateProduction"] is False
+    assert snapshot_commit["authorizationStatus"] == (
+        "requires_publisher_consumption_receipt"
+    )
+    assert snapshot_commit["preparationReceiptFileName"] == output.name
+    assert snapshot_commit["snapshotManifestSha256"] == (
+        snapshot_binding["manifestSha256"]
+    )
+    assert snapshot_manifest["transactionId"] == (
+        snapshot_commit["transactionId"]
+    )
+    assert snapshot_commit["transactionId"] == (
+        snapshot_binding["transactionId"]
+    )
+    object_names = {
+        path.name
+        for path in (snapshot_root / "objects").iterdir()
+    }
+    assert object_names == {
+        row["objectName"]
+        for row in snapshot_manifest["artifacts"]
+    }
+    for row in snapshot_manifest["artifacts"]:
+        object_path = snapshot_root / "objects" / row["objectName"]
+        assert object_path.stat().st_mode & 0o777 == 0o400
+        assert object_path.stat().st_size == row["sizeBytes"]
+        assert hashlib.sha256(object_path.read_bytes()).hexdigest() == (
+            row["sha256"]
+        )
     assert output.stat().st_mode & 0o777 == 0o600
     assert output.read_bytes() == canonical(receipt)
 
@@ -1212,6 +1311,544 @@ def test_rejects_any_artifact_byte_or_metadata_drift(
         or "promotion evidence does not bind" in result.stderr
     )
     assert not output.exists()
+
+
+def test_artifact_verification_rechecks_earlier_files_after_later_hashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    first_name = state["manifest"]["artifacts"][0]["fileName"]
+    first_path = files_root / first_name
+    real_hold = module._hold_stable_file_digest
+    hold_count = 0
+    raced = False
+
+    def race_earlier_file(
+        path: Path,
+        label: str,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal hold_count, raced
+        held = real_hold(path, label, **kwargs)
+        hold_count += 1
+        if hold_count == 2:
+            original = first_path.read_bytes()
+            replacement = (
+                (b"x" if original[:1] != b"x" else b"y")
+                + original[1:]
+            )
+            first_path.write_bytes(replacement)
+            raced = True
+        return held
+
+    monkeypatch.setattr(module, "_hold_stable_file_digest", race_earlier_file)
+    with pytest.raises(module.ScopeError, match="changed during held recheck"):
+        module._verify_files(state["manifest"], files_root)
+    assert raced
+
+
+def test_post_write_artifact_recheck_removes_receipt_after_late_mutation(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, _, held_files = module._verify_files(state["manifest"], files_root)
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+
+    def final_check() -> None:
+        for held_file in held_files:
+            held_file.recheck()
+
+    try:
+        final_check()
+        raced_path = files_root / state["manifest"]["artifacts"][0]["fileName"]
+        original = raced_path.read_bytes()
+        raced_path.write_bytes(
+            (b"x" if original[:1] != b"x" else b"y") + original[1:]
+        )
+        with pytest.raises(
+            module.ScopeError,
+            match="changed during held recheck",
+        ):
+            module._write_new(
+                output,
+                {"status": "pass"},
+                post_write_check=final_check,
+            )
+        assert not output.exists()
+    finally:
+        for held_file in reversed(held_files):
+            held_file.close()
+
+
+def test_candidate_fifo_is_opened_nonblocking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    fifo = tmp_path / "candidate.deb"
+    os.mkfifo(fifo, mode=0o600)
+    real_open = module.os.open
+    checked = False
+
+    def assert_nonblocking_open(
+        path: object,
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        nonlocal checked
+        if path == fifo.name and "dir_fd" in kwargs:
+            assert flags & getattr(os, "O_NONBLOCK", 0)
+            checked = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", assert_nonblocking_open)
+    with pytest.raises(
+        module.ScopeError,
+        match="single-link regular file",
+    ):
+        module._hold_stable_file_digest(fifo, "candidate FIFO")
+    assert checked
+
+
+@pytest.mark.parametrize("phase", ["initial", "recheck"])
+def test_artifact_hash_reads_are_bounded_by_held_size(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+) -> None:
+    module = load_union_module()
+    path = tmp_path / "candidate.bin"
+    write_bytes(path, b"a", 0o600)
+    held = (
+        module._hold_stable_file_digest(path, "bounded artifact")
+        if phase == "recheck"
+        else None
+    )
+    requested_sizes: list[int] = []
+
+    def endless_nonempty_read(_descriptor: int, requested: int) -> bytes:
+        requested_sizes.append(requested)
+        if len(requested_sizes) > 2:
+            raise RuntimeError("read loop was not bounded")
+        return b"x" * requested
+
+    monkeypatch.setattr(module.os, "read", endless_nonempty_read)
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="stable hash|held recheck",
+        ):
+            if held is None:
+                module._hold_stable_file_digest(path, "bounded artifact")
+            else:
+                held.recheck()
+        assert requested_sizes == [2]
+    finally:
+        if held is not None:
+            held.close()
+
+
+def test_artifact_size_mismatch_is_rejected_before_any_hash_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    path = tmp_path / "oversized-candidate.bin"
+    with path.open("wb") as stream:
+        stream.truncate(8 * 1024 * 1024)
+    path.chmod(0o600)
+    reads = 0
+
+    def reject_any_read(_descriptor: int, _requested: int) -> bytes:
+        nonlocal reads
+        reads += 1
+        raise AssertionError("mismatched artifact must not be hashed")
+
+    monkeypatch.setattr(module.os, "read", reject_any_read)
+    with pytest.raises(module.ScopeError, match="disagree with manifest"):
+        module._hold_stable_file_digest(
+            path,
+            "candidate artifact bytes",
+            expected_size=28,
+        )
+    assert reads == 0
+
+
+def test_artifact_snapshot_detaches_authorized_bytes_from_live_source_mmap(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    first_name = state["manifest"]["artifacts"][0]["fileName"]
+    writable = os.open(files_root / first_name, os.O_RDWR)
+    mapping = mmap.mmap(
+        writable,
+        (files_root / first_name).stat().st_size,
+    )
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    output = tmp_path / "scope-receipt.json"
+    guard = module._materialize_artifact_snapshot(
+        root=snapshot_root,
+        output=output,
+        manifest=state["manifest"],
+        held_artifacts=held,
+        release_version=VERSION,
+        manifest_sha256=hashlib.sha256(
+            canonical(state["manifest"])
+        ).hexdigest(),
+        inventory_sha256=inventory_sha256,
+        registry_commit="a" * 40,
+    )
+    try:
+        for snapshot_file in guard.files:
+            assert (
+                fcntl.fcntl(snapshot_file.descriptor, fcntl.F_GETFL)
+                & os.O_ACCMODE
+            ) == os.O_RDONLY
+        mapping[:8] = b"TAMPERED"
+        guard.verify()
+        snapshot_manifest = json.loads(
+            (
+                snapshot_root / "ARTIFACT_SNAPSHOT.generated.json"
+            ).read_bytes()
+        )
+        first_record = next(
+            row
+            for row in snapshot_manifest["artifacts"]
+            if row["sourceFileName"] == first_name
+        )
+        snapshot_object = (
+            snapshot_root
+            / "objects"
+            / first_record["objectName"]
+        )
+        assert hashlib.sha256(snapshot_object.read_bytes()).hexdigest() == (
+            first_record["sha256"]
+        )
+        assert (files_root / first_name).read_bytes() != (
+            snapshot_object.read_bytes()
+        )
+    finally:
+        guard.close()
+        for item in reversed(held):
+            item.close()
+        mapping.close()
+        os.close(writable)
+
+
+def test_artifact_snapshot_guard_rejects_post_link_object_change(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    guard = module._materialize_artifact_snapshot(
+        root=snapshot_root,
+        output=tmp_path / "scope-receipt.json",
+        manifest=state["manifest"],
+        held_artifacts=held,
+        release_version=VERSION,
+        manifest_sha256=hashlib.sha256(
+            canonical(state["manifest"])
+        ).hexdigest(),
+        inventory_sha256=inventory_sha256,
+        registry_commit="b" * 40,
+    )
+    try:
+        object_path = next((snapshot_root / "objects").iterdir())
+        object_path.chmod(0o600)
+        object_path.write_bytes(b"changed snapshot object\n")
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed|snapshot object changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+        for item in reversed(held):
+            item.close()
+
+
+def test_final_link_boundary_can_only_publish_nonauthorizing_preparation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "preparation.json"
+    guard = module._materialize_artifact_snapshot(
+        root=snapshot_root,
+        output=output,
+        manifest=state["manifest"],
+        held_artifacts=held,
+        release_version=VERSION,
+        manifest_sha256=hashlib.sha256(
+            canonical(state["manifest"])
+        ).hexdigest(),
+        inventory_sha256=inventory_sha256,
+        registry_commit="c" * 40,
+    )
+    object_path = next((snapshot_root / "objects").iterdir())
+    real_link = module.os.link
+    mutated = False
+
+    def link_then_mutate(*args: object, **kwargs: object) -> None:
+        nonlocal mutated
+        real_link(*args, **kwargs)
+        if kwargs.get("dst_dir_fd") is not None:
+            destination = args[1]
+            if destination == output.name:
+                object_path.chmod(0o600)
+                object_path.write_bytes(b"changed after final barrier\n")
+                mutated = True
+
+    payload = {
+        "contractName": "chummer.release-scope-union-preparation/v1",
+        "contractVersion": 1,
+        "status": "prepared",
+        "authorizesCandidateProduction": False,
+        "authorizationStatus": "requires_publisher_consumption_receipt",
+    }
+    monkeypatch.setattr(module.os, "link", link_then_mutate)
+    try:
+        module._write_new(
+            output,
+            payload,
+            post_write_check=guard.verify,
+            mutation_watch=guard.mutation_watch,
+        )
+        assert mutated
+        assert json.loads(output.read_text()) == payload
+        assert json.loads(output.read_text())["status"] != "pass"
+        assert not json.loads(output.read_text())[
+            "authorizesCandidateProduction"
+        ]
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed|snapshot object changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+        for item in reversed(held):
+            item.close()
+
+
+def test_complete_uncommitted_snapshot_is_retained_but_nonauthorizing(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    guard = module._materialize_artifact_snapshot(
+        root=snapshot_root,
+        output=tmp_path / "preparation.json",
+        manifest=state["manifest"],
+        held_artifacts=held,
+        release_version=VERSION,
+        manifest_sha256=hashlib.sha256(
+            canonical(state["manifest"])
+        ).hexdigest(),
+        inventory_sha256=inventory_sha256,
+        registry_commit="d" * 40,
+    )
+    try:
+        assert snapshot_root.is_dir()
+        assert not (tmp_path / "preparation.json").exists()
+        snapshot_commit = json.loads(
+            (
+                snapshot_root
+                / "ARTIFACT_SNAPSHOT_COMMIT.generated.json"
+            ).read_text()
+        )
+        assert snapshot_commit["authorizesCandidateProduction"] is False
+        assert snapshot_commit["authorizationStatus"] == (
+            "requires_publisher_consumption_receipt"
+        )
+    finally:
+        guard.close()
+        for item in reversed(held):
+            item.close()
+
+
+@pytest.mark.parametrize("phase", ["partial_objects", "after_snapshot_commit"])
+def test_failed_snapshot_publication_retains_nonauthorizing_prefix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    real_link = module.os.link
+    link_count = 0
+
+    def fail_snapshot_link(*args: object, **kwargs: object) -> None:
+        nonlocal link_count
+        link_count += 1
+        destination = args[1]
+        if phase == "partial_objects" and link_count == 2:
+            raise OSError("injected partial object publication failure")
+        real_link(*args, **kwargs)
+        if (
+            phase == "after_snapshot_commit"
+            and destination == module.SNAPSHOT_COMMIT_NAME
+        ):
+            raise OSError("injected post-commit link report failure")
+
+    monkeypatch.setattr(module.os, "link", fail_snapshot_link)
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="artifact snapshot publication failed",
+        ):
+            module._materialize_artifact_snapshot(
+                root=snapshot_root,
+                output=tmp_path / "preparation.json",
+                manifest=state["manifest"],
+                held_artifacts=held,
+                release_version=VERSION,
+                manifest_sha256=hashlib.sha256(
+                    canonical(state["manifest"])
+                ).hexdigest(),
+                inventory_sha256=inventory_sha256,
+                registry_commit="f" * 40,
+            )
+        assert snapshot_root.is_dir()
+        assert not (tmp_path / "preparation.json").exists()
+        snapshot_commit_path = (
+            snapshot_root
+            / "ARTIFACT_SNAPSHOT_COMMIT.generated.json"
+        )
+        if snapshot_commit_path.exists():
+            snapshot_commit = json.loads(snapshot_commit_path.read_text())
+            assert snapshot_commit["authorizesCandidateProduction"] is False
+            assert snapshot_commit["authorizationStatus"] == (
+                "requires_publisher_consumption_receipt"
+            )
+    finally:
+        for item in reversed(held):
+            item.close()
+
+
+@pytest.mark.parametrize(
+    ("phase", "exit_code"),
+    [("partial_objects", 91), ("complete_snapshot", 92)],
+)
+def test_process_death_leaves_only_nonauthorizing_snapshot_prefix(
+    tmp_path: Path,
+    phase: str,
+    exit_code: int,
+) -> None:
+    module = load_union_module()
+    state = candidate_state()
+    files_root = tmp_path / "files"
+    for name, raw in state["files"].items():
+        write_bytes(files_root / name, raw, 0o644)
+    _, inventory_sha256, held = module._verify_files(
+        state["manifest"],
+        files_root,
+    )
+    snapshot_root = tmp_path / "artifact-snapshot"
+    preparation = tmp_path / "preparation.json"
+    child = os.fork()
+    if child == 0:
+        if phase == "partial_objects":
+            real_link = module.os.link
+            linked = 0
+
+            def exit_after_first_link(
+                *args: object,
+                **kwargs: object,
+            ) -> None:
+                nonlocal linked
+                real_link(*args, **kwargs)
+                linked += 1
+                if linked == 1:
+                    os._exit(91)
+
+            module.os.link = exit_after_first_link
+        module._materialize_artifact_snapshot(
+            root=snapshot_root,
+            output=preparation,
+            manifest=state["manifest"],
+            held_artifacts=held,
+            release_version=VERSION,
+            manifest_sha256=hashlib.sha256(
+                canonical(state["manifest"])
+            ).hexdigest(),
+            inventory_sha256=inventory_sha256,
+            registry_commit="1" * 40,
+        )
+        os._exit(92)
+    try:
+        _pid, status = os.waitpid(child, 0)
+        assert os.waitstatus_to_exitcode(status) == exit_code
+        assert snapshot_root.is_dir()
+        assert not preparation.exists()
+        snapshot_commit_path = (
+            snapshot_root
+            / "ARTIFACT_SNAPSHOT_COMMIT.generated.json"
+        )
+        if snapshot_commit_path.exists():
+            snapshot_commit = json.loads(snapshot_commit_path.read_text())
+            assert snapshot_commit["authorizesCandidateProduction"] is False
+            assert snapshot_commit["authorizationStatus"] == (
+                "requires_publisher_consumption_receipt"
+            )
+    finally:
+        for item in reversed(held):
+            item.close()
 
 
 @pytest.mark.parametrize(
@@ -1773,19 +2410,23 @@ def test_registry_inspection_holds_and_rechecks_checkout_identity(
     module = load_union_module()
     repository = tmp_path / "registry"
     expected_commit = create_registry_fixture(repository)
-    real_run = module.subprocess.run
+    real_popen = module.subprocess.Popen
     call_count = 0
 
     def race_after_first_git(*args: object, **kwargs: object) -> Any:
         nonlocal call_count
-        result = real_run(*args, **kwargs)
         call_count += 1
-        if call_count == 1:
+        process = real_popen(*args, **kwargs)
+        if call_count != 1:
+            return process
+
+        def replace_checkout() -> None:
             repository.rename(tmp_path / "registry-held-original")
             repository.mkdir()
-        return result
 
-    monkeypatch.setattr(module.subprocess, "run", race_after_first_git)
+        return ProcessAfterWait(process, replace_checkout)
+
+    monkeypatch.setattr(module.subprocess, "Popen", race_after_first_git)
     with pytest.raises(module.ScopeError, match="changed during Git inspection"):
         module._verify_registry_checkout(repository, expected_commit)
 
@@ -1829,6 +2470,1210 @@ def test_registry_inspection_rejects_subpath_replacement_during_comparison(
         match="changed during protected source comparison",
     ):
         module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rechecks_earlier_producers_after_later_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    first_source = repository / REGISTRY_PROTECTED_PATHS[0]
+    real_popen = module.subprocess.Popen
+    blob_reads = 0
+    raced = False
+
+    def mutate_first_source_during_second_blob(
+        *args: object,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal blob_reads, raced
+        command = args[0] if args else kwargs.get("args")
+        process = real_popen(*args, **kwargs)
+        if (
+            isinstance(command, list)
+            and len(command) >= 3
+            and command[-3] == "cat-file"
+            and command[-2] == "blob"
+        ):
+            blob_reads += 1
+            if blob_reads == 2:
+                original = first_source.read_bytes()
+                first_source.write_bytes(
+                    (b"x" if original[:1] != b"x" else b"y")
+                    + original[1:]
+                )
+                raced = True
+        return process
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        mutate_first_source_during_second_blob,
+    )
+    with pytest.raises(
+        module.ScopeError,
+        match="changed during protected source comparison",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert raced
+
+
+def test_registry_comparison_cannot_switch_head_for_blob_reads_and_restore(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    relative = REGISTRY_PROTECTED_PATHS[0]
+    (repository / relative).write_bytes(b"malicious temporal producer\n")
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "add", "--", relative],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "temporal substitution",
+        ],
+        check=True,
+    )
+    malicious_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "update-ref",
+            "HEAD",
+            expected_commit,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "reset",
+            "-q",
+            "--mixed",
+            expected_commit,
+        ],
+        check=True,
+    )
+    assert (repository / relative).read_bytes() == b"malicious temporal producer\n"
+
+    real_popen = module.subprocess.Popen
+    switched = False
+    restored = False
+
+    def switch_and_restore_around_git(
+        *args: object,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal switched, restored
+        command = args[0] if args else kwargs.get("args")
+        process = real_popen(*args, **kwargs)
+        if (
+            not switched
+            and isinstance(command, list)
+            and command[-3:] == ["rev-parse", "--verify", "HEAD^{commit}"]
+        ):
+            def switch_head() -> None:
+                nonlocal switched
+                subprocess.run(
+                    [
+                        "/usr/bin/git",
+                        "-C",
+                        str(repository),
+                        "update-ref",
+                        "HEAD",
+                        malicious_commit,
+                    ],
+                    check=True,
+                )
+                switched = True
+
+            return ProcessAfterWait(process, switch_head)
+        if (
+            switched
+            and not restored
+            and isinstance(command, list)
+            and "cat-file" in command
+            and "blob" in command
+        ):
+            def restore_head() -> None:
+                nonlocal restored
+                subprocess.run(
+                    [
+                        "/usr/bin/git",
+                        "-C",
+                        str(repository),
+                        "update-ref",
+                        "HEAD",
+                        expected_commit,
+                    ],
+                    check=True,
+                )
+                restored = True
+
+            return ProcessAfterWait(process, restore_head)
+        return process
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        switch_and_restore_around_git,
+    )
+    with pytest.raises(
+        module.ScopeError,
+        match="release producer paths must be clean",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert switched
+    assert restored
+    assert (
+        subprocess.run(
+            ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+        == expected_commit
+    )
+
+
+def test_registry_inspection_holds_and_rechecks_absolute_parent_chain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    authority = tmp_path / "authority"
+    repository = authority / "registry"
+    expected_commit = create_registry_fixture(repository)
+    real_popen = module.subprocess.Popen
+    swapped = False
+
+    def swap_parent_after_first_git(*args: object, **kwargs: object) -> Any:
+        nonlocal swapped
+        process = real_popen(*args, **kwargs)
+        if swapped:
+            return process
+
+        def replace_parent() -> None:
+            nonlocal swapped
+            authority.rename(tmp_path / "authority-held-original")
+            authority.mkdir()
+            (authority / "registry").mkdir()
+            swapped = True
+
+        return ProcessAfterWait(process, replace_parent)
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        swap_parent_after_first_git,
+    )
+    with pytest.raises(module.ScopeError, match="changed during Git inspection"):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert swapped
+
+
+@pytest.mark.parametrize("object_kind", ["commit", "tree"])
+def test_registry_inspection_raw_rehashes_objects_mutated_after_fsck(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    object_kind: str,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    if object_kind == "commit":
+        object_id = expected_commit
+    else:
+        object_id = subprocess.run(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(repository),
+                "rev-parse",
+                f"{expected_commit}^{{tree}}",
+            ],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+    object_path = (
+        repository / ".git" / "objects" / object_id[:2] / object_id[2:]
+    )
+    real_popen = module.subprocess.Popen
+    mutated = False
+
+    def mutate_object_after_fsck(*args: object, **kwargs: object) -> Any:
+        nonlocal mutated
+        command = args[0] if args else kwargs.get("args")
+        process = real_popen(*args, **kwargs)
+        if (
+            not mutated
+            and isinstance(command, list)
+            and "fsck" in command
+        ):
+            def corrupt_object() -> None:
+                nonlocal mutated
+                inflated = zlib.decompress(object_path.read_bytes())
+                header, content = inflated.split(b"\0", 1)
+                replacement = content[:-1] + bytes([content[-1] ^ 1])
+                object_path.chmod(0o600)
+                object_path.write_bytes(
+                    zlib.compress(header + b"\0" + replacement)
+                )
+                object_path.chmod(0o444)
+                mutated = True
+
+            return ProcessAfterWait(process, corrupt_object)
+        return process
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        mutate_object_after_fsck,
+    )
+    with pytest.raises(module.ScopeError, match="Git object"):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert mutated
+
+
+def test_registry_guard_rereads_reviewed_object_closure(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    tree_id = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "rev-parse",
+            f"{expected_commit}^{{tree}}",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    object_path = (
+        repository / ".git" / "objects" / tree_id[:2] / tree_id[2:]
+    )
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    try:
+        inflated = zlib.decompress(object_path.read_bytes())
+        header, content = inflated.split(b"\0", 1)
+        replacement = content[:-1] + bytes([content[-1] ^ 1])
+        object_path.chmod(0o600)
+        object_path.write_bytes(
+            zlib.compress(header + b"\0" + replacement)
+        )
+        object_path.chmod(0o444)
+        with pytest.raises(
+            module.ScopeError,
+            match="Git object|release authority changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+
+
+def test_registry_guard_preserves_unrelated_reachable_loose_object(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    create_registry_fixture(repository)
+    unrelated = repository / "reachable-unrelated.bin"
+    write_bytes(unrelated, b"reachable but not a producer\n", 0o644)
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "add",
+            "--",
+            unrelated.name,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "add reachable non-producer",
+        ],
+        check=True,
+    )
+    expected_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    object_id = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "rev-parse",
+            f"HEAD:{unrelated.name}",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    object_path = (
+        repository / ".git" / "objects" / object_id[:2] / object_id[2:]
+    )
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    try:
+        inflated = zlib.decompress(object_path.read_bytes())
+        header, content = inflated.split(b"\0", 1)
+        replacement = content[:-1] + bytes([content[-1] ^ 1])
+        object_path.chmod(0o600)
+        object_path.write_bytes(
+            zlib.compress(header + b"\0" + replacement)
+        )
+        object_path.chmod(0o444)
+        with pytest.raises(
+            module.ScopeError,
+            match="Git object graph|release authority changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+
+
+def test_registry_guard_detects_git_object_change_and_restore_aba(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    tree_id = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "rev-parse",
+            f"{expected_commit}^{{tree}}",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    object_path = (
+        repository / ".git" / "objects" / tree_id[:2] / tree_id[2:]
+    )
+    original = object_path.read_bytes()
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    try:
+        inflated = zlib.decompress(original)
+        header, content = inflated.split(b"\0", 1)
+        replacement = content[:-1] + bytes([content[-1] ^ 1])
+        object_path.chmod(0o600)
+        object_path.write_bytes(
+            zlib.compress(header + b"\0" + replacement)
+        )
+        object_path.write_bytes(original)
+        object_path.chmod(0o444)
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed during receipt commit",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+
+
+def test_registry_inspection_rejects_symlink_mode_with_matching_regular_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    create_registry_fixture(repository)
+    relative = REGISTRY_PROTECTED_PATHS[0]
+    object_id = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "rev-parse",
+            f"HEAD:{relative}",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "update-index",
+            "--cacheinfo",
+            "120000",
+            object_id,
+            relative,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "symlink-mode substitution",
+        ],
+        check=True,
+    )
+    expected_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    assert stat.S_ISREG((repository / relative).lstat().st_mode)
+    with pytest.raises(
+        module.ScopeError,
+        match="source tree mode is not regular",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rejects_executable_bit_drift(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    (repository / REGISTRY_PROTECTED_PATHS[0]).chmod(0o755)
+    with pytest.raises(
+        module.ScopeError,
+        match="release producer paths must be clean",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_matches_git_owner_execute_semantics(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    create_registry_fixture(repository)
+    source = repository / REGISTRY_PROTECTED_PATHS[0]
+    source.chmod(0o755)
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "add",
+            "--",
+            REGISTRY_PROTECTED_PATHS[0],
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "review executable producer",
+        ],
+        check=True,
+    )
+    expected_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    source.chmod(0o641)
+    status = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "status", "--porcelain"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+    assert status
+    with pytest.raises(
+        module.ScopeError,
+        match="release producer paths must be clean",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_supports_held_packed_symbolic_head(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    symbolic_name = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "symbolic-ref", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "pack-refs", "--all"],
+        check=True,
+    )
+    loose_ref = repository / ".git" / symbolic_name
+    assert not loose_ref.exists()
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    try:
+        guard.verify()
+    finally:
+        guard.close()
+
+
+def test_registry_protected_fifo_is_opened_nonblocking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    source = repository / REGISTRY_PROTECTED_PATHS[0]
+    source.unlink()
+    os.mkfifo(source, mode=0o600)
+    real_open = module.os.open
+    checked = False
+
+    def assert_nonblocking_open(
+        path: object,
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        nonlocal checked
+        if path == source.name and "dir_fd" in kwargs:
+            assert flags & getattr(os, "O_NONBLOCK", 0)
+            checked = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", assert_nonblocking_open)
+    with pytest.raises(
+        module.ScopeError,
+        match="single-link regular file",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert checked
+
+
+def test_registry_inspection_detects_clean_head_switch_restore_aba(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    write_bytes(repository / "unprotected.txt", b"alternate commit\n", 0o644)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "add", "unprotected.txt"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "alternate unprotected commit",
+        ],
+        check=True,
+    )
+    alternate_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "reset",
+            "--hard",
+            "-q",
+            expected_commit,
+        ],
+        check=True,
+    )
+    real_hold = module._hold_stable_file_digest
+    switched = False
+
+    def switch_and_restore_after_metadata_hold(
+        path: Path,
+        label: str,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal switched
+        held = real_hold(path, label, **kwargs)
+        if label == "Registry symbolic HEAD metadata":
+            subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(repository),
+                    "update-ref",
+                    "HEAD",
+                    alternate_commit,
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(repository),
+                    "update-ref",
+                    "HEAD",
+                    expected_commit,
+                ],
+                check=True,
+            )
+            switched = True
+        return held
+
+    monkeypatch.setattr(
+        module,
+        "_hold_stable_file_digest",
+        switch_and_restore_after_metadata_hold,
+    )
+    with pytest.raises(
+        module.ScopeError,
+        match="Registry .*metadata .*changed during held recheck",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert switched
+    assert (
+        subprocess.run(
+            ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+        ).stdout.strip()
+        == expected_commit
+    )
+
+
+def test_registry_repository_child_fstat_failure_closes_every_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    before_fds = set(os.listdir("/proc/self/fd"))
+    real_fstat = module.os.fstat
+    fstat_calls = 0
+
+    def fail_first_child(descriptor: int) -> os.stat_result:
+        nonlocal fstat_calls
+        fstat_calls += 1
+        if fstat_calls == 2:
+            raise OSError("injected child fstat failure")
+        return real_fstat(descriptor)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(module.os, "fstat", fail_first_child)
+        with pytest.raises(
+            module.ScopeError,
+            match="could not be held safely",
+        ):
+            module._verify_registry_checkout(repository, expected_commit)
+    assert set(os.listdir("/proc/self/fd")) == before_fds
+
+
+def test_registry_inspection_rejects_corrupt_reachable_git_object(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    object_id = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "rev-parse",
+            f"{expected_commit}:{REGISTRY_PROTECTED_PATHS[0]}",
+        ],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    object_path = repository / ".git" / "objects" / object_id[:2] / object_id[2:]
+    inflated = zlib.decompress(object_path.read_bytes())
+    header, content = inflated.split(b"\0", 1)
+    replacement = (
+        (b"x" if content[:1] != b"x" else b"y")
+        + content[1:]
+    )
+    object_path.chmod(0o600)
+    object_path.write_bytes(zlib.compress(header + b"\0" + replacement))
+    object_path.chmod(0o444)
+    with pytest.raises(
+        module.ScopeError,
+        match="Git object graph is invalid",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_ignores_unrelated_parent_directory_churn(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    real_popen = module.subprocess.Popen
+    churned = False
+
+    def churn_sibling_after_first_git(*args: object, **kwargs: object) -> Any:
+        nonlocal churned
+        process = real_popen(*args, **kwargs)
+        if churned:
+            return process
+
+        def churn_sibling() -> None:
+            nonlocal churned
+            unrelated = tmp_path / "unrelated-entry"
+            unrelated.write_bytes(b"unrelated\n")
+            unrelated.unlink()
+            churned = True
+
+        return ProcessAfterWait(process, churn_sibling)
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        churn_sibling_after_first_git,
+    )
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    try:
+        assert churned
+    finally:
+        guard.close()
+
+
+def test_registry_git_control_output_is_byte_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    real_popen = module.subprocess.Popen
+    injected = False
+
+    def replace_first_git_with_noisy_process(
+        *args: object,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal injected
+        if injected:
+            return real_popen(*args, **kwargs)
+        injected = True
+        noisy_command = [
+            sys.executable,
+            "-c",
+            (
+                "import os;"
+                "os.write(1,b'x'*"
+                f"{module.MAX_GIT_CONTROL_OUTPUT_BYTES + 1})"
+            ),
+        ]
+        return real_popen(noisy_command, **kwargs)
+
+    monkeypatch.setattr(
+        module.subprocess,
+        "Popen",
+        replace_first_git_with_noisy_process,
+    )
+    with pytest.raises(
+        module.ScopeError,
+        match="output exceeded its bound",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert injected
+
+
+def test_registry_inspection_rejects_shallow_repository(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    create_registry_fixture(source)
+    extra = source / "README.md"
+    write_bytes(extra, b"second commit\n", 0o644)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(source), "add", "README.md"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(source),
+            "-c",
+            "user.name=Release Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-q",
+            "-m",
+            "second fixture commit",
+        ],
+        check=True,
+    )
+    repository = tmp_path / "shallow"
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "-q",
+            "--depth=1",
+            f"file://{source}",
+            str(repository),
+        ],
+        check=True,
+    )
+    expected_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="shallow .*not allowed",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rejects_linked_worktree_gitfile(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    linked = tmp_path / "linked"
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            str(linked),
+            expected_commit,
+        ],
+        check=True,
+    )
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="linked worktrees and Git metadata indirection are not allowed",
+    ):
+        module._verify_registry_checkout(linked, expected_commit)
+
+
+def test_registry_object_root_inventory_is_entry_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    object_root = repository / ".git" / "objects"
+    module = load_union_module()
+    real_scandir = module.os.scandir
+
+    class FakeEntry:
+        name = "aa"
+        path = str(object_root / "aa")
+
+        @staticmethod
+        def is_symlink() -> bool:
+            return False
+
+        @staticmethod
+        def is_dir(*, follow_symlinks: bool = True) -> bool:
+            return not follow_symlinks or True
+
+        @staticmethod
+        def stat(*, follow_symlinks: bool = True) -> os.stat_result:
+            assert not follow_symlinks
+            return object_root.stat()
+
+    class FakeScandir:
+        def __enter__(self) -> object:
+            return iter(
+                FakeEntry()
+                for _ in range(
+                    module.MAX_GIT_OBJECT_ROOT_ENTRIES + 1
+                )
+            )
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    def bounded_scandir(path: object) -> object:
+        if Path(path) == object_root:
+            return FakeScandir()
+        return real_scandir(path)
+
+    monkeypatch.setattr(module.os, "scandir", bounded_scandir)
+    with pytest.raises(
+        module.ScopeError,
+        match="object root exceeds its inventory bound",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("include.path", "/dev/null"),
+        ("extensions.worktreeConfig", "true"),
+        ("remote.origin.promisor", "true"),
+        ("remote.origin.partialCloneFilter", "blob:none"),
+    ],
+)
+def test_registry_inspection_rejects_nonlocal_graph_configuration(
+    tmp_path: Path,
+    key: str,
+    value: str,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "config", key, value],
+        check=True,
+    )
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="shallow, partial, included, or split Git configuration",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rejects_partial_clone_extension(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    config_path = repository / ".git" / "config"
+    config_path.write_bytes(
+        config_path.read_bytes()
+        + b"\n[extensions]\n\tpartialClone = origin\n"
+    )
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="shallow, partial, included, or split Git configuration",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("fsck.missingEmail", "ignore"),
+        ("fsck.skipList", "/dev/null"),
+    ],
+)
+def test_registry_inspection_rejects_local_fsck_policy_configuration(
+    tmp_path: Path,
+    key: str,
+    value: str,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "config", key, value],
+        check=True,
+    )
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="local Git fsck policy configuration is not allowed",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+def test_registry_inspection_rejects_promisor_pack_marker(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    marker = repository / ".git" / "objects" / "pack" / (
+        "pack-" + "a" * 40 + ".promisor"
+    )
+    write_bytes(marker, b"", 0o600)
+    module = load_union_module()
+    with pytest.raises(
+        module.ScopeError,
+        match="promisor packs are not allowed",
+    ):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
+@pytest.mark.parametrize(
+    ("injection", "message"),
+    [
+        ("promisor", "promisor packs are not allowed"),
+        ("unexpected-root-entry", "object root contains an unexpected entry"),
+    ],
+)
+def test_registry_inspection_rejects_object_store_injection_before_watch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    injection: str,
+    message: str,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "repack", "-a", "-d", "-q"],
+        check=True,
+    )
+    object_root = repository / ".git" / "objects"
+    pack_root = object_root / "pack"
+    pack_path = next(
+        path for path in pack_root.iterdir() if path.suffix == ".pack"
+    )
+    injected_path = (
+        pack_path.with_suffix(".promisor")
+        if injection == "promisor"
+        else object_root / "unexpected-after-scan"
+    )
+    module = load_union_module()
+    real_watch = module._MutationWatch
+    injected = False
+
+    def inject_before_watch(
+        *args: object,
+        **kwargs: object,
+    ) -> Any:
+        nonlocal injected
+        write_bytes(injected_path, b"", 0o600)
+        injected = True
+        return real_watch(*args, **kwargs)
+
+    monkeypatch.setattr(module, "_MutationWatch", inject_before_watch)
+    with pytest.raises(module.ScopeError, match=message):
+        module._verify_registry_checkout(repository, expected_commit)
+    assert injected
+    assert injected_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        ".git/shallow",
+        ".git/info/grafts",
+        ".git/objects/info/alternates",
+        ".git/objects/info/http-alternates",
+    ],
+)
+def test_registry_guard_rejects_graph_control_absence_aba(
+    tmp_path: Path,
+    relative: str,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    module = load_union_module()
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    control = repository / relative
+    try:
+        write_bytes(control, (expected_commit + "\n").encode(), 0o600)
+        control.unlink()
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed|absence changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
+
+
+def test_registry_guard_rejects_local_config_aba(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "registry"
+    expected_commit = create_registry_fixture(repository)
+    module = load_union_module()
+    guard = module._verify_registry_checkout(repository, expected_commit)
+    config_path = repository / ".git" / "config"
+    original = config_path.read_bytes()
+    try:
+        config_path.write_bytes(original + b"\n# transient mutation\n")
+        config_path.write_bytes(original)
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed|configuration changed",
+        ):
+            guard.verify()
+    finally:
+        guard.close()
 
 
 def test_rejects_internally_rehashed_review_bytes_that_differ_from_gold(
@@ -2042,26 +3887,570 @@ def test_rejects_publicly_readable_private_authority_receipt(tmp_path: Path) -> 
 
 
 def test_rejects_duplicate_or_case_shadowed_manifest_fields(tmp_path: Path) -> None:
+    private_field = "PRIVATE-DUPLICATE-FIELD-SENTINEL"
+
     def post(context: dict[str, Any]) -> None:
         raw = context["manifest"].read_text()
         context["manifest"].write_text(
-            raw.replace('"status":"published"', '"Status":"published","status":"published"')
+            raw.replace(
+                '"status":"published"',
+                (
+                    '"status":"published",'
+                    f'"{private_field}":1,'
+                    f'"{private_field.lower()}":2'
+                ),
+            )
         )
         context["manifest"].chmod(0o600)
 
     result, output, _ = invoke(tmp_path, post_materialize=post)
     assert result.returncode == 1
     assert "duplicate or case-shadowed" in result.stderr
+    assert private_field not in result.stderr
+    assert private_field.lower() not in result.stderr
     assert not output.exists()
 
 
 def test_output_is_create_only_and_never_overwrites_existing_receipt(
     tmp_path: Path,
 ) -> None:
-    result, output, _ = invoke(tmp_path, precreate_output=True)
+    result, output, context = invoke(tmp_path, precreate_output=True)
     assert result.returncode == 1
     assert "output already exists" in result.stderr
     assert json.loads(output.read_text()) == {"status": "old"}
+    assert not context["artifact_snapshot_root"].exists()
+
+
+def test_artifact_snapshot_root_is_create_only(
+    tmp_path: Path,
+) -> None:
+    def precreate_snapshot(context: dict[str, Any]) -> None:
+        context["artifact_snapshot_root"].mkdir()
+
+    result, output, _ = invoke(
+        tmp_path,
+        post_materialize=precreate_snapshot,
+    )
+    assert result.returncode == 1
+    assert "artifact snapshot root already exists" in result.stderr
+    assert not output.exists()
+
+
+def test_artifact_snapshot_root_named_objects_uses_explicit_parent_fds(
+    tmp_path: Path,
+) -> None:
+    def use_objects_basename(context: dict[str, Any]) -> None:
+        snapshot_root = tmp_path / "objects"
+        command = context["command"]
+        argument_index = command.index("--artifact-snapshot-root") + 1
+        command[argument_index] = str(snapshot_root)
+        context["artifact_snapshot_root"] = snapshot_root
+
+    result, output, context = invoke(
+        tmp_path,
+        post_materialize=use_objects_basename,
+    )
+    assert result.returncode == 0, result.stderr
+    receipt = json.loads(output.read_text())
+    snapshot_root = context["artifact_snapshot_root"]
+    assert receipt["artifactSnapshot"]["root"] == str(snapshot_root)
+    assert (snapshot_root / "ARTIFACT_SNAPSHOT.generated.json").is_file()
+    assert (
+        snapshot_root / "ARTIFACT_SNAPSHOT_COMMIT.generated.json"
+    ).is_file()
+    assert (snapshot_root / "objects").is_dir()
+
+
+def test_output_final_name_is_absent_until_post_write_check_passes(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    callback_path_states: list[bool] = []
+
+    def final_check() -> None:
+        callback_path_states.append(output.exists())
+
+    module._write_new(
+        output,
+        {"status": "pass"},
+        post_write_check=final_check,
+    )
+    assert callback_path_states == [False, False]
+    assert output.read_bytes() == canonical({"status": "pass"})
+
+
+def test_output_commit_fsyncs_parent_after_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    parent_identity = (
+        output_parent.stat().st_dev,
+        output_parent.stat().st_ino,
+    )
+    real_fsync = module.os.fsync
+    real_link = module.os.link
+    events: list[tuple[str, bool]] = []
+
+    def traced_fsync(descriptor: int) -> None:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) == parent_identity:
+            events.append(("parent_fsync", output.exists()))
+        real_fsync(descriptor)
+
+    def traced_link(*args: object, **kwargs: object) -> None:
+        events.append(("link_before", output.exists()))
+        real_link(*args, **kwargs)
+        events.append(("link_after", output.exists()))
+
+    monkeypatch.setattr(module.os, "fsync", traced_fsync)
+    monkeypatch.setattr(module.os, "link", traced_link)
+    module._write_new(output, {"status": "prepared"})
+    assert events == [
+        ("parent_fsync", False),
+        ("parent_fsync", False),
+        ("link_before", False),
+        ("link_after", True),
+        ("parent_fsync", True),
+    ]
+
+
+def test_post_link_parent_fsync_failure_is_durability_indeterminate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    payload = {
+        "status": "prepared",
+        "authorizationStatus": "requires_publisher_consumption_receipt",
+    }
+    parent_identity = (
+        output_parent.stat().st_dev,
+        output_parent.stat().st_ino,
+    )
+    real_fsync = module.os.fsync
+    parent_fsyncs = 0
+
+    def fail_post_link_parent_fsync(descriptor: int) -> None:
+        nonlocal parent_fsyncs
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) == parent_identity:
+            parent_fsyncs += 1
+            if parent_fsyncs == 3:
+                raise OSError("injected post-link fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(module.os, "fsync", fail_post_link_parent_fsync)
+    with pytest.raises(
+        module.ScopeError,
+        match="durability is indeterminate",
+    ):
+        module._write_new(output, payload)
+    assert output.read_bytes() == canonical(payload)
+    with pytest.raises(module.ScopeError, match="output already exists"):
+        module._write_new(output, payload)
+
+
+def test_output_parent_retry_fsyncs_visible_creation_residue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    first_created = tmp_path / "new-parent"
+    output = first_created / "nested" / "preparation.json"
+    real_fsync = module.os.fsync
+    target_attempts = 0
+    injected = False
+
+    def fail_first_created_directory_fsync(descriptor: int) -> None:
+        nonlocal target_attempts, injected
+        opened = os.fstat(descriptor)
+        if first_created.exists():
+            target = first_created.stat()
+            if (opened.st_dev, opened.st_ino) == (
+                target.st_dev,
+                target.st_ino,
+            ):
+                target_attempts += 1
+                if not injected:
+                    injected = True
+                    raise OSError("injected first ancestor fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(
+        module.os,
+        "fsync",
+        fail_first_created_directory_fsync,
+    )
+    with pytest.raises(
+        module.ScopeError,
+        match="output parent could not be made durable",
+    ):
+        module._open_private_output_parent(output)
+    assert first_created.is_dir()
+
+    parent_fd, parent = module._open_private_output_parent(output)
+    try:
+        assert parent == output.parent
+        assert target_attempts >= 2
+    finally:
+        os.close(parent_fd)
+
+
+def test_output_staging_has_no_named_path_visible_to_callback(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    observations = 0
+
+    def inspect_private_parent() -> None:
+        nonlocal observations
+        stages = [
+            item
+            for item in output_parent.iterdir()
+            if item.name.startswith(".scope-union-")
+        ]
+        assert stages == []
+        observations += 1
+
+    module._write_new(
+        output,
+        {"status": "pass"},
+        post_write_check=inspect_private_parent,
+    )
+    assert observations == 2
+    assert output.read_bytes() == canonical({"status": "pass"})
+
+
+def test_output_second_authority_failure_happens_before_publication(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    checks = 0
+
+    def fail_second_check() -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise module.ScopeError("late authority failure")
+
+    with pytest.raises(module.ScopeError, match="late authority failure"):
+        module._write_new(
+            output,
+            {"status": "pass"},
+            post_write_check=fail_second_check,
+        )
+    assert checks == 2
+    assert not output.exists()
+
+
+def test_output_process_exit_during_final_check_cannot_publish_pass(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    child = os.fork()
+    if child == 0:
+        checks = 0
+
+        def exit_during_second_check() -> None:
+            nonlocal checks
+            checks += 1
+            if checks == 2:
+                os._exit(91)
+
+        module._write_new(
+            output,
+            {"status": "pass"},
+            post_write_check=exit_during_second_check,
+        )
+        os._exit(0)
+    _pid, status = os.waitpid(child, 0)
+    assert os.waitstatus_to_exitcode(status) == 91
+    assert not output.exists()
+
+
+def test_mutation_watch_catches_earlier_authority_change_during_later_check(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    first = tmp_path / "first.bin"
+    second = tmp_path / "second.bin"
+    write_bytes(first, b"first authority\n", 0o600)
+    write_bytes(second, b"second authority\n", 0o600)
+    first_held = module._hold_stable_file_digest(first, "first authority")
+    second_held = module._hold_stable_file_digest(second, "second authority")
+    watch = module._MutationWatch([first, second])
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    mutated = False
+
+    def sequential_check() -> None:
+        nonlocal mutated
+        first_held.recheck()
+        if not mutated:
+            first.write_bytes(b"first mutation!\n")
+            mutated = True
+        second_held.recheck()
+
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed during receipt commit",
+        ):
+            module._write_new(
+                output,
+                {"status": "pass"},
+                post_write_check=sequential_check,
+                mutation_watch=watch,
+            )
+        assert mutated
+        assert not output.exists()
+    finally:
+        watch.close()
+        second_held.close()
+        first_held.close()
+
+
+def test_reverse_digest_sweep_detects_preopened_mmap_change(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    first = tmp_path / "first.bin"
+    second = tmp_path / "second.bin"
+    write_bytes(first, b"APPROVED-FIRST!!", 0o600)
+    write_bytes(second, b"APPROVED-SECOND!", 0o600)
+    writable = os.open(first, os.O_RDWR)
+    mapping = mmap.mmap(writable, first.stat().st_size)
+    first_held = module._hold_stable_file_digest(first, "first authority")
+    second_held = module._hold_stable_file_digest(second, "second authority")
+    watch = module._MutationWatch([first, second])
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    mutated = False
+
+    def forward_reverse_check() -> None:
+        nonlocal mutated
+        held = [first_held, second_held]
+        for index, item in enumerate(held):
+            item.recheck()
+            if index == 0 and not mutated:
+                mapping[:8] = b"TAMPERED"
+                mutated = True
+        for item in reversed(held):
+            item.recheck()
+
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="changed during held recheck",
+        ):
+            module._write_new(
+                output,
+                {"status": "pass"},
+                post_write_check=forward_reverse_check,
+                mutation_watch=watch,
+            )
+        assert mutated
+        assert not output.exists()
+    finally:
+        watch.close()
+        second_held.close()
+        first_held.close()
+        mapping.close()
+        os.close(writable)
+
+
+def test_mutation_watch_ignores_only_its_output_in_shared_parent(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    shared_parent = tmp_path / "private-shared"
+    shared_parent.mkdir(mode=0o700)
+    authority = shared_parent / "authority.bin"
+    output = shared_parent / "receipt.json"
+    write_bytes(authority, b"stable authority\n", 0o600)
+    held = module._hold_stable_file_digest(authority, "shared authority")
+    watch = module._MutationWatch(
+        [authority],
+        ignored_paths=[output],
+    )
+
+    try:
+        module._write_new(
+            output,
+            {"status": "pass"},
+            post_write_check=held.recheck,
+            mutation_watch=watch,
+        )
+        assert output.read_bytes() == canonical({"status": "pass"})
+    finally:
+        watch.close()
+        held.close()
+
+
+def test_mutation_watch_ignores_unrelated_sibling_churn_but_poison_is_sticky(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    parent = tmp_path / "shared"
+    parent.mkdir()
+    authority = parent / "authority.bin"
+    write_bytes(authority, b"stable authority\n", 0o600)
+    watch = module._MutationWatch([authority])
+    try:
+        unrelated = parent / "unrelated.log"
+        unrelated.write_bytes(b"ordinary sibling churn\n")
+        unrelated.unlink()
+        watch.assert_quiet()
+
+        authority.write_bytes(b"changed authority\n")
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed during receipt commit",
+        ):
+            watch.assert_quiet()
+        authority.write_bytes(b"stable authority\n")
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed during receipt commit",
+        ):
+            watch.assert_quiet()
+    finally:
+        watch.close()
+
+
+def test_mutation_watch_detects_higher_ancestor_rename_restore_aba(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    authority_root = tmp_path / "authority"
+    shelf = authority_root / "shelf"
+    shelf.mkdir(parents=True)
+    artifact = shelf / "artifact.bin"
+    write_bytes(artifact, b"approved bytes\n", 0o600)
+    watch = module._MutationWatch([artifact])
+    held_root = tmp_path / "authority-held"
+    try:
+        authority_root.rename(held_root)
+        authority_root.mkdir()
+        (authority_root / "shelf").mkdir()
+        write_bytes(
+            authority_root / "shelf" / "artifact.bin",
+            b"forged bytes!!\n",
+            0o600,
+        )
+        shutil.rmtree(authority_root)
+        held_root.rename(authority_root)
+        with pytest.raises(
+            module.ScopeError,
+            match="release authority changed during receipt commit",
+        ):
+            watch.assert_quiet()
+    finally:
+        watch.close()
+
+
+def test_output_parent_permission_change_during_check_fails_closed(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    changed = False
+
+    def change_parent_permissions() -> None:
+        nonlocal changed
+        if not changed:
+            output_parent.chmod(0o777)
+            changed = True
+
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="output parent permissions changed",
+        ):
+            module._write_new(
+                output,
+                {"status": "pass"},
+                post_write_check=change_parent_permissions,
+            )
+        assert changed
+        assert not output.exists()
+    finally:
+        output_parent.chmod(0o700)
+
+
+def test_output_parent_second_check_failure_prevents_publication(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+    checks = 0
+
+    def change_parent_after_commit() -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            output_parent.chmod(0o777)
+
+    try:
+        with pytest.raises(
+            module.ScopeError,
+            match="output parent permissions changed",
+        ):
+            module._write_new(
+                output,
+                {"status": "pass"},
+                post_write_check=change_parent_after_commit,
+            )
+        assert checks == 2
+        assert not output.exists()
+    finally:
+        output_parent.chmod(0o700)
+
+
+def test_output_link_failure_leaves_no_named_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    output_parent = tmp_path / "private-output"
+    output_parent.mkdir(mode=0o700)
+    output = output_parent / "receipt.json"
+
+    def fail_link(*_args: object, **_kwargs: object) -> None:
+        raise OSError("injected final link failure")
+
+    monkeypatch.setattr(module.os, "link", fail_link)
+    with pytest.raises(
+        module.ScopeError,
+        match="could not be committed",
+    ):
+        module._write_new(output, {"status": "pass"})
+    assert not output.exists()
 
 
 def test_rejects_nonprivate_output_parent(tmp_path: Path) -> None:
@@ -2088,6 +4477,85 @@ def test_input_parent_identity_swap_is_detected(
     monkeypatch.setattr(module, "_parent_still_bound", swapped)
     with pytest.raises(module.ScopeError, match="ancestor swap"):
         module._stable_bytes(path, "raced input", private=True)
+
+
+def test_nul_basename_is_rejected_without_leaking_parent_descriptor(
+    tmp_path: Path,
+) -> None:
+    module = load_union_module()
+    before_fds = set(os.listdir("/proc/self/fd"))
+    with pytest.raises(module.ScopeError, match="inspected safely"):
+        module._hold_stable_file_digest(
+            tmp_path / "private-field\0name",
+            "NUL candidate",
+        )
+    assert set(os.listdir("/proc/self/fd")) == before_fds
+
+
+def test_existing_parent_child_fstat_failure_closes_every_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    parent = tmp_path / "authority"
+    parent.mkdir()
+    path = parent / "input.json"
+    before_fds = set(os.listdir("/proc/self/fd"))
+    real_fstat = module.os.fstat
+    injected = False
+
+    def fail_child_fstat(descriptor: int) -> os.stat_result:
+        nonlocal injected
+        if not injected:
+            injected = True
+            raise OSError("injected parent fstat failure")
+        return real_fstat(descriptor)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(module.os, "fstat", fail_child_fstat)
+        with pytest.raises(
+            module.ScopeError,
+            match="parent could not be opened safely",
+        ):
+            module._open_existing_parent(path, "injected input")
+    assert injected
+    assert set(os.listdir("/proc/self/fd")) == before_fds
+
+
+def test_cleanup_continues_after_one_close_reports_an_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    first_path = tmp_path / "first.bin"
+    second_path = tmp_path / "second.bin"
+    write_bytes(first_path, b"first\n", 0o600)
+    write_bytes(second_path, b"second\n", 0o600)
+    first = module._hold_stable_file_digest(first_path, "first")
+    second = module._hold_stable_file_digest(second_path, "second")
+    descriptors = [
+        first.descriptor,
+        first.parent_fd,
+        second.descriptor,
+        second.parent_fd,
+    ]
+    real_close = module.os.close
+    injected = False
+
+    def close_then_report_error(descriptor: int) -> None:
+        nonlocal injected
+        real_close(descriptor)
+        if not injected:
+            injected = True
+            raise OSError("injected close report")
+
+    monkeypatch.setattr(module.os, "close", close_then_report_error)
+    first.close()
+    second.close()
+    assert injected
+    for descriptor in descriptors:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
 
 
 def test_output_parent_identity_swap_removes_partial_output(
