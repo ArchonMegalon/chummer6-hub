@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -1139,6 +1140,7 @@ def test_credential_reader_mac_acl_parser_boundaries() -> None:
 def test_credential_reader_native_macos_acl_policy_boundaries() -> None:
     reader_source, namespace = load_credential_reader_namespace()
     acl_guard = namespace["assert_macos_acl_is_nonpermissive"]
+    acl_is_absent = namespace["_macos_acl_is_absent"]
     unsafe_error = namespace["UnsafeCredentialFile"]
     owner_uuid = b"o" * 16
     non_owner_uuid = b"n" * 16
@@ -1205,6 +1207,13 @@ def test_credential_reader_native_macos_acl_policy_boundaries() -> None:
     assert "acl_valid_fd_np" in reader_source
     assert "mbr_uid_to_uuid" in reader_source
     assert "qualifier_uuid == owner_uuid" in reader_source
+    assert acl_is_absent(0)
+    assert acl_is_absent(errno.ENOENT)
+    if hasattr(errno, "ENOATTR"):
+        assert acl_is_absent(errno.ENOATTR)
+    if hasattr(errno, "ENODATA"):
+        assert acl_is_absent(errno.ENODATA)
+    assert not acl_is_absent(errno.EBADF)
 
 
 def test_credential_reader_rejects_acl_transition_and_closes_descriptor(

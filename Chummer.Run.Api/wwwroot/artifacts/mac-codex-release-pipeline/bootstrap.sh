@@ -3121,6 +3121,15 @@ def _validate_metadata(metadata: os.stat_result) -> None:
         _reject()
 
 
+def _macos_acl_is_absent(error_number: int) -> bool:
+    return error_number in {
+        0,
+        errno.ENOENT,
+        getattr(errno, "ENOATTR", -1),
+        getattr(errno, "ENODATA", -1),
+    }
+
+
 def _read_native_macos_acl(
     descriptor: int,
 ) -> tuple[bytes, tuple[tuple[int, bytes], ...]]:
@@ -3157,22 +3166,17 @@ def _read_native_macos_acl(
     except (AttributeError, OSError):
         _reject()
 
+    ctypes.set_errno(0)
+    acl = library.acl_get_fd_np(descriptor, MACOS_ACL_TYPE_EXTENDED)
+    if not acl:
+        if _macos_acl_is_absent(ctypes.get_errno()):
+            return bytes(MACOS_UUID_BYTES), ()
+        _reject()
+
     owner_buffer = (ctypes.c_ubyte * MACOS_UUID_BYTES)()
     if library.mbr_uid_to_uuid(os.geteuid(), owner_buffer) != 0:
         _reject()
     owner_uuid = bytes(owner_buffer)
-
-    ctypes.set_errno(0)
-    acl = library.acl_get_fd_np(descriptor, MACOS_ACL_TYPE_EXTENDED)
-    if not acl:
-        no_acl_errors = {
-            0,
-            getattr(errno, "ENOATTR", -1),
-            getattr(errno, "ENODATA", -1),
-        }
-        if ctypes.get_errno() in no_acl_errors:
-            return owner_uuid, ()
-        _reject()
 
     entries: list[tuple[int, bytes]] = []
     try:
