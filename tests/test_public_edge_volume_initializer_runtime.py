@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -18,6 +19,18 @@ IMAGE = os.environ.get(
 SCRIPT = ROOT / "scripts" / "initialize-public-edge-volumes.sh"
 PORTAL_UID = 1000
 PORTAL_GID = 1000
+PROJECTION_SNAPSHOT_ID = "public-projection-" + ("1" * 64)
+PROJECTION_OUTPUT_NAMES = (
+    "FLAGSHIP_PRODUCT_READINESS.generated.json",
+    "HUB_LOCAL_RELEASE_PROOF.generated.json",
+    "HUB_SERVED_RELEASE_PROOF.generated.json",
+    "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+    "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+    "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+    "PUBLIC_PROJECTION_SNAPSHOT.generated.json",
+    "RELEASE_CHANNEL.generated.json",
+    "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+)
 
 
 def docker(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -71,7 +84,26 @@ def write_runtime_inputs(root: Path) -> dict[str, str]:
 
     (app / "portal.txt").write_text("portal\n", encoding="utf-8")
     (fleet / "fleet.txt").write_text("fleet\n", encoding="utf-8")
-    (projection / "projection.json").write_text("{}\n", encoding="utf-8")
+    projection_snapshot = projection / PROJECTION_SNAPSHOT_ID
+    projection_snapshot.mkdir(mode=0o755)
+    for name in PROJECTION_OUTPUT_NAMES:
+        (projection_snapshot / name).write_text(
+            json.dumps({"fixture": name}, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    current = projection / "CURRENT.json"
+    current.write_text(
+        json.dumps(
+            {
+                "contractName": "chummer.public_projection_current/v1",
+                "status": "candidate_import_ready",
+                "snapshotId": PROJECTION_SNAPSHOT_ID,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     generation = shelf / "generations" / "generation-test"
     generation.mkdir(parents=True, mode=0o755)
@@ -104,11 +136,20 @@ def write_runtime_inputs(root: Path) -> dict[str, str]:
     certificate.write_bytes(b"test-certificate-bytes\n")
     password.write_text("test-password\n", encoding="utf-8")
 
-    for directory in (root, app, fleet, shelf, generation.parent, generation, projection):
+    for directory in (
+        root,
+        app,
+        fleet,
+        shelf,
+        generation.parent,
+        generation,
+        projection,
+    ):
         directory.chmod(0o755)
     for path in root.rglob("*"):
         if path.is_file():
             path.chmod(0o644)
+    projection_snapshot.chmod(0o555)
 
     return {
         "CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256": hashlib.sha256(
@@ -120,7 +161,15 @@ def write_runtime_inputs(root: Path) -> dict[str, str]:
         "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": tree_sha256(app),
         "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": tree_sha256(fleet),
         "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": tree_sha256(shelf),
-        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": tree_sha256(projection),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": hashlib.sha256(
+            current.read_bytes()
+        ).hexdigest(),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+            PROJECTION_SNAPSHOT_ID
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": tree_sha256(
+            projection_snapshot
+        ),
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": hashlib.sha256(
             runtime_proof.read_bytes()
         ).hexdigest(),
@@ -128,6 +177,159 @@ def write_runtime_inputs(root: Path) -> dict[str, str]:
             final_gold.read_bytes()
         ).hexdigest(),
     }
+
+
+@pytest.fixture
+def projection_copy_harness(tmp_path: Path) -> Path:
+    source = SCRIPT.read_text(encoding="utf-8")
+    end = source.index("\ncopy_isolated_release_shelf()")
+    harness = tmp_path / "copy-candidate-projection-authority.sh"
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir(mode=0o755)
+    fake_chown = fake_bin / "chown"
+    fake_chown.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_chown.chmod(0o555)
+    harness.write_text(
+        source[:end]
+        + '\nPATH="$(dirname "$0")/fake-bin:$PATH"\n'
+        + "export PATH\n"
+        + "copy_candidate_projection_authority \"$1\" \"$2\" "
+        "\"$3\" \"$4\" \"$5\"\n",
+        encoding="utf-8",
+    )
+    harness.chmod(0o555)
+    return harness
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error"),
+    [
+        ("extra", "inventory drifted"),
+        ("symlink", "must not be a symbolic link"),
+        ("mode", "mode drifted"),
+        ("current-drift", "CURRENT digest drifted"),
+    ],
+)
+def test_projection_authority_seed_rejects_unsafe_or_drifted_source(
+    tmp_path: Path,
+    projection_copy_harness: Path,
+    mutation: str,
+    expected_error: str,
+) -> None:
+    runtime_inputs = tmp_path / "runtime-inputs"
+    runtime_inputs.mkdir(mode=0o755)
+    digests = write_runtime_inputs(runtime_inputs)
+    projection = runtime_inputs / "projection"
+    snapshot = projection / PROJECTION_SNAPSHOT_ID
+    if mutation == "extra":
+        snapshot.chmod(0o755)
+        (snapshot / "unexpected.json").write_text("{}\n", encoding="utf-8")
+        (snapshot / "unexpected.json").chmod(0o644)
+        snapshot.chmod(0o555)
+    elif mutation == "symlink":
+        snapshot.chmod(0o755)
+        target = snapshot / PROJECTION_OUTPUT_NAMES[0]
+        target.unlink()
+        target.symlink_to(PROJECTION_OUTPUT_NAMES[1])
+        snapshot.chmod(0o555)
+    elif mutation == "mode":
+        (snapshot / PROJECTION_OUTPUT_NAMES[0]).chmod(0o600)
+    elif mutation == "current-drift":
+        (projection / "CURRENT.json").write_text(
+            '{"drifted":true}\n',
+            encoding="utf-8",
+        )
+        (projection / "CURRENT.json").chmod(0o644)
+    else:
+        raise AssertionError(mutation)
+
+    destination = tmp_path / "destination"
+    destination.mkdir(mode=0o755)
+    try:
+        result = subprocess.run(
+            [
+                "/bin/sh",
+                str(projection_copy_harness),
+                str(projection),
+                str(destination),
+                PROJECTION_SNAPSHOT_ID,
+                digests["CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256"],
+                digests["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256"],
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert result.returncode != 0
+        assert expected_error in result.stderr
+    finally:
+        snapshot.chmod(0o755)
+        destination.chmod(0o755)
+        for directory in (
+            path
+            for path in destination.rglob("*")
+            if path.is_dir() and not path.is_symlink()
+        ):
+            directory.chmod(0o755)
+
+
+def test_projection_authority_seed_copies_exact_root_and_preserves_modes(
+    tmp_path: Path,
+    projection_copy_harness: Path,
+) -> None:
+    runtime_inputs = tmp_path / "runtime-inputs"
+    runtime_inputs.mkdir(mode=0o755)
+    digests = write_runtime_inputs(runtime_inputs)
+    projection = runtime_inputs / "projection"
+    destination = tmp_path / "destination"
+    destination.mkdir(mode=0o755)
+    try:
+        result = subprocess.run(
+            [
+                "/bin/sh",
+                str(projection_copy_harness),
+                str(projection),
+                str(destination),
+                PROJECTION_SNAPSHOT_ID,
+                digests["CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256"],
+                digests["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256"],
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert result.returncode == 0, result.stderr
+        assert sorted(path.name for path in destination.iterdir()) == [
+            "CURRENT.json",
+            PROJECTION_SNAPSHOT_ID,
+        ]
+        assert (destination.stat().st_mode & 0o777) == 0o555
+        assert (destination / "CURRENT.json").read_bytes() == (
+            projection / "CURRENT.json"
+        ).read_bytes()
+        assert (
+            (destination / "CURRENT.json").stat().st_mode & 0o777
+        ) == 0o644
+        copied_snapshot = destination / PROJECTION_SNAPSHOT_ID
+        assert (copied_snapshot.stat().st_mode & 0o777) == 0o555
+        assert tree_sha256(copied_snapshot) == digests[
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256"
+        ]
+        assert all(
+            (path.stat().st_mode & 0o777) == 0o644
+            for path in copied_snapshot.iterdir()
+        )
+    finally:
+        (projection / PROJECTION_SNAPSHOT_ID).chmod(0o755)
+        destination.chmod(0o755)
+        for directory in (
+            path
+            for path in destination.rglob("*")
+            if path.is_dir() and not path.is_symlink()
+        ):
+            directory.chmod(0o755)
 
 
 def test_public_download_initializer_accepts_valid_digests_and_copies_inputs(
@@ -205,6 +407,34 @@ def test_public_download_initializer_accepts_valid_digests_and_copies_inputs(
             f"public-download runtime inputs verified for "
             f"{PORTAL_UID}:{PORTAL_GID}"
         ) in result.stdout
+        projection_inspection = docker(
+            "run",
+            "--rm",
+            "--read-only",
+            "--network",
+            "none",
+            "--cap-drop",
+            "ALL",
+            "--entrypoint",
+            "/bin/sh",
+            "-v",
+            f"{volumes[7]}:/projection:ro",
+            IMAGE,
+            "-eu",
+            "-c",
+            (
+                'test "$(stat -c %a /projection)" = 555; '
+                'test "$(stat -c %a /projection/CURRENT.json)" = 644; '
+                f'test "$(stat -c %a /projection/{PROJECTION_SNAPSHOT_ID})" '
+                "= 555; "
+                "find -P /projection -xdev -mindepth 1 -maxdepth 1 "
+                "-printf '%f\\n' | LC_ALL=C sort"
+            ),
+        )
+        assert projection_inspection.stdout.splitlines() == [
+            "CURRENT.json",
+            PROJECTION_SNAPSHOT_ID,
+        ]
     finally:
         for volume in volumes:
             docker("volume", "rm", "-f", volume, check=False)

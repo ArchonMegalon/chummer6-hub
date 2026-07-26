@@ -60,6 +60,8 @@ def test_projection_semantic_identity_is_distinct_from_source_tree_digest(
         tmp_path
     )
     annotations = controller.SidecarConfig.__annotations__
+    assert "projection_authority_root" in annotations
+    assert "projection_current_sha256" in annotations
     assert "projection_snapshot_sha256" in annotations
     assert "projection_source_tree_sha256" in annotations
 
@@ -76,6 +78,8 @@ def test_projection_semantic_identity_is_distinct_from_source_tree_digest(
         fleet_source=operation_root / "fleet",
         fleet_sha256="1" * 64,
         shelf_source=operation_root / "shelf",
+        projection_authority_root=projection_root.parent,
+        projection_current_sha256="8" * 64,
         projection_snapshot_root=projection_root,
         projection_snapshot_id=f"public-projection-{semantic_sha256}",
         projection_snapshot_sha256=semantic_sha256,
@@ -103,7 +107,136 @@ def test_projection_semantic_identity_is_distinct_from_source_tree_digest(
     assert environment[
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256"
     ] == source_tree_sha256
+    assert environment[
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"
+    ] == str(projection_root.parent)
+    assert environment[
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256"
+    ] == "8" * 64
+    assert environment[
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID"
+    ] == config.projection_snapshot_id
     assert source_tree_sha256 != semantic_sha256
+
+
+def candidate_current_payload(
+    snapshot_id: str,
+    snapshot_sha256: str,
+    manifest_sha256: str,
+) -> dict[str, Any]:
+    names = (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "HUB_SERVED_RELEASE_PROOF.generated.json",
+        "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+        "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+        "RELEASE_CHANNEL.generated.json",
+        "FLAGSHIP_PRODUCT_READINESS.generated.json",
+        "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+    )
+    return {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "candidate_import_ready",
+        "projectionStage": "candidate_import_ready",
+        "codeDeploymentAuthority": False,
+        "releaseUploadAuthority": False,
+        "candidateImportAuthority": True,
+        "releaseGateFindings": [],
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "manifestRelativePath": (
+            f"{snapshot_id}/PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+        ),
+        "manifestSha256": manifest_sha256,
+        "outputs": {name: f"{snapshot_id}/{name}" for name in names},
+    }
+
+
+def projection_current_binding_fixture(
+    tmp_path: Path,
+) -> tuple[SimpleNamespace, Path]:
+    snapshot_sha256 = "1" * 64
+    snapshot_id = f"public-projection-{snapshot_sha256}"
+    manifest_sha256 = "2" * 64
+    authority_root = tmp_path / "published"
+    snapshot_root = authority_root / snapshot_id
+    snapshot_root.mkdir(parents=True)
+    current = authority_root / "CURRENT.json"
+    current.write_text(
+        json.dumps(
+            candidate_current_payload(
+                snapshot_id,
+                snapshot_sha256,
+                manifest_sha256,
+            ),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    current.chmod(0o644)
+    config = SimpleNamespace(
+        projection_authority_root=authority_root,
+        projection_current_sha256=hashlib.sha256(
+            current.read_bytes()
+        ).hexdigest(),
+        projection_snapshot_root=snapshot_root,
+        projection_snapshot_id=snapshot_id,
+        projection_snapshot_sha256=snapshot_sha256,
+        projection_manifest_sha256=manifest_sha256,
+    )
+    return config, current
+
+
+def test_candidate_projection_current_binds_the_nested_runtime_authority(
+    tmp_path: Path,
+) -> None:
+    config, _current = projection_current_binding_fixture(tmp_path)
+
+    controller._validate_projection_current_binding(config)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        ("flattened", "outside the authenticated authority root"),
+        ("status", "does not bind the selected candidate-import snapshot"),
+        ("digest", "CURRENT digest drifted"),
+        ("output-extra", "does not bind the selected candidate-import snapshot"),
+    ],
+)
+def test_candidate_projection_current_rejects_flattening_or_drift(
+    tmp_path: Path,
+    mutation: str,
+    expected: str,
+) -> None:
+    config, current = projection_current_binding_fixture(tmp_path)
+    if mutation == "flattened":
+        config.projection_snapshot_root = config.projection_authority_root
+    elif mutation == "digest":
+        config.projection_current_sha256 = "f" * 64
+    else:
+        payload = json.loads(current.read_text(encoding="utf-8"))
+        if mutation == "status":
+            payload["status"] = "review_required"
+        elif mutation == "output-extra":
+            payload["outputs"]["unexpected.json"] = (
+                f"{config.projection_snapshot_id}/unexpected.json"
+            )
+        else:
+            raise AssertionError(mutation)
+        current.write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        current.chmod(0o644)
+        config.projection_current_sha256 = hashlib.sha256(
+            current.read_bytes()
+        ).hexdigest()
+
+    with pytest.raises(controller.CutoverError, match=expected):
+        controller._validate_projection_current_binding(config)
 
 
 def test_wrapper_uses_a_sidecar_only_active_runtime_authority() -> None:

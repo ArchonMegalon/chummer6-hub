@@ -148,6 +148,19 @@ validate_sha256() {
   esac
 }
 
+validate_projection_snapshot_id() {
+  value="$1"
+  case "$value" in
+    public-projection-*)
+      digest="${value#public-projection-}"
+      ;;
+    *)
+      fail "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID is invalid"
+      ;;
+  esac
+  validate_sha256 CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID "$digest"
+}
+
 require_regular_input() {
   path="$1"
   label="$2"
@@ -301,6 +314,162 @@ copy_immutable_tree() {
   find -P "$destination" -xdev -type d -exec chmod 0555 -- {} + \
     || fail "cannot seal copied $label directories"
   verify_tree_sha256 "$destination" "$expected" "$label copy"
+}
+
+require_candidate_projection_snapshot() {
+  root="$1"
+  label="$2"
+  require_mount_root "$root"
+  [ "$(stat -c %a -- "$root")" = "555" ] \
+    || fail "$label directory mode drifted"
+
+  expected_inventory="$(
+    printf '%s\n' \
+      FLAGSHIP_PRODUCT_READINESS.generated.json \
+      HUB_LOCAL_RELEASE_PROOF.generated.json \
+      HUB_SERVED_RELEASE_PROOF.generated.json \
+      LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json \
+      NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json \
+      NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json \
+      PUBLIC_PROJECTION_SNAPSHOT.generated.json \
+      RELEASE_CHANNEL.generated.json \
+      RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json \
+      | LC_ALL=C sort
+  )"
+  observed_inventory="$(
+    find -P "$root" -xdev -mindepth 1 -maxdepth 1 -printf '%f\n' \
+      | LC_ALL=C sort
+  )" || fail "$label inventory could not be inspected"
+  [ "$observed_inventory" = "$expected_inventory" ] \
+    || fail "$label inventory drifted"
+  nested_entry="$(find -P "$root" -xdev -mindepth 2 -print -quit)" \
+    || fail "$label nested inventory could not be inspected"
+  [ -z "$nested_entry" ] || fail "$label contains nested or extra material"
+
+  for name in \
+    FLAGSHIP_PRODUCT_READINESS.generated.json \
+    HUB_LOCAL_RELEASE_PROOF.generated.json \
+    HUB_SERVED_RELEASE_PROOF.generated.json \
+    LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json \
+    NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json \
+    NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json \
+    PUBLIC_PROJECTION_SNAPSHOT.generated.json \
+    RELEASE_CHANNEL.generated.json \
+    RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json
+  do
+    require_regular_input "$root/$name" "$label $name"
+    [ "$(stat -c %a -- "$root/$name")" = "644" ] \
+      || fail "$label $name mode drifted"
+  done
+}
+
+copy_candidate_projection_authority() {
+  source="$1"
+  destination="$2"
+  snapshot_id="$3"
+  current_expected="$4"
+  snapshot_tree_expected="$5"
+
+  require_mount_root "$source"
+  current_source="$source/CURRENT.json"
+  snapshot_source="$source/$snapshot_id"
+  require_regular_input "$current_source" "public projection CURRENT"
+  [ "$(stat -c %a -- "$current_source")" = "644" ] \
+    || fail "public projection CURRENT mode drifted"
+  verify_file_sha256 \
+    "$current_source" \
+    "$current_expected" \
+    "public projection CURRENT"
+  require_candidate_projection_snapshot \
+    "$snapshot_source" \
+    "public projection snapshot"
+  verify_tree_sha256 \
+    "$snapshot_source" \
+    "$snapshot_tree_expected" \
+    "public projection snapshot"
+
+  reset_runtime_input_root "$destination"
+  snapshot_stage="$destination/.projection-snapshot-stage.$$"
+  current_stage="$destination/.CURRENT.json.$$"
+  if [ -e "$snapshot_stage" ] || [ -L "$snapshot_stage" ]; then
+    fail "public projection snapshot stage already exists"
+  fi
+  if [ -e "$current_stage" ] || [ -L "$current_stage" ]; then
+    fail "public projection CURRENT stage already exists"
+  fi
+  mkdir -m 0700 -- "$snapshot_stage" \
+    || fail "cannot create public projection snapshot stage"
+  cp -R \
+    --preserve=mode \
+    --no-preserve=ownership,timestamps \
+    -- "$snapshot_source/." "$snapshot_stage/" \
+    || fail "cannot stage the public projection snapshot"
+  chown -R 0:0 -- "$snapshot_stage" \
+    || fail "cannot seal staged public projection ownership"
+  chmod 0555 -- "$snapshot_stage" \
+    || fail "cannot preserve public projection snapshot mode"
+  require_candidate_projection_snapshot \
+    "$snapshot_stage" \
+    "staged public projection snapshot"
+  verify_tree_sha256 \
+    "$snapshot_stage" \
+    "$snapshot_tree_expected" \
+    "staged public projection snapshot"
+  mv -- "$snapshot_stage" "$destination/$snapshot_id" \
+    || fail "cannot atomically install the public projection snapshot"
+
+  cp \
+    --preserve=mode \
+    --no-preserve=ownership,timestamps \
+    -- "$current_source" "$current_stage" \
+    || fail "cannot stage public projection CURRENT"
+  chown 0:0 -- "$current_stage" \
+    || fail "cannot seal staged public projection CURRENT ownership"
+  [ "$(stat -c %a -- "$current_stage")" = "644" ] \
+    || fail "staged public projection CURRENT mode drifted"
+  verify_file_sha256 \
+    "$current_stage" \
+    "$current_expected" \
+    "staged public projection CURRENT"
+  mv -- "$current_stage" "$destination/CURRENT.json" \
+    || fail "cannot atomically install public projection CURRENT"
+  chmod 0555 -- "$destination" \
+    || fail "cannot seal public projection authority root"
+
+  expected_root_inventory="$(
+    printf '%s\n' CURRENT.json "$snapshot_id" | LC_ALL=C sort
+  )"
+  observed_root_inventory="$(
+    find -P "$destination" -xdev -mindepth 1 -maxdepth 1 -printf '%f\n' \
+      | LC_ALL=C sort
+  )" || fail "copied public projection root could not be inspected"
+  [ "$observed_root_inventory" = "$expected_root_inventory" ] \
+    || fail "copied public projection root contains extra material"
+  verify_file_sha256 \
+    "$destination/CURRENT.json" \
+    "$current_expected" \
+    "copied public projection CURRENT"
+  require_candidate_projection_snapshot \
+    "$destination/$snapshot_id" \
+    "copied public projection snapshot"
+  verify_tree_sha256 \
+    "$destination/$snapshot_id" \
+    "$snapshot_tree_expected" \
+    "copied public projection snapshot"
+
+  # Re-read the bind source after the atomic destination commits so a source
+  # mutation cannot leave a mixed CURRENT/snapshot authority in the volume.
+  verify_file_sha256 \
+    "$current_source" \
+    "$current_expected" \
+    "public projection CURRENT"
+  require_candidate_projection_snapshot \
+    "$snapshot_source" \
+    "public projection snapshot"
+  verify_tree_sha256 \
+    "$snapshot_source" \
+    "$snapshot_tree_expected" \
+    "public projection snapshot"
 }
 
 copy_isolated_release_shelf() {
@@ -474,6 +643,8 @@ run_public_download_initializer() {
   fleet_sha="${CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256-}"
   shelf_sha="${CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256-}"
   projection_sha="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256-}"
+  projection_current_sha="${CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256-}"
+  projection_snapshot_id="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID-}"
   runtime_proof_sha="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
   final_gold_sha="${CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256-}"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_SIDECAR_DP_CERTIFICATE_SHA256 "$certificate_sha"
@@ -482,6 +653,8 @@ run_public_download_initializer() {
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256 "$fleet_sha"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256 "$shelf_sha"
   validate_sha256 CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256 "$projection_sha"
+  validate_sha256 CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256 "$projection_current_sha"
+  validate_projection_snapshot_id "$projection_snapshot_id"
   validate_sha256 CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 "$runtime_proof_sha"
   validate_sha256 CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256 "$final_gold_sha"
 
@@ -516,11 +689,12 @@ run_public_download_initializer() {
     /runtime-inputs/shelf \
     /downloads-source \
     "$shelf_sha"
-  copy_immutable_tree \
+  copy_candidate_projection_authority \
     /runtime-inputs/projection \
     /public-projection-staging \
-    "$projection_sha" \
-    "public projection"
+    "$projection_snapshot_id" \
+    "$projection_current_sha" \
+    "$projection_sha"
   copy_runtime_proofs \
     /proofs-staging \
     /runtime-inputs/HUB_LOCAL_RELEASE_PROOF.generated.json \

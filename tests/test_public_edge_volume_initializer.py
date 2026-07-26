@@ -99,6 +99,38 @@ def test_initializer_is_fail_closed_and_never_chowns_downloads_bind() -> None:
         assert root in script
 
 
+def test_projection_seed_commits_the_exact_authority_pointer_last() -> None:
+    script = SCRIPT_PATH.read_text(encoding="utf-8")
+    start = script.index("copy_candidate_projection_authority() {")
+    end = script.index("\n\ncopy_isolated_release_shelf()", start)
+    projection_copy = script[start:end]
+
+    assert "require_candidate_projection_snapshot" in projection_copy
+    assert 'verify_file_sha256 \\\n    "$current_source"' in projection_copy
+    assert 'verify_tree_sha256 \\\n    "$snapshot_source"' in projection_copy
+    assert "--preserve=mode" in projection_copy
+    assert "--no-preserve=ownership,timestamps" in projection_copy
+    assert (
+        'mv -- "$snapshot_stage" "$destination/$snapshot_id"'
+        in projection_copy
+    )
+    assert (
+        'mv -- "$current_stage" "$destination/CURRENT.json"'
+        in projection_copy
+    )
+    assert projection_copy.index(
+        'mv -- "$snapshot_stage" "$destination/$snapshot_id"'
+    ) < projection_copy.index(
+        'mv -- "$current_stage" "$destination/CURRENT.json"'
+    )
+    assert "copied public projection root contains extra material" in (
+        projection_copy
+    )
+    assert projection_copy.count(
+        '"public projection snapshot"'
+    ) >= 4
+
+
 def test_initializer_service_is_root_only_and_portal_remains_nonroot() -> None:
     yaml = pytest.importorskip("yaml")
     payload = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))

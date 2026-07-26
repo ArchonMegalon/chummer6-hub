@@ -2935,6 +2935,8 @@ class SidecarConfig:
     manifest_closure_restoration_spec_sha256: str
     release_channel_receipt: Path
     release_channel_receipt_sha256: str
+    projection_authority_root: Path
+    projection_current_sha256: str
     projection_snapshot_root: Path
     projection_snapshot_id: str
     projection_snapshot_sha256: str
@@ -5729,6 +5731,85 @@ class TopologyBActionsProtocol(Protocol):
     ) -> dict[str, Any]: ...
 
 
+def _validate_projection_current_binding(config: SidecarConfig) -> None:
+    if (
+        config.projection_snapshot_root.parent
+        != config.projection_authority_root
+        or config.projection_snapshot_root
+        != config.projection_authority_root
+        / config.projection_snapshot_id
+    ):
+        raise CutoverError(
+            "projection snapshot is outside the authenticated authority root"
+        )
+    current_raw = stable_regular_bytes(
+        config.projection_authority_root / "CURRENT.json",
+        label="projection authority CURRENT",
+        maximum_bytes=1024 * 1024,
+    )
+    if sha256_bytes(current_raw) != config.projection_current_sha256:
+        raise CutoverError("projection authority CURRENT digest drifted")
+    current = _strict_json_object_bytes(
+        current_raw,
+        label="projection authority CURRENT",
+    )
+    expected_current_outputs = {
+        name: f"{config.projection_snapshot_id}/{name}"
+        for name in (
+            "HUB_LOCAL_RELEASE_PROOF.generated.json",
+            "HUB_SERVED_RELEASE_PROOF.generated.json",
+            "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+            "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+            "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+            "RELEASE_CHANNEL.generated.json",
+            "FLAGSHIP_PRODUCT_READINESS.generated.json",
+            "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json",
+        )
+    }
+    if (
+        set(current)
+        != {
+            "contractName",
+            "status",
+            "projectionStage",
+            "codeDeploymentAuthority",
+            "releaseUploadAuthority",
+            "candidateImportAuthority",
+            "releaseGateFindings",
+            "snapshotId",
+            "snapshotSha256",
+            "manifestRelativePath",
+            "manifestSha256",
+            "outputs",
+        }
+        or current.get("contractName")
+        != "chummer.public_projection_current/v1"
+        or current.get("status") != "candidate_import_ready"
+        or current.get("projectionStage") != "candidate_import_ready"
+        or current.get("codeDeploymentAuthority") is not False
+        or current.get("releaseUploadAuthority") is not False
+        or current.get("candidateImportAuthority") is not True
+        or current.get("snapshotId") != config.projection_snapshot_id
+        or current.get("snapshotSha256")
+        != config.projection_snapshot_sha256
+        or current.get("manifestRelativePath")
+        != (
+            f"{config.projection_snapshot_id}/"
+            "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+        )
+        or current.get("manifestSha256")
+        != config.projection_manifest_sha256
+        or not _json_semantically_equal(
+            current.get("outputs"),
+            expected_current_outputs,
+        )
+    ):
+        raise CutoverError(
+            "projection authority CURRENT does not bind the selected "
+            "candidate-import snapshot"
+        )
+
+
 def _validate_sidecar_config(config: SidecarConfig) -> None:
     if config.operation not in OPERATIONS:
         raise CutoverError("topology-B operation is invalid")
@@ -5845,6 +5926,7 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
         (config.shelf_root, "canonical release shelf"),
         (config.migration_candidate_root, "migration candidate"),
         (config.release_candidate_root, "sealed release candidate"),
+        (config.projection_authority_root, "projection authority root"),
         (config.projection_snapshot_root, "projection snapshot"),
         (config.fleet_source, "fleet runtime source"),
         (config.build_context, "build context"),
@@ -5885,6 +5967,7 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
             "manifest-closure restoration spec",
         ),
         (config.release_channel_receipt_sha256, "release-channel receipt"),
+        (config.projection_current_sha256, "projection CURRENT"),
         (config.projection_snapshot_sha256, "projection snapshot"),
         (
             config.projection_source_tree_sha256,
@@ -5974,6 +6057,7 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
         raise CutoverError("projection snapshot tree digest drifted")
     if config.projection_snapshot_root.name != config.projection_snapshot_id:
         raise CutoverError("projection snapshot directory identity drifted")
+    _validate_projection_current_binding(config)
     if config.candidate_import_authority != (
         config.projection_snapshot_root
         / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
@@ -7733,7 +7817,13 @@ def _sidecar_compose_environment(
             shelf["shelfTreeSha256"]
         ),
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": str(
-            config.projection_snapshot_root
+            config.projection_authority_root
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": (
+            config.projection_current_sha256
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+            config.projection_snapshot_id
         ),
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": (
             config.projection_source_tree_sha256
@@ -7842,7 +7932,11 @@ def materialize_sidecar_compose(
         "--fleet-sha256",
         config.fleet_sha256,
         "--projection-source",
-        str(config.projection_snapshot_root),
+        str(config.projection_authority_root),
+        "--projection-current-sha256",
+        config.projection_current_sha256,
+        "--projection-snapshot-id",
+        config.projection_snapshot_id,
         "--projection-sha256",
         config.projection_source_tree_sha256,
         "--runtime-proof-source",
@@ -10770,8 +10864,12 @@ class TopologyBActions:
                 "sha256": shelf["shelfTreeSha256"],
             },
             "projection": {
-                "source": str(config.projection_snapshot_root),
-                "sha256": config.projection_source_tree_sha256,
+                "source": str(config.projection_authority_root),
+                "currentSha256": config.projection_current_sha256,
+                "snapshotId": config.projection_snapshot_id,
+                "snapshotTreeSha256": (
+                    config.projection_source_tree_sha256
+                ),
             },
             "runtimeProof": {
                 "source": str(config.runtime_proof_source),
@@ -11483,6 +11581,8 @@ class TopologyBActions:
                 "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE": "path",
                 "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": "digest",
                 "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": "path",
+                "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": "digest",
+                "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": "snapshot-id",
                 "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": "digest",
                 "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": "path",
                 "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": "digest",
@@ -11512,6 +11612,14 @@ class TopologyBActions:
                         raise RecoveryUncertain(
                             "retirement runtime input digest is malformed"
                         )
+                elif kind == "snapshot-id":
+                    if re.fullmatch(
+                        r"public-projection-[0-9a-f]{64}",
+                        value,
+                    ) is None:
+                        raise RecoveryUncertain(
+                            "retirement runtime projection id is malformed"
+                        )
                 else:
                     candidate = Path(value)
                     if (
@@ -11536,7 +11644,24 @@ class TopologyBActions:
                     selected[
                         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"
                     ]
+                )
+                / selected[
+                    "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID"
+                ],
+                projection_authority_root=Path(
+                    selected[
+                        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"
+                    ]
                 ),
+                projection_current_sha256=selected[
+                    "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256"
+                ],
+                projection_snapshot_id=selected[
+                    "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID"
+                ],
+                projection_snapshot_sha256=selected[
+                    "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID"
+                ].removeprefix("public-projection-"),
                 projection_source_tree_sha256=selected[
                     "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256"
                 ],
@@ -14286,6 +14411,8 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
     )
     parser.add_argument("--release-channel-receipt", type=Path, required=True)
     parser.add_argument("--release-channel-receipt-sha256", required=True)
+    parser.add_argument("--projection-authority-root", type=Path, required=True)
+    parser.add_argument("--projection-current-sha256", required=True)
     parser.add_argument("--projection-snapshot-root", type=Path, required=True)
     parser.add_argument("--projection-snapshot-id", required=True)
     parser.add_argument("--projection-snapshot-sha256", required=True)
@@ -14482,6 +14609,11 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
             "release-channel receipt",
         ),
         release_channel_receipt_sha256=args.release_channel_receipt_sha256,
+        projection_authority_root=cutover_input(
+            args.projection_authority_root,
+            "projection authority root",
+        ),
+        projection_current_sha256=args.projection_current_sha256,
         projection_snapshot_root=cutover_input(
             args.projection_snapshot_root,
             "projection snapshot",

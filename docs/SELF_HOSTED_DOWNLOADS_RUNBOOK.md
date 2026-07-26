@@ -497,6 +497,17 @@ unset approved_runtime_proof_sha256
       treating upload authority as restored. Candidate import by itself is never release readiness,
       never advances a stable/current release pointer, and never authorizes another candidate.
 
+   The isolated public-download sidecar seeds its projection volume from the authenticated authority
+   root, not from a flattened snapshot directory. The initializer accepts only the exact
+   `candidate_import_ready` `CURRENT.json` selected by the controller and that pointer's immutable
+   `public-projection-<sha256>` directory. It rechecks the pointer digest, snapshot tree digest,
+   fixed candidate-output inventory, single-link regular-file posture, and generated `0644`/`0555`
+   modes; symbolic links, extra material, or drift fail before the portal can start. The snapshot
+   directory is installed first and `CURRENT.json` is renamed into place last, then the complete
+   two-entry authority root is mounted read-only at `/public-projection`. Historical sibling
+   snapshots in the operator-owned publication root are deliberately not copied into the runtime
+   volume.
+
    - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, runs the volume initializer, starts a uniquely named blue/green candidate with `--no-build`, and postdeploy-gates its exact image id before durably committing the candidate authority. The exact old portal is retained for rollback until that commit.
    - Before upgrading the guarded deploy source across this journal-schema change, verify that `/docker/chummercomplete/.state/public-edge-deploy-receipts/active-overlay-transaction.json` is absent. If a legacy journal exists, recover it with the exact audited source version that created it; do not delete, rewrite, or pass it to the new recovery path, which deliberately fails closed and retains incompatible journals.
    - If a durable transaction journal exists, the wrapper reconciles it and exits without starting a new deploy. Rerun the deploy only after that recovery succeeds. To request idempotent reconciliation explicitly, repeat the authority-file checks above and use the same clean launcher, source-authority inputs, and explicit proof authority (release-receipt inputs are not required for recovery):

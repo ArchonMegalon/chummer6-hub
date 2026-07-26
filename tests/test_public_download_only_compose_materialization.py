@@ -32,6 +32,7 @@ APP_OVERLAY_SOURCE = "/tmp/public-download-app"
 FLEET_SOURCE = "/tmp/public-download-fleet"
 SHELF_SOURCE = "/tmp/public-download-shelf"
 PROJECTION_SOURCE = "/tmp/public-download-projection"
+PROJECTION_SNAPSHOT_ID = "public-projection-" + ("a" * 64)
 FINAL_GOLD_SOURCE = "/tmp/final-gold.json"
 PROJECT_NAME = "public-download-op-1234"
 DIGESTS = {
@@ -39,6 +40,7 @@ DIGESTS = {
     "fleet": "5" * 64,
     "shelf": "6" * 64,
     "projection": "7" * 64,
+    "projection_current": "a" * 64,
     "runtime_proof": "8" * 64,
     "final_gold": "9" * 64,
 }
@@ -143,6 +145,12 @@ def render(output: Path, tmp_path: Path) -> str:
         "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SOURCE": SHELF_SOURCE,
         "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": DIGESTS["shelf"],
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": PROJECTION_SOURCE,
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": (
+            DIGESTS["projection_current"]
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+            PROJECTION_SNAPSHOT_ID
+        ),
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": (
             DIGESTS["projection"]
         ),
@@ -250,6 +258,10 @@ def validate(
             DIGESTS["fleet"],
             "--projection-source",
             PROJECTION_SOURCE,
+            "--projection-current-sha256",
+            DIGESTS["projection_current"],
+            "--projection-snapshot-id",
+            PROJECTION_SNAPSHOT_ID,
             "--projection-sha256",
             DIGESTS["projection"],
             "--runtime-proof-source",
