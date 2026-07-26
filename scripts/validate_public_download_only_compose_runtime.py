@@ -47,6 +47,9 @@ POSTURES = {
 }
 IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+PROJECTION_SNAPSHOT_ID_PATTERN = re.compile(
+    r"^public-projection-[0-9a-f]{64}$"
+)
 SOURCE_HEAD_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 VOLUME_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 REMOVED_SERVICES = {
@@ -583,6 +586,8 @@ def validate(
     shelf_source: str,
     shelf_sha256: str,
     projection_source: str,
+    projection_current_sha256: str,
+    projection_snapshot_id: str,
     projection_sha256: str,
     runtime_proof_source: str,
     runtime_proof_sha256: str,
@@ -693,6 +698,12 @@ def validate(
         "CHUMMER_PUBLIC_DOWNLOAD_APP_OVERLAY_SHA256": app_overlay_sha256,
         "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": fleet_sha256,
         "CHUMMER_PUBLIC_DOWNLOAD_SHELF_SHA256": shelf_sha256,
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": (
+            projection_current_sha256
+        ),
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+            projection_snapshot_id
+        ),
         "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": projection_sha256,
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": (
             runtime_proof_sha256
@@ -776,7 +787,9 @@ def validate(
             "shelf": {"source": shelf_source, "sha256": shelf_sha256},
             "projection": {
                 "source": projection_source,
-                "sha256": projection_sha256,
+                "currentSha256": projection_current_sha256,
+                "snapshotId": projection_snapshot_id,
+                "snapshotTreeSha256": projection_sha256,
             },
             "runtimeProof": {
                 "source": runtime_proof_source,
@@ -849,6 +862,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fleet-source", required=True)
     parser.add_argument("--fleet-sha256", required=True)
     parser.add_argument("--projection-source", required=True)
+    parser.add_argument("--projection-current-sha256", required=True)
+    parser.add_argument("--projection-snapshot-id", required=True)
     parser.add_argument("--projection-sha256", required=True)
     parser.add_argument("--runtime-proof-source", required=True)
     parser.add_argument("--runtime-proof-sha256", required=True)
@@ -893,12 +908,23 @@ def main(argv: list[str] | None = None) -> int:
             ),
             ("app overlay SHA-256", args.app_overlay_sha256),
             ("fleet SHA-256", args.fleet_sha256),
+            (
+                "projection CURRENT SHA-256",
+                args.projection_current_sha256,
+            ),
             ("projection SHA-256", args.projection_sha256),
             ("runtime proof SHA-256", args.runtime_proof_sha256),
             ("final-gold SHA-256", args.final_gold_sha256),
         ):
             if SHA256_PATTERN.fullmatch(digest) is None:
                 raise ValueError(f"{label} is invalid")
+        if (
+            PROJECTION_SNAPSHOT_ID_PATTERN.fullmatch(
+                args.projection_snapshot_id
+            )
+            is None
+        ):
+            raise ValueError("projection snapshot id is invalid")
         try:
             operation_root = args.operation_root.resolve(strict=True)
             operation_root_metadata = args.operation_root.lstat()
@@ -980,6 +1006,8 @@ def main(argv: list[str] | None = None) -> int:
             fleet_source=args.fleet_source,
             fleet_sha256=args.fleet_sha256,
             projection_source=args.projection_source,
+            projection_current_sha256=args.projection_current_sha256,
+            projection_snapshot_id=args.projection_snapshot_id,
             projection_sha256=args.projection_sha256,
             runtime_proof_source=args.runtime_proof_source,
             runtime_proof_sha256=args.runtime_proof_sha256,

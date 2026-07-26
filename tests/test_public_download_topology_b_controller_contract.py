@@ -840,6 +840,10 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
             str(release_receipt),
             "--release-channel-receipt-sha256",
             "7" * 64,
+            "--projection-authority-root",
+            str(projection_root.parent),
+            "--projection-current-sha256",
+            "c" * 64,
             "--projection-snapshot-root",
             str(projection_root),
             "--projection-snapshot-id",
@@ -896,6 +900,8 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
     assert config.direct_import_receipt_sha256 == direct_import_sha256
     assert config.projection_snapshot_sha256 == semantic_sha256
     assert config.projection_source_tree_sha256 == tree_sha256
+    assert config.projection_authority_root == projection_root.parent
+    assert config.projection_current_sha256 == "c" * 64
     assert semantic_sha256 != tree_sha256
 
     wrapper = (
@@ -909,6 +915,8 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
         "--direct-import-receipt-sha256",
         "--projection-snapshot-sha256",
         "--projection-snapshot-tree-sha256",
+        "--projection-authority-root",
+        "--projection-current-sha256",
     ):
         assert flag in wrapper
 
@@ -2014,7 +2022,15 @@ def cleanup_test_config(tmp_path: Path) -> SimpleNamespace:
         fleet_source=operation_root / "fleet-source",
         fleet_sha256="1" * 64,
         shelf_source=operation_root / "release-shelf",
-        projection_snapshot_root=operation_root / "projection",
+        projection_authority_root=operation_root / "projection-authority",
+        projection_current_sha256="9" * 64,
+        projection_snapshot_root=(
+            operation_root
+            / "projection-authority"
+            / ("public-projection-" + ("a" * 64))
+        ),
+        projection_snapshot_id="public-projection-" + ("a" * 64),
+        projection_snapshot_sha256="a" * 64,
         projection_source_tree_sha256="2" * 64,
         runtime_proof_source=operation_root / "runtime-proof.json",
         runtime_proof_sha256="3" * 64,
@@ -2168,8 +2184,14 @@ def complete_runtime_receipts(
                         "sha256": shelf["shelfTreeSha256"],
                     },
                     "projection": {
-                        "source": str(config.projection_snapshot_root),
-                        "sha256": config.projection_source_tree_sha256,
+                        "source": str(config.projection_authority_root),
+                        "currentSha256": (
+                            config.projection_current_sha256
+                        ),
+                        "snapshotId": config.projection_snapshot_id,
+                        "snapshotTreeSha256": (
+                            config.projection_source_tree_sha256
+                        ),
                     },
                     "runtimeProof": {
                         "source": str(config.runtime_proof_source),
@@ -4837,10 +4859,14 @@ def test_retirement_cleanup_reconstructs_original_runtime_inputs(
     recorded = {
         "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE": "/recorded/fleet",
         "CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256": "1" * 64,
-        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": (
-            "/recorded/projection"
-        ),
-        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": "2" * 64,
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": (
+                "/recorded/projection"
+            ),
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": "5" * 64,
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+                "public-projection-" + ("6" * 64)
+            ),
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256": "2" * 64,
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": (
             "/recorded/projection/proof.json"
         ),
@@ -4856,8 +4882,12 @@ def test_retirement_cleanup_reconstructs_original_runtime_inputs(
         volume_names={},
         fleet_source=Path("/placeholder/fleet"),
         fleet_sha256="0" * 64,
-        projection_snapshot_root=Path("/placeholder/projection"),
-        projection_source_tree_sha256="0" * 64,
+            projection_snapshot_root=Path("/placeholder/projection"),
+            projection_authority_root=Path("/placeholder"),
+            projection_current_sha256="0" * 64,
+            projection_snapshot_id="public-projection-" + ("0" * 64),
+            projection_snapshot_sha256="0" * 64,
+            projection_source_tree_sha256="0" * 64,
         runtime_proof_source=Path("/placeholder/proof.json"),
         runtime_proof_sha256="0" * 64,
         final_gold_source=Path("/placeholder/final-gold.json"),
@@ -4922,9 +4952,17 @@ def test_retirement_cleanup_reconstructs_original_runtime_inputs(
     assert observed["operation"] == controller.CUTOVER_OPERATION
     assert observed["fleet_source"] == Path("/recorded/fleet")
     assert observed["fleet_sha256"] == "1" * 64
-    assert observed["projection_snapshot_root"] == Path(
+    assert observed["projection_authority_root"] == Path(
         "/recorded/projection"
     )
+    assert observed["projection_snapshot_root"] == Path(
+        "/recorded/projection/public-projection-" + ("6" * 64)
+    )
+    assert observed["projection_current_sha256"] == "5" * 64
+    assert observed["projection_snapshot_id"] == (
+        "public-projection-" + ("6" * 64)
+    )
+    assert observed["projection_snapshot_sha256"] == "6" * 64
     assert observed["projection_source_tree_sha256"] == "2" * 64
     assert observed["runtime_proof_source"] == Path(
         "/recorded/projection/proof.json"

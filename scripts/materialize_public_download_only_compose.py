@@ -137,6 +137,14 @@ INITIALIZER_ENVIRONMENT = {
         "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_SHA256:"
         "?Set the projection tree SHA-256}"
     ),
+    "CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256": (
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_CURRENT_SHA256:"
+        "?Set the authenticated projection CURRENT SHA-256}"
+    ),
+    "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID": (
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ID:"
+        "?Set the authenticated projection snapshot id}"
+    ),
     "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256": (
         "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256:"
         "?Set the runtime-proof SHA-256}"
