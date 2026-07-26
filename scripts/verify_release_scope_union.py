@@ -943,26 +943,88 @@ def _verify_review_authorities(
 
 def _verify_registry_checkout(path: Path, expected_commit: str) -> None:
     _path_without_symlinks(path, "Registry repository")
+    absolute = path.absolute()
+    git_binary = Path("/usr/bin/git")
     try:
-        repository_stat = path.stat()
+        git_stat = git_binary.lstat()
+        repository_stat = os.stat(absolute, follow_symlinks=False)
     except OSError as error:
-        raise ScopeError("Registry repository is unavailable") from error
+        raise ScopeError("Registry Git authority is unavailable") from error
+    if (
+        not stat.S_ISREG(git_stat.st_mode)
+        or git_stat.st_uid != 0
+        or git_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+    ):
+        raise ScopeError(
+            "Registry Git authority must be the absolute root-owned /usr/bin/git"
+        )
     if (
         not stat.S_ISDIR(repository_stat.st_mode)
         or repository_stat.st_uid != os.geteuid()
     ):
         raise ScopeError("Registry repository must be a caller-owned directory")
+
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        repository_fd = os.open(absolute, directory_flags)
+    except OSError as error:
+        raise ScopeError("Registry repository could not be held safely") from error
+    held_stat = os.fstat(repository_fd)
+    if _identity(held_stat) != _identity(repository_stat):
+        os.close(repository_fd)
+        raise ScopeError("Registry repository changed while it was opened")
+    held_path = f"/proc/self/fd/{repository_fd}"
     command_prefix = [
-        "git",
+        str(git_binary),
         "-c",
-        f"safe.directory={path.absolute()}",
+        "core.fsmonitor=false",
+        "-c",
+        "core.untrackedCache=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.attributesFile=/dev/null",
+        "-c",
+        "diff.external=",
         "-C",
-        str(path),
+        held_path,
     ]
+    git_environment = {
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_EXTERNAL_DIFF": "",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_PAGER": "cat",
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+
+    def repository_still_bound() -> None:
+        try:
+            current = os.stat(absolute, follow_symlinks=False)
+            opened = os.fstat(repository_fd)
+        except OSError as error:
+            raise ScopeError(
+                "Registry repository changed during Git inspection"
+            ) from error
+        if (
+            _identity(current) != _identity(repository_stat)
+            or _identity(opened) != _identity(repository_stat)
+        ):
+            raise ScopeError("Registry repository changed during Git inspection")
 
     def run(*arguments: str) -> subprocess.CompletedProcess[str]:
+        repository_still_bound()
         try:
-            return subprocess.run(
+            result = subprocess.run(
                 [*command_prefix, *arguments],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
@@ -970,57 +1032,59 @@ def _verify_registry_checkout(path: Path, expected_commit: str) -> None:
                 text=True,
                 check=False,
                 timeout=30,
-                env={
-                    "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-                    "LANG": "C",
-                    "LC_ALL": "C",
-                    "GIT_CONFIG_NOSYSTEM": "1",
-                },
+                env=git_environment,
+                close_fds=True,
+                pass_fds=(repository_fd,),
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             raise ScopeError("Registry Git authority could not be inspected") from error
+        repository_still_bound()
+        return result
 
-    top_level = run("rev-parse", "--show-toplevel")
-    if top_level.returncode != 0:
-        raise ScopeError("Registry repository is not a Git worktree")
     try:
-        observed_root = Path(top_level.stdout.strip()).resolve(strict=True)
-        expected_root = path.resolve(strict=True)
-    except OSError as error:
-        raise ScopeError("Registry repository root could not be resolved") from error
-    if observed_root != expected_root:
-        raise ScopeError("Registry repository path is not the worktree root")
-    head = run("rev-parse", "--verify", "HEAD^{commit}")
-    if (
-        head.returncode != 0
-        or head.stdout.strip() != expected_commit
-        or GIT_COMMIT.fullmatch(head.stdout.strip()) is None
-    ):
-        raise ScopeError(
-            "review authority Registry commit does not equal the checked-out HEAD"
-        )
-    protected_paths = (
-        "scripts/release/promote_public_stable_release_channel.sh",
-        "scripts/materialize_public_release_channel.py",
-        "scripts/verify_public_release_channel.py",
-    )
-    status = run(
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all",
-        "--",
-        *protected_paths,
-    )
-    if status.returncode != 0 or status.stdout:
-        raise ScopeError(
-            "Registry release producer paths must be clean at the reviewed HEAD"
-        )
-    for source_path in protected_paths:
-        exists = run("cat-file", "-e", f"HEAD:{source_path}")
-        if exists.returncode != 0:
+        top_level = run("rev-parse", "--show-toplevel")
+        if top_level.returncode != 0:
+            raise ScopeError("Registry repository is not a Git worktree")
+        try:
+            observed_root = Path(top_level.stdout.strip()).resolve(strict=True)
+            expected_root = absolute.resolve(strict=True)
+        except OSError as error:
+            raise ScopeError("Registry repository root could not be resolved") from error
+        if observed_root != expected_root:
+            raise ScopeError("Registry repository path is not the worktree root")
+        head = run("rev-parse", "--verify", "HEAD^{commit}")
+        if (
+            head.returncode != 0
+            or head.stdout.strip() != expected_commit
+            or GIT_COMMIT.fullmatch(head.stdout.strip()) is None
+        ):
             raise ScopeError(
-                f"Registry reviewed HEAD is missing required source path {source_path}"
+                "review authority Registry commit does not equal the checked-out HEAD"
             )
+        protected_paths = (
+            "scripts/release/promote_public_stable_release_channel.sh",
+            "scripts/materialize_public_release_channel.py",
+            "scripts/verify_public_release_channel.py",
+        )
+        status_result = run(
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            *protected_paths,
+        )
+        if status_result.returncode != 0 or status_result.stdout:
+            raise ScopeError(
+                "Registry release producer paths must be clean at the reviewed HEAD"
+            )
+        for source_path in protected_paths:
+            exists = run("cat-file", "-e", f"HEAD:{source_path}")
+            if exists.returncode != 0:
+                raise ScopeError(
+                    f"Registry reviewed HEAD is missing required source path {source_path}"
+                )
+    finally:
+        os.close(repository_fd)
 
 
 def _manifest_coverage(manifest: dict[str, Any]) -> None:

@@ -1493,6 +1493,106 @@ def test_rejects_registry_head_substitution_and_dirty_release_source(
     assert not output.exists()
 
 
+def test_registry_inspection_ignores_path_and_global_git_config_injection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    marker = tmp_path / "untrusted-git-executed"
+    fake_bin = tmp_path / "fake-bin"
+    fake_git = fake_bin / "git"
+    hook = tmp_path / "untrusted-git-hook"
+    write_bytes(
+        fake_git,
+        (
+            "#!/bin/sh\n"
+            f"printf touched > {marker}\n"
+            'exec /usr/bin/git "$@"\n'
+        ).encode(),
+        0o700,
+    )
+    write_bytes(
+        hook,
+        (
+            "#!/bin/sh\n"
+            f"printf touched > {marker}\n"
+            "exit 1\n"
+        ).encode(),
+        0o700,
+    )
+    global_config = tmp_path / "untrusted-gitconfig"
+    write_bytes(
+        global_config,
+        (
+            "[core]\n"
+            f"\tfsmonitor = {hook}\n"
+            "[diff]\n"
+            f"\texternal = {hook}\n"
+        ).encode(),
+        0o600,
+    )
+
+    def post(_: dict[str, Any]) -> None:
+        monkeypatch.setenv("PATH", f"{fake_bin}:{os.environ.get('PATH', '')}")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
+
+    result, output, _ = invoke(tmp_path / "fixture", post_materialize=post)
+    assert result.returncode == 0, result.stderr
+    assert output.is_file()
+    assert not marker.exists()
+
+
+def test_registry_inspection_holds_and_rechecks_checkout_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_union_module()
+    repository = tmp_path / "registry"
+    for relative in (
+        "scripts/release/promote_public_stable_release_channel.sh",
+        "scripts/materialize_public_release_channel.py",
+        "scripts/verify_public_release_channel.py",
+    ):
+        write_bytes(repository / relative, f"{relative}\n".encode(), 0o644)
+    subprocess.run(["/usr/bin/git", "init", "-q", str(repository)], check=True)
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "add", "."],
+        check=True,
+    )
+    commit_environment = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Release Fixture",
+        "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+        "GIT_COMMITTER_NAME": "Release Fixture",
+        "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+    }
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "commit", "-q", "-m", "fixture"],
+        check=True,
+        env=commit_environment,
+    )
+    expected_commit = subprocess.run(
+        ["/usr/bin/git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+    real_run = module.subprocess.run
+    call_count = 0
+
+    def race_after_first_git(*args: object, **kwargs: object) -> Any:
+        nonlocal call_count
+        result = real_run(*args, **kwargs)
+        call_count += 1
+        if call_count == 1:
+            repository.rename(tmp_path / "registry-held-original")
+            repository.mkdir()
+        return result
+
+    monkeypatch.setattr(module.subprocess, "run", race_after_first_git)
+    with pytest.raises(module.ScopeError, match="changed during Git inspection"):
+        module._verify_registry_checkout(repository, expected_commit)
+
+
 def test_rejects_internally_rehashed_review_bytes_that_differ_from_gold(
     tmp_path: Path,
 ) -> None:
