@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
 import hmac
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -98,6 +99,7 @@ CANDIDATE_RETAINED_POINTER_KEYS = {
 }
 CANDIDATE_AUTHORITY_CONTRACT_V2 = "chummer.release-upload.candidate-import-authority/v2"
 CANDIDATE_AUTHORITY_CONTRACT_V3 = "chummer.release-upload.candidate-import-authority/v3"
+CANDIDATE_AUTHORITY_CONTRACT_V4 = "chummer.release-upload.candidate-import-authority/v4"
 CANDIDATE_PUBLICATION_SCOPE_FILE = "PREVIEW_NIGHTLY_PUBLICATION_SCOPE.generated.json"
 CANDIDATE_UNSIGNED_SCOPE_FILE = "PREVIEW_NIGHTLY_UNSIGNED_SCOPE.proposed.json"
 CANDIDATE_UNSIGNED_COMPOSITION_FILE = (
@@ -6732,8 +6734,275 @@ def _validate_candidate_import_authority_v3(
     return authority
 
 
+def _load_candidate_authority_materializer() -> object:
+    path = REPO_ROOT / "scripts/release/materialize_candidate_import_authority.py"
+    spec = importlib.util.spec_from_file_location(
+        "chummer_projection_candidate_authority_materializer",
+        path,
+    )
+    if spec is None or spec.loader is None:
+        raise ProjectionBlocked(
+            "candidate authority materializer could not be loaded"
+        )
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        raise ProjectionBlocked(
+            "candidate authority materializer could not be loaded"
+        ) from exc
+    return module
+
+
+def _validate_candidate_import_authority_v4(
+    authority: dict[str, object],
+    *,
+    candidate_materializer: object | None = None,
+    expected_installed_executable: dict[str, object] | None = None,
+    now: datetime | None = None,
+) -> dict[str, object]:
+    """Validate the narrow unsigned owner-native bridge over exact v3 custody."""
+
+    v3_root_keys = {
+        "candidate",
+        "candidateImportAuthority",
+        "candidateReviewAuthority",
+        "codeDeploymentAuthority",
+        "contractName",
+        "contractVersion",
+        "crossRunBitReproducible",
+        "custody",
+        "deployAuthority",
+        "exactIncomingDesktopScope",
+        "expiresAtUtc",
+        "generatedAtUtc",
+        "platformScope",
+        "publicationAuthorized",
+        "publicationEligible",
+        "releaseUploadAuthority",
+        "routeAuthority",
+        "signaturePolicy",
+        "status",
+    }
+    v3_custody_keys = {
+        "canonicalManifest",
+        "compatibilityManifest",
+        "inventory",
+        "registryFinalization",
+        "registryFinalizeAuthority",
+        "registryFinalizeReceipt",
+        "registryPrepareCandidateReceipt",
+        "unsignedPublicationEvidence",
+    }
+    custody = authority.get("custody")
+    if (
+        set(authority)
+        != {*v3_root_keys, "ownerNativeFinalizationBridgeAuthority"}
+        or authority.get("contractName") != CANDIDATE_AUTHORITY_CONTRACT_V4
+        or type(authority.get("contractVersion")) is not int
+        or authority.get("contractVersion") != 4
+        or authority.get("ownerNativeFinalizationBridgeAuthority") is not True
+        or not isinstance(custody, dict)
+        or set(custody) != {*v3_custody_keys, "nativeWindowsFinalizedEvidence"}
+    ):
+        raise ProjectionBlocked(
+            "unsigned owner-native candidate authority contract drifted"
+        )
+
+    evidence = custody.get("unsignedPublicationEvidence")
+    if not isinstance(evidence, dict) or not isinstance(
+        evidence.get("files"), list
+    ):
+        raise ProjectionBlocked(
+            "unsigned owner-native publication evidence is unavailable"
+        )
+    composition_entries = [
+        entry
+        for entry in evidence["files"]
+        if isinstance(entry, dict)
+        and entry.get("path") == CANDIDATE_UNSIGNED_COMPOSITION_FILE
+    ]
+    if len(composition_entries) != 1:
+        raise ProjectionBlocked(
+            "unsigned owner-native composition custody is ambiguous"
+        )
+
+    predecessor = dict(authority)
+    predecessor["contractName"] = CANDIDATE_AUTHORITY_CONTRACT_V3
+    predecessor["contractVersion"] = 3
+    predecessor.pop("ownerNativeFinalizationBridgeAuthority")
+    predecessor_custody = dict(custody)
+    predecessor_custody.pop("nativeWindowsFinalizedEvidence")
+    predecessor_evidence = dict(evidence)
+    predecessor_evidence["files"] = [
+        entry
+        for entry in evidence["files"]
+        if not (
+            isinstance(entry, dict)
+            and entry.get("path") == CANDIDATE_UNSIGNED_COMPOSITION_FILE
+        )
+    ]
+    predecessor_custody["unsignedPublicationEvidence"] = predecessor_evidence
+    predecessor["custody"] = predecessor_custody
+    validated_predecessor = _validate_candidate_import_authority_v3(
+        predecessor
+    )
+
+    candidate = validated_predecessor.get("candidate")
+    validated_custody = validated_predecessor.get("custody")
+    if not isinstance(candidate, dict) or not isinstance(validated_custody, dict):
+        raise ProjectionBlocked(
+            "unsigned owner-native predecessor identity is unavailable"
+        )
+    canonical_raw = _candidate_embedded_bytes(
+        validated_custody.get("canonicalManifest"),
+        label="unsigned owner-native canonical manifest",
+        expected_path="RELEASE_CHANNEL.generated.json",
+    )
+    compatibility_raw = _candidate_embedded_bytes(
+        validated_custody.get("compatibilityManifest"),
+        label="unsigned owner-native compatibility manifest",
+        expected_path="releases.json",
+    )
+    inventory_raw = _candidate_embedded_bytes(
+        validated_custody.get("inventory"),
+        label="unsigned owner-native upload inventory",
+        expected_path="CANDIDATE_UPLOAD_INVENTORY.generated.json",
+    )
+    inventory = _strict_json_object(
+        inventory_raw,
+        label="unsigned owner-native upload inventory",
+    )
+    candidate_rows = _candidate_inventory_rows(
+        inventory.get("files"),
+        label="unsigned owner-native upload inventory",
+    )
+
+    documents: dict[str, bytes] = {}
+    for reference in evidence["files"]:
+        if not isinstance(reference, dict):
+            raise ProjectionBlocked(
+                "unsigned owner-native evidence entry drifted"
+            )
+        relative = _candidate_relative_path(
+            reference.get("path"),
+            label="unsigned owner-native evidence path",
+        )
+        if relative in documents:
+            raise ProjectionBlocked(
+                "unsigned owner-native evidence path is duplicated"
+            )
+        documents[relative] = _candidate_embedded_bytes(
+            reference,
+            label=f"unsigned owner-native evidence {relative}",
+            expected_path=relative,
+        )
+
+    registry_candidate_raw = _candidate_embedded_bytes(
+        validated_custody.get("registryPrepareCandidateReceipt"),
+        label="unsigned owner-native Registry PREPARE receipt",
+        expected_path=CANDIDATE_REGISTRY_RECEIPT_FILE,
+    )
+    registry_candidate = _strict_json_object(
+        registry_candidate_raw,
+        label="unsigned owner-native Registry PREPARE receipt",
+    )
+    composition = registry_candidate.get("compositionInputDocument")
+    if not isinstance(composition, dict):
+        raise ProjectionBlocked(
+            "unsigned owner-native Registry composition is unavailable"
+        )
+    composition_raw = (
+        json.dumps(composition, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if documents.get(CANDIDATE_UNSIGNED_COMPOSITION_FILE) != composition_raw:
+        raise ProjectionBlocked(
+            "unsigned owner-native composition custody drifted"
+        )
+
+    materializer = (
+        candidate_materializer
+        if candidate_materializer is not None
+        else _load_candidate_authority_materializer()
+    )
+    try:
+        canonical = _strict_json_object(
+            canonical_raw,
+            label="unsigned owner-native canonical manifest",
+        )
+        scope = materializer._canonical_windows_scope(
+            canonical,
+            candidate_rows,
+            allow_ancillary_files=True,
+            expected_channel="preview",
+        )
+        source_canonical_raw = documents[
+            materializer.UNSIGNED_SOURCE_CANONICAL_PATH
+        ]
+        source_compatibility_raw = documents[
+            materializer.UNSIGNED_SOURCE_COMPATIBILITY_PATH
+        ]
+        expected_content: dict[str, bytes] = {
+            materializer.UNSIGNED_COMPOSITION_FILE: composition_raw,
+            "publication/RELEASE_CHANNEL.generated.json": source_canonical_raw,
+            "publication/releases.json": source_compatibility_raw,
+        }
+        for provenance_path in materializer.UNSIGNED_PROVENANCE_PATHS.values():
+            expected_content[provenance_path] = documents[provenance_path]
+        expected_content_rows = [
+            {
+                "path": path,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "sizeBytes": len(payload),
+            }
+            for path, payload in expected_content.items()
+        ]
+        candidate_by_path = {
+            str(row["path"]): row for row in candidate_rows
+        }
+        for head in scope["heads"]:
+            installer = scope["artifacts"][head]["installer"]["path"]
+            payload = scope["artifacts"][head]["payload"]["path"]
+            for candidate_path in (
+                installer,
+                payload,
+                f"{payload}.json",
+            ):
+                row = candidate_by_path[candidate_path]
+                expected_content_rows.append(
+                    {
+                        **row,
+                        "path": f"publication/{candidate_path}",
+                    }
+                )
+        expected_content_rows.sort(key=lambda row: str(row["path"]))
+        materializer._validate_embedded_unsigned_native_evidence(
+            custody.get("nativeWindowsFinalizedEvidence"),
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=source_canonical_raw,
+            source_compatibility_bytes=source_compatibility_raw,
+            expected_content_rows=expected_content_rows,
+            expected_installed_executable=expected_installed_executable,
+            scope=scope,
+            publication_source_sha=str(evidence.get("sourceSha") or ""),
+            now=now or datetime.now(timezone.utc),
+            max_age=timedelta(
+                seconds=materializer.DEFAULT_MAX_PROOF_AGE_SECONDS
+            ),
+        )
+    except ProjectionBlocked:
+        raise
+    except Exception as exc:
+        raise ProjectionBlocked(
+            "unsigned owner-native finalized evidence validation failed"
+        ) from exc
+    return authority
+
+
 def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
     authority = _strict_json_object(payload, label="candidate import authority")
+    if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V4:
+        return _validate_candidate_import_authority_v4(authority)
     if authority.get("contractName") == CANDIDATE_AUTHORITY_CONTRACT_V3:
         return _validate_candidate_import_authority_v3(authority)
     if set(authority) != {

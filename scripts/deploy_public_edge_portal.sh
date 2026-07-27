@@ -1113,6 +1113,14 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
   PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT-}"
   PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY-}"
   PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256-}"
+  PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY-}"
+  PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_SHA256-}"
+  PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT-}"
+  PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_SHA256-}"
+  PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID="${CHUMMER_PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID-}"
+  PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT-}"
+  PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_SHA256-}"
+  PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT=0
   PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT-}"
   PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256="${CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256-}"
   PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_INPUT="${CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE-}"
@@ -1239,6 +1247,71 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
       exit 2
     fi
     PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT="$PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_INPUT"
+    public_download_successor_inputs=(
+      "$PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_INPUT"
+      "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_INPUT"
+      "$PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_INPUT"
+    )
+    public_download_successor_digests=(
+      "$PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_SHA256"
+      "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_SHA256"
+      "$PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_SHA256"
+    )
+    for public_download_successor_input in \
+      "${public_download_successor_inputs[@]}"; do
+      if [[ -n "$public_download_successor_input" ]]; then
+        ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT += 1))
+      fi
+    done
+    for public_download_successor_digest in \
+      "${public_download_successor_digests[@]}"; do
+      if [[ -n "$public_download_successor_digest" ]]; then
+        ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT += 1))
+      fi
+    done
+    if [[ -n "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID" ]]; then
+      ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT += 1))
+    fi
+    if ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT != 0 \
+      && PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT != 7)); then
+      echo "successor cutover authority inputs must be supplied together" >&2
+      exit 2
+    fi
+    if ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT == 7)); then
+      if [[ ! "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID" \
+        =~ ^[1-9][0-9]*$ ]]; then
+        echo "successor decision artifact id is invalid" >&2
+        exit 2
+      fi
+      for public_download_successor_index in 0 1 2; do
+        public_download_successor_input="${public_download_successor_inputs[$public_download_successor_index]}"
+        public_download_successor_digest="${public_download_successor_digests[$public_download_successor_index]}"
+        if [[ "$public_download_successor_input" != /* \
+          || "$public_download_successor_input" == *$'\n'* \
+          || "$public_download_successor_input" == *'|'* \
+          || ! "$public_download_successor_digest" =~ ^[0-9a-f]{64}$ \
+          || ! -f "$public_download_successor_input" \
+          || -L "$public_download_successor_input" \
+          || ! -O "$public_download_successor_input" \
+          || "$("$TRUSTED_STAT" -c '%h' -- \
+            "$public_download_successor_input")" != 1 \
+          || "$("$TRUSTED_REALPATH" -e -- \
+            "$public_download_successor_input")" \
+            != "$public_download_successor_input" ]]; then
+          echo "successor cutover authority input is unsafe" >&2
+          exit 2
+        fi
+        public_download_successor_observed_sha256="$(
+          "$TRUSTED_SHA256SUM" -- "$public_download_successor_input"
+        )"
+        public_download_successor_observed_sha256="${public_download_successor_observed_sha256%% *}"
+        if [[ "$public_download_successor_observed_sha256" \
+          != "$public_download_successor_digest" ]]; then
+          echo "successor cutover authority input SHA-256 drifted" >&2
+          exit 2
+        fi
+      done
+    fi
     if [[ ! "$PROJECTION_SNAPSHOT_TREE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
       echo "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_TREE_SHA256 is required" >&2
       exit 2
@@ -1392,6 +1465,24 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     --delivery-phase "$PUBLIC_DOWNLOAD_DELIVERY_PHASE"
     --ready-timeout-seconds "$PORTAL_READY_TIMEOUT_SECONDS"
   )
+  if ((PUBLIC_DOWNLOAD_SUCCESSOR_INPUT_COUNT == 7)); then
+    public_download_controller_args+=(
+      --successor-cutover-authority \
+        "$PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_INPUT"
+      --successor-cutover-authority-sha256 \
+        "$PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY_SHA256"
+      --operator-decision-artifact \
+        "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_INPUT"
+      --operator-decision-artifact-sha256 \
+        "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_SHA256"
+      --operator-decision-artifact-id \
+        "$PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID"
+      --predecessor-retirement-receipt \
+        "$PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_INPUT"
+      --predecessor-retirement-receipt-sha256 \
+        "$PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_SHA256"
+    )
+  fi
   public_download_controller_status=0
   "$TRUSTED_ENV" -i \
     PATH=/usr/bin:/bin LANG=C LC_ALL=C \

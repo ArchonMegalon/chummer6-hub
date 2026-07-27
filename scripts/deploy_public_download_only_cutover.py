@@ -2929,6 +2929,13 @@ class SidecarConfig:
     release_candidate_root: Path
     candidate_import_authority: Path
     candidate_import_authority_sha256: str
+    successor_cutover_authority: Path | None
+    successor_cutover_authority_sha256: str
+    operator_decision_artifact: Path | None
+    operator_decision_artifact_sha256: str
+    operator_decision_artifact_id: int
+    predecessor_retirement_receipt: Path | None
+    predecessor_retirement_receipt_sha256: str
     direct_import_receipt: Path
     direct_import_receipt_sha256: str
     manifest_closure_restoration_spec: Path
@@ -5703,6 +5710,10 @@ class TopologyBActionsProtocol(Protocol):
     def wait_sidecar_healthy(self, config: Any, *args: Any) -> dict[str, Any]: ...
     def probe_sidecar_hosts(self, config: Any, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
     def probe_public_incumbent(self, config: Any, **kwargs: Any) -> dict[str, Any]: ...
+
+    def verify_canonical_incumbent_before_retirement(
+        self, config: Any, *args: Any
+    ) -> dict[str, Any]: ...
     def capture_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
     def apply_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
     def commit_cloudflare(self, config: Any, *args: Any) -> dict[str, Any]: ...
@@ -5980,6 +5991,51 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
     ):
         if SHA256.fullmatch(digest) is None:
             raise CutoverError(f"{label} SHA-256 is invalid")
+    successor_inputs = (
+        getattr(config, "successor_cutover_authority", None),
+        getattr(config, "operator_decision_artifact", None),
+        getattr(config, "predecessor_retirement_receipt", None),
+    )
+    successor_digests = (
+        getattr(config, "successor_cutover_authority_sha256", ""),
+        getattr(config, "operator_decision_artifact_sha256", ""),
+        getattr(config, "predecessor_retirement_receipt_sha256", ""),
+    )
+    if any(path is not None for path in successor_inputs) != all(
+        path is not None for path in successor_inputs
+    ):
+        raise CutoverError(
+            "successor cutover authority inputs must be supplied together"
+        )
+    if any(bool(digest) for digest in successor_digests) != all(
+        bool(digest) for digest in successor_digests
+    ):
+        raise CutoverError(
+            "successor cutover authority digests must be supplied together"
+        )
+    if any(path is not None for path in successor_inputs) != all(
+        SHA256.fullmatch(digest) is not None
+        for digest in successor_digests
+    ):
+        raise CutoverError(
+            "successor cutover authority paths and SHA-256 bindings disagree"
+        )
+    operator_decision_artifact_id = getattr(
+        config,
+        "operator_decision_artifact_id",
+        0,
+    )
+    if (
+        type(operator_decision_artifact_id) is not int
+        or operator_decision_artifact_id < 0
+        or (
+            any(path is not None for path in successor_inputs)
+            != (operator_decision_artifact_id > 0)
+        )
+    ):
+        raise CutoverError(
+            "successor decision artifact id and authority inputs disagree"
+        )
     if (
         config.projection_snapshot_id
         != f"public-projection-{config.projection_snapshot_sha256}"
@@ -6042,6 +6098,32 @@ def _validate_sidecar_config(config: SidecarConfig) -> None:
             owner_only=owner_only,
         )
         if digest and sha256_bytes(raw) != digest:
+            raise CutoverError(f"{label} SHA-256 drifted")
+    for path, digest, label in (
+        (
+            getattr(config, "successor_cutover_authority", None),
+            getattr(config, "successor_cutover_authority_sha256", ""),
+            "successor cutover authority",
+        ),
+        (
+            getattr(config, "operator_decision_artifact", None),
+            getattr(config, "operator_decision_artifact_sha256", ""),
+            "operator decision artifact",
+        ),
+        (
+            getattr(config, "predecessor_retirement_receipt", None),
+            getattr(config, "predecessor_retirement_receipt_sha256", ""),
+            "predecessor retirement receipt",
+        ),
+    ):
+        if path is None:
+            continue
+        raw = stable_regular_bytes(
+            path,
+            label=label,
+            maximum_bytes=16 * 1024 * 1024,
+        )
+        if sha256_bytes(raw) != digest:
             raise CutoverError(f"{label} SHA-256 drifted")
     observed_fleet = tree_sha256_file_stream(
         config.fleet_source,
@@ -7168,11 +7250,144 @@ def _validate_scope_bound_existing_bytes_candidate(
     }
 
 
+def _validate_v4_successor_cutover_authority(
+    config: SidecarConfig,
+    *,
+    scripts: Path,
+    candidate_authority: dict[str, Any],
+    successor_authority_validator: Any | None,
+    cloudflare: Any | None,
+    now: datetime | None,
+) -> dict[str, Any]:
+    successor_path = getattr(
+        config,
+        "successor_cutover_authority",
+        None,
+    )
+    decision_path = getattr(
+        config,
+        "operator_decision_artifact",
+        None,
+    )
+    retirement_path = getattr(
+        config,
+        "predecessor_retirement_receipt",
+        None,
+    )
+    if not all(
+        isinstance(path, Path)
+        for path in (
+            successor_path,
+            decision_path,
+            retirement_path,
+        )
+    ):
+        raise CutoverError(
+            "v4 bridge has no explicit successor serving authority"
+        )
+    successor_raw = stable_regular_bytes(
+        successor_path,
+        label="successor cutover authority",
+        maximum_bytes=16 * 1024 * 1024,
+    )
+    successor_sha256 = getattr(
+        config,
+        "successor_cutover_authority_sha256",
+        "",
+    )
+    if sha256_bytes(successor_raw) != successor_sha256:
+        raise CutoverError(
+            "successor cutover authority SHA-256 drifted"
+        )
+    successor_authority_validator = (
+        successor_authority_validator
+        or load_module(
+            scripts / "release/public_download_successor_authority.py",
+            "topology_b_successor_authority_"
+            f"{secrets.token_hex(6)}",
+        )
+    )
+    cloudflare = cloudflare or load_module(
+        scripts / "cloudflare_public_download_transaction.py",
+        f"topology_b_successor_cloudflare_{secrets.token_hex(6)}",
+    )
+    try:
+        successor = (
+            successor_authority_validator.validate_successor_authority(
+                successor_raw,
+                authority_path=successor_path,
+                authority_sha256=successor_sha256,
+                decision_artifact_path=decision_path,
+                decision_artifact_sha256=getattr(
+                    config,
+                    "operator_decision_artifact_sha256",
+                    "",
+                ),
+                github_artifact_id=getattr(
+                    config,
+                    "operator_decision_artifact_id",
+                    0,
+                ),
+                candidate_authority=candidate_authority,
+                candidate_authority_path=(
+                    config.candidate_import_authority
+                ),
+                candidate_authority_sha256=(
+                    config.candidate_import_authority_sha256
+                ),
+                predecessor_retirement_path=retirement_path,
+                predecessor_retirement_sha256=getattr(
+                    config,
+                    "predecessor_retirement_receipt_sha256",
+                    "",
+                ),
+                operation_root=config.operation_root,
+                project_name=config.project_name,
+                source_head=config.source_head,
+                account_id=config.cloudflare_account_id,
+                tunnel_id=config.cloudflare_tunnel_id,
+                origin=SIDECAR_ORIGIN,
+                public_hosts=SIDECAR_HOSTS,
+                cloudflare=cloudflare,
+                now=now,
+            )
+        )
+    except Exception as exc:
+        raise CutoverError(
+            "successor serving authority validation failed"
+        ) from exc
+    required = {
+        "generationId",
+        "transitionId",
+        "priorConfig",
+        "priorConfigSha256",
+        "priorVersion",
+        "targetConfig",
+        "targetConfigSha256",
+        "retainedIncumbentRoot",
+        "retainedIncumbentGenerationId",
+        "retainedIncumbentShelfTreeSha256",
+        "servingAuthority",
+    }
+    if (
+        not isinstance(successor, dict)
+        or not required.issubset(successor)
+        or not isinstance(successor.get("servingAuthority"), dict)
+    ):
+        raise CutoverError(
+            "successor serving authority validation is malformed"
+        )
+    return successor
+
+
 def validate_release_candidate_authority(
     config: SidecarConfig,
     *,
     projection_verifier: Any | None = None,
     candidate_materializer: Any | None = None,
+    successor_authority_validator: Any | None = None,
+    cloudflare: Any | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Authenticate the exact sealed bundle and its incumbent/fresh partition."""
 
@@ -7203,13 +7418,34 @@ def validate_release_candidate_authority(
         raise CutoverError(
             "candidate import authority semantic validation failed"
         ) from exc
-    if (
-        authority.get("contractName")
+    authority_contract = authority.get("contractName")
+    authority_version = authority.get("contractVersion")
+    owner_native_bridge = (
+        authority_contract
+        == "chummer.release-upload.candidate-import-authority/v4"
+        and type(authority_version) is int
+        and authority_version == 4
+    )
+    if not owner_native_bridge and (
+        authority_contract
         != "chummer.release-upload.candidate-import-authority/v3"
-        or type(authority.get("contractVersion")) is not int
-        or authority.get("contractVersion") != 3
+        or type(authority_version) is not int
+        or authority_version != 3
     ):
-        raise CutoverError("candidate import authority is not the required v3 contract")
+        raise CutoverError(
+            "candidate import authority is not a supported v3 or v4 contract"
+        )
+    if not owner_native_bridge and any(
+        getattr(config, field, None) is not None
+        for field in (
+            "successor_cutover_authority",
+            "operator_decision_artifact",
+            "predecessor_retirement_receipt",
+        )
+    ):
+        raise CutoverError(
+            "successor cutover authority requires the strict v4 bridge"
+        )
     candidate = authority.get("candidate")
     custody = authority.get("custody")
     if not isinstance(candidate, dict) or not isinstance(custody, dict):
@@ -7237,6 +7473,110 @@ def validate_release_candidate_authority(
         )
     except Exception as exc:
         raise CutoverError("direct-import receipt is malformed") from exc
+    direct_authority_reference = direct_import.get(
+        "hubCandidateImportAuthority"
+    )
+    if owner_native_bridge:
+        if (
+            not isinstance(direct_authority_reference, dict)
+            or set(direct_authority_reference)
+            != {"path", "sha256", "sizeBytes"}
+            or direct_authority_reference.get("path")
+            != "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+            or SHA256.fullmatch(
+                str(direct_authority_reference.get("sha256") or "")
+            )
+            is None
+            or type(direct_authority_reference.get("sizeBytes")) is not int
+            or direct_authority_reference["sizeBytes"] <= 0
+        ):
+            raise CutoverError(
+                "v4 bridge direct-import predecessor binding is malformed"
+            )
+        predecessor_path = (
+            config.direct_import_receipt.parent
+            / str(direct_authority_reference["path"])
+        )
+        predecessor_raw = stable_regular_bytes(
+            predecessor_path,
+            label="v4 bridge v3 predecessor authority",
+            maximum_bytes=16 * 1024 * 1024,
+        )
+        if (
+            predecessor_path.resolve(strict=True) != predecessor_path
+            or sha256_bytes(predecessor_raw)
+            != direct_authority_reference["sha256"]
+            or len(predecessor_raw)
+            != direct_authority_reference["sizeBytes"]
+        ):
+            raise CutoverError(
+                "v4 bridge v3 predecessor authority bytes drifted"
+            )
+        try:
+            predecessor = (
+                projection_verifier._validate_candidate_import_authority(
+                    predecessor_raw
+                )
+            )
+        except Exception as exc:
+            raise CutoverError(
+                "v4 bridge v3 predecessor authority is invalid"
+            ) from exc
+        predecessor_candidate = predecessor.get("candidate")
+        predecessor_custody = predecessor.get("custody")
+        shared_v4_custody = dict(custody)
+        shared_v4_custody.pop("nativeWindowsFinalizedEvidence", None)
+        shared_evidence = shared_v4_custody.get(
+            "unsignedPublicationEvidence"
+        )
+        if isinstance(shared_evidence, dict):
+            shared_evidence = dict(shared_evidence)
+            shared_evidence["files"] = [
+                item
+                for item in shared_evidence.get("files", [])
+                if not (
+                    isinstance(item, dict)
+                    and item.get("path")
+                    == projection_verifier.CANDIDATE_UNSIGNED_COMPOSITION_FILE
+                )
+            ]
+            shared_v4_custody["unsignedPublicationEvidence"] = (
+                shared_evidence
+            )
+        if (
+            predecessor.get("contractName")
+            != "chummer.release-upload.candidate-import-authority/v3"
+            or predecessor.get("contractVersion") != 3
+            or not _json_semantically_equal(
+                predecessor_candidate,
+                candidate,
+            )
+            or not _json_semantically_equal(
+                predecessor_custody,
+                shared_v4_custody,
+            )
+        ):
+            raise CutoverError(
+                "v4 bridge does not preserve its exact v3 predecessor custody"
+            )
+    else:
+        predecessor_path = config.candidate_import_authority
+        predecessor_raw = authority_raw
+        predecessor = authority
+    successor_validation = (
+        _validate_v4_successor_cutover_authority(
+            config,
+            scripts=scripts,
+            candidate_authority=authority,
+            successor_authority_validator=(
+                successor_authority_validator
+            ),
+            cloudflare=cloudflare,
+            now=now,
+        )
+        if owner_native_bridge
+        else None
+    )
     if (
         authority.get("projectionProfile")
         == SCOPE_BOUND_EXISTING_BYTES_PROFILE
@@ -7309,8 +7649,8 @@ def validate_release_candidate_authority(
                 "path": (
                     "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
                 ),
-                "sha256": config.candidate_import_authority_sha256,
-                "sizeBytes": len(authority_raw),
+                "sha256": sha256_bytes(predecessor_raw),
+                "sizeBytes": len(predecessor_raw),
             },
         )
     ):
@@ -7374,13 +7714,39 @@ def validate_release_candidate_authority(
         incumbent_snapshot = composition.get("incumbentSnapshot")
         if not isinstance(incumbent_snapshot, dict):
             raise CutoverError("candidate incumbent snapshot is unavailable")
+        incumbent_scan_root = config.migration_candidate_root
+        if successor_validation is not None:
+            retained_root_value = successor_validation.get(
+                "retainedIncumbentRoot"
+            )
+            if (
+                not isinstance(retained_root_value, str)
+                or not retained_root_value.startswith("/")
+            ):
+                raise CutoverError(
+                    "successor retained incumbent root is malformed"
+                )
+            incumbent_scan_root = Path(retained_root_value)
+            if (
+                incumbent_scan_root.is_symlink()
+                or not incumbent_scan_root.is_dir()
+                or incumbent_scan_root.resolve(strict=True)
+                != incumbent_scan_root
+                or incumbent_scan_root.name
+                != successor_validation.get(
+                    "retainedIncumbentGenerationId"
+                )
+            ):
+                raise CutoverError(
+                    "successor retained incumbent root drifted"
+                )
         (
             incumbent_rows,
             incumbent_modes,
             incumbent_directory_modes,
             _incumbent_captured,
         ) = candidate_materializer._scan_bundle_tree(
-            config.migration_candidate_root
+            incumbent_scan_root
         )
     except CutoverError:
         raise
@@ -7392,6 +7758,44 @@ def validate_release_candidate_authority(
     source_commits = direct_import.get("sourceCommits")
     registry_commit = registry_candidate.get("registryCommit")
     ui_commit = scope.get("sourceSha")
+    hub_source_commit = (
+        str(source_commits.get("hub") or "")
+        if isinstance(source_commits, dict)
+        else ""
+    )
+    hub_source_is_authorized = hub_source_commit == config.source_head
+    if (
+        owner_native_bridge
+        and not hub_source_is_authorized
+        and COMMIT.fullmatch(hub_source_commit) is not None
+    ):
+        try:
+            ancestry = subprocess.run(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(config.source_root),
+                    "merge-base",
+                    "--is-ancestor",
+                    hub_source_commit,
+                    config.source_head,
+                ],
+                env={
+                    "PATH": "/usr/bin:/bin",
+                    "LANG": "C",
+                    "LC_ALL": "C",
+                },
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                check=False,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise CutoverError(
+                "v4 bridge Hub source ancestry could not be verified"
+            ) from exc
+        hub_source_is_authorized = ancestry.returncode == 0
     if (
         not isinstance(source_commits, dict)
         or set(source_commits) != {"hub", "registry", "ui"}
@@ -7399,7 +7803,7 @@ def validate_release_candidate_authority(
             COMMIT.fullmatch(str(source_commits.get(name) or "")) is None
             for name in ("hub", "registry", "ui")
         )
-        or source_commits.get("hub") != config.source_head
+        or not hub_source_is_authorized
         or source_commits.get("registry") != registry_commit
         or source_commits.get("ui") != ui_commit
     ):
@@ -7608,10 +8012,57 @@ def validate_release_candidate_authority(
         != config.release_channel_receipt_sha256
     ):
         raise CutoverError(
-            "release manifest bytes do not share one v3 candidate authority"
+            "release manifest bytes do not share one candidate authority"
         )
 
-    return {
+    if owner_native_bridge:
+        try:
+            canonical_document = (
+                projection_verifier._strict_json_object(
+                    canonical_authority_raw,
+                    label="v4 bridge canonical manifest",
+                )
+            )
+            windows_scope = candidate_materializer._canonical_windows_scope(
+                canonical_document,
+                release_rows,
+                allow_ancillary_files=True,
+                expected_channel="preview",
+            )
+            heads = windows_scope.get("heads")
+            if (
+                not isinstance(heads, list)
+                or len(heads) != 1
+                or heads[0] != "avalonia"
+            ):
+                raise CutoverError(
+                    "v4 bridge executable scope is not exactly Avalonia"
+                )
+            payload_path = windows_scope["artifacts"]["avalonia"][
+                "payload"
+            ]["path"]
+            payload_row = release_by_path[str(payload_path)]
+            expected_executable = (
+                candidate_materializer._derive_unsigned_payload_executable(
+                    config.release_candidate_root,
+                    payload_path=str(payload_path),
+                    payload_row=payload_row,
+                )
+            )
+            projection_verifier._validate_candidate_import_authority_v4(
+                authority,
+                candidate_materializer=candidate_materializer,
+                expected_installed_executable=expected_executable,
+                now=now or datetime.now(UTC),
+            )
+        except CutoverError:
+            raise
+        except Exception as exc:
+            raise CutoverError(
+                "v4 bridge native executable custody validation failed"
+            ) from exc
+
+    result = {
         "path": str(config.candidate_import_authority),
         "sha256": config.candidate_import_authority_sha256,
         "contractName": authority["contractName"],
@@ -7643,9 +8094,36 @@ def validate_release_candidate_authority(
         "incumbentInventorySha256": evidence[
             "incumbentInventorySha256"
         ],
-        "servingAuthority": True,
+        "servingAuthority": (
+            successor_validation["servingAuthority"]
+            if successor_validation is not None
+            else True
+        ),
         "validatedAtUtc": utc_now(),
     }
+    if successor_validation is not None:
+        result.update(
+            {
+                "generationId": successor_validation["generationId"],
+                "ownerNativeFinalizationBridgeAuthority": {
+                    "candidateImportAuthority": True,
+                    "ownerNativeFinalizationBridgeAuthority": True,
+                    "publicationAuthorized": False,
+                    "publicationEligible": False,
+                    "releaseUploadAuthority": False,
+                    "deployAuthority": False,
+                    "routeAuthority": False,
+                    "codeDeploymentAuthority": False,
+                },
+                "v3PredecessorAuthority": {
+                    "path": str(predecessor_path),
+                    "sha256": sha256_bytes(predecessor_raw),
+                    "sizeBytes": len(predecessor_raw),
+                },
+                "successorCutoverAuthority": successor_validation,
+            }
+        )
+    return result
 
 
 def prepare_sidecar_release_shelf(
@@ -8344,6 +8822,9 @@ class TopologyBActions:
             "cloudflare",
             "activatedAtUtc",
         }
+        successor_summary = payload.get("successorCutoverAuthority")
+        if successor_summary is not None:
+            expected_fields.add("successorCutoverAuthority")
         final_gold = payload.get("finalGoldDiagnostic")
         cloudflare_summary = payload.get("cloudflare")
         if (
@@ -8399,6 +8880,72 @@ class TopologyBActions:
                 str(cloudflare_summary.get("evidenceSha256") or "")
             )
             is None
+            or (
+                successor_summary is not None
+                and (
+                    not isinstance(successor_summary, dict)
+                    or set(successor_summary)
+                    != {
+                        "path",
+                        "sha256",
+                        "transitionId",
+                        "generationId",
+                        "candidateImportAuthoritySha256",
+                        "operatorDecisionArtifactId",
+                        "operatorDecisionArtifactSha256",
+                        "predecessorRetirementReceiptSha256",
+                        "priorConfigSha256",
+                        "priorVersion",
+                        "targetConfigSha256",
+                        "validationSha256",
+                    }
+                    or not isinstance(
+                        successor_summary.get("path"),
+                        str,
+                    )
+                    or any(
+                        SHA256.fullmatch(
+                            str(successor_summary.get(field) or "")
+                        )
+                        is None
+                        for field in (
+                            "sha256",
+                            "candidateImportAuthoritySha256",
+                            "operatorDecisionArtifactSha256",
+                            "predecessorRetirementReceiptSha256",
+                            "priorConfigSha256",
+                            "targetConfigSha256",
+                            "validationSha256",
+                        )
+                    )
+                    or SAFE_NAME.fullmatch(
+                        str(
+                            successor_summary.get("transitionId")
+                            or ""
+                        )
+                    )
+                    is None
+                    or successor_summary.get("generationId")
+                    != payload.get("generationId")
+                    or type(
+                        successor_summary.get(
+                            "operatorDecisionArtifactId"
+                        )
+                    )
+                    is not int
+                    or successor_summary[
+                        "operatorDecisionArtifactId"
+                    ]
+                    < 1
+                    or type(
+                        successor_summary.get("priorVersion")
+                    )
+                    is not int
+                    or successor_summary["priorVersion"] < 0
+                    or successor_summary.get("targetConfigSha256")
+                    != cloudflare_summary.get("targetConfigSha256")
+                )
+            )
         ):
             raise RecoveryUncertain(
                 "topology-B runtime authority is malformed"
@@ -8455,6 +9002,211 @@ class TopologyBActions:
                 "committed Cloudflare evidence is not the active target"
             )
         return evidence_raw, evidence
+
+    def verify_canonical_incumbent_before_retirement(
+        self,
+        config: SidecarConfig,
+        *_args: Any,
+    ) -> dict[str, Any]:
+        """Freeze the hidden primary's flat aliases before route restoration."""
+
+        receipts = self._state.get("receipts")
+        if not isinstance(receipts, dict):
+            raise RecoveryUncertain(
+                "topology-B operation receipts are malformed"
+            )
+        existing = receipts.get("canonicalIncumbentRetirementPreflight")
+        if existing is not None:
+            if (
+                not isinstance(existing, dict)
+                or existing.get("contractName")
+                != (
+                    "chummer.public-download-canonical-incumbent-"
+                    "retirement-preflight/v1"
+                )
+                or existing.get("status") != "pass"
+                or existing.get("operationRoot")
+                != str(config.operation_root)
+                or existing.get("canonicalShelfRoot")
+                != str(config.shelf_root)
+                or existing.get("canonicalShelfMutated") is not False
+                or not isinstance(existing.get("verifiedAtUtc"), str)
+            ):
+                raise RecoveryUncertain(
+                    "canonical incumbent retirement preflight drifted"
+                )
+            if self._state.get("phase") != "active":
+                return copy.deepcopy(existing)
+        if (
+            config.operation != RETIRE_OPERATION
+            or self._state.get("phase") != "active"
+        ):
+            raise RecoveryUncertain(
+                "canonical incumbent preflight must precede retirement mutation"
+            )
+
+        journal_raw = stable_regular_bytes(
+            config.operation_journal,
+            label="pre-retirement topology-B operation journal",
+            maximum_bytes=16 * 1024 * 1024,
+            owner_only=True,
+        )
+        active_raw, active, _active_path = self._load_retirement_authority(
+            config
+        )
+        committed_raw, committed = (
+            self._load_committed_retirement_evidence(config, active)
+        )
+        baseline = self._validated_retirement_baseline()
+        try:
+            remote = self.cloudflare.parse_configuration_response(
+                self._cloudflare_api().get_configuration()
+            )
+        except Exception as exc:
+            raise RecoveryUncertain(
+                "pre-retirement Cloudflare target could not be verified"
+            ) from exc
+        if (
+            remote.sha256 != committed.get("targetConfigSha256")
+            or remote.version != committed.get("targetVersion")
+        ):
+            raise RecoveryUncertain(
+                "pre-retirement Cloudflare target changed"
+            )
+
+        portal_id = service_container(
+            self.runner,
+            PORTAL_SERVICE,
+            oneoff=False,
+        )
+        portal = container_runtime(self.runner, portal_id)
+        if not portal["existed"] or not portal["wasRunning"]:
+            raise RecoveryUncertain(
+                "canonical portal is not running before retirement"
+            )
+        inspection = docker_inspect_json(
+            self.runner,
+            "container",
+            portal_id,
+        )
+        mounts = inspection.get("Mounts")
+        shelf_mounts = (
+            [
+                mount
+                for mount in mounts
+                if isinstance(mount, dict)
+                and mount.get("Destination") == "/downloads-source"
+            ]
+            if isinstance(mounts, list)
+            else []
+        )
+        if (
+            len(shelf_mounts) != 1
+            or shelf_mounts[0].get("Type") != "bind"
+            or shelf_mounts[0].get("Source") != str(config.shelf_root)
+            or shelf_mounts[0].get("RW") is not True
+        ):
+            raise RecoveryUncertain(
+                "canonical portal release-shelf mount authority drifted"
+            )
+
+        paths = {
+            "/downloads/RELEASE_CHANNEL.generated.json": (
+                config.shelf_root / "RELEASE_CHANNEL.generated.json"
+            ),
+            "/downloads/releases.json": (
+                config.shelf_root / "releases.json"
+            ),
+        }
+        files: dict[str, dict[str, Any]] = {}
+        observations: dict[str, dict[str, Any]] = {}
+        for request_path, file_path in paths.items():
+            raw = stable_regular_bytes(
+                file_path,
+                label=f"canonical incumbent alias {file_path.name}",
+                maximum_bytes=8 * 1024 * 1024,
+            )
+            files[request_path] = {
+                "path": str(file_path),
+                "sha256": sha256_bytes(raw),
+                "sizeBytes": len(raw),
+            }
+        for hostname in SIDECAR_HOSTS:
+            host_observations: dict[str, Any] = {}
+            for request_path in paths:
+                status, _headers, body = _http_bytes(
+                    scheme="http",
+                    connect_host="127.0.0.1",
+                    connect_port=CANONICAL_PORT,
+                    request_host=hostname,
+                    path=request_path,
+                    timeout=30,
+                )
+                observation = {
+                    "httpStatus": status,
+                    "bodySha256": sha256_bytes(body),
+                    "sizeBytes": len(body),
+                }
+                if (
+                    observation
+                    != baseline.get(hostname, {}).get(request_path)
+                    or observation["bodySha256"]
+                    != files[request_path]["sha256"]
+                    or observation["sizeBytes"]
+                    != files[request_path]["sizeBytes"]
+                ):
+                    raise RecoveryUncertain(
+                        "canonical incumbent local alias differs from "
+                        "the committed retirement baseline"
+                    )
+                host_observations[request_path] = observation
+            observations[hostname] = host_observations
+
+        receipt = {
+            "contractName": (
+                "chummer.public-download-canonical-incumbent-"
+                "retirement-preflight/v1"
+            ),
+            "status": "pass",
+            "operationRoot": str(config.operation_root),
+            "canonicalShelfRoot": str(config.shelf_root),
+            "operationJournalSha256": sha256_bytes(journal_raw),
+            "activeAuthoritySha256": sha256_bytes(active_raw),
+            "committedEvidenceSha256": sha256_bytes(committed_raw),
+            "cloudflareTargetConfigSha256": remote.sha256,
+            "cloudflareTargetVersion": remote.version,
+            "portal": {
+                "containerId": portal["containerId"],
+                "imageId": portal["imageId"],
+                "mountSource": str(config.shelf_root),
+                "mountDestination": "/downloads-source",
+                "readWrite": True,
+            },
+            "files": files,
+            "observations": observations,
+            "incumbentBaselineSha256": (
+                self.cloudflare.canonical_sha256(baseline)
+            ),
+            "canonicalShelfMutated": False,
+            "verifiedAtUtc": utc_now(),
+        }
+        state = copy.deepcopy(self._state)
+        state_receipts = state.get("receipts")
+        if not isinstance(state_receipts, dict):
+            raise RecoveryUncertain(
+                "topology-B operation receipts are malformed"
+            )
+        state_receipts[
+            "canonicalIncumbentRetirementPreflight"
+        ] = copy.deepcopy(receipt)
+        state["updatedAtUtc"] = utc_now()
+        write_private_json(
+            config.operation_journal,
+            state,
+            replace=True,
+        )
+        self._state = state
+        return receipt
 
     def authorize_committed_retirement(
         self,
@@ -10187,6 +10939,38 @@ class TopologyBActions:
             journal_path=config.cloudflare_journal,
             lock_path=config.cloudflare_lock,
         )
+        successor = release_revalidation.get(
+            "successorCutoverAuthority"
+        )
+        if successor is not None:
+            if (
+                not isinstance(successor, dict)
+                or receipt.get("priorConfigSha256")
+                != successor.get("priorConfigSha256")
+                or receipt.get("priorVersion")
+                != successor.get("priorVersion")
+                or receipt.get("targetConfigSha256")
+                != successor.get("targetConfigSha256")
+                or receipt.get("generationId")
+                != successor.get("generationId")
+                or receipt.get("origin") != SIDECAR_ORIGIN
+                or receipt.get("accountId")
+                != config.cloudflare_account_id
+                or receipt.get("tunnelId")
+                != config.cloudflare_tunnel_id
+                or not _json_semantically_equal(
+                    receipt.get("priorConfig"),
+                    successor.get("priorConfig"),
+                )
+                or not _json_semantically_equal(
+                    receipt.get("targetConfig"),
+                    successor.get("targetConfig"),
+                )
+            ):
+                raise CutoverError(
+                    "captured Cloudflare transition differs from "
+                    "the one-use successor authority"
+                )
         summary = {
             "phase": receipt["phase"],
             "priorConfigSha256": receipt["priorConfigSha256"],
@@ -10473,6 +11257,51 @@ class TopologyBActions:
             "cloudflare": dict(cloudflare_commit),
             "activatedAtUtc": utc_now(),
         }
+        release_authority = shelf.get("releaseCandidateAuthority")
+        successor = (
+            release_authority.get("successorCutoverAuthority")
+            if isinstance(release_authority, Mapping)
+            else None
+        )
+        if successor is not None:
+            if (
+                not isinstance(successor, Mapping)
+                or successor.get("generationId")
+                != shelf.get("generationId")
+                or successor.get("targetConfigSha256")
+                != cloudflare_commit.get("targetConfigSha256")
+            ):
+                raise RecoveryUncertain(
+                    "successor active authority binding drifted"
+                )
+            payload["successorCutoverAuthority"] = {
+                "path": str(config.successor_cutover_authority),
+                "sha256": config.successor_cutover_authority_sha256,
+                "transitionId": successor.get("transitionId"),
+                "generationId": successor.get("generationId"),
+                "candidateImportAuthoritySha256": (
+                    config.candidate_import_authority_sha256
+                ),
+                "operatorDecisionArtifactId": (
+                    config.operator_decision_artifact_id
+                ),
+                "operatorDecisionArtifactSha256": (
+                    config.operator_decision_artifact_sha256
+                ),
+                "predecessorRetirementReceiptSha256": (
+                    config.predecessor_retirement_receipt_sha256
+                ),
+                "priorConfigSha256": successor.get(
+                    "priorConfigSha256"
+                ),
+                "priorVersion": successor.get("priorVersion"),
+                "targetConfigSha256": successor.get(
+                    "targetConfigSha256"
+                ),
+                "validationSha256": _topology_b_canonical_sha256(
+                    successor
+                ),
+            }
         write_private_json(
             config.active_runtime_authority,
             payload,
@@ -14295,6 +15124,9 @@ def retire_topology_b(
         action_boundary = (
             actions if actions is not None else TopologyBActions(config)
         )
+        action_boundary.verify_canonical_incumbent_before_retirement(
+            config
+        )
         authorization = action_boundary.authorize_committed_retirement(
             config
         )
@@ -14397,6 +15229,35 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
     parser.add_argument(
         "--candidate-import-authority-sha256",
         required=True,
+    )
+    parser.add_argument(
+        "--successor-cutover-authority",
+        type=Path,
+    )
+    parser.add_argument(
+        "--successor-cutover-authority-sha256",
+        default="",
+    )
+    parser.add_argument(
+        "--operator-decision-artifact",
+        type=Path,
+    )
+    parser.add_argument(
+        "--operator-decision-artifact-sha256",
+        default="",
+    )
+    parser.add_argument(
+        "--operator-decision-artifact-id",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
+        "--predecessor-retirement-receipt",
+        type=Path,
+    )
+    parser.add_argument(
+        "--predecessor-retirement-receipt-sha256",
+        default="",
     )
     parser.add_argument("--direct-import-receipt", type=Path, required=True)
     parser.add_argument("--direct-import-receipt-sha256", required=True)
@@ -14591,6 +15452,42 @@ def parse_args(argv: list[str] | None = None) -> SidecarConfig:
         ),
         candidate_import_authority_sha256=(
             args.candidate_import_authority_sha256
+        ),
+        successor_cutover_authority=(
+            cutover_input(
+                args.successor_cutover_authority,
+                "successor cutover authority",
+            )
+            if args.successor_cutover_authority is not None
+            else None
+        ),
+        successor_cutover_authority_sha256=(
+            args.successor_cutover_authority_sha256
+        ),
+        operator_decision_artifact=(
+            cutover_input(
+                args.operator_decision_artifact,
+                "operator decision artifact",
+            )
+            if args.operator_decision_artifact is not None
+            else None
+        ),
+        operator_decision_artifact_sha256=(
+            args.operator_decision_artifact_sha256
+        ),
+        operator_decision_artifact_id=(
+            args.operator_decision_artifact_id
+        ),
+        predecessor_retirement_receipt=(
+            cutover_input(
+                args.predecessor_retirement_receipt,
+                "predecessor retirement receipt",
+            )
+            if args.predecessor_retirement_receipt is not None
+            else None
+        ),
+        predecessor_retirement_receipt_sha256=(
+            args.predecessor_retirement_receipt_sha256
         ),
         direct_import_receipt=cutover_input(
             args.direct_import_receipt,
