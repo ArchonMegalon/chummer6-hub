@@ -265,6 +265,19 @@ def connections_response(
     }
 
 
+def connections_response_without_result_info(
+    connector_ids: list[str],
+) -> dict[str, Any]:
+    return {
+        "success": True,
+        "errors": [],
+        "messages": [],
+        "result": [
+            {"id": connector_id} for connector_id in connector_ids
+        ],
+    }
+
+
 def capture(
     tmp_path: Path, api: FakeApi, *, origin: str = "http://172.17.0.1:8080"
 ) -> tuple[Path, Path, dict[str, Any]]:
@@ -1006,6 +1019,132 @@ def test_connector_capture_accepts_complete_provider_single_page_above_20() -> N
 
     assert api.list_calls == 1
     assert [row["id"] for row in captured] == sorted(all_ids)
+
+
+def test_connector_capture_accepts_bounded_success_without_result_info() -> None:
+    response = connections_response_without_result_info(
+        ["connector-b", "connector-a"]
+    )
+    api = ScriptedConnectionsApi(
+        [response],
+        {"connector-a": 12, "connector-b": 11},
+    )
+
+    captured = transaction.capture_preexisting_connectors(api)
+
+    assert frozenset(response) == (
+        transaction.CONNECTIONS_RESPONSE_FIELDS_WITHOUT_RESULT_INFO
+    )
+    assert captured == [
+        {
+            "id": "connector-a",
+            "configVersionAvailable": True,
+            "configVersion": 12,
+        },
+        {
+            "id": "connector-b",
+            "configVersionAvailable": True,
+            "configVersion": 11,
+        },
+    ]
+
+
+def test_current_connections_accepts_metadata_free_result_at_exact_bound() -> None:
+    connector_ids = [
+        f"connector-{index:04d}"
+        for index in range(transaction.MAX_CURRENT_CONNECTORS)
+    ]
+    api = ScriptedConnectionsApi(
+        [connections_response_without_result_info(connector_ids)],
+        {},
+    )
+
+    observed = transaction._current_connections(api)
+
+    assert len(observed) == transaction.MAX_CURRENT_CONNECTORS
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("success", 1),
+        ("success", False),
+        ("errors", [{"code": 1000}]),
+        ("messages", {}),
+    ],
+)
+def test_metadata_free_connections_rejects_envelope_mutation(
+    field: str,
+    value: Any,
+) -> None:
+    response = connections_response_without_result_info(["connector-a"])
+    response[field] = value
+    api = ScriptedConnectionsApi([response], {"connector-a": 12})
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="response shape",
+    ):
+        transaction.capture_preexisting_connectors(api)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing_messages", "extra_count", "null_result_info"],
+)
+def test_metadata_free_connections_rejects_ambiguous_field_sets(
+    mutation: str,
+) -> None:
+    response = connections_response_without_result_info(["connector-a"])
+    expected = "response shape"
+    if mutation == "missing_messages":
+        del response["messages"]
+    elif mutation == "extra_count":
+        response["count"] = 1
+    else:
+        response["result_info"] = None
+        expected = "result_info shape"
+    api = ScriptedConnectionsApi([response], {"connector-a": 12})
+
+    with pytest.raises(transaction.ValidationError, match=expected):
+        transaction.capture_preexisting_connectors(api)
+
+
+def test_metadata_free_connections_rejects_result_above_bound() -> None:
+    connector_ids = [
+        f"connector-{index:04d}"
+        for index in range(transaction.MAX_CURRENT_CONNECTORS + 1)
+    ]
+    api = ScriptedConnectionsApi(
+        [connections_response_without_result_info(connector_ids)],
+        {},
+    )
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="bounded connector limit",
+    ):
+        transaction.capture_preexisting_connectors(api)
+
+
+def test_metadata_free_connections_preserves_connector_identity_binding() -> None:
+    class MismatchedConnectorApi(ScriptedConnectionsApi):
+        def get_connector(self, connector_id: str) -> Mapping[str, Any]:
+            return {
+                "success": True,
+                "result": {
+                    "id": "connector-other",
+                    "config_version": 12,
+                },
+            }
+
+    api = MismatchedConnectorApi(
+        [connections_response_without_result_info(["connector-a"])],
+        {"connector-a": 12},
+    )
+
+    with pytest.raises(transaction.ValidationError, match="id mismatch"):
+        transaction.capture_preexisting_connectors(api)
 
 
 @pytest.mark.parametrize(

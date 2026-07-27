@@ -203,6 +203,9 @@ CURRENT_CONNECTOR_CONVERGENCE_FIELDS = frozenset(
 CONNECTIONS_RESPONSE_FIELDS = frozenset(
     {"success", "errors", "messages", "result", "result_info"}
 )
+CONNECTIONS_RESPONSE_FIELDS_WITHOUT_RESULT_INFO = frozenset(
+    {"success", "errors", "messages", "result"}
+)
 CONNECTIONS_RESULT_INFO_FIELDS = frozenset(
     {"count", "page", "per_page", "total_count"}
 )
@@ -553,9 +556,16 @@ def _parse_connector_result(response: Any, expected_id: str) -> int | None:
 
 def _current_connections(api: TunnelApi) -> list[Any]:
     response = api.list_connections()
+    response_fields = (
+        frozenset(response) if isinstance(response, Mapping) else frozenset()
+    )
     if (
         not isinstance(response, Mapping)
-        or set(response) != CONNECTIONS_RESPONSE_FIELDS
+        or response_fields
+        not in {
+            CONNECTIONS_RESPONSE_FIELDS,
+            CONNECTIONS_RESPONSE_FIELDS_WITHOUT_RESULT_INFO,
+        }
         or response.get("success") is not True
         or response.get("errors") != []
         or not isinstance(response.get("messages"), list)
@@ -569,6 +579,15 @@ def _current_connections(api: TunnelApi) -> list[Any]:
         raise ValidationError(
             "Cloudflare connections result must be an array"
         )
+    if response_fields == CONNECTIONS_RESPONSE_FIELDS_WITHOUT_RESULT_INFO:
+        # Cloudflare models this endpoint as a single page and documents
+        # result_info as optional.  Without metadata, the exact envelope and
+        # this local cap are the complete fail-closed collection boundary.
+        if len(result) > MAX_CURRENT_CONNECTORS:
+            raise ValidationError(
+                "Cloudflare connections result exceeds the bounded connector limit"
+            )
+        return result
     if not isinstance(result_info, Mapping) or (
         set(result_info) != CONNECTIONS_RESULT_INFO_FIELDS
     ):
