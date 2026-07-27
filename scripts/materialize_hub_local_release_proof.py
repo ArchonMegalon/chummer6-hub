@@ -953,6 +953,39 @@ def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_k
     return _append_reason_details(base_reason, details)
 
 
+def _normalized_readiness_coverage_gap_keys(
+    readiness_payload: dict,
+) -> list[str]:
+    readiness_audit = readiness_payload.get("flagship_readiness_audit")
+    audit = readiness_audit if isinstance(readiness_audit, dict) else {}
+    # Preserve severity across producer generations: explicit missing evidence
+    # outranks legacy aggregate gaps, which outrank warning-only fallbacks.
+    candidates = (
+        readiness_payload.get("scoped_missing_keys"),
+        readiness_payload.get("missing_keys"),
+        audit.get("scoped_missing_coverage_keys"),
+        audit.get("missing_coverage_keys"),
+        audit.get("scoped_coverage_gap_keys"),
+        audit.get("coverage_gap_keys"),
+        readiness_payload.get("scoped_warning_keys"),
+        readiness_payload.get("warning_keys"),
+        audit.get("scoped_warning_coverage_keys"),
+        audit.get("warning_coverage_keys"),
+    )
+    for candidate in candidates:
+        if not isinstance(candidate, list) or any(
+            not isinstance(item, str) or not item.strip()
+            for item in candidate
+        ):
+            continue
+        normalized = _sorted_unique_strings(
+            [item.strip() for item in candidate]
+        )
+        if normalized:
+            return normalized
+    return []
+
+
 def _load_flagship_readiness_snapshot(
     readiness_payload: dict | None = None,
     *,
@@ -979,33 +1012,10 @@ def _load_flagship_readiness_snapshot(
         if readiness_payload is None:
             return snapshot
 
-    coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
-    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-        coverage_gap_keys = readiness_payload.get("warning_keys")
-    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-        coverage_gap_keys = readiness_payload.get("scoped_missing_keys")
-    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-        coverage_gap_keys = readiness_payload.get("missing_keys")
-
     readiness_audit = readiness_payload.get("flagship_readiness_audit")
-    if (not isinstance(coverage_gap_keys, list) or not coverage_gap_keys) and isinstance(readiness_audit, dict):
-        coverage_gap_keys = readiness_audit.get("scoped_coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-            coverage_gap_keys = readiness_audit.get("coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-            coverage_gap_keys = readiness_audit.get("scoped_warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-            coverage_gap_keys = readiness_audit.get("warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-            coverage_gap_keys = readiness_audit.get("scoped_missing_coverage_keys")
-        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
-            coverage_gap_keys = readiness_audit.get("missing_coverage_keys")
-
-    normalized_coverage_gap_keys = [
-        str(item).strip()
-        for item in coverage_gap_keys or []
-        if str(item).strip()
-    ]
+    normalized_coverage_gap_keys = _normalized_readiness_coverage_gap_keys(
+        readiness_payload
+    )
     completion_audit = readiness_payload.get("completion_audit")
     raw_reason = _release_readiness_reason(
         str(readiness_audit.get("reason") or "").strip()

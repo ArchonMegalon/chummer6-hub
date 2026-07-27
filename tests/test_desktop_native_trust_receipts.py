@@ -390,6 +390,84 @@ def load_verifier_module():
     return module
 
 
+def load_materializer_module():
+    spec = importlib.util.spec_from_file_location(
+        "materialize_hub_local_release_proof",
+        PROOF_SCRIPT,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load materializer module from {PROOF_SCRIPT}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_readiness_snapshots(payload: dict) -> tuple[dict, dict]:
+    materializer = load_materializer_module()
+    materialized = materializer._load_flagship_readiness_snapshot(
+        json.loads(json.dumps(payload)),
+        source_label="test://flagship-readiness",
+    )
+
+    with tempfile.TemporaryDirectory() as temp_root:
+        readiness_path = Path(temp_root) / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+        readiness_path.write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        verifier = load_verifier_module()
+        verifier._flagship_readiness_path = lambda: readiness_path
+        errors: list[str] = []
+        verified = verifier._load_flagship_readiness_snapshot(errors)
+
+    if errors:
+        raise AssertionError(f"readiness verifier reported errors: {errors!r}")
+    if verified is None:
+        raise AssertionError("readiness verifier did not return a snapshot")
+    return materialized, verified
+
+
+def mixed_readiness_payload() -> dict:
+    return {
+        "contract_name": "fleet.flagship_product_readiness",
+        "generated_at": "2026-07-27T00:00:00Z",
+        "status": "fail",
+        "scoped_status": "fail",
+        "scoped_warning_keys": ["fleet_and_operator_loop"],
+        "warning_keys": ["fleet_and_operator_loop"],
+        "scoped_missing_keys": ["desktop_client"],
+        "missing_keys": ["desktop_client"],
+        "completion_audit": {
+            "status": "fail",
+            "reason": "desktop_client is missing",
+        },
+        "flagship_readiness_audit": {
+            "reason": "desktop_client is missing",
+            "scoped_coverage_gap_keys": [
+                "fleet_and_operator_loop",
+                "desktop_client",
+            ],
+            "coverage_gap_keys": [
+                "fleet_and_operator_loop",
+                "desktop_client",
+            ],
+            "scoped_warning_coverage_keys": ["fleet_and_operator_loop"],
+            "warning_coverage_keys": ["fleet_and_operator_loop"],
+            "scoped_missing_coverage_keys": ["desktop_client"],
+            "missing_coverage_keys": ["desktop_client"],
+        },
+        "gate_status_override": {
+            "reason": "flagship readiness remains blocked",
+            "launch_critical_nested_blockers": ["release channel"],
+            "scoped_coverage_gap_keys": [
+                "fleet_and_operator_loop",
+                "desktop_client",
+            ],
+        },
+    }
+
+
 def proof_anchor_paths() -> list[Path]:
     anchors: list[Path] = []
     for value in [*QUEUE_PROOF_LINES, *REGISTRY_102_1_LINES]:
@@ -4156,6 +4234,99 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("missing desktop_client_readiness block", result.stderr)
+
+    def test_mixed_warning_and_missing_readiness_keeps_desktop_missing(self) -> None:
+        snapshots = load_readiness_snapshots(mixed_readiness_payload())
+
+        for snapshot in snapshots:
+            self.assertEqual(
+                ["desktop_client"],
+                snapshot["missing_coverage_keys"],
+            )
+            self.assertIs(True, snapshot["desktop_client_missing"])
+            self.assertIn("desktop_client", snapshot["reason"])
+
+    def test_warning_mutations_cannot_mask_a_more_severe_missing_category(
+        self,
+    ) -> None:
+        cases: list[tuple[str, dict, list[str], bool]] = []
+
+        audit_missing_only = mixed_readiness_payload()
+        audit_missing_only.pop("scoped_missing_keys")
+        audit_missing_only.pop("missing_keys")
+        cases.append(
+            (
+                "audit missing survives top-level warning",
+                audit_missing_only,
+                ["desktop_client"],
+                True,
+            )
+        )
+
+        aggregate_fallback = mixed_readiness_payload()
+        aggregate_fallback.pop("scoped_missing_keys")
+        aggregate_fallback.pop("missing_keys")
+        aggregate_fallback["flagship_readiness_audit"].pop(
+            "scoped_missing_coverage_keys"
+        )
+        aggregate_fallback["flagship_readiness_audit"].pop(
+            "missing_coverage_keys"
+        )
+        cases.append(
+            (
+                "aggregate gaps survive warning-only category fields",
+                aggregate_fallback,
+                ["fleet_and_operator_loop", "desktop_client"],
+                True,
+            )
+        )
+
+        malformed_missing_fallback = mixed_readiness_payload()
+        malformed_missing_fallback["scoped_missing_keys"] = [
+            "other_missing_category",
+            "",
+            7,
+        ]
+        malformed_missing_fallback["missing_keys"] = None
+        cases.append(
+            (
+                "malformed top-level missing falls back to audit missing",
+                malformed_missing_fallback,
+                ["desktop_client"],
+                True,
+            )
+        )
+
+        warning_only = mixed_readiness_payload()
+        warning_only.pop("scoped_missing_keys")
+        warning_only.pop("missing_keys")
+        for key in (
+            "scoped_missing_coverage_keys",
+            "missing_coverage_keys",
+            "scoped_coverage_gap_keys",
+            "coverage_gap_keys",
+        ):
+            warning_only["flagship_readiness_audit"].pop(key)
+        cases.append(
+            (
+                "warning fallback remains fail closed",
+                warning_only,
+                ["fleet_and_operator_loop"],
+                False,
+            )
+        )
+
+        for case_name, payload, expected_keys, desktop_missing in cases:
+            with self.subTest(case=case_name):
+                for snapshot in load_readiness_snapshots(payload):
+                    self.assertEqual(
+                        expected_keys,
+                        snapshot["missing_coverage_keys"],
+                    )
+                    self.assertIs(
+                        desktop_missing,
+                        snapshot["desktop_client_missing"],
+                    )
 
     def test_verifier_fail_closes_desktop_client_readiness_drift_from_flagship_proof(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:

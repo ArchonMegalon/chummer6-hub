@@ -2736,7 +2736,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 candidate = verifier._validate_candidate_import_authority_v4(
                     candidate,
-                    now=_utc_now(now),
                 )
             except Exception as exc:
                 raise SuccessorAuthorityError(

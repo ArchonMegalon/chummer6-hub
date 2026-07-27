@@ -5447,6 +5447,8 @@ def _validate_scope_bound_existing_bytes_authority(
 
 def _validate_candidate_import_authority_v3(
     authority: dict[str, object],
+    *,
+    now: datetime | None = None,
 ) -> dict[str, object]:
     if (
         authority.get("projectionProfile")
@@ -5513,13 +5515,13 @@ def _validate_candidate_import_authority_v3(
         )
     except ValueError as exc:
         raise ProjectionBlocked("unsigned candidate authority timestamps are invalid") from exc
-    now = datetime.now(timezone.utc)
+    validation_now = now or datetime.now(timezone.utc)
     if (
         generated_at.utcoffset() != timezone.utc.utcoffset(generated_at)
         or expires_at.utcoffset() != timezone.utc.utcoffset(expires_at)
-        or generated_at > now + timedelta(minutes=5)
-        or generated_at < now - timedelta(hours=6, minutes=5)
-        or expires_at <= now
+        or generated_at > validation_now + timedelta(minutes=5)
+        or generated_at < validation_now - timedelta(hours=6, minutes=5)
+        or expires_at <= validation_now
         or expires_at > generated_at + timedelta(hours=6)
     ):
         raise ProjectionBlocked("unsigned candidate authority lifetime drifted")
@@ -6856,6 +6858,7 @@ def _validate_candidate_import_authority_v4(
 ) -> dict[str, object]:
     """Validate the narrow unsigned owner-native bridge over exact v3 custody."""
 
+    validation_now = now or datetime.now(timezone.utc)
     v3_root_keys = {
         "candidate",
         "candidateImportAuthority",
@@ -6938,7 +6941,8 @@ def _validate_candidate_import_authority_v4(
     predecessor_custody["unsignedPublicationEvidence"] = predecessor_evidence
     predecessor["custody"] = predecessor_custody
     validated_predecessor = _validate_candidate_import_authority_v3(
-        predecessor
+        predecessor,
+        now=validation_now,
     )
 
     candidate = validated_predecessor.get("candidate")
@@ -7078,7 +7082,7 @@ def _validate_candidate_import_authority_v4(
             expected_installed_executable=expected_installed_executable,
             scope=scope,
             publication_source_sha=str(evidence.get("sourceSha") or ""),
-            now=now or datetime.now(timezone.utc),
+            now=validation_now,
             max_age=timedelta(
                 seconds=materializer.DEFAULT_MAX_PROOF_AGE_SECONDS
             ),

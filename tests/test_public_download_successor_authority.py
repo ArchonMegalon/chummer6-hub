@@ -586,6 +586,81 @@ def test_materializes_and_normalizes_exact_retained_successor(
         )
 
 
+def test_materialize_cli_does_not_inject_operator_time_into_candidate_freshness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    candidate_path = tmp_path / "candidate-v4.json"
+    candidate_raw = _write_json(
+        candidate_path,
+        {"contractName": "candidate-v4-sentinel"},
+    )
+    no_injected_clock = object()
+
+    class RecordingVerifier:
+        def __init__(self) -> None:
+            self.received_now: list[object] = []
+
+        def _validate_candidate_import_authority_v4(
+            self,
+            candidate: dict[str, object],
+            *,
+            now: object = no_injected_clock,
+        ) -> dict[str, object]:
+            self.received_now.append(now)
+            raise RuntimeError("stop after candidate freshness validation")
+
+    verifier = RecordingVerifier()
+    monkeypatch.setattr(
+        SUCCESSOR,
+        "load_projection_verifier",
+        lambda: verifier,
+    )
+    unused_path = tmp_path / "unused"
+    result = SUCCESSOR.main(
+        [
+            "materialize",
+            "--decision-artifact",
+            str(unused_path),
+            "--decision-artifact-sha256",
+            "0" * 64,
+            "--github-artifact-id",
+            "1",
+            "--candidate-authority",
+            str(candidate_path),
+            "--candidate-authority-sha256",
+            _digest(candidate_raw),
+            "--predecessor-retirement",
+            str(unused_path),
+            "--predecessor-retirement-sha256",
+            "0" * 64,
+            "--cloudflare-current-response",
+            str(unused_path),
+            "--cloudflare-current-response-sha256",
+            "0" * 64,
+            "--operation-root",
+            str(tmp_path / "operation"),
+            "--project-name",
+            "successor-test",
+            "--source-head",
+            SOURCE_HEAD,
+            "--account-id",
+            ACCOUNT_ID,
+            "--tunnel-id",
+            TUNNEL_ID,
+            "--output",
+            str(tmp_path / "successor-authority.json"),
+            "--now",
+            MATERIALIZE_NOW.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ]
+    )
+
+    assert result == 1
+    assert verifier.received_now == [no_injected_clock]
+    assert "failed the strict v4 verifier" in capsys.readouterr().err
+
+
 def test_rejects_any_v4_serving_authority_widening(
     tmp_path: Path,
 ) -> None:
