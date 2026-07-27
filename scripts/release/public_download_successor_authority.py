@@ -1186,7 +1186,7 @@ def _live_github_provider_evidence(
         "login": SOLE_OPERATOR_GITHUB_LOGIN,
         "id": SOLE_OPERATOR_GITHUB_ACTOR_ID,
     }
-    expected_workflow_path = f"{WORKFLOW_PATH}@main"
+    expected_workflow_path = WORKFLOW_PATH
     if (
         run.get("id") != run_id
         or run.get("url") != run_api_url

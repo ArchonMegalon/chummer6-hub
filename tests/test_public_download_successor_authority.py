@@ -342,7 +342,7 @@ def _build_lane(
                 f"{SUCCESSOR.GITHUB_WEB_ROOT}/actions/runs/{run_id}"
             ),
             "artifacts_url": f"{run_api_url}/artifacts",
-            "path": f"{SUCCESSOR.WORKFLOW_PATH}@main",
+            "path": SUCCESSOR.WORKFLOW_PATH,
             "head_branch": "main",
             "head_sha": SOURCE_HEAD,
             "event": "workflow_dispatch",
@@ -573,6 +573,9 @@ def test_materializes_and_normalizes_exact_retained_successor(
         "targetConfigSha256"
     ]
     assert normalized["servingAuthority"]["singleUse"] is True
+    assert authority["githubProviderEvidence"]["workflowRun"][
+        "workflowPath"
+    ] == SUCCESSOR.WORKFLOW_PATH
     assert (
         normalized["servingAuthority"]["retainedIncumbentRoot"]
         == str(lane["generationRoot"])
@@ -673,7 +676,12 @@ def test_live_github_rejects_forged_valid_one_file_zip(
         (
             "workflow_run",
             ("path",),
-            ".github/workflows/other.yml@main",
+            f"{SUCCESSOR.WORKFLOW_PATH}@main",
+        ),
+        (
+            "workflow_run",
+            ("path",),
+            ".github/workflows/other.yml",
         ),
         ("workflow_run", ("head_sha",), "e" * 40),
         ("workflow_run", ("event",), "push"),
