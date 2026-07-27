@@ -2534,7 +2534,14 @@ def _validate_native_screenshot(
             _fail(f"{label} screenshot dimensions drifted")
 
 
-def _validate_native_host(value: object, *, label: str) -> None:
+def _validate_native_host(
+    value: object,
+    *,
+    label: str,
+    expected_evidence_sources: frozenset[str] = frozenset(
+        {"GitHub-hosted windows-latest"}
+    ),
+) -> None:
     if not isinstance(value, dict) or set(value) not in (
         {
             "contractName",
@@ -2557,7 +2564,7 @@ def _validate_native_host(value: object, *, label: str) -> None:
         _fail(f"{label} native-host property set drifted")
     if (
         value.get("contractName") != "chummer6-ui.native_windows_host_evidence"
-        or value.get("evidenceSource") != "GitHub-hosted windows-latest"
+        or value.get("evidenceSource") not in expected_evidence_sources
         or value.get("hostPlatform") != "windows"
         or value.get("isNativeWindows") is not True
         or value.get("runner") not in {"pwsh", "powershell.exe"}
@@ -2568,6 +2575,18 @@ def _validate_native_host(value: object, *, label: str) -> None:
         not isinstance(value["hostKernel"], str) or not value["hostKernel"].strip()
     ):
         _fail(f"{label} native host kernel drifted")
+    if value.get("evidenceSource") == "host_kernel_and_runner_selection":
+        if (
+            "hostKernel" not in value
+            or value.get("runner") != "pwsh"
+            or re.fullmatch(
+                r"(?:MINGW64|MSYS|CYGWIN)_NT-[0-9]+\.[0-9]+"
+                r"(?:-[0-9]+)?",
+                value["hostKernel"],
+            )
+            is None
+        ):
+            _fail(f"{label} current native host kernel drifted")
 
 
 def _validate_native_inventory(
@@ -2617,13 +2636,22 @@ def _validate_unsigned_native_logs(
     *,
     head: str,
 ) -> None:
+    startup_path = f"startup-smoke/startup-smoke-{head}-{RID}.log"
+    startup_receipt_path = (
+        f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"
+    )
+    payload_http_path = (
+        f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log"
+    )
+    startup_receipt = _native_json(
+        payloads,
+        startup_receipt_path,
+        label="unsigned native startup receipt",
+    )
+    current_dialect = "verificationScope" in startup_receipt
     paths_and_markers = {
-        f"startup-smoke/startup-smoke-{head}-{RID}.log": [
-            "native startup passed"
-        ],
-        f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log": [
-            "candidate payload download passed"
-        ],
+        startup_path: [],
+        payload_http_path: [],
         f"startup-smoke/windows-installer-progress-{head}-{RID}.log": [
             "Bootstrap temp root:",
             "Payload download target:",
@@ -2649,12 +2677,231 @@ def _validate_unsigned_native_logs(
             for character in text
         ):
             _fail(f"unsigned native log {path} contains control bytes")
+        lines = text.splitlines()
+        if path == startup_path:
+            expected_marker = (
+                f"startup smoke ready: head={head} platform=windows "
+                "arch=x64 checkpoint=pre_ui_event_loop"
+                if current_dialect
+                else "native startup passed"
+            )
+            if expected_marker not in lines:
+                _fail(
+                    f"unsigned native log {path} omits a recognized "
+                    "startup-ready marker"
+                )
+        if path == payload_http_path:
+            if current_dialect:
+                current_pattern = re.compile(
+                    r"127\.0\.0\.1 - - "
+                    r"\[[0-9]{2}/[A-Z][a-z]{2}/[0-9]{4} "
+                    r"[0-9]{2}:[0-9]{2}:[0-9]{2}\] "
+                    rf'"GET /chummer-{re.escape(head)}-{RID}-payload\.zip '
+                    r'HTTP/1\.1" 200 -'
+                )
+                payload_download_passed = any(
+                    current_pattern.fullmatch(line) is not None
+                    for line in lines
+                )
+            else:
+                payload_download_passed = (
+                    "candidate payload download passed" in lines
+                )
+            if not payload_download_passed:
+                _fail(
+                    f"unsigned native log {path} omits a recognized "
+                    "payload-download success marker"
+                )
         offset = 0
         for marker in markers:
             marker_offset = text.find(marker, offset)
             if marker_offset < 0:
                 _fail(f"unsigned native log {path} omits {marker!r}")
             offset = marker_offset + len(marker)
+
+
+def _validate_unsigned_native_startup_receipt(
+    startup: dict[str, Any],
+    *,
+    head: str,
+    scope: dict[str, Any],
+    expected_installed_executable: dict[str, Any] | None,
+    now: datetime,
+    max_age: timedelta,
+) -> None:
+    legacy_keys = {
+        "artifactDigest",
+        "artifactFileName",
+        "bootstrapPayloadAcquisitionMode",
+        "bootstrapPayloadFileName",
+        "bootstrapPayloadSha256",
+        "bootstrapPayloadSizeBytes",
+        "channelId",
+        "executionEnvironment",
+        "headId",
+        "nativeHostEvidence",
+        "platform",
+        "readyCheckpoint",
+        "releaseVersion",
+        "rid",
+        "status",
+    }
+    current_keys = legacy_keys | {
+        "arch",
+        "artifactDigestSource",
+        "artifactId",
+        "artifactInstallMode",
+        "artifactPath",
+        "artifactPathDisclosure",
+        "artifactRelativePath",
+        "artifactSha256",
+        "bootstrapPayloadDownloadUrl",
+        "completedAtUtc",
+        "fileName",
+        "framework",
+        "hostClass",
+        "installLinkingInstallationId",
+        "installLinkingLaunchCount",
+        "installLinkingPromptReason",
+        "installLinkingPromptRequired",
+        "installLinkingStatus",
+        "operatingSystem",
+        "processPath",
+        "processPathDisclosure",
+        "recordedAtUtc",
+        "startedAtUtc",
+        "verificationScope",
+        "version",
+    }
+    startup_keys = set(startup)
+    if startup_keys not in (legacy_keys, current_keys):
+        _fail("unsigned native startup receipt property set drifted")
+
+    artifacts = scope["artifacts"][head]
+    installer = artifacts["installer"]
+    payload = artifacts["payload"]
+    if (
+        startup.get("status") != "pass"
+        or startup.get("readyCheckpoint") != "pre_ui_event_loop"
+        or startup.get("executionEnvironment") != "native_windows"
+        or startup.get("headId") != head
+        or startup.get("platform") != "windows"
+        or startup.get("rid") != RID
+        or startup.get("releaseVersion") != scope["version"]
+        or startup.get("channelId") != scope["channel"]
+        or startup.get("artifactFileName") != installer["fileName"]
+        or startup.get("artifactDigest")
+        != f"sha256:{installer['sha256']}"
+        or startup.get("bootstrapPayloadAcquisitionMode") != "download"
+        or startup.get("bootstrapPayloadFileName") != payload["fileName"]
+        or startup.get("bootstrapPayloadSha256") != payload["sha256"]
+        or startup.get("bootstrapPayloadSizeBytes") != payload["sizeBytes"]
+    ):
+        _fail("unsigned native startup receipt drifted")
+
+    if startup_keys == current_keys:
+        installer_path = f"files/{installer['fileName']}"
+        payload_url = startup.get("bootstrapPayloadDownloadUrl")
+        payload_url_match = (
+            re.fullmatch(
+                rf"http://127\.0\.0\.1:([1-9][0-9]{{0,4}})/"
+                rf"{re.escape(payload['fileName'])}",
+                payload_url,
+            )
+            if isinstance(payload_url, str)
+            else None
+        )
+        expected_process = (
+            expected_installed_executable.get("fileName")
+            if isinstance(expected_installed_executable, dict)
+            else None
+        )
+        if (
+            not isinstance(expected_process, str)
+            or re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._-]{0,126}\.exe",
+                expected_process,
+                flags=re.IGNORECASE,
+            )
+            is None
+            or startup.get("arch") != "x64"
+            or startup.get("version") != scope["version"]
+            or startup.get("hostClass")
+            != "github-hosted-windows-latest-native"
+            or startup.get("verificationScope") != "native_windows_startup"
+            or startup.get("artifactDigestSource") != "environment"
+            or startup.get("artifactInstallMode")
+            != "nsis_bootstrap_installer"
+            or startup.get("artifactPath") != installer_path
+            or startup.get("artifactPathDisclosure")
+            != "artifact_shelf_relative_path"
+            or startup.get("artifactRelativePath") != installer_path
+            or startup.get("artifactSha256") != installer["sha256"]
+            or startup.get("fileName") != installer["fileName"]
+            or startup.get("artifactId") != f"{head}-{RID}-installer"
+            or payload_url_match is None
+            or int(payload_url_match.group(1)) > 65535
+            or startup.get("processPathDisclosure") != "file_name_only"
+            or startup.get("processPath") != expected_process
+            or not isinstance(startup.get("framework"), str)
+            or re.fullmatch(
+                r"\.NET [0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?",
+                startup["framework"],
+            )
+            is None
+            or not isinstance(startup.get("operatingSystem"), str)
+            or re.fullmatch(
+                r"Microsoft Windows [0-9]+(?:\.[0-9]+){1,3}",
+                startup["operatingSystem"],
+            )
+            is None
+            or startup.get("installLinkingStatus") != "guest"
+            or startup.get("installLinkingPromptRequired") is not True
+            or startup.get("installLinkingPromptReason") != "claim_required"
+            or type(startup.get("installLinkingLaunchCount")) is not int
+            or startup.get("installLinkingLaunchCount") != 1
+            or not isinstance(
+                startup.get("installLinkingInstallationId"), str
+            )
+            or re.fullmatch(
+                r"ins-[0-9a-f]{32}",
+                startup["installLinkingInstallationId"],
+            )
+            is None
+        ):
+            _fail("unsigned native current startup receipt drifted")
+        started = _fresh_timestamp(
+            startup.get("startedAtUtc"),
+            label="unsigned native startup startedAtUtc",
+            now=now,
+            max_age=max_age,
+        )
+        recorded = _fresh_timestamp(
+            startup.get("recordedAtUtc"),
+            label="unsigned native startup recordedAtUtc",
+            now=now,
+            max_age=max_age,
+        )
+        completed = _fresh_timestamp(
+            startup.get("completedAtUtc"),
+            label="unsigned native startup completedAtUtc",
+            now=now,
+            max_age=max_age,
+        )
+        if (
+            not started <= recorded <= completed
+            or completed - started > timedelta(minutes=10)
+        ):
+            _fail("unsigned native startup timestamp sequence drifted")
+        expected_sources = frozenset({"host_kernel_and_runner_selection"})
+    else:
+        expected_sources = frozenset({"GitHub-hosted windows-latest"})
+
+    _validate_native_host(
+        startup.get("nativeHostEvidence"),
+        label="unsigned startup receipt",
+        expected_evidence_sources=expected_sources,
+    )
 
 
 def _validate_unsigned_native_graph(
@@ -3240,48 +3487,13 @@ def _validate_unsigned_native_graph(
         f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json",
         label="unsigned native startup receipt",
     )
-    artifacts = scope["artifacts"][head]
-    if set(startup) != {
-        "artifactDigest",
-        "artifactFileName",
-        "bootstrapPayloadAcquisitionMode",
-        "bootstrapPayloadFileName",
-        "bootstrapPayloadSha256",
-        "bootstrapPayloadSizeBytes",
-        "channelId",
-        "executionEnvironment",
-        "headId",
-        "nativeHostEvidence",
-        "platform",
-        "readyCheckpoint",
-        "releaseVersion",
-        "rid",
-        "status",
-    } or (
-        startup.get("status") != "pass"
-        or startup.get("readyCheckpoint") != "pre_ui_event_loop"
-        or startup.get("executionEnvironment") != "native_windows"
-        or startup.get("headId") != head
-        or startup.get("platform") != "windows"
-        or startup.get("rid") != RID
-        or startup.get("releaseVersion") != scope["version"]
-        or startup.get("channelId") != scope["channel"]
-        or startup.get("artifactFileName")
-        != artifacts["installer"]["fileName"]
-        or startup.get("artifactDigest")
-        != f"sha256:{artifacts['installer']['sha256']}"
-        or startup.get("bootstrapPayloadAcquisitionMode") != "download"
-        or startup.get("bootstrapPayloadFileName")
-        != artifacts["payload"]["fileName"]
-        or startup.get("bootstrapPayloadSha256")
-        != artifacts["payload"]["sha256"]
-        or startup.get("bootstrapPayloadSizeBytes")
-        != artifacts["payload"]["sizeBytes"]
-    ):
-        _fail("unsigned native startup receipt drifted")
-    _validate_native_host(
-        startup.get("nativeHostEvidence"),
-        label="unsigned startup receipt",
+    _validate_unsigned_native_startup_receipt(
+        startup,
+        head=head,
+        scope=scope,
+        expected_installed_executable=expected_installed_executable,
+        now=now,
+        max_age=max_age,
     )
 
     startup_visual = _native_json(
