@@ -7073,13 +7073,27 @@ def _validate_candidate_import_authority_v4(
                     }
                 )
         expected_content_rows.sort(key=lambda row: str(row["path"]))
+        sealed_installed_executable = (
+            materializer._derive_embedded_unsigned_native_installed_executable(
+                custody.get("nativeWindowsFinalizedEvidence"),
+                scope=scope,
+            )
+        )
+        if (
+            expected_installed_executable is not None
+            and expected_installed_executable != sealed_installed_executable
+        ):
+            raise ProjectionBlocked(
+                "unsigned owner-native startup executable differs from "
+                "the exact candidate payload ZIP"
+            )
         materializer._validate_embedded_unsigned_native_evidence(
             custody.get("nativeWindowsFinalizedEvidence"),
             candidate_rows=candidate_rows,
             source_canonical_bytes=source_canonical_raw,
             source_compatibility_bytes=source_compatibility_raw,
             expected_content_rows=expected_content_rows,
-            expected_installed_executable=expected_installed_executable,
+            expected_installed_executable=sealed_installed_executable,
             scope=scope,
             publication_source_sha=str(evidence.get("sourceSha") or ""),
             now=validation_now,
