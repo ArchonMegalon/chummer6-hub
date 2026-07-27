@@ -2199,6 +2199,9 @@ def test_unsigned_native_logs_accept_current_startup_ready_marker() -> None:
     rid = materializer.RID
     materializer._validate_unsigned_native_logs(
         {
+            f"startup-smoke/startup-smoke-{head}-{rid}.receipt.json": (
+                b'{"verificationScope":"native_windows_startup"}\n'
+            ),
             f"startup-smoke/startup-smoke-{head}-{rid}.log": (
                 b"startup smoke ready: head=avalonia platform=windows "
                 b"arch=x64 checkpoint=pre_ui_event_loop\n"
@@ -2235,6 +2238,9 @@ def test_unsigned_native_logs_reject_incomplete_current_startup_marker() -> None
     ):
         materializer._validate_unsigned_native_logs(
             {
+                f"startup-smoke/startup-smoke-{head}-{rid}.receipt.json": (
+                    b'{"verificationScope":"native_windows_startup"}\n'
+                ),
                 f"startup-smoke/startup-smoke-{head}-{rid}.log": (
                     b"startup smoke ready: head=avalonia platform=windows\n"
                 ),
@@ -2270,13 +2276,53 @@ def test_unsigned_native_logs_reject_failed_payload_download() -> None:
     ):
         materializer._validate_unsigned_native_logs(
             {
+                f"startup-smoke/startup-smoke-{head}-{rid}.receipt.json": (
+                    b'{"verificationScope":"native_windows_startup"}\n'
+                ),
                 f"startup-smoke/startup-smoke-{head}-{rid}.log": (
-                    b"native startup passed\n"
+                    b"startup smoke ready: head=avalonia platform=windows "
+                    b"arch=x64 checkpoint=pre_ui_event_loop\n"
                 ),
                 f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log": (
                     b'127.0.0.1 - - [27/Jul/2026 07:08:47] '
                     b'"GET /chummer-avalonia-win-x64-payload.zip HTTP/1.1" '
                     b"500 -\n"
+                ),
+                f"startup-smoke/windows-installer-progress-{head}-{rid}.log": (
+                    b"Bootstrap temp root:\n"
+                    b"Payload download target:\n"
+                    b"Downloading application files\n"
+                    b"Verifying payload size\n"
+                    b"Verifying payload checksum\n"
+                    b"Extracting application files\n"
+                    b"Install complete\n"
+                ),
+            },
+            head=head,
+        )
+
+
+def test_unsigned_native_logs_reject_legacy_dialect_for_current_receipt() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_legacy_log_current_receipt_test",
+    )
+    head = "avalonia"
+    rid = materializer.RID
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="recognized startup-ready marker",
+    ):
+        materializer._validate_unsigned_native_logs(
+            {
+                f"startup-smoke/startup-smoke-{head}-{rid}.receipt.json": (
+                    b'{"verificationScope":"native_windows_startup"}\n'
+                ),
+                f"startup-smoke/startup-smoke-{head}-{rid}.log": (
+                    b"native startup passed\n"
+                ),
+                f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log": (
+                    b"candidate payload download passed\n"
                 ),
                 f"startup-smoke/windows-installer-progress-{head}-{rid}.log": (
                     b"Bootstrap temp root:\n"
@@ -2386,6 +2432,48 @@ def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> Non
         now=now,
         max_age=timedelta(hours=24),
     )
+
+
+@pytest.mark.parametrize(
+    "native_host",
+    [
+        {
+            "contractName": "chummer6-ui.native_windows_host_evidence",
+            "status": "verified",
+            "isNativeWindows": True,
+            "hostPlatform": "windows",
+            "runner": "pwsh",
+            "evidenceSource": "host_kernel_and_runner_selection",
+        },
+        {
+            "contractName": "chummer6-ui.native_windows_host_evidence",
+            "status": "verified",
+            "isNativeWindows": True,
+            "hostPlatform": "windows",
+            "hostKernel": "Linux",
+            "runner": "pwsh",
+            "evidenceSource": "host_kernel_and_runner_selection",
+        },
+    ],
+)
+def test_current_native_host_requires_windows_kernel(
+    native_host: dict[str, object],
+) -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_current_host_kernel_test",
+    )
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="current native host kernel drifted",
+    ):
+        materializer._validate_native_host(
+            native_host,
+            label="current native host",
+            expected_evidence_sources=frozenset(
+                {"host_kernel_and_runner_selection"}
+            ),
+        )
 
 
 def test_unsigned_native_v4_embedded_custody_reuses_exact_tree_validator(

@@ -2575,6 +2575,18 @@ def _validate_native_host(
         not isinstance(value["hostKernel"], str) or not value["hostKernel"].strip()
     ):
         _fail(f"{label} native host kernel drifted")
+    if value.get("evidenceSource") == "host_kernel_and_runner_selection":
+        if (
+            "hostKernel" not in value
+            or value.get("runner") != "pwsh"
+            or re.fullmatch(
+                r"(?:MINGW64|MSYS|CYGWIN)_NT-[0-9]+\.[0-9]+"
+                r"(?:-[0-9]+)?",
+                value["hostKernel"],
+            )
+            is None
+        ):
+            _fail(f"{label} current native host kernel drifted")
 
 
 def _validate_native_inventory(
@@ -2625,9 +2637,18 @@ def _validate_unsigned_native_logs(
     head: str,
 ) -> None:
     startup_path = f"startup-smoke/startup-smoke-{head}-{RID}.log"
+    startup_receipt_path = (
+        f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"
+    )
     payload_http_path = (
         f"startup-smoke/startup-smoke-payload-http-{head}-{RID}.log"
     )
+    startup_receipt = _native_json(
+        payloads,
+        startup_receipt_path,
+        label="unsigned native startup receipt",
+    )
+    current_dialect = "verificationScope" in startup_receipt
     paths_and_markers = {
         startup_path: [],
         payload_http_path: [],
@@ -2656,28 +2677,37 @@ def _validate_unsigned_native_logs(
             for character in text
         ):
             _fail(f"unsigned native log {path} contains control bytes")
+        lines = text.splitlines()
         if path == startup_path:
-            legacy_marker = "native startup passed"
-            current_markers = (
-                "startup smoke ready:",
-                "checkpoint=pre_ui_event_loop",
+            expected_marker = (
+                f"startup smoke ready: head={head} platform=windows "
+                "arch=x64 checkpoint=pre_ui_event_loop"
+                if current_dialect
+                else "native startup passed"
             )
-            if legacy_marker not in text and not all(
-                marker in text for marker in current_markers
-            ):
+            if expected_marker not in lines:
                 _fail(
                     f"unsigned native log {path} omits a recognized "
                     "startup-ready marker"
                 )
         if path == payload_http_path:
-            legacy_marker = "candidate payload download passed"
-            current_marker = (
-                f'"GET /chummer-{head}-{RID}-payload.zip HTTP/1.1" 200'
-            )
-            if (
-                legacy_marker not in text
-                and current_marker not in text
-            ):
+            if current_dialect:
+                current_pattern = re.compile(
+                    r"127\.0\.0\.1 - - "
+                    r"\[[0-9]{2}/[A-Z][a-z]{2}/[0-9]{4} "
+                    r"[0-9]{2}:[0-9]{2}:[0-9]{2}\] "
+                    rf'"GET /chummer-{re.escape(head)}-{RID}-payload\.zip '
+                    r'HTTP/1\.1" 200 -'
+                )
+                payload_download_passed = any(
+                    current_pattern.fullmatch(line) is not None
+                    for line in lines
+                )
+            else:
+                payload_download_passed = (
+                    "candidate payload download passed" in lines
+                )
+            if not payload_download_passed:
                 _fail(
                     f"unsigned native log {path} omits a recognized "
                     "payload-download success marker"
@@ -2787,7 +2817,14 @@ def _validate_unsigned_native_startup_receipt(
             else None
         )
         if (
-            startup.get("arch") != "x64"
+            not isinstance(expected_process, str)
+            or re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._-]{0,126}\.exe",
+                expected_process,
+                flags=re.IGNORECASE,
+            )
+            is None
+            or startup.get("arch") != "x64"
             or startup.get("version") != scope["version"]
             or startup.get("hostClass")
             != "github-hosted-windows-latest-native"
