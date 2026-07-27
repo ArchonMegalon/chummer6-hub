@@ -3791,6 +3791,101 @@ def _validate_unsigned_native_evidence(
     return outer, min(captured_at, finalized_at)
 
 
+def _validate_embedded_unsigned_native_evidence(
+    evidence: object,
+    *,
+    candidate_rows: list[dict[str, Any]],
+    source_canonical_bytes: bytes,
+    source_compatibility_bytes: bytes,
+    expected_content_rows: list[dict[str, Any]] | None = None,
+    expected_installed_executable: dict[str, Any] | None = None,
+    scope: dict[str, Any],
+    publication_source_sha: str,
+    now: datetime,
+    max_age: timedelta,
+) -> tuple[dict[str, Any], datetime]:
+    """Revalidate an embedded v4 native graph through the disk-tree validator.
+
+    A v4 candidate authority carries the finalized native evidence as JSON
+    custody rather than as an independently selected directory. Rehydrate only
+    the already digest-checked embedded rows into a new private directory, then
+    reuse the same exact-tree and semantic validator used at materialization.
+    """
+
+    if not isinstance(evidence, dict):
+        _fail("unsigned finalized native-Windows evidence custody is unavailable")
+    _rows, payloads = _decode_unsigned_native_files(evidence.get("files"))
+    try:
+        outer_raw = (
+            json.dumps(
+                evidence,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise CandidateAuthorityBlocked(
+            "unsigned finalized native-Windows evidence is not canonical JSON"
+        ) from exc
+
+    def write_private_file(root: Path, relative: str, payload: bytes) -> None:
+        target = root.joinpath(*relative.split("/"))
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        ancestor = target.parent
+        while ancestor != root:
+            os.chmod(ancestor, 0o700, follow_symlinks=False)
+            ancestor = ancestor.parent
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor = os.open(target, flags, 0o600)
+        try:
+            view = memoryview(payload)
+            while view:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    _fail(
+                        "unsigned finalized native-Windows evidence "
+                        "rehydration made no progress"
+                    )
+                view = view[written:]
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    with tempfile.TemporaryDirectory(
+        prefix="chummer-unsigned-native-authority-"
+    ) as temporary:
+        root = Path(temporary)
+        os.chmod(root, 0o700)
+        for relative, payload in sorted(payloads.items()):
+            write_private_file(root, relative, payload)
+        write_private_file(
+            root,
+            UNSIGNED_NATIVE_FINALIZED_EVIDENCE_FILE,
+            outer_raw,
+        )
+        return _validate_unsigned_native_evidence(
+            root,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=source_canonical_bytes,
+            source_compatibility_bytes=source_compatibility_bytes,
+            expected_content_rows=expected_content_rows,
+            expected_installed_executable=expected_installed_executable,
+            scope=scope,
+            publication_source_sha=publication_source_sha,
+            now=now,
+            max_age=max_age,
+        )
+
+
 def _source(value: object, *, label: str, workflow: str) -> dict[str, Any]:
     required = {
         "repository",

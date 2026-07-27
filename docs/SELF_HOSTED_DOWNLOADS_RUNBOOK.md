@@ -246,6 +246,90 @@ ancestry, artifact metadata, archive digest, fresh envelope time, and exact
 bytes through a Hub-scoped read-only Actions token. Do not manually create,
 edit, or re-upload this artifact.
 
+### Owner-native v4 successor cutover
+
+A candidate-import v4 authority is a native-finalization identity and custody
+bridge only. Its publication, upload, deployment, route, and code-deployment
+authority fields remain false. Never reinterpret that bridge as serving
+authority and never downgrade it to v3 to bypass the native evidence or
+retained-incumbent bindings.
+
+When the v4 candidate must replace an already active topology-B sidecar, use
+this exact sequence:
+
+1. Retire the existing sidecar through
+   `initial-release-shelf-public-download-cutover-retire` with its original
+   operation ID. The controller first verifies the hidden canonical portal on
+   local port `8091`, its exact read-write canonical shelf bind, and both flat
+   aliases for both public Host headers against the original committed
+   incumbent baseline. This preflight records
+   `canonicalShelfMutated=false`; it does not seed, copy, or rewrite the
+   canonical shelf. The ordinary retirement then restores the exact prior
+   Cloudflare configuration and frees the fixed sidecar port.
+2. Preserve the retired operation root and its operation journal,
+   `sidecar-shelf-receipt.json`, immutable generation tree,
+   `retired-active-runtime-authority.json`, and terminal
+   `topology-b-retirement.json`. Do not clean or edit these files. The
+   successor validates their exact digest closure and uses that immutable
+   generation—not the restored canonical primary—as the v4 retained incumbent
+   snapshot.
+3. From protected Hub `main`, dispatch
+   `.github/workflows/public-download-successor-decision.yml` exactly once.
+   The workflow accepts only a first-attempt `workflow_dispatch` whose actor
+   and triggering actor are the same. In a sole-operator installation this is
+   the provider-authenticated operator decision; no second reviewer is
+   implied. The inputs bind the strict-v4 candidate digest, a fresh successor
+   operation root and project, release/generation identity, the terminal
+   predecessor retirement, and every surviving retained-custody digest.
+   Supply the predecessor closure as the single
+   `predecessor_binding_json` input in compact canonical JSON with exactly
+   these sorted keys and no trailing newline:
+
+   ```json
+   {"operationJournalSha256":"<sha256>","operationRoot":"<absolute-old-operation-root>","projectName":"<old-project-name>","retainedGenerationId":"<old-generation-id>","retainedShelfTreeSha256":"<sha256>","retiredAuthoritySha256":"<sha256>","retirementSha256":"<sha256>","shelfReceiptSha256":"<sha256>"}
+   ```
+
+   Download the resulting one-file artifact without editing or repacking it
+   and pin the exact downloaded archive SHA-256 and positive GitHub artifact
+   ID.
+4. Capture the actual Cloudflare tunnel configuration response after
+   retirement, then run
+   `scripts/release/public_download_successor_authority.py materialize`.
+   Supply the downloaded decision artifact and digest, strict-v4 candidate
+   authority and digest, terminal retirement receipt and digest, exact
+   post-retirement Cloudflare response and digest, fresh operation
+   root/project, protected-main source commit, GitHub artifact ID, account ID,
+   and tunnel ID. Both materialization and later controller validation require
+   outbound TLS to `api.github.com`; they live-read the fixed workflow-run and
+   artifact resources and require the provider's artifact digest and size to
+   equal the downloaded ZIP. Caller-supplied API JSON is not authority. The
+   materializer rejects an expired or inconsistent decision, a reused retired
+   operation root, missing retained custody, or a post-retirement
+   configuration/version that differs from the terminal retirement. Its
+   output is a single-use successor serving authority with the exact prior
+   configuration and the freshly planned target configuration.
+5. Launch a fresh
+   `initial-release-shelf-public-download-cutover` operation with all normal
+   clean-launch pins plus the three exact successor input pairs:
+   `CHUMMER_PUBLIC_DOWNLOAD_SUCCESSOR_CUTOVER_AUTHORITY` and its `_SHA256`,
+   `CHUMMER_PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT` and its `_SHA256`, and
+   `CHUMMER_PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT` and its `_SHA256`.
+   Also supply the provider's positive integer artifact ID as
+   `CHUMMER_PUBLIC_DOWNLOAD_OPERATOR_DECISION_ARTIFACT_ID`. Supplying none
+   preserves the v3 path; supplying anything less than all seven values fails
+   before the controller starts.
+
+The successor controller revalidates native executable custody from the exact
+payload, scans the predecessor's preserved immutable generation for retained
+bytes, and probes the newly prepared generation locally before Cloudflare
+capture. Immediately before any route mutation, the captured Cloudflare
+prior/version and planned target must equal the single-use successor
+authority. The final active-runtime marker records that authority and its
+candidate, decision, predecessor, and transition digests. Any mismatch,
+expiry, missing retained file, occupied sidecar port, or uncertain retirement
+state is a hard stop; resume the governed operation from its receipts rather
+than editing authority files or routing by hand.
+
 ### Authenticated manual stale-lock recovery
 
 The shared mutation lock never expires automatically. A failed acquisition remains a hard stop.

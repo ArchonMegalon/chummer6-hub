@@ -43,6 +43,12 @@ UNSIGNED_NATIVE_V4_CONTRACT_FIXTURE = (
     / "Fixtures"
     / "unsigned_native_evidence_v4_contract.json.gz.b64"
 )
+UNSIGNED_V4_AUTHORITY_FIXTURE = (
+    REPO_ROOT
+    / "Chummer.Tests"
+    / "Fixtures"
+    / "unsigned_candidate_import_authority_v4_distinct_source.json.gz.b64"
+)
 DEFAULT_HEADS = ("avalonia",)
 UNSIGNED_RETAINED_POINTER_KEYS = {
     "atomicallyRetained",
@@ -2055,6 +2061,13 @@ def load_unsigned_native_v4_contract_fixture() -> dict[str, object]:
     return value
 
 
+def load_unsigned_v4_authority_fixture() -> dict[str, object]:
+    encoded = "".join(UNSIGNED_V4_AUTHORITY_FIXTURE.read_text().splitlines())
+    value = json.loads(gzip.decompress(base64.b64decode(encoded)))
+    assert isinstance(value, dict)
+    return value
+
+
 def rehydrate_unsigned_native_v4_root(
     tmp_path: Path,
 ) -> tuple[
@@ -2175,6 +2188,80 @@ def test_unsigned_native_v4_validator_accepts_exact_final_head_fixture(
     assert oldest <= now
     assert validated["captureSource"]["sha"] == validated["finalizationSource"]["sha"]
     assert validated["captureSource"]["sha"] != source_sha
+
+
+def test_unsigned_native_v4_embedded_custody_reuses_exact_tree_validator(
+    tmp_path: Path,
+) -> None:
+    (
+        materializer,
+        _root,
+        native,
+        candidate_rows,
+        canonical,
+        compatibility,
+        scope,
+        now,
+    ) = rehydrate_unsigned_native_v4_root(tmp_path)
+    source_sha = native["candidateContentInventory"]["sourceSha"]
+    expected_content_rows = [
+        dict(row)
+        for row in native["candidateContentInventory"]["files"]
+    ]
+
+    validated, oldest = (
+        materializer._validate_embedded_unsigned_native_evidence(
+            native,
+            candidate_rows=candidate_rows,
+            source_canonical_bytes=canonical,
+            source_compatibility_bytes=compatibility,
+            expected_content_rows=expected_content_rows,
+            scope=scope,
+            publication_source_sha=source_sha,
+            now=now,
+            max_age=timedelta(hours=24),
+        )
+    )
+
+    assert validated == native
+    assert oldest <= now
+
+
+def test_projection_accepts_exact_owner_native_v4_bridge_custody() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_v4_authority_projection_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+
+    validated = projection._validate_candidate_import_authority_v4(
+        authority,
+        now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+    )
+
+    assert validated["contractName"] == (
+        "chummer.release-upload.candidate-import-authority/v4"
+    )
+    assert validated["ownerNativeFinalizationBridgeAuthority"] is True
+    assert validated["deployAuthority"] is False
+    assert validated["routeAuthority"] is False
+    assert validated["publicationAuthorized"] is False
+
+
+def test_projection_rejects_v4_bridge_posture_broadened_to_route_authority() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_v4_route_drift_projection_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+    authority["routeAuthority"] = True
+
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="candidate import authority contract drifted",
+    ):
+        projection._validate_candidate_import_authority_v4(
+            authority,
+            now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+        )
 
 
 @pytest.mark.parametrize(

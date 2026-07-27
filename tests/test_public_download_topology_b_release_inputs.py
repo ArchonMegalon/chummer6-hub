@@ -1489,6 +1489,183 @@ def test_v3_authority_binds_exact_candidate_tree_retained_and_fresh_delta(
     }
 
 
+def test_v3_authority_rejects_successor_only_inputs(
+    tmp_path: Path,
+) -> None:
+    config, projection_verifier, candidate_materializer, _release = (
+        release_candidate_authority_fixture(tmp_path)
+    )
+    config.successor_cutover_authority = (
+        tmp_path / "v3-must-not-consume-successor-authority.json"
+    )
+
+    with pytest.raises(
+        controller.CutoverError,
+        match="requires the strict v4 bridge",
+    ):
+        controller.validate_release_candidate_authority(
+            config,
+            projection_verifier=projection_verifier,
+            candidate_materializer=candidate_materializer,
+        )
+
+
+def test_v4_bridge_requires_and_preserves_separate_successor_serving_authority(
+    tmp_path: Path,
+) -> None:
+    (
+        config,
+        base_projection,
+        candidate_materializer,
+        _release_by_path,
+    ) = release_candidate_authority_fixture(tmp_path)
+    v3 = base_projection._validate_candidate_import_authority(b"")
+    v4 = json.loads(json.dumps(v3))
+    v4["contractName"] = (
+        "chummer.release-upload.candidate-import-authority/v4"
+    )
+    v4["contractVersion"] = 4
+    v4["ownerNativeFinalizationBridgeAuthority"] = True
+    v4["custody"]["nativeWindowsFinalizedEvidence"] = {
+        "contractName": "fixture-native"
+    }
+    v4["custody"]["unsignedPublicationEvidence"]["files"].append(
+        {
+            "path": "composition.json",
+            "token": "composition",
+        }
+    )
+
+    predecessor = (
+        config.direct_import_receipt.parent
+        / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+    )
+    predecessor.write_bytes(config.candidate_import_authority.read_bytes())
+    v4_path = config.candidate_import_authority.parent / "strict-v4.json"
+    v4_path.write_bytes(b"fixture strict v4 authority\n")
+    config.candidate_import_authority = v4_path
+    config.candidate_import_authority_sha256 = hashlib.sha256(
+        v4_path.read_bytes()
+    ).hexdigest()
+    successor_path = tmp_path / "successor-authority.json"
+    decision_path = tmp_path / "operator-decision.zip"
+    retirement_path = tmp_path / "retirement.json"
+    for path, payload in (
+        (successor_path, b"successor\n"),
+        (decision_path, b"decision\n"),
+        (retirement_path, b"retirement\n"),
+    ):
+        path.write_bytes(payload)
+    config.successor_cutover_authority = successor_path
+    config.successor_cutover_authority_sha256 = hashlib.sha256(
+        successor_path.read_bytes()
+    ).hexdigest()
+    config.operator_decision_artifact = decision_path
+    config.operator_decision_artifact_sha256 = hashlib.sha256(
+        decision_path.read_bytes()
+    ).hexdigest()
+    config.operator_decision_artifact_id = 123456
+    config.predecessor_retirement_receipt = retirement_path
+    config.predecessor_retirement_receipt_sha256 = hashlib.sha256(
+        retirement_path.read_bytes()
+    ).hexdigest()
+    config.operation_root = tmp_path / "chummer-public-download-successor"
+    config.project_name = config.operation_root.name
+    config.cloudflare_account_id = "a" * 32
+    config.cloudflare_tunnel_id = (
+        "b" * 8 + "-bbbb-bbbb-bbbb-" + "b" * 12
+    )
+
+    class ProjectionVerifier(base_projection):
+        @staticmethod
+        def _validate_candidate_import_authority(
+            raw: bytes,
+        ) -> dict[str, Any]:
+            return v4 if raw == v4_path.read_bytes() else v3
+
+        @staticmethod
+        def _validate_candidate_import_authority_v4(
+            authority: dict[str, Any],
+            **_kwargs: Any,
+        ) -> dict[str, Any]:
+            assert authority is v4
+            return authority
+
+    candidate_materializer._canonical_windows_scope = staticmethod(
+        lambda *_args, **_kwargs: {
+            "heads": ["avalonia"],
+            "artifacts": {
+                "avalonia": {
+                    "payload": {"path": FRESH_WINDOWS_PATHS[1]}
+                }
+            },
+        }
+    )
+    candidate_materializer._derive_unsigned_payload_executable = (
+        staticmethod(
+            lambda *_args, **_kwargs: {
+                "fileName": "Chummer.Avalonia.exe",
+                "payloadEntry": "Chummer.Avalonia.exe",
+                "sha256": "c" * 64,
+                "sizeBytes": 1,
+            }
+        )
+    )
+
+    expected_serving = {
+        "source": "providerAuthenticatedSoleOperatorDecision",
+        "transitionId": "successor-transition-fixture",
+    }
+
+    class SuccessorValidator:
+        @staticmethod
+        def validate_successor_authority(
+            _raw: bytes,
+            **kwargs: Any,
+        ) -> dict[str, Any]:
+            assert kwargs["candidate_authority"] is v4
+            assert kwargs["github_artifact_id"] == 123456
+            return {
+                "generationId": "g-successor-fixture",
+                "transitionId": "successor-transition-fixture",
+                "priorConfig": {"ingress": [{"service": "http_status:404"}]},
+                "priorConfigSha256": "d" * 64,
+                "priorVersion": 13,
+                "targetConfig": {"ingress": [{"service": "http://sidecar"}]},
+                "targetConfigSha256": "e" * 64,
+                "retainedIncumbentRoot": str(
+                    config.migration_candidate_root
+                ),
+                "retainedIncumbentGenerationId": (
+                    config.migration_candidate_root.name
+                ),
+                "retainedIncumbentShelfTreeSha256": "f" * 64,
+                "servingAuthority": expected_serving,
+            }
+
+    receipt = controller.validate_release_candidate_authority(
+        config,
+        projection_verifier=ProjectionVerifier,
+        candidate_materializer=candidate_materializer,
+        successor_authority_validator=SuccessorValidator,
+        cloudflare=object(),
+    )
+
+    assert receipt["contractVersion"] == 4
+    assert receipt["generationId"] == "g-successor-fixture"
+    assert receipt["servingAuthority"] == expected_serving
+    assert receipt["ownerNativeFinalizationBridgeAuthority"] == {
+        "candidateImportAuthority": True,
+        "ownerNativeFinalizationBridgeAuthority": True,
+        "publicationAuthorized": False,
+        "publicationEligible": False,
+        "releaseUploadAuthority": False,
+        "deployAuthority": False,
+        "routeAuthority": False,
+        "codeDeploymentAuthority": False,
+    }
+
+
 def test_v3_authority_rejects_fresh_windows_hash_not_in_exact_bundle(
     tmp_path: Path,
 ) -> None:

@@ -1,0 +1,118 @@
+name: Public-download successor decision
+
+on:
+  workflow_dispatch:
+    inputs:
+      transition_id:
+        description: One-use lowercase successor transition identifier
+        required: true
+        type: string
+      operation_root:
+        description: Exact fresh successor operation root on the release host
+        required: true
+        type: string
+      project_name:
+        description: Exact fresh topology-B Compose project name
+        required: true
+        type: string
+      candidate_authority_sha256:
+        description: Exact strict-v4 candidate authority SHA-256
+        required: true
+        type: string
+      release_version:
+        description: Exact successor preview version
+        required: true
+        type: string
+      generation_id:
+        description: Exact successor generation identifier
+        required: true
+        type: string
+      predecessor_binding_json:
+        description: Exact canonical predecessor custody JSON binding
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-download-successor-decision-${{ inputs.transition_id }}
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    name: Authorize one exact successor
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.ref_protected == true &&
+      github.run_attempt == 1 &&
+      github.actor == 'ArchonMegalon' &&
+      github.triggering_actor == 'ArchonMegalon' &&
+      github.event.sender.login == 'ArchonMegalon' &&
+      github.event.sender.id == 11421547
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact protected main source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up exact Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Emit exact sole-operator decision
+        shell: bash
+        env:
+          DECISION_ROOT: ${{ runner.temp }}/public-download-successor-decision
+          TRANSITION_ID: ${{ inputs.transition_id }}
+          OPERATION_ROOT: ${{ inputs.operation_root }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          CANDIDATE_AUTHORITY_SHA256: ${{ inputs.candidate_authority_sha256 }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          GENERATION_ID: ${{ inputs.generation_id }}
+          PREDECESSOR_BINDING_JSON: ${{ inputs.predecessor_binding_json }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_EVENT_NAME}" = "workflow_dispatch"
+          test "${GITHUB_REPOSITORY}" = "ArchonMegalon/chummer6-hub"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_REF_PROTECTED}" = "true"
+          test "${GITHUB_RUN_ATTEMPT}" = "1"
+          test "${GITHUB_ACTOR}" = "ArchonMegalon"
+          test "${GITHUB_TRIGGERING_ACTOR}" = "ArchonMegalon"
+          test "${GITHUB_ACTOR_ID}" = "11421547"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          install -d -m 0700 "${DECISION_ROOT}"
+          python3 scripts/release/public_download_successor_authority.py \
+            emit-decision \
+            --transition-id "${TRANSITION_ID}" \
+            --operation-root "${OPERATION_ROOT}" \
+            --project-name "${PROJECT_NAME}" \
+            --candidate-authority-sha256 "${CANDIDATE_AUTHORITY_SHA256}" \
+            --release-version "${RELEASE_VERSION}" \
+            --generation-id "${GENERATION_ID}" \
+            --predecessor-binding-json "${PREDECESSOR_BINDING_JSON}" \
+            --lifetime-seconds 7200 \
+            --output "${DECISION_ROOT}/PUBLIC_DOWNLOAD_SUCCESSOR_DECISION.generated.json"
+          test "$(find "${DECISION_ROOT}" -mindepth 1 -maxdepth 1 -type f | wc -l)" = "1"
+          test "$(find "${DECISION_ROOT}" -mindepth 1 -maxdepth 1 -type d | wc -l)" = "0"
+          test "$(stat -c '%a' "${DECISION_ROOT}/PUBLIC_DOWNLOAD_SUCCESSOR_DECISION.generated.json")" = "444"
+
+      - name: Upload immutable one-file decision
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-download-successor-decision-${{ github.run_id }}-1
+          path: ${{ runner.temp }}/public-download-successor-decision/PUBLIC_DOWNLOAD_SUCCESSOR_DECISION.generated.json
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+          retention-days: 7

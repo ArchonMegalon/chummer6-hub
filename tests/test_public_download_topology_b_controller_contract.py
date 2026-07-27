@@ -331,6 +331,106 @@ def test_capture_cloudflare_binds_recorded_local_served_manifest_digest(
         )
 
 
+def test_successor_capture_requires_exact_authorized_cloudflare_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    generation_id = "g-successor-capture"
+    local_probe = local_generation_probe(generation_id)
+    prior_config = {"ingress": [{"service": "http_status:404"}]}
+    target_config = {
+        "ingress": [
+            {
+                "hostname": "chummer.run",
+                "service": controller.SIDECAR_ORIGIN,
+            },
+            {"service": "http_status:404"},
+        ]
+    }
+    successor = {
+        "generationId": generation_id,
+        "priorConfig": prior_config,
+        "priorConfigSha256": "1" * 64,
+        "priorVersion": 5,
+        "targetConfig": target_config,
+        "targetConfigSha256": "2" * 64,
+    }
+    release_authority = {
+        "contractName": "candidate-authority",
+        "validatedAtUtc": "2026-07-24T20:00:00Z",
+        "successorCutoverAuthority": successor,
+    }
+    shelf = {
+        "generationId": generation_id,
+        "releaseCandidateAuthority": release_authority,
+    }
+    config = SimpleNamespace(
+        cloudflare_account_id="account-a",
+        cloudflare_tunnel_id="tunnel-a",
+        cloudflare_journal=Path("/tmp/cloudflare-journal"),
+        cloudflare_lock=Path("/tmp/cloudflare-lock"),
+    )
+
+    class FakeCloudflare:
+        mismatch = False
+
+        def capture_transaction(
+            self,
+            _api: Any,
+            **_kwargs: Any,
+        ) -> dict[str, Any]:
+            return {
+                "phase": "captured",
+                "priorConfig": prior_config,
+                "priorConfigSha256": "1" * 64,
+                "priorVersion": 5,
+                "targetConfig": target_config,
+                "targetConfigSha256": (
+                    "3" * 64 if self.mismatch else "2" * 64
+                ),
+                "generationId": generation_id,
+                "origin": controller.SIDECAR_ORIGIN,
+                "accountId": "account-a",
+                "tunnelId": "tunnel-a",
+            }
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.cloudflare = FakeCloudflare()
+    actions.projection_verifier = object()
+    actions.candidate_materializer = object()
+    actions._state = {"receipts": {"localProbe": local_probe}}
+    actions._record = lambda *_args, **_kwargs: None
+    actions._cloudflare_api = lambda: object()
+    monkeypatch.setattr(
+        controller,
+        "validate_release_candidate_authority",
+        lambda *_args, **_kwargs: release_authority,
+    )
+
+    actions.capture_cloudflare(
+        config,
+        shelf,
+        {},
+        {},
+        local_probe,
+        {},
+    )
+
+    actions.cloudflare.mismatch = True
+    with pytest.raises(
+        controller.CutoverError,
+        match="one-use successor authority",
+    ):
+        actions.capture_cloudflare(
+            config,
+            shelf,
+            {},
+            {},
+            local_probe,
+            {},
+        )
+
+
 def test_public_generation_convergence_retries_only_positive_manifest_probe(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -779,6 +879,15 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
         projection_root
         / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
     )
+    successor_authority = document(
+        tmp_path / "successor-authority.json"
+    )
+    decision_artifact = document(
+        tmp_path / "successor-decision.zip"
+    )
+    predecessor_retirement = document(
+        tmp_path / "predecessor-retirement.json"
+    )
     direct_import = document(
         sealed_root
         / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
@@ -828,6 +937,20 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
             str(candidate_authority),
             "--candidate-import-authority-sha256",
             candidate_sha256,
+            "--successor-cutover-authority",
+            str(successor_authority),
+            "--successor-cutover-authority-sha256",
+            "d" * 64,
+            "--operator-decision-artifact",
+            str(decision_artifact),
+            "--operator-decision-artifact-sha256",
+            "e" * 64,
+            "--operator-decision-artifact-id",
+            "123456",
+            "--predecessor-retirement-receipt",
+            str(predecessor_retirement),
+            "--predecessor-retirement-receipt-sha256",
+            "f" * 64,
             "--direct-import-receipt",
             str(direct_import),
             "--direct-import-receipt-sha256",
@@ -896,6 +1019,16 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
     assert config.release_candidate_root == release_candidate
     assert config.candidate_import_authority == candidate_authority
     assert config.candidate_import_authority_sha256 == candidate_sha256
+    assert config.successor_cutover_authority == successor_authority
+    assert config.successor_cutover_authority_sha256 == "d" * 64
+    assert config.operator_decision_artifact == decision_artifact
+    assert config.operator_decision_artifact_sha256 == "e" * 64
+    assert config.operator_decision_artifact_id == 123456
+    assert (
+        config.predecessor_retirement_receipt
+        == predecessor_retirement
+    )
+    assert config.predecessor_retirement_receipt_sha256 == "f" * 64
     assert config.direct_import_receipt == direct_import
     assert config.direct_import_receipt_sha256 == direct_import_sha256
     assert config.projection_snapshot_sha256 == semantic_sha256
@@ -911,6 +1044,13 @@ def test_active_cli_parses_exact_release_authorities_from_wrapper_argv(
         "--release-candidate-root",
         "--candidate-import-authority",
         "--candidate-import-authority-sha256",
+        "--successor-cutover-authority",
+        "--successor-cutover-authority-sha256",
+        "--operator-decision-artifact",
+        "--operator-decision-artifact-sha256",
+        "--operator-decision-artifact-id",
+        "--predecessor-retirement-receipt",
+        "--predecessor-retirement-receipt-sha256",
         "--direct-import-receipt",
         "--direct-import-receipt-sha256",
         "--projection-snapshot-sha256",
@@ -1080,6 +1220,13 @@ class RecordingActions:
         self, _config: Any, *_args: Any
     ) -> dict[str, Any]:
         return self.record("authorize_committed_retirement")
+
+    def verify_canonical_incumbent_before_retirement(
+        self, _config: Any, *_args: Any
+    ) -> dict[str, Any]:
+        return self.record(
+            "verify_canonical_incumbent_before_retirement"
+        )
 
     def restore_committed_prior(
         self, _config: Any, *_args: Any
@@ -3325,6 +3472,7 @@ def test_explicit_retirement_restores_proves_retires_then_cleans(
 
     assert result["disposition"] == "committed-sidecar-retired-to-incumbent"
     assert actions.events == [
+        "verify_canonical_incumbent_before_retirement",
         "authorize_committed_retirement",
         "restore_committed_prior",
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
@@ -3344,6 +3492,129 @@ def test_explicit_retirement_restores_proves_retires_then_cleans(
     } == original_handlers
 
 
+def test_retirement_preflight_freezes_flat_primary_without_mutating_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shelf = tmp_path / "downloads"
+    shelf.mkdir()
+    canonical = b'{"version":"incumbent"}\n'
+    compatibility = b'{"downloads":[],"version":"incumbent"}\n'
+    (shelf / "RELEASE_CHANNEL.generated.json").write_bytes(canonical)
+    (shelf / "releases.json").write_bytes(compatibility)
+    journal = tmp_path / "operation.json"
+    journal.write_text('{"phase":"active"}\n', encoding="utf-8")
+    journal.chmod(0o600)
+    operation_root = tmp_path / "chummer-public-download-incumbent"
+    config = SimpleNamespace(
+        operation=controller.RETIRE_OPERATION,
+        operation_root=operation_root,
+        operation_journal=journal,
+        shelf_root=shelf,
+    )
+    by_path = {
+        "/downloads/RELEASE_CHANNEL.generated.json": canonical,
+        "/downloads/releases.json": compatibility,
+    }
+    baseline = {
+        hostname: {
+            path: {
+                "httpStatus": 200,
+                "bodySha256": hashlib.sha256(payload).hexdigest(),
+                "sizeBytes": len(payload),
+            }
+            for path, payload in by_path.items()
+        }
+        for hostname in HOSTS
+    }
+
+    class Cloudflare:
+        @staticmethod
+        def parse_configuration_response(_value: Any) -> Any:
+            return SimpleNamespace(sha256="a" * 64, version=12)
+
+        @staticmethod
+        def canonical_sha256(value: Any) -> str:
+            return hashlib.sha256(
+                json.dumps(value, sort_keys=True).encode()
+            ).hexdigest()
+
+    actions = object.__new__(controller.TopologyBActions)
+    actions.config = config
+    actions.runner = object()
+    actions.cloudflare = Cloudflare()
+    actions._state = {"phase": "active", "receipts": {}}
+    actions._load_retirement_authority = lambda _config: (
+        b"active\n",
+        {"cloudflare": {}},
+        tmp_path / "active.json",
+    )
+    actions._load_committed_retirement_evidence = (
+        lambda _config, _active: (
+            b"committed\n",
+            {
+                "targetConfigSha256": "a" * 64,
+                "targetVersion": 12,
+            },
+        )
+    )
+    actions._validated_retirement_baseline = lambda: baseline
+    actions._cloudflare_api = lambda: SimpleNamespace(
+        get_configuration=lambda: {}
+    )
+    monkeypatch.setattr(
+        controller,
+        "service_container",
+        lambda *_args, **_kwargs: "b" * 64,
+    )
+    monkeypatch.setattr(
+        controller,
+        "container_runtime",
+        lambda *_args, **_kwargs: {
+            "existed": True,
+            "wasRunning": True,
+            "containerId": "b" * 64,
+            "imageId": "sha256:" + "c" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        controller,
+        "docker_inspect_json",
+        lambda *_args, **_kwargs: {
+            "Mounts": [
+                {
+                    "Type": "bind",
+                    "Source": str(shelf),
+                    "Destination": "/downloads-source",
+                    "RW": True,
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        controller,
+        "_http_bytes",
+        lambda **kwargs: (200, {}, by_path[kwargs["path"]]),
+    )
+    before = controller.tree_sha256_file_stream(
+        shelf,
+        label="primary before retirement preflight",
+    )
+
+    receipt = actions.verify_canonical_incumbent_before_retirement(
+        config
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["canonicalShelfMutated"] is False
+    assert receipt["observations"] == baseline
+    assert actions._state["phase"] == "active"
+    assert controller.tree_sha256_file_stream(
+        shelf,
+        label="primary after retirement preflight",
+    ) == before
+
+
 class FatalRetirementBoundary(BaseException):
     pass
 
@@ -3351,6 +3622,7 @@ class FatalRetirementBoundary(BaseException):
 @pytest.mark.parametrize(
     "failure_event",
     (
+        "verify_canonical_incumbent_before_retirement",
         "authorize_committed_retirement",
         "restore_committed_prior",
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
@@ -3465,6 +3737,8 @@ def maybe_block(name):
     return {"stage": name}
 
 class Actions:
+    def verify_canonical_incumbent_before_retirement(self, *_args):
+        return maybe_block("verify_canonical_incumbent_before_retirement")
     def authorize_committed_retirement(self, *_args):
         return maybe_block("authorize_committed_retirement")
     def restore_committed_prior(self, *_args):
@@ -3543,6 +3817,7 @@ raise SystemExit(0)
 @pytest.mark.parametrize(
     "failure_event",
     (
+        "verify_canonical_incumbent_before_retirement",
         "authorize_committed_retirement",
         "restore_committed_prior",
         "probe_incumbent_after-retirement_chummer.run,www.chummer.run",
