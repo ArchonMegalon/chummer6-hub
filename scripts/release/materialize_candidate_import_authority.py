@@ -2263,6 +2263,90 @@ def _decode_unsigned_native_files(
     return rows, payloads
 
 
+def _derive_embedded_unsigned_native_installed_executable(
+    evidence: object,
+    *,
+    scope: dict[str, Any],
+) -> dict[str, Any]:
+    """Derive the sealed executable identity from exact embedded v4 custody."""
+
+    if (
+        not isinstance(evidence, dict)
+        or scope.get("heads") != ("avalonia",)
+        or not isinstance(scope.get("artifacts"), dict)
+        or set(scope["artifacts"]) != {"avalonia"}
+    ):
+        _fail("unsigned embedded startup executable scope drifted")
+    artifacts = scope["artifacts"]["avalonia"]
+    if (
+        not isinstance(artifacts, dict)
+        or set(artifacts) != {"installer", "payload"}
+        or not isinstance(artifacts.get("installer"), dict)
+        or not isinstance(artifacts.get("payload"), dict)
+        or artifacts["installer"].get("path")
+        != "files/chummer-avalonia-win-x64-installer.exe"
+        or artifacts["installer"].get("fileName")
+        != "chummer-avalonia-win-x64-installer.exe"
+        or artifacts["payload"].get("path")
+        != "files/chummer-avalonia-win-x64-payload.zip"
+        or artifacts["payload"].get("fileName")
+        != "chummer-avalonia-win-x64-payload.zip"
+    ):
+        _fail("unsigned embedded startup executable scope drifted")
+
+    _rows, payloads = _decode_unsigned_native_files(evidence.get("files"))
+    capture = _native_json(
+        payloads,
+        UNSIGNED_NATIVE_CAPTURE_FILE,
+        label="unsigned embedded native capture manifest",
+    )
+    native_evidence = capture.get("nativeEvidence")
+    startup_visual_binding = (
+        native_evidence.get("startupVisual")
+        if isinstance(native_evidence, dict)
+        else None
+    )
+    capture_executable = (
+        startup_visual_binding.get("installedExecutable")
+        if isinstance(startup_visual_binding, dict)
+        else None
+    )
+    startup_visual_path = (
+        "startup-visual/"
+        "windows-application-avalonia-win-x64-startup.receipt.json"
+    )
+    startup_visual = _native_json(
+        payloads,
+        startup_visual_path,
+        label="unsigned embedded startup visual receipt",
+    )
+    receipt_executable = startup_visual.get("installedExecutable")
+
+    expected_keys = {"fileName", "payloadEntry", "sha256", "sizeBytes"}
+    for value, label in (
+        (capture_executable, "capture manifest"),
+        (receipt_executable, "startup visual receipt"),
+    ):
+        if (
+            not isinstance(value, dict)
+            or set(value) != expected_keys
+            or value.get("fileName") != "Chummer.Avalonia.exe"
+            or value.get("payloadEntry") != "Chummer.Avalonia.exe"
+        ):
+            _fail(f"unsigned embedded {label} executable identity drifted")
+        _sha256(
+            value.get("sha256"),
+            label=f"unsigned embedded {label} executable sha256",
+        )
+        _positive_int(
+            value.get("sizeBytes"),
+            label=f"unsigned embedded {label} executable sizeBytes",
+        )
+    if capture_executable != receipt_executable:
+        _fail("unsigned embedded startup executable custody copies differ")
+    return dict(capture_executable)
+
+
 def _native_json(
     payloads: dict[str, bytes],
     path: str,

@@ -2153,6 +2153,201 @@ def rewrite_unsigned_native_embedded_document(
     return payload
 
 
+def upgrade_embedded_v4_authority_to_current_startup(
+    authority: dict[str, object],
+    *,
+    process_path: str = "Chummer.Avalonia.exe",
+    capture_executable: dict[str, object] | None = None,
+    receipt_executable: dict[str, object] | None = None,
+) -> None:
+    custody = authority["custody"]
+    assert isinstance(custody, dict)
+    evidence = custody["nativeWindowsFinalizedEvidence"]
+    assert isinstance(evidence, dict)
+    rows = evidence["files"]
+    assert isinstance(rows, list)
+    payloads = {
+        str(row["path"]): base64.b64decode(
+            str(row["bytesBase64"]),
+            validate=True,
+        )
+        for row in rows
+        if isinstance(row, dict)
+    }
+
+    def document(path: str) -> dict[str, object]:
+        value = json.loads(payloads[path])
+        assert isinstance(value, dict)
+        return value
+
+    def write_document(path: str, value: dict[str, object]) -> None:
+        payloads[path] = (
+            json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
+
+    def binding(path: str) -> dict[str, object]:
+        payload = payloads[path]
+        return {
+            "path": path,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "sizeBytes": len(payload),
+        }
+
+    head = "avalonia"
+    rid = "win-x64"
+    receipt_path = f"startup-smoke/startup-smoke-{head}-{rid}.receipt.json"
+    startup_log_path = f"startup-smoke/startup-smoke-{head}-{rid}.log"
+    payload_http_path = (
+        f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log"
+    )
+    startup_visual_path = (
+        f"startup-visual/windows-application-{head}-{rid}"
+        "-startup.receipt.json"
+    )
+    capture_path = "UNSIGNED_WINDOWS_PREVIEW_NATIVE_CAPTURE.generated.json"
+    capture_inventory_path = (
+        "UNSIGNED_WINDOWS_PREVIEW_NATIVE_CAPTURE_INVENTORY.generated.json"
+    )
+    finalization_path = (
+        "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZATION.generated.json"
+    )
+    finalized_inventory_path = (
+        "UNSIGNED_WINDOWS_PREVIEW_NATIVE_FINALIZED_INVENTORY.generated.json"
+    )
+    visual_path = (
+        "UNSIGNED_WINDOWS_PREVIEW_VISUAL_PROOF-"
+        f"{head}-{rid}.generated.json"
+    )
+
+    startup = document(receipt_path)
+    installer_name = str(startup["artifactFileName"])
+    payload_name = str(startup["bootstrapPayloadFileName"])
+    timestamp = str(evidence["captureGeneratedAtUtc"])
+    startup.update(
+        {
+            "arch": "x64",
+            "artifactDigestSource": "environment",
+            "artifactId": f"{head}-{rid}-installer",
+            "artifactInstallMode": "nsis_bootstrap_installer",
+            "artifactPath": f"files/{installer_name}",
+            "artifactPathDisclosure": "artifact_shelf_relative_path",
+            "artifactRelativePath": f"files/{installer_name}",
+            "artifactSha256": str(startup["artifactDigest"]).removeprefix(
+                "sha256:"
+            ),
+            "bootstrapPayloadDownloadUrl": (
+                f"http://127.0.0.1:50023/{payload_name}"
+            ),
+            "completedAtUtc": timestamp,
+            "fileName": installer_name,
+            "framework": ".NET 10.0.3",
+            "hostClass": "github-hosted-windows-latest-native",
+            "installLinkingInstallationId": f"ins-{'c' * 32}",
+            "installLinkingLaunchCount": 1,
+            "installLinkingPromptReason": "claim_required",
+            "installLinkingPromptRequired": True,
+            "installLinkingStatus": "guest",
+            "operatingSystem": "Microsoft Windows 10.0.26100",
+            "processPath": process_path,
+            "processPathDisclosure": "file_name_only",
+            "recordedAtUtc": timestamp,
+            "startedAtUtc": timestamp,
+            "verificationScope": "native_windows_startup",
+            "version": startup["releaseVersion"],
+        }
+    )
+    startup["nativeHostEvidence"] = {
+        "contractName": "chummer6-ui.native_windows_host_evidence",
+        "evidenceSource": "host_kernel_and_runner_selection",
+        "hostKernel": "MINGW64_NT-10.0-26100",
+        "hostPlatform": "windows",
+        "isNativeWindows": True,
+        "runner": "pwsh",
+        "status": "verified",
+    }
+    write_document(receipt_path, startup)
+    payloads[startup_log_path] = (
+        b"startup smoke ready: head=avalonia platform=windows "
+        b"arch=x64 checkpoint=pre_ui_event_loop\n"
+    )
+    payloads[payload_http_path] = (
+        b'127.0.0.1 - - [26/Jul/2026 22:54:53] "GET /'
+        + payload_name.encode("ascii")
+        + b' HTTP/1.1" 200 -\n'
+    )
+
+    startup_visual = document(startup_visual_path)
+    original_executable = startup_visual["installedExecutable"]
+    assert isinstance(original_executable, dict)
+    startup_visual["installedExecutable"] = (
+        receipt_executable
+        if receipt_executable is not None
+        else dict(original_executable)
+    )
+    write_document(startup_visual_path, startup_visual)
+
+    capture = document(capture_path)
+    heads = capture["heads"]
+    native_evidence = capture["nativeEvidence"]
+    assert isinstance(heads, list) and isinstance(heads[0], dict)
+    assert isinstance(native_evidence, dict)
+    native_head = native_evidence["head"]
+    startup_visual_binding = native_evidence["startupVisual"]
+    assert isinstance(native_head, dict)
+    assert isinstance(startup_visual_binding, dict)
+    receipt_digest = binding(receipt_path)["sha256"]
+    heads[0]["receipt"]["sha256"] = receipt_digest
+    native_head["receipt"]["sha256"] = receipt_digest
+    native_evidence["startupLog"] = binding(startup_log_path)
+    native_evidence["payloadHttpLog"] = binding(payload_http_path)
+    startup_visual_binding["receipt"] = binding(startup_visual_path)
+    startup_visual_binding["installedExecutable"] = (
+        capture_executable
+        if capture_executable is not None
+        else dict(original_executable)
+    )
+    write_document(capture_path, capture)
+
+    capture_inventory = document(capture_inventory_path)
+    capture_inventory["files"] = [
+        binding(str(row["path"]))
+        for row in capture_inventory["files"]
+        if isinstance(row, dict)
+    ]
+    capture_inventory["captureManifest"] = binding(capture_path)
+    write_document(capture_inventory_path, capture_inventory)
+    capture_inventory_sha = hashlib.sha256(
+        payloads[capture_inventory_path]
+    ).hexdigest()
+
+    visual = document(visual_path)
+    visual["captureBinding"]["inventorySha256"] = capture_inventory_sha
+    write_document(visual_path, visual)
+
+    finalization = document(finalization_path)
+    finalization["captureInventorySha256"] = capture_inventory_sha
+    finalization["proofs"][0]["sha256"] = binding(visual_path)["sha256"]
+    write_document(finalization_path, finalization)
+
+    finalized_inventory = document(finalized_inventory_path)
+    finalized_inventory["captureInventorySha256"] = capture_inventory_sha
+    finalized_inventory["finalization"] = binding(finalization_path)
+    finalized_inventory["files"] = [
+        binding(str(row["path"]))
+        for row in finalized_inventory["files"]
+        if isinstance(row, dict)
+    ]
+    write_document(finalized_inventory_path, finalized_inventory)
+
+    for row in rows:
+        assert isinstance(row, dict)
+        path = str(row["path"])
+        payload = payloads[path]
+        row["bytesBase64"] = base64.b64encode(payload).decode("ascii")
+        row["sha256"] = hashlib.sha256(payload).hexdigest()
+        row["sizeBytes"] = len(payload)
+
+
 def test_unsigned_native_v4_validator_accepts_exact_final_head_fixture(
     tmp_path: Path,
 ) -> None:
@@ -2338,16 +2533,15 @@ def test_unsigned_native_logs_reject_legacy_dialect_for_current_receipt() -> Non
         )
 
 
-def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> None:
-    materializer = load_script(
-        MATERIALIZER,
-        "unsigned_native_current_startup_receipt_test",
-    )
+def current_unsigned_native_startup_receipt_fixture(
+    *,
+    process_path: str = "Chummer.Avalonia.exe",
+) -> tuple[dict[str, object], dict[str, object], datetime]:
     now = datetime.now(timezone.utc).replace(microsecond=0)
     recorded_at = now.isoformat().replace("+00:00", "Z")
     installer_sha = "a" * 64
     payload_sha = "b" * 64
-    scope = {
+    scope: dict[str, object] = {
         "channel": "preview",
         "version": "run-20260727-065724",
         "artifacts": {
@@ -2364,7 +2558,7 @@ def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> Non
             }
         },
     }
-    materializer._validate_unsigned_native_startup_receipt(
+    return (
         {
             "status": "pass",
             "headId": "avalonia",
@@ -2376,7 +2570,7 @@ def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> Non
             "rid": "win-x64",
             "readyCheckpoint": "pre_ui_event_loop",
             "hostClass": "github-hosted-windows-latest-native",
-            "processPath": "Chummer.Avalonia.exe",
+            "processPath": process_path,
             "processPathDisclosure": "file_name_only",
             "artifactDigest": f"sha256:{installer_sha}",
             "artifactDigestSource": "environment",
@@ -2426,12 +2620,49 @@ def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> Non
             "artifactSha256": installer_sha,
             "artifactId": "avalonia-win-x64-installer",
         },
+        scope,
+        now,
+    )
+
+
+def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_current_startup_receipt_test",
+    )
+    startup, scope, now = current_unsigned_native_startup_receipt_fixture()
+    materializer._validate_unsigned_native_startup_receipt(
+        startup,
         head="avalonia",
         scope=scope,
         expected_installed_executable={"fileName": "Chummer.Avalonia.exe"},
         now=now,
         max_age=timedelta(hours=24),
     )
+
+
+def test_unsigned_native_startup_receipt_rejects_sealed_process_mismatch() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_current_startup_process_mismatch_test",
+    )
+    startup, scope, now = current_unsigned_native_startup_receipt_fixture(
+        process_path="Other.exe",
+    )
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="current startup receipt drifted",
+    ):
+        materializer._validate_unsigned_native_startup_receipt(
+            startup,
+            head="avalonia",
+            scope=scope,
+            expected_installed_executable={
+                "fileName": "Chummer.Avalonia.exe",
+            },
+            now=now,
+            max_age=timedelta(hours=24),
+        )
 
 
 @pytest.mark.parametrize(
@@ -2531,6 +2762,126 @@ def test_projection_accepts_exact_owner_native_v4_bridge_custody() -> None:
     assert validated["deployAuthority"] is False
     assert validated["routeAuthority"] is False
     assert validated["publicationAuthorized"] is False
+
+
+def test_projection_accepts_current_v4_startup_with_sealed_executable() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_current_v4_authority_projection_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+    upgrade_embedded_v4_authority_to_current_startup(authority)
+
+    validated = projection._validate_candidate_import_authority_v4(
+        authority,
+        now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+    )
+
+    assert validated["candidate"]["version"] == "run-20260722-150000"
+    assert validated["ownerNativeFinalizationBridgeAuthority"] is True
+
+
+def test_projection_rejects_coherently_rehashed_non_chummer_executable() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_v4_executable_name_rebind_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+    rebound = {
+        "fileName": "Other.exe",
+        "payloadEntry": "Other.exe",
+        "sha256": "e" * 64,
+        "sizeBytes": 4096,
+    }
+    upgrade_embedded_v4_authority_to_current_startup(
+        authority,
+        process_path="Other.exe",
+        capture_executable=rebound,
+        receipt_executable=rebound,
+    )
+
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="finalized evidence validation failed",
+    ) as exc_info:
+        projection._validate_candidate_import_authority_v4(
+            authority,
+            now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+        )
+
+    assert "capture manifest executable identity drifted" in str(
+        exc_info.value.__cause__
+    )
+
+
+def test_projection_rejects_installed_executable_custody_copy_mismatch() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_v4_executable_copy_mismatch_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+    rebound_receipt = {
+        "fileName": "Chummer.Avalonia.exe",
+        "payloadEntry": "Chummer.Avalonia.exe",
+        "sha256": "e" * 64,
+        "sizeBytes": 4096,
+    }
+    upgrade_embedded_v4_authority_to_current_startup(
+        authority,
+        receipt_executable=rebound_receipt,
+    )
+
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="finalized evidence validation failed",
+    ) as exc_info:
+        projection._validate_candidate_import_authority_v4(
+            authority,
+            now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+        )
+
+    assert "custody copies differ" in str(exc_info.value.__cause__)
+
+
+def test_projection_rejects_current_v4_process_path_mismatch() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_current_v4_process_mismatch_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+    upgrade_embedded_v4_authority_to_current_startup(
+        authority,
+        process_path="Other.exe",
+    )
+
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="finalized evidence validation failed",
+    ) as exc_info:
+        projection._validate_candidate_import_authority_v4(
+            authority,
+            now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+        )
+
+    assert "current startup receipt drifted" in str(exc_info.value.__cause__)
+
+
+def test_projection_rejects_v4_executable_rebound_from_exact_payload_zip() -> None:
+    projection = load_script(
+        PROJECTION, "owner_native_v4_exact_payload_executable_test"
+    )
+    authority = load_unsigned_v4_authority_fixture()
+
+    with pytest.raises(
+        projection.ProjectionBlocked,
+        match="exact candidate payload ZIP",
+    ):
+        projection._validate_candidate_import_authority_v4(
+            authority,
+            expected_installed_executable={
+                "fileName": "Chummer.Avalonia.exe",
+                "payloadEntry": "Chummer.Avalonia.exe",
+                "sha256": "e" * 64,
+                "sizeBytes": 4096,
+            },
+            now=datetime(2026, 7, 26, 23, 5, tzinfo=timezone.utc),
+        )
 
 
 def test_projection_rejects_v4_bridge_posture_broadened_to_route_authority() -> None:
