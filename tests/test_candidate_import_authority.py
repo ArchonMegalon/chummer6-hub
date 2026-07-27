@@ -2190,6 +2190,204 @@ def test_unsigned_native_v4_validator_accepts_exact_final_head_fixture(
     assert validated["captureSource"]["sha"] != source_sha
 
 
+def test_unsigned_native_logs_accept_current_startup_ready_marker() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_current_startup_log_test",
+    )
+    head = "avalonia"
+    rid = materializer.RID
+    materializer._validate_unsigned_native_logs(
+        {
+            f"startup-smoke/startup-smoke-{head}-{rid}.log": (
+                b"startup smoke ready: head=avalonia platform=windows "
+                b"arch=x64 checkpoint=pre_ui_event_loop\n"
+            ),
+            f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log": (
+                b'127.0.0.1 - - [27/Jul/2026 07:08:47] '
+                b'"GET /chummer-avalonia-win-x64-payload.zip HTTP/1.1" '
+                b"200 -\n"
+            ),
+            f"startup-smoke/windows-installer-progress-{head}-{rid}.log": (
+                b"Bootstrap temp root:\n"
+                b"Payload download target:\n"
+                b"Downloading application files\n"
+                b"Verifying payload size\n"
+                b"Verifying payload checksum\n"
+                b"Extracting application files\n"
+                b"Install complete\n"
+            ),
+        },
+        head=head,
+    )
+
+
+def test_unsigned_native_logs_reject_incomplete_current_startup_marker() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_incomplete_startup_log_test",
+    )
+    head = "avalonia"
+    rid = materializer.RID
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="recognized startup-ready marker",
+    ):
+        materializer._validate_unsigned_native_logs(
+            {
+                f"startup-smoke/startup-smoke-{head}-{rid}.log": (
+                    b"startup smoke ready: head=avalonia platform=windows\n"
+                ),
+                f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log": (
+                    b'127.0.0.1 - - [27/Jul/2026 07:08:47] '
+                    b'"GET /chummer-avalonia-win-x64-payload.zip HTTP/1.1" '
+                    b"200 -\n"
+                ),
+                f"startup-smoke/windows-installer-progress-{head}-{rid}.log": (
+                    b"Bootstrap temp root:\n"
+                    b"Payload download target:\n"
+                    b"Downloading application files\n"
+                    b"Verifying payload size\n"
+                    b"Verifying payload checksum\n"
+                    b"Extracting application files\n"
+                    b"Install complete\n"
+                ),
+            },
+            head=head,
+        )
+
+
+def test_unsigned_native_logs_reject_failed_payload_download() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_failed_payload_download_log_test",
+    )
+    head = "avalonia"
+    rid = materializer.RID
+    with pytest.raises(
+        materializer.CandidateAuthorityBlocked,
+        match="recognized payload-download success marker",
+    ):
+        materializer._validate_unsigned_native_logs(
+            {
+                f"startup-smoke/startup-smoke-{head}-{rid}.log": (
+                    b"native startup passed\n"
+                ),
+                f"startup-smoke/startup-smoke-payload-http-{head}-{rid}.log": (
+                    b'127.0.0.1 - - [27/Jul/2026 07:08:47] '
+                    b'"GET /chummer-avalonia-win-x64-payload.zip HTTP/1.1" '
+                    b"500 -\n"
+                ),
+                f"startup-smoke/windows-installer-progress-{head}-{rid}.log": (
+                    b"Bootstrap temp root:\n"
+                    b"Payload download target:\n"
+                    b"Downloading application files\n"
+                    b"Verifying payload size\n"
+                    b"Verifying payload checksum\n"
+                    b"Extracting application files\n"
+                    b"Install complete\n"
+                ),
+            },
+            head=head,
+        )
+
+
+def test_unsigned_native_startup_receipt_accepts_current_producer_shape() -> None:
+    materializer = load_script(
+        MATERIALIZER,
+        "unsigned_native_current_startup_receipt_test",
+    )
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    recorded_at = now.isoformat().replace("+00:00", "Z")
+    installer_sha = "a" * 64
+    payload_sha = "b" * 64
+    scope = {
+        "channel": "preview",
+        "version": "run-20260727-065724",
+        "artifacts": {
+            "avalonia": {
+                "installer": {
+                    "fileName": "chummer-avalonia-win-x64-installer.exe",
+                    "sha256": installer_sha,
+                },
+                "payload": {
+                    "fileName": "chummer-avalonia-win-x64-payload.zip",
+                    "sha256": payload_sha,
+                    "sizeBytes": 51231899,
+                },
+            }
+        },
+    }
+    materializer._validate_unsigned_native_startup_receipt(
+        {
+            "status": "pass",
+            "headId": "avalonia",
+            "version": "run-20260727-065724",
+            "releaseVersion": "run-20260727-065724",
+            "channelId": "preview",
+            "platform": "windows",
+            "arch": "x64",
+            "rid": "win-x64",
+            "readyCheckpoint": "pre_ui_event_loop",
+            "hostClass": "github-hosted-windows-latest-native",
+            "processPath": "Chummer.Avalonia.exe",
+            "processPathDisclosure": "file_name_only",
+            "artifactDigest": f"sha256:{installer_sha}",
+            "artifactDigestSource": "environment",
+            "installLinkingStatus": "guest",
+            "installLinkingPromptRequired": True,
+            "installLinkingPromptReason": "claim_required",
+            "installLinkingLaunchCount": 1,
+            "installLinkingInstallationId": f"ins-{'c' * 32}",
+            "framework": ".NET 10.0.3",
+            "operatingSystem": "Microsoft Windows 10.0.26100",
+            "recordedAtUtc": recorded_at,
+            "startedAtUtc": recorded_at,
+            "completedAtUtc": recorded_at,
+            "executionEnvironment": "native_windows",
+            "verificationScope": "native_windows_startup",
+            "nativeHostEvidence": {
+                "contractName": "chummer6-ui.native_windows_host_evidence",
+                "status": "verified",
+                "isNativeWindows": True,
+                "hostPlatform": "windows",
+                "hostKernel": "MINGW64_NT-10.0-26100",
+                "runner": "pwsh",
+                "evidenceSource": "host_kernel_and_runner_selection",
+            },
+            "artifactInstallMode": "nsis_bootstrap_installer",
+            "artifactPath": (
+                "files/chummer-avalonia-win-x64-installer.exe"
+            ),
+            "bootstrapPayloadAcquisitionMode": "download",
+            "bootstrapPayloadDownloadUrl": (
+                "http://127.0.0.1:50023/"
+                "chummer-avalonia-win-x64-payload.zip"
+            ),
+            "bootstrapPayloadSha256": payload_sha,
+            "bootstrapPayloadSizeBytes": 51231899,
+            "bootstrapPayloadFileName": (
+                "chummer-avalonia-win-x64-payload.zip"
+            ),
+            "artifactPathDisclosure": "artifact_shelf_relative_path",
+            "artifactFileName": (
+                "chummer-avalonia-win-x64-installer.exe"
+            ),
+            "fileName": "chummer-avalonia-win-x64-installer.exe",
+            "artifactRelativePath": (
+                "files/chummer-avalonia-win-x64-installer.exe"
+            ),
+            "artifactSha256": installer_sha,
+            "artifactId": "avalonia-win-x64-installer",
+        },
+        head="avalonia",
+        scope=scope,
+        expected_installed_executable={"fileName": "Chummer.Avalonia.exe"},
+        now=now,
+        max_age=timedelta(hours=24),
+    )
+
+
 def test_unsigned_native_v4_embedded_custody_reuses_exact_tree_validator(
     tmp_path: Path,
 ) -> None:
