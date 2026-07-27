@@ -384,6 +384,50 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void RuntimeAcceptsRegistryPinnedUnsignedWindowsOnlyFreshDeltaManifestPair()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+            canonical,
+            compatibility);
+
+        bool profile =
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
+                JsonSerializer.SerializeToElement(canonical),
+                JsonSerializer.SerializeToElement(compatibility),
+                "run-20260722-165800");
+
+        Assert.True(profile);
+        Assert.Single(canonical["artifacts"]!.AsArray());
+        Assert.Empty(
+            canonical["retainedIncumbentProvenance"]!
+                .AsObject()["retainedArtifactBindings"]!
+                .AsArray());
+    }
+
+    [Fact]
+    public void RuntimeRejectsRegistryPinnedUnsignedFreshDeltaMixedRetainedModes()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        JsonObject retainedCompatibility = compatibility.DeepClone().AsObject();
+        ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+            canonical,
+            compatibility);
+        compatibility["downloads"] =
+            retainedCompatibility["downloads"]!.DeepClone();
+        compatibility["retainedIncumbentProvenance"] =
+            retainedCompatibility["retainedIncumbentProvenance"]!.DeepClone();
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ValidateUnsignedWindowsFreshDeltaManifestPair(
+                JsonSerializer.SerializeToElement(canonical),
+                JsonSerializer.SerializeToElement(compatibility),
+                "run-20260722-165800"));
+    }
+
+    [Fact]
     public void RuntimeLoadsRegistryPinnedUnsignedWindowsFreshDeltaAuthority()
     {
         byte[] authorityBytes = LoadUnsignedWindowsFreshDeltaCandidateAuthorityV3();
@@ -1055,6 +1099,93 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             pair["compatibility"]?.AsObject()
                 ?? throw new InvalidDataException(
                     "unsigned fresh-delta compatibility fixture is invalid"));
+    }
+
+    private static void ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+        JsonObject canonical,
+        JsonObject compatibility)
+    {
+        canonical["artifacts"] = new JsonArray(
+            canonical["artifacts"]!.AsArray()
+                .Where(static node => string.Equals(
+                    node!["platform"]!.GetValue<string>(),
+                    "windows",
+                    StringComparison.Ordinal))
+                .Select(static node => node!.DeepClone())
+                .ToArray());
+        compatibility["downloads"] = new JsonArray(
+            compatibility["downloads"]!.AsArray()
+                .Where(static node => string.Equals(
+                    node!["platform"]!.GetValue<string>(),
+                    "windows",
+                    StringComparison.Ordinal))
+                .Select(static node => node!.DeepClone())
+                .ToArray());
+
+        string emptyArraySha256 =
+            Convert.ToHexStringLower(SHA256.HashData("[]"u8));
+        foreach (JsonObject manifest in new[] { canonical, compatibility })
+        {
+            JsonObject provenance =
+                manifest["retainedIncumbentProvenance"]!.AsObject();
+            provenance["retainedArtifactBindings"] = new JsonArray();
+            provenance["retainedArtifactBindingsSha256"] = emptyArraySha256;
+            provenance["retainedCompatibilityBindings"] = new JsonArray();
+            provenance["retainedCompatibilityBindingsSha256"] = emptyArraySha256;
+
+            JsonObject coverage = manifest["desktopTupleCoverage"]!.AsObject();
+            coverage["requiredDesktopPlatforms"] =
+                JsonSerializer.SerializeToNode(new[] { "windows" });
+            coverage["requiredDesktopPlatformHeadRidTuples"] =
+                JsonSerializer.SerializeToNode(
+                    new[] { "avalonia:win-x64:windows" });
+            coverage["missingRequiredHeads"] =
+                JsonSerializer.SerializeToNode(new[] { "avalonia" });
+            coverage["promotedInstallerTuples"] = new JsonArray();
+            coverage["promotedPlatformHeadRidTuples"] = new JsonArray();
+            coverage["promotedPlatformHeads"] = new JsonObject
+            {
+                ["windows"] = new JsonArray()
+            };
+            coverage["desktopRouteTruth"] = new JsonArray(
+                coverage["desktopRouteTruth"]!.AsArray()
+                    .Where(static node => string.Equals(
+                        node!["platform"]!.GetValue<string>(),
+                        "windows",
+                        StringComparison.Ordinal))
+                    .Select(static node => node!.DeepClone())
+                    .ToArray());
+        }
+
+        JsonObject artifact = canonical["artifacts"]![0]!.AsObject();
+        var inventory = new JsonArray
+        {
+            new JsonObject
+            {
+                ["arch"] = artifact["arch"]!.DeepClone(),
+                ["artifactId"] = artifact["artifactId"]!.DeepClone(),
+                ["fileName"] = artifact["fileName"]!.DeepClone(),
+                ["head"] = artifact["head"]!.DeepClone(),
+                ["kind"] = artifact["kind"]!.DeepClone(),
+                ["payloadFileName"] = artifact["payloadFileName"]!.DeepClone(),
+                ["payloadSha256"] = artifact["payloadSha256"]!.DeepClone(),
+                ["payloadSizeBytes"] = artifact["payloadSizeBytes"]!.DeepClone(),
+                ["platform"] = artifact["platform"]!.DeepClone(),
+                ["rid"] = artifact["rid"]!.DeepClone(),
+                ["sha256"] = artifact["sha256"]!.DeepClone(),
+                ["sizeBytes"] = artifact["sizeBytes"]!.DeepClone()
+            }
+        };
+        string projectedInventorySha256 = Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(inventory.ToJsonString())));
+        foreach (JsonObject manifest in new[] { canonical, compatibility })
+        {
+            JsonObject review =
+                manifest["codeDeployCurrentShelfAuthority"]!.AsObject();
+            review["projectedArtifactCount"] = 1;
+            review["projectedArtifactInventorySha256"] =
+                projectedInventorySha256;
+        }
     }
 
     private static byte[] TamperUnsignedCandidateAuthorityV3Scope(string tamper)

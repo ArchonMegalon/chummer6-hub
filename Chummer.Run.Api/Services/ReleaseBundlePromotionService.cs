@@ -7494,13 +7494,45 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException(
                 "v3 unsigned Windows projection requires the authenticated exact fresh tuple.");
         }
+        string[] retainedArtifactIds = canonicalArtifacts
+            .Where(artifact => !string.Equals(
+                NormalizePlatform(artifact.Platform),
+                "windows",
+                StringComparison.Ordinal))
+            .Select(artifact => artifact.ArtifactId)
+            .ToArray();
+        string[] frozenRetainedMacosArtifactIds =
+        [
+            "avalonia-osx-arm64-installer",
+            "blazor-desktop-osx-arm64-installer",
+            "avalonia-osx-arm64-archive",
+            "blazor-desktop-osx-arm64-archive"
+        ];
+        bool retainsMacos = retainedArtifactIds.SequenceEqual(
+            frozenRetainedMacosArtifactIds,
+            StringComparer.Ordinal);
+        if (retainedArtifactIds.Length != 0 && !retainsMacos)
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows retained artifact identities or order drifted.");
+        }
+        string[] expectedRequiredPlatforms = retainsMacos
+            ? ["macos", "windows"]
+            : ["windows"];
+        string[] expectedRequiredTuples = retainsMacos
+            ? ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
+            : ["avalonia:win-x64:windows"];
+        string[] expectedMissingHeads = retainsMacos ? [] : ["avalonia"];
+        string[] expectedPromotedTuples = retainsMacos
+            ? ["avalonia:osx-arm64:macos", "blazor-desktop:osx-arm64:macos"]
+            : [];
         JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
             ?? throw new InvalidDataException(
                 $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
         RequireExactStringArray(
             coverage,
             "requiredDesktopPlatforms",
-            ["macos", "windows"],
+            expectedRequiredPlatforms,
             "v3 unsigned Windows platform floor");
         RequireExactStringArray(
             coverage,
@@ -7510,7 +7542,7 @@ public sealed class ReleaseBundlePromotionService
         RequireExactStringArray(
             coverage,
             "requiredDesktopPlatformHeadRidTuples",
-            ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"],
+            expectedRequiredTuples,
             "v3 unsigned Windows tuple floor");
         RequireExactStringArray(
             coverage,
@@ -7520,7 +7552,7 @@ public sealed class ReleaseBundlePromotionService
         RequireExactStringArray(
             coverage,
             "missingRequiredHeads",
-            [],
+            expectedMissingHeads,
             "v3 unsigned Windows missing heads");
         RequireExactStringArray(
             coverage,
@@ -7535,8 +7567,28 @@ public sealed class ReleaseBundlePromotionService
         RequireExactStringArray(
             coverage,
             "promotedPlatformHeadRidTuples",
-            ["avalonia:osx-arm64:macos", "blazor-desktop:osx-arm64:macos"],
+            expectedPromotedTuples,
             "v3 unsigned Windows retained promoted tuples");
+        if (coverage["promotedPlatformHeads"] is not JsonObject promotedPlatformHeads
+            || promotedPlatformHeads.Count != (retainsMacos ? 2 : 1)
+            || !promotedPlatformHeads.ContainsKey("windows"))
+        {
+            throw new InvalidDataException(
+                "v3 unsigned Windows promoted platform/head truth drifted.");
+        }
+        RequireExactStringArray(
+            promotedPlatformHeads,
+            "windows",
+            [],
+            "v3 unsigned Windows promoted Windows heads");
+        if (retainsMacos)
+        {
+            RequireExactStringArray(
+                promotedPlatformHeads,
+                "macos",
+                ["avalonia", "blazor-desktop"],
+                "v3 unsigned Windows retained macOS heads");
+        }
         if (!TryGetJsonBoolean(coverage["complete"], out bool complete)
             || complete
             || !TryGetJsonBoolean(coverage["routeAuthority"], out bool routeAuthority)
@@ -7552,7 +7604,7 @@ public sealed class ReleaseBundlePromotionService
                 "tupleId")
             .ToArray();
         if (!reportedPromoted.SequenceEqual(
-                ["avalonia:macos:osx-arm64", "blazor-desktop:macos:osx-arm64"],
+                expectedPromotedTuples,
                 StringComparer.Ordinal))
         {
             throw new InvalidDataException(
@@ -7568,7 +7620,22 @@ public sealed class ReleaseBundlePromotionService
             .ToDictionary(
                 row => GetJsonString(row["tupleId"]) ?? string.Empty,
                 StringComparer.Ordinal);
+        string[] expectedRouteTupleIds = retainsMacos
+            ?
+            [
+                "avalonia:macos:osx-arm64",
+                "blazor-desktop:macos:osx-arm64",
+                "avalonia:windows:win-x64",
+                "blazor-desktop:windows:win-x64"
+            ]
+            :
+            [
+                "avalonia:windows:win-x64",
+                "blazor-desktop:windows:win-x64"
+            ];
         if (routes.Count != routeRows.Count
+            || !routes.Keys.ToHashSet(StringComparer.Ordinal)
+                .SetEquals(expectedRouteTupleIds)
             || !routes.TryGetValue("avalonia:windows:win-x64", out JsonObject? windows)
             || !string.Equals(
                 GetJsonString(windows["promotionState"]),
@@ -7589,11 +7656,14 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException(
                 "v3 unsigned Windows route must remain unpromoted and proof-required.");
         }
-        foreach (string tupleId in new[]
-                 {
-                     "avalonia:macos:osx-arm64",
-                     "blazor-desktop:macos:osx-arm64"
-                 })
+        foreach (string tupleId in (
+                     retainsMacos
+                         ?
+                         [
+                             "avalonia:macos:osx-arm64",
+                             "blazor-desktop:macos:osx-arm64"
+                         ]
+                         : Array.Empty<string>()))
         {
             if (!routes.TryGetValue(tupleId, out JsonObject? retained)
                 || !string.Equals(
@@ -7613,14 +7683,17 @@ public sealed class ReleaseBundlePromotionService
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        if (!platforms.SequenceEqual(["macos", "windows"], StringComparer.Ordinal)
+        string[] expectedPlatforms = retainsMacos
+            ? ["macos", "windows"]
+            : ["windows"];
+        if (!platforms.SequenceEqual(expectedPlatforms, StringComparer.Ordinal)
             || canonicalArtifacts.Count(artifact =>
                 string.Equals(NormalizePlatform(artifact.Platform), "windows", StringComparison.Ordinal)
                 && string.Equals(NormalizeToken(artifact.Head), "avalonia", StringComparison.Ordinal)
                 && string.Equals(NormalizeToken(artifact.Rid), "win-x64", StringComparison.Ordinal)) != 1)
         {
             throw new InvalidDataException(
-                "v3 unsigned Windows canonical shelf must be exact macOS plus Windows.");
+                "v3 unsigned Windows canonical shelf platform mode drifted.");
         }
         ValidateCanonicalPostureFloors(canonical, desktopCoverageComplete: false);
     }

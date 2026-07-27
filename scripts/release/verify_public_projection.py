@@ -4032,7 +4032,7 @@ def _candidate_validate_profile_retained_provenance(
             )
         retained_ids.append(str(artifact_id))
         retained_by_file[str(artifact.get("fileName"))] = artifact
-    if retained_ids != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS:
+    if retained_ids and retained_ids != CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS:
         raise ProjectionBlocked(
             "projected retained artifact identities or order drifted"
         )
@@ -4278,27 +4278,100 @@ def _candidate_validate_unsigned_profile_manifest_pair(
                 "projected compatibility retained incumbent provenance is invalid"
             )
 
+    retains_macos = (
+        retained_artifact_ids == CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS
+    )
+    expected_required_platforms = (
+        ["macos", "windows"] if retains_macos else ["windows"]
+    )
+    expected_required_tuples = (
+        ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
+        if retains_macos
+        else ["avalonia:win-x64:windows"]
+    )
+    expected_missing_heads = [] if retains_macos else ["avalonia"]
+    expected_promoted_platform_tuples = (
+        [
+            "avalonia:osx-arm64:macos",
+            "blazor-desktop:osx-arm64:macos",
+        ]
+        if retains_macos
+        else []
+    )
+    expected_promoted_platform_heads = (
+        {"macos": ["avalonia", "blazor-desktop"], "windows": []}
+        if retains_macos
+        else {"windows": []}
+    )
     coverage = canonical.get("desktopTupleCoverage")
     if (
         not isinstance(coverage, dict)
-        or coverage.get("requiredDesktopPlatforms") != ["macos", "windows"]
+        or coverage.get("requiredDesktopPlatforms") != expected_required_platforms
         or coverage.get("requiredDesktopHeads") != ["avalonia"]
         or coverage.get("requiredDesktopPlatformHeadRidTuples")
-        != ["avalonia:osx-arm64:macos", "avalonia:win-x64:windows"]
+        != expected_required_tuples
+        or coverage.get("missingRequiredHeads") != expected_missing_heads
         or coverage.get("missingRequiredPlatforms") != ["windows"]
         or coverage.get("missingRequiredPlatformHeadPairs") != ["avalonia:windows"]
         or coverage.get("missingRequiredPlatformHeadRidTuples")
         != ["avalonia:win-x64:windows"]
+        or coverage.get("promotedPlatformHeadRidTuples")
+        != expected_promoted_platform_tuples
+        or coverage.get("promotedPlatformHeads")
+        != expected_promoted_platform_heads
+        or coverage.get("publicationDeltaPlatforms") != ["windows"]
         or coverage.get("complete") is not False
         or coverage.get("routeAuthority") is not False
     ):
         raise ProjectionBlocked("projected canonical desktop coverage posture drifted")
+    promoted_installer_tuples = coverage.get("promotedInstallerTuples")
+    if (
+        not isinstance(promoted_installer_tuples, list)
+        or (
+            [
+                row.get("artifactId")
+                for row in promoted_installer_tuples
+                if isinstance(row, dict)
+            ]
+            != (
+                [
+                    "avalonia-osx-arm64-installer",
+                    "blazor-desktop-osx-arm64-installer",
+                ]
+                if retains_macos
+                else []
+            )
+        )
+        or any(not isinstance(row, dict) for row in promoted_installer_tuples)
+    ):
+        raise ProjectionBlocked(
+            "projected canonical promoted installer coverage drifted"
+        )
     routes = coverage.get("desktopRouteTruth")
     if not isinstance(routes, list):
         raise ProjectionBlocked("projected canonical desktop route truth is missing")
     route_by_tuple = {
         row.get("tupleId"): row for row in routes if isinstance(row, dict)
     }
+    expected_route_tuples = {
+        "avalonia:windows:win-x64",
+        "blazor-desktop:windows:win-x64",
+    }
+    if retains_macos:
+        expected_route_tuples.update(
+            {
+                "avalonia:macos:osx-arm64",
+                "blazor-desktop:macos:osx-arm64",
+            }
+        )
+    if (
+        any(not isinstance(row, dict) for row in routes)
+        or len(routes) != len(expected_route_tuples)
+        or set(route_by_tuple) != expected_route_tuples
+    ):
+        raise ProjectionBlocked(
+            "projected canonical desktop route tuple set drifted"
+        )
     windows_route = route_by_tuple.get("avalonia:windows:win-x64")
     if (
         not isinstance(windows_route, dict)
@@ -4310,8 +4383,12 @@ def _candidate_validate_unsigned_profile_manifest_pair(
     ):
         raise ProjectionBlocked("projected canonical Windows route is not proof-required")
     for tuple_id in (
-        "avalonia:macos:osx-arm64",
-        "blazor-desktop:macos:osx-arm64",
+        (
+            "avalonia:macos:osx-arm64",
+            "blazor-desktop:macos:osx-arm64",
+        )
+        if retains_macos
+        else ()
     ):
         row = route_by_tuple.get(tuple_id)
         if (
@@ -6442,12 +6519,28 @@ def _validate_candidate_import_authority_v3(
         or registry_candidate.get("provenance") != composition_provenance
     ):
         raise ProjectionBlocked("unsigned Registry PREPARE custody graph drifted")
-    if profile_enabled and (
-        registry_candidate.get("retainedPlatforms") != ["macos"]
-        or registry_candidate.get("shelfPlatforms") != ["macos", "windows"]
-        or canonical_platforms != {"macos", "windows"}
-    ):
-        raise ProjectionBlocked("unsigned Registry profile shelf platforms drifted")
+    if profile_enabled:
+        profile_retains_macos = (
+            profile_manifest["retainedArtifactIds"]
+            == CANDIDATE_UNSIGNED_RETAINED_ARTIFACT_IDS
+        )
+        expected_retained_platforms = ["macos"] if profile_retains_macos else []
+        expected_shelf_platforms = (
+            ["macos", "windows"] if profile_retains_macos else ["windows"]
+        )
+        expected_canonical_platforms = (
+            {"macos", "windows"} if profile_retains_macos else {"windows"}
+        )
+        if (
+            registry_candidate.get("retainedPlatforms")
+            != expected_retained_platforms
+            or registry_candidate.get("shelfPlatforms")
+            != expected_shelf_platforms
+            or canonical_platforms != expected_canonical_platforms
+        ):
+            raise ProjectionBlocked(
+                "unsigned Registry profile shelf platforms drifted"
+            )
     _candidate_unsigned_projection_inputs(
         registry_candidate.get("projectionInputs"), profile_enabled=profile_enabled
     )

@@ -163,16 +163,18 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "case \"$*\" in\n"
         "  *verify_public_edge_deploy_authority.py*) exit \"${FAKE_AUTHORITY_EXIT:-0}\";;\n"
         "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
-        "  *deploy_public_download_only_cutover.py*) if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID:-}\" ]; then printf '%s\\n' \"$$\" > \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID\"; fi; if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY:-}\" ]; then /usr/bin/touch \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY\"; fi; case \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_MODE:-exit}\" in block) trap '' HUP INT TERM; while :; do printf '%s\\n' alive >> \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_HEARTBEAT\"; /usr/bin/sleep 0.05; done;; term) /usr/bin/kill -TERM \"$$\";; int) /usr/bin/kill -INT \"$$\";; exit) exit \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT:-0}\";; *) exit 91;; esac;;\n"
+        "  *deploy_public_download_only_cutover.py*) if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID:-}\" ]; then printf '%s\\n' \"$$\" > \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_PID\"; fi; if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY:-}\" ]; then /usr/bin/touch \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY\"; fi; case \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_MODE:-exit}\" in block) trap '' HUP INT TERM; while :; do printf '%s\\n' alive >> \"$FAKE_PUBLIC_DOWNLOAD_CONTROLLER_HEARTBEAT\"; /usr/bin/sleep 0.05; done;; term) /usr/bin/kill -TERM \"$$\";; int) /usr/bin/kill -INT \"$$\";; exit) if [ -n \"${FAKE_PUBLIC_DOWNLOAD_CLEANUP_TAMPER_PATH:-}\" ]; then /usr/bin/chmod 0644 \"$FAKE_PUBLIC_DOWNLOAD_CLEANUP_TAMPER_PATH\"; fi; exit \"${FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT:-0}\";; *) exit 91;; esac;;\n"
         "  *verify_install_linking_cutover_boundary.py*\"--expected-phase public_acceptance_completed\"*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_FINAL_VERIFICATION_JSON\"; exit 0;;\n"
         "  *verify_install_linking_cutover_boundary.py*) boundary=\"$(arg_value --boundary \"$@\")\"; expected=\"$(arg_value --expected-boundary-sha256 \"$@\")\"; actual=\"$(/usr/bin/sha256sum -- \"$boundary\" | /usr/bin/awk '{print $1}')\"; [ \"$actual\" = \"$expected\" ] || exit 81; /usr/bin/cat \"$FAKE_INSTALL_LINKING_BOUNDARY_VERIFICATION_JSON\"; exit \"${FAKE_INSTALL_LINKING_BOUNDARY_VERIFY_EXIT:-0}\";;\n"
         "  *run_install_linking_postgres_cutover.py*\"--source-replay-preflight\"*) exit \"${FAKE_SOURCE_REPLAY_PREFLIGHT_EXIT:-0}\";;\n"
         "  *run_install_linking_postgres_cutover.py*\"--post-quiesce-reproof\"*) output=\"$(arg_value --output \"$@\")\"; attempt=\"$(arg_value --reproof-attempt-id \"$@\")\"; inventory=\"$(arg_value --volume-inventory-receipt \"$@\")\"; expected_inventory_sha256=\"$(arg_value --expected-volume-inventory-sha256 \"$@\")\"; actual_inventory_sha256=\"$(/usr/bin/sha256sum -- \"$inventory\" | /usr/bin/awk '{print $1}')\"; [ \"$actual_inventory_sha256\" = \"$expected_inventory_sha256\" ] || exit 84; reproof_exit=\"${FAKE_POSTQUIESCE_EXIT:-}\"; reproof_mode=\"${FAKE_POSTQUIESCE_MODE:-}\"; if [ -z \"$reproof_mode\" ]; then if [ -z \"$reproof_exit\" ] || [ \"$reproof_exit\" = 0 ]; then reproof_mode=pass; else reproof_mode=unknown; fi; fi; case \"$reproof_mode\" in sigkill) /usr/bin/kill -KILL \"$$\";; missing) exit \"${reproof_exit:-1}\";; malformed) printf '%s\\n' '{malformed' > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"${reproof_exit:-1}\";; safe_fail) reproof_status=fail; start_intent=false; start_may=false; reproof_exit=\"${reproof_exit:-1}\";; pass) reproof_status=pass; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-0}\"; printf '%s\\n' \"$attempt\" > \"$FAKE_POSTQUIESCE_COMPLETED_STATE\";; oom) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-137}\";; unknown) reproof_status=unknown; start_intent=true; start_may=true; reproof_exit=\"${reproof_exit:-70}\";; *) exit 85;; esac; printf '{\"containerStartMayHaveBeenInvoked\":%s,\"mode\":\"%s\",\"reason\":\"%s\",\"startIntentWritten\":%s,\"status\":\"%s\"}\\n' \"$start_may\" \"$reproof_mode\" \"${FAKE_POSTQUIESCE_REASON:-none}\" \"$start_intent\" \"$reproof_status\" > \"$output\"; /usr/bin/chmod 0600 \"$output\"; exit \"$reproof_exit\";;\n"
         "  *materialize_install_linking_cutover_boundary.py*\"--phase public_acceptance_completed\"*) /usr/bin/cp \"$FAKE_INSTALL_LINKING_FINAL_BOUNDARY\" \"$(arg_value --output \"$@\")\"; /usr/bin/chmod 0600 \"$(arg_value --output \"$@\")\"; exit \"${FAKE_INSTALL_LINKING_MATERIALIZER_EXIT:-0}\";;\n"
-        "  *verify_public_projection.py*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *verify_public_projection.py*) if [ -n \"${FAKE_PUBLIC_DOWNLOAD_PROJECTION_RESOLUTION:-}\" ]; then /usr/bin/cat \"$FAKE_PUBLIC_DOWNLOAD_PROJECTION_RESOLUTION\"; exit 0; fi; exec /usr/bin/python3 \"$@\";;\n"
         "  *verify_public_edge_postdeploy_gate.py*) exec /usr/bin/python3 \"$@\";;\n"
         "  *chummer.public_projection_current/v1*) exec /usr/bin/python3 \"$@\";;\n"
         "  *validate_public_edge_compose_runtime.py*) /usr/bin/cat >/dev/null; exit 0;;\n"
+        "  *\"Public-download pinned controller descriptor verifier\"*) if [ -n \"${FAKE_BOUND_CONTROLLER_DESCRIPTOR_PAUSE_READY:-}\" ]; then /usr/bin/touch \"$FAKE_BOUND_CONTROLLER_DESCRIPTOR_PAUSE_READY\"; /usr/bin/sleep 30; fi; exec /usr/bin/python3 \"$@\";;\n"
+        "  *\"Retained pre-controller public-download post-lease verifier\"*) exec /usr/bin/python3 \"$@\";;\n"
         "  *secrets.token_hex*|*hmac.compare_digest*) exec /usr/bin/python3 \"$@\";;\n"
         "  *matches\\ =\\ \\[\\]*) exec /usr/bin/python3 \"$@\";;\n"
         "  *\"InstallLinking verified boundary binding parser\"*) exec /usr/bin/python3 \"$@\";;\n"
@@ -501,10 +503,46 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
 
 
+def materialize_fake_public_download_journal(
+    tmp_path: Path,
+    operation_id: str,
+    *,
+    source_head: str = "0" * 40,
+) -> tuple[Path, Path]:
+    receipt_root = tmp_path / "lock-state" / "public-edge-deploy-receipts"
+    receipt_root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    receipt_root.chmod(0o700)
+    operation_root = receipt_root / f"chummer-public-download-{operation_id}"
+    operation_root.mkdir(mode=0o700, exist_ok=True)
+    operation_root.chmod(0o700)
+    operation_journal = receipt_root / f"{operation_root.name}.operation.json"
+    operation_journal.write_text(
+        json.dumps(
+            {
+                "operation": (
+                    "initial-release-shelf-public-download-cutover"
+                ),
+                "operationRoot": str(operation_root),
+                "projectName": operation_root.name,
+                "schema": "chummer.public-download-only-operation/v1",
+                "sourceHead": source_head,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    operation_journal.chmod(0o600)
+    return operation_root, operation_journal
+
+
 def configure_fake_public_download_retirement(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    operation_id = "retire-test-0001"
+    materialize_fake_public_download_journal(tmp_path, operation_id)
     credentials = tmp_path / "cloudflare-credentials.json"
     credentials.write_text(
         '{"apiToken":"test-only-not-a-live-token"}\n',
@@ -513,7 +551,7 @@ def configure_fake_public_download_retirement(
     credentials.chmod(0o600)
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID",
-        "retire-test-0001",
+        operation_id,
     )
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE",
@@ -535,6 +573,260 @@ def configure_fake_public_download_retirement(
         "CHUMMER_PUBLIC_DOWNLOAD_CANONICAL_PUBLISHER_SHA256",
         "9" * 64,
     )
+
+
+def configure_fake_public_download_cutover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> str:
+    operation_id = "cutover-test-0001"
+    projection_root = Path(
+        os.environ["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"]
+    )
+    (projection_root / "CURRENT.json").chmod(0o644)
+    snapshot_sha256 = "a" * 64
+    snapshot_id = f"public-projection-{snapshot_sha256}"
+    snapshot = projection_root / snapshot_id
+    snapshot.mkdir(mode=0o755)
+    runtime_proof = snapshot / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    release_channel = snapshot / "RELEASE_CHANNEL.generated.json"
+    candidate_authority = (
+        snapshot / "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+    )
+    runtime_proof.write_text('{"status":"test"}\n', encoding="utf-8")
+    release_channel.write_text('{"status":"test"}\n', encoding="utf-8")
+    candidate_authority.write_text(
+        '{"candidateImportAuthority":true}\n',
+        encoding="utf-8",
+    )
+    runtime_sha256 = hashlib.sha256(runtime_proof.read_bytes()).hexdigest()
+    release_sha256 = hashlib.sha256(release_channel.read_bytes()).hexdigest()
+    candidate_sha256 = hashlib.sha256(candidate_authority.read_bytes()).hexdigest()
+    resolution = {
+        "candidateImportAuthority": True,
+        "codeDeploymentAuthority": False,
+        "contractName": "chummer.public_projection_current/v1",
+        "manifestSha256": "b" * 64,
+        "outputs": {
+            runtime_proof.name: {
+                "name": runtime_proof.name,
+                "path": str(runtime_proof),
+                "sha256": runtime_sha256,
+            },
+            release_channel.name: {
+                "name": release_channel.name,
+                "path": str(release_channel),
+                "sha256": release_sha256,
+            },
+            candidate_authority.name: {
+                "name": candidate_authority.name,
+                "path": str(candidate_authority),
+                "sha256": candidate_sha256,
+            },
+        },
+        "projectionStage": "candidate_import_ready",
+        "releaseUploadAuthority": False,
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "status": "candidate_import_ready",
+    }
+    resolution_path = tmp_path / "candidate-projection-resolution.json"
+    resolution_path.write_text(
+        json.dumps(resolution, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    credentials = tmp_path / "cloudflare-credentials.json"
+    credentials.write_text(
+        '{"apiToken":"test-only-not-a-live-token"}\n',
+        encoding="utf-8",
+    )
+    credentials.chmod(0o600)
+    candidate_stage = tmp_path / "candidate-stage"
+    release_candidate = candidate_stage / "bundle"
+    release_candidate.mkdir(parents=True)
+    direct_import = candidate_stage / "UNSIGNED_WINDOWS_PREVIEW_DIRECT_IMPORT.generated.json"
+    direct_import.write_text('{"status":"pass"}\n', encoding="utf-8")
+    migration_authority = tmp_path / "migration-authority.json"
+    migration_authority.write_text('{"status":"pass"}\n', encoding="utf-8")
+    restoration = tmp_path / "restoration.json"
+    restoration.write_text('{"status":"pass"}\n', encoding="utf-8")
+    final_gold = tmp_path / "final-gold.json"
+    final_gold.write_text('{"status":"pass"}\n', encoding="utf-8")
+    fleet = tmp_path / "fleet"
+    fleet.mkdir()
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_PROJECTION_RESOLUTION",
+        str(resolution_path),
+    )
+    monkeypatch.setenv("CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID", operation_id)
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE",
+        str(credentials),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_ACCOUNT_ID",
+        "a" * 32,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_TUNNEL_ID",
+        "11111111-1111-1111-1111-111111111111",
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY",
+        str(migration_authority),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_MIGRATION_AUTHORITY_SHA256",
+        hashlib.sha256(migration_authority.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_RELEASE_CANDIDATE_ROOT",
+        str(release_candidate),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY",
+        str(candidate_authority),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CANDIDATE_IMPORT_AUTHORITY_SHA256",
+        candidate_sha256,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT",
+        str(direct_import),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_DIRECT_IMPORT_RECEIPT_SHA256",
+        hashlib.sha256(direct_import.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_MANIFEST_CLOSURE_RESTORATION_SPEC",
+        str(restoration),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_MANIFEST_CLOSURE_RESTORATION_SPEC_SHA256",
+        hashlib.sha256(restoration.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SOURCE",
+        str(final_gold),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_FINAL_GOLD_SHA256",
+        hashlib.sha256(final_gold.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv("CHUMMER_PUBLIC_DOWNLOAD_FLEET_SOURCE", str(fleet))
+    monkeypatch.setenv("CHUMMER_PUBLIC_DOWNLOAD_FLEET_SHA256", "c" * 64)
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_TREE_SHA256",
+        "d" * 64,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
+        runtime_sha256,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT",
+        str(release_channel),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256",
+        release_sha256,
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_DELIVERY_PHASE",
+        "windows-preview",
+    )
+    return operation_id
+
+
+def retained_public_edge_lock_artifacts(tmp_path: Path) -> dict[str, Path]:
+    lock_root = tmp_path / "lock-state"
+    lock = lock_root / "public-edge-mutation.lock"
+    token_path = lock / "owner-token"
+    token = token_path.read_text(encoding="ascii").strip()
+    token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+    authority_root = lock_root / "public-edge-lock-recovery-receipts"
+    return {
+        "authorization": (
+            authority_root / f"deploy-{token_digest}.owner-token"
+        ),
+        "binding": authority_root / f"deploy-{token_digest}.binding.json",
+        "lease": authority_root / f"deploy-{token_digest}.lease",
+        "lock": lock,
+        "token": token_path,
+    }
+
+
+def retain_fake_public_download_retirement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, Path]:
+    configure_fake_public_download_retirement(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "143")
+    retained = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert retained.returncode == 76, retained.stderr
+    return retained_public_edge_lock_artifacts(tmp_path)
+
+
+def retain_fake_public_download_precontroller_cutover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[str, dict[str, Path]]:
+    operation_id = configure_fake_public_download_cutover(tmp_path, monkeypatch)
+    ready = tmp_path / "bound-controller-descriptor-paused"
+    monkeypatch.setenv(
+        "FAKE_BOUND_CONTROLLER_DESCRIPTOR_PAUSE_READY",
+        str(ready),
+    )
+    process = subprocess.Popen(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while (
+            not ready.exists()
+            and process.poll() is None
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.01)
+        assert ready.exists(), "cutover did not reach pinned controller preflight"
+        artifacts = retained_public_edge_lock_artifacts(tmp_path)
+        os.killpg(process.pid, signal.SIGKILL)
+        assert process.wait(timeout=5) == -signal.SIGKILL
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=5)
+        monkeypatch.delenv(
+            "FAKE_BOUND_CONTROLLER_DESCRIPTOR_PAUSE_READY",
+            raising=False,
+        )
+    return operation_id, artifacts
 
 
 def make_fake_authority_source(
@@ -2572,6 +2864,11 @@ def test_guarded_deploy_sigkill_leaves_external_authenticated_recovery_token(
 
     assert (tmp_path / "lock-state" / "public-edge-mutation.lock").is_dir()
     assert external_token.is_file()
+    retained_artifacts = retained_public_edge_lock_artifacts(tmp_path)
+    assert retained_artifacts["binding"].is_file()
+    assert retained_artifacts["lease"].is_file()
+    assert retained_artifacts["binding"].stat().st_mode & 0o777 == 0o600
+    assert retained_artifacts["lease"].stat().st_mode & 0o777 == 0o600
 
 
 def test_retirement_controller_failure_forces_status_76_and_retains_lock(
@@ -2601,6 +2898,582 @@ def test_retirement_controller_failure_forces_status_76_and_retains_lock(
     assert (
         tmp_path / "lock-state" / "public-edge-mutation.lock"
     ).is_dir()
+
+
+def test_cutover_recovery_adopts_exact_retained_lock_and_cleans_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id = configure_fake_public_download_cutover(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "76")
+
+    cutover = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert cutover.returncode == 76, cutover.stderr
+    lock_root = tmp_path / "lock-state"
+    lock = lock_root / "public-edge-mutation.lock"
+    token = (lock / "owner-token").read_text(encoding="ascii").strip()
+    token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+    authority_root = lock_root / "public-edge-lock-recovery-receipts"
+    binding = authority_root / f"deploy-{token_digest}.binding.json"
+    lease = authority_root / f"deploy-{token_digest}.lease"
+    authorization = authority_root / f"deploy-{token_digest}.owner-token"
+    binding_payload = json.loads(binding.read_text(encoding="utf-8"))
+    assert token not in binding.read_text(encoding="utf-8")
+    assert binding_payload["initialOperation"].endswith("-cutover")
+    assert binding_payload["allowedResumeOperation"].endswith("-cutover-recover")
+    assert binding.stat().st_mode & 0o777 == 0o600
+    assert lease.stat().st_mode & 0o777 == 0o600
+    assert authorization.stat().st_mode & 0o777 == 0o600
+
+    materialize_fake_public_download_journal(tmp_path, operation_id)
+    projection_current = (
+        Path(os.environ["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"])
+        / "CURRENT.json"
+    )
+    projection_current.write_text("{}\n", encoding="utf-8")
+    projection_current.chmod(0o644)
+    trusted_python_log = tmp_path / "recovery-trusted-python.log"
+    monkeypatch.setenv(
+        "FAKE_TRUSTED_PYTHON_LOG",
+        str(trusted_python_log),
+    )
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+    recovery = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-recover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert recovery.returncode == 0, recovery.stderr
+    assert not lock.exists()
+    assert not binding.exists()
+    assert not lease.exists()
+    assert not authorization.exists()
+    assert projection_current.read_text(encoding="utf-8") == "{}\n"
+    assert not any(
+        "verify_public_projection.py" in call
+        for call in trusted_python_log.read_text(
+            encoding="utf-8"
+        ).splitlines()
+    )
+
+
+def test_precontroller_cutover_sigkill_retries_same_id_without_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id, artifacts = (
+        retain_fake_public_download_precontroller_cutover(
+            tmp_path,
+            monkeypatch,
+        )
+    )
+    binding_before = artifacts["binding"].read_bytes()
+    journal = (
+        tmp_path
+        / "lock-state"
+        / "public-edge-deploy-receipts"
+        / f"chummer-public-download-{operation_id}.operation.json"
+    )
+    assert not journal.exists()
+
+    wrong_route = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-recover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert wrong_route.returncode == 70
+    assert artifacts["binding"].read_bytes() == binding_before
+
+    retry = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert retry.returncode == 0, retry.stderr
+    assert not artifacts["lock"].exists()
+    assert not artifacts["authorization"].exists()
+    assert not artifacts["lease"].exists()
+    assert not artifacts["binding"].exists()
+
+
+def test_precontroller_cutover_retry_reclaims_exact_empty_operation_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id, artifacts = (
+        retain_fake_public_download_precontroller_cutover(
+            tmp_path,
+            monkeypatch,
+        )
+    )
+    operation_root = (
+        tmp_path
+        / "lock-state"
+        / "public-edge-deploy-receipts"
+        / f"chummer-public-download-{operation_id}"
+    )
+    operation_root.mkdir(mode=0o700)
+    operation_root.chmod(0o700)
+
+    retry = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert retry.returncode == 0, retry.stderr
+    assert not operation_root.exists()
+    assert not artifacts["lock"].exists()
+    assert not artifacts["authorization"].exists()
+    assert not artifacts["lease"].exists()
+    assert not artifacts["binding"].exists()
+
+
+def test_precontroller_cutover_retry_rejects_journal_after_lease_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id, artifacts = (
+        retain_fake_public_download_precontroller_cutover(
+            tmp_path,
+            monkeypatch,
+        )
+    )
+    operation_root, journal = materialize_fake_public_download_journal(
+        tmp_path,
+        operation_id,
+    )
+    binding_before = artifacts["binding"].read_bytes()
+    controller_ready = tmp_path / "journaled-prestart-controller-ready"
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY",
+        str(controller_ready),
+    )
+
+    rejected = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert rejected.returncode == 70
+    assert "changed after lease acquisition" in rejected.stderr
+    assert not controller_ready.exists()
+    assert operation_root.is_dir()
+    assert journal.is_file()
+    assert artifacts["binding"].read_bytes() == binding_before
+    assert artifacts["lock"].is_dir()
+    assert artifacts["authorization"].is_file()
+    assert artifacts["lease"].is_file()
+
+
+def test_retirement_retry_adopts_same_id_retained_lock_and_cleans_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_fake_public_download_retirement(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "143")
+    first = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert first.returncode == 76, first.stderr
+
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+    retry = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert retry.returncode == 0, retry.stderr
+    lock_root = tmp_path / "lock-state"
+    assert not (lock_root / "public-edge-mutation.lock").exists()
+    assert not list(
+        (lock_root / "public-edge-lock-recovery-receipts").iterdir()
+    )
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    (
+        "operation-id",
+        "route",
+        "journal",
+        "source-head",
+        "wrapper-digest",
+        "controller-digest",
+    ),
+)
+def test_retained_lock_adoption_rejects_bound_identity_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mismatch: str,
+) -> None:
+    artifacts = retain_fake_public_download_retirement(tmp_path, monkeypatch)
+    operation = "initial-release-shelf-public-download-cutover-retire"
+    if mismatch == "operation-id":
+        monkeypatch.setenv(
+            "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID",
+            "retire-test-0002",
+        )
+    elif mismatch == "route":
+        operation = "initial-release-shelf-public-download-cutover-recover"
+    elif mismatch == "journal":
+        operation_id = os.environ["CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID"]
+        journal = (
+            tmp_path
+            / "lock-state"
+            / "public-edge-deploy-receipts"
+            / f"chummer-public-download-{operation_id}.operation.json"
+        )
+        payload = json.loads(journal.read_text(encoding="utf-8"))
+        payload["projectName"] = "chummer-public-download-wrong"
+        journal.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        journal.chmod(0o600)
+    elif mismatch == "source-head":
+        monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", "1" * 40)
+    elif mismatch == "wrapper-digest":
+        DEPLOY.write_text(
+            DEPLOY.read_text(encoding="utf-8") + "\n",
+            encoding="utf-8",
+        )
+        DEPLOY.chmod(0o755)
+    elif mismatch == "controller-digest":
+        binding = json.loads(
+            artifacts["binding"].read_text(encoding="utf-8")
+        )
+        binding["controllerSha256"] = "f" * 64
+        artifacts["binding"].write_text(
+            json.dumps(binding, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        artifacts["binding"].chmod(0o600)
+    controller_ready = tmp_path / "mismatched-adoption-controller-ready"
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY",
+        str(controller_ready),
+    )
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+
+    rejected = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            operation,
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert rejected.returncode == 70
+    assert "could not atomically establish" in rejected.stderr
+    assert not controller_ready.exists()
+    assert artifacts["lock"].is_dir()
+    assert artifacts["token"].is_file()
+    assert artifacts["authorization"].is_file()
+    assert artifacts["lease"].is_file()
+    assert artifacts["binding"].is_file()
+
+
+def test_generic_recover_never_adopts_public_download_retirement_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts = retain_fake_public_download_retirement(tmp_path, monkeypatch)
+    binding_before = artifacts["binding"].read_bytes()
+
+    rejected = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "recover",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert rejected.returncode == 75
+    assert "another public-edge mutation owns" in rejected.stderr
+    assert artifacts["lock"].is_dir()
+    assert artifacts["token"].is_file()
+    assert artifacts["binding"].read_bytes() == binding_before
+
+
+def test_adopted_retirement_validation_failure_retains_exact_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts = retain_fake_public_download_retirement(tmp_path, monkeypatch)
+    before = {
+        name: path.read_bytes()
+        for name, path in artifacts.items()
+        if name != "lock"
+    }
+    controller_ready = tmp_path / "validation-failure-controller-ready"
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY",
+        str(controller_ready),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_DOWNLOAD_CLOUDFLARE_CREDENTIALS_FILE",
+        str(tmp_path / "missing-cloudflare-credentials.json"),
+    )
+
+    failed = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert failed.returncode == 76
+    assert "adopted public-download recovery did not complete" in failed.stderr
+    assert not controller_ready.exists()
+    assert artifacts["lock"].is_dir()
+    for name, expected in before.items():
+        assert artifacts[name].read_bytes() == expected
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    (
+        "binding-symlink",
+        "lease-hardlink",
+        "authorization-mode",
+        "binding-tamper",
+        "authorization-tamper",
+        "lease-tamper",
+        "lock-extra-entry",
+    ),
+)
+def test_retained_lock_adoption_rejects_unsafe_artifact_metadata_or_tamper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    artifacts = retain_fake_public_download_retirement(tmp_path, monkeypatch)
+    if corruption == "binding-symlink":
+        decoy = tmp_path / "binding-decoy.json"
+        decoy.write_text("{}\n", encoding="utf-8")
+        decoy.chmod(0o600)
+        artifacts["binding"].unlink()
+        artifacts["binding"].symlink_to(decoy)
+    elif corruption == "lease-hardlink":
+        os.link(artifacts["lease"], tmp_path / "lease-hardlink")
+    elif corruption == "authorization-mode":
+        artifacts["authorization"].chmod(0o644)
+    elif corruption == "binding-tamper":
+        payload = json.loads(
+            artifacts["binding"].read_text(encoding="utf-8")
+        )
+        payload["allowedResumeOperation"] = "recover"
+        artifacts["binding"].write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        artifacts["binding"].chmod(0o600)
+    elif corruption == "authorization-tamper":
+        artifacts["authorization"].write_text(
+            "f" * 64 + "\n",
+            encoding="ascii",
+        )
+        artifacts["authorization"].chmod(0o600)
+    elif corruption == "lease-tamper":
+        artifacts["lease"].write_text("not-empty\n", encoding="ascii")
+        artifacts["lease"].chmod(0o600)
+    elif corruption == "lock-extra-entry":
+        extra = artifacts["lock"] / "unexpected"
+        extra.write_text("unexpected\n", encoding="utf-8")
+        extra.chmod(0o600)
+    controller_ready = tmp_path / "unsafe-adoption-controller-ready"
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CONTROLLER_READY",
+        str(controller_ready),
+    )
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+
+    rejected = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert rejected.returncode == 70
+    assert not controller_ready.exists()
+    assert artifacts["lock"].is_dir()
+
+
+def test_retained_lock_cleanup_failure_keeps_all_authority_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts = retain_fake_public_download_retirement(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+    monkeypatch.setenv(
+        "FAKE_PUBLIC_DOWNLOAD_CLEANUP_TAMPER_PATH",
+        str(artifacts["binding"]),
+    )
+
+    result = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            str(DEPLOY),
+            "initial-release-shelf-public-download-cutover-retire",
+        ],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 70
+    assert "deployment lock release failed" in result.stderr
+    assert artifacts["lock"].is_dir()
+    assert artifacts["token"].is_file()
+    assert artifacts["authorization"].is_file()
+    assert artifacts["lease"].is_file()
+    assert artifacts["binding"].is_file()
+
+
+def test_lock_cleanup_durably_releases_canonical_name_before_artifact_gc() -> None:
+    script = DEPLOY.read_text(encoding="utf-8")
+    cleanup_start = script.index(
+        'releasing_path = os.path.join(\n'
+        '    lock_root,\n'
+        '    f"public-edge-mutation.lock.releasing.'
+    )
+    cleanup_end = script.index(
+        "' \"$DEPLOY_LOCK_DIR\" \"$deploy_lock_identity\"",
+        cleanup_start,
+    )
+    cleanup = script[cleanup_start:cleanup_end]
+
+    rename = cleanup.index(
+        "renameat2(-100, lock_path, -100, releasing_path, 1)"
+    )
+    durable_release = cleanup.index("os.fsync(lock_root_descriptor)", rename)
+    token_gc = cleanup.index("os.unlink(released_token_path)", durable_release)
+    binding_gc = cleanup.index("os.unlink(binding_path)", token_gc)
+    authorization_gc = cleanup.index("os.unlink(authorization_path)", binding_gc)
+    lease_gc = cleanup.index("os.unlink(lease_path)", authorization_gc)
+    tombstone_gc = cleanup.index("os.rmdir(releasing_path)", lease_gc)
+
+    assert rename < durable_release < token_gc
+    assert token_gc < binding_gc < authorization_gc < lease_gc < tombstone_gc
 
 
 def test_retirement_wrapper_sigkill_keeps_durable_lock_while_child_continues(
@@ -2677,6 +3550,51 @@ def test_retirement_wrapper_sigkill_keeps_durable_lock_while_child_continues(
                 / "public-edge-lock-recovery-receipts"
             ).glob("deploy-*.owner-token")
         )
+
+        live_adoption = subprocess.run(
+            [
+                "/usr/bin/bash",
+                "--noprofile",
+                "--norc",
+                str(DEPLOY),
+                "initial-release-shelf-public-download-cutover-retire",
+            ],
+            cwd=ROOT,
+            env=os.environ.copy(),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert live_adoption.returncode == 75
+        assert "another public-edge mutation owns" in live_adoption.stderr
+        assert lock.is_dir()
+
+        os.kill(child_pid, signal.SIGKILL)
+        monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_MODE", "exit")
+        monkeypatch.setenv("FAKE_PUBLIC_DOWNLOAD_CONTROLLER_EXIT", "0")
+        adopted: subprocess.CompletedProcess[str] | None = None
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            adopted = subprocess.run(
+                [
+                    "/usr/bin/bash",
+                    "--noprofile",
+                    "--norc",
+                    str(DEPLOY),
+                    "initial-release-shelf-public-download-cutover-retire",
+                ],
+                cwd=ROOT,
+                env=os.environ.copy(),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if adopted.returncode != 75:
+                break
+            time.sleep(0.02)
+        assert adopted is not None
+        assert adopted.returncode == 0, adopted.stderr
+        assert not lock.exists()
     finally:
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -2720,6 +3638,7 @@ def test_guarded_deploy_unique_auth_orphan_does_not_block_new_lock(
     assert orphan.read_text(encoding="ascii") == orphan_token + "\n"
     assert not (lock_root / "public-edge-mutation.lock").exists()
     assert list(auth_root.glob("deploy-*.owner-token")) == [orphan]
+    assert list(auth_root.iterdir()) == [orphan]
 
 
 def test_guarded_deploy_never_removes_tokenless_existing_fixed_lock(
@@ -2747,6 +3666,9 @@ def test_guarded_deploy_never_removes_tokenless_existing_fixed_lock(
         (lock_root / "public-edge-lock-recovery-receipts").glob(
             "deploy-*.owner-token"
         )
+    )
+    assert not list(
+        (lock_root / "public-edge-lock-recovery-receipts").iterdir()
     )
 
 

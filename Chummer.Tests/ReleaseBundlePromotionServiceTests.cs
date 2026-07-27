@@ -29,6 +29,40 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public void ProfileRegistryArtifactProjectionAcceptsExactWindowsOnlyRows()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+            canonical,
+            compatibility);
+
+        ReleaseBundlePromotionService.ValidateRegistryArtifactProjection(
+            compatibility,
+            canonical);
+    }
+
+    [Fact]
+    public void ProfileRegistryArtifactProjectionRejectsMixedRetainedModes()
+    {
+        (JsonObject canonical, JsonObject compatibility) =
+            LoadUnsignedWindowsFreshDeltaManifestPair();
+        canonical["artifacts"] = new JsonArray(
+            canonical["artifacts"]!.AsArray()
+                .Where(static node => string.Equals(
+                    node!["platform"]!.GetValue<string>(),
+                    "windows",
+                    StringComparison.Ordinal))
+                .Select(static node => node!.DeepClone())
+                .ToArray());
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ValidateRegistryArtifactProjection(
+                compatibility,
+                canonical));
+    }
+
+    [Fact]
     public void ProfilePayloadSidecarAcceptsExactDownloadModeWhenOptionalOrRequired()
     {
         const string installer = "chummer-avalonia-win-x64-installer.exe";
@@ -74,12 +108,21 @@ public sealed class ReleaseBundlePromotionServiceTests
             out failure), failure);
     }
 
-    [Fact]
-    public void ProfilePreparedShelfOmitsUnboundAurCatalogAndFiles()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProfilePreparedShelfSupportsRetainedAndWindowsOnlyModes(
+        bool windowsOnly)
     {
         using var fixture = new ReleaseBundlePromotionFixture();
         (JsonObject canonical, JsonObject compatibility) =
             LoadUnsignedWindowsFreshDeltaManifestPair();
+        if (windowsOnly)
+        {
+            ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+                canonical,
+                compatibility);
+        }
         PublicReleaseManifestDto manifest = compatibility.Deserialize<PublicReleaseManifestDto>(
                 TestJsonOptions)
             ?? throw new InvalidDataException(
@@ -246,6 +289,59 @@ public sealed class ReleaseBundlePromotionServiceTests
             pair["compatibility"]?.AsObject()
                 ?? throw new InvalidDataException(
                     "unsigned fresh-delta compatibility fixture is invalid"));
+    }
+
+    private static void ConvertUnsignedFreshDeltaManifestPairToWindowsOnly(
+        JsonObject canonical,
+        JsonObject compatibility)
+    {
+        canonical["artifacts"] = new JsonArray(
+            canonical["artifacts"]!.AsArray()
+                .Where(static node => string.Equals(
+                    node!["platform"]!.GetValue<string>(),
+                    "windows",
+                    StringComparison.Ordinal))
+                .Select(static node => node!.DeepClone())
+                .ToArray());
+        compatibility["downloads"] = new JsonArray(
+            compatibility["downloads"]!.AsArray()
+                .Where(static node => string.Equals(
+                    node!["platform"]!.GetValue<string>(),
+                    "windows",
+                    StringComparison.Ordinal))
+                .Select(static node => node!.DeepClone())
+                .ToArray());
+
+        foreach (JsonObject manifest in new[] { canonical, compatibility })
+        {
+            JsonObject provenance =
+                manifest["retainedIncumbentProvenance"]!.AsObject();
+            provenance["retainedArtifactBindings"] = new JsonArray();
+            provenance["retainedCompatibilityBindings"] = new JsonArray();
+
+            JsonObject coverage = manifest["desktopTupleCoverage"]!.AsObject();
+            coverage["requiredDesktopPlatforms"] =
+                JsonSerializer.SerializeToNode(new[] { "windows" });
+            coverage["requiredDesktopPlatformHeadRidTuples"] =
+                JsonSerializer.SerializeToNode(
+                    new[] { "avalonia:win-x64:windows" });
+            coverage["missingRequiredHeads"] =
+                JsonSerializer.SerializeToNode(new[] { "avalonia" });
+            coverage["promotedInstallerTuples"] = new JsonArray();
+            coverage["promotedPlatformHeadRidTuples"] = new JsonArray();
+            coverage["promotedPlatformHeads"] = new JsonObject
+            {
+                ["windows"] = new JsonArray()
+            };
+            coverage["desktopRouteTruth"] = new JsonArray(
+                coverage["desktopRouteTruth"]!.AsArray()
+                    .Where(static node => string.Equals(
+                        node!["platform"]!.GetValue<string>(),
+                        "windows",
+                        StringComparison.Ordinal))
+                    .Select(static node => node!.DeepClone())
+                    .ToArray());
+        }
     }
 
     [Fact]
