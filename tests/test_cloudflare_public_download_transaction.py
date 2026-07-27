@@ -1627,6 +1627,42 @@ def test_missing_connector_config_version_requires_bound_external_probe(
     assert len(api.put_calls) == put_count
 
 
+def test_only_byte_pinned_r7_fixture_bypasses_current_plan_replay(
+    tmp_path: Path,
+) -> None:
+    fixture = (
+        ROOT
+        / "tests"
+        / "fixtures"
+        / "cloudflare-committed-r7.json"
+    )
+    path = tmp_path / "cloudflare-committed-r7.json"
+    path.write_bytes(fixture.read_bytes())
+    path.chmod(0o600)
+    payload = json.loads(path.read_bytes())
+
+    with pytest.raises(
+        transaction.ValidationError,
+        match="managed and fail-closed rules",
+    ):
+        transaction.validate_journal(payload)
+
+    assert transaction.load_journal(path) == payload
+
+    mutated = path.read_bytes().replace(
+        b'"updatedAt":"2026-07-25T04:25:43.650029Z"',
+        b'"updatedAt":"2026-07-25T04:25:43.650028Z"',
+    )
+    assert mutated != path.read_bytes()
+    path.write_bytes(mutated)
+    path.chmod(0o600)
+    with pytest.raises(
+        transaction.ValidationError,
+        match="managed and fail-closed rules",
+    ):
+        transaction.load_journal(path)
+
+
 @pytest.mark.parametrize(
     ("field", "value", "expected"),
     [

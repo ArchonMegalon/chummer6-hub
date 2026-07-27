@@ -3453,6 +3453,129 @@ def test_recovery_reconciles_committed_route_without_cleanup(
     assert config.canonical_shelf_sentinel.read_bytes() == canonical_before
 
 
+def r7_retirement_loader_inputs(
+    tmp_path: Path,
+) -> tuple[Any, SimpleNamespace, dict[str, Any], bytes]:
+    fixture = (
+        ROOT
+        / "tests"
+        / "fixtures"
+        / "cloudflare-committed-r7.json"
+    )
+    fixture_raw = fixture.read_bytes()
+    r7_project = (
+        "chummer-public-download-windows-preview-pr74-"
+        "c46cfcf9-20260725t041830z-r7"
+    )
+    r7_source_head = "c46cfcf92ccc7fd051157e88dc76fde580f8d71e"
+    actions = object.__new__(controller.TopologyBActions)
+    actions.cloudflare = load_module(
+        ROOT / "scripts" / "cloudflare_public_download_transaction.py",
+        f"r7_retirement_cloudflare_{time.time_ns()}",
+    )
+    operation_root = tmp_path / r7_project
+    operation_root.mkdir(mode=0o700)
+    evidence_path = operation_root / "cloudflare-committed.json"
+    evidence_path.write_bytes(fixture_raw)
+    evidence_path.chmod(0o600)
+    config = SimpleNamespace(
+        operation=controller.RETIRE_OPERATION,
+        operation_root=operation_root,
+        project_name=r7_project,
+        source_head=r7_source_head,
+        cloudflare_committed_evidence=evidence_path,
+        cloudflare_account_id=actions.cloudflare.R7_RETIREMENT_ACCOUNT_ID,
+        cloudflare_tunnel_id=actions.cloudflare.R7_RETIREMENT_TUNNEL_ID,
+    )
+    active = {
+        "operation": controller.CUTOVER_OPERATION,
+        "operationRoot": str(operation_root),
+        "origin": controller.SIDECAR_ORIGIN,
+        "projectName": r7_project,
+        "sourceHead": r7_source_head,
+        "generationId": actions.cloudflare.R7_RETIREMENT_GENERATION_ID,
+        "cloudflare": {
+            "evidencePath": str(evidence_path),
+            "evidenceSha256": actions.cloudflare.R7_RETIREMENT_EVIDENCE_SHA256,
+            "targetConfigSha256": (
+                actions.cloudflare.R7_RETIREMENT_TARGET_CONFIG_SHA256
+            ),
+            "targetVersion": actions.cloudflare.R7_RETIREMENT_TARGET_VERSION,
+        },
+    }
+    return actions, config, active, fixture_raw
+
+
+def test_retirement_accepts_only_the_byte_pinned_r7_terminal_evidence(
+    tmp_path: Path,
+) -> None:
+    actions, config, active, fixture_raw = r7_retirement_loader_inputs(
+        tmp_path
+    )
+
+    raw, payload = actions._load_committed_retirement_evidence(
+        config,
+        active,
+    )
+
+    assert raw == fixture_raw
+    assert hashlib.sha256(raw).hexdigest() == (
+        actions.cloudflare.R7_RETIREMENT_EVIDENCE_SHA256
+    )
+    assert payload["phase"] == "committed"
+    assert payload["priorVersion"] == (
+        actions.cloudflare.R7_RETIREMENT_PRIOR_VERSION
+    )
+    assert (
+        payload["targetVersion"]
+        == actions.cloudflare.R7_RETIREMENT_TARGET_VERSION
+    )
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "generation",
+        "active-evidence-sha",
+        "target-config-sha",
+        "target-version",
+        "account",
+        "tunnel",
+        "raw-byte",
+    ],
+)
+def test_r7_retirement_compatibility_rejects_identity_or_byte_drift(
+    tmp_path: Path,
+    drift: str,
+) -> None:
+    actions, config, active, fixture_raw = r7_retirement_loader_inputs(
+        tmp_path
+    )
+    if drift == "generation":
+        active["generationId"] = "g-drifted"
+    elif drift == "active-evidence-sha":
+        active["cloudflare"]["evidenceSha256"] = "0" * 64
+    elif drift == "target-config-sha":
+        active["cloudflare"]["targetConfigSha256"] = "0" * 64
+    elif drift == "target-version":
+        active["cloudflare"]["targetVersion"] = 13
+    elif drift == "account":
+        config.cloudflare_account_id = "account-drifted"
+    elif drift == "tunnel":
+        config.cloudflare_tunnel_id = "tunnel-drifted"
+    elif drift == "raw-byte":
+        mutated = fixture_raw.replace(
+            b'"updatedAt":"2026-07-25T04:25:43.650029Z"',
+            b'"updatedAt":"2026-07-25T04:25:43.650028Z"',
+        )
+        assert mutated != fixture_raw
+        config.cloudflare_committed_evidence.write_bytes(mutated)
+        config.cloudflare_committed_evidence.chmod(0o600)
+
+    with pytest.raises(controller.RecoveryUncertain):
+        actions._load_committed_retirement_evidence(config, active)
+
+
 def test_explicit_retirement_restores_proves_retires_then_cleans(
     tmp_path: Path,
 ) -> None:
