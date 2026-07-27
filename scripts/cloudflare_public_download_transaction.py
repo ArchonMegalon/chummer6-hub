@@ -13,6 +13,7 @@ import copy
 import datetime as dt
 import fcntl
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -30,6 +31,21 @@ import urllib.request
 
 SCHEMA = "cloudflare-public-download-ingress-transaction/v2"
 EXTERNAL_PROBE_SCHEMA = "cloudflare-public-download-external-probe/v2"
+R7_RETIREMENT_EVIDENCE_SHA256 = (
+    "3bebd7d28cf9d00d27756acf9cb77253249379081216d2cc44ae4b86f0b0c491"
+)
+R7_RETIREMENT_ACCOUNT_ID = "7c5862dfa7269197830c136937a48580"
+R7_RETIREMENT_TUNNEL_ID = "9e16dede-51cf-40fb-8bc1-2240650874fa"
+R7_RETIREMENT_ORIGIN = "http://172.17.0.1:18091"
+R7_RETIREMENT_GENERATION_ID = "g-20260724T152516Z-6907464d-c779a59"
+R7_RETIREMENT_PRIOR_CONFIG_SHA256 = (
+    "c9769513192fc5400d11f5dd30448cc654dbac2df12937c0fa3a9673d9c4aecd"
+)
+R7_RETIREMENT_TARGET_CONFIG_SHA256 = (
+    "4d398a87e4ba699608f42fe0b8e600a475d19ed809c2f6f070ed0961b5837aae"
+)
+R7_RETIREMENT_PRIOR_VERSION = 11
+R7_RETIREMENT_TARGET_VERSION = 12
 PHASES = frozenset(
     {
         "captured",
@@ -1006,7 +1022,7 @@ def validate_current_connector_convergence_receipt(
     return value
 
 
-def validate_journal(value: Any) -> dict[str, Any]:
+def _validate_journal_invariants(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValidationError("transaction journal must be an object")
     _require_exact_fields(value, JOURNAL_FIELDS, "transaction journal")
@@ -1025,7 +1041,6 @@ def validate_journal(value: Any) -> dict[str, Any]:
         raise ValidationError("journal prior response/config/version mismatch")
     if canonical_sha256(value["priorConfig"]) != value["priorConfigSha256"]:
         raise ValidationError("journal prior config digest mismatch")
-    validate_planned_config(value["priorConfig"], value["targetConfig"], origin)
     if canonical_sha256(value["targetConfig"]) != value["targetConfigSha256"]:
         raise ValidationError("journal target config digest mismatch")
     generation_id = validate_generation_id(value["generationId"])
@@ -1089,6 +1104,42 @@ def validate_journal(value: Any) -> dict[str, Any]:
         )
     return value
 
+
+def validate_journal(value: Any) -> dict[str, Any]:
+    validated = _validate_journal_invariants(value)
+    validate_planned_config(
+        validated["priorConfig"],
+        validated["targetConfig"],
+        validated["origin"],
+    )
+    return validated
+
+
+def _validate_byte_pinned_r7_retirement_journal(
+    raw: bytes,
+    value: Any,
+) -> dict[str, Any]:
+    if not hmac.compare_digest(
+        hashlib.sha256(raw).hexdigest(),
+        R7_RETIREMENT_EVIDENCE_SHA256,
+    ):
+        raise ValidationError("r7 retirement journal bytes are not authorized")
+    validated = _validate_journal_invariants(value)
+    if (
+        validated["phase"] != "committed"
+        or validated["accountId"] != R7_RETIREMENT_ACCOUNT_ID
+        or validated["tunnelId"] != R7_RETIREMENT_TUNNEL_ID
+        or validated["origin"] != R7_RETIREMENT_ORIGIN
+        or validated["generationId"] != R7_RETIREMENT_GENERATION_ID
+        or validated["priorConfigSha256"]
+        != R7_RETIREMENT_PRIOR_CONFIG_SHA256
+        or validated["targetConfigSha256"]
+        != R7_RETIREMENT_TARGET_CONFIG_SHA256
+        or validated["priorVersion"] != R7_RETIREMENT_PRIOR_VERSION
+        or validated["targetVersion"] != R7_RETIREMENT_TARGET_VERSION
+    ):
+        raise ValidationError("r7 retirement journal identity drifted")
+    return validated
 
 def _dir_fd(path: Path) -> int:
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC
@@ -1299,6 +1350,11 @@ def load_journal(path: Path) -> dict[str, Any]:
         parsed = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise JournalError("transaction journal is not valid JSON") from exc
+    if hmac.compare_digest(
+        hashlib.sha256(raw).hexdigest(),
+        R7_RETIREMENT_EVIDENCE_SHA256,
+    ):
+        return _validate_byte_pinned_r7_retirement_journal(raw, parsed)
     return validate_journal(parsed)
 
 
