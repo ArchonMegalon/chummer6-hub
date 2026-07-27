@@ -2653,6 +2653,103 @@ def unsigned_fresh_delta_manifest_validator(layer: str):
     )
 
 
+def unsigned_retained_provenance_validator(layer: str):
+    if layer == "materializer":
+        module = load_script(
+            MATERIALIZER,
+            "unsigned_retained_provenance_materializer_test",
+        )
+        return (
+            module._validate_profile_retained_provenance,
+            module.CandidateAuthorityBlocked,
+        )
+    module = load_script(
+        PROJECTION,
+        "unsigned_retained_provenance_projection_test",
+    )
+    return (
+        module._candidate_validate_profile_retained_provenance,
+        module.ProjectionBlocked,
+    )
+
+
+def bind_retained_artifacts(
+    provenance: dict[str, object],
+    artifacts: list[dict[str, object]],
+) -> None:
+    bindings = [
+        {
+            "artifactId": artifact.get("artifactId") or artifact.get("id"),
+            "manifestRowSha256": canonical_sha256(artifact),
+            "sha256": artifact["sha256"],
+            "sizeBytes": artifact["sizeBytes"],
+        }
+        for artifact in artifacts
+    ]
+    provenance["retainedArtifactBindings"] = bindings
+    provenance["retainedArtifactBindingsSha256"] = canonical_sha256(bindings)
+
+
+def windows_only_unsigned_fresh_delta_manifest_pair() -> (
+    dict[str, dict[str, object]]
+):
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    canonical["artifacts"] = [
+        artifact
+        for artifact in canonical["artifacts"]
+        if artifact.get("platform") == "windows"
+    ]
+    compatibility["downloads"] = [
+        artifact
+        for artifact in compatibility["downloads"]
+        if artifact.get("platform") == "windows"
+    ]
+    for manifest in (canonical, compatibility):
+        provenance = manifest["retainedIncumbentProvenance"]
+        provenance["retainedArtifactBindings"] = []
+        provenance["retainedArtifactBindingsSha256"] = canonical_sha256([])
+        provenance["retainedCompatibilityBindings"] = []
+        provenance["retainedCompatibilityBindingsSha256"] = canonical_sha256([])
+    coverage = canonical["desktopTupleCoverage"]
+    coverage["requiredDesktopPlatforms"] = ["windows"]
+    coverage["requiredDesktopPlatformHeadRidTuples"] = [
+        "avalonia:win-x64:windows"
+    ]
+    coverage["missingRequiredHeads"] = ["avalonia"]
+    coverage["promotedInstallerTuples"] = []
+    coverage["promotedPlatformHeadRidTuples"] = []
+    coverage["promotedPlatformHeads"] = {"windows": []}
+    coverage["desktopRouteTruth"] = [
+        row
+        for row in coverage["desktopRouteTruth"]
+        if row.get("platform") == "windows"
+    ]
+    artifact = canonical["artifacts"][0]
+    inventory = [
+        {
+            "arch": artifact["arch"],
+            "artifactId": artifact["artifactId"],
+            "fileName": artifact["fileName"],
+            "head": artifact["head"],
+            "kind": artifact["kind"],
+            "payloadFileName": artifact["payloadFileName"],
+            "payloadSha256": artifact["payloadSha256"],
+            "payloadSizeBytes": artifact["payloadSizeBytes"],
+            "platform": artifact["platform"],
+            "rid": artifact["rid"],
+            "sha256": artifact["sha256"],
+            "sizeBytes": artifact["sizeBytes"],
+        }
+    ]
+    for manifest in (canonical, compatibility):
+        review = manifest["codeDeployCurrentShelfAuthority"]
+        review["projectedArtifactCount"] = 1
+        review["projectedArtifactInventorySha256"] = canonical_sha256(inventory)
+    return pair
+
+
 @pytest.mark.parametrize("layer", ["materializer", "projection"])
 def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
     layer: str,
@@ -2672,6 +2769,131 @@ def test_unsigned_fresh_delta_manifest_pair_accepts_registry_pushed_commit(
         "avalonia-osx-arm64-archive",
         "blazor-desktop-osx-arm64-archive",
     ]
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_fresh_delta_manifest_pair_accepts_exact_windows_only_mode(
+    layer: str,
+) -> None:
+    pair = windows_only_unsigned_fresh_delta_manifest_pair()
+    validate, _error = unsigned_fresh_delta_manifest_validator(layer)
+
+    result = validate(pair["canonical"], pair["compatibility"])
+
+    assert result["retainedArtifactIds"] == []
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+def test_unsigned_retained_provenance_accepts_exact_windows_only_empty_sets(
+    layer: str,
+) -> None:
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    canonical["artifacts"] = [
+        artifact
+        for artifact in canonical["artifacts"]
+        if artifact.get("platform") == "windows"
+    ]
+    compatibility["downloads"] = [
+        artifact
+        for artifact in compatibility["downloads"]
+        if artifact.get("platform") == "windows"
+    ]
+    for manifest in (canonical, compatibility):
+        provenance = manifest["retainedIncumbentProvenance"]
+        provenance["retainedArtifactBindings"] = []
+        provenance["retainedArtifactBindingsSha256"] = canonical_sha256([])
+        provenance["retainedCompatibilityBindings"] = []
+        provenance["retainedCompatibilityBindingsSha256"] = canonical_sha256([])
+    validate, _error = unsigned_retained_provenance_validator(layer)
+
+    _provenance, retained_ids = validate(
+        canonical,
+        compatibility,
+        canonical["retainedIncumbentProvenance"],
+        review=canonical["codeDeployCurrentShelfAuthority"],
+    )
+
+    assert retained_ids == []
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize("drift", ["partial", "reordered", "other"])
+def test_unsigned_retained_provenance_rejects_nonfrozen_nonempty_id_sets(
+    layer: str,
+    drift: str,
+) -> None:
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    retained = [
+        artifact
+        for artifact in canonical["artifacts"]
+        if artifact.get("platform") == "macos"
+    ]
+    windows = [
+        artifact
+        for artifact in canonical["artifacts"]
+        if artifact.get("platform") == "windows"
+    ]
+    if drift == "partial":
+        retained = retained[:-1]
+    elif drift == "reordered":
+        retained = [retained[1], retained[0], *retained[2:]]
+    elif drift == "other":
+        retained[0]["artifactId"] = "other-osx-arm64-installer"
+        retained[0]["id"] = "other-osx-arm64-installer"
+    else:
+        raise AssertionError(f"unknown drift: {drift}")
+    canonical["artifacts"] = [*retained, *windows]
+    provenance = canonical["retainedIncumbentProvenance"]
+    bind_retained_artifacts(provenance, retained)
+    validate, error = unsigned_retained_provenance_validator(layer)
+
+    with pytest.raises(
+        error,
+        match="retained artifact identities or order drifted",
+    ):
+        validate(
+            canonical,
+            compatibility,
+            provenance,
+            review=canonical["codeDeployCurrentShelfAuthority"],
+        )
+
+
+@pytest.mark.parametrize("layer", ["materializer", "projection"])
+@pytest.mark.parametrize("drift", ["partial", "reordered", "other"])
+def test_unsigned_retained_provenance_rejects_compatibility_binding_drift(
+    layer: str,
+    drift: str,
+) -> None:
+    pair = load_unsigned_fresh_delta_manifest_pair()
+    canonical = pair["canonical"]
+    compatibility = pair["compatibility"]
+    provenance = canonical["retainedIncumbentProvenance"]
+    bindings = provenance["retainedCompatibilityBindings"]
+    if drift == "partial":
+        bindings.pop()
+    elif drift == "reordered":
+        bindings[0], bindings[1] = bindings[1], bindings[0]
+    elif drift == "other":
+        bindings[0]["artifactId"] = "other-osx-arm64-installer"
+    else:
+        raise AssertionError(f"unknown drift: {drift}")
+    provenance["retainedCompatibilityBindingsSha256"] = canonical_sha256(
+        bindings
+    )
+    validate, error = unsigned_retained_provenance_validator(layer)
+
+    with pytest.raises(error, match="retained compatibility binding"):
+        validate(
+            canonical,
+            compatibility,
+            provenance,
+            review=canonical["codeDeployCurrentShelfAuthority"],
+        )
 
 
 @pytest.mark.parametrize("layer", ["materializer", "projection"])

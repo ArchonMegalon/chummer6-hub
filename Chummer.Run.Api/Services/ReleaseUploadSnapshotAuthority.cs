@@ -2388,6 +2388,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         string sourceCanonicalPath,
         string sourceCompatibilityPath)
     {
+        bool profileRetainsMacos = false;
         using JsonDocument projectedCompatibilityDocument = ParseStrictObject(
             compatibilityBytes,
             "unsigned projected compatibility manifest");
@@ -2928,7 +2929,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 review,
                 "incumbentSnapshotSha256",
                 RequireSha256(incumbent, "snapshotSha256"));
-            ValidateUnsignedRetainedIncumbentProvenance(
+            profileRetainsMacos = ValidateUnsignedRetainedIncumbentProvenance(
                 RequireObject(canonical, "retainedIncumbentProvenance"),
                 canonical,
                 projectedCompatibilityDocument.RootElement,
@@ -3157,10 +3158,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             registryCandidate,
             "shelfPlatforms",
             shelfPlatforms.ToArray());
+        string[] expectedProfileShelfPlatforms = profileRetainsMacos
+            ? ["macos", "windows"]
+            : ["windows"];
+        string[] expectedProfileRetainedPlatforms = profileRetainsMacos
+            ? ["macos"]
+            : [];
         if (unsignedWindowsFreshDeltaProfile
-            && (!shelfPlatforms.SetEquals(["macos", "windows"])
+            && (!shelfPlatforms.SetEquals(expectedProfileShelfPlatforms)
                 || !shelfPlatforms.Where(static platform => platform != "windows")
-                    .SequenceEqual(["macos"], StringComparer.Ordinal)))
+                    .SequenceEqual(
+                        expectedProfileRetainedPlatforms,
+                        StringComparer.Ordinal)))
         {
             throw new InvalidDataException(
                 "unsigned Registry profile shelf platforms drifted");
@@ -3642,14 +3651,28 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         JsonElement[] allCompatibilityRows = RequireArray(compatibility, "downloads")
             .EnumerateArray()
             .ToArray();
-        string[] expectedArtifactIds =
+        string[] canonicalArtifactIds = allCanonicalRows
+            .Select(RequireUnsignedArtifactIdentity)
+            .ToArray();
+        string[] compatibilityArtifactIds = allCompatibilityRows
+            .Select(RequireUnsignedArtifactIdentity)
+            .ToArray();
+        string[] windowsOnlyArtifactIds = ["avalonia-win-x64-installer"];
+        string[] retainedMacosArtifactIds =
             [.. UnsignedRetainedArtifactIds, "avalonia-win-x64-installer"];
-        if (!allCanonicalRows
-                .Select(RequireUnsignedArtifactIdentity)
-                .SequenceEqual(expectedArtifactIds, StringComparer.Ordinal)
-            || !allCompatibilityRows
-                .Select(RequireUnsignedArtifactIdentity)
-                .SequenceEqual(expectedArtifactIds, StringComparer.Ordinal))
+        bool exactWindowsOnly = canonicalArtifactIds.SequenceEqual(
+                windowsOnlyArtifactIds,
+                StringComparer.Ordinal)
+            && compatibilityArtifactIds.SequenceEqual(
+                windowsOnlyArtifactIds,
+                StringComparer.Ordinal);
+        bool exactRetainedMacos = canonicalArtifactIds.SequenceEqual(
+                retainedMacosArtifactIds,
+                StringComparer.Ordinal)
+            && compatibilityArtifactIds.SequenceEqual(
+                retainedMacosArtifactIds,
+                StringComparer.Ordinal);
+        if (!exactWindowsOnly && !exactRetainedMacos)
         {
             throw new InvalidDataException(
                 "unsigned projected manifest artifact identities or order drifted");
@@ -3776,7 +3799,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         return artifactId;
     }
 
-    private static void ValidateUnsignedRetainedIncumbentProvenance(
+    private static bool ValidateUnsignedRetainedIncumbentProvenance(
         JsonElement provenance,
         JsonElement canonical,
         JsonElement compatibility,
@@ -3846,6 +3869,17 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         {
             throw new InvalidDataException(
                 "unsigned retained canonical platform is not exact macOS");
+        }
+        string[] retainedIdsInOrder = canonicalRows
+            .Select(RequireUnsignedArtifactIdentity)
+            .ToArray();
+        bool retainsMacos = retainedIdsInOrder.SequenceEqual(
+            UnsignedRetainedArtifactIds,
+            StringComparer.Ordinal);
+        if (retainedIdsInOrder.Length != 0 && !retainsMacos)
+        {
+            throw new InvalidDataException(
+                "unsigned retained canonical identities or order drifted");
         }
         JsonElement canonicalBindings = RequireArray(
             provenance,
@@ -3931,6 +3965,7 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             compatibilityRows,
             retainedIds,
             "compatibility");
+        return retainsMacos;
     }
 
     private static void ValidateUnsignedRetainedBindingDigest(

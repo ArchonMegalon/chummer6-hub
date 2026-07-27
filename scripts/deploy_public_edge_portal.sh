@@ -58,13 +58,14 @@ readonly TRUSTED_STAT="/usr/bin/stat"
 readonly TRUSTED_SHA256SUM="/usr/bin/sha256sum"
 readonly TRUSTED_MKTEMP="/usr/bin/mktemp"
 readonly TRUSTED_RM="/usr/bin/rm"
+readonly TRUSTED_FLOCK="/usr/bin/flock"
 
 for trusted_tool in \
   "$TRUSTED_GIT" "$TRUSTED_PYTHON" "$TRUSTED_DOCKER" \
   "$TRUSTED_TIMEOUT" "$TRUSTED_REALPATH" "$TRUSTED_INSTALL" "$TRUSTED_CHMOD" \
   "$TRUSTED_MKDIR" "$TRUSTED_RMDIR" "$TRUSTED_AWK" "$TRUSTED_SLEEP" \
   "$TRUSTED_ENV" "$TRUSTED_DIRNAME" "$TRUSTED_STAT" "$TRUSTED_SHA256SUM" \
-  "$TRUSTED_MKTEMP" "$TRUSTED_RM"; do
+  "$TRUSTED_MKTEMP" "$TRUSTED_RM" "$TRUSTED_FLOCK"; do
   if [[ ! -x "$trusted_tool" ]]; then
     printf 'trusted public-edge tool is unavailable: %s\n' "$trusted_tool" >&2
     exit 2
@@ -231,6 +232,8 @@ PUBLIC_DOWNLOAD_CUTOVER_STATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-relea
 PUBLIC_DOWNLOAD_CANDIDATE_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/initial-release-shelf-public-download-candidate"
 PUBLIC_DOWNLOAD_OPERATION_ID="${CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID-}"
 PUBLIC_DOWNLOAD_OPERATION_ROOT="$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID"
+PUBLIC_DOWNLOAD_OPERATION_JOURNAL="$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID.operation.json"
+PUBLIC_DOWNLOAD_CONTROLLER="$SOURCE_ROOT/scripts/deploy_public_download_only_cutover.py"
 CANONICAL_RELEASE_SHELF_ROOT="/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"
 CUTOVER_RECOVERY_REEXEC=0
 CUTOVER_STEADY_HANDOFF=0
@@ -238,6 +241,7 @@ CUTOVER_STATE_CLASSIFICATION=""
 RECOVERY_ROUTE_REQUESTED=0
 epoch_rotation_fail_forward_required=0
 epoch_rotation_precommit_refused=0
+public_download_controller_may_have_started=0
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION == 1 \
   || RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
   if [[ ! "$RELEASE_UPLOAD_TICKET_NEXT_EPOCH" \
@@ -668,6 +672,79 @@ if [[ ! "$COMPOSE_PROJECT" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
   exit 2
 fi
 "$TRUSTED_INSTALL" -d -m 0700 -- "$DEPLOY_LOCK_ROOT"
+if [[ ! -d "$DEPLOY_LOCK_ROOT" || -L "$DEPLOY_LOCK_ROOT" \
+  || ! -O "$DEPLOY_LOCK_ROOT" \
+  || "$("$TRUSTED_REALPATH" -e -- "$DEPLOY_LOCK_ROOT")" \
+    != "$DEPLOY_LOCK_ROOT" ]]; then
+  echo "public edge deploy lock root is not a caller-owned directory" >&2
+  exit 2
+fi
+"$TRUSTED_CHMOD" 0700 -- "$DEPLOY_LOCK_ROOT"
+if [[ -L "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
+  || (-e "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
+    && (! -d "$CANONICAL_DEPLOY_RECEIPT_ROOT" \
+      || ! -O "$CANONICAL_DEPLOY_RECEIPT_ROOT")) ]]; then
+  echo "canonical public edge deploy receipt root is unsafe" >&2
+  exit 70
+fi
+"$TRUSTED_INSTALL" -d -m 0700 -- "$CANONICAL_DEPLOY_RECEIPT_ROOT"
+"$TRUSTED_CHMOD" 0700 -- "$CANONICAL_DEPLOY_RECEIPT_ROOT"
+if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_RECEIPT_ROOT")" \
+  != "$CANONICAL_DEPLOY_RECEIPT_ROOT" ]]; then
+  echo "canonical public edge deploy receipt root contains a symlink component" >&2
+  exit 70
+fi
+
+deploy_lock_wrapper_sha256="$("$TRUSTED_SHA256SUM" -- "$SCRIPT_PATH")"
+deploy_lock_wrapper_sha256="${deploy_lock_wrapper_sha256%% *}"
+deploy_lock_controller_sha256="$(
+  printf '%064d' 0
+)"
+deploy_lock_operation_id=""
+deploy_lock_operation_root=""
+deploy_lock_operation_journal=""
+if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
+  if [[ ! "$PUBLIC_DOWNLOAD_OPERATION_ID" \
+    =~ ^[a-z0-9][a-z0-9-]{7,63}$ ]]; then
+    echo "CHUMMER_PUBLIC_DOWNLOAD_OPERATION_ID must be the exact governed topology-B operation identifier" >&2
+    exit 2
+  fi
+  if [[ "$PUBLIC_DOWNLOAD_OPERATION_ROOT" \
+      != "$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID" \
+    || "$PUBLIC_DOWNLOAD_OPERATION_JOURNAL" \
+      != "$CANONICAL_DEPLOY_RECEIPT_ROOT/chummer-public-download-$PUBLIC_DOWNLOAD_OPERATION_ID.operation.json" ]]; then
+    echo "public-download lock binding paths are not exact and adjacent" >&2
+    exit 70
+  fi
+  if [[ ! -f "$PUBLIC_DOWNLOAD_CONTROLLER" || -L "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || ! -O "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    || "$("$TRUSTED_STAT" -c '%h' -- "$PUBLIC_DOWNLOAD_CONTROLLER")" != 1 ]]; then
+    echo "audited public-download cutover controller is unsafe" >&2
+    exit 2
+  fi
+  if ! public_download_controller_mode="$(
+    "$TRUSTED_STAT" -c '%a' -- "$PUBLIC_DOWNLOAD_CONTROLLER"
+  )" \
+    || [[ ! "$public_download_controller_mode" =~ ^[0-7]{3,4}$ ]] \
+    || (( (8#$public_download_controller_mode & 8#022) != 0 )); then
+    echo "audited public-download cutover controller is group- or world-writable" >&2
+    exit 2
+  fi
+  deploy_lock_controller_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$PUBLIC_DOWNLOAD_CONTROLLER"
+  )"
+  deploy_lock_controller_sha256="${deploy_lock_controller_sha256%% *}"
+  deploy_lock_operation_id="$PUBLIC_DOWNLOAD_OPERATION_ID"
+  deploy_lock_operation_root="$PUBLIC_DOWNLOAD_OPERATION_ROOT"
+  deploy_lock_operation_journal="$PUBLIC_DOWNLOAD_OPERATION_JOURNAL"
+fi
+if [[ ! "$deploy_lock_wrapper_sha256" =~ ^[0-9a-f]{64}$ \
+  || ! "$deploy_lock_controller_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "public edge deployment lock program digests are malformed" >&2
+  exit 70
+fi
+
+"$TRUSTED_INSTALL" -d -m 0700 -- "$DEPLOY_LOCK_ROOT"
 if [[ ! -d "$DEPLOY_LOCK_ROOT" || -L "$DEPLOY_LOCK_ROOT" || ! -O "$DEPLOY_LOCK_ROOT" \
   || "$("$TRUSTED_REALPATH" -e -- "$DEPLOY_LOCK_ROOT")" != "$DEPLOY_LOCK_ROOT" ]]; then
   echo "public edge deploy lock root is not a caller-owned directory" >&2
@@ -689,16 +766,219 @@ if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT")" \
 fi
 lock_acquire_mode=acquire
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
-  lock_acquire_mode=resume
+  lock_acquire_mode=adopt
+elif [[ "$DEPLOY_OPERATION" \
+    == initial-release-shelf-public-download-cutover ]]; then
+  lock_acquire_mode=acquire-or-prestart-adopt
+elif [[ "$DEPLOY_OPERATION" \
+    == initial-release-shelf-public-download-cutover-recover ]]; then
+  lock_acquire_mode=adopt
+elif [[ "$DEPLOY_OPERATION" \
+    == initial-release-shelf-public-download-cutover-retire ]]; then
+  lock_acquire_mode=acquire-or-adopt
 fi
 if deploy_lock_metadata="$(
   "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
     "$TRUSTED_PYTHON" -I -c '
-import ctypes, errno, hashlib, hmac, os, secrets, stat, sys
+import hashlib, hmac, json, os, re, secrets, stat, sys
 lock_root = os.fsencode(sys.argv[1])
 lock_path = os.fsencode(sys.argv[2])
 authorization_root = os.fsencode(sys.argv[3])
 mode = sys.argv[4]
+requested_operation = sys.argv[5]
+operation_id = sys.argv[6]
+operation_root = sys.argv[7]
+journal_path = sys.argv[8]
+source_head = sys.argv[9].lower()
+wrapper_sha256 = sys.argv[10]
+controller_sha256 = sys.argv[11]
+cutover_operation = "initial-release-shelf-public-download-cutover"
+recovery_operation = "initial-release-shelf-public-download-cutover-recover"
+retire_operation = "initial-release-shelf-public-download-cutover-retire"
+epoch_operation = "release-upload-ticket-epoch-rotate"
+epoch_resume_operation = "release-upload-ticket-epoch-rotate-resume"
+binding_contract = "chummer.public-edge-retained-lock-binding/v1"
+journal_schema = "chummer.public-download-only-operation/v1"
+sha256_pattern = re.compile(r"[0-9a-f]{64}")
+commit_pattern = re.compile(r"[0-9a-f]{40}")
+operation_id_pattern = re.compile(r"[a-z0-9][a-z0-9-]{7,63}")
+
+
+def fail(status=70):
+    raise SystemExit(status)
+
+
+def full_identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+    )
+
+
+def pair(metadata):
+    return f"{metadata.st_dev}:{metadata.st_ino}"
+
+
+def binding_identity(metadata):
+    return {"device": metadata.st_dev, "inode": metadata.st_ino}
+
+
+def validate_private_directory(path, *, exact_mode=True):
+    metadata = os.lstat(path)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or (
+            exact_mode
+            and stat.S_IMODE(metadata.st_mode) != 0o700
+        )
+        or (
+            not exact_mode
+            and stat.S_IMODE(metadata.st_mode) & 0o077
+        )
+        or os.path.realpath(path) != path
+    ):
+        fail()
+    return metadata
+
+
+def stable_regular(path, *, maximum, empty=False):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        value = os.read(descriptor, maximum + 1)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    named = os.lstat(path)
+    if (
+        len({full_identity(item) for item in (before, after, named)}) != 1
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or len(value) > maximum
+        or (empty and value != b"")
+    ):
+        fail()
+    return value, before
+
+
+def fsync_directories(*paths):
+    for path in paths:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def validate_public_paths(*, require_operation_root):
+    if (
+        operation_id_pattern.fullmatch(operation_id) is None
+        or b"|" in lock_root
+        or "|" in operation_root
+        or "|" in journal_path
+    ):
+        fail()
+    receipt_root = os.path.join(lock_root, b"public-edge-deploy-receipts")
+    validate_private_directory(receipt_root)
+    expected_operation_root = os.path.join(
+        os.fsdecode(receipt_root),
+        f"chummer-public-download-{operation_id}",
+    )
+    expected_journal = f"{expected_operation_root}.operation.json"
+    if (
+        operation_root != expected_operation_root
+        or journal_path != expected_journal
+        or not os.path.isabs(operation_root)
+        or os.path.normpath(operation_root) != operation_root
+    ):
+        fail()
+    encoded_root = os.fsencode(operation_root)
+    if os.path.lexists(encoded_root):
+        validate_private_directory(encoded_root)
+    elif require_operation_root:
+        fail()
+
+
+def load_journal(*, required, require_operation_root):
+    validate_public_paths(require_operation_root=require_operation_root)
+    encoded_journal = os.fsencode(journal_path)
+    if not os.path.lexists(encoded_journal):
+        if required:
+            fail()
+        return source_head
+    raw, _metadata = stable_regular(
+        encoded_journal,
+        maximum=16 * 1024 * 1024,
+    )
+    try:
+        payload = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError):
+        fail()
+    journal_source_head = (
+        payload.get("sourceHead") if isinstance(payload, dict) else None
+    )
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != journal_schema
+        or payload.get("operation") != cutover_operation
+        or payload.get("projectName") != os.path.basename(operation_root)
+        or payload.get("operationRoot") != operation_root
+        or not isinstance(journal_source_head, str)
+        or commit_pattern.fullmatch(journal_source_head) is None
+    ):
+        fail()
+    return journal_source_head
+
+
+def exact_binding_keys(payload):
+    return set(payload) == {
+        "allowedResumeOperation",
+        "allowedPreControllerOperation",
+        "contractName",
+        "controllerSha256",
+        "identities",
+        "initialOperation",
+        "journalPath",
+        "journalSourceHead",
+        "operationId",
+        "operationRoot",
+        "sourceHead",
+        "tokenSha256",
+        "wrapperSha256",
+    } and set(payload.get("identities") or {}) == {
+        "authorization",
+        "binding",
+        "lease",
+        "lock",
+        "token",
+    }
+
+
+for digest in (wrapper_sha256, controller_sha256):
+    if sha256_pattern.fullmatch(digest) is None:
+        fail()
+if commit_pattern.fullmatch(source_head) is None:
+    fail()
 lock_root_stat = os.lstat(lock_root)
 authorization_root_stat = os.lstat(authorization_root)
 for metadata in (lock_root_stat, authorization_root_stat):
@@ -708,8 +988,16 @@ for metadata in (lock_root_stat, authorization_root_stat):
         or metadata.st_uid != os.getuid()
         or stat.S_IMODE(metadata.st_mode) != 0o700
     ):
-        raise SystemExit(70)
-if mode == "resume":
+        fail()
+if mode == "acquire-or-adopt":
+    mode = "adopt" if os.path.lexists(lock_path) else "acquire"
+elif mode == "acquire-or-prestart-adopt":
+    mode = (
+        "adopt-prestart"
+        if os.path.lexists(lock_path)
+        else "acquire"
+    )
+if mode in {"adopt", "adopt-prestart"}:
     lock_stat = os.lstat(lock_path)
     if (
         not stat.S_ISDIR(lock_stat.st_mode)
@@ -718,88 +1006,199 @@ if mode == "resume":
         or stat.S_IMODE(lock_stat.st_mode) != 0o700
         or os.listdir(lock_path) != [b"owner-token"]
     ):
-        raise SystemExit(70)
+        fail()
     token_path = os.path.join(lock_path, b"owner-token")
-    flags = (
-        os.O_RDONLY
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
+    token_raw, token_stat = stable_regular(
+        token_path,
+        maximum=65,
     )
-    descriptor = os.open(token_path, flags)
-    try:
-        token_stat = os.fstat(descriptor)
-        token_raw = os.read(descriptor, 66)
-        token_after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    token_path_stat = os.lstat(token_path)
-    token_identities = {
-        (
-            item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns,
-            item.st_ctime_ns, item.st_mode, item.st_nlink, item.st_uid,
-        )
-        for item in (token_stat, token_after, token_path_stat)
-    }
     try:
         token = token_raw.decode("ascii", errors="strict").rstrip("\n")
     except UnicodeError:
-        raise SystemExit(70)
+        fail()
     if (
-        len(token_identities) != 1
-        or not stat.S_ISREG(token_stat.st_mode)
-        or token_stat.st_nlink != 1
-        or token_stat.st_uid != os.getuid()
-        or stat.S_IMODE(token_stat.st_mode) != 0o600
-        or token_raw not in {
+        token_raw not in {
             token.encode("ascii"),
             (token + "\n").encode("ascii"),
         }
         or len(token) != 64
         or any(character not in "0123456789abcdef" for character in token)
     ):
-        raise SystemExit(70)
+        fail()
     token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
     authorization_path = os.path.join(
         authorization_root,
         f"deploy-{token_digest}.owner-token".encode("ascii"),
     )
-    authorization_descriptor = os.open(authorization_path, flags)
+    lease_path = os.path.join(
+        authorization_root,
+        f"deploy-{token_digest}.lease".encode("ascii"),
+    )
+    binding_path = os.path.join(
+        authorization_root,
+        f"deploy-{token_digest}.binding.json".encode("ascii"),
+    )
+    authorization_raw, authorization_stat = stable_regular(
+        authorization_path,
+        maximum=65,
+    )
+    _lease_raw, lease_stat = stable_regular(
+        lease_path,
+        maximum=0,
+        empty=True,
+    )
+    binding_raw, binding_stat = stable_regular(
+        binding_path,
+        maximum=64 * 1024,
+    )
+    if not hmac.compare_digest(authorization_raw, token_raw):
+        fail()
     try:
-        authorization_stat = os.fstat(authorization_descriptor)
-        authorization_raw = os.read(authorization_descriptor, 66)
-        authorization_after = os.fstat(authorization_descriptor)
-    finally:
-        os.close(authorization_descriptor)
-    authorization_path_stat = os.lstat(authorization_path)
-    authorization_identities = {
-        (
-            item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns,
-            item.st_ctime_ns, item.st_mode, item.st_nlink, item.st_uid,
+        binding = json.loads(binding_raw)
+    except (UnicodeError, json.JSONDecodeError):
+        fail()
+    canonical_binding = (
+        json.dumps(
+            binding,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+            allow_nan=False,
         )
-        for item in (
-            authorization_stat,
-            authorization_after,
-            authorization_path_stat,
-        )
-    }
+        + "\n"
+    ).encode("utf-8")
     if (
-        len(authorization_identities) != 1
-        or not stat.S_ISREG(authorization_stat.st_mode)
-        or authorization_stat.st_nlink != 1
-        or authorization_stat.st_uid != os.getuid()
-        or stat.S_IMODE(authorization_stat.st_mode) != 0o600
-        or not hmac.compare_digest(authorization_raw, token_raw)
+        not isinstance(binding, dict)
+        or not exact_binding_keys(binding)
+        or canonical_binding != binding_raw
+        or token.encode("ascii") in binding_raw
+        or binding.get("contractName") != binding_contract
+        or binding.get("tokenSha256") != token_digest
+        or binding.get("sourceHead") != source_head
+        or binding.get("wrapperSha256") != wrapper_sha256
+        or binding.get("controllerSha256") != controller_sha256
+        or binding["identities"].get("lock") != binding_identity(lock_stat)
+        or binding["identities"].get("token") != binding_identity(token_stat)
+        or binding["identities"].get("authorization")
+        != binding_identity(authorization_stat)
+        or binding["identities"].get("lease") != binding_identity(lease_stat)
+        or binding["identities"].get("binding") != binding_identity(binding_stat)
     ):
-        raise SystemExit(70)
+        fail()
+    expected_pair = (
+        (cutover_operation, recovery_operation)
+        if (
+            mode == "adopt-prestart"
+            and requested_operation == cutover_operation
+        )
+        else {
+            recovery_operation: (cutover_operation, recovery_operation),
+            retire_operation: (retire_operation, retire_operation),
+            epoch_resume_operation: (
+                epoch_operation,
+                epoch_resume_operation,
+            ),
+        }.get(requested_operation)
+    )
+    if expected_pair is None:
+        fail()
+    expected_precontroller_operation = (
+        cutover_operation
+        if expected_pair[0] == cutover_operation
+        else ""
+    )
+    if (
+        binding.get("initialOperation") != expected_pair[0]
+        or binding.get("allowedResumeOperation") != expected_pair[1]
+        or binding.get("allowedPreControllerOperation")
+            != expected_precontroller_operation
+    ):
+        fail()
+    if mode == "adopt-prestart":
+        validate_public_paths(require_operation_root=False)
+        if (
+            binding.get("allowedPreControllerOperation")
+                != cutover_operation
+            or binding.get("operationId") != operation_id
+            or binding.get("operationRoot") != operation_root
+            or binding.get("journalPath") != journal_path
+            or binding.get("journalSourceHead") != source_head
+        ):
+            fail()
+    elif requested_operation in {recovery_operation, retire_operation}:
+        journal_source_head = load_journal(
+            required=True,
+            require_operation_root=requested_operation == retire_operation,
+        )
+        if (
+            binding.get("operationId") != operation_id
+            or binding.get("operationRoot") != operation_root
+            or binding.get("journalPath") != journal_path
+            or binding.get("journalSourceHead") != journal_source_head
+        ):
+            fail()
+    elif any(
+        binding.get(key) != ""
+        for key in (
+            "operationId",
+            "operationRoot",
+            "journalPath",
+            "journalSourceHead",
+        )
+    ):
+        fail()
+    binding_sha256 = hashlib.sha256(binding_raw).hexdigest()
+    adoption_kind = (
+        "prestart" if mode == "adopt-prestart" else "retained"
+    )
     print(
         f"{token}|{lock_stat.st_dev}:{lock_stat.st_ino}|"
         f"{token_stat.st_dev}:{token_stat.st_ino}|"
         f"{authorization_stat.st_dev}:{authorization_stat.st_ino}|"
-        f"{os.fsdecode(authorization_path)}"
+        f"{os.fsdecode(authorization_path)}|"
+        f"{lease_stat.st_dev}:{lease_stat.st_ino}|"
+        f"{os.fsdecode(lease_path)}|"
+        f"{binding_stat.st_dev}:{binding_stat.st_ino}|"
+        f"{os.fsdecode(binding_path)}|{binding_sha256}|0||"
+        f"{adoption_kind}"
     )
     raise SystemExit(0)
 if mode != "acquire":
-    raise SystemExit(70)
+    fail()
+if requested_operation in {
+    recovery_operation,
+    epoch_resume_operation,
+}:
+    fail()
+allowed_precontroller_operation = ""
+if requested_operation == cutover_operation:
+    initial_operation = cutover_operation
+    allowed_resume_operation = recovery_operation
+    allowed_precontroller_operation = cutover_operation
+    journal_source_head = load_journal(
+        required=False,
+        require_operation_root=False,
+    )
+    if journal_source_head != source_head:
+        fail()
+elif requested_operation == retire_operation:
+    initial_operation = retire_operation
+    allowed_resume_operation = retire_operation
+    journal_source_head = load_journal(
+        required=True,
+        require_operation_root=True,
+    )
+else:
+    initial_operation = requested_operation
+    allowed_resume_operation = (
+        epoch_resume_operation
+        if requested_operation == epoch_operation
+        else ""
+    )
+    operation_id = ""
+    operation_root = ""
+    journal_path = ""
+    journal_source_head = ""
 token = secrets.token_hex(32)
 token_digest = hashlib.sha256(token.encode("ascii")).hexdigest()
 staging_path = os.path.join(
@@ -807,6 +1206,16 @@ staging_path = os.path.join(
 )
 authorization_path = os.path.join(
     authorization_root, f"deploy-{token_digest}.owner-token".encode("ascii")
+)
+lease_path = os.path.join(
+    authorization_root, f"deploy-{token_digest}.lease".encode("ascii")
+)
+binding_path = os.path.join(
+    authorization_root, f"deploy-{token_digest}.binding.json".encode("ascii")
+)
+binding_temporary_path = os.path.join(
+    authorization_root,
+    f".deploy-{token_digest}.binding.{token[:24]}.tmp".encode("ascii"),
 )
 os.mkdir(staging_path, 0o700)
 os.chmod(staging_path, 0o700)
@@ -832,7 +1241,7 @@ if (
     or token_stat.st_uid != os.getuid()
     or stat.S_IMODE(token_stat.st_mode) != 0o600
 ):
-    raise SystemExit(70)
+    fail()
 authorization_descriptor = os.open(authorization_path, flags, 0o600)
 try:
     os.fchmod(authorization_descriptor, 0o600)
@@ -854,73 +1263,96 @@ if (
     or authorization_stat.st_uid != os.getuid()
     or stat.S_IMODE(authorization_stat.st_mode) != 0o600
 ):
-    raise SystemExit(70)
-libc = ctypes.CDLL(None, use_errno=True)
-renameat2 = getattr(libc, "renameat2", None)
-if renameat2 is None:
-    raise SystemExit(70)
-renameat2.argtypes = [
-    ctypes.c_int,
-    ctypes.c_char_p,
-    ctypes.c_int,
-    ctypes.c_char_p,
-    ctypes.c_uint,
-]
-renameat2.restype = ctypes.c_int
-AT_FDCWD = -100
-RENAME_NOREPLACE = 1
-if renameat2(AT_FDCWD, staging_path, AT_FDCWD, lock_path, RENAME_NOREPLACE) != 0:
-    error_number = ctypes.get_errno()
-    if error_number == errno.EEXIST:
-        current_staging = os.lstat(staging_path)
-        current_token = os.lstat(token_path)
-        current_authorization = os.lstat(authorization_path)
-        if (
-            (current_staging.st_dev, current_staging.st_ino)
-            != (staging_stat.st_dev, staging_stat.st_ino)
-            or (current_token.st_dev, current_token.st_ino)
-            != (token_stat.st_dev, token_stat.st_ino)
-            or (current_authorization.st_dev, current_authorization.st_ino)
-            != (authorization_stat.st_dev, authorization_stat.st_ino)
-        ):
-            raise SystemExit(70)
-        os.unlink(token_path)
-        os.rmdir(staging_path)
-        os.unlink(authorization_path)
-        for path in (lock_root, authorization_root):
-            directory_descriptor = os.open(
-                path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-            )
-            try:
-                os.fsync(directory_descriptor)
-            finally:
-                os.close(directory_descriptor)
-        raise SystemExit(75)
-    raise OSError(error_number, os.strerror(error_number), os.fsdecode(lock_path))
-lock_root_descriptor = os.open(
-    lock_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-)
+    fail()
+lease_descriptor = os.open(lease_path, flags, 0o600)
 try:
-    os.fsync(lock_root_descriptor)
+    os.fchmod(lease_descriptor, 0o600)
+    os.fsync(lease_descriptor)
+    lease_stat = os.fstat(lease_descriptor)
 finally:
-    os.close(lock_root_descriptor)
-lock_stat = os.lstat(lock_path)
-published_token_path = os.path.join(lock_path, b"owner-token")
-published_token_stat = os.lstat(published_token_path)
+    os.close(lease_descriptor)
 if (
-    (lock_stat.st_dev, lock_stat.st_ino) != (staging_stat.st_dev, staging_stat.st_ino)
-    or (published_token_stat.st_dev, published_token_stat.st_ino)
-    != (token_stat.st_dev, token_stat.st_ino)
+    not stat.S_ISREG(lease_stat.st_mode)
+    or lease_stat.st_nlink != 1
+    or lease_stat.st_uid != os.getuid()
+    or stat.S_IMODE(lease_stat.st_mode) != 0o600
+    or lease_stat.st_size != 0
 ):
-    raise SystemExit(70)
+    fail()
+binding_descriptor = os.open(binding_temporary_path, flags, 0o600)
+try:
+    os.fchmod(binding_descriptor, 0o600)
+    binding_stat = os.fstat(binding_descriptor)
+    binding = {
+        "allowedPreControllerOperation": allowed_precontroller_operation,
+        "allowedResumeOperation": allowed_resume_operation,
+        "contractName": binding_contract,
+        "controllerSha256": controller_sha256,
+        "identities": {
+            "authorization": binding_identity(authorization_stat),
+            "binding": binding_identity(binding_stat),
+            "lease": binding_identity(lease_stat),
+            "lock": binding_identity(staging_stat),
+            "token": binding_identity(token_stat),
+        },
+        "initialOperation": initial_operation,
+        "journalPath": journal_path,
+        "journalSourceHead": journal_source_head,
+        "operationId": operation_id,
+        "operationRoot": operation_root,
+        "sourceHead": source_head,
+        "tokenSha256": token_digest,
+        "wrapperSha256": wrapper_sha256,
+    }
+    binding_raw = (
+        json.dumps(
+            binding,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    if token.encode("ascii") in binding_raw:
+        fail()
+    os.write(binding_descriptor, binding_raw)
+    os.fsync(binding_descriptor)
+    binding_after = os.fstat(binding_descriptor)
+finally:
+    os.close(binding_descriptor)
+if (
+    pair(binding_after) != pair(binding_stat)
+    or not stat.S_ISREG(binding_after.st_mode)
+    or binding_after.st_nlink != 1
+    or binding_after.st_uid != os.getuid()
+    or stat.S_IMODE(binding_after.st_mode) != 0o600
+):
+    fail()
+os.link(binding_temporary_path, binding_path, follow_symlinks=False)
+os.unlink(binding_temporary_path)
+published_binding_stat = os.lstat(binding_path)
+if pair(published_binding_stat) != pair(binding_stat):
+    fail()
+fsync_directories(authorization_root)
+lock_stat = staging_stat
+binding_sha256 = hashlib.sha256(binding_raw).hexdigest()
 print(
     f"{token}|{lock_stat.st_dev}:{lock_stat.st_ino}|"
     f"{token_stat.st_dev}:{token_stat.st_ino}|"
     f"{authorization_stat.st_dev}:{authorization_stat.st_ino}|"
-    f"{os.fsdecode(authorization_path)}"
+    f"{os.fsdecode(authorization_path)}|"
+    f"{lease_stat.st_dev}:{lease_stat.st_ino}|"
+    f"{os.fsdecode(lease_path)}|"
+    f"{binding_stat.st_dev}:{binding_stat.st_ino}|"
+    f"{os.fsdecode(binding_path)}|{binding_sha256}|1|"
+    f"{os.fsdecode(staging_path)}|fresh"
 )
 ' "$DEPLOY_LOCK_ROOT" "$DEPLOY_LOCK_DIR" "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" \
-    "$lock_acquire_mode"
+    "$lock_acquire_mode" "$DEPLOY_OPERATION" "$deploy_lock_operation_id" \
+    "$deploy_lock_operation_root" "$deploy_lock_operation_journal" \
+    "${EXPECTED_HEAD,,}" "$deploy_lock_wrapper_sha256" \
+    "$deploy_lock_controller_sha256"
 )"; then
   :
 else
@@ -934,20 +1366,541 @@ else
 fi
 IFS='|' read -r deploy_lock_owner_token deploy_lock_identity deploy_lock_token_identity \
   deploy_lock_auth_token_identity DEPLOY_LOCK_AUTH_TOKEN_FILE \
+  deploy_lock_lease_identity DEPLOY_LOCK_LEASE_FILE \
+  deploy_lock_binding_identity DEPLOY_LOCK_BINDING_FILE \
+  deploy_lock_binding_sha256 deploy_lock_publish_required \
+  deploy_lock_staging_path deploy_lock_adoption_kind \
   <<<"$deploy_lock_metadata"
 deploy_lock_token_digest="$(
   printf '%s' "$deploy_lock_owner_token" | "$TRUSTED_SHA256SUM"
 )"
 deploy_lock_token_digest="${deploy_lock_token_digest%% *}"
 deploy_lock_auth_token_name="${DEPLOY_LOCK_AUTH_TOKEN_FILE##*/}"
+deploy_lock_lease_name="${DEPLOY_LOCK_LEASE_FILE##*/}"
+deploy_lock_binding_name="${DEPLOY_LOCK_BINDING_FILE##*/}"
 if [[ ! "$deploy_lock_owner_token" =~ ^[0-9a-f]{64}$ \
   || ! "$deploy_lock_identity" =~ ^[0-9]+:[0-9]+$ \
   || ! "$deploy_lock_token_identity" =~ ^[0-9]+:[0-9]+$ \
   || ! "$deploy_lock_auth_token_identity" =~ ^[0-9]+:[0-9]+$ \
+  || ! "$deploy_lock_lease_identity" =~ ^[0-9]+:[0-9]+$ \
+  || ! "$deploy_lock_binding_identity" =~ ^[0-9]+:[0-9]+$ \
+  || ! "$deploy_lock_binding_sha256" =~ ^[0-9a-f]{64}$ \
+  || ! "$deploy_lock_publish_required" =~ ^[01]$ \
+  || ! "$deploy_lock_adoption_kind" =~ ^(fresh|retained|prestart)$ \
   || "${DEPLOY_LOCK_AUTH_TOKEN_FILE%/*}" != "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" \
-  || "$deploy_lock_auth_token_name" != "deploy-$deploy_lock_token_digest.owner-token" ]]; then
+  || "${DEPLOY_LOCK_LEASE_FILE%/*}" != "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" \
+  || "${DEPLOY_LOCK_BINDING_FILE%/*}" != "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" \
+  || "$deploy_lock_auth_token_name" \
+    != "deploy-$deploy_lock_token_digest.owner-token" \
+  || "$deploy_lock_lease_name" != "deploy-$deploy_lock_token_digest.lease" \
+  || "$deploy_lock_binding_name" \
+    != "deploy-$deploy_lock_token_digest.binding.json" \
+  || ( "$deploy_lock_publish_required" == 1 \
+    && ( "${deploy_lock_staging_path%/*}" != "$DEPLOY_LOCK_ROOT" \
+      || "${deploy_lock_staging_path##*/}" \
+        != ".public-edge-mutation.lock.staging.${deploy_lock_owner_token:0:24}" ) ) \
+  || ( "$deploy_lock_publish_required" == 0 \
+    && -n "$deploy_lock_staging_path" ) \
+  || ( "$deploy_lock_publish_required" == 1 \
+    && "$deploy_lock_adoption_kind" != fresh ) \
+  || ( "$deploy_lock_publish_required" == 0 \
+    && "$deploy_lock_adoption_kind" == fresh ) \
+  || ( "$deploy_lock_adoption_kind" == prestart \
+    && "$DEPLOY_OPERATION" \
+      != initial-release-shelf-public-download-cutover ) ]]; then
   echo "authenticated public-edge deployment lock metadata is malformed" >&2
   exit 70
+fi
+if ! exec {deploy_lock_lease_fd}<>"$DEPLOY_LOCK_LEASE_FILE"; then
+  echo "authenticated public-edge deployment lock lease could not be opened" >&2
+  exit 70
+fi
+validate_deploy_lock_lease_descriptor() {
+  "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+    "$TRUSTED_PYTHON" -I -c '
+import os, stat, sys
+descriptor = int(sys.argv[1])
+path = os.fsencode(sys.argv[2])
+expected_identity = sys.argv[3]
+before = os.fstat(descriptor)
+named = os.lstat(path)
+after = os.fstat(descriptor)
+identities = {
+    (
+        item.st_dev,
+        item.st_ino,
+        item.st_size,
+        item.st_mode,
+        item.st_nlink,
+        item.st_uid,
+    )
+    for item in (before, named, after)
+}
+if (
+    len(identities) != 1
+    or not stat.S_ISREG(before.st_mode)
+    or before.st_nlink != 1
+    or before.st_uid != os.getuid()
+    or stat.S_IMODE(before.st_mode) != 0o600
+    or before.st_size != 0
+    or f"{before.st_dev}:{before.st_ino}" != expected_identity
+):
+    raise SystemExit(1)
+' "$deploy_lock_lease_fd" "$DEPLOY_LOCK_LEASE_FILE" \
+      "$deploy_lock_lease_identity"
+}
+if ! validate_deploy_lock_lease_descriptor; then
+  exec {deploy_lock_lease_fd}>&-
+  echo "authenticated public-edge deployment lock lease identity drifted" >&2
+  exit 70
+fi
+if ! "$TRUSTED_FLOCK" --nonblock "$deploy_lock_lease_fd"; then
+  exec {deploy_lock_lease_fd}>&-
+  echo "another public-edge mutation owns the shared deployment authority" >&2
+  exit 75
+fi
+if ! validate_deploy_lock_lease_descriptor; then
+  exec {deploy_lock_lease_fd}>&-
+  echo "authenticated public-edge deployment lock lease changed while acquired" >&2
+  exit 70
+fi
+if [[ "$deploy_lock_adoption_kind" == prestart ]]; then
+  if ! "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+    "$TRUSTED_PYTHON" -I -c '
+# Retained pre-controller public-download post-lease verifier.
+import hashlib, json, os, re, stat, sys
+receipt_root = os.fsencode(sys.argv[1])
+operation_id = sys.argv[2]
+operation_root = os.fsencode(sys.argv[3])
+journal_path = os.fsencode(sys.argv[4])
+binding_path = os.fsencode(sys.argv[5])
+expected_binding_identity = sys.argv[6]
+expected_binding_sha256 = sys.argv[7]
+lease_descriptor = int(sys.argv[8])
+lease_path = os.fsencode(sys.argv[9])
+expected_lease_identity = sys.argv[10]
+cutover_operation = "initial-release-shelf-public-download-cutover"
+
+
+def fail():
+    raise SystemExit(70)
+
+
+def identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+    )
+
+
+def pair(metadata):
+    return f"{metadata.st_dev}:{metadata.st_ino}"
+
+
+def private_directory_identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_uid,
+    )
+
+
+def stable_regular(path, expected_identity, maximum):
+    descriptor = os.open(
+        path,
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        before = os.fstat(descriptor)
+        value = os.read(descriptor, maximum + 1)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    named = os.lstat(path)
+    if (
+        len({identity(item) for item in (before, after, named)}) != 1
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or pair(before) != expected_identity
+        or len(value) > maximum
+    ):
+        fail()
+    return value
+
+
+if (
+    re.fullmatch(r"[a-z0-9][a-z0-9-]{7,63}", operation_id) is None
+    or re.fullmatch(r"[0-9]+:[0-9]+", expected_binding_identity) is None
+    or re.fullmatch(r"[0-9a-f]{64}", expected_binding_sha256) is None
+    or re.fullmatch(r"[0-9]+:[0-9]+", expected_lease_identity) is None
+):
+    fail()
+expected_operation_root = os.path.join(
+    receipt_root,
+    f"chummer-public-download-{operation_id}".encode("ascii"),
+)
+expected_journal = expected_operation_root + b".operation.json"
+if (
+    operation_root != expected_operation_root
+    or journal_path != expected_journal
+    or os.path.dirname(operation_root) != receipt_root
+):
+    fail()
+receipt_descriptor = os.open(
+    receipt_root,
+    os.O_RDONLY
+    | getattr(os, "O_DIRECTORY", 0)
+    | getattr(os, "O_CLOEXEC", 0)
+    | getattr(os, "O_NOFOLLOW", 0),
+)
+try:
+    receipt_before = os.fstat(receipt_descriptor)
+    receipt_named = os.lstat(receipt_root)
+    if (
+        identity(receipt_before) != identity(receipt_named)
+        or not stat.S_ISDIR(receipt_before.st_mode)
+        or receipt_before.st_uid != os.getuid()
+        or stat.S_IMODE(receipt_before.st_mode) != 0o700
+        or os.path.realpath(receipt_root) != receipt_root
+    ):
+        fail()
+    binding_raw = stable_regular(
+        binding_path,
+        expected_binding_identity,
+        64 * 1024,
+    )
+    lease_named = os.lstat(lease_path)
+    lease_open = os.fstat(lease_descriptor)
+    if (
+        identity(lease_named) != identity(lease_open)
+        or not stat.S_ISREG(lease_open.st_mode)
+        or lease_open.st_nlink != 1
+        or lease_open.st_uid != os.getuid()
+        or stat.S_IMODE(lease_open.st_mode) != 0o600
+        or lease_open.st_size != 0
+        or pair(lease_open) != expected_lease_identity
+    ):
+        fail()
+    try:
+        binding = json.loads(binding_raw)
+    except (UnicodeError, json.JSONDecodeError):
+        fail()
+    if (
+        hashlib.sha256(binding_raw).hexdigest()
+            != expected_binding_sha256
+        or not isinstance(binding, dict)
+        or binding.get("initialOperation") != cutover_operation
+        or binding.get("allowedPreControllerOperation")
+            != cutover_operation
+        or binding.get("operationId") != operation_id
+        or os.fsencode(binding.get("operationRoot", "")) != operation_root
+        or os.fsencode(binding.get("journalPath", "")) != journal_path
+    ):
+        fail()
+    if os.path.lexists(journal_path):
+        fail()
+    if os.path.lexists(operation_root):
+        operation_descriptor = os.open(
+            operation_root,
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            operation_before = os.fstat(operation_descriptor)
+            operation_named = os.lstat(operation_root)
+            entries = os.listdir(operation_descriptor)
+            operation_after = os.fstat(operation_descriptor)
+            operation_named_after = os.lstat(operation_root)
+            if (
+                len(
+                    {
+                        identity(item)
+                        for item in (
+                            operation_before,
+                            operation_named,
+                            operation_after,
+                            operation_named_after,
+                        )
+                    }
+                ) != 1
+                or not stat.S_ISDIR(operation_before.st_mode)
+                or operation_before.st_uid != os.getuid()
+                or stat.S_IMODE(operation_before.st_mode) != 0o700
+                or os.path.realpath(operation_root) != operation_root
+                or entries
+                or os.path.lexists(journal_path)
+            ):
+                fail()
+            os.rmdir(operation_root)
+            os.fsync(receipt_descriptor)
+        finally:
+            os.close(operation_descriptor)
+    receipt_after = os.fstat(receipt_descriptor)
+    receipt_named_after = os.lstat(receipt_root)
+    if (
+        os.path.lexists(operation_root)
+        or os.path.lexists(journal_path)
+        or private_directory_identity(receipt_after)
+            != private_directory_identity(receipt_before)
+        or private_directory_identity(receipt_named_after)
+            != private_directory_identity(receipt_before)
+    ):
+        fail()
+finally:
+    os.close(receipt_descriptor)
+' "$CANONICAL_DEPLOY_RECEIPT_ROOT" "$PUBLIC_DOWNLOAD_OPERATION_ID" \
+      "$PUBLIC_DOWNLOAD_OPERATION_ROOT" "$PUBLIC_DOWNLOAD_OPERATION_JOURNAL" \
+      "$DEPLOY_LOCK_BINDING_FILE" "$deploy_lock_binding_identity" \
+      "$deploy_lock_binding_sha256" "$deploy_lock_lease_fd" \
+      "$DEPLOY_LOCK_LEASE_FILE" "$deploy_lock_lease_identity"; then
+    exec {deploy_lock_lease_fd}>&-
+    echo "retained pre-controller public-download authority changed after lease acquisition" >&2
+    exit 70
+  fi
+fi
+if [[ "$deploy_lock_publish_required" == 1 ]]; then
+  if printf '%s\n' "$deploy_lock_owner_token" \
+    | "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+      "$TRUSTED_PYTHON" -I -c '
+import ctypes, errno, hashlib, hmac, json, os, re, stat, sys
+staging_path = os.fsencode(sys.argv[1])
+lock_path = os.fsencode(sys.argv[2])
+lock_root = os.fsencode(sys.argv[3])
+authorization_root = os.fsencode(sys.argv[4])
+expected_lock_identity = sys.argv[5]
+expected_token_identity = sys.argv[6]
+authorization_path = os.fsencode(sys.argv[7])
+expected_authorization_identity = sys.argv[8]
+lease_path = os.fsencode(sys.argv[9])
+expected_lease_identity = sys.argv[10]
+binding_path = os.fsencode(sys.argv[11])
+expected_binding_identity = sys.argv[12]
+expected_binding_sha256 = sys.argv[13]
+lease_descriptor = int(sys.argv[14])
+expected_token = sys.stdin.buffer.read(65).decode(
+    "ascii",
+    errors="strict",
+).strip()
+if (
+    re.fullmatch(r"[0-9a-f]{64}", expected_token) is None
+    or re.fullmatch(r"[0-9a-f]{64}", expected_binding_sha256) is None
+):
+    raise SystemExit(70)
+
+
+def identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+    )
+
+
+def pair(metadata):
+    return f"{metadata.st_dev}:{metadata.st_ino}"
+
+
+def binding_identity(metadata):
+    return {"device": metadata.st_dev, "inode": metadata.st_ino}
+
+
+def stable_regular(path, expected_identity, maximum):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        value = os.read(descriptor, maximum + 1)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    named = os.lstat(path)
+    if (
+        len({identity(item) for item in (before, after, named)}) != 1
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or pair(before) != expected_identity
+        or len(value) > maximum
+    ):
+        raise SystemExit(70)
+    return value, before
+
+
+for directory in (lock_root, authorization_root):
+    metadata = os.lstat(directory)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+        or os.path.realpath(directory) != directory
+    ):
+        raise SystemExit(70)
+staging_stat = os.lstat(staging_path)
+if (
+    not stat.S_ISDIR(staging_stat.st_mode)
+    or stat.S_ISLNK(staging_stat.st_mode)
+    or staging_stat.st_uid != os.getuid()
+    or stat.S_IMODE(staging_stat.st_mode) != 0o700
+    or pair(staging_stat) != expected_lock_identity
+    or os.path.realpath(staging_path) != staging_path
+    or os.listdir(staging_path) != [b"owner-token"]
+):
+    raise SystemExit(70)
+token_path = os.path.join(staging_path, b"owner-token")
+token_raw, token_stat = stable_regular(
+    token_path,
+    expected_token_identity,
+    65,
+)
+authorization_raw, authorization_stat = stable_regular(
+    authorization_path,
+    expected_authorization_identity,
+    65,
+)
+lease_raw, lease_stat = stable_regular(
+    lease_path,
+    expected_lease_identity,
+    0,
+)
+binding_raw, binding_stat = stable_regular(
+    binding_path,
+    expected_binding_identity,
+    64 * 1024,
+)
+lease_descriptor_stat = os.fstat(lease_descriptor)
+try:
+    actual_token = token_raw.decode("ascii", errors="strict").strip()
+    binding = json.loads(binding_raw)
+except (UnicodeError, json.JSONDecodeError):
+    raise SystemExit(70)
+token_digest = hashlib.sha256(expected_token.encode("ascii")).hexdigest()
+if (
+    not hmac.compare_digest(actual_token, expected_token)
+    or token_raw not in {
+        expected_token.encode("ascii"),
+        (expected_token + "\n").encode("ascii"),
+    }
+    or not hmac.compare_digest(authorization_raw, token_raw)
+    or lease_raw != b""
+    or identity(lease_descriptor_stat) != identity(lease_stat)
+    or hashlib.sha256(binding_raw).hexdigest() != expected_binding_sha256
+    or not isinstance(binding, dict)
+    or not isinstance(binding.get("identities"), dict)
+    or binding.get("contractName")
+        != "chummer.public-edge-retained-lock-binding/v1"
+    or binding.get("tokenSha256") != token_digest
+    or binding["identities"].get("lock")
+        != binding_identity(staging_stat)
+    or binding["identities"].get("token")
+        != binding_identity(token_stat)
+    or binding["identities"].get("authorization")
+        != binding_identity(authorization_stat)
+    or binding["identities"].get("lease")
+        != binding_identity(lease_stat)
+    or binding["identities"].get("binding")
+        != binding_identity(binding_stat)
+    or expected_token.encode("ascii") in binding_raw
+):
+    raise SystemExit(70)
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = getattr(libc, "renameat2", None)
+if renameat2 is None:
+    raise SystemExit(70)
+renameat2.argtypes = [
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_uint,
+]
+renameat2.restype = ctypes.c_int
+if renameat2(-100, staging_path, -100, lock_path, 1) != 0:
+    error_number = ctypes.get_errno()
+    if error_number != errno.EEXIST:
+        raise OSError(
+            error_number,
+            os.strerror(error_number),
+            os.fsdecode(lock_path),
+        )
+    os.unlink(token_path)
+    os.rmdir(staging_path)
+    os.unlink(binding_path)
+    os.unlink(authorization_path)
+    os.unlink(lease_path)
+    for directory in (lock_root, authorization_root):
+        descriptor = os.open(
+            directory,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    raise SystemExit(75)
+published_lock_stat = os.lstat(lock_path)
+published_token_stat = os.lstat(
+    os.path.join(lock_path, b"owner-token")
+)
+if (
+    pair(published_lock_stat) != expected_lock_identity
+    or pair(published_token_stat) != expected_token_identity
+):
+    raise SystemExit(70)
+descriptor = os.open(
+    lock_root,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+' "$deploy_lock_staging_path" "$DEPLOY_LOCK_DIR" "$DEPLOY_LOCK_ROOT" \
+        "$CANONICAL_DEPLOY_LOCK_AUTH_ROOT" "$deploy_lock_identity" \
+        "$deploy_lock_token_identity" "$DEPLOY_LOCK_AUTH_TOKEN_FILE" \
+        "$deploy_lock_auth_token_identity" "$DEPLOY_LOCK_LEASE_FILE" \
+        "$deploy_lock_lease_identity" "$DEPLOY_LOCK_BINDING_FILE" \
+        "$deploy_lock_binding_identity" "$deploy_lock_binding_sha256" \
+        "$deploy_lock_lease_fd"; then
+    :
+  else
+    deploy_lock_publish_status="$?"
+    exec {deploy_lock_lease_fd}>&-
+    if [[ "$deploy_lock_publish_status" == 75 ]]; then
+      echo "another public-edge mutation owns the shared deployment authority" >&2
+      exit 75
+    fi
+    echo "could not publish leased public-edge deployment lock ownership" >&2
+    exit 70
+  fi
+fi
+deploy_lock_was_adopted=0
+adopted_public_download_controller_completed=0
+if [[ "$deploy_lock_publish_required" == 0 ]]; then
+  deploy_lock_was_adopted=1
 fi
 deploy_lock_active=1
 if ((RELEASE_UPLOAD_TICKET_EPOCH_ROTATION_RESUME == 1)); then
@@ -961,13 +1914,86 @@ release_deploy_lock() {
   if ! printf '%s\n' "$deploy_lock_owner_token" \
     | "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
       "$TRUSTED_PYTHON" -I -c '
-import hmac, os, re, stat, sys
+import ctypes, errno, hashlib, hmac, json, os, re, stat, sys
 lock_path = os.fsencode(sys.argv[1])
 expected_lock_identity = sys.argv[2]
 expected_token_identity = sys.argv[3]
+authorization_path = os.fsencode(sys.argv[4])
+expected_authorization_identity = sys.argv[5]
+lease_path = os.fsencode(sys.argv[6])
+expected_lease_identity = sys.argv[7]
+binding_path = os.fsencode(sys.argv[8])
+expected_binding_identity = sys.argv[9]
+expected_binding_sha256 = sys.argv[10]
+lease_descriptor = int(sys.argv[11])
+lock_root = os.path.dirname(lock_path)
+authorization_root = os.path.dirname(authorization_path)
 expected_token = sys.stdin.buffer.read(65).decode("ascii", errors="strict").strip()
-if re.fullmatch(r"[0-9a-f]{64}", expected_token) is None:
+if (
+    re.fullmatch(r"[0-9a-f]{64}", expected_token) is None
+    or re.fullmatch(r"[0-9a-f]{64}", expected_binding_sha256) is None
+):
     raise SystemExit(1)
+
+
+def identity(metadata):
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+    )
+
+
+def pair(metadata):
+    return f"{metadata.st_dev}:{metadata.st_ino}"
+
+
+def binding_identity(metadata):
+    return {"device": metadata.st_dev, "inode": metadata.st_ino}
+
+
+def stable_regular(path, expected_identity, maximum):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        value = os.read(descriptor, maximum + 1)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    named = os.lstat(path)
+    if (
+        len({identity(item) for item in (before, after, named)}) != 1
+        or not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or before.st_uid != os.getuid()
+        or stat.S_IMODE(before.st_mode) != 0o600
+        or pair(before) != expected_identity
+        or len(value) > maximum
+    ):
+        raise SystemExit(1)
+    return value, before
+
+
+for directory in (lock_root, authorization_root):
+    metadata = os.lstat(directory)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+        or os.path.realpath(directory) != directory
+    ):
+        raise SystemExit(1)
 lock_stat = os.lstat(lock_path)
 if (
     not stat.S_ISDIR(lock_stat.st_mode)
@@ -975,85 +2001,145 @@ if (
     or lock_stat.st_uid != os.getuid()
     or stat.S_IMODE(lock_stat.st_mode) != 0o700
     or f"{lock_stat.st_dev}:{lock_stat.st_ino}" != expected_lock_identity
+    or os.listdir(lock_path) != [b"owner-token"]
 ):
     raise SystemExit(1)
 token_path = os.path.join(lock_path, b"owner-token")
-flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-descriptor = os.open(token_path, flags)
+token_raw, token_stat = stable_regular(
+    token_path,
+    expected_token_identity,
+    65,
+)
+authorization_raw, authorization_stat = stable_regular(
+    authorization_path,
+    expected_authorization_identity,
+    65,
+)
+lease_raw, lease_stat = stable_regular(
+    lease_path,
+    expected_lease_identity,
+    0,
+)
+binding_raw, binding_stat = stable_regular(
+    binding_path,
+    expected_binding_identity,
+    64 * 1024,
+)
+lease_descriptor_stat = os.fstat(lease_descriptor)
 try:
-    token_stat = os.fstat(descriptor)
-    path_stat = os.lstat(token_path)
-    actual_token = os.read(descriptor, 65).decode("ascii", errors="strict").strip()
-finally:
-    os.close(descriptor)
+    actual_token = token_raw.decode("ascii", errors="strict").strip()
+    binding = json.loads(binding_raw)
+except (UnicodeError, json.JSONDecodeError):
+    raise SystemExit(1)
+token_digest = hashlib.sha256(expected_token.encode("ascii")).hexdigest()
 if (
-    not stat.S_ISREG(token_stat.st_mode)
-    or token_stat.st_nlink != 1
-    or token_stat.st_uid != os.getuid()
-    or stat.S_IMODE(token_stat.st_mode) != 0o600
-    or (token_stat.st_dev, token_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
-    or f"{token_stat.st_dev}:{token_stat.st_ino}" != expected_token_identity
-    or not hmac.compare_digest(actual_token, expected_token)
+    not hmac.compare_digest(actual_token, expected_token)
+    or token_raw not in {
+        expected_token.encode("ascii"),
+        (expected_token + "\n").encode("ascii"),
+    }
+    or not hmac.compare_digest(authorization_raw, token_raw)
+    or lease_raw != b""
+    or identity(lease_descriptor_stat) != identity(lease_stat)
+    or hashlib.sha256(binding_raw).hexdigest() != expected_binding_sha256
+    or not isinstance(binding, dict)
+    or binding.get("contractName")
+        != "chummer.public-edge-retained-lock-binding/v1"
+    or binding.get("tokenSha256") != token_digest
+    or not isinstance(binding.get("identities"), dict)
+    or binding.get("identities", {}).get("lock")
+        != binding_identity(lock_stat)
+    or binding.get("identities", {}).get("token")
+        != binding_identity(token_stat)
+    or binding.get("identities", {}).get("authorization")
+        != binding_identity(authorization_stat)
+    or binding.get("identities", {}).get("lease")
+        != binding_identity(lease_stat)
+    or binding.get("identities", {}).get("binding")
+        != binding_identity(binding_stat)
+    or expected_token.encode("ascii") in binding_raw
 ):
     raise SystemExit(1)
-os.unlink(token_path)
-os.rmdir(lock_path)
-' "$DEPLOY_LOCK_DIR" "$deploy_lock_identity" "$deploy_lock_token_identity"; then
-    return 1
-  fi
-  if ! printf '%s\n' "$deploy_lock_owner_token" \
-    | "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
-      "$TRUSTED_PYTHON" -I -c '
-import hmac, os, re, stat, sys
-authorization_path = os.fsencode(sys.argv[1])
-authorization_root = os.path.dirname(authorization_path)
-expected_identity = sys.argv[2]
-expected_token = sys.stdin.buffer.read(65).decode("ascii", errors="strict").strip()
-if re.fullmatch(r"[0-9a-f]{64}", expected_token) is None:
+releasing_path = os.path.join(
+    lock_root,
+    f"public-edge-mutation.lock.releasing.{token_digest}".encode("ascii"),
+)
+libc = ctypes.CDLL(None, use_errno=True)
+renameat2 = getattr(libc, "renameat2", None)
+if renameat2 is None:
     raise SystemExit(1)
-root_stat = os.lstat(authorization_root)
-if (
-    not stat.S_ISDIR(root_stat.st_mode)
-    or stat.S_ISLNK(root_stat.st_mode)
-    or root_stat.st_uid != os.getuid()
-    or stat.S_IMODE(root_stat.st_mode) != 0o700
-):
-    raise SystemExit(1)
-flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
-descriptor = os.open(authorization_path, flags)
-try:
-    token_stat = os.fstat(descriptor)
-    path_stat = os.lstat(authorization_path)
-    actual_token = os.read(descriptor, 65).decode("ascii", errors="strict").strip()
-finally:
-    os.close(descriptor)
-if (
-    not stat.S_ISREG(token_stat.st_mode)
-    or token_stat.st_nlink != 1
-    or token_stat.st_uid != os.getuid()
-    or stat.S_IMODE(token_stat.st_mode) != 0o600
-    or (token_stat.st_dev, token_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
-    or f"{token_stat.st_dev}:{token_stat.st_ino}" != expected_identity
-    or not hmac.compare_digest(actual_token, expected_token)
-):
-    raise SystemExit(1)
-os.unlink(authorization_path)
-root_descriptor = os.open(
-    authorization_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+renameat2.argtypes = [
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_int,
+    ctypes.c_char_p,
+    ctypes.c_uint,
+]
+renameat2.restype = ctypes.c_int
+if renameat2(-100, lock_path, -100, releasing_path, 1) != 0:
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise SystemExit(1)
+    raise OSError(
+        error_number,
+        os.strerror(error_number),
+        os.fsdecode(lock_path),
+    )
+lock_root_descriptor = os.open(
+    lock_root,
+    os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
 )
 try:
-    os.fsync(root_descriptor)
+    os.fsync(lock_root_descriptor)
 finally:
-    os.close(root_descriptor)
-' "$DEPLOY_LOCK_AUTH_TOKEN_FILE" "$deploy_lock_auth_token_identity"; then
+    os.close(lock_root_descriptor)
+released_lock_stat = os.lstat(releasing_path)
+if (
+    pair(released_lock_stat) != expected_lock_identity
+    or not stat.S_ISDIR(released_lock_stat.st_mode)
+    or stat.S_IMODE(released_lock_stat.st_mode) != 0o700
+):
+    raise SystemExit(1)
+released_token_path = os.path.join(releasing_path, b"owner-token")
+released_token_stat = os.lstat(released_token_path)
+if pair(released_token_stat) != expected_token_identity:
+    raise SystemExit(1)
+os.unlink(released_token_path)
+os.unlink(binding_path)
+os.unlink(authorization_path)
+os.unlink(lease_path)
+os.rmdir(releasing_path)
+for directory in (lock_root, authorization_root):
+    directory_descriptor = os.open(
+        directory,
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+    )
+    try:
+        os.fsync(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
+' "$DEPLOY_LOCK_DIR" "$deploy_lock_identity" "$deploy_lock_token_identity" \
+        "$DEPLOY_LOCK_AUTH_TOKEN_FILE" "$deploy_lock_auth_token_identity" \
+        "$DEPLOY_LOCK_LEASE_FILE" "$deploy_lock_lease_identity" \
+        "$DEPLOY_LOCK_BINDING_FILE" "$deploy_lock_binding_identity" \
+        "$deploy_lock_binding_sha256" "$deploy_lock_lease_fd"; then
     return 1
   fi
   deploy_lock_active=0
+  exec {deploy_lock_lease_fd}>&-
 }
 
 release_only_on_exit() {
   local failure_status="$?"
   trap - EXIT
+  if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1 \
+    && deploy_lock_was_adopted == 1 \
+    && adopted_public_download_controller_completed == 0 \
+    && deploy_lock_active == 1)); then
+    deploy_lock_active=0
+    echo "adopted public-download recovery did not complete; authenticated mutation lock retained" >&2
+    exit 76
+  fi
   if ((epoch_rotation_fail_forward_required == 1 \
     && deploy_lock_active == 1)); then
     deploy_lock_active=0
@@ -1075,11 +2161,11 @@ exit_for_signal() {
     echo "release-upload ticket epoch rotation interrupted; authenticated mutation lock retained" >&2
     exit 76
   fi
-  if [[ "$DEPLOY_OPERATION" \
-      == initial-release-shelf-public-download-cutover-retire ]] \
-    && ((deploy_lock_active == 1)); then
+  if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1 \
+      && public_download_controller_may_have_started == 1 \
+      && deploy_lock_active == 1)); then
     deploy_lock_active=0
-    echo "public-download retirement interrupted; authenticated mutation lock retained" >&2
+    echo "public-download journaled operation interrupted; authenticated mutation lock retained" >&2
     exit 76
   fi
   exit "$signal_status"
@@ -1483,12 +2569,154 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
         "$PUBLIC_DOWNLOAD_PREDECESSOR_RETIREMENT_RECEIPT_SHA256"
     )
   fi
+  public_download_wrapper_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$SCRIPT_PATH"
+  )"
+  public_download_wrapper_sha256="${public_download_wrapper_sha256%% *}"
+  public_download_controller_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$PUBLIC_DOWNLOAD_CONTROLLER"
+  )"
+  public_download_controller_sha256="${public_download_controller_sha256%% *}"
+  if [[ "$public_download_wrapper_sha256" \
+      != "$deploy_lock_wrapper_sha256" \
+    || "$public_download_controller_sha256" \
+      != "$deploy_lock_controller_sha256" ]]; then
+    echo "public-download lock-bound wrapper or controller digest drifted" >&2
+    exit 70
+  fi
+  if ! exec {public_download_controller_fd}<"$PUBLIC_DOWNLOAD_CONTROLLER"; then
+    echo "public-download lock-bound controller could not be opened" >&2
+    exit 70
+  fi
+  if ! "$TRUSTED_ENV" -i \
+    PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+    CHUMMER_PUBLIC_EDGE_BOUND_CONTROLLER_PATH="$PUBLIC_DOWNLOAD_CONTROLLER" \
+    "$TRUSTED_PYTHON" -I -c '
+import hashlib, os, stat, sys
+# Public-download pinned controller descriptor verifier.
+descriptor = int(sys.argv[1])
+path = os.fsencode(
+    os.environ.pop("CHUMMER_PUBLIC_EDGE_BOUND_CONTROLLER_PATH")
+)
+expected_sha256 = sys.argv[2]
+before = os.fstat(descriptor)
+named_before = os.lstat(path)
+os.lseek(descriptor, 0, os.SEEK_SET)
+digest = hashlib.sha256()
+size = 0
+while True:
+    chunk = os.read(descriptor, 1024 * 1024)
+    if not chunk:
+        break
+    size += len(chunk)
+    if size > 16 * 1024 * 1024:
+        raise SystemExit(1)
+    digest.update(chunk)
+os.lseek(descriptor, 0, os.SEEK_SET)
+after = os.fstat(descriptor)
+named_after = os.lstat(path)
+identity = lambda item: (
+    item.st_dev,
+    item.st_ino,
+    item.st_size,
+    item.st_mtime_ns,
+    item.st_ctime_ns,
+    item.st_mode,
+    item.st_nlink,
+    item.st_uid,
+)
+if (
+    len({
+        identity(item)
+        for item in (before, named_before, after, named_after)
+    }) != 1
+    or not stat.S_ISREG(before.st_mode)
+    or before.st_nlink != 1
+    or before.st_uid != os.getuid()
+    or stat.S_IMODE(before.st_mode) & 0o022
+    or size != before.st_size
+    or digest.hexdigest() != expected_sha256
+):
+    raise SystemExit(1)
+' "$public_download_controller_fd" "$deploy_lock_controller_sha256"; then
+    exec {public_download_controller_fd}<&-
+    echo "public-download lock-bound controller descriptor drifted" >&2
+    exit 70
+  fi
   public_download_controller_status=0
+  public_download_controller_may_have_started=1
   "$TRUSTED_ENV" -i \
     PATH=/usr/bin:/bin LANG=C LC_ALL=C \
-    "$TRUSTED_PYTHON" -I "$PUBLIC_DOWNLOAD_CONTROLLER" \
+    CHUMMER_PUBLIC_EDGE_DEPLOY_LEASE_FD="$deploy_lock_lease_fd" \
+    "$TRUSTED_PYTHON" -I -c '
+import hashlib, os, stat, sys
+controller_path = sys.argv[1]
+descriptor = int(sys.argv[2])
+expected_sha256 = sys.argv[3]
+controller_arguments = sys.argv[4:]
+metadata = os.fstat(descriptor)
+if (
+    not stat.S_ISREG(metadata.st_mode)
+    or metadata.st_nlink != 1
+    or metadata.st_uid != os.getuid()
+    or stat.S_IMODE(metadata.st_mode) & 0o022
+    or metadata.st_size > 16 * 1024 * 1024
+):
+    raise SystemExit(70)
+os.lseek(descriptor, 0, os.SEEK_SET)
+chunks = []
+remaining = metadata.st_size + 1
+while remaining > 0:
+    chunk = os.read(descriptor, min(1024 * 1024, remaining))
+    if not chunk:
+        break
+    chunks.append(chunk)
+    remaining -= len(chunk)
+raw = b"".join(chunks)
+after = os.fstat(descriptor)
+if (
+    len(raw) != metadata.st_size
+    or (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+    )
+    != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+        after.st_mode,
+        after.st_nlink,
+        after.st_uid,
+    )
+    or hashlib.sha256(raw).hexdigest() != expected_sha256
+):
+    raise SystemExit(70)
+code = compile(raw, controller_path, "exec")
+sys.argv = [controller_path, *controller_arguments]
+namespace = globals()
+namespace.update({
+    "__cached__": None,
+    "__doc__": None,
+    "__file__": controller_path,
+    "__loader__": None,
+    "__name__": "__main__",
+    "__package__": None,
+    "__spec__": None,
+})
+exec(code, namespace, namespace)
+' "$PUBLIC_DOWNLOAD_CONTROLLER" "$public_download_controller_fd" \
+    "$deploy_lock_controller_sha256" \
     "${public_download_controller_args[@]}" \
     || public_download_controller_status=$?
+  exec {public_download_controller_fd}<&-
   if ((public_download_controller_status == 76)) \
     || [[ "$DEPLOY_OPERATION" \
       == initial-release-shelf-public-download-cutover-retire \
@@ -1501,6 +2729,7 @@ if ((PUBLIC_DOWNLOAD_ONLY_OPERATION == 1)); then
     echo "public-download cutover, recovery, or retirement failed" >&2
     exit "$public_download_controller_status"
   fi
+  adopted_public_download_controller_completed=1
   if ! release_deploy_lock; then
     deploy_lock_active=0
     trap - EXIT
