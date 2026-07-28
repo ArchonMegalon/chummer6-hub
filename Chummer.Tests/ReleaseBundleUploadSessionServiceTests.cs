@@ -406,6 +406,56 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     }
 
     [Fact]
+    public void ScopeBoundExistingBytesFreshDeltaDoesNotRequireIncumbentShelfBinding()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddHours(2);
+        var candidate = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: null);
+        ReleaseDesktopTupleScope scope = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+
+        ReleaseUploadSession created = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+        ReleaseUploadSession durable = fixture.CreateService().CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate,
+            scope);
+
+        Assert.Equal(created.SessionId, durable.SessionId);
+        Assert.True(durable.CandidateImportBinding!.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.Null(durable.CandidateImportBinding.IncumbentBinding);
+
+        Assert.Throws<InvalidDataException>(() =>
+            fixture.Service.CreateSession(
+                new string('b', 64),
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidate with
+                {
+                    ExactIncomingDesktopScopeIsFreshDelta = false,
+                    IncumbentBinding = new ReleaseUploadCandidateIncumbentBinding(
+                        SnapshotSha256: new string('6', 64),
+                        FullShelfInventorySha256: new string('7', 64),
+                        ActiveInventorySha256: new string('8', 64),
+                        CanonicalManifestSha256: new string('9', 64),
+                        CompatibilityManifestSha256: new string('a', 64))
+                }));
+    }
+
+    [Fact]
     public void NativeEvidenceCandidateBindingIsDurableAndComparedExactly()
     {
         using Fixture fixture = new();

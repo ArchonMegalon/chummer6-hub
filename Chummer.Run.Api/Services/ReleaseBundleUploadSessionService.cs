@@ -1779,8 +1779,8 @@ public sealed class ReleaseBundleUploadSessionService
             || !IsBareSha256(binding.BundleIdentitySha256)
             || !IsBareSha256(binding.CanonicalManifestSha256)
             || !IsBareSha256(binding.InventorySha256)
-            || binding.ExactIncomingDesktopScopeIsFreshDelta
-               != (binding.IncumbentBinding is not null)
+            || binding.IncumbentBinding is not null
+               && !binding.ExactIncomingDesktopScopeIsFreshDelta
             || binding.IncumbentBinding is { } incumbent
                && (!IsBareSha256(incumbent.SnapshotSha256)
                    || !IsBareSha256(incumbent.FullShelfInventorySha256)
