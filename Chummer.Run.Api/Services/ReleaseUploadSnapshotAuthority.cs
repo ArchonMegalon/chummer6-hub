@@ -103,6 +103,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         "avalonia:windows:win-x64";
     private const string UnsignedWindowsFreshDeltaProjectionProfile =
         "v3_unsigned_windows_fresh_delta";
+    private const string ScopeBoundExistingWindowsBytesProjectionProfile =
+        "v3_scope_bound_existing_windows_bytes";
+    private const string ScopeBoundExistingBytesContractName =
+        "chummer.release-upload.scope-bound-existing-bytes/v1";
+    private const string ScopeBoundGenerationInventoryContractName =
+        "chummer.release-shelf.existing-bytes-generation-inventory/v1";
     private const string UnsignedWindowsCodeDeployReviewContract =
         "chummer.registry.preview-publication-delta-code-deploy-review/v1";
 
@@ -469,6 +475,26 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             && unsignedContract is UnsignedCandidateContractName
                 or UnsignedNativeCandidateContractName)
         {
+            if (string.Equals(
+                    unsignedContract,
+                    UnsignedCandidateContractName,
+                    StringComparison.Ordinal)
+                && root.TryGetProperty(
+                    "projectionProfile",
+                    out JsonElement projectionProfile)
+                && projectionProfile.ValueKind == JsonValueKind.String
+                && string.Equals(
+                    projectionProfile.GetString(),
+                    ScopeBoundExistingWindowsBytesProjectionProfile,
+                    StringComparison.Ordinal))
+            {
+                return ParseScopeBoundExistingBytesCandidateAuthority(
+                    snapshotId,
+                    snapshotSha256,
+                    authoritySha256,
+                    root,
+                    now);
+            }
             return ParseUnsignedCandidateAuthority(
                 snapshotId,
                 snapshotSha256,
@@ -690,6 +716,838 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             candidate.BundleIdentitySha256,
             candidate.CanonicalManifestSha256,
             candidate.InventorySha256);
+    }
+
+    private static ReleaseUploadCandidateAuthority
+        ParseScopeBoundExistingBytesCandidateAuthority(
+            string snapshotId,
+            string snapshotSha256,
+            string authoritySha256,
+            JsonElement root,
+            DateTimeOffset now)
+    {
+        if (!ExactPropertySet(
+                root,
+                new HashSet<string>(
+                    [
+                        "candidate",
+                        "candidateImportAuthority",
+                        "candidateReviewAuthority",
+                        "codeDeploymentAuthority",
+                        "contractName",
+                        "contractVersion",
+                        "crossRunBitReproducible",
+                        "custody",
+                        "deployAuthority",
+                        "exactIncomingDesktopScope",
+                        "expiresAtUtc",
+                        "generatedAtUtc",
+                        "platformScope",
+                        "projectionProfile",
+                        "publicationAuthorized",
+                        "publicationEligible",
+                        "releaseUploadAuthority",
+                        "routeAuthority",
+                        "signaturePolicy",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate import authority property set drifted");
+        }
+        RequireExactString(root, "contractName", UnsignedCandidateContractName);
+        RequireExactInt32(root, "contractVersion", 3);
+        RequireExactString(
+            root,
+            "projectionProfile",
+            ScopeBoundExistingWindowsBytesProjectionProfile);
+        RequireExactString(root, "status", "candidate_import_ready");
+        RequireBoolean(root, "candidateImportAuthority", expected: true);
+        RequireBoolean(root, "candidateReviewAuthority", expected: true);
+        RequireBoolean(root, "publicationAuthorized", expected: false);
+        RequireBoolean(root, "publicationEligible", expected: false);
+        RequireBoolean(root, "releaseUploadAuthority", expected: false);
+        RequireBoolean(root, "deployAuthority", expected: false);
+        RequireBoolean(root, "routeAuthority", expected: false);
+        RequireBoolean(root, "codeDeploymentAuthority", expected: false);
+        RequireBoolean(root, "crossRunBitReproducible", expected: false);
+        RequireExactString(root, "platformScope", "windows_only");
+        RequireExactString(
+            root,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        JsonElement signaturePolicy = RequireObject(root, "signaturePolicy");
+        ValidateUnsignedSignaturePolicy(signaturePolicy);
+
+        DateTimeOffset generatedAt = RequireUtcTimestamp(root, "generatedAtUtc");
+        DateTimeOffset expiresAt = RequireUtcTimestamp(root, "expiresAtUtc");
+        if (generatedAt > now.AddMinutes(5)
+            || generatedAt < now.AddHours(-6).AddMinutes(-5)
+            || expiresAt <= now
+            || expiresAt > now.AddHours(6).AddMinutes(5)
+            || expiresAt <= generatedAt
+            || expiresAt > generatedAt.AddHours(6))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate import authority is expired or future-dated");
+        }
+
+        JsonElement candidateElement = RequireObject(root, "candidate");
+        if (!ExactPropertySet(
+                candidateElement,
+                new HashSet<string>(
+                    [
+                        "version",
+                        "canonicalManifestSha256",
+                        "inventorySha256",
+                        "fileCount",
+                        "totalBytes",
+                        "bundleIdentitySha256"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate identity property set drifted");
+        }
+        string version = RequireString(candidateElement, "version");
+        if (!VersionPattern.IsMatch(version) || version.Contains("..", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("scope-bound candidate version is invalid");
+        }
+        var candidate = new ReleaseUploadCandidateIdentity(
+            version,
+            RequireSha256(candidateElement, "canonicalManifestSha256"),
+            RequireSha256(candidateElement, "inventorySha256"),
+            RequirePositiveInt32(candidateElement, "fileCount"),
+            RequireNonNegativeInt64(candidateElement, "totalBytes"),
+            RequireSha256(candidateElement, "bundleIdentitySha256"));
+        if (!string.Equals(
+                ComputeBundleIdentity(candidate),
+                candidate.BundleIdentitySha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate bundle identity drifted");
+        }
+
+        JsonElement custody = RequireObject(root, "custody");
+        if (!ExactPropertySet(
+                custody,
+                new HashSet<string>(
+                    [
+                        "canonicalManifest",
+                        "compatibilityManifest",
+                        "generationInventory",
+                        "inventory",
+                        "releaseScopeDecision",
+                        "scopeBoundExistingBytes"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate custody property set drifted");
+        }
+        byte[] canonicalManifest = DecodeEmbedded(
+            RequireObject(custody, "canonicalManifest"),
+            "scope-bound canonical manifest",
+            "RELEASE_CHANNEL.generated.json");
+        byte[] compatibilityManifest = DecodeEmbedded(
+            RequireObject(custody, "compatibilityManifest"),
+            "scope-bound compatibility manifest",
+            "releases.json");
+        byte[] inventoryBytes = DecodeEmbedded(
+            RequireObject(custody, "inventory"),
+            "scope-bound candidate inventory",
+            "CANDIDATE_UPLOAD_INVENTORY.generated.json");
+        byte[] releaseScopeBytes = DecodeEmbedded(
+            RequireObject(custody, "releaseScopeDecision"),
+            "scope-bound release-scope decision",
+            "RELEASE_SCOPE_DECISION.approved.json");
+        byte[] generationInventoryBytes = DecodeEmbedded(
+            RequireObject(custody, "generationInventory"),
+            "scope-bound generation inventory",
+            "EXISTING_BYTES_GENERATION_INVENTORY.generated.json");
+
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory =
+            ParseCandidateInventory(inventoryBytes);
+        if (inventory.Count != candidate.FileCount
+            || inventory.Sum(static row => row.SizeBytes) != candidate.TotalBytes
+            || !string.Equals(
+                ComputeInventoryDigest(inventory),
+                candidate.InventorySha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                Sha256(canonicalManifest),
+                candidate.CanonicalManifestSha256,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate inventory summary drifted");
+        }
+        string[] expectedPaths =
+        [
+            "RELEASE_CHANNEL.generated.json",
+            "files/chummer-avalonia-win-x64-installer.exe",
+            "files/chummer-avalonia-win-x64-payload.zip",
+            "files/chummer-avalonia-win-x64-payload.zip.json",
+            "releases.json"
+        ];
+        if (!inventory.Select(static row => row.Path).SequenceEqual(
+                expectedPaths,
+                StringComparer.Ordinal)
+            || inventory.Any(static row => row.SizeBytes <= 0)
+            || !inventory.Any(row =>
+                string.Equals(
+                    row.Path,
+                    "RELEASE_CHANNEL.generated.json",
+                    StringComparison.Ordinal)
+                && string.Equals(
+                    row.Sha256,
+                    candidate.CanonicalManifestSha256,
+                    StringComparison.Ordinal)
+                && row.SizeBytes == canonicalManifest.LongLength)
+            || !inventory.Any(row =>
+                string.Equals(row.Path, "releases.json", StringComparison.Ordinal)
+                && string.Equals(
+                    row.Sha256,
+                    Sha256(compatibilityManifest),
+                    StringComparison.Ordinal)
+                && row.SizeBytes == compatibilityManifest.LongLength))
+        {
+            throw new InvalidDataException(
+                "scope-bound candidate exact Windows inventory drifted");
+        }
+
+        using JsonDocument canonicalDocument = ParseStrictObject(
+            canonicalManifest,
+            "scope-bound canonical manifest");
+        using JsonDocument compatibilityDocument = ParseStrictObject(
+            compatibilityManifest,
+            "scope-bound compatibility manifest");
+        using JsonDocument releaseScopeDocument = ParseStrictObject(
+            releaseScopeBytes,
+            "scope-bound release-scope decision");
+        using JsonDocument generationInventoryDocument = ParseStrictObject(
+            generationInventoryBytes,
+            "scope-bound generation inventory");
+        JsonElement canonical = canonicalDocument.RootElement;
+        JsonElement compatibility = compatibilityDocument.RootElement;
+        JsonElement releaseScope = releaseScopeDocument.RootElement;
+        JsonElement generationInventory = generationInventoryDocument.RootElement;
+        JsonElement binding = RequireObject(custody, "scopeBoundExistingBytes");
+
+        ValidateUnsignedRecursiveAuthorityPosture(
+            canonical,
+            "scope-bound canonical manifest");
+        ValidateUnsignedRecursiveAuthorityPosture(
+            compatibility,
+            "scope-bound compatibility manifest");
+        ValidateUnsignedRecursiveAuthorityPosture(
+            releaseScope,
+            "scope-bound release-scope decision");
+        ValidateUnsignedRecursiveAuthorityPosture(
+            generationInventory,
+            "scope-bound generation inventory");
+        ValidateUnsignedRecursiveAuthorityPosture(
+            binding,
+            "scope-bound existing-byte binding");
+        ValidateUnsignedManifestIdentity(
+            canonical,
+            version,
+            "scope-bound canonical manifest");
+        ValidateUnsignedManifestIdentity(
+            compatibility,
+            version,
+            "scope-bound compatibility manifest");
+        ValidateScopeBoundExistingBytesManifestPair(
+            canonical,
+            compatibility,
+            version);
+        _ = ParseCandidateWindowsScope(
+            canonical,
+            candidate,
+            inventory,
+            allowAdditionalRetainedShelfFiles: true);
+        RequireExactString(canonical, "platformScope", "windows_only");
+        RequireExactString(compatibility, "platformScope", "windows_only");
+        string generationId = RequireString(canonical, "generationId");
+        if (!generationId.StartsWith("g-", StringComparison.Ordinal)
+            || !VersionPattern.IsMatch(generationId)
+            || generationId.Contains("..", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound generation identifier is invalid");
+        }
+        RequireExactString(compatibility, "generationId", generationId);
+
+        JsonElement artifacts = RequireArray(canonical, "artifacts");
+        JsonElement downloads = RequireArray(compatibility, "downloads");
+        if (artifacts.GetArrayLength() != 1
+            || downloads.GetArrayLength() != 1)
+        {
+            throw new InvalidDataException(
+                "scope-bound manifests must contain exactly one Windows artifact");
+        }
+        JsonElement artifact = artifacts[0];
+        JsonElement download = downloads[0];
+        foreach (string property in new[]
+                 {
+                     "artifactId",
+                     "fileName",
+                     "installerMode",
+                     "payloadAcquisitionMode",
+                     "payloadFileName",
+                     "payloadSha256",
+                     "payloadSizeBytes",
+                     "sha256",
+                     "sizeBytes"
+                 })
+        {
+            if (!artifact.TryGetProperty(property, out JsonElement artifactValue)
+                || !download.TryGetProperty(property, out JsonElement downloadValue)
+                || !JsonSemanticEquals(artifactValue, downloadValue))
+            {
+                throw new InvalidDataException(
+                    $"scope-bound manifest {property} binding drifted");
+            }
+        }
+        foreach (JsonElement row in new[] { artifact, download })
+        {
+            RequireExactString(row, "platform", "windows");
+            RequireExactString(row, "head", "avalonia");
+            RequireExactString(row, "rid", WindowsRid);
+            RequireExactString(row, "installAccessClass", "open_public");
+        }
+
+        ValidateScopeBoundReleaseScope(releaseScope, version);
+        string decisionId = RequireString(releaseScope, "decisionId");
+        ValidateScopeBoundGenerationInventory(
+            generationInventory,
+            inventory,
+            candidate,
+            canonicalManifest,
+            compatibilityManifest,
+            generationId);
+        ValidateScopeBoundExistingBytesBinding(
+            binding,
+            signaturePolicy,
+            releaseScopeBytes,
+            generationInventoryBytes,
+            candidate,
+            canonicalManifest,
+            compatibilityManifest,
+            inventory,
+            canonical,
+            compatibility,
+            releaseScope,
+            generationInventory,
+            generationId,
+            decisionId);
+
+        return new ReleaseUploadCandidateAuthority(
+            snapshotId,
+            snapshotSha256,
+            authoritySha256,
+            expiresAt,
+            candidate,
+            canonicalManifest,
+            inventory,
+            ExactIncomingDesktopScopeIsFreshDelta: true);
+    }
+
+    private static void ValidateScopeBoundExistingBytesManifestPair(
+        JsonElement canonical,
+        JsonElement compatibility,
+        string version)
+    {
+        foreach ((string label, JsonElement manifest) in new[]
+                 {
+                     ("canonical", canonical),
+                     ("compatibility", compatibility)
+                 })
+        {
+            RequireExactString(manifest, "platformScope", "windows_only");
+            RequireExactString(manifest, "status", "published");
+            RequireExactString(
+                manifest,
+                "rolloutState",
+                "public_release_review_required");
+            RequireExactString(
+                manifest,
+                "supportabilityState",
+                "review_required");
+            string generatedAt = RequireMatchingAlias(
+                manifest,
+                "generatedAt",
+                "generated_at",
+                $"scope-bound {label} generated time");
+            _ = manifest.TryGetProperty("generatedAt", out _)
+                ? RequireUtcTimestamp(manifest, "generatedAt")
+                : RequireUtcTimestamp(manifest, "generated_at");
+            RequireExactString(manifest, "publishedAt", generatedAt);
+            string registryCommit = RequireMatchingAlias(
+                manifest,
+                "registryCommit",
+                "registry_commit",
+                $"scope-bound {label} Registry commit");
+            if (!CommitPattern.IsMatch(registryCommit))
+            {
+                throw new InvalidDataException(
+                    $"scope-bound {label} Registry commit is invalid");
+            }
+            JsonElement proof = RequireObject(manifest, "releaseProof");
+            RequireExactString(proof, "status", "passed");
+        }
+
+        RequireExactString(
+            canonical,
+            "contractName",
+            "Chummer.Hub.Registry.Contracts");
+        RequireExactString(
+            canonical,
+            "contract_name",
+            "Chummer.Hub.Registry.Contracts");
+        RequireExactInt32(canonical, "schemaVersion", 1);
+        RequireExactString(canonical, "product", "chummer");
+        RequireBoolean(canonical, "crossRunBitReproducible", expected: false);
+        RequireBoolean(canonical, "publicationAuthorized", expected: false);
+        RequireBoolean(canonical, "deployAuthorized", expected: false);
+        RequireBoolean(canonical, "uploadAuthorized", expected: false);
+        ValidateUnsignedManifestSignature(RequireObject(canonical, "signature"));
+
+        RequireExactString(
+            compatibility,
+            "contractName",
+            "Chummer.Hub.Registry.Contracts");
+        RequireExactString(
+            compatibility,
+            "contract_name",
+            "Chummer.Hub.Registry.Contracts");
+        RequireExactString(compatibility, "source", "registry");
+        RequireExactString(compatibility, "publicVersion", version);
+
+        if (!JsonSemanticEquals(
+                RequireObject(canonical, "releaseProof"),
+                RequireObject(compatibility, "releaseProof")))
+        {
+            throw new InvalidDataException(
+                "scope-bound manifest release-proof projections disagree");
+        }
+    }
+
+    private static void ValidateScopeBoundReleaseScope(
+        JsonElement releaseScope,
+        string version)
+    {
+        if (!ExactPropertySet(
+                releaseScope,
+                new HashSet<string>(
+                    [
+                        "approvedAtUtc",
+                        "approvedBy",
+                        "channel",
+                        "contractName",
+                        "contractVersion",
+                        "decisionId",
+                        "platforms",
+                        "releaseTarget",
+                        "releaseVersion",
+                        "status",
+                        "supportOwner"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound release-scope decision property set drifted");
+        }
+        RequireExactString(
+            releaseScope,
+            "contractName",
+            "chummer.release-scope-decision/v1");
+        RequireExactInt32(releaseScope, "contractVersion", 1);
+        RequireExactString(releaseScope, "status", "approved");
+        RequireExactString(releaseScope, "channel", "preview");
+        RequireExactString(releaseScope, "releaseTarget", "preview");
+        RequireExactString(releaseScope, "releaseVersion", version);
+        _ = RequireUtcTimestamp(releaseScope, "approvedAtUtc");
+        _ = RequireString(releaseScope, "approvedBy");
+        _ = RequireString(releaseScope, "supportOwner");
+        string decisionId = RequireString(releaseScope, "decisionId");
+        if (!VersionPattern.IsMatch(decisionId)
+            || decisionId.Contains("..", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound release-scope decision identifier is invalid");
+        }
+        JsonElement platforms = RequireArray(releaseScope, "platforms");
+        if (platforms.GetArrayLength() != 1
+            || !ExactPropertySet(
+                platforms[0],
+                new HashSet<string>(
+                    [
+                        "artifactAccessClass",
+                        "fallbackHeads",
+                        "platform",
+                        "primaryHead",
+                        "rid",
+                        "signingRequirement"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound release-scope platform property set drifted");
+        }
+        JsonElement platform = platforms[0];
+        RequireExactString(platform, "artifactAccessClass", "open_public");
+        RequireExactString(platform, "platform", "windows");
+        RequireExactString(platform, "primaryHead", "avalonia");
+        RequireExactString(platform, "rid", WindowsRid);
+        RequireExactString(
+            platform,
+            "signingRequirement",
+            "preview_unsigned_allowed");
+        if (RequireArray(platform, "fallbackHeads").GetArrayLength() != 0)
+        {
+            throw new InvalidDataException(
+                "scope-bound release-scope fallback head drifted");
+        }
+    }
+
+    private static void ValidateScopeBoundGenerationInventory(
+        JsonElement generation,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
+        ReleaseUploadCandidateIdentity candidate,
+        byte[] canonicalManifest,
+        byte[] compatibilityManifest,
+        string generationId)
+    {
+        if (!ExactPropertySet(
+                generation,
+                new HashSet<string>(
+                    [
+                        "bundleIdentitySha256",
+                        "canonicalManifestSha256",
+                        "channel",
+                        "compatibilityManifestSha256",
+                        "contractName",
+                        "contractVersion",
+                        "directories",
+                        "fileCount",
+                        "files",
+                        "generationId",
+                        "inventorySha256",
+                        "projectionProfile",
+                        "releaseVersion",
+                        "rootMode",
+                        "status",
+                        "totalBytes"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound generation inventory property set drifted");
+        }
+        RequireExactString(
+            generation,
+            "contractName",
+            ScopeBoundGenerationInventoryContractName);
+        RequireExactInt32(generation, "contractVersion", 1);
+        RequireExactString(generation, "status", "pass");
+        RequireExactString(
+            generation,
+            "projectionProfile",
+            ScopeBoundExistingWindowsBytesProjectionProfile);
+        RequireExactString(generation, "releaseVersion", candidate.Version);
+        RequireExactString(generation, "channel", "preview");
+        RequireExactString(generation, "generationId", generationId);
+        RequireExactString(
+            generation,
+            "canonicalManifestSha256",
+            Sha256(canonicalManifest));
+        RequireExactString(
+            generation,
+            "compatibilityManifestSha256",
+            Sha256(compatibilityManifest));
+        RequireExactString(
+            generation,
+            "inventorySha256",
+            candidate.InventorySha256);
+        RequireExactString(
+            generation,
+            "bundleIdentitySha256",
+            candidate.BundleIdentitySha256);
+        if (RequirePositiveInt32(generation, "fileCount") != candidate.FileCount
+            || RequireNonNegativeInt64(generation, "totalBytes")
+            != candidate.TotalBytes
+            || RequireNonNegativeInt64(generation, "rootMode") != 448)
+        {
+            throw new InvalidDataException(
+                "scope-bound generation inventory summary drifted");
+        }
+        JsonElement files = RequireArray(generation, "files");
+        if (files.GetArrayLength() != inventory.Count)
+        {
+            throw new InvalidDataException(
+                "scope-bound generation file count drifted");
+        }
+        for (int index = 0; index < inventory.Count; index++)
+        {
+            JsonElement row = files[index];
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["mode", "path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal))
+                || RequireNonNegativeInt64(row, "mode") != 384
+                || !string.Equals(
+                    RequireString(row, "path"),
+                    inventory[index].Path,
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    inventory[index].Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(row, "sizeBytes")
+                != inventory[index].SizeBytes)
+            {
+                throw new InvalidDataException(
+                    "scope-bound generation file inventory drifted");
+            }
+        }
+        JsonElement directories = RequireArray(generation, "directories");
+        if (directories.GetArrayLength() != 1
+            || !ExactPropertySet(
+                directories[0],
+                new HashSet<string>(["mode", "path"], StringComparer.Ordinal))
+            || RequireNonNegativeInt64(directories[0], "mode") != 448
+            || !string.Equals(
+                RequireString(directories[0], "path"),
+                "files",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound generation directory inventory drifted");
+        }
+    }
+
+    private static void ValidateScopeBoundExistingBytesBinding(
+        JsonElement binding,
+        JsonElement rootSignaturePolicy,
+        byte[] releaseScopeBytes,
+        byte[] generationInventoryBytes,
+        ReleaseUploadCandidateIdentity candidate,
+        byte[] canonicalManifest,
+        byte[] compatibilityManifest,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> inventory,
+        JsonElement canonical,
+        JsonElement compatibility,
+        JsonElement releaseScope,
+        JsonElement generationInventory,
+        string generationId,
+        string decisionId)
+    {
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(
+                    [
+                        "canonicalManifestSha256",
+                        "channel",
+                        "compatibilityManifestSha256",
+                        "contractName",
+                        "contractVersion",
+                        "exactIncomingDesktopScope",
+                        "freshDelta",
+                        "generationId",
+                        "generationInventorySha256",
+                        "inventorySha256",
+                        "platformScope",
+                        "projectionProfile",
+                        "releaseScopeAuthority",
+                        "releaseScopeDecisionSha256",
+                        "releaseVersion",
+                        "retainedFromIncumbent",
+                        "retainedPlatforms",
+                        "shelfPlatforms",
+                        "signaturePolicy",
+                        "sourceCommitPosture",
+                        "sourceCommits",
+                        "status"
+                    ],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound existing-byte binding property set drifted");
+        }
+        RequireExactString(
+            binding,
+            "contractName",
+            ScopeBoundExistingBytesContractName);
+        RequireExactInt32(binding, "contractVersion", 1);
+        RequireExactString(binding, "status", "sealed_review_required");
+        RequireExactString(
+            binding,
+            "projectionProfile",
+            ScopeBoundExistingWindowsBytesProjectionProfile);
+        RequireExactString(binding, "releaseVersion", candidate.Version);
+        RequireExactString(binding, "channel", "preview");
+        RequireExactString(binding, "generationId", generationId);
+        RequireExactString(binding, "platformScope", "windows_only");
+        RequireExactString(
+            binding,
+            "exactIncomingDesktopScope",
+            CandidateExactIncomingDesktopScope);
+        if (!JsonSemanticEquals(
+                RequireObject(binding, "signaturePolicy"),
+                rootSignaturePolicy))
+        {
+            throw new InvalidDataException(
+                "scope-bound existing-byte signature policy drifted");
+        }
+        string releaseScopeSha256 = Sha256(releaseScopeBytes);
+        RequireExactString(
+            binding,
+            "releaseScopeDecisionSha256",
+            releaseScopeSha256);
+        RequireExactString(
+            binding,
+            "releaseScopeAuthority",
+            $"design://release-scope/{decisionId}/sha256/{releaseScopeSha256}");
+        RequireExactString(
+            binding,
+            "canonicalManifestSha256",
+            Sha256(canonicalManifest));
+        RequireExactString(
+            binding,
+            "compatibilityManifestSha256",
+            Sha256(compatibilityManifest));
+        RequireExactString(
+            binding,
+            "inventorySha256",
+            candidate.InventorySha256);
+        RequireExactString(
+            binding,
+            "generationInventorySha256",
+            Sha256(generationInventoryBytes));
+        if (RequireArray(binding, "retainedFromIncumbent").GetArrayLength() != 0
+            || RequireArray(binding, "retainedPlatforms").GetArrayLength() != 0)
+        {
+            throw new InvalidDataException(
+                "scope-bound retained shelf posture drifted");
+        }
+        JsonElement shelfPlatforms = RequireArray(binding, "shelfPlatforms");
+        if (shelfPlatforms.GetArrayLength() != 1
+            || shelfPlatforms[0].ValueKind != JsonValueKind.String
+            || !string.Equals(
+                shelfPlatforms[0].GetString(),
+                "windows",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "scope-bound shelf platform posture drifted");
+        }
+
+        JsonElement sourceCommitPosture = RequireObject(
+            binding,
+            "sourceCommitPosture");
+        if (!ExactPropertySet(
+                sourceCommitPosture,
+                new HashSet<string>(["hub", "registry", "ui"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound source-commit posture property set drifted");
+        }
+        RequireExactString(
+            sourceCommitPosture,
+            "hub",
+            "cutover_source_head_required");
+        RequireExactString(
+            sourceCommitPosture,
+            "registry",
+            "bound_to_sealed_manifest_aliases");
+        RequireExactString(
+            sourceCommitPosture,
+            "ui",
+            "caller_asserted_unverified_informational");
+        JsonElement sourceCommits = RequireObject(binding, "sourceCommits");
+        if (!ExactPropertySet(
+                sourceCommits,
+                new HashSet<string>(["hub", "registry", "ui"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound source-commit property set drifted");
+        }
+        foreach (string repository in new[] { "hub", "registry", "ui" })
+        {
+            if (!CommitPattern.IsMatch(RequireString(sourceCommits, repository)))
+            {
+                throw new InvalidDataException(
+                    $"scope-bound {repository} source commit drifted");
+            }
+        }
+        string registryCommit = RequireString(sourceCommits, "registry");
+        RequireExactString(canonical, "registryCommit", registryCommit);
+        RequireExactString(canonical, "registry_commit", registryCommit);
+        RequireExactString(compatibility, "registryCommit", registryCommit);
+        RequireExactString(compatibility, "registry_commit", registryCommit);
+        RequireExactString(releaseScope, "releaseVersion", candidate.Version);
+        RequireExactString(
+            generationInventory,
+            "inventorySha256",
+            candidate.InventorySha256);
+
+        var inventoryByPath = inventory.ToDictionary(
+            static row => row.Path,
+            StringComparer.Ordinal);
+        string[] roles = ["installer", "bootstrap_payload", "bootstrap_payload_sidecar"];
+        string[] paths =
+        [
+            "files/chummer-avalonia-win-x64-installer.exe",
+            "files/chummer-avalonia-win-x64-payload.zip",
+            "files/chummer-avalonia-win-x64-payload.zip.json"
+        ];
+        JsonElement generationFiles = RequireArray(generationInventory, "files");
+        var modesByPath = generationFiles
+            .EnumerateArray()
+            .ToDictionary(
+                static row => RequireString(row, "path"),
+                static row => RequireNonNegativeInt64(row, "mode"),
+                StringComparer.Ordinal);
+        JsonElement freshDelta = RequireArray(binding, "freshDelta");
+        if (freshDelta.GetArrayLength() != roles.Length)
+        {
+            throw new InvalidDataException(
+                "scope-bound fresh Windows delta count drifted");
+        }
+        for (int index = 0; index < roles.Length; index++)
+        {
+            JsonElement row = freshDelta[index];
+            string path = paths[index];
+            ReleaseUploadCandidateInventoryRow expected = inventoryByPath[path];
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(
+                        ["artifactRole", "mode", "path", "sha256", "sizeBytes"],
+                        StringComparer.Ordinal))
+                || !string.Equals(
+                    RequireString(row, "artifactRole"),
+                    roles[index],
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    RequireString(row, "path"),
+                    path,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(row, "mode") != modesByPath[path]
+                || !string.Equals(
+                    RequireSha256(row, "sha256"),
+                    expected.Sha256,
+                    StringComparison.Ordinal)
+                || RequireNonNegativeInt64(row, "sizeBytes") != expected.SizeBytes)
+            {
+                throw new InvalidDataException(
+                    "scope-bound fresh Windows delta byte drifted");
+            }
+        }
     }
 
     private static ReleaseUploadCandidateAuthority ParseUnsignedCandidateAuthority(

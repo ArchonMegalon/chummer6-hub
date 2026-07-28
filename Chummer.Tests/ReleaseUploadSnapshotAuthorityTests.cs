@@ -448,6 +448,50 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void RuntimeLoadsScopeBoundExistingWindowsBytesAuthority()
+    {
+        byte[] authorityBytes =
+            LoadScopeBoundExistingWindowsBytesCandidateAuthorityV3();
+
+        ReleaseUploadCandidateAuthority candidate =
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('a', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes);
+
+        Assert.True(candidate.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.Equal("run-20260727-065724", candidate.Candidate.Version);
+        Assert.Equal(5, candidate.Inventory.Count);
+        Assert.Null(candidate.IncumbentBinding);
+    }
+
+    [Theory]
+    [InlineData("projectionProfile", "v3_windows_unsigned_fresh_delta")]
+    [InlineData("status", "review_required")]
+    [InlineData("candidateImportAuthority", "false")]
+    public void RuntimeRejectsScopeBoundExistingWindowsBytesAuthorityDrift(
+        string property,
+        string value)
+    {
+        JsonObject authority = JsonNode.Parse(
+                LoadScopeBoundExistingWindowsBytesCandidateAuthorityV3())?.AsObject()
+            ?? throw new InvalidDataException(
+                "scope-bound existing-byte authority fixture is invalid");
+        authority[property] = property == "candidateImportAuthority"
+            ? JsonValue.Create(bool.Parse(value))
+            : JsonValue.Create(value);
+        byte[] authorityBytes = JsonSerializer.SerializeToUtf8Bytes(authority);
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadSnapshotAuthorityService.ParseCandidateAuthority(
+                $"public-projection-{new string('a', 64)}",
+                new string('a', 64),
+                Convert.ToHexStringLower(SHA256.HashData(authorityBytes)),
+                authorityBytes));
+    }
+
+    [Fact]
     public void RuntimeRejectsCoordinatedRehashedUnsignedWindowsFreshDeltaRegistryCommitDrift()
     {
         byte[] authorityBytes =
@@ -1014,6 +1058,27 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         JsonObject authority = JsonNode.Parse(output.ToArray())?.AsObject()
             ?? throw new InvalidDataException(
                 "unsigned fresh-delta authority fixture is invalid");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        authority["generatedAtUtc"] = now;
+        authority["expiresAtUtc"] = now.AddHours(2);
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static byte[] LoadScopeBoundExistingWindowsBytesCandidateAuthorityV3()
+    {
+        string fixturePath = RepoPaths.FromRoot(
+            "Chummer.Tests",
+            "Fixtures",
+            "scope_bound_existing_windows_bytes_candidate_authority_v3.json.gz.b64");
+        byte[] compressed = Convert.FromBase64String(
+            string.Concat(File.ReadLines(fixturePath)));
+        using var input = new MemoryStream(compressed, writable: false);
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        gzip.CopyTo(output);
+        JsonObject authority = JsonNode.Parse(output.ToArray())?.AsObject()
+            ?? throw new InvalidDataException(
+                "scope-bound existing-byte authority fixture is invalid");
         DateTimeOffset now = DateTimeOffset.UtcNow;
         authority["generatedAtUtc"] = now;
         authority["expiresAtUtc"] = now.AddHours(2);
