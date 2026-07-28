@@ -881,7 +881,7 @@ public sealed class ReleaseSelectionService
             return true;
         }
 
-        if (string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(PlatformAcceptancePosture(platform), "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -985,7 +985,7 @@ public sealed class ReleaseSelectionService
 
         var label = RequestedPlatformLabel(requestedPlatform) ?? "This platform";
         var platform = ResolvePlatformAcceptance(platformAcceptance, requestedPlatform);
-        if (platform is not null && string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
+        if (platform is not null && string.Equals(PlatformAcceptancePosture(platform), "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the downloads page yet",
@@ -1169,17 +1169,34 @@ public sealed class ReleaseSelectionService
         };
     }
 
+    private static string PlatformAcceptancePosture(
+        DesktopPlatformAcceptancePlatformDocument platform)
+        => !string.IsNullOrWhiteSpace(platform.PublicShelfStatus)
+            ? platform.PublicShelfStatus
+            : platform.Eligibility;
+
+    private static string PlatformSupportability(
+        DesktopPlatformAcceptancePlatformDocument? platform)
+        => platform is null
+            ? string.Empty
+            : !string.IsNullOrWhiteSpace(platform.Supportability)
+                ? platform.Supportability
+                : platform.SupportabilityRequirement;
+
     private static string SupportabilityLabel(DesktopPlatformAcceptancePlatformDocument? platform)
-        => (platform?.Supportability ?? string.Empty).Trim().ToLowerInvariant() switch
+        => PlatformSupportability(platform).Trim().ToLowerInvariant() switch
         {
             "primary" => "primary",
             "secondary" => "secondary",
+            "named_owner_and_current_support_proof" => "named owner and current support proof",
             "account_gated_setup_script_preview" => "account-gated setup continuity",
             "account_gated_setup_script_release" => "account-gated setup-script release",
             "signed_notarized_preview" => "signed and notarized track",
             "public_archive_preview" => "guided support track",
             "signed_notarized_release" => "signed and notarized release",
-            _ => string.IsNullOrWhiteSpace(platform?.Supportability) ? "not specified" : platform!.Supportability.Replace('_', ' ')
+            _ => string.IsNullOrWhiteSpace(PlatformSupportability(platform))
+                ? "not specified"
+                : PlatformSupportability(platform).Replace('_', ' ')
         };
 
     private static int PlatformSortKey(string? platformId)

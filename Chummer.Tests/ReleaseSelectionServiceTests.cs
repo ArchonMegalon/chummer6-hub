@@ -23,6 +23,8 @@ public sealed class ReleaseSelectionServiceTests
 product: chummer
 surface: desktop_delivery
 version: 1
+policy_only: true
+current_platform_state: CURRENT_PLATFORM_STATE.generated.json
 flagship_head: Chummer.Avalonia
 fallback_head: Chummer.Blazor.Desktop
 gold_release_head_policy:
@@ -45,12 +47,12 @@ head_policies:
       - Blazor is the only visible desktop head.
 platforms:
   - id: windows
-    public_shelf_status: promoted_preview
+    eligibility: promotable_when_current_scope_and_native_proof_pass
     primary_package_kind: installer
     startup_smoke_gate: required
     signing_posture: required_for_promoted_release
     updater_mode: in_app_apply_helper
-    supportability: primary
+    supportability_requirement: named_owner_and_current_support_proof
 """);
 
             var configuration = new ConfigurationBuilder()
@@ -64,10 +66,33 @@ platforms:
             var document = loader.LoadRequiredYaml<DesktopPlatformAcceptanceDocument>(".codex-design/product/DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml");
 
             Assert.Equal("Chummer.Avalonia", document.FlagshipHead);
+            Assert.True(document.PolicyOnly);
+            Assert.Equal(
+                "CURRENT_PLATFORM_STATE.generated.json",
+                document.CurrentPlatformState);
             Assert.NotNull(document.GoldReleaseHeadPolicy);
             Assert.True(document.GoldReleaseHeadPolicy!.PrimaryPublicRouteMustBeUnique);
             Assert.Equal(2, document.HeadPolicies?.Count);
             Assert.Equal("compatibility_fallback_by_default", document.HeadPolicies?[1].Role);
+            Assert.Equal(
+                "promotable_when_current_scope_and_native_proof_pass",
+                document.Platforms?[0].Eligibility);
+            Assert.Equal(
+                "named_owner_and_current_support_proof",
+                document.Platforms?[0].SupportabilityRequirement);
+
+            File.WriteAllText(
+                Path.Combine(productRoot, "UNKNOWN_DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml"),
+                """
+product: chummer
+surface: desktop_delivery
+version: 1
+unknown_contract_field: forbidden
+""");
+            InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+                () => loader.LoadRequiredYaml<DesktopPlatformAcceptanceDocument>(
+                    ".codex-design/product/UNKNOWN_DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml"));
+            Assert.Contains("unknown_contract_field", error.Message, StringComparison.Ordinal);
         }
         finally
         {
