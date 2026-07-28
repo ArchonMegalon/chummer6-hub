@@ -4809,7 +4809,7 @@ def _validate_scope_bound_manifest_source_and_routes(
         f"/downloads/g/{generation_id}/files/{installer_name}"
     )
     payload_url = (
-        f"/downloads/g/{generation_id}/install/{artifact_id}/payload"
+        f"/downloads/g/{generation_id}/files/{payload_name}"
     )
     semantic_install_url = (
         "/downloads/install/avalonia-win-x64-installer"

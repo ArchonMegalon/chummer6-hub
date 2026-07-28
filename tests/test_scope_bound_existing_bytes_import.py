@@ -180,8 +180,7 @@ def fixture(tmp_path: Path) -> dict[str, Any]:
         "kind": "installer",
         "payloadAcquisitionMode": "download",
         "payloadDownloadUrl": (
-            f"/downloads/g/{GENERATION_ID}/install/"
-            "avalonia-win-x64-installer/payload"
+            f"/downloads/g/{GENERATION_ID}/files/{payload_name}"
         ),
         "payloadFileName": payload_name,
         "payloadSha256": payload_sha,
