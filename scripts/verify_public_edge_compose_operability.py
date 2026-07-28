@@ -46,6 +46,8 @@ CORE_GM_WORKSPACE_CONFIGURATION_KEY = (
     "Chummer__CoreGmCharacterEdits__WorkspaceStorePath"
 )
 CORE_GM_WORKSPACE_DIRECTORY = "/app/state/core-workspaces"
+REGISTRY_BASE_URL_CONFIGURATION_KEY = "CHUMMER_HUB_REGISTRY_BASE_URL"
+REGISTRY_BASE_URL_COMPOSE_VALUE = "${CHUMMER_HUB_REGISTRY_BASE_URL:-}"
 
 DEPENDENCY_CONTRACTS = {
     "chummer-public-blazor": {"chummer-presentation-api"},
@@ -272,6 +274,15 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
             failures.append(
                 "chummer-portal must provision Core delegated GM edits at "
                 f"{CORE_GM_WORKSPACE_DIRECTORY}"
+            )
+        if (
+            isinstance(environment, dict)
+            and environment.get(REGISTRY_BASE_URL_CONFIGURATION_KEY)
+            != REGISTRY_BASE_URL_COMPOSE_VALUE
+        ):
+            failures.append(
+                "chummer-portal must expose the private Registry base URL as "
+                "an explicit empty-default opt-in"
             )
 
     return failures
