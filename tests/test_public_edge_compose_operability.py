@@ -120,6 +120,19 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
+    def test_registry_runtime_binding_is_explicit_and_empty_by_default(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        del payload["services"]["chummer-portal"]["environment"][
+            module.REGISTRY_BASE_URL_CONFIGURATION_KEY
+        ]
+
+        self.assertIn(
+            "chummer-portal must expose the private Registry base URL as "
+            "an explicit empty-default opt-in",
+            module.validate_compose(payload),
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

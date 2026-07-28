@@ -309,6 +309,10 @@ services:
       CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES: ${CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES:-720}
       CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS: ${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-}
       CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER: ${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-true}
+      # Opt in only when the private Registry authority service is healthy and
+      # its CURRENT snapshot has been independently verified. Empty preserves
+      # the fail-closed file-backed public shelf during review-only staging.
+      CHUMMER_HUB_REGISTRY_BASE_URL: ${CHUMMER_HUB_REGISTRY_BASE_URL:-}
       IDENTITY_SERVICE_BASE_URL: http://chummer-run-identity:8080
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
       IDENTITY_EMAIL_START_ENABLED: ${IDENTITY_EMAIL_START_ENABLED:-false}

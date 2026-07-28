@@ -9,6 +9,12 @@ Registry note:
 The canonical promoted release record is `RELEASE_CHANNEL.generated.json`, materialized by `chummer6-hub-registry`.
 When available, Hub may consume the registry runtime endpoint directly via `CHUMMER_RELEASE_REGISTRY_CURRENT_URL`
 or `CHUMMER_HUB_REGISTRY_BASE_URL`; the file-backed manifest remains the fallback.
+The public-edge Compose contract exposes `CHUMMER_HUB_REGISTRY_BASE_URL` as an
+explicit opt-in with an empty default. For the private loopback-bound Registry
+runtime lane, set it to `http://host.docker.internal:18093` only after the
+Registry `CURRENT` response passes the exact publish-response verifier. A
+review-required snapshot is an immutable staging denominator, not publication
+or promotion authority.
 
 ## Prerequisites
 
