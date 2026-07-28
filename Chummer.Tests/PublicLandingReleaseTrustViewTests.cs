@@ -29,6 +29,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("No download or setup command is started", dispatch, StringComparison.Ordinal);
         Assert.Contains("model=\"Model.ReleaseTruthProjection\"", dispatch, StringComparison.Ordinal);
         Assert.Contains("Release routes remain inspectable, but installer handoffs", progressService, StringComparison.Ordinal);
+        Assert.Contains("ReviewRequiredPublicByteHandoffsAllowed", progressService, StringComparison.Ordinal);
+        Assert.Contains("AlignDownloadsRouteCard", progressService, StringComparison.Ordinal);
+        Assert.Contains("Exact Windows review bytes are approved for this preview", progressService, StringComparison.Ordinal);
         Assert.DoesNotContain("Working download links remain visible", progressService, StringComparison.Ordinal);
     }
 

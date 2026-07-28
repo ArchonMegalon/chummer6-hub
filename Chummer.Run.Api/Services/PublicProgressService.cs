@@ -58,16 +58,98 @@ public sealed class PublicProgressService
     private string AttachReleaseTruthHtml(string html)
     {
         PublicReleaseTruthProjectionDto projection = CurrentProjection();
+        html = AlignDownloadsRouteCard(html, projection);
         string projectionJson = JsonSerializer.Serialize(projection, JsonOptions);
-        string banner = projection.ReviewBannerRequired
-            ? $"<section data-release-truth-banner=\"{WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}\" role=\"status\"><strong>Release review required</strong><p>Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</p></section>"
-            : string.Empty;
+        string banner = projection.ReviewRequiredPublicByteHandoffsAllowed
+            ? $"<section data-release-truth-banner=\"{WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}\" role=\"status\"><strong>Review preview</strong><p>Exact Windows review bytes are approved for this preview. Supportability and stable-release claims remain withheld.</p></section>"
+            : projection.ReviewBannerRequired
+                ? $"<section data-release-truth-banner=\"{WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}\" role=\"status\"><strong>Release review required</strong><p>Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</p></section>"
+                : string.Empty;
         string marker = $"<script id=\"chummer-release-truth\" type=\"application/json\">{projectionJson}</script>{banner}";
         int bodyTag = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
         int bodyStart = bodyTag < 0 ? -1 : html.IndexOf('>', bodyTag);
         return bodyStart >= 0
             ? html.Insert(bodyStart + 1, marker)
             : marker + html;
+    }
+
+    private static string AlignDownloadsRouteCard(
+        string html,
+        PublicReleaseTruthProjectionDto projection)
+    {
+        const string routeMarker =
+            "<div class=\"route-card-path\">/downloads</div>";
+        int marker = html.IndexOf(routeMarker, StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            return html;
+        }
+
+        int articleStart = html.LastIndexOf(
+            "<article",
+            marker,
+            StringComparison.OrdinalIgnoreCase);
+        int articleClose = html.IndexOf(
+            "</article>",
+            marker,
+            StringComparison.OrdinalIgnoreCase);
+        if (articleStart < 0 || articleClose < marker)
+        {
+            return html;
+        }
+
+        int articleEnd = articleClose + "</article>".Length;
+        string badge;
+        string detail;
+        if (projection.ReviewRequiredPublicByteHandoffsAllowed)
+        {
+            badge = "Review preview";
+            detail =
+                $"{projection.ArtifactCount} exact review-preview installer handoff is authority-bound. " +
+                $"Rollout state: {projection.RolloutState}. " +
+                $"Supportability state: {projection.SupportabilityState}. " +
+                "Stable-release claims remain withheld.";
+        }
+        else if (projection.AvailabilityClaimsAllowed)
+        {
+            badge = "Available";
+            detail =
+                $"{projection.ArtifactCount} current installer artifact(s) are available. " +
+                $"Rollout state: {projection.RolloutState}. " +
+                $"Supportability state: {projection.SupportabilityState}.";
+        }
+        else
+        {
+            badge = "Withheld";
+            detail =
+                "No current installer handoff is approved. " +
+                $"Rollout state: {projection.RolloutState}. " +
+                $"Supportability state: {projection.SupportabilityState}.";
+        }
+
+        string platformSummary = projection.AvailablePlatforms.Count == 0
+            ? "No platform is currently claimed."
+            : $"Platforms in authority: {string.Join(", ", projection.AvailablePlatforms)}.";
+        string replacement = $"""
+      <article class="route-card route-card-implemented">
+        <div class="route-card-head">
+          <div>
+            {routeMarker}
+            <h3>Downloads and install truth</h3>
+          </div>
+          <span class="proof-badge proof-badge-implemented">{WebUtility.HtmlEncode(badge)}</span>
+        </div>
+        <div class="route-semantic">supportable_install</div>
+        <p>Package, install, update, rollback, and revoke claims follow the current immutable release authority.</p>
+        <div class="route-detail">{WebUtility.HtmlEncode(detail)}</div>
+        <div class="route-proof-meta"><span>{WebUtility.HtmlEncode(platformSummary)}</span><span>Download access: {WebUtility.HtmlEncode(projection.DownloadAccessPosture)}</span></div>
+        <ul class="route-evidence"><li>Release channel: {WebUtility.HtmlEncode(projection.Channel)}</li><li>Release status: {WebUtility.HtmlEncode(projection.ReleaseStatus)}</li><li>Decision: {WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}</li><li>Manifest SHA-256: {WebUtility.HtmlEncode(projection.ManifestSha256)}</li></ul>
+      </article>
+""";
+        return string.Concat(
+            html.AsSpan(0, articleStart),
+            replacement,
+            html.AsSpan(articleEnd));
     }
 
     private string AttachReleaseTruthSvg(string svg)

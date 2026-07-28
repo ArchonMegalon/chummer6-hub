@@ -40,6 +40,8 @@ def projection(**overrides):
         "registryCommit": "b" * 40,
         "releaseDecisionStatus": "stable_ready",
         "releaseDecisionSha256": "c" * 64,
+        "releaseScopeDecisionSha256": "e" * 64,
+        "artifactHandoff": None,
     }
     payload.update(overrides)
     return payload
@@ -279,6 +281,31 @@ def test_truthful_negative_installer_copy_is_not_treated_as_optimistic() -> None
     ) == withheld
 
 
+def test_review_copy_can_name_the_withheld_claim_without_becoming_optimistic() -> None:
+    module = load_module()
+    withheld = projection(
+        channel="preview",
+        rolloutState="public_release_review_required",
+        supportabilityState="review_required",
+        releaseDecisionStatus="review_required",
+    )
+    body = (
+        '<script id="chummer-release-truth" type="application/json">'
+        + json.dumps(withheld)
+        + "</script><main>"
+        "Published release notes remain inspectable without asserting that "
+        "an installer is ready. Account history remains available, but it "
+        "does not establish installer availability."
+        "</main>"
+    ).encode()
+
+    assert module.extract_route_projection(
+        route="/now",
+        headers={module.PROJECTION_HEADER: encode_header(withheld)},
+        body=body,
+        content_type="text/html",
+    ) == withheld
+
 def test_rendered_platform_claims_must_match_available_platforms() -> None:
     module = load_module()
     mac_preview = projection(
@@ -498,7 +525,7 @@ def test_compatibility_manifest_prefers_canonical_platform_id_over_display_label
             },
             {
                 "platform": "Avalonia Desktop Windows X64 Installer",
-                "platformId": "windows",
+                "platformId": "windows-x64",
                 "head": "avalonia",
                 "installAccessClass": "open_public",
             },

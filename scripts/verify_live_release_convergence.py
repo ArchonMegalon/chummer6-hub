@@ -40,6 +40,8 @@ REQUIRED_FIELDS = (
     "registryCommit",
     "releaseDecisionStatus",
     "releaseDecisionSha256",
+    "releaseScopeDecisionSha256",
+    "artifactHandoff",
 )
 DEFAULT_ROUTES = (
     "/",
@@ -129,6 +131,15 @@ RENDERED_WITHHELD_PATTERNS = (
         r"\bdownloads?\s+(?:(?:is|are)\s+)?(?:paused|unavailable|withheld)\b"
     ),
     re.compile(r"\bno\s+current\s+build\s+has\s+passed\s+release\s+verification\b"),
+    re.compile(
+        r"\bwithout\s+(?:asserting|claiming)\s+that\s+"
+        r"(?:an?|the)\s+(?:build|installer|download)\s+"
+        r"(?:is\s+)?(?:ready|available|live)\b"
+    ),
+    re.compile(
+        r"\bdo(?:es)?\s+not\s+establish\s+"
+        r"(?:build|installer|download)\s+availability\b"
+    ),
 )
 PLATFORM_TOKEN_PATTERN = re.compile(r"\b(?:windows|linux|mac(?:os|\s+os)?)\b")
 PLATFORM_CLAIM_PATTERN = re.compile(
@@ -246,6 +257,7 @@ def canonicalize_projection(payload: Any, *, source: str) -> dict[str, Any]:
         "registryCommit",
         "releaseDecisionStatus",
         "releaseDecisionSha256",
+        "releaseScopeDecisionSha256",
     )
     for field in scalar_fields:
         value = projection[field]
@@ -328,8 +340,70 @@ def canonicalize_projection(payload: Any, *, source: str) -> dict[str, Any]:
         raise ConvergenceError(f"{source}: manifestSha256 is not immutable authority SHA-256")
     if not SHA256_PATTERN.fullmatch(projection["releaseDecisionSha256"]):
         raise ConvergenceError(f"{source}: releaseDecisionSha256 is not a SHA-256")
+    if not SHA256_PATTERN.fullmatch(projection["releaseScopeDecisionSha256"]):
+        raise ConvergenceError(
+            f"{source}: releaseScopeDecisionSha256 is not a SHA-256"
+        )
     if not GIT_COMMIT_PATTERN.fullmatch(projection["registryCommit"]):
         raise ConvergenceError(f"{source}: registryCommit is not a Git commit ID")
+
+    handoff = projection["artifactHandoff"]
+    if handoff is not None:
+        handoff_fields = {
+            "contractName",
+            "status",
+            "sourcePublicationState",
+            "releaseScopeDecisionSha256",
+            "releaseVersion",
+            "channel",
+            "artifactId",
+            "head",
+            "platform",
+            "rid",
+            "arch",
+            "sha256",
+            "sizeBytes",
+            "artifactAccessClass",
+            "signingRequirement",
+            "downloadUrl",
+            "publicInstallRoute",
+        }
+        if not isinstance(handoff, dict) or set(handoff) != handoff_fields:
+            raise ConvergenceError(
+                f"{source}: artifactHandoff must be null or the exact v1 contract"
+            )
+        handoff_scalar_fields = handoff_fields - {"sizeBytes"}
+        if any(
+            not isinstance(handoff[field], str)
+            or not handoff[field]
+            or handoff[field] != handoff[field].strip()
+            or len(handoff[field]) > 512
+            for field in handoff_scalar_fields
+        ):
+            raise ConvergenceError(
+                f"{source}: artifactHandoff strings must be canonical and bounded"
+            )
+        if (
+            handoff["contractName"] != "chummer.public-preview-byte-handoff/v1"
+            or handoff["status"] != "approved_public_preview_bytes"
+            or handoff["sourcePublicationState"] != "preview"
+            or handoff["channel"] != projection["channel"]
+            or handoff["releaseVersion"] != projection["releaseVersion"]
+            or handoff["releaseScopeDecisionSha256"]
+            != projection["releaseScopeDecisionSha256"]
+            or not SHA256_PATTERN.fullmatch(handoff["sha256"])
+            or not SHA256_PATTERN.fullmatch(
+                handoff["releaseScopeDecisionSha256"]
+            )
+            or isinstance(handoff["sizeBytes"], bool)
+            or not isinstance(handoff["sizeBytes"], int)
+            or handoff["sizeBytes"] <= 0
+            or not handoff["downloadUrl"].startswith("/")
+            or not handoff["publicInstallRoute"].startswith("/downloads/install/")
+        ):
+            raise ConvergenceError(
+                f"{source}: artifactHandoff authority binding is invalid"
+            )
 
     return {
         "contractName": PROJECTION_CONTRACT,
@@ -630,11 +704,12 @@ def _validate_native_manifest_claims(
             access_classes: list[str] = []
             platform_heads: set[tuple[str, str]] = set()
             for index, artifact in enumerate(rows):
-                platform = _native_artifact_string(
+                raw_platform = _native_artifact_string(
                     artifact,
                     ("platformId",) if "platformId" in artifact else ("platform",),
                     source=f"{source}: native {field}[{index}]",
                 )
+                platform = _platform_family(raw_platform) or raw_platform
                 head = _native_artifact_string(
                     artifact,
                     ("head", "headId"),
