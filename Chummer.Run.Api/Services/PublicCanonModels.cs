@@ -347,6 +347,8 @@ internal sealed class DesktopPlatformAcceptanceDocument
     public string Product { get; init; } = string.Empty;
     public string Surface { get; init; } = string.Empty;
     public int Version { get; init; }
+    public bool PolicyOnly { get; init; }
+    public string CurrentPlatformState { get; init; } = string.Empty;
     public string FlagshipHead { get; init; } = string.Empty;
     public string FallbackHead { get; init; } = string.Empty;
     public DesktopPlatformAcceptanceGoldReleaseHeadPolicyDocument? GoldReleaseHeadPolicy { get; init; }
@@ -376,12 +378,14 @@ internal sealed class DesktopPlatformAcceptancePlatformDocument
 {
     public string Id { get; init; } = string.Empty;
     public string PublicShelfStatus { get; init; } = string.Empty;
+    public string Eligibility { get; init; } = string.Empty;
     public string PrimaryPackageKind { get; init; } = string.Empty;
     public List<string>? FallbackPackageKinds { get; init; }
     public string StartupSmokeGate { get; init; } = string.Empty;
     public string SigningPosture { get; init; } = string.Empty;
     public string UpdaterMode { get; init; } = string.Empty;
     public string Supportability { get; init; } = string.Empty;
+    public string SupportabilityRequirement { get; init; } = string.Empty;
     public string? PublicManifestVisibility { get; init; }
     public string? PublicPromotionGate { get; init; }
 }
