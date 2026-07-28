@@ -614,6 +614,8 @@ public sealed class ReleaseBundlePromotionServiceTests
     public async Task ScopeBoundExistingBytesCandidateStagesRegistryReviewManifest()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
+        ReleaseDesktopTupleScope exactWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
         string bundle = fixture.CreateBundle(
             "run-scope-bound-existing-windows",
             [
@@ -633,7 +635,8 @@ public sealed class ReleaseBundlePromotionServiceTests
                     PayloadFileName: "chummer-avalonia-win-x64-payload.zip",
                     PayloadBytes: "windows-existing-payload"u8.ToArray())
             ],
-            includeBuildProvenance: false);
+            includeBuildProvenance: false,
+            exactDesktopScope: exactWindows);
         foreach (string manifestName in new[]
                  {
                      "releases.json",
@@ -643,8 +646,6 @@ public sealed class ReleaseBundlePromotionServiceTests
             fixture.RewriteBundleManifest(bundle, manifestName, manifest =>
                 manifest["releaseProof"]!.AsObject().Remove("flagshipReadiness"));
         }
-        ReleaseDesktopTupleScope exactWindows = ReleaseDesktopTupleScope.Parse(
-            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
         var binding = new ReleaseUploadCandidateSessionBinding(
             SnapshotSha256: new string('1', 64),
             AuthoritySha256: new string('2', 64),

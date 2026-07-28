@@ -1896,11 +1896,13 @@ public sealed class ReleaseBundlePromotionService
         CancellationToken cancellationToken)
     {
         exactIncomingDesktopScope?.ValidateCanonical();
+        bool scopeBoundExistingBytesCandidate =
+            IsScopeBoundExistingBytesCandidate(candidateImportBinding);
         PreparedReleaseBundle prepared = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta,
-            IsScopeBoundExistingBytesCandidate(candidateImportBinding));
+            scopeBoundExistingBytesCandidate);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
         ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
@@ -1961,7 +1963,8 @@ public sealed class ReleaseBundlePromotionService
                 compatibilitySha256,
                 canonicalSha256,
                 exactIncomingDesktopScope,
-                exactIncomingDesktopScopeIsFreshDelta);
+                exactIncomingDesktopScopeIsFreshDelta,
+                scopeBoundExistingBytesCandidate);
             IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(stagedRoot);
             string inventoryDigest = ComputeInventoryDigest(inventory);
             string candidatePath = Path.Combine(stagedRoot, ActivationCandidateName);
@@ -2010,7 +2013,8 @@ public sealed class ReleaseBundlePromotionService
                     inventory,
                     prepared.PromotedArtifactIds,
                     exactIncomingDesktopScope,
-                    exactIncomingDesktopScopeIsFreshDelta);
+                    exactIncomingDesktopScopeIsFreshDelta,
+                    scopeBoundExistingBytesCandidate);
                 return BuildStageResult(existingReceipt);
             }
             string activationReceiptId = BuildPreparedActivationReceiptId(stageReceiptId, inventoryDigest);
@@ -2027,7 +2031,8 @@ public sealed class ReleaseBundlePromotionService
                 inventory,
                 prepared.PromotedArtifactIds,
                 exactIncomingDesktopScope,
-                exactIncomingDesktopScopeIsFreshDelta);
+                exactIncomingDesktopScopeIsFreshDelta,
+                scopeBoundExistingBytesCandidate);
             FlushTreeDurably(stagedRoot);
             NotifyCheckpoint(PromotionCheckpoint.StagedShelfValidated);
             cancellationToken.ThrowIfCancellationRequested();
@@ -2042,7 +2047,8 @@ public sealed class ReleaseBundlePromotionService
                     inventory,
                     prepared.PromotedArtifactIds,
                     exactIncomingDesktopScope,
-                    exactIncomingDesktopScopeIsFreshDelta);
+                    exactIncomingDesktopScopeIsFreshDelta,
+                    scopeBoundExistingBytesCandidate);
             }
             else
             {
@@ -2439,7 +2445,8 @@ public sealed class ReleaseBundlePromotionService
             incomingCompatibilityManifest,
             incomingCanonicalArtifacts,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            candidateAuthorityPrevalidatedExistingBytes);
         ValidateNoDesktopInstallTupleRegression(
             null,
             incomingCanonicalManifest,
@@ -4078,7 +4085,8 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<ActivationInventoryEntry> expectedInventory,
         IReadOnlyList<string> artifactIds,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool candidateAuthorityPrevalidatedExistingBytes = false)
     {
         if (!Directory.Exists(generationRoot) || File.Exists(generationRoot))
         {
@@ -4096,7 +4104,8 @@ public sealed class ReleaseBundlePromotionService
             expectedInventory,
             artifactIds,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            candidateAuthorityPrevalidatedExistingBytes);
         foreach (string name in new[]
                  {
                      ActivationCandidateName,
@@ -4160,7 +4169,8 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<ActivationInventoryEntry> expectedInventory,
         IReadOnlyList<string> promotedArtifactIds,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope = null,
-        bool exactIncomingDesktopScopeIsFreshDelta = false)
+        bool exactIncomingDesktopScopeIsFreshDelta = false,
+        bool candidateAuthorityPrevalidatedExistingBytes = false)
     {
         ValidateIncomingDesktopScopeProfile(
             exactIncomingDesktopScope,
@@ -4174,7 +4184,8 @@ public sealed class ReleaseBundlePromotionService
             pointer.Manifests.Compatibility.Sha256,
             pointer.Manifests.Canonical.Sha256,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            candidateAuthorityPrevalidatedExistingBytes);
         if (!string.Equals(manifest.Version, pointer.ReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(manifest.Channel, pointer.Channel, StringComparison.Ordinal)
             || manifest.PublishedAt.ToUniversalTime()
@@ -7060,7 +7071,8 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto compatibilityManifest,
         IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool candidateAuthorityPrevalidatedExistingBytes)
     {
         RequireRegistryContract(compatibility, CompatibilityManifestName);
         RequireRegistryContract(canonical, CanonicalManifestName);
@@ -7132,7 +7144,8 @@ public sealed class ReleaseBundlePromotionService
             canonical,
             canonicalArtifacts,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            candidateAuthorityPrevalidatedExistingBytes);
     }
 
     private static void RequireRegistryContract(JsonObject manifest, string label)
@@ -7360,7 +7373,8 @@ public sealed class ReleaseBundlePromotionService
         JsonObject canonical,
         IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool candidateAuthorityPrevalidatedExistingBytes)
     {
         if (exactIncomingDesktopScopeIsFreshDelta
             && string.Equals(
@@ -7375,7 +7389,10 @@ public sealed class ReleaseBundlePromotionService
             return;
         }
         ReleaseDesktopTupleScope? completeShelfScope =
-            exactIncomingDesktopScopeIsFreshDelta ? null : exactIncomingDesktopScope;
+            exactIncomingDesktopScopeIsFreshDelta
+            && !candidateAuthorityPrevalidatedExistingBytes
+                ? null
+                : exactIncomingDesktopScope;
         IReadOnlyList<string> requiredDesktopPlatforms =
             completeShelfScope?.RequiredPlatforms ?? RequiredDesktopPlatforms;
         IReadOnlyList<string> requiredDesktopHeads =
@@ -10955,7 +10972,8 @@ public sealed class ReleaseBundlePromotionService
         string expectedCompatibilitySha256,
         string expectedCanonicalSha256,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope = null,
-        bool exactIncomingDesktopScopeIsFreshDelta = false)
+        bool exactIncomingDesktopScopeIsFreshDelta = false,
+        bool candidateAuthorityPrevalidatedExistingBytes = false)
     {
         if (!File.Exists(liveCompatibilityManifestPath))
         {
@@ -11011,7 +11029,8 @@ public sealed class ReleaseBundlePromotionService
             liveCompatibilityManifest,
             liveCanonicalArtifacts,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            candidateAuthorityPrevalidatedExistingBytes);
         HashSet<string> liveCanonicalIds = liveCanonicalArtifacts
             .Select(static artifact => artifact.ArtifactId)
             .Where(static id => !string.IsNullOrWhiteSpace(id))
