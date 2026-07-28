@@ -50,6 +50,8 @@ COMPARED_FIELDS = [
     "registryCommit",
     "releaseDecisionStatus",
     "releaseDecisionSha256",
+    "releaseScopeDecisionSha256",
+    "artifactHandoff",
 ]
 
 
@@ -117,6 +119,8 @@ def _convergence(role: str, generated_at: dt.datetime) -> dict[str, object]:
         "registryCommit": "4" * 40,
         "releaseDecisionStatus": "preview_ready",
         "releaseDecisionSha256": TARGET["decisionSha256"],
+        "releaseScopeDecisionSha256": "1" * 64,
+        "artifactHandoff": None,
     }
     if role == "generation":
         checked_routes = set(

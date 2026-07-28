@@ -706,6 +706,8 @@ def build_release_truth(binding: dict[str, str]) -> dict[str, object]:
         "registryCommit": "4" * 40,
         "releaseDecisionStatus": "preview_ready",
         "releaseDecisionSha256": binding["decisionSha256"],
+        "releaseScopeDecisionSha256": digest("release-scope-decision"),
+        "artifactHandoff": None,
     }
 
 

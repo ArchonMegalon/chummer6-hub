@@ -44,6 +44,8 @@ def release_truth():
         "registryCommit": "b" * 40,
         "releaseDecisionStatus": "stable_ready",
         "releaseDecisionSha256": "c" * 64,
+        "releaseScopeDecisionSha256": "e" * 64,
+        "artifactHandoff": None,
     }
 
 
