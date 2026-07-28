@@ -529,11 +529,19 @@ public sealed class ReleaseBundlePromotionService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(candidateImportBinding);
-        return ValidateDirectoryAsync(
+        if (string.IsNullOrWhiteSpace(bundleRoot))
+        {
+            throw new InvalidDataException("bundle root is required.");
+        }
+        exactIncomingDesktopScope?.ValidateCanonical();
+
+        cancellationToken.ThrowIfCancellationRequested();
+        _ = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
             candidateImportBinding.ExactIncomingDesktopScopeIsFreshDelta,
-            cancellationToken);
+            IsScopeBoundExistingBytesCandidate(candidateImportBinding));
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -1891,7 +1899,8 @@ public sealed class ReleaseBundlePromotionService
         PreparedReleaseBundle prepared = PrepareBundle(
             bundleRoot,
             exactIncomingDesktopScope,
-            exactIncomingDesktopScopeIsFreshDelta);
+            exactIncomingDesktopScopeIsFreshDelta,
+            IsScopeBoundExistingBytesCandidate(candidateImportBinding));
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
         ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
@@ -2359,11 +2368,22 @@ public sealed class ReleaseBundlePromotionService
     private PreparedReleaseBundle PrepareBundle(
         string bundleRoot,
         ReleaseDesktopTupleScope? exactIncomingDesktopScope,
-        bool exactIncomingDesktopScopeIsFreshDelta)
+        bool exactIncomingDesktopScopeIsFreshDelta,
+        bool candidateAuthorityPrevalidatedExistingBytes = false)
     {
         ValidateIncomingDesktopScopeProfile(
             exactIncomingDesktopScope,
             exactIncomingDesktopScopeIsFreshDelta);
+        if (candidateAuthorityPrevalidatedExistingBytes
+            && (!exactIncomingDesktopScopeIsFreshDelta
+                || !string.Equals(
+                    exactIncomingDesktopScope?.ToTransport(),
+                    ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope,
+                    StringComparison.Ordinal)))
+        {
+            throw new InvalidDataException(
+                "scope-bound existing-byte candidate requires the exact authenticated Windows fresh-delta scope.");
+        }
         string compatibilityManifestPath = RequireSingleFile(bundleRoot, CompatibilityManifestName);
         string canonicalManifestPath = RequireSingleFile(bundleRoot, CanonicalManifestName);
         string filesRoot = RequireSiblingDirectory(compatibilityManifestPath, "files");
@@ -2404,6 +2424,8 @@ public sealed class ReleaseBundlePromotionService
             incomingCompatibilityManifest,
             incomingCanonicalManifest,
             allowReviewRequiredProof: true,
+            releaseProofAlreadyValidatedBeforeGenerationBinding:
+                candidateAuthorityPrevalidatedExistingBytes,
             allowExactUnsignedWindowsFreshDeltaProof: unsignedWindowsFreshDeltaProfile);
         ValidatePassedReleaseProofPublicationWindow(incomingCompatibilityManifest);
 
@@ -2432,7 +2454,8 @@ public sealed class ReleaseBundlePromotionService
             _timeProvider.GetUtcNow(),
             unsignedWindowsFreshDeltaProfile,
             profileAncillaryFiles);
-        if (!unsignedWindowsFreshDeltaProfile)
+        if (!unsignedWindowsFreshDeltaProfile
+            && !candidateAuthorityPrevalidatedExistingBytes)
         {
             ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
         }
@@ -2456,6 +2479,15 @@ public sealed class ReleaseBundlePromotionService
             unsignedWindowsFreshDeltaProfile,
             profileAncillaryFiles);
     }
+
+    private static bool IsScopeBoundExistingBytesCandidate(
+        ReleaseUploadCandidateSessionBinding? binding)
+        => binding is
+        {
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: null,
+            NativeEvidenceBinding: null
+        };
 
     private sealed record PreparedReleaseBundle(
         PublicReleaseManifestDto CompatibilityManifest,
@@ -4969,8 +5001,8 @@ public sealed class ReleaseBundlePromotionService
             || !IsBareLowerSha256(binding.BundleIdentitySha256)
             || !IsBareLowerSha256(binding.CanonicalManifestSha256)
             || !IsBareLowerSha256(binding.InventorySha256)
-            || binding.ExactIncomingDesktopScopeIsFreshDelta
-               != (binding.IncumbentBinding is not null)
+            || binding.IncumbentBinding is not null
+               && !binding.ExactIncomingDesktopScopeIsFreshDelta
             || binding.IncumbentBinding is { } incumbent
                && (!IsBareLowerSha256(incumbent.SnapshotSha256)
                    || !IsBareLowerSha256(incumbent.FullShelfInventorySha256)
@@ -8873,6 +8905,10 @@ public sealed class ReleaseBundlePromotionService
                 throw new InvalidDataException(
                     "legacy candidate validation cannot carry an unsigned-v3 incumbent binding.");
             }
+            return;
+        }
+        if (IsScopeBoundExistingBytesCandidate(candidateImportBinding))
+        {
             return;
         }
 

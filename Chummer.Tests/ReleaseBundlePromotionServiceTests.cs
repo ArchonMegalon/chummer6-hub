@@ -611,6 +611,61 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task ScopeBoundExistingBytesCandidateStagesRegistryReviewManifest()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundle = fixture.CreateBundle(
+            "run-scope-bound-existing-windows",
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-existing-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "unsigned",
+                    InstallAccessClass: "open_public",
+                    InstallerMode: "bootstrap",
+                    PayloadFileName: "chummer-avalonia-win-x64-payload.zip",
+                    PayloadBytes: "windows-existing-payload"u8.ToArray())
+            ],
+            includeBuildProvenance: false);
+        foreach (string manifestName in new[]
+                 {
+                     "releases.json",
+                     "RELEASE_CHANNEL.generated.json"
+                 })
+        {
+            fixture.RewriteBundleManifest(bundle, manifestName, manifest =>
+                manifest["releaseProof"]!.AsObject().Remove("flagshipReadiness"));
+        }
+        ReleaseDesktopTupleScope exactWindows = ReleaseDesktopTupleScope.Parse(
+            ReleaseUploadSnapshotAuthorityService.CandidateExactIncomingDesktopScope);
+        var binding = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64),
+            ExactIncomingDesktopScopeIsFreshDelta: true,
+            IncumbentBinding: null);
+
+        ReleaseBundleStageResult staged = await fixture.StageAsync(
+            bundle,
+            Guid.NewGuid().ToString("N"),
+            exactDesktopScope: exactWindows,
+            candidateImportBinding: binding);
+
+        Assert.Equal(exactWindows.ToTransport(), staged.ExactIncomingDesktopScope);
+        Assert.True(staged.ExactIncomingDesktopScopeIsFreshDelta);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "current.json")));
+    }
+
+    [Fact]
     public async Task CandidateFreshWindowsDeltaBindsStillActiveIncumbentAndPreviousPointer()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
