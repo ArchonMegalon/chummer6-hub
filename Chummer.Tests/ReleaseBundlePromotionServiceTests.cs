@@ -658,6 +658,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             bundle,
             Guid.NewGuid().ToString("N"),
             exactDesktopScope: exactWindows,
+            evaluationInstant: DateTimeOffset.Parse("2026-04-05T20:00:00Z"),
             candidateImportBinding: binding);
 
         Assert.Equal(exactWindows.ToTransport(), staged.ExactIncomingDesktopScope);

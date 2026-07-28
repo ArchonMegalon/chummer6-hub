@@ -2427,7 +2427,10 @@ public sealed class ReleaseBundlePromotionService
             releaseProofAlreadyValidatedBeforeGenerationBinding:
                 candidateAuthorityPrevalidatedExistingBytes,
             allowExactUnsignedWindowsFreshDeltaProof: unsignedWindowsFreshDeltaProfile);
-        ValidatePassedReleaseProofPublicationWindow(incomingCompatibilityManifest);
+        if (!candidateAuthorityPrevalidatedExistingBytes)
+        {
+            ValidatePassedReleaseProofPublicationWindow(incomingCompatibilityManifest);
+        }
 
         IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
         ValidateRegistryAuthoredManifestPair(
