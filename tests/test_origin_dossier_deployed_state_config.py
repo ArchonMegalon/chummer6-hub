@@ -16,6 +16,20 @@ def test_public_edge_configures_origin_publication_index_on_persistent_state_vol
     assert "CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX: /tmp/" not in source
 
 
+def test_origin_media_storage_initializer_can_harden_paths_after_chown() -> None:
+    source = COMPOSE.read_text(encoding="utf-8")
+    service = source.split("  chummer-origin-media-storage-init:", 1)[1].split(
+        "\n  chummer-origin-media-worker:",
+        1,
+    )[0]
+
+    assert "cap_drop:\n      - ALL" in service
+    assert "      - CHOWN" in service
+    assert "      - DAC_OVERRIDE" in service
+    assert "      - FOWNER" in service
+    assert "chmod 0700 /origin-media" in service
+
+
 def test_public_edge_forwards_origin_provider_registry_and_visual_runtime_env() -> None:
     source = COMPOSE.read_text(encoding="utf-8")
 
