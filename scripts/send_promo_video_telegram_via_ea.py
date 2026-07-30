@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -31,6 +32,18 @@ def load_env(path: Path) -> None:
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def sha256_text(value: object) -> str:
+    return hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def main() -> int:
@@ -103,17 +116,22 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     receipt_name = str(args.receipt_name or f"{video.stem}.telegram.receipt.json").strip()
     payload = {
+        "contract_name": "ea.telegram_media_live_delivery_receipt.v1",
+        "operation": "telegram_media_delivery",
         "generated_at_utc": utc_now(),
+        "delivered_at_utc": utc_now(),
         "status": "sent",
         "transport": transport,
         "delivery_mode": delivery_mode,
-        "principal_id": receipt.principal_id,
-        "chat_id": receipt.chat_id,
-        "bot_key": receipt.bot_key,
-        "bot_handle": receipt.bot_handle,
-        "message_ids": list(receipt.message_ids),
-        "video": str(video),
-        "caption": args.caption,
+        "principal_ref_hash": sha256_text(receipt.principal_id),
+        "chat_ref_hash": sha256_text(receipt.chat_id),
+        "bot_ref_hash": sha256_text(f"{receipt.bot_key}|{receipt.bot_handle}"),
+        "message_ref_hashes": [sha256_text(value) for value in receipt.message_ids],
+        "artifact_name": video.name,
+        "artifact_sha256": sha256_file(video),
+        "artifact_bytes": video.stat().st_size,
+        "caption_sha256": sha256_text(args.caption),
+        "raw_identifiers_included": False,
     }
     receipt_path = OUT / receipt_name
     receipt_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
