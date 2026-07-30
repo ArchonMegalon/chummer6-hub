@@ -6078,6 +6078,22 @@ public sealed class ReleaseBundlePromotionService
             List<JsonObject> revokedRoutes = rows
                 .Where(RouteTruthIsRevoked)
                 .ToList();
+            List<JsonObject> readinessRecommendedRoutes = recommendedRoutes
+                .Where(row => string.Equals(
+                    RouteTruthPublicationState(row, proofFreshnessStatus),
+                    "published",
+                    StringComparison.Ordinal))
+                .ToList();
+            List<JsonObject> readinessFallbackRoutes = fallbackRoutes
+                .Where(row => string.Equals(
+                    RouteTruthPublicationState(row, proofFreshnessStatus),
+                    "retained",
+                    StringComparison.Ordinal))
+                .ToList();
+            blockedRoutes.AddRange(
+                recommendedRoutes.Where(row => !readinessRecommendedRoutes.Contains(row)));
+            blockedRoutes.AddRange(
+                fallbackRoutes.Where(row => !readinessFallbackRoutes.Contains(row)));
 
             Dictionary<string, JsonObject> artifactsById = (manifest["artifacts"] as JsonArray ?? new JsonArray())
                 .OfType<JsonObject>()
@@ -6089,14 +6105,14 @@ public sealed class ReleaseBundlePromotionService
                 .Where(static item => !string.IsNullOrWhiteSpace(item.ArtifactId))
                 .ToDictionary(static item => item.ArtifactId, static item => item.Artifact, StringComparer.OrdinalIgnoreCase);
 
-            recommendedRouteCount = recommendedRoutes.Count;
-            fallbackRouteCount = fallbackRoutes.Count;
+            recommendedRouteCount = readinessRecommendedRoutes.Count;
+            fallbackRouteCount = readinessFallbackRoutes.Count;
             blockedRouteCount = blockedRoutes.Count;
             revokedRouteCount = revokedRoutes.Count;
 
             publicInstallCount = 0;
             accountLinkedInstallCount = 0;
-            foreach (JsonObject row in recommendedRoutes)
+            foreach (JsonObject row in readinessRecommendedRoutes)
             {
                 string artifactId = (GetJsonString(row["artifactId"]) ?? string.Empty).Trim();
                 if (!artifactsById.TryGetValue(artifactId, out JsonObject? artifact))
@@ -6222,6 +6238,33 @@ public sealed class ReleaseBundlePromotionService
     private static bool RouteTruthIsRevoked(JsonObject row)
         => string.Equals(NormalizeToken(GetJsonString(row["revokeState"])), "revoked", StringComparison.Ordinal)
             || string.Equals(NormalizeToken(GetJsonString(row["promotionState"])), "revoked", StringComparison.Ordinal);
+
+    private static string RouteTruthPublicationState(JsonObject row, string proofFreshnessStatus)
+    {
+        string explicitState = NormalizeToken(
+            GetJsonString(row["publicationState"])
+            ?? GetJsonString(row["publication_state"]));
+        string state = explicitState is "preview" or "published" or "revoked" or "retained"
+            ? explicitState
+            : RouteTruthIsRevoked(row)
+                ? "revoked"
+                : string.Equals(
+                    NormalizeToken(GetJsonString(row["promotionState"])),
+                    "promoted",
+                    StringComparison.Ordinal)
+                    ? "published"
+                    : string.Equals(
+                        NormalizeToken(GetJsonString(row["routeRole"])),
+                        "fallback",
+                        StringComparison.Ordinal)
+                        ? "retained"
+                        : "preview";
+
+        return ProofFreshnessBlocksOutputReadiness(proofFreshnessStatus)
+            && (state is "published" or "retained")
+                ? "preview"
+                : state;
+    }
 
     private static bool RouteTruthIsPreviewOnlyFallback(JsonObject row)
         => string.Equals(NormalizeToken(GetJsonString(row["routeRole"])), "fallback", StringComparison.Ordinal)
@@ -6404,7 +6447,8 @@ public sealed class ReleaseBundlePromotionService
         foreach (JsonObject routeRow in desktopRouteTruth.OfType<JsonObject>())
         {
             string artifactId = ExpectedInstallerArtifactIdForRoute(routeRow);
-            if (string.IsNullOrWhiteSpace(artifactId))
+            if (string.IsNullOrWhiteSpace(artifactId)
+                || !artifactById.ContainsKey(NormalizeToken(artifactId)))
             {
                 continue;
             }

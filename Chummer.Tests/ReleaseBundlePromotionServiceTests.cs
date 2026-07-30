@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Compression;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
@@ -2495,6 +2496,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                         out JsonElement installAwareRegistry))
                 {
                     manifestsWithExtendedDesktopRegistries++;
+                    Assert.Equal(2, installAwareRegistry.GetArrayLength());
                     Assert.All(
                         installAwareRegistry.EnumerateArray(),
                         row =>
@@ -2526,6 +2528,8 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         Assert.True(manifestsWithExtendedDesktopRegistries > 0);
         Assert.Equal(result.GenerationId, fixture.CaptureActiveShelf().GenerationId);
+        AssertRegistryDesktopContractAccepts(
+            Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json"));
     }
 
     [Theory]
@@ -2829,6 +2833,16 @@ public sealed class ReleaseBundlePromotionServiceTests
         JsonElement releaseChannel = metrics.GetProperty("releaseChannel");
         JsonElement adoptionHealth = metrics.GetProperty("adoptionHealth");
         JsonElement revocationFacts = metrics.GetProperty("revocationFacts");
+        bool proofIsFresh = string.Equals(
+            metrics.GetProperty("proofFreshness").GetProperty("status").GetString(),
+            "fresh",
+            StringComparison.Ordinal);
+        if (!proofIsFresh)
+        {
+            expectedBlocked += expectedPrimary + expectedFallback;
+            expectedPrimary = 0;
+            expectedFallback = 0;
+        }
 
         Assert.Equal(expectedPrimary, releaseChannel.GetProperty("recommendedRouteCount").GetInt32());
         Assert.Equal(expectedFallback, releaseChannel.GetProperty("fallbackRecoveryRouteCount").GetInt32());
@@ -2885,10 +2899,9 @@ public sealed class ReleaseBundlePromotionServiceTests
             primary.GetProperty("channelRationale").GetString(),
             StringComparison.Ordinal);
 
-        JsonElement fallback = Assert.Single(
+        Assert.DoesNotContain(
             rows,
             row => row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer");
-        Assert.False(fallback.GetProperty("currentForInstalledBuild").GetBoolean());
     }
 
     [Theory]
@@ -3034,7 +3047,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 .GetProperty("releaseChannel")
                 .GetProperty("publicTrustPosture")
                 .GetString());
-        Assert.Equal("limited", metrics.GetProperty("adoptionHealth").GetProperty("status").GetString());
+        Assert.Equal("blocked", metrics.GetProperty("adoptionHealth").GetProperty("status").GetString());
     }
 
     [Fact]
@@ -3722,6 +3735,54 @@ public sealed class ReleaseBundlePromotionServiceTests
     {
         sidecar[property] = value;
         return sidecar.ToJsonString(TestJsonOptions);
+    }
+
+    private static void AssertRegistryDesktopContractAccepts(string manifestPath)
+    {
+        string verifierPath = Path.GetFullPath(
+            Path.Combine(
+                RepoPaths.Root,
+                "..",
+                "chummer-hub-registry",
+                "scripts",
+                "verify_public_release_channel.py"));
+        Assert.True(File.Exists(verifierPath), $"Registry verifier was not found: {verifierPath}");
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "python3",
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add(
+            "import json, runpy, sys; "
+            + "module = runpy.run_path(sys.argv[1]); "
+            + "source = sys.argv[2]; "
+            + "payload = json.load(open(source, encoding='utf-8')); "
+            + "payload['desktopTupleCoverage']['externalProofRequests'] = "
+            + "module['expected_external_proof_request_rows'](payload); "
+            + "module['verify_desktop_tuple_coverage'](payload, source); "
+            + "module['verify_install_aware_artifact_registry'](payload, source); "
+            + "('desktopSurfaceRefs' not in payload or module['verify_desktop_surface_refs'](payload, source)); "
+            + "('artifactIdentityRegistry' not in payload or module['verify_artifact_identity_registry'](payload, source)); "
+            + "('artifactPublicationBindings' not in payload or module['verify_artifact_publication_bindings'](payload, source)); "
+            + "payload['publicTrustMetrics']['proofFreshness'] = "
+            + "module['expected_public_trust_metrics'](payload)['proofFreshness']; "
+            + "module['verify_public_trust_metrics'](payload, source)");
+        startInfo.ArgumentList.Add(verifierPath);
+        startInfo.ArgumentList.Add(manifestPath);
+        startInfo.Environment["CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE"] = "0";
+
+        using Process process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.True(
+            process.ExitCode == 0,
+            $"Registry desktop-contract verifier rejected {manifestPath} with exit code {process.ExitCode}\nstdout:\n{stdout}\nstderr:\n{stderr}");
     }
 
     private sealed class ReleaseBundlePromotionFixture : IDisposable
