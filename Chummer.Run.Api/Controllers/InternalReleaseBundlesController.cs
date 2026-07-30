@@ -455,10 +455,22 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         }
 
         bool activationIntentRecorded = false;
+        ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease? completionLease = null;
         try
         {
-            using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+            completionLease =
                 _uploadSessions.BeginCompletion(sessionId, authorization!.AuthorizationBinding);
+            ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+                completionLease;
+            if (completion.RejectionReason is not null)
+            {
+                return BuildProblem(
+                    StatusCodes.Status400BadRequest,
+                    "Upload session promotion rejected",
+                    completion.RejectionReason,
+                    "https://chummer.run/problems/release-bundle/rejected");
+            }
+
             if (completion.CompletedResult is not null)
             {
                 ReleaseBundlePromotionResult completedResult = completion.CompletedResult;
@@ -599,6 +611,29 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 return BuildPublicationOutcomeUnknown();
             }
 
+            if (completionLease is not null)
+            {
+                try
+                {
+                    completionLease.MarkRejected(ex.Message);
+                }
+                catch (Exception terminalizationException) when (
+                    terminalizationException is InvalidDataException
+                        or InvalidOperationException
+                        or JsonException
+                        or NotSupportedException
+                        or IOException
+                        or UnauthorizedAccessException)
+                {
+                    LogSessionInfrastructureFailure(terminalizationException);
+                    return BuildProblem(
+                        StatusCodes.Status503ServiceUnavailable,
+                        "Release upload infrastructure failure",
+                        "release upload rejection could not be durably recorded.",
+                        "https://chummer.run/problems/release-bundle/unavailable");
+                }
+            }
+
             return BuildProblem(
                 StatusCodes.Status400BadRequest,
                 "Upload session promotion rejected",
@@ -618,6 +653,10 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 "Release upload infrastructure failure",
                 "release upload session storage is unavailable.",
                 "https://chummer.run/problems/release-bundle/unavailable");
+        }
+        finally
+        {
+            completionLease?.Dispose();
         }
     }
 

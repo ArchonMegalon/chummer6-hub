@@ -40,6 +40,7 @@ class ManifestRow:
     payload_download_url: str
     payload_sha256: str
     payload_size_bytes: int | None
+    payload_acquisition_mode: str
     installer_mode: str
 
 
@@ -146,6 +147,9 @@ def read_manifest_rows(manifest_paths: list[Path]) -> dict[str, ManifestRow]:
                     payload_download_url=str(item.get("payloadDownloadUrl") or "").strip(),
                     payload_sha256=str(item.get("payloadSha256") or "").strip().lower(),
                     payload_size_bytes=try_int(item.get("payloadSizeBytes")),
+                    payload_acquisition_mode=str(
+                        item.get("payloadAcquisitionMode") or ""
+                    ).strip().lower(),
                     installer_mode=str(item.get("installerMode") or "").strip().lower(),
                 )
     return rows
@@ -424,6 +428,34 @@ def validate_bootstrap_sidecar_metadata(
         failures.append(
             f"bootstrap payload sidecar metadata installerFileName does not match installer: expected {installer_path.name}"
         )
+    sidecar_acquisition_mode = str(
+        payload.get("payloadAcquisitionMode") or ""
+    ).strip().lower()
+    manifest_acquisition_mode = (
+        manifest_row.payload_acquisition_mode if manifest_row is not None else ""
+    )
+    if sidecar_acquisition_mode not in {"", "download", "embedded"}:
+        failures.append(
+            "bootstrap payload sidecar metadata payloadAcquisitionMode must be download or embedded"
+        )
+    if sidecar_acquisition_mode != manifest_acquisition_mode:
+        failures.append(
+            "bootstrap payload sidecar metadata payloadAcquisitionMode does not match manifest"
+        )
+
+    expected_properties = {
+        "contractName",
+        "fileName",
+        "downloadUrl",
+        "sha256",
+        "sizeBytes",
+        "installerFileName",
+        "releaseVersion",
+    }
+    if manifest_acquisition_mode:
+        expected_properties.add("payloadAcquisitionMode")
+    if set(payload) != expected_properties:
+        failures.append("bootstrap payload sidecar metadata property set is noncanonical")
 
     observed_sha256 = sha256_bytes(candidate.data)
     if str(payload.get("sha256") or "").strip().lower() != observed_sha256:

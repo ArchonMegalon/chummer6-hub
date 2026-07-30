@@ -324,6 +324,42 @@ public sealed class ReleaseBundleUploadQuotaTests
     }
 
     [Fact]
+    public async Task DeterministicRejectionIsTerminalAndReleasesActiveSessionQuota()
+    {
+        using Fixture fixture = new(Options(maxActive: 1, maxPerAuthorization: 1));
+        ReleaseUploadSession rejected = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: false);
+        await fixture.Service.WriteFileAsync(
+            rejected.SessionId,
+            "files/rejected.bin",
+            new MemoryStream(new byte[32]),
+            AuthorizationA,
+            CancellationToken.None);
+
+        using (ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+               fixture.Service.BeginCompletion(rejected.SessionId, AuthorizationA))
+        {
+            completion.MarkRejected("candidate contract mismatch");
+            Assert.Equal("candidate contract mismatch", completion.RejectionReason);
+        }
+
+        Assert.False(Directory.Exists(rejected.BundleRoot));
+        Assert.False(Directory.Exists(Path.Combine(
+            fixture.SessionsRoot,
+            rejected.SessionId,
+            "staging")));
+        ReleaseUploadSession replacement = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: false);
+        Assert.NotEqual(rejected.SessionId, replacement.SessionId);
+
+        using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease replay =
+            fixture.Service.BeginCompletion(rejected.SessionId, AuthorizationA);
+        Assert.Equal("candidate contract mismatch", replay.RejectionReason);
+    }
+
+    [Fact]
     public async Task TwoServiceInstancesCannotRacePastSharedLastByte()
     {
         ReleaseUploadQuotaOptions setupOptions = Options(

@@ -3400,6 +3400,78 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncPublishesCatalogBoundAurPackageFiles()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260730-aur-catalog",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ],
+            includeAurPackage: true);
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.False(string.IsNullOrWhiteSpace(result.GenerationId));
+        ReleaseShelfSnapshot snapshot = fixture.CaptureActiveShelf();
+        Assert.Equal(result.GenerationId, snapshot.GenerationId);
+        Assert.True(File.Exists(Path.Combine(snapshot.PhysicalRoot, "aur-packages.json")));
+        Assert.True(File.Exists(Path.Combine(
+            snapshot.PhysicalRoot,
+            "files",
+            "chummer6-bin-aur-source.tar.gz")));
+        Assert.True(File.Exists(Path.Combine(
+            snapshot.PhysicalRoot,
+            "files",
+            "chummer6-bin.PKGBUILD")));
+        Assert.True(File.Exists(Path.Combine(
+            snapshot.PhysicalRoot,
+            "files",
+            "chummer6-bin.SRCINFO")));
+    }
+
+    [Fact]
+    public async Task ValidateDirectoryAsyncRejectsAurPackageFileDigestDrift()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260730-aur-tamper",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ],
+            includeAurPackage: true);
+        fixture.ReplaceBundleEntry(
+            bundlePath,
+            "files/chummer6-bin.PKGBUILD",
+            "tampered-pkgbuild"u8.ToArray());
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => fixture.ValidateBundleAsync(bundlePath));
+
+        Assert.Contains("AUR pkgbuild digest mismatch", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PreparedGenerationUsesIncomingAuthoritativeShelfInsteadOfRetainingInvalidObsoleteArtifact()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -3902,7 +3974,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             object? publicTrustMetrics = null,
             bool seedReviewRequiredPosture = false,
             bool includeBuildProvenance = true,
-            string? startupSmokeRecordedAt = null)
+            string? startupSmokeRecordedAt = null,
+            bool includeAurPackage = false)
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -4119,6 +4192,60 @@ public sealed class ReleaseBundlePromotionServiceTests
 
                     File.WriteAllBytes(targetPath, proofArtifact.Bytes);
                 }
+            }
+
+            if (includeAurPackage)
+            {
+                BundleArtifact upstream = artifacts.FirstOrDefault(static artifact =>
+                    string.Equals(
+                        FixturePlatformFamily(artifact.Platform),
+                        "linux",
+                        StringComparison.Ordinal))
+                    ?? throw new InvalidOperationException(
+                        "AUR package fixture requires a Linux upstream artifact.");
+                string upstreamPath = Path.Combine(filesRoot, upstream.FileName);
+                string sourceArchiveFileName = "chummer6-bin-aur-source.tar.gz";
+                string pkgbuildFileName = "chummer6-bin.PKGBUILD";
+                string srcinfoFileName = "chummer6-bin.SRCINFO";
+                string sourceArchivePath = Path.Combine(filesRoot, sourceArchiveFileName);
+                string pkgbuildPath = Path.Combine(filesRoot, pkgbuildFileName);
+                string srcinfoPath = Path.Combine(filesRoot, srcinfoFileName);
+                File.WriteAllBytes(sourceArchivePath, "aur-source-archive"u8.ToArray());
+                File.WriteAllText(pkgbuildPath, "pkgname=chummer6-bin\npkgver=1\n");
+                File.WriteAllText(srcinfoPath, "pkgbase = chummer6-bin\n");
+                File.WriteAllText(
+                    Path.Combine(bundleRoot, "aur-packages.json"),
+                    JsonSerializer.Serialize(new
+                    {
+                        contractName = "chummer.downloads.aur_packages.v1",
+                        contract_name = "chummer.downloads.aur_packages.v1",
+                        generatedAt = publishedAt,
+                        generated_at = publishedAt,
+                        version,
+                        channel,
+                        packages = new[]
+                        {
+                            new
+                            {
+                                id = "chummer6-bin",
+                                sourceArchiveFileName,
+                                sourceArchiveUrl = $"/downloads/files/{sourceArchiveFileName}",
+                                sourceArchiveSha256 = Sha256For(sourceArchivePath),
+                                sourceArchiveSizeBytes = new FileInfo(sourceArchivePath).Length,
+                                pkgbuildFileName,
+                                pkgbuildUrl = $"/downloads/files/{pkgbuildFileName}",
+                                pkgbuildSha256 = Sha256For(pkgbuildPath),
+                                srcinfoFileName,
+                                srcinfoUrl = $"/downloads/files/{srcinfoFileName}",
+                                srcinfoSha256 = Sha256For(srcinfoPath),
+                                upstreamArtifactId = upstream.ArtifactId,
+                                upstreamArtifactFileName = upstream.FileName,
+                                upstreamArtifactUrl = $"/downloads/files/{upstream.FileName}",
+                                upstreamArtifactSha256 = Sha256For(upstreamPath),
+                                upstreamArtifactSizeBytes = new FileInfo(upstreamPath).Length
+                            }
+                        }
+                    }, TestJsonOptions));
             }
 
             string zipPath = Path.Combine(_root, $"{Path.GetFileName(bundleRoot)}.zip");

@@ -539,7 +539,7 @@ public sealed class InternalReleaseBundlesControllerTests
     }
 
     [Fact]
-    public async Task UploadSessionPrevalidationFailureLeavesSessionRepairableBeforePublication()
+    public async Task UploadSessionPrevalidationFailureTerminalizesSessionBeforePublication()
     {
         using ControllerFixture fixture = new();
         AuthenticateController(fixture);
@@ -571,25 +571,41 @@ public sealed class InternalReleaseBundlesControllerTests
         Assert.False(File.Exists(Path.Combine(
             fixture.Configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!,
             "current.json")));
+        ReleaseUploadSession rejectedSession = fixture.ReadSessionMetadata(created.SessionId);
+        Assert.True(rejectedSession.Rejected);
+        Assert.False(rejectedSession.Completed);
+        Assert.NotNull(rejectedSession.RejectedAtUtc);
+        Assert.Equal(problem.Detail, rejectedSession.RejectionReason);
+        Assert.False(Directory.Exists(rejectedSession.BundleRoot));
 
-        await UploadFileAsync(
-            fixture.Controller,
-            created.SessionId,
+        FormFile repairFile = BuildByteFormFile(
             "releases.json",
             "application/json",
             BuildCompatibilityManifest());
+        ActionResult<InternalReleaseBundlesController.ReleaseUploadFileStoredResponse> repairUpload =
+            await fixture.Controller.UploadSessionFile(
+                created.SessionId,
+                repairFile,
+                "releases.json",
+                CancellationToken.None);
+        ObjectResult repairRejected = Assert.IsType<ObjectResult>(repairUpload.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, repairRejected.StatusCode);
 
-        ActionResult<ReleaseBundlePromotionResult> repairedCompletion = await fixture.Controller.CompleteUploadSession(
+        ActionResult<ReleaseBundlePromotionResult> replayedCompletion = await fixture.Controller.CompleteUploadSession(
             created.SessionId,
             CancellationToken.None);
-        ObjectResult repaired = Assert.IsAssignableFrom<ObjectResult>(repairedCompletion.Result);
-        Assert.True(
-            repaired.StatusCode == StatusCodes.Status200OK,
-            repaired.Value is ProblemDetails repairedProblem
-                ? $"Expected repaired session to publish but got {repaired.StatusCode}: {repairedProblem.Detail}"
-                : $"Expected repaired session to publish but got {repaired.StatusCode}: {repaired.Value}");
-        ReleaseBundlePromotionResult promoted = Assert.IsType<ReleaseBundlePromotionResult>(repaired.Value);
-        Assert.Equal("run-test", promoted.Version);
+        ObjectResult replayedRejected = Assert.IsType<ObjectResult>(replayedCompletion.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, replayedRejected.StatusCode);
+        ProblemDetails replayedProblem = Assert.IsType<ProblemDetails>(replayedRejected.Value);
+        Assert.Equal(problem.Detail, replayedProblem.Detail);
+
+        AuthenticateController(fixture);
+        OkObjectResult replacementResponse =
+            Assert.IsType<OkObjectResult>(fixture.Controller.CreateUploadSession().Result);
+        var replacement =
+            Assert.IsType<InternalReleaseBundlesController.ReleaseUploadSessionCreatedResponse>(
+                replacementResponse.Value);
+        Assert.NotEqual(created.SessionId, replacement.SessionId);
     }
 
     [Fact]

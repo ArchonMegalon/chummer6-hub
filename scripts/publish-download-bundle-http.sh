@@ -841,7 +841,7 @@ scalar_fields = (
     "expiresAtUtc", "ExpiresAtUtc", "expires_at_utc", "expiresAt",
     *sorted(endpoint_fields), "status", "state", "version", "channel",
     "publishedAt", "supportabilityState", "compatibilityState",
-    "traceId", "requestId", "success", "fileCount", "totalBytes",
+    "type", "instance", "traceId", "requestId", "success", "fileCount", "totalBytes",
 )
 
 def safe_url(value: object, *, allow_relative: bool) -> str | None:
@@ -880,6 +880,11 @@ if isinstance(payload, dict):
             safe_value = safe_url(value, allow_relative=True)
             if safe_value is not None:
                 summary[field_name] = safe_value
+        elif field_name == "instance" and isinstance(value, str) and re.fullmatch(
+            r"/api/internal/releases/upload-sessions/[0-9a-f]{32}/complete#[A-Za-z0-9:._-]{1,200}",
+            value,
+        ):
+            summary[field_name] = value
         elif isinstance(value, str) and safe_scalar.fullmatch(value):
             summary[field_name] = value
 

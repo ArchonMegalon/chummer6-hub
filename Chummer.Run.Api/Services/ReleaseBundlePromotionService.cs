@@ -1303,6 +1303,7 @@ public sealed class ReleaseBundlePromotionService
             incomingCanonicalArtifacts,
             filesRoot,
             startupSmokeRoot,
+            aurPackagesPath,
             promotionEvidencePath,
             _timeProvider.GetUtcNow());
         ReleaseBuildProvenanceValidator.Validate(incomingCanonicalManifest, filesRoot, proofRoot);
@@ -1464,9 +1465,37 @@ public sealed class ReleaseBundlePromotionService
         Directory.CreateDirectory(stagedProofRoot);
 
         CopyDirectoryContents(filesRoot, stagedFilesRoot, cancellationToken);
+        string activeAurPackagesPath = Path.Combine(activeShelfRoot, "aur-packages.json");
+        string? effectiveAurPackagesPath =
+            !string.IsNullOrWhiteSpace(aurPackagesPath) && File.Exists(aurPackagesPath)
+                ? aurPackagesPath
+                : File.Exists(activeAurPackagesPath)
+                    ? activeAurPackagesPath
+                    : null;
+        IReadOnlyList<AurPackageFileBinding> aurPackageFiles = LoadAurPackageFileBindings(
+            effectiveAurPackagesPath,
+            compatibilityManifest);
+        if (string.IsNullOrWhiteSpace(aurPackagesPath)
+            && !string.IsNullOrWhiteSpace(effectiveAurPackagesPath))
+        {
+            string activeFilesRoot = Path.Combine(activeShelfRoot, "files");
+            foreach (AurPackageFileBinding binding in aurPackageFiles)
+            {
+                string sourcePath = Path.Combine(activeFilesRoot, binding.FileName);
+                if (!File.Exists(sourcePath))
+                {
+                    throw new InvalidDataException(
+                        $"active AUR catalog references missing file {binding.FileName}.");
+                }
+
+                File.Copy(sourcePath, Path.Combine(stagedFilesRoot, binding.FileName), overwrite: true);
+            }
+        }
+
+        ValidateAurPackageFileBytes(stagedFilesRoot, aurPackageFiles);
         RejectCaseCollidingPaths(stagedFilesRoot, "release artifact shelf");
-        PruneUnreferencedArtifactFiles(stagedFilesRoot, compatibilityManifest);
-        ValidateFilesAreManifestBound(stagedFilesRoot, compatibilityManifest);
+        PruneUnreferencedArtifactFiles(stagedFilesRoot, compatibilityManifest, aurPackageFiles);
+        ValidateFilesAreManifestBound(stagedFilesRoot, compatibilityManifest, aurPackageFiles);
 
         if (!string.IsNullOrWhiteSpace(startupSmokeRoot) && Directory.Exists(startupSmokeRoot))
         {
@@ -1493,15 +1522,10 @@ public sealed class ReleaseBundlePromotionService
                 cancellationToken);
         }
 
-        string activeAurPackagesPath = Path.Combine(activeShelfRoot, "aur-packages.json");
         string stagedAurPackagesPath = Path.Combine(stagedRoot, "aur-packages.json");
-        if (!string.IsNullOrWhiteSpace(aurPackagesPath) && File.Exists(aurPackagesPath))
+        if (!string.IsNullOrWhiteSpace(effectiveAurPackagesPath))
         {
-            File.Copy(aurPackagesPath, stagedAurPackagesPath);
-        }
-        else if (File.Exists(activeAurPackagesPath))
-        {
-            File.Copy(activeAurPackagesPath, stagedAurPackagesPath);
+            File.Copy(effectiveAurPackagesPath, stagedAurPackagesPath);
         }
 
         JsonObject compatibilityObject = JsonSerializer.SerializeToNode(compatibilityManifest, JsonOptions)?.AsObject()
@@ -1718,9 +1742,12 @@ public sealed class ReleaseBundlePromotionService
 
     private static void PruneUnreferencedArtifactFiles(
         string filesRoot,
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlyList<AurPackageFileBinding>? aurPackageFiles = null)
     {
-        HashSet<string> retained = BuildManifestBoundArtifactPaths(compatibilityManifest);
+        HashSet<string> retained = BuildManifestBoundArtifactPaths(
+            compatibilityManifest,
+            aurPackageFiles);
         foreach (string path in EnumerateRegularFilesWithoutLinks(filesRoot).ToArray())
         {
             string relativePath = Path.GetRelativePath(filesRoot, path)
@@ -1743,10 +1770,13 @@ public sealed class ReleaseBundlePromotionService
 
     private static void ValidateFilesAreManifestBound(
         string filesRoot,
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlyList<AurPackageFileBinding>? aurPackageFiles = null)
     {
         RejectCaseCollidingPaths(filesRoot, "release bundle files");
-        HashSet<string> retained = BuildManifestBoundArtifactPaths(compatibilityManifest);
+        HashSet<string> retained = BuildManifestBoundArtifactPaths(
+            compatibilityManifest,
+            aurPackageFiles);
         foreach (string path in EnumerateRegularFilesWithoutLinks(filesRoot))
         {
             string relativePath = Path.GetRelativePath(filesRoot, path)
@@ -1760,7 +1790,8 @@ public sealed class ReleaseBundlePromotionService
     }
 
     private static HashSet<string> BuildManifestBoundArtifactPaths(
-        PublicReleaseManifestDto compatibilityManifest)
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlyList<AurPackageFileBinding>? aurPackageFiles = null)
     {
         var retained = new HashSet<string>(StringComparer.Ordinal);
         foreach (PublicReleaseArtifactDto artifact in compatibilityManifest.Downloads)
@@ -1774,6 +1805,14 @@ public sealed class ReleaseBundlePromotionService
             string payloadFileName = Path.GetFileName(artifact.PayloadFileName.Trim());
             retained.Add(payloadFileName);
             retained.Add(payloadFileName + ".json");
+        }
+
+        if (aurPackageFiles is not null)
+        {
+            foreach (AurPackageFileBinding binding in aurPackageFiles)
+            {
+                retained.Add(binding.FileName);
+            }
         }
 
         return retained;
@@ -4381,6 +4420,7 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts,
         string filesRoot,
         string? startupSmokeRoot,
+        string? aurPackagesPath,
         string? promotionEvidencePath,
         DateTimeOffset evaluatedAtUtc)
     {
@@ -4389,7 +4429,11 @@ public sealed class ReleaseBundlePromotionService
             throw new InvalidDataException("bundle contains no downloadable artifacts.");
         }
 
-        ValidateFilesAreManifestBound(filesRoot, compatibilityManifest);
+        IReadOnlyList<AurPackageFileBinding> aurPackageFiles = LoadAurPackageFileBindings(
+            aurPackagesPath,
+            compatibilityManifest);
+        ValidateAurPackageFileBytes(filesRoot, aurPackageFiles);
+        ValidateFilesAreManifestBound(filesRoot, compatibilityManifest, aurPackageFiles);
 
         Dictionary<string, PublicReleaseArtifactDto> compatibilityById = BuildUniqueCompatibilityArtifacts(
             compatibilityManifest.Downloads);
@@ -4443,6 +4487,225 @@ public sealed class ReleaseBundlePromotionService
                 evaluatedAtUtc,
                 allowWindowsCompatibilityPreview);
             ValidatePromotionEvidence(artifact, promotionEvidence, compatibilityManifest.Channel);
+        }
+    }
+
+    private sealed record AurPackageFileBinding(
+        string PackageId,
+        string FileName,
+        string Sha256,
+        long? SizeBytes,
+        string Role);
+
+    private static IReadOnlyList<AurPackageFileBinding> LoadAurPackageFileBindings(
+        string? catalogPath,
+        PublicReleaseManifestDto compatibilityManifest)
+    {
+        if (string.IsNullOrWhiteSpace(catalogPath) || !File.Exists(catalogPath))
+        {
+            return Array.Empty<AurPackageFileBinding>();
+        }
+
+        EnsureRegularFile(catalogPath, "AUR package catalog");
+        var catalogInfo = new FileInfo(catalogPath);
+        if (catalogInfo.Length <= 0 || catalogInfo.Length > 1024 * 1024)
+        {
+            throw new InvalidDataException("AUR package catalog size is invalid.");
+        }
+
+        JsonObject catalog = LoadJsonObject(catalogPath);
+        string contractName = GetJsonString(catalog["contractName"]) ?? string.Empty;
+        string legacyContractName = GetJsonString(catalog["contract_name"]) ?? string.Empty;
+        const string expectedContract = "chummer.downloads.aur_packages.v1";
+        if ((!string.IsNullOrWhiteSpace(contractName)
+             && !string.Equals(contractName, expectedContract, StringComparison.Ordinal))
+            || (!string.IsNullOrWhiteSpace(legacyContractName)
+                && !string.Equals(legacyContractName, expectedContract, StringComparison.Ordinal))
+            || (string.IsNullOrWhiteSpace(contractName) && string.IsNullOrWhiteSpace(legacyContractName)))
+        {
+            throw new InvalidDataException("AUR package catalog contract is invalid.");
+        }
+
+        if (!string.Equals(
+                GetJsonString(catalog["version"]),
+                compatibilityManifest.Version,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                NormalizeToken(GetJsonString(catalog["channel"])),
+                NormalizeToken(compatibilityManifest.Channel),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "AUR package catalog version/channel does not match the compatibility manifest.");
+        }
+
+        if (catalog["packages"] is not JsonArray packages || packages.Count == 0)
+        {
+            throw new InvalidDataException("AUR package catalog contains no packages.");
+        }
+
+        Dictionary<string, PublicReleaseArtifactDto> artifacts = BuildUniqueCompatibilityArtifacts(
+            compatibilityManifest.Downloads);
+        var packageIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fileNames = new HashSet<string>(StringComparer.Ordinal);
+        var bindings = new List<AurPackageFileBinding>(packages.Count * 3);
+        foreach (JsonNode? packageNode in packages)
+        {
+            if (packageNode is not JsonObject package)
+            {
+                throw new InvalidDataException("AUR package catalog contains a malformed package row.");
+            }
+
+            string packageId = RequireArtifactToken(
+                GetJsonString(package["id"]),
+                "AUR package id");
+            if (!packageIds.Add(packageId))
+            {
+                throw new InvalidDataException($"AUR package catalog repeats package id {packageId}.");
+            }
+
+            string upstreamArtifactId = RequireArtifactToken(
+                GetJsonString(package["upstreamArtifactId"]),
+                $"AUR package {packageId} upstreamArtifactId");
+            if (!artifacts.TryGetValue(upstreamArtifactId, out PublicReleaseArtifactDto? upstream))
+            {
+                throw new InvalidDataException(
+                    $"AUR package {packageId} references unknown upstream artifact {upstreamArtifactId}.");
+            }
+
+            string upstreamFileName = RequirePortableArtifactFileName(
+                GetJsonString(package["upstreamArtifactFileName"]),
+                packageId,
+                "upstreamArtifactFileName");
+            string upstreamSha256 = RequireArtifactSha256(
+                GetJsonString(package["upstreamArtifactSha256"]),
+                packageId,
+                "upstreamArtifact");
+            long upstreamSizeBytes = RequireArtifactSize(
+                GetJsonInt64(package["upstreamArtifactSizeBytes"]),
+                packageId,
+                "upstreamArtifact");
+            string expectedUpstreamFileName = RequirePortableArtifactFileName(
+                upstream.FileName,
+                upstreamArtifactId,
+                "fileName");
+            string expectedUpstreamSha256 = RequireArtifactSha256(
+                upstream.Sha256,
+                upstreamArtifactId,
+                "artifact");
+            long expectedUpstreamSizeBytes = RequireArtifactSize(
+                upstream.SizeBytes,
+                upstreamArtifactId,
+                "artifact");
+            if (!string.Equals(upstreamFileName, expectedUpstreamFileName, StringComparison.Ordinal)
+                || !string.Equals(upstreamSha256, expectedUpstreamSha256, StringComparison.Ordinal)
+                || upstreamSizeBytes != expectedUpstreamSizeBytes)
+            {
+                throw new InvalidDataException(
+                    $"AUR package {packageId} upstream artifact binding does not match {upstreamArtifactId}.");
+            }
+
+            _ = RequireGovernedIncomingArtifactUrl(
+                GetJsonString(package["upstreamArtifactUrl"]),
+                upstreamFileName,
+                packageId);
+            AddAurPackageFileBinding(
+                bindings,
+                fileNames,
+                package,
+                packageId,
+                "sourceArchive",
+                requireSize: true);
+            AddAurPackageFileBinding(
+                bindings,
+                fileNames,
+                package,
+                packageId,
+                "pkgbuild",
+                requireSize: false);
+            AddAurPackageFileBinding(
+                bindings,
+                fileNames,
+                package,
+                packageId,
+                "srcinfo",
+                requireSize: false);
+        }
+
+        return bindings;
+    }
+
+    private static void AddAurPackageFileBinding(
+        ICollection<AurPackageFileBinding> bindings,
+        ISet<string> fileNames,
+        JsonObject package,
+        string packageId,
+        string propertyPrefix,
+        bool requireSize)
+    {
+        string fileNameProperty = propertyPrefix + "FileName";
+        string urlProperty = propertyPrefix + "Url";
+        string sha256Property = propertyPrefix + "Sha256";
+        string sizeProperty = propertyPrefix + "SizeBytes";
+        string fileName = RequirePortableArtifactFileName(
+            GetJsonString(package[fileNameProperty]),
+            packageId,
+            fileNameProperty);
+        string sha256 = RequireArtifactSha256(
+            GetJsonString(package[sha256Property]),
+            packageId,
+            propertyPrefix);
+        long? sizeBytes = GetJsonInt64(package[sizeProperty]);
+        if (requireSize)
+        {
+            sizeBytes = RequireArtifactSize(sizeBytes, packageId, propertyPrefix);
+        }
+        else if (sizeBytes is < 0)
+        {
+            throw new InvalidDataException(
+                $"AUR package {packageId} {sizeProperty} is invalid.");
+        }
+
+        _ = RequireGovernedIncomingArtifactUrl(
+            GetJsonString(package[urlProperty]),
+            fileName,
+            packageId);
+        if (!fileNames.Add(fileName))
+        {
+            throw new InvalidDataException(
+                $"AUR package catalog repeats file binding {fileName}.");
+        }
+
+        bindings.Add(new AurPackageFileBinding(
+            packageId,
+            fileName,
+            sha256,
+            sizeBytes,
+            propertyPrefix));
+    }
+
+    private static void ValidateAurPackageFileBytes(
+        string filesRoot,
+        IReadOnlyList<AurPackageFileBinding> bindings)
+    {
+        foreach (AurPackageFileBinding binding in bindings)
+        {
+            string filePath = Path.Combine(filesRoot, binding.FileName);
+            if (!File.Exists(filePath))
+            {
+                throw new InvalidDataException(
+                    $"bundle is missing AUR {binding.Role} file {binding.FileName} for {binding.PackageId}.");
+            }
+
+            EnsureRegularFile(filePath, $"AUR {binding.Role} file for {binding.PackageId}");
+            long expectedSize = binding.SizeBytes ?? new FileInfo(filePath).Length;
+            ValidateBoundFileBytes(
+                filesRoot,
+                binding.FileName,
+                binding.Sha256,
+                expectedSize,
+                binding.PackageId,
+                $"AUR {binding.Role}");
         }
     }
 
@@ -5898,6 +6161,27 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return int.TryParse(GetJsonString(node), out value) ? value : 0;
+    }
+
+    private static long? GetJsonInt64(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<long>(out long value))
+        {
+            return value;
+        }
+
+        return long.TryParse(
+            GetJsonString(node),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out value)
+            ? value
+            : null;
     }
 
     private static int GetMetricCount(JsonObject? section, string propertyName, int fallbackValue)

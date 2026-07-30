@@ -61,6 +61,11 @@ class PublishDownloadBundleHttpContractTests(unittest.TestCase):
         self.assertIn("is_deterministic_pre_activation_rejection", script)
         self.assertIn('[[ "$REQUEST_HTTP_STATUS" == "400" ]]', script)
         self.assertIn("record_upload_attempt_state durably_aborted", script)
+        self.assertIn('"type", "instance", "traceId"', script)
+        self.assertIn(
+            r"/api/internal/releases/upload-sessions/[0-9a-f]{32}/complete#",
+            script,
+        )
         self.assertIn(
             "https://chummer.run/problems/release-bundle/rejected",
             script,

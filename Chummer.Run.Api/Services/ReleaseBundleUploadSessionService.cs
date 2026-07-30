@@ -20,7 +20,10 @@ public sealed record ReleaseUploadSession(
     bool Poisoned = false,
     string? PoisonReason = null,
     DateTimeOffset? CompletedAtUtc = null,
-    DateTimeOffset? ActivationAcknowledgedAtUtc = null);
+    DateTimeOffset? ActivationAcknowledgedAtUtc = null,
+    bool Rejected = false,
+    string? RejectionReason = null,
+    DateTimeOffset? RejectedAtUtc = null);
 
 public sealed record ReleaseUploadChunkResult(
     string RelativePath,
@@ -124,7 +127,7 @@ public sealed class ReleaseBundleUploadSessionService
             ReleaseUploadSession? existing = FindSessionForAuthorization(authorizationBinding);
             if (existing is not null)
             {
-                if (existing.Completed)
+                if (existing.Completed || existing.Rejected)
                 {
                     throw new InvalidOperationException("release upload authorization has already been consumed.");
                 }
@@ -1070,7 +1073,9 @@ public sealed class ReleaseBundleUploadSessionService
             }
 
             string binding = ValidateDurableSessionState(session, canonicalSessionId);
-            if (!session.Completed && EffectiveExpiry(session) > DateTimeOffset.UtcNow)
+            if (!session.Completed
+                && !session.Rejected
+                && EffectiveExpiry(session) > DateTimeOffset.UtcNow)
             {
                 activeSessionCount++;
                 activeByAuthorization[binding] =
@@ -1320,11 +1325,13 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException("upload session has expired.");
         }
 
-        if ((session.Completed || session.Publishing) && !allowCompleted)
+        if ((session.Completed || session.Publishing || session.Rejected) && !allowCompleted)
         {
             throw new InvalidDataException(
                 session.Completed
                     ? "upload session has already been completed."
+                    : session.Rejected
+                        ? $"upload session was deterministically rejected: {session.RejectionReason}"
                     : "upload session publication outcome requires reconciliation.");
         }
 
@@ -1404,7 +1411,47 @@ public sealed class ReleaseBundleUploadSessionService
         };
         string sessionRoot = Path.Combine(ResolveSessionsRoot(), session.SessionId);
         PersistMetadata(sessionRoot, completed);
-        CleanupCompletedPayload(sessionRoot, session.SessionId);
+        CleanupTerminalPayload(sessionRoot, session.SessionId);
+    }
+
+    private ReleaseUploadSession MarkSessionRejected(
+        ReleaseUploadSession session,
+        string reason)
+    {
+        reason = (reason ?? string.Empty).Trim();
+        if (reason.Length == 0 || reason.Length > 2048)
+        {
+            throw new InvalidDataException("upload session rejection reason is invalid.");
+        }
+        if (session.Publishing
+            || session.Completed
+            || session.ActivationIntent is not null
+            || session.CompletionResult is not null)
+        {
+            throw new InvalidOperationException(
+                "only a pre-activation upload session may be rejected.");
+        }
+        if (session.Rejected)
+        {
+            if (!string.Equals(session.RejectionReason, reason, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "upload session rejection reason is immutable.");
+            }
+
+            return session;
+        }
+
+        ReleaseUploadSession rejected = session with
+        {
+            Rejected = true,
+            RejectionReason = reason,
+            RejectedAtUtc = DateTimeOffset.UtcNow
+        };
+        string sessionRoot = Path.Combine(ResolveSessionsRoot(), session.SessionId);
+        PersistMetadata(sessionRoot, rejected);
+        CleanupTerminalPayload(sessionRoot, session.SessionId);
+        return rejected;
     }
 
     private static void ValidateActivationIntent(ReleaseActivationIntent intent)
@@ -1504,6 +1551,8 @@ public sealed class ReleaseBundleUploadSessionService
         if (!string.Equals(session.AuthorizationBinding, authorizationBinding, StringComparison.Ordinal)
             || !string.Equals(session.SessionId, expectedSessionId, StringComparison.Ordinal)
             || session.Completed && session.Publishing
+            || session.Completed && session.Rejected
+            || session.Rejected && session.Publishing
             || session.Completed && session.CompletionResult is null
             || !session.Completed && session.CompletionResult is not null
             || session.SingleUseAuthorization && session.AuthorizationExpiresAtUtc is null
@@ -1512,6 +1561,11 @@ public sealed class ReleaseBundleUploadSessionService
             || !session.Completed && session.CompletedAtUtc is not null
             || !session.Completed && session.ActivationAcknowledgedAtUtc is not null
             || session.ActivationAcknowledgedAtUtc is not null && session.ActivationIntent is null
+            || session.Rejected != !string.IsNullOrWhiteSpace(session.RejectionReason)
+            || session.Rejected != session.RejectedAtUtc.HasValue
+            || session.Rejected && session.ActivationIntent is not null
+            || session.Rejected && session.CompletedAtUtc is not null
+            || session.Rejected && session.ActivationAcknowledgedAtUtc is not null
             || session.Poisoned != !string.IsNullOrWhiteSpace(session.PoisonReason))
         {
             throw new InvalidDataException("upload session metadata is invalid.");
@@ -1531,7 +1585,7 @@ public sealed class ReleaseBundleUploadSessionService
         return authorizationBinding;
     }
 
-    private void CleanupCompletedPayload(string sessionRoot, string sessionId)
+    private void CleanupTerminalPayload(string sessionRoot, string sessionId)
     {
         foreach (string name in new[] { "bundle", "staging" })
         {
@@ -1548,7 +1602,7 @@ public sealed class ReleaseBundleUploadSessionService
             catch (Exception ex)
             {
                 _logger.LogWarning(
-                    "Completed release upload payload cleanup failed for {SessionId} ({ExceptionType}).",
+                    "Terminal release upload payload cleanup failed for {SessionId} ({ExceptionType}).",
                     sessionId,
                     ex.GetType().Name);
             }
@@ -2171,6 +2225,8 @@ public sealed class ReleaseBundleUploadSessionService
         public ReleaseActivationIntent? ActivationIntent => _session.ActivationIntent;
         public ReleaseBundlePromotionResult? CompletedResult
             => _session.Completed ? _session.CompletionResult : null;
+        public string? RejectionReason
+            => _session.Rejected ? _session.RejectionReason : null;
         public bool PublicationOutcomeUnknown => _session.Publishing && !_session.Completed;
         public bool RecoveryOnly { get; }
 
@@ -2213,6 +2269,9 @@ public sealed class ReleaseBundleUploadSessionService
                 CompletedAtUtc = DateTimeOffset.UtcNow
             };
         }
+
+        public void MarkRejected(string reason)
+            => _session = _owner.MarkSessionRejected(_session, reason);
 
         public void MarkActivationAcknowledged()
         {
