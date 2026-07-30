@@ -1198,6 +1198,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertFalse(module.governed_code_path("Project/bin/Release/generated.dll"))
         self.assertFalse(module.governed_code_path("Project/obj/Debug/generated.cs"))
         self.assertFalse(module.governed_code_path("Project/obj_tmp/project.assets.json"))
+        self.assertFalse(module.governed_code_path("Chummer/state/workspaces/runner.json"))
         self.assertFalse(module.governed_code_path(".runtime-temp/session/state.json"))
         self.assertFalse(module.governed_code_path(".vexp/manifest.json"))
         self.assertFalse(module.governed_code_path("scripts/__pycache__/helper.pyc"))
