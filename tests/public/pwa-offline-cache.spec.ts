@@ -51,6 +51,7 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
       supported: true,
       controller: !!navigator.serviceWorker.controller,
       scriptURL: worker?.scriptURL ?? null,
+      workerState: worker?.state ?? null,
     };
   });
 
@@ -58,11 +59,9 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
     await expect.poll(async () => (await readServiceWorkerState()).scriptURL ?? '', {
       timeout: 30000,
     }).toContain('/service-worker.js');
-    await page.evaluate(async () => {
-      if ('serviceWorker' in navigator) {
-        await navigator.serviceWorker.ready;
-      }
-    });
+    await expect.poll(async () => (await readServiceWorkerState()).workerState, {
+      timeout: 30000,
+    }).toBe('activated');
     if (!(await readServiceWorkerState()).controller) {
       await page.reload({ waitUntil: 'domcontentloaded' });
     }
