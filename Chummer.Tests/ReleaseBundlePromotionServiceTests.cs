@@ -2432,6 +2432,7 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
 
+        int manifestsWithExtendedDesktopRegistries = 0;
         foreach (JsonDocument manifest in new[]
                  {
                      fixture.ReadCompatibilityManifest(),
@@ -2465,9 +2466,65 @@ public sealed class ReleaseBundlePromotionServiceTests
                             row.GetProperty("tupleId").GetString() == "avalonia:macos:osx-arm64")
                         .GetProperty("publicInstallRoute")
                         .GetString());
+
+                foreach (string registryName in new[]
+                         {
+                             "desktopSurfaceRefs",
+                             "artifactIdentityRegistry",
+                             "artifactPublicationBindings"
+                         })
+                {
+                    if (!manifest.RootElement.TryGetProperty(
+                            registryName,
+                            out JsonElement registry))
+                    {
+                        continue;
+                    }
+
+                    manifestsWithExtendedDesktopRegistries++;
+                    Assert.All(
+                        registry.EnumerateArray(),
+                        row => Assert.StartsWith(
+                            "/downloads/install/",
+                            row.GetProperty("publicInstallRoute").GetString(),
+                            StringComparison.Ordinal));
+                }
+
+                if (manifest.RootElement.TryGetProperty(
+                        "installAwareArtifactRegistry",
+                        out JsonElement installAwareRegistry))
+                {
+                    manifestsWithExtendedDesktopRegistries++;
+                    Assert.All(
+                        installAwareRegistry.EnumerateArray(),
+                        row =>
+                        {
+                            string? recoveryInstallRoute = row
+                                .GetProperty("recoveryProofRefs")
+                                .EnumerateArray()
+                                .Select(static item => item.GetString())
+                                .FirstOrDefault(static item =>
+                                    item?.StartsWith("/downloads/", StringComparison.Ordinal) == true);
+                            if (recoveryInstallRoute is not null)
+                            {
+                                Assert.StartsWith(
+                                    "/downloads/install/",
+                                    recoveryInstallRoute,
+                                    StringComparison.Ordinal);
+                            }
+
+                            Assert.StartsWith(
+                                "/downloads/install/",
+                                row.GetProperty("conciergeAssetRefs")
+                                    .GetProperty("publicTrustWrapper")
+                                    .GetString(),
+                                StringComparison.Ordinal);
+                        });
+                }
             }
         }
 
+        Assert.True(manifestsWithExtendedDesktopRegistries > 0);
         Assert.Equal(result.GenerationId, fixture.CaptureActiveShelf().GenerationId);
     }
 

@@ -1938,6 +1938,12 @@ public sealed class ReleaseBundlePromotionService
             for (int index = jsonArray.Count - 1; index >= 0; index--)
             {
                 JsonNode? child = jsonArray[index];
+                if (canonicalDesktopRouteDeclarations.Any(
+                        candidate => ReferenceEquals(child, candidate)))
+                {
+                    continue;
+                }
+
                 if (child is JsonValue value && value.TryGetValue(out string? text))
                 {
                     string? rewritten = RewriteReleaseUrl(text, generationId, artifactRoutes);
@@ -1967,20 +1973,72 @@ public sealed class ReleaseBundlePromotionService
         JsonObject manifest)
     {
         var routes = new List<JsonNode>();
-        if (manifest["desktopTupleCoverage"] is not JsonObject coverage)
+        if (manifest["desktopTupleCoverage"] is JsonObject coverage)
         {
-            return routes;
+            CaptureCanonicalDesktopRouteDeclarations(
+                coverage["externalProofRequests"] as JsonArray,
+                "expectedPublicInstallRoute",
+                routes);
+            CaptureCanonicalDesktopRouteDeclarations(
+                coverage["desktopRouteTruth"] as JsonArray,
+                "publicInstallRoute",
+                routes);
         }
 
         CaptureCanonicalDesktopRouteDeclarations(
-            coverage["externalProofRequests"] as JsonArray,
-            "expectedPublicInstallRoute",
-            routes);
-        CaptureCanonicalDesktopRouteDeclarations(
-            coverage["desktopRouteTruth"] as JsonArray,
+            manifest["desktopSurfaceRefs"] as JsonArray,
             "publicInstallRoute",
             routes);
+        CaptureCanonicalDesktopRouteDeclarations(
+            manifest["artifactIdentityRegistry"] as JsonArray,
+            "publicInstallRoute",
+            routes);
+        CaptureCanonicalDesktopRouteDeclarations(
+            manifest["artifactPublicationBindings"] as JsonArray,
+            "publicInstallRoute",
+            routes);
+        CaptureCanonicalDesktopRouteDeclarations(
+            ((manifest["publicTrustMetrics"] as JsonObject)?["revocationFacts"]
+                as JsonObject)?["activeRevocations"] as JsonArray,
+            "publicInstallRoute",
+            routes);
+        CaptureInstallAwareCanonicalDesktopRouteDeclarations(
+            manifest["installAwareArtifactRegistry"] as JsonArray,
+            routes);
         return routes;
+    }
+
+    private static void CaptureInstallAwareCanonicalDesktopRouteDeclarations(
+        JsonArray? rows,
+        ICollection<JsonNode> routes)
+    {
+        if (rows is null)
+        {
+            return;
+        }
+
+        foreach (JsonNode? rowNode in rows)
+        {
+            if (rowNode is not JsonObject row)
+            {
+                continue;
+            }
+
+            if (row["recoveryProofRefs"] is JsonArray recoveryProofRefs)
+            {
+                foreach (JsonNode? routeNode in recoveryProofRefs)
+                {
+                    CaptureCanonicalDesktopRouteDeclaration(
+                        routeNode,
+                        routes,
+                        optionalReleaseRoute: true);
+                }
+            }
+
+            CaptureCanonicalDesktopRouteDeclaration(
+                (row["conciergeAssetRefs"] as JsonObject)?["publicTrustWrapper"],
+                routes);
+        }
     }
 
     private static void CaptureCanonicalDesktopRouteDeclarations(
@@ -1995,24 +2053,42 @@ public sealed class ReleaseBundlePromotionService
 
         foreach (JsonNode? rowNode in rows)
         {
-            if (rowNode is not JsonObject row
-                || row[propertyName] is not JsonValue routeNode
-                || !routeNode.TryGetValue(out string? route))
+            if (rowNode is not JsonObject row)
             {
                 continue;
             }
 
-            if (route.StartsWith("/downloads/g/", StringComparison.Ordinal))
-            {
-                // A manifest from the short-lived pre-fix writer can be safely
-                // re-promoted: its immutable route is normalized to the new
-                // generation instead of being retained as canonical truth.
-                continue;
-            }
-
-            ValidateCanonicalDesktopInstallRoute(route);
-            routes.Add(routeNode);
+            CaptureCanonicalDesktopRouteDeclaration(row[propertyName], routes);
         }
+    }
+
+    private static void CaptureCanonicalDesktopRouteDeclaration(
+        JsonNode? candidate,
+        ICollection<JsonNode> routes,
+        bool optionalReleaseRoute = false)
+    {
+        if (candidate is not JsonValue routeNode
+            || !routeNode.TryGetValue(out string? route)
+            || route is null)
+        {
+            return;
+        }
+
+        if (optionalReleaseRoute && !TryGetReleasePath(route, out _))
+        {
+            return;
+        }
+
+        if (route.StartsWith("/downloads/g/", StringComparison.Ordinal))
+        {
+            // A manifest from the short-lived pre-fix writer can be safely
+            // re-promoted: its immutable route is normalized to the new
+            // generation instead of being retained as canonical truth.
+            return;
+        }
+
+        ValidateCanonicalDesktopInstallRoute(route);
+        routes.Add(routeNode);
     }
 
     private static void ValidateCanonicalDesktopInstallRoute(string? value)
@@ -2310,7 +2386,9 @@ public sealed class ReleaseBundlePromotionService
         {
             foreach (JsonNode? child in jsonArray)
             {
-                if (child is null)
+                if (child is null
+                    || canonicalDesktopRouteDeclarations.Any(
+                        candidate => ReferenceEquals(child, candidate)))
                 {
                     continue;
                 }

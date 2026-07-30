@@ -1509,6 +1509,22 @@ public sealed class ReleaseShelfGenerationStore
                         continue;
                     }
 
+                    if (context == GenerationRouteTraversalContext.DesktopRouteReferenceRow
+                        && property.NameEquals("publicInstallRoute")
+                        && IsCanonicalDesktopInstallRoute(property.Value))
+                    {
+                        ValidateCanonicalDesktopInstallRoute(property.Value, label);
+                        continue;
+                    }
+
+                    if (context == GenerationRouteTraversalContext.InstallAwareConciergeAssetRefs
+                        && property.NameEquals("publicTrustWrapper")
+                        && IsCanonicalDesktopInstallRoute(property.Value))
+                    {
+                        ValidateCanonicalDesktopInstallRoute(property.Value, label);
+                        continue;
+                    }
+
                     GenerationRouteTraversalContext childContext =
                         context == GenerationRouteTraversalContext.ManifestRoot
                         && property.NameEquals("releaseProof")
@@ -1524,6 +1540,34 @@ public sealed class ReleaseShelfGenerationStore
                           && property.NameEquals("desktopRouteTruth")
                           && property.Value.ValueKind == JsonValueKind.Array
                             ? GenerationRouteTraversalContext.DesktopRouteTruth
+                        : context == GenerationRouteTraversalContext.ManifestRoot
+                          && property.NameEquals("installAwareArtifactRegistry")
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.InstallAwareArtifactRegistry
+                        : context == GenerationRouteTraversalContext.ManifestRoot
+                          && (property.NameEquals("desktopSurfaceRefs")
+                              || property.NameEquals("artifactIdentityRegistry")
+                              || property.NameEquals("artifactPublicationBindings"))
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.DesktopRouteReferenceRows
+                        : context == GenerationRouteTraversalContext.ManifestRoot
+                          && property.NameEquals("publicTrustMetrics")
+                            ? GenerationRouteTraversalContext.TopLevelPublicTrustMetrics
+                        : context == GenerationRouteTraversalContext.TopLevelPublicTrustMetrics
+                          && property.NameEquals("revocationFacts")
+                            ? GenerationRouteTraversalContext.PublicTrustRevocationFacts
+                        : context == GenerationRouteTraversalContext.PublicTrustRevocationFacts
+                          && property.NameEquals("activeRevocations")
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.DesktopRouteReferenceRows
+                        : context == GenerationRouteTraversalContext.InstallAwareArtifactRegistryRow
+                          && property.NameEquals("recoveryProofRefs")
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.InstallAwareRecoveryProofRefs
+                        : context == GenerationRouteTraversalContext.InstallAwareArtifactRegistryRow
+                          && property.NameEquals("conciergeAssetRefs")
+                          && property.Value.ValueKind == JsonValueKind.Object
+                            ? GenerationRouteTraversalContext.InstallAwareConciergeAssetRefs
                             : GenerationRouteTraversalContext.Other;
                     ValidateGenerationRoutes(property.Value, generationId, label, childContext);
                 }
@@ -1531,6 +1575,13 @@ public sealed class ReleaseShelfGenerationStore
             case JsonValueKind.Array:
                 foreach (JsonElement child in element.EnumerateArray())
                 {
+                    if (context == GenerationRouteTraversalContext.InstallAwareRecoveryProofRefs
+                        && IsCanonicalDesktopInstallRoute(child))
+                    {
+                        ValidateCanonicalDesktopInstallRoute(child, label);
+                        continue;
+                    }
+
                     ValidateGenerationRoutes(
                         child,
                         generationId,
@@ -1541,6 +1592,12 @@ public sealed class ReleaseShelfGenerationStore
                         : context == GenerationRouteTraversalContext.DesktopRouteTruth
                           && child.ValueKind == JsonValueKind.Object
                             ? GenerationRouteTraversalContext.DesktopRouteTruthRow
+                        : context == GenerationRouteTraversalContext.InstallAwareArtifactRegistry
+                          && child.ValueKind == JsonValueKind.Object
+                            ? GenerationRouteTraversalContext.InstallAwareArtifactRegistryRow
+                        : context == GenerationRouteTraversalContext.DesktopRouteReferenceRows
+                          && child.ValueKind == JsonValueKind.Object
+                            ? GenerationRouteTraversalContext.DesktopRouteReferenceRow
                             : GenerationRouteTraversalContext.Other);
                 }
                 return;
@@ -1626,6 +1683,14 @@ public sealed class ReleaseShelfGenerationStore
         ExternalProofRequest,
         DesktopRouteTruth,
         DesktopRouteTruthRow,
+        InstallAwareArtifactRegistry,
+        InstallAwareArtifactRegistryRow,
+        InstallAwareRecoveryProofRefs,
+        InstallAwareConciergeAssetRefs,
+        DesktopRouteReferenceRows,
+        DesktopRouteReferenceRow,
+        TopLevelPublicTrustMetrics,
+        PublicTrustRevocationFacts,
         Other
     }
 
