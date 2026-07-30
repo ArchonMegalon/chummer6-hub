@@ -31,14 +31,40 @@ def _count_words(value: str) -> int:
     return len(re.findall(r"\b[\w'-]+\b", value, flags=re.UNICODE))
 
 
+def _chapter_title(match: re.Match[str]) -> str:
+    chapter_number = int(match.group(1))
+    return (match.group(2) or "").strip() or f"Chapter {chapter_number}"
+
+
+def _normalized_chapter_title(match: re.Match[str]) -> str:
+    return re.sub(r"\s+", " ", _chapter_title(match)).strip().casefold()
+
+
 def _split_chapters(manuscript: str) -> list[dict[str, Any]]:
-    matches = list(CHAPTER_HEADING.finditer(manuscript))
+    matches: list[re.Match[str]] = []
+    for candidate in CHAPTER_HEADING.finditer(manuscript):
+        if matches:
+            previous = matches[-1]
+            duplicate_provider_wrapper = (
+                int(previous.group(1)) == int(candidate.group(1))
+                and _normalized_chapter_title(previous) == _normalized_chapter_title(candidate)
+                and not manuscript[previous.end():candidate.start()].strip()
+            )
+            if duplicate_provider_wrapper:
+                # First Book exports can wrap an edited chapter with their own
+                # Markdown heading while retaining the editor's identical title
+                # immediately beneath it. Keep the outer boundary so the exact
+                # provider bytes remain archived, but do not count the inner
+                # wrapper as another chapter.
+                continue
+        matches.append(candidate)
+
     chapters: list[dict[str, Any]] = []
     for index, match in enumerate(matches):
         start = match.start()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(manuscript)
         chapter_number = int(match.group(1))
-        title = (match.group(2) or "").strip() or f"Chapter {chapter_number}"
+        title = _chapter_title(match)
         chapters.append(
             {
                 "number": chapter_number,

@@ -54,6 +54,46 @@ def build_manuscript(path: Path, chapter_count: int = 8, words_per_chapter: int 
     return path
 
 
+def test_split_chapters_collapses_adjacent_identical_provider_title_wrappers() -> None:
+    module = load_module()
+    manuscript = (
+        "## Chapter 1: Arrival\n\n"
+        "# Chapter 1: Arrival\n\n"
+        "The runner enters the rain.\n\n"
+        "## Chapter 2: Reckoning\n\n"
+        "The runner chooses the truth.\n"
+    )
+
+    chapters = module._split_chapters(manuscript)
+
+    assert [chapter["number"] for chapter in chapters] == [1, 2]
+    assert [chapter["title"] for chapter in chapters] == ["Arrival", "Reckoning"]
+    assert "# Chapter 1: Arrival" in chapters[0]["text"]
+
+
+def test_split_chapters_preserves_real_or_mismatched_duplicate_boundaries() -> None:
+    module = load_module()
+    manuscript = (
+        "## Chapter 1: Arrival\n\n"
+        "Substantive prose separates the headings.\n\n"
+        "# Chapter 1: Arrival\n\n"
+        "More prose.\n\n"
+        "## Chapter 2: Reckoning\n\n"
+        "# Chapter 2: Different title\n\n"
+        "Closing prose.\n"
+    )
+
+    chapters = module._split_chapters(manuscript)
+
+    assert [chapter["number"] for chapter in chapters] == [1, 1, 2, 2]
+    assert [chapter["title"] for chapter in chapters] == [
+        "Arrival",
+        "Arrival",
+        "Reckoning",
+        "Different title",
+    ]
+
+
 def test_intake_preserves_provider_export_and_emits_hub_compatible_receipt(tmp_path: Path) -> None:
     module = load_module()
     packet = build_packet(tmp_path / "packet.json")
