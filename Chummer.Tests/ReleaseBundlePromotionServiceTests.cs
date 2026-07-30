@@ -2380,6 +2380,129 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromotionPreservesCanonicalRouteForMissingDesktopTupleProofRequest()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        const string expectedRoute = "/downloads/install/avalonia-osx-arm64-installer";
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260730-external-proof-route",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false),
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview")
+            ]);
+
+        foreach (string manifestName in new[] { "releases.json", "RELEASE_CHANNEL.generated.json" })
+        {
+            fixture.RewriteBundleManifest(bundlePath, manifestName, root =>
+            {
+                root["desktopTupleCoverage"] = new JsonObject
+                {
+                    ["externalProofRequests"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["tupleId"] = "avalonia:osx-arm64:macos",
+                            ["expectedArtifactId"] = "avalonia-osx-arm64-installer",
+                            ["expectedPublicInstallRoute"] = expectedRoute
+                        }
+                    }
+                };
+            });
+        }
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        foreach (JsonDocument manifest in new[]
+                 {
+                     fixture.ReadCompatibilityManifest(),
+                     fixture.ReadCanonicalManifest()
+                 })
+        {
+            using (manifest)
+            {
+                JsonElement request = Assert.Single(
+                    manifest.RootElement
+                        .GetProperty("desktopTupleCoverage")
+                        .GetProperty("externalProofRequests")
+                        .EnumerateArray()
+                        .ToArray());
+                Assert.Equal(expectedRoute, request.GetProperty("expectedPublicInstallRoute").GetString());
+            }
+        }
+
+        Assert.Equal(result.GenerationId, fixture.CaptureActiveShelf().GenerationId);
+    }
+
+    [Theory]
+    [InlineData("/downloads/install/avalonia-osx-arm64-installer/payload")]
+    [InlineData("/downloads/install/avalonia-osx-arm64-installer?ticket=x")]
+    [InlineData("/downloads/install/avalonia-osx-arm64-installer%2Fpayload")]
+    [InlineData("https://chummer.run/downloads/install/avalonia-osx-arm64-installer")]
+    public async Task PromotionRejectsUnsafeCanonicalRouteForMissingDesktopTupleProofRequest(
+        string route)
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260730-unsafe-external-proof-route",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ]);
+
+        foreach (string manifestName in new[] { "releases.json", "RELEASE_CHANNEL.generated.json" })
+        {
+            fixture.RewriteBundleManifest(bundlePath, manifestName, root =>
+            {
+                root["desktopTupleCoverage"] = new JsonObject
+                {
+                    ["externalProofRequests"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["tupleId"] = "avalonia:osx-arm64:macos",
+                            ["expectedPublicInstallRoute"] = route
+                        }
+                    }
+                };
+            });
+        }
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => fixture.PromoteAsync(bundlePath));
+
+        Assert.Contains("unsafe canonical install route", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PromoteAsyncPublishesCanonicalRouteTruthWithRevokeSource()
     {
         using var fixture = new ReleaseBundlePromotionFixture();

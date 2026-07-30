@@ -630,6 +630,54 @@ public sealed class ReleaseShelfGenerationStoreTests
         Assert.Equal("generation-a", snapshot.GenerationId);
     }
 
+    [Fact]
+    public void CaptureAcceptsCanonicalRouteForExactExternalProofRequestField()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            externalProofRequestRoute: "/downloads/install/missing-installer");
+        fixture.Activate("generation-a", "run-a");
+
+        ReleaseShelfSnapshot snapshot = fixture.CreateStore().Capture();
+
+        Assert.Equal("generation-a", snapshot.GenerationId);
+    }
+
+    [Theory]
+    [InlineData("/downloads/install/missing-installer/payload")]
+    [InlineData("/downloads/install/missing-installer?ticket=x")]
+    [InlineData("/downloads/install/missing-installer%2Fpayload")]
+    [InlineData("https://chummer.run/downloads/install/missing-installer")]
+    public void CaptureRejectsUnsafeCanonicalRouteForExternalProofRequestField(string route)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            externalProofRequestRoute: route);
+        fixture.Activate("generation-a", "run-a");
+
+        Assert.Throws<InvalidDataException>(() => fixture.CreateStore().Capture());
+    }
+
+    [Fact]
+    public void CaptureRejectsCanonicalRouteInNestedExternalProofRequestLookalike()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            nestedExternalProofRequestRoute: "/downloads/install/missing-installer");
+        fixture.Activate("generation-a", "run-a");
+
+        Assert.Throws<InvalidDataException>(() => fixture.CreateStore().Capture());
+    }
+
     [Theory]
     [InlineData("/downloads/g/generation-a/install/test-installer/claim")]
     [InlineData("/downloads/g/generation-a/install/test-installer?ticket=x")]
@@ -1415,7 +1463,9 @@ public sealed class ReleaseShelfGenerationStoreTests
             string? artifactDownloadUrlOverride = null,
             IReadOnlyDictionary<string, string>? extraFiles = null,
             IReadOnlyList<string>? topLevelProofRoutes = null,
-            IReadOnlyList<string>? nestedProofRoutes = null)
+            IReadOnlyList<string>? nestedProofRoutes = null,
+            string? externalProofRequestRoute = null,
+            string? nestedExternalProofRequestRoute = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1510,6 +1560,40 @@ public sealed class ReleaseShelfGenerationStoreTests
                     ["releaseProof"] = new Dictionary<string, object?>
                     {
                         ["proofRoutes"] = nestedProofRoutes
+                    }
+                };
+            }
+
+            if (externalProofRequestRoute is not null)
+            {
+                var coverage = new Dictionary<string, object?>
+                {
+                    ["externalProofRequests"] = new object[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["tupleId"] = "avalonia:osx-arm64:macos",
+                            ["expectedPublicInstallRoute"] = externalProofRequestRoute
+                        }
+                    }
+                };
+                canonical["desktopTupleCoverage"] = coverage;
+                compatibility["desktopTupleCoverage"] = coverage;
+            }
+
+            if (nestedExternalProofRequestRoute is not null)
+            {
+                canonical["extension"] = new Dictionary<string, object?>
+                {
+                    ["desktopTupleCoverage"] = new Dictionary<string, object?>
+                    {
+                        ["externalProofRequests"] = new object[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["expectedPublicInstallRoute"] = nestedExternalProofRequestRoute
+                            }
+                        }
                     }
                 };
             }

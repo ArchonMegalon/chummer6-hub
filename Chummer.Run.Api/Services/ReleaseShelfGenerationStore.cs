@@ -1493,10 +1493,24 @@ public sealed class ReleaseShelfGenerationStore
                         continue;
                     }
 
+                    if (context == GenerationRouteTraversalContext.ExternalProofRequest
+                        && property.NameEquals("expectedPublicInstallRoute"))
+                    {
+                        ValidateCanonicalExternalProofRequestRoute(property.Value, label);
+                        continue;
+                    }
+
                     GenerationRouteTraversalContext childContext =
                         context == GenerationRouteTraversalContext.ManifestRoot
                         && property.NameEquals("releaseProof")
                             ? GenerationRouteTraversalContext.TopLevelReleaseProof
+                        : context == GenerationRouteTraversalContext.ManifestRoot
+                          && property.NameEquals("desktopTupleCoverage")
+                            ? GenerationRouteTraversalContext.TopLevelDesktopTupleCoverage
+                        : context == GenerationRouteTraversalContext.TopLevelDesktopTupleCoverage
+                          && property.NameEquals("externalProofRequests")
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.ExternalProofRequests
                             : GenerationRouteTraversalContext.Other;
                     ValidateGenerationRoutes(property.Value, generationId, label, childContext);
                 }
@@ -1508,7 +1522,10 @@ public sealed class ReleaseShelfGenerationStore
                         child,
                         generationId,
                         label,
-                        GenerationRouteTraversalContext.Other);
+                        context == GenerationRouteTraversalContext.ExternalProofRequests
+                        && child.ValueKind == JsonValueKind.Object
+                            ? GenerationRouteTraversalContext.ExternalProofRequest
+                            : GenerationRouteTraversalContext.Other);
                 }
                 return;
             case JsonValueKind.String:
@@ -1559,10 +1576,33 @@ public sealed class ReleaseShelfGenerationStore
         }
     }
 
+    private static void ValidateCanonicalExternalProofRequestRoute(
+        JsonElement element,
+        string label)
+    {
+        const string prefix = "/downloads/install/";
+        string? value = element.ValueKind == JsonValueKind.String
+            ? element.GetString()
+            : null;
+        string artifactId = value is not null && value.StartsWith(prefix, StringComparison.Ordinal)
+            ? value[prefix.Length..]
+            : string.Empty;
+        if (artifactId.Length is < 1 or > 255
+            || !artifactId.All(static character =>
+                char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '+' or '-'))
+        {
+            throw new InvalidDataException(
+                $"{label} contains an unsafe canonical external-proof install route.");
+        }
+    }
+
     private enum GenerationRouteTraversalContext
     {
         ManifestRoot,
         TopLevelReleaseProof,
+        TopLevelDesktopTupleCoverage,
+        ExternalProofRequests,
+        ExternalProofRequest,
         Other
     }
 
