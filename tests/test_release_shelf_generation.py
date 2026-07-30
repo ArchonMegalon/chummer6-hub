@@ -328,6 +328,20 @@ def test_manifest_validator_rejects_non_exact_generation_install_routes(url: str
         )
 
 
+@pytest.mark.parametrize("suffix", ("payload", "metadata"))
+def test_manifest_validator_accepts_immutable_generation_install_resources(suffix: str) -> None:
+    MODULE.validate_manifest_routes(
+        {
+            "url": (
+                "/downloads/g/generation-routes/install/"
+                f"protected-installer/{suffix}"
+            )
+        },
+        "generation-routes",
+        "fixture",
+    )
+
+
 def test_shared_helper_accepts_cross_language_contract_fixture() -> None:
     fixture = ROOT / "tests" / "fixtures" / "atomic_release_shelf_v1"
 

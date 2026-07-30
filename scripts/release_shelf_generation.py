@@ -383,7 +383,13 @@ def validate_manifest_routes(payload: dict[str, Any], generation_id: str, label:
         relative = PurePosixPath(relative_text)
         invalid_root_shape = relative.parts[0] not in ALLOWED_GENERATION_ROUTE_ROOTS
         if relative.parts[0] == "install":
-            invalid_root_shape = len(relative.parts) != 2
+            invalid_root_shape = (
+                len(relative.parts) not in {2, 3}
+                or (
+                    len(relative.parts) == 3
+                    and relative.parts[2] not in {"payload", "metadata"}
+                )
+            )
         if (
             not relative_text
             or relative.is_absolute()

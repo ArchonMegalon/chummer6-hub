@@ -443,7 +443,7 @@ def test_source_bundle_materializer_fails_visual_proof_before_persistent_publica
         status_capture,
     )
     first_persistent_write = min(
-        source.index('mkdir -p "$REPO_ROOT/Chummer.Run.Api/wwwroot/proofs/mac-codex-release"'),
+        source.index('--output "$ui_localization_release_gate_mirror"'),
         source.index('bash "$SCRIPT_DIR/generate-releases-manifest.sh"'),
         source.index(
             'sync_authoritative_published_manifest '
@@ -485,9 +485,7 @@ def test_source_bundle_materializer_gates_candidate_evidence_without_restamping_
         encoding="utf-8"
     )
     stage_call = source.index("stage_startup_smoke_receipts \\")
-    first_persistent_write = source.index(
-        'mkdir -p "$REPO_ROOT/Chummer.Run.Api/wwwroot/proofs/mac-codex-release"'
-    )
+    first_persistent_write = source.index('--output "$ui_localization_release_gate_mirror"')
     stage_block = source[stage_call:first_persistent_write]
 
     assert stage_call < first_persistent_write
