@@ -23,6 +23,22 @@ public sealed class ReleaseProofFreshnessEvaluatorTests
         Assert.Equal("missing", result.MaterializedStatus);
     }
 
+    [Fact]
+    public void PresentButInvalidReleaseProofIsStaleRatherThanMissing()
+    {
+        JsonObject proofFreshness = new() { ["status"] = "stale" };
+
+        ReleaseProofFreshnessEvaluation result = ReleaseProofFreshnessEvaluator.Evaluate(
+            proofFreshness,
+            new JsonObject(),
+            PublishedAt,
+            PublishedAt);
+
+        Assert.False(result.IsFresh);
+        Assert.Equal("stale", result.MaterializedStatus);
+        Assert.Contains("releaseProof keys", result.Reason, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("releaseProofAgeSeconds")]
     [InlineData("uiLocalizationAgeSeconds")]

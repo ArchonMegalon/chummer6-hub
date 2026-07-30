@@ -22,7 +22,9 @@ internal static class ReleaseProofFreshnessEvaluator
         ReleaseProofTrustEvaluation evidence = ReleaseProofTrustEvaluator.Validate(releaseProofPayload);
         if (!evidence.IsValid)
         {
-            return Missing(evidence.Reason);
+            return releaseProofPayload is null
+                ? Missing(evidence.Reason)
+                : Stale(evidence.Reason);
         }
 
         if (proofFreshness is null || publishedAt is null)
