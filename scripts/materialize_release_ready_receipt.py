@@ -170,6 +170,14 @@ GOVERNED_CODE_EXCLUDED_OUTPUTS = (
 GOVERNED_CODE_EXCLUDED_OUTPUT_PREFIXES = tuple(
     prefix for prefix, _reason in GOVERNED_CODE_EXCLUDED_OUTPUTS
 )
+# The workspace root is an allowlist repository: its tracked .gitignore owns
+# only the local controller scripts/tests/docs and deliberately leaves product
+# repositories, historical worktrees, evidence, and operator state independent.
+# Non-ignored untracked code is still rejected there. Product repositories keep
+# the stricter ignored-code scan below.
+GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES = (
+    (ROOT, "tracked root allowlist leaves independent repositories and state unowned"),
+)
 GOVERNED_RESTORED_DEPENDENCY_PREFIXES = (
     "node_modules/",
 )
@@ -4111,6 +4119,14 @@ def governed_restored_dependency_path(relative_path: str) -> bool:
     )
 
 
+def governed_repository_scans_ignored_code(repository: Path) -> bool:
+    normalized = Path(os.path.abspath(repository))
+    return all(
+        normalized != Path(os.path.abspath(boundary))
+        for boundary, _reason in GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES
+    )
+
+
 def governed_repository_root(path: Path) -> Path:
     normalized = Path(os.path.abspath(path))
     alias = canonical_release_entrypoint_alias_binding(normalized)
@@ -4253,12 +4269,16 @@ def current_governed_code_snapshot(
         head = run_governed_git(root, ["rev-parse", "--verify", "HEAD"], environment).decode().strip()
         tree = run_governed_git(root, ["rev-parse", "--verify", "HEAD^{tree}"], environment).decode().strip()
         dirty_values: list[str] = []
-        for arguments in (
+        dirty_commands = [
             ["diff", "--name-only", "-z", "--no-ext-diff"],
             ["diff", "--cached", "--name-only", "-z", "--no-ext-diff"],
             ["ls-files", "--others", "--exclude-standard", "-z"],
-            ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
-        ):
+        ]
+        if governed_repository_scans_ignored_code(root):
+            dirty_commands.append(
+                ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
+            )
+        for arguments in dirty_commands:
             dirty_values.extend(null_delimited_paths(run_governed_git(root, arguments, environment)))
         dirty_code_paths = sorted(
             set(
@@ -4310,12 +4330,21 @@ def current_governed_code_snapshot(
                     GOVERNED_RESTORED_DEPENDENCY_PREFIXES
                 ),
                 "restored_dependency_file_count": len(restored_dependency_files),
+                "ignored_code_scan": (
+                    "full"
+                    if governed_repository_scans_ignored_code(root)
+                    else "tracked_ownership_allowlist"
+                ),
             }
         )
     body: dict[str, object] = {
         "excluded_outputs": [
             {"prefix": prefix, "reason": reason}
             for prefix, reason in GOVERNED_CODE_EXCLUDED_OUTPUTS
+        ],
+        "ignored_code_ownership_boundaries": [
+            {"root": str(root), "reason": reason}
+            for root, reason in GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES
         ],
         "repositories": repository_snapshots,
     }

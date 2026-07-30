@@ -1183,6 +1183,16 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertTrue(
             all(prefix and reason for prefix, reason in module.GOVERNED_CODE_EXCLUDED_OUTPUTS)
         )
+        self.assertTrue(
+            all(
+                Path(root).is_absolute() and reason
+                for root, reason in module.GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES
+            )
+        )
+        self.assertFalse(module.governed_repository_scans_ignored_code(module.ROOT))
+        self.assertTrue(
+            module.governed_repository_scans_ignored_code(module.RUN_SERVICES_ROOT)
+        )
         self.assertFalse(module.governed_code_path(".codex-studio/helper.py"))
         self.assertFalse(module.governed_code_path(".codex-worktrees/linked/scripts/helper.py"))
         self.assertTrue(module.governed_code_path("node_modules/injected.js"))
