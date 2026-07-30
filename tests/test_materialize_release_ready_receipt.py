@@ -1252,6 +1252,24 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         tampered["snapshot_sha256"] = module.canonical_json_sha256(tampered_body)
         self.assertFalse(module.governed_code_snapshot_binding_valid(tampered))
 
+    def test_release_execution_environment_drift_reports_names_not_values(self) -> None:
+        module = load_module()
+        plan = passing_verifier_evidence(module)["plan"]
+        drifted = dict(plan["environment"])
+        drifted["CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS"] = "61"
+
+        with self.assertRaisesRegex(
+            ValueError,
+            r"control fields: CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS$",
+        ) as caught:
+            module.validate_release_execution_plan(
+                plan,
+                controller_environment=drifted,
+                recheck_inputs=False,
+            )
+
+        self.assertNotIn("61", str(caught.exception))
+
     def test_controller_gate_is_nonlogin_and_login_profile_cannot_bypass_command(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-controller-nonlogin-") as temp_dir:

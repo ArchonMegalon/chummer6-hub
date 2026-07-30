@@ -4670,7 +4670,15 @@ def validate_release_execution_plan(
         controller_environment
     ) if controller_environment is not None else current_release_execution_environment()
     if enforce_current_environment and normalized_environment != current_environment:
-        raise ValueError("release execution environment drifted")
+        drifted_keys = sorted(
+            key
+            for key in RELEASE_EXECUTION_ENV_KEYS
+            if normalized_environment.get(key) != current_environment.get(key)
+        )
+        raise ValueError(
+            "release execution environment drifted for control fields: "
+            + ", ".join(drifted_keys)
+        )
     if controller_environment is not None:
         expected_keys = sorted(controller_environment)
         expected_digests = controller_environment_value_digests(controller_environment)
