@@ -6952,18 +6952,9 @@ public sealed class ReleaseBundlePromotionService
                         }
                         else
                         {
-                            if (promoted)
-                            {
-                                rollbackState = "primary_reinstall_available";
-                                rollbackReasonCode = "primary_installer_reinstall_available";
-                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} remains an unpromoted compatibility lane for {tupleLabel}; recover {routeTupleLabel} from the promoted primary installer {artifactId} until a separately proved fallback is published.";
-                            }
-                            else
-                            {
-                                rollbackState = "manual_recovery_required";
-                                rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
-                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup verification are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
-                            }
+                            rollbackState = "manual_recovery_required";
+                            rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
+                            rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup verification are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
                         }
                     }
                     else

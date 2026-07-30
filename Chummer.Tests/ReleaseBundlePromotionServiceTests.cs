@@ -2624,7 +2624,7 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public async Task PromoteAsyncMarksPromotedPrimaryInstallerAsReinstallRecoveryWhenFallbackIsMissing()
+    public async Task PromoteAsyncRequiresManualRecoveryWhenFallbackIsMissing()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
 
@@ -2679,9 +2679,11 @@ public sealed class ReleaseBundlePromotionServiceTests
             .Single(row => row.GetProperty("tupleId").GetString() == "avalonia:linux:linux-x64");
 
         Assert.Equal("promoted", primary.GetProperty("promotionState").GetString());
-        Assert.Equal("primary_reinstall_available", primary.GetProperty("rollbackState").GetString());
-        Assert.Equal("primary_installer_reinstall_available", primary.GetProperty("rollbackReasonCode").GetString());
-        Assert.Contains("avalonia-linux-x64-installer", primary.GetProperty("rollbackReason").GetString());
+        Assert.Equal("manual_recovery_required", primary.GetProperty("rollbackState").GetString());
+        Assert.Equal(
+            "fallback_missing_artifact_or_startup_smoke_proof",
+            primary.GetProperty("rollbackReasonCode").GetString());
+        Assert.Contains("blazor-desktop:linux:linux-x64", primary.GetProperty("rollbackReason").GetString());
 
         JsonElement releaseChannel = canonical.RootElement
             .GetProperty("publicTrustMetrics")
