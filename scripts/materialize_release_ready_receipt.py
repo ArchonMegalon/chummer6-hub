@@ -170,6 +170,7 @@ GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     ("coverage/", "coverage report output"),
     ("dist/", "packaged distribution output"),
     ("obj/", "compiler intermediate output"),
+    ("obj_tmp/", "alternate compiler intermediate output"),
     ("Chummer.Portal/downloads/", "published download shelf bound by release receipts"),
     ("Docker/Downloads/", "mirrored download shelf bound by release receipts"),
 )
