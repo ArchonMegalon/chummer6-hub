@@ -626,7 +626,30 @@ def public_installer_available(payload: dict[str, Any]) -> bool:
     adoption_health = adoption_health if isinstance(adoption_health, dict) else {}
     if "publicInstallCount" in adoption_health:
         try:
-            return int(adoption_health.get("publicInstallCount") or 0) > 0
+            public_install_count = int(adoption_health.get("publicInstallCount") or 0)
+        except (TypeError, ValueError):
+            return False
+        if public_install_count > 0:
+            return True
+        if public_install_count != 0:
+            return False
+
+        # Preview publication can intentionally lack a flagship-stable primary
+        # route while still carrying an explicit guest-readable registry
+        # entitlement. Only that published-preview combination may override the
+        # otherwise authoritative zero adoption count.
+        if (
+            release_text(payload, "status").lower() != "published"
+            or release_text(payload, "channel", "channelId", "channel_id").lower() != "preview"
+        ):
+            return False
+
+        coverage = payload.get("registryBoundaryCoverage")
+        coverage = coverage if isinstance(coverage, dict) else {}
+        entitlement = coverage.get("entitlement")
+        entitlement = entitlement if isinstance(entitlement, dict) else {}
+        try:
+            return int(entitlement.get("openPublicSurfaceCount") or 0) > 0
         except (TypeError, ValueError):
             return False
 

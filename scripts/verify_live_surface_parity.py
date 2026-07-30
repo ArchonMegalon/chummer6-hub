@@ -643,7 +643,31 @@ def public_installer_available(payload: dict[str, Any]) -> bool:
     adoption_health = adoption_health if isinstance(adoption_health, dict) else {}
     if "publicInstallCount" in adoption_health:
         try:
-            return int(adoption_health.get("publicInstallCount") or 0) > 0
+            public_install_count = int(adoption_health.get("publicInstallCount") or 0)
+        except (TypeError, ValueError):
+            return False
+        if public_install_count > 0:
+            return True
+        if public_install_count != 0:
+            return False
+
+        # A review-required nightly has no flagship-stable primary route, so its
+        # adoption count may be zero even when the registry explicitly exposes
+        # guest-readable preview installers. This is the same narrow authority
+        # honored by ReleaseSelectionService; every other zero-count posture
+        # remains paused.
+        if (
+            normalize_token(payload.get("status")) != "published"
+            or normalize_token(payload.get("channel") or payload.get("channelId") or payload.get("channel_id")) != "preview"
+        ):
+            return False
+
+        coverage = payload.get("registryBoundaryCoverage")
+        coverage = coverage if isinstance(coverage, dict) else {}
+        entitlement = coverage.get("entitlement")
+        entitlement = entitlement if isinstance(entitlement, dict) else {}
+        try:
+            return int(entitlement.get("openPublicSurfaceCount") or 0) > 0
         except (TypeError, ValueError):
             return False
 

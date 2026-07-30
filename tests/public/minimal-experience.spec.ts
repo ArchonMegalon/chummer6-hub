@@ -76,7 +76,21 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
         .publicInstallCount,
   );
-  const publicInstallerAvailable = Number.isFinite(publicInstallCount) && publicInstallCount > 0;
+  const openPublicSurfaceCount = Number(
+    (manifest.registryBoundaryCoverage as Record<string, unknown> | undefined)
+      ?.entitlement
+      && ((manifest.registryBoundaryCoverage as Record<string, unknown>).entitlement as Record<string, unknown>)
+        .openPublicSurfaceCount,
+  );
+  const previewEntitlementAvailable = String(manifest.status || '').toLowerCase() === 'published'
+    && String(manifest.channel || manifest.channelId || manifest.channel_id || '').toLowerCase() === 'preview'
+    && Number.isFinite(publicInstallCount)
+    && publicInstallCount === 0
+    && Number.isFinite(openPublicSurfaceCount)
+    && openPublicSurfaceCount > 0;
+  const publicInstallerAvailable = (
+    Number.isFinite(publicInstallCount) && publicInstallCount > 0
+  ) || previewEntitlementAvailable;
   if (publicInstallerAvailable) {
     await expect(stableLane).toBeVisible();
     await expect(nightlyLane).toBeVisible();
@@ -100,6 +114,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
     stable_visible: publicInstallerAvailable,
     nightly_visible: publicInstallerAvailable,
     public_install_count: Number.isFinite(publicInstallCount) ? publicInstallCount : null,
+    open_public_surface_count: Number.isFinite(openPublicSurfaceCount) ? openPublicSurfaceCount : null,
     promoted_platforms: promotedPlatforms,
   });
 

@@ -515,6 +515,28 @@ def test_release_channel_heading_uses_explicit_public_installer_availability() -
     assert legacy_expected["status_heading_expected"] == "Preview downloads"
 
 
+def test_release_channel_heading_accepts_published_preview_with_open_registry_entitlement() -> None:
+    module = load_module()
+    expected, failures = module.release_channel_expectations(
+        {
+            "status": "published",
+            "version": "run-20260730",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+            "publicTrustMetrics": {"adoptionHealth": {"publicInstallCount": 0}},
+            "registryBoundaryCoverage": {
+                "entitlement": {"openPublicSurfaceCount": 2},
+            },
+        },
+        require_launch_supported=False,
+    )
+
+    assert failures == []
+    assert expected["public_installer_available"] is True
+    assert expected["status_heading_expected"] == "Preview downloads"
+
+
 def test_release_channel_expectations_rejects_unknown_channel_even_with_nonempty_posture() -> None:
     module = load_module()
 

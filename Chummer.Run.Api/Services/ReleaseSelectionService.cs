@@ -281,7 +281,25 @@ public sealed class ReleaseSelectionService
                 "publicInstallCount",
                 out System.Text.Json.JsonElement publicInstallCount))
         {
-            return TryReadPositiveCount(publicInstallCount);
+            if (TryReadPositiveCount(publicInstallCount))
+            {
+                return true;
+            }
+
+            // Preview/nightly publication is intentionally review-required and may
+            // have no flagship-stable primary route. The registry separately binds
+            // explicit guest-readable preview surfaces; honor that narrower
+            // authority only for a published preview channel. Stable and malformed
+            // receipts continue to fail closed.
+            return IsPublishedPreviewChannel(manifest)
+                && TryReadNonNegativeCount(publicInstallCount, out long publicCount)
+                && publicCount == 0
+                && TryGetNestedProperty(
+                    manifest.RegistryBoundaryCoverage,
+                    "entitlement",
+                    "openPublicSurfaceCount",
+                    out System.Text.Json.JsonElement previewOpenPublicSurfaceCount)
+                && TryReadPositiveCount(previewOpenPublicSurfaceCount);
         }
 
         if (TryGetNestedProperty(
@@ -296,6 +314,14 @@ public sealed class ReleaseSelectionService
         // Older manifests have no explicit public-route counter. Keep their
         // established artifact-policy behavior until a receipt publishes one.
         return true;
+    }
+
+    private static bool IsPublishedPreviewChannel(PublicReleaseManifestDto manifest)
+    {
+        string channel = (manifest.Channel ?? string.Empty).Trim();
+        string status = (manifest.Status ?? string.Empty).Trim();
+        return string.Equals(channel, "preview", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(status, "published", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryGetNestedProperty(
@@ -318,14 +344,22 @@ public sealed class ReleaseSelectionService
 
     private static bool TryReadPositiveCount(System.Text.Json.JsonElement value)
     {
+        return TryReadNonNegativeCount(value, out long count) && count > 0;
+    }
+
+    private static bool TryReadNonNegativeCount(
+        System.Text.Json.JsonElement value,
+        out long count)
+    {
+        count = 0;
         if (value.ValueKind == System.Text.Json.JsonValueKind.Number)
         {
-            return value.TryGetInt64(out long numericCount) && numericCount > 0;
+            return value.TryGetInt64(out count) && count >= 0;
         }
 
         return value.ValueKind == System.Text.Json.JsonValueKind.String
-            && long.TryParse(value.GetString(), out long textCount)
-            && textCount > 0;
+            && long.TryParse(value.GetString(), out count)
+            && count >= 0;
     }
 
     private static ReleaseOptionViewModel BuildNormalizedOption(PublicReleaseArtifactDto download, bool authenticated, bool recommended)

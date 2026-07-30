@@ -677,6 +677,73 @@ platforms:
     }
 
     [Fact]
+    public void ApplyAccessPolicySurfacesPublishedPreviewWhenRegistryEntitlementIsExplicitlyOpen()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260730-nightly",
+            Channel: "preview",
+            Status: "published",
+            RolloutState: "coverage_incomplete",
+            SupportabilityState: "review_required",
+            PublishedAt: DateTimeOffset.Parse("2026-07-30T20:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "nightly-installer",
+                    SizeBytes: 98_977_472,
+                    Head: "avalonia",
+                    PlatformId: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "open_public")
+            ])
+        {
+            PublicTrustMetrics = System.Text.Json.JsonSerializer.SerializeToElement(
+                new
+                {
+                    adoptionHealth = new
+                    {
+                        status = "blocked",
+                        primaryPromotedCount = 0,
+                        publicInstallCount = 0
+                    }
+                }),
+            RegistryBoundaryCoverage = System.Text.Json.JsonSerializer.SerializeToElement(
+                new
+                {
+                    entitlement = new
+                    {
+                        openPublicSurfaceCount = 1,
+                        accountRequiredSurfaceCount = 0
+                    }
+                })
+        };
+
+        var normalized = service.ApplyAccessPolicy(manifest);
+        var experience = service.BuildExperience(
+            normalized,
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            authenticated: false);
+
+        Assert.Single(normalized.Downloads);
+        Assert.NotNull(experience.Recommended);
+        Assert.True(experience.GuestDownloadAvailable);
+        Assert.Equal("avalonia-win-x64-installer", experience.Recommended!.Artifact.Id);
+    }
+
+    [Fact]
     public void ApplyAccessPolicyFailsClosedForMalformedAuthoritativeInstallerCount()
     {
         var configuration = new ConfigurationBuilder()

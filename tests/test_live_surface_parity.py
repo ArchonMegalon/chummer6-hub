@@ -37,6 +37,15 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
     release_supportability_state = "review_required"
     release_rollout_state = "coverage_incomplete"
     public_install_count = 1
+    open_public_surface_count = 0
+
+    def public_installer_available(self) -> bool:
+        return self.public_install_count > 0 or (
+            self.release_status == "published"
+            and self.release_channel == "preview"
+            and self.public_install_count == 0
+            and self.open_public_surface_count > 0
+        )
 
     def do_GET(self):  # noqa: N802
         if self.path == "/downloads/RELEASE_CHANNEL.generated.json":
@@ -56,6 +65,11 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                                 "publicInstallCount": self.public_install_count,
                             }
                         },
+                        "registryBoundaryCoverage": {
+                            "entitlement": {
+                                "openPublicSurfaceCount": self.open_public_surface_count,
+                            }
+                        },
                     }
                 ).encode("utf-8")
             )
@@ -73,7 +87,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 play_control = b"<a class=\"site-open-chummer-menu__button\" href=\"/mobile/player\" data-mobile-app-handoff=\"mobile-app-handoff\">Play</a>"
             installer_copy = (
                 b"No public installer right now.</p><p>Current public lane: Downloads paused."
-                if self.public_install_count <= 0
+                if not self.public_installer_available()
                 else b"Current public installer: Windows."
             )
             self.wfile.write(
@@ -135,14 +149,14 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             )
             heading = (
                 b"Downloads paused"
-                if self.public_install_count <= 0
+                if not self.public_installer_available()
                 else b"Preview downloads"
                 if review_required
                 else b"Stable downloads"
             )
             status_line = (
                 b"Downloads are paused."
-                if self.public_install_count <= 0
+                if not self.public_installer_available()
                 else b"Windows and Linux downloads are live. Stable is still unavailable."
                 if review_required
                 else b"Windows and Linux downloads are live."
@@ -336,6 +350,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         _SurfaceHandler.release_supportability_state = "review_required"
         _SurfaceHandler.release_rollout_state = "coverage_incomplete"
         _SurfaceHandler.public_install_count = 1
+        _SurfaceHandler.open_public_surface_count = 0
 
     def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()
@@ -428,6 +443,19 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Download script", downloads["required_texts"])
         self.assertNotIn("Build from source", downloads["forbidden_texts"])
         self.assertIn("Downloads paused", status["required_texts"])
+
+    def test_verify_accepts_published_preview_with_open_registry_entitlement(self) -> None:
+        module = load_module()
+        _SurfaceHandler.release_channel = "preview"
+        _SurfaceHandler.public_install_count = 0
+        _SurfaceHandler.open_public_surface_count = 2
+        _SurfaceHandler.downloads_mode = "review"
+
+        payload = module.verify(self.base_url)
+
+        self.assertEqual("pass", payload["status"], payload["failures"])
+        self.assertFalse(payload["release_posture"]["downloads_paused"])
+        self.assertTrue(payload["release_posture"]["review_required"])
 
     def test_verify_rejects_download_rails_when_manifest_has_no_public_installer(self) -> None:
         module = load_module()

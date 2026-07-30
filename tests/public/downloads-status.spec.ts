@@ -9,6 +9,31 @@ function normalizedText(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+function publicInstallerAvailableFromManifest(manifest: Record<string, unknown>): boolean {
+  const publicInstallCount = Number(
+    (manifest.publicTrustMetrics as Record<string, unknown> | undefined)
+      ?.adoptionHealth
+      && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
+        .publicInstallCount,
+  );
+  if (Number.isFinite(publicInstallCount) && publicInstallCount > 0) {
+    return true;
+  }
+
+  const openPublicSurfaceCount = Number(
+    (manifest.registryBoundaryCoverage as Record<string, unknown> | undefined)
+      ?.entitlement
+      && ((manifest.registryBoundaryCoverage as Record<string, unknown>).entitlement as Record<string, unknown>)
+        .openPublicSurfaceCount,
+  );
+  return normalizedText(manifest.status) === 'published'
+    && normalizedText(manifest.channel ?? manifest.channelId ?? manifest.channel_id) === 'preview'
+    && Number.isFinite(publicInstallCount)
+    && publicInstallCount === 0
+    && Number.isFinite(openPublicSurfaceCount)
+    && openPublicSurfaceCount > 0;
+}
+
 function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): string {
   const status = normalizedText(manifest.status);
   const version = typeof manifest.version === 'string' ? manifest.version.trim() : '';
@@ -22,7 +47,9 @@ function expectedStatusHeadingFromManifest(manifest: Record<string, unknown>): s
       && ((manifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
         .publicInstallCount,
   );
-  if (Number.isFinite(publicInstallCount) && publicInstallCount === 0) {
+  if (Number.isFinite(publicInstallCount)
+      && publicInstallCount === 0
+      && !publicInstallerAvailableFromManifest(manifest)) {
     return 'Downloads paused';
   }
   const isPublishedStableRelease = (
@@ -91,7 +118,7 @@ test('downloads and status stay concise and point to the right next steps', asyn
       && ((releaseManifest.publicTrustMetrics as Record<string, unknown>).adoptionHealth as Record<string, unknown>)
         .publicInstallCount,
   );
-  const publicInstallerAvailable = Number.isFinite(publicInstallCount) && publicInstallCount > 0;
+  const publicInstallerAvailable = publicInstallerAvailableFromManifest(releaseManifest);
   if (publicInstallerAvailable) {
     await expect(downloadsMain.locator('[data-release-lane]')).not.toHaveCount(0);
   } else {
