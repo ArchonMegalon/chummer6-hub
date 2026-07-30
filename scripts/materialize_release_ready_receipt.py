@@ -4382,6 +4382,34 @@ def validate_governed_code_snapshot(
     return current
 
 
+def governed_code_snapshot_binding_valid(snapshot: dict[str, object]) -> bool:
+    snapshot_body = {
+        key: value
+        for key, value in snapshot.items()
+        if key != "snapshot_sha256"
+    }
+    return (
+        set(snapshot)
+        == {
+            "excluded_outputs",
+            "ignored_code_ownership_boundaries",
+            "repositories",
+            "snapshot_sha256",
+        }
+        and snapshot.get("snapshot_sha256") == canonical_json_sha256(snapshot_body)
+        and snapshot.get("excluded_outputs")
+        == [
+            {"prefix": prefix, "reason": reason}
+            for prefix, reason in GOVERNED_CODE_EXCLUDED_OUTPUTS
+        ]
+        and snapshot.get("ignored_code_ownership_boundaries")
+        == [
+            {"root": str(root), "reason": reason}
+            for root, reason in GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES
+        ]
+    )
+
+
 def path_is_within_declared_root(path: Path, roots: list[Path]) -> bool:
     return any(path == root or root in path.parents for root in roots)
 
@@ -4670,22 +4698,7 @@ def validate_release_execution_plan(
     if not isinstance(governed_snapshot, dict):
         raise ValueError("release governed code snapshot is invalid")
     if plan.get("governed_code_snapshot_required") is True:
-        snapshot_body = {
-            key: value
-            for key, value in governed_snapshot.items()
-            if key != "snapshot_sha256"
-        }
-        if (
-            set(governed_snapshot)
-            != {"excluded_outputs", "repositories", "snapshot_sha256"}
-            or governed_snapshot.get("snapshot_sha256")
-            != canonical_json_sha256(snapshot_body)
-            or governed_snapshot.get("excluded_outputs")
-            != [
-                {"prefix": prefix, "reason": reason}
-                for prefix, reason in GOVERNED_CODE_EXCLUDED_OUTPUTS
-            ]
-        ):
+        if not governed_code_snapshot_binding_valid(governed_snapshot):
             raise ValueError("release governed code snapshot binding is invalid")
         repositories = governed_snapshot.get("repositories")
         if not isinstance(repositories, list) or not repositories:

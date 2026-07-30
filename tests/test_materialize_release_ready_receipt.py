@@ -1224,6 +1224,34 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 with self.subTest(gate=spec["name"], entrypoint=entrypoint):
                     self.assertTrue(module.governed_code_path(relative))
 
+    def test_governed_snapshot_binding_requires_exact_ownership_boundaries(self) -> None:
+        module = load_module()
+        body = {
+            "excluded_outputs": [
+                {"prefix": prefix, "reason": reason}
+                for prefix, reason in module.GOVERNED_CODE_EXCLUDED_OUTPUTS
+            ],
+            "ignored_code_ownership_boundaries": [
+                {"root": str(root), "reason": reason}
+                for root, reason in module.GOVERNED_IGNORED_CODE_OWNERSHIP_BOUNDARIES
+            ],
+            "repositories": [{"root": {"path": "/example"}}],
+        }
+        snapshot = {
+            **body,
+            "snapshot_sha256": module.canonical_json_sha256(body),
+        }
+
+        self.assertTrue(module.governed_code_snapshot_binding_valid(snapshot))
+
+        tampered = dict(snapshot)
+        tampered["ignored_code_ownership_boundaries"] = []
+        tampered_body = {
+            key: value for key, value in tampered.items() if key != "snapshot_sha256"
+        }
+        tampered["snapshot_sha256"] = module.canonical_json_sha256(tampered_body)
+        self.assertFalse(module.governed_code_snapshot_binding_valid(tampered))
+
     def test_controller_gate_is_nonlogin_and_login_profile_cannot_bypass_command(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-controller-nonlogin-") as temp_dir:
