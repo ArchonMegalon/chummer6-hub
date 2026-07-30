@@ -160,6 +160,8 @@ GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     (".state/", "runtime watcher/import state, never an executable entrypoint"),
     (".tmp/", "ephemeral workspace scratch output"),
     (".vexp/", "context index metadata, never an executable entrypoint"),
+    (".pytest_cache/", "pytest cache output"),
+    ("__pycache__/", "Python bytecode cache output"),
     ("TestResults/", "test result output"),
     ("_completion/", "operator completion/delivery output"),
     ("artifacts/", "build artifact output"),
