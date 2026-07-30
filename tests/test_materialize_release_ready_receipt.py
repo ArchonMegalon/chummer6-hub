@@ -1195,10 +1195,18 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         )
         self.assertFalse(module.governed_code_path(".codex-studio/helper.py"))
         self.assertFalse(module.governed_code_path(".codex-worktrees/linked/scripts/helper.py"))
+        self.assertFalse(module.governed_code_path("Project/bin/Release/generated.dll"))
+        self.assertFalse(module.governed_code_path("Project/obj/Debug/generated.cs"))
+        self.assertFalse(module.governed_code_path(".runtime-temp/session/state.json"))
+        self.assertFalse(module.governed_code_path(".vexp/manifest.json"))
         self.assertTrue(module.governed_code_path("node_modules/injected.js"))
         self.assertTrue(
             module.governed_restored_dependency_path("node_modules/injected.js")
         )
+        self.assertTrue(
+            module.governed_restored_dependency_path("frontend/node_modules/injected.js")
+        )
+        self.assertTrue(module.governed_code_path("ignored/helper.py"))
         for spec in module.canonical_release_gate_specs(
             module._test_release_execution_environment
         ):

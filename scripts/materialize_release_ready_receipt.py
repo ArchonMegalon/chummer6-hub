@@ -156,8 +156,10 @@ GOVERNED_CODE_BASENAMES = frozenset(
 GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     (".codex-studio/", "gate-generated receipts; launch-critical receipts are bound separately"),
     (".codex-worktrees/", "independent linked Git worktrees, never root-repository entrypoints"),
+    (".runtime-temp/", "ephemeral local runtime state, never an executable entrypoint"),
     (".state/", "runtime watcher/import state, never an executable entrypoint"),
     (".tmp/", "ephemeral workspace scratch output"),
+    (".vexp/", "context index metadata, never an executable entrypoint"),
     ("TestResults/", "test result output"),
     ("_completion/", "operator completion/delivery output"),
     ("artifacts/", "build artifact output"),
@@ -4096,7 +4098,7 @@ def governed_code_path(relative_path: str) -> bool:
         normalized = normalized[2:]
     normalized = normalized.lstrip("/")
     if not normalized or any(
-        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+        governed_path_matches_prefix(normalized, prefix)
         for prefix in GOVERNED_CODE_EXCLUDED_OUTPUT_PREFIXES
     ):
         return False
@@ -4108,13 +4110,25 @@ def governed_code_path(relative_path: str) -> bool:
     )
 
 
+def governed_path_matches_prefix(relative_path: str, prefix: str) -> bool:
+    path_parts = Path(relative_path.replace(os.sep, "/").strip("/")).parts
+    prefix_parts = Path(prefix.replace(os.sep, "/").strip("/")).parts
+    if not path_parts or not prefix_parts or len(prefix_parts) > len(path_parts):
+        return False
+    width = len(prefix_parts)
+    return any(
+        path_parts[index:index + width] == prefix_parts
+        for index in range(len(path_parts) - width + 1)
+    )
+
+
 def governed_restored_dependency_path(relative_path: str) -> bool:
     normalized = relative_path.replace(os.sep, "/")
     while normalized.startswith("./"):
         normalized = normalized[2:]
     normalized = normalized.lstrip("/")
     return any(
-        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
+        governed_path_matches_prefix(normalized, prefix)
         for prefix in GOVERNED_RESTORED_DEPENDENCY_PREFIXES
     )
 
