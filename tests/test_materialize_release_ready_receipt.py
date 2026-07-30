@@ -1881,7 +1881,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             mock.patch.object(
                 module,
                 "current_gate_execution_prebinding",
-                side_effect=lambda _plan, gate, _start: {"gate": gate},
+                side_effect=lambda _plan, gate, _start, **_kwargs: {"gate": gate},
             ),
             mock.patch.object(
                 module,

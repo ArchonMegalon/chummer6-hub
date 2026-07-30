@@ -4884,9 +4884,15 @@ def current_gate_execution_prebinding(
     start_binding: dict[str, object],
     *,
     now: datetime | None = None,
+    controller_environment: dict[str, str] | None = None,
 ) -> dict[str, object]:
     observed_at = (now or datetime.now(UTC)).astimezone(UTC)
-    validate_release_execution_plan(plan, now=observed_at, recheck_inputs=False)
+    validate_release_execution_plan(
+        plan,
+        now=observed_at,
+        recheck_inputs=False,
+        controller_environment=controller_environment,
+    )
     gate = release_execution_gate(plan, gate_name)
     if (
         start_binding.get("run_nonce") != plan.get("run_nonce")
@@ -4919,9 +4925,15 @@ def complete_gate_execution_binding(
     prebinding: dict[str, object],
     *,
     now: datetime | None = None,
+    controller_environment: dict[str, str] | None = None,
 ) -> dict[str, object]:
     observed_at = (now or datetime.now(UTC)).astimezone(UTC)
-    validate_release_execution_plan(plan, now=observed_at, recheck_inputs=False)
+    validate_release_execution_plan(
+        plan,
+        now=observed_at,
+        recheck_inputs=False,
+        controller_environment=controller_environment,
+    )
     gate_name = str(prebinding.get("gate") or "")
     gate = release_execution_gate(plan, gate_name)
     expected_pre_fields = {
@@ -5062,6 +5074,7 @@ def current_release_verifier_replay_binding(
     execution_bindings: list[dict[str, object]] | None = None,
     direct_receipt_bindings: list[dict[str, object]] | None = None,
     enforce_current_environment: bool = True,
+    controller_environment: dict[str, str] | None = None,
 ) -> dict[str, object]:
     selected_gates = tuple(gate_names or REQUIRED_RELEASE_VERIFIER_GATES)
     if selected_gates != REQUIRED_RELEASE_VERIFIER_GATES:
@@ -5115,6 +5128,7 @@ def current_release_verifier_replay_binding(
             execution_plan,
             now=observed_at,
             enforce_current_environment=enforce_current_environment,
+            controller_environment=controller_environment,
         )
         execution_plan_sha256 = str(execution_plan.get("plan_sha256") or "")
         run_nonce = str(execution_plan.get("run_nonce") or "")
@@ -5189,6 +5203,7 @@ def validate_release_verifier_binding_payload(
     execution_bindings: list[dict[str, object]] | None = None,
     direct_receipt_bindings: list[dict[str, object]] | None = None,
     enforce_current_environment: bool = False,
+    controller_environment: dict[str, str] | None = None,
 ) -> dict[str, object]:
     expected_fields = {
         "contract_name",
@@ -5247,6 +5262,7 @@ def validate_release_verifier_binding_payload(
             execution_plan,
             now=observed_at,
             enforce_current_environment=enforce_current_environment,
+            controller_environment=controller_environment,
         )
         if (
             binding.get("execution_plan_sha256") != execution_plan.get("plan_sha256")
@@ -5262,6 +5278,7 @@ def validate_release_verifier_binding_payload(
         execution_bindings=execution_bindings,
         direct_receipt_bindings=direct_receipt_bindings,
         enforce_current_environment=enforce_current_environment,
+        controller_environment=controller_environment,
     )
     for key in expected_fields - {"generated_at_utc"}:
         if binding.get(key) != current.get(key):
@@ -6071,6 +6088,7 @@ def run_authoritative_release_controller(
         start_binding = current_release_verifier_replay_binding(
             execution_plan=plan,
             binding_phase="start",
+            controller_environment=environment,
         )
         transcript.append(
             RELEASE_VERIFIER_START_BINDING_PREFIX
@@ -6108,6 +6126,7 @@ def run_authoritative_release_controller(
                 plan,
                 gate_name,
                 start_binding,
+                controller_environment=environment,
             )
             transcript.append(
                 f"START {gate_name} timeout={gate['timeout_seconds']}s"
@@ -6144,7 +6163,11 @@ def run_authoritative_release_controller(
                     "validated_release_binding": {},
                     "external_write_authorized": external_write_authorized,
                 }
-            execution_binding = complete_gate_execution_binding(plan, prebinding)
+            execution_binding = complete_gate_execution_binding(
+                plan,
+                prebinding,
+                controller_environment=environment,
+            )
             execution_bindings.append(execution_binding)
             transcript.append(
                 RELEASE_GATE_EXECUTION_BINDING_PREFIX
@@ -6188,6 +6211,7 @@ def run_authoritative_release_controller(
             binding_phase="final",
             execution_bindings=execution_bindings,
             direct_receipt_bindings=receipt_bindings,
+            controller_environment=environment,
         )
         validate_start_final_release_authority(
             start_binding,
@@ -6201,6 +6225,7 @@ def run_authoritative_release_controller(
             execution_bindings=execution_bindings,
             direct_receipt_bindings=receipt_bindings,
             enforce_current_environment=True,
+            controller_environment=environment,
         )
         transcript.append(
             RELEASE_VERIFIER_REPLAY_BINDING_PREFIX
