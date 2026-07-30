@@ -4379,8 +4379,58 @@ def validate_governed_code_snapshot(
 ) -> dict[str, object]:
     current = current_governed_code_snapshot(repositories, environment)
     if current != recorded:
-        raise ValueError("release governed code snapshot drifted")
+        raise ValueError(
+            "release governed code snapshot drifted: "
+            + governed_code_snapshot_drift_summary(recorded, current)
+        )
     return current
+
+
+def governed_code_snapshot_drift_summary(
+    recorded: dict[str, object],
+    current: dict[str, object],
+) -> str:
+    summaries: list[str] = []
+    for field in sorted(
+        (set(recorded) | set(current))
+        - {"repositories", "snapshot_sha256"}
+    ):
+        if recorded.get(field) != current.get(field):
+            summaries.append(f"snapshot:{field}")
+
+    def repository_map(snapshot: dict[str, object]) -> dict[str, dict[str, object]]:
+        values = snapshot.get("repositories")
+        if not isinstance(values, list):
+            return {}
+        result: dict[str, dict[str, object]] = {}
+        for item in values:
+            if not isinstance(item, dict):
+                continue
+            root = item.get("root")
+            root_path = str(root.get("path") or "") if isinstance(root, dict) else ""
+            if root_path:
+                result[root_path] = item
+        return result
+
+    recorded_repositories = repository_map(recorded)
+    current_repositories = repository_map(current)
+    for root_path in sorted(set(recorded_repositories) | set(current_repositories)):
+        before = recorded_repositories.get(root_path)
+        after = current_repositories.get(root_path)
+        if before is None:
+            summaries.append(f"{root_path}:added")
+            continue
+        if after is None:
+            summaries.append(f"{root_path}:removed")
+            continue
+        changed_fields = sorted(
+            field
+            for field in set(before) | set(after)
+            if before.get(field) != after.get(field)
+        )
+        if changed_fields:
+            summaries.append(f"{root_path}:" + ",".join(changed_fields))
+    return "; ".join(summaries) or "unclassified"
 
 
 def governed_code_snapshot_binding_valid(snapshot: dict[str, object]) -> bool:

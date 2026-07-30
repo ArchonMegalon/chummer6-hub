@@ -1255,6 +1255,37 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         tampered["snapshot_sha256"] = module.canonical_json_sha256(tampered_body)
         self.assertFalse(module.governed_code_snapshot_binding_valid(tampered))
 
+    def test_governed_snapshot_drift_summary_reports_only_roots_and_field_names(self) -> None:
+        module = load_module()
+        recorded = {
+            "excluded_outputs": [{"prefix": "bin/", "reason": "output"}],
+            "repositories": [
+                {
+                    "root": {"path": "/repo", "inode": 1},
+                    "head_commit": "a" * 40,
+                    "governed_files_sha256": "b" * 64,
+                }
+            ],
+            "snapshot_sha256": "c" * 64,
+        }
+        current = {
+            "excluded_outputs": [{"prefix": "bin/", "reason": "output"}],
+            "repositories": [
+                {
+                    "root": {"path": "/repo", "inode": 2},
+                    "head_commit": "a" * 40,
+                    "governed_files_sha256": "d" * 64,
+                }
+            ],
+            "snapshot_sha256": "e" * 64,
+        }
+
+        summary = module.governed_code_snapshot_drift_summary(recorded, current)
+
+        self.assertEqual("/repo:governed_files_sha256,root", summary)
+        self.assertNotIn("a" * 40, summary)
+        self.assertNotIn("d" * 64, summary)
+
     def test_release_execution_environment_drift_reports_names_not_values(self) -> None:
         module = load_module()
         plan = passing_verifier_evidence(module)["plan"]
