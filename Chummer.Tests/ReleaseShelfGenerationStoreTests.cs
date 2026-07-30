@@ -694,6 +694,22 @@ public sealed class ReleaseShelfGenerationStoreTests
         Assert.Equal("generation-a", snapshot.GenerationId);
     }
 
+    [Fact]
+    public void CaptureAcceptsPriorGenerationBoundRouteForDesktopRouteTruthField()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            desktopRouteTruthRoute: "/downloads/g/generation-a/files/chummer-test.bin");
+        fixture.Activate("generation-a", "run-a");
+
+        ReleaseShelfSnapshot snapshot = fixture.CreateStore().Capture();
+
+        Assert.Equal("generation-a", snapshot.GenerationId);
+    }
+
     [Theory]
     [InlineData("/downloads/install/test-installer/payload")]
     [InlineData("/downloads/install/test-installer?ticket=x")]

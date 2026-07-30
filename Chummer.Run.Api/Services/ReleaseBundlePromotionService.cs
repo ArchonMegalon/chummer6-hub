@@ -2002,6 +2002,14 @@ public sealed class ReleaseBundlePromotionService
                 continue;
             }
 
+            if (route.StartsWith("/downloads/g/", StringComparison.Ordinal))
+            {
+                // A manifest from the short-lived pre-fix writer can be safely
+                // re-promoted: its immutable route is normalized to the new
+                // generation instead of being retained as canonical truth.
+                continue;
+            }
+
             ValidateCanonicalDesktopInstallRoute(route);
             routes.Add(routeNode);
         }

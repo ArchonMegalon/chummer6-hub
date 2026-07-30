@@ -1494,14 +1494,16 @@ public sealed class ReleaseShelfGenerationStore
                     }
 
                     if (context == GenerationRouteTraversalContext.ExternalProofRequest
-                        && property.NameEquals("expectedPublicInstallRoute"))
+                        && property.NameEquals("expectedPublicInstallRoute")
+                        && IsCanonicalDesktopInstallRoute(property.Value))
                     {
                         ValidateCanonicalDesktopInstallRoute(property.Value, label);
                         continue;
                     }
 
                     if (context == GenerationRouteTraversalContext.DesktopRouteTruthRow
-                        && property.NameEquals("publicInstallRoute"))
+                        && property.NameEquals("publicInstallRoute")
+                        && IsCanonicalDesktopInstallRoute(property.Value))
                     {
                         ValidateCanonicalDesktopInstallRoute(property.Value, label);
                         continue;
@@ -1609,6 +1611,11 @@ public sealed class ReleaseShelfGenerationStore
                 $"{label} contains an unsafe canonical desktop install route declaration.");
         }
     }
+
+    private static bool IsCanonicalDesktopInstallRoute(JsonElement element)
+        => element.ValueKind == JsonValueKind.String
+           && element.GetString() is { } value
+           && value.StartsWith("/downloads/install/", StringComparison.Ordinal);
 
     private enum GenerationRouteTraversalContext
     {
