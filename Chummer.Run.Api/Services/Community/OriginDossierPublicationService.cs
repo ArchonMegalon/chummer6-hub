@@ -13,7 +13,7 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class OriginDossierPublicationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Subscribr"];
+    private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["First Book", "Subscribr"];
     private static readonly IReadOnlyList<string> DefaultApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
     private static readonly IReadOnlyList<string> DefaultPreferredVisualProviderTokens = ["Magicfit"];
     private static readonly IReadOnlyList<string> DefaultApprovedVisualProviderTokens = DefaultPreferredVisualProviderTokens;
@@ -1149,7 +1149,7 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasSourcePacketReceipt(entry.SourcePacketPath, entry.SourcePacketReceiptPath), "approved source packet receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.ProviderManuscriptPath), "provider manuscript artifact path");
         AddIfMissing(missing, HasFullChapteredStoryManuscript(entry.ProviderManuscriptPath), "ebook-length full chaptered story manuscript artifact");
-        AddIfMissing(missing, HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath), "Subscribr full-story manuscript receipt path");
+        AddIfMissing(missing, HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath), "approved full-story manuscript receipt path");
         AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.ProviderManuscriptAccountAlias, entry.ProviderManuscriptReceiptPath, "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES", "OriginDossier:ManuscriptAccountAliases"), "provider manuscript account alias");
         AddIfMissing(
             missing,

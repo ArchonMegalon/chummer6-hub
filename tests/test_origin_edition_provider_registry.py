@@ -25,6 +25,9 @@ def test_provider_registry_uses_token_boundaries_not_substrings() -> None:
     assert registry.audio_provider_allowed("NotUnmixr Account 02") is False
     assert registry.manuscript_provider_allowed("Subscribr Tier 4") is True
     assert registry.manuscript_provider_allowed("FakeSubscribrProxy") is False
+    assert registry.manuscript_provider_allowed("First Book AI Premium") is True
+    assert registry.manuscript_provider_allowed("FirstBook Premium") is True
+    assert registry.manuscript_provider_allowed("NotFirstBookProxy") is False
     assert registry.manuscript_provider_allowed("WorkLLM Tier 4") is True
     assert registry.manuscript_provider_allowed("FakeWorkLLMProxy") is False
     assert registry.manuscript_provider_allowed("Inkfluence Tier 3") is False

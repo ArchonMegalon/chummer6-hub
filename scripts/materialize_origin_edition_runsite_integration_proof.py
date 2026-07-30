@@ -494,7 +494,7 @@ def materialize(
             "origin_publication_gold_gate_service",
             repo_root / "Chummer.Run.Api/Services/Community/OriginDossierPublicationService.cs",
             [
-                'DefaultApprovedManuscriptProviderTokens = ["Subscribr"]',
+                'DefaultApprovedManuscriptProviderTokens = ["First Book", "Subscribr"]',
                 "FullStoryManuscriptToken",
                 "StoryEditionEbookToken",
                 "CharacterVisibleCinematicToken",

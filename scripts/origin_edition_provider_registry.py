@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 
 DEFAULT_MANUSCRIPT_PROVIDER_TOKENS = (
+    "first book",
+    "firstbook",
     "subscribr",
     "workllm",
 )

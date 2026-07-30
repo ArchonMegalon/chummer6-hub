@@ -293,3 +293,134 @@ def test_firstbook_packet_and_receipt_verifier_passes(tmp_path: Path) -> None:
     assert verified["validation"]["source_binding"] == "pass"
     assert verified["validation"]["chapter_hashes"] == "pass"
     assert verified["validation"]["export_hashes"] == "pass"
+    assert verified["full_manuscript_ready"] is False
+
+
+def test_firstbook_full_manuscript_receipt_is_authenticated_and_source_bound(tmp_path: Path) -> None:
+    build_packet = load_module("build_firstbook_premium_packet.py")
+    materialize_receipt = load_module("materialize_firstbook_premium_receipt.py")
+    verify_receipt = load_module("verify_firstbook_premium_receipt.py")
+
+    outline = tmp_path / "outline.md"
+    outline.write_text("# Outline\n1. Arrival\n2. Reckoning\n", encoding="utf-8")
+    chapter_one = tmp_path / "chapter-1.md"
+    chapter_one.write_text("# Chapter 1 - Arrival\nThe runner enters the rain.\n", encoding="utf-8")
+    chapter_two = tmp_path / "chapter-2.md"
+    chapter_two.write_text("# Chapter 2 - Reckoning\nThe runner chooses the truth.\n", encoding="utf-8")
+    manuscript = tmp_path / "origin-dossier.md"
+    manuscript.write_text(
+        chapter_one.read_text(encoding="utf-8")
+        + "\n"
+        + chapter_two.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    packet = build_packet.build_packet(
+        argparse.Namespace(
+            packet_id="origin-dossier-firstbook-v1",
+            source_packet_ref=["approved-origin-packet-sha256"],
+            book_title="Rain Ledger",
+            audience="the authenticated runner",
+            style_profile="source-faithful cinematic noir",
+            chapter_count=2,
+            forbidden_material=[
+                "sourcebook copied prose",
+                "private runner data",
+                "GM-only campaign secrets",
+                "unproven release claims",
+            ],
+            human_review_required_per_chapter=True,
+            publication_allowed=False,
+            out=None,
+        )
+    )
+    packet_path = tmp_path / "packet.json"
+    packet_path.write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
+
+    receipt = materialize_receipt.build_receipt(
+        argparse.Namespace(
+            packet=str(packet_path),
+            outline=str(outline),
+            chapter=[
+                f"1|Arrival|{chapter_one}|approved",
+                f"2|Reckoning|{chapter_two}|approved",
+            ],
+            export=[f"markdown|{manuscript}"],
+            manuscript=str(manuscript),
+            provider_run_ref="firstbook-origin-run-20260730",
+            account_alias="firstbook-premium",
+            out=None,
+        )
+    )
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    verified, passed = verify_receipt.verify_receipt(
+        argparse.Namespace(receipt=str(receipt_path), out=None)
+    )
+
+    assert passed is True
+    assert verified["status"] == "verified"
+    assert verified["full_manuscript_ready"] is True
+    assert verified["validation"]["manuscript_binding"] == "pass"
+    assert verified["validation"]["provider_authentication"] == "pass"
+    assert verified["artifactSha256"] == [receipt["manuscript"]["sha256"]]
+    assert "operator_verified_live_run" in verified["deliveredLinks"]
+    assert "provider_receipt_reference:First Book AI:provider_manuscript_import" in verified["deliveredLinks"]
+    assert verified["providerAuthentication"]["providerRunRefHash"] != "firstbook-origin-run-20260730"
+
+
+def test_firstbook_verifier_rejects_unapproved_chapter(tmp_path: Path) -> None:
+    build_packet = load_module("build_firstbook_premium_packet.py")
+    materialize_receipt = load_module("materialize_firstbook_premium_receipt.py")
+    verify_receipt = load_module("verify_firstbook_premium_receipt.py")
+
+    outline = tmp_path / "outline.md"
+    outline.write_text("# Outline\n", encoding="utf-8")
+    chapter = tmp_path / "chapter-1.md"
+    chapter.write_text("# Chapter 1 - Draft\nUnreviewed prose.\n", encoding="utf-8")
+    export_md = tmp_path / "draft.md"
+    export_md.write_text(chapter.read_text(encoding="utf-8"), encoding="utf-8")
+    packet = build_packet.build_packet(
+        argparse.Namespace(
+            packet_id="firstbook-draft-v1",
+            source_packet_ref=["approved-origin-packet-sha256"],
+            book_title="Draft",
+            audience="runner",
+            style_profile="source-bound",
+            chapter_count=1,
+            forbidden_material=[
+                "sourcebook copied prose",
+                "private runner data",
+                "GM-only campaign secrets",
+                "unproven release claims",
+            ],
+            human_review_required_per_chapter=True,
+            publication_allowed=False,
+            out=None,
+        )
+    )
+    packet_path = tmp_path / "packet.json"
+    packet_path.write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
+    receipt = materialize_receipt.build_receipt(
+        argparse.Namespace(
+            packet=str(packet_path),
+            outline=str(outline),
+            chapter=[f"1|Draft|{chapter}|draft"],
+            export=[f"markdown|{export_md}"],
+            manuscript="",
+            provider_run_ref="",
+            account_alias="",
+            out=None,
+        )
+    )
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+
+    verified, passed = verify_receipt.verify_receipt(
+        argparse.Namespace(receipt=str(receipt_path), out=None)
+    )
+
+    assert passed is False
+    assert verified["status"] == "validation_blocked"
+    assert verified["validation"]["human_review"] == "partial"

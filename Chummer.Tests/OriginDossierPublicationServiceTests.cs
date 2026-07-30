@@ -474,7 +474,7 @@ public sealed class OriginDossierPublicationServiceTests
     }
 
     [Fact]
-    public void ListForAccountRequiresSubscribrReceiptToProveFullChapteredStory()
+    public void ListForAccountRequiresApprovedProviderReceiptToProveFullChapteredStory()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempRoot);
@@ -517,7 +517,77 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("Subscribr full-story manuscript receipt path", publication.MissingGoldRequirements);
+        Assert.Contains("approved full-story manuscript receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsAuthenticatedFirstBookFullManuscriptReceipt()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-firstbook-manuscript.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-firstbook-manuscript");
+        File.WriteAllText(
+            artifacts.ProviderManuscriptReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    contract_name = "chummer.firstbook_premium_receipt.v1",
+                    operation = "provider_manuscript_import",
+                    provider = "First Book AI",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    full_manuscript_ready = true,
+                    providerAuthentication = new
+                    {
+                        status = "authenticated",
+                        accountAlias = OriginManuscriptAccountAlias,
+                        providerRunRefHash = new string('a', 64),
+                        rawProviderRunRefIncluded = false
+                    },
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:First Book AI:provider_manuscript_import",
+                        $"accountAlias: {OriginManuscriptAccountAlias}",
+                        "full_story_manuscript",
+                        "chaptered_story"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-firstbook-manuscript",
+                            "First Book Manuscript",
+                            "Vanta",
+                            artifacts)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.FullStoryVerified);
+        Assert.DoesNotContain("approved full-story manuscript receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
@@ -935,7 +1005,7 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("Subscribr full-story manuscript receipt path", publication.MissingGoldRequirements);
+        Assert.Contains("approved full-story manuscript receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
