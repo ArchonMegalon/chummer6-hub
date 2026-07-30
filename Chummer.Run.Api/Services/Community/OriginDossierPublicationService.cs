@@ -277,7 +277,7 @@ public sealed class OriginDossierPublicationService
             OriginDossierPortraitChoiceDto[] validChoices = choices
                 .Where(IsValidRenderablePortraitChoice)
                 .ToArray();
-            if (!CanAccessDossierShare(entry)
+            if (!CanRequestOriginMedia(entry)
                 || validChoices.Length != 3
                 || !validChoices
                     .Any(choice => Matches(choice.PortraitId, portraitId)))
@@ -302,7 +302,7 @@ public sealed class OriginDossierPublicationService
         {
             OriginDossierAudiobookVoiceOptionDto[] options = entry.AudiobookVoiceOptions?.ToArray()
                 ?? Array.Empty<OriginDossierAudiobookVoiceOptionDto>();
-            if (!CanAccessDossierShare(entry)
+            if (!CanRequestOriginMedia(entry)
                 || options.Length == 0
                 || !options.Where(IsValidAudiobookVoiceOption)
                     .Any(option => Matches(option.VoiceId, voiceId)))
@@ -327,7 +327,7 @@ public sealed class OriginDossierPublicationService
         {
             OriginDossierSceneHighlightDto[] scenes = entry.SceneHighlights?.ToArray()
                 ?? Array.Empty<OriginDossierSceneHighlightDto>();
-            if (!CanAccessDossierShare(entry)
+            if (!CanRequestOriginMedia(entry)
                 || !HasSelectedPortraitChoice(entry)
                 || scenes.Length == 0
                 || !scenes.Where(IsValidSceneHighlight)
@@ -364,7 +364,7 @@ public sealed class OriginDossierPublicationService
                     IsOwnedBy(candidate, userId, subjectId)
                     && Matches(candidate.ProjectId, projectId));
             if (entry is null
-                || !CanAccessDossierShare(entry)
+                || !CanRequestOriginMedia(entry)
                 || !HasArchivedArtifact(entry.ProviderManuscriptPath)
                 || !HasArchivedArtifact(entry.SourcePacketPath))
             {
@@ -1101,6 +1101,27 @@ public sealed class OriginDossierPublicationService
             && IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfDossierShareUrl)
             && HasArchivedArtifact(entry.EbookArtifactPath)
             && HasAudiobookshelfDossierImportReceipt(entry);
+
+    private bool CanRequestOriginMedia(OriginDossierPublicationIndexEntry entry)
+        => IsPublishedForOwner(entry.PublicationState)
+            && entry.ProviderAuthoredManuscriptImported
+            && HasOriginEditionNamespace(entry)
+            && IsChummerRunOwnerUrl(entry)
+            && !ContainsFakeMarker(entry)
+            && HasArchivedArtifact(entry.SourcePacketPath)
+            && HasSourcePacketReceipt(entry.SourcePacketPath, entry.SourcePacketReceiptPath)
+            && HasArchivedArtifact(entry.ProviderManuscriptPath)
+            && HasFullChapteredStoryManuscript(entry.ProviderManuscriptPath)
+            && HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath)
+            && HasProviderAccountAliasReceipt(
+                entry.ProviderManuscriptAccountAlias,
+                entry.ProviderManuscriptReceiptPath,
+                "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES",
+                "OriginDossier:ManuscriptAccountAliases")
+            && HasCanonAuditReceipt(
+                entry.SourcePacketPath,
+                entry.ProviderManuscriptPath,
+                entry.CanonAuditReceiptPath);
 
     private bool CanAccessCoverArtifact(OriginDossierPublicationIndexEntry entry)
         => HasStoryCoverReady(entry);

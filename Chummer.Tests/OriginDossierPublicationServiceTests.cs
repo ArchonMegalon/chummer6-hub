@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Media.Contracts;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
@@ -744,7 +745,7 @@ public sealed class OriginDossierPublicationServiceTests
     }
 
     [Fact]
-    public void OwnerChoicesStayLockedUntilEbookHandoffIsVerified()
+    public void OwnerCanChoosePrivateMediaBeforeEbookHandoffIsVerified()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempRoot);
@@ -794,9 +795,36 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.True(publication.FullStoryVerified);
         Assert.False(publication.EbookHandoffReady);
         Assert.Contains("Audiobookshelf dossier ebook import receipt path", publication.MissingGoldRequirements);
-        Assert.Null(service.SelectPortraitForAccount("user-1", "subject-1", projectId, $"portrait-{projectId}-quiet"));
-        Assert.Null(service.SelectAudiobookVoiceForAccount("user-1", "subject-1", projectId, "voice-street"));
-        Assert.Null(service.SelectCinematicSceneForAccount("user-1", "subject-1", projectId, "scene-burned-safehouse"));
+        Assert.Null(service.SelectCinematicSceneForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "scene-burned-safehouse"));
+
+        Assert.NotNull(service.SelectPortraitForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            $"portrait-{projectId}-quiet"));
+        Assert.NotNull(service.SelectAudiobookVoiceForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "voice-street"));
+        Assert.NotNull(service.SelectCinematicSceneForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "scene-burned-safehouse"));
+
+        OriginDossierMediaDispatchSource? dispatch = service.GetMediaDispatchSourceForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            OriginDossierMediaDispatchKind.Audiobook,
+            "voice-street");
+        Assert.NotNull(dispatch);
+        Assert.Equal(ComputeSha256(artifacts.ProviderManuscriptPath), dispatch.OriginRevisionId);
     }
 
     [Fact]
