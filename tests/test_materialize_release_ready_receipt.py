@@ -1184,6 +1184,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             all(prefix and reason for prefix, reason in module.GOVERNED_CODE_EXCLUDED_OUTPUTS)
         )
         self.assertFalse(module.governed_code_path(".codex-studio/helper.py"))
+        self.assertFalse(module.governed_code_path(".codex-worktrees/linked/scripts/helper.py"))
         self.assertTrue(module.governed_code_path("node_modules/injected.js"))
         self.assertTrue(
             module.governed_restored_dependency_path("node_modules/injected.js")

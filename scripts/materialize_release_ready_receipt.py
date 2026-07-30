@@ -155,6 +155,7 @@ GOVERNED_CODE_BASENAMES = frozenset(
 # launch truth are bound separately by RELEASE_VERIFIER_GATE_RECEIPTS.
 GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     (".codex-studio/", "gate-generated receipts; launch-critical receipts are bound separately"),
+    (".codex-worktrees/", "independent linked Git worktrees, never root-repository entrypoints"),
     (".state/", "runtime watcher/import state, never an executable entrypoint"),
     (".tmp/", "ephemeral workspace scratch output"),
     ("TestResults/", "test result output"),
