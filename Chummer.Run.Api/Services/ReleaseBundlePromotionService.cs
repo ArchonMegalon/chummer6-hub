@@ -1865,14 +1865,14 @@ public sealed class ReleaseBundlePromotionService
         JsonNode? canonicalProofRoutes = proofRoutesCandidate is JsonArray
             ? proofRoutesCandidate
             : null;
-        IReadOnlyList<JsonNode> canonicalExternalProofRequestRoutes =
-            CaptureCanonicalExternalProofRequestRoutes(manifest);
+        IReadOnlyList<JsonNode> canonicalDesktopRouteDeclarations =
+            CaptureCanonicalDesktopRouteDeclarations(manifest);
         NormalizeManifestNode(
             manifest,
             generationId,
             artifactRoutes,
             canonicalProofRoutes,
-            canonicalExternalProofRequestRoutes);
+            canonicalDesktopRouteDeclarations);
         ValidateGenerationBoundManifestRoutes(manifest, generationId);
     }
 
@@ -1881,7 +1881,7 @@ public sealed class ReleaseBundlePromotionService
         string generationId,
         IReadOnlyDictionary<string, GenerationArtifactRoute> artifactRoutes,
         JsonNode? canonicalProofRoutes,
-        IReadOnlyList<JsonNode> canonicalExternalProofRequestRoutes)
+        IReadOnlyList<JsonNode> canonicalDesktopRouteDeclarations)
     {
         if (node is JsonObject jsonObject)
         {
@@ -1897,11 +1897,11 @@ public sealed class ReleaseBundlePromotionService
                     continue;
                 }
 
-                // Missing desktop tuple proof requests deliberately retain the
-                // canonical install route where a future artifact will appear.
-                // The exact top-level node identities are captured and validated
-                // before traversal so nested lookalikes receive no exemption.
-                if (canonicalExternalProofRequestRoutes.Any(
+                // Desktop route truth and missing-tuple proof requests deliberately
+                // retain canonical install dispatch declarations. The exact
+                // top-level node identities are captured and validated before
+                // traversal so nested lookalikes receive no exemption.
+                if (canonicalDesktopRouteDeclarations.Any(
                         candidate => ReferenceEquals(child, candidate)))
                 {
                     continue;
@@ -1926,7 +1926,7 @@ public sealed class ReleaseBundlePromotionService
                         generationId,
                         artifactRoutes,
                         canonicalProofRoutes,
-                        canonicalExternalProofRequestRoutes);
+                        canonicalDesktopRouteDeclarations);
                 }
             }
 
@@ -1957,39 +1957,57 @@ public sealed class ReleaseBundlePromotionService
                         generationId,
                         artifactRoutes,
                         canonicalProofRoutes,
-                        canonicalExternalProofRequestRoutes);
+                        canonicalDesktopRouteDeclarations);
                 }
             }
         }
     }
 
-    private static IReadOnlyList<JsonNode> CaptureCanonicalExternalProofRequestRoutes(
+    private static IReadOnlyList<JsonNode> CaptureCanonicalDesktopRouteDeclarations(
         JsonObject manifest)
     {
         var routes = new List<JsonNode>();
-        if ((manifest["desktopTupleCoverage"] as JsonObject)?["externalProofRequests"]
-            is not JsonArray requests)
+        if (manifest["desktopTupleCoverage"] is not JsonObject coverage)
         {
             return routes;
         }
 
-        foreach (JsonNode? requestNode in requests)
+        CaptureCanonicalDesktopRouteDeclarations(
+            coverage["externalProofRequests"] as JsonArray,
+            "expectedPublicInstallRoute",
+            routes);
+        CaptureCanonicalDesktopRouteDeclarations(
+            coverage["desktopRouteTruth"] as JsonArray,
+            "publicInstallRoute",
+            routes);
+        return routes;
+    }
+
+    private static void CaptureCanonicalDesktopRouteDeclarations(
+        JsonArray? rows,
+        string propertyName,
+        ICollection<JsonNode> routes)
+    {
+        if (rows is null)
         {
-            if (requestNode is not JsonObject request
-                || request["expectedPublicInstallRoute"] is not JsonValue routeNode
+            return;
+        }
+
+        foreach (JsonNode? rowNode in rows)
+        {
+            if (rowNode is not JsonObject row
+                || row[propertyName] is not JsonValue routeNode
                 || !routeNode.TryGetValue(out string? route))
             {
                 continue;
             }
 
-            ValidateCanonicalExternalProofRequestRoute(route);
+            ValidateCanonicalDesktopInstallRoute(route);
             routes.Add(routeNode);
         }
-
-        return routes;
     }
 
-    private static void ValidateCanonicalExternalProofRequestRoute(string? value)
+    private static void ValidateCanonicalDesktopInstallRoute(string? value)
     {
         const string prefix = "/downloads/install/";
         string artifactId = value is not null && value.StartsWith(prefix, StringComparison.Ordinal)
@@ -2000,7 +2018,7 @@ public sealed class ReleaseBundlePromotionService
                 char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '+' or '-'))
         {
             throw new InvalidDataException(
-                $"external proof request contains an unsafe canonical install route: {value}");
+                $"desktop route declaration contains an unsafe canonical install route: {value}");
         }
     }
 
@@ -2202,13 +2220,13 @@ public sealed class ReleaseBundlePromotionService
         JsonNode? canonicalProofRoutes = proofRoutesCandidate is JsonArray
             ? proofRoutesCandidate
             : null;
-        IReadOnlyList<JsonNode> canonicalExternalProofRequestRoutes = node is JsonObject manifest
-            ? CaptureCanonicalExternalProofRequestRoutes(manifest)
+        IReadOnlyList<JsonNode> canonicalDesktopRouteDeclarations = node is JsonObject manifest
+            ? CaptureCanonicalDesktopRouteDeclarations(manifest)
             : [];
         foreach (string value in EnumerateGenerationBoundStrings(
                      node,
                      canonicalProofRoutes,
-                     canonicalExternalProofRequestRoutes))
+                     canonicalDesktopRouteDeclarations))
         {
             if (!TryGetReleasePath(value, out string path))
             {
@@ -2248,7 +2266,7 @@ public sealed class ReleaseBundlePromotionService
     private static IEnumerable<string> EnumerateGenerationBoundStrings(
         JsonNode node,
         JsonNode? canonicalProofRoutes,
-        IReadOnlyList<JsonNode> canonicalExternalProofRequestRoutes)
+        IReadOnlyList<JsonNode> canonicalDesktopRouteDeclarations)
     {
         if (node is JsonValue value && value.TryGetValue(out string? text))
         {
@@ -2262,7 +2280,7 @@ public sealed class ReleaseBundlePromotionService
             {
                 if (child is null
                     || ReferenceEquals(child, canonicalProofRoutes)
-                    || canonicalExternalProofRequestRoutes.Any(
+                    || canonicalDesktopRouteDeclarations.Any(
                         candidate => ReferenceEquals(child, candidate)))
                 {
                     continue;
@@ -2271,7 +2289,7 @@ public sealed class ReleaseBundlePromotionService
                 foreach (string nested in EnumerateGenerationBoundStrings(
                              child,
                              canonicalProofRoutes,
-                             canonicalExternalProofRequestRoutes))
+                             canonicalDesktopRouteDeclarations))
                 {
                     yield return nested;
                 }
@@ -2292,7 +2310,7 @@ public sealed class ReleaseBundlePromotionService
                 foreach (string nested in EnumerateGenerationBoundStrings(
                              child,
                              canonicalProofRoutes,
-                             canonicalExternalProofRequestRoutes))
+                             canonicalDesktopRouteDeclarations))
                 {
                     yield return nested;
                 }

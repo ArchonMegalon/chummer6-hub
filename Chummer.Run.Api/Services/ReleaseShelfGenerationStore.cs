@@ -1496,7 +1496,14 @@ public sealed class ReleaseShelfGenerationStore
                     if (context == GenerationRouteTraversalContext.ExternalProofRequest
                         && property.NameEquals("expectedPublicInstallRoute"))
                     {
-                        ValidateCanonicalExternalProofRequestRoute(property.Value, label);
+                        ValidateCanonicalDesktopInstallRoute(property.Value, label);
+                        continue;
+                    }
+
+                    if (context == GenerationRouteTraversalContext.DesktopRouteTruthRow
+                        && property.NameEquals("publicInstallRoute"))
+                    {
+                        ValidateCanonicalDesktopInstallRoute(property.Value, label);
                         continue;
                     }
 
@@ -1511,6 +1518,10 @@ public sealed class ReleaseShelfGenerationStore
                           && property.NameEquals("externalProofRequests")
                           && property.Value.ValueKind == JsonValueKind.Array
                             ? GenerationRouteTraversalContext.ExternalProofRequests
+                        : context == GenerationRouteTraversalContext.TopLevelDesktopTupleCoverage
+                          && property.NameEquals("desktopRouteTruth")
+                          && property.Value.ValueKind == JsonValueKind.Array
+                            ? GenerationRouteTraversalContext.DesktopRouteTruth
                             : GenerationRouteTraversalContext.Other;
                     ValidateGenerationRoutes(property.Value, generationId, label, childContext);
                 }
@@ -1525,6 +1536,9 @@ public sealed class ReleaseShelfGenerationStore
                         context == GenerationRouteTraversalContext.ExternalProofRequests
                         && child.ValueKind == JsonValueKind.Object
                             ? GenerationRouteTraversalContext.ExternalProofRequest
+                        : context == GenerationRouteTraversalContext.DesktopRouteTruth
+                          && child.ValueKind == JsonValueKind.Object
+                            ? GenerationRouteTraversalContext.DesktopRouteTruthRow
                             : GenerationRouteTraversalContext.Other);
                 }
                 return;
@@ -1576,7 +1590,7 @@ public sealed class ReleaseShelfGenerationStore
         }
     }
 
-    private static void ValidateCanonicalExternalProofRequestRoute(
+    private static void ValidateCanonicalDesktopInstallRoute(
         JsonElement element,
         string label)
     {
@@ -1592,7 +1606,7 @@ public sealed class ReleaseShelfGenerationStore
                 char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '+' or '-'))
         {
             throw new InvalidDataException(
-                $"{label} contains an unsafe canonical external-proof install route.");
+                $"{label} contains an unsafe canonical desktop install route declaration.");
         }
     }
 
@@ -1603,6 +1617,8 @@ public sealed class ReleaseShelfGenerationStore
         TopLevelDesktopTupleCoverage,
         ExternalProofRequests,
         ExternalProofRequest,
+        DesktopRouteTruth,
+        DesktopRouteTruthRow,
         Other
     }
 

@@ -678,6 +678,54 @@ public sealed class ReleaseShelfGenerationStoreTests
         Assert.Throws<InvalidDataException>(() => fixture.CreateStore().Capture());
     }
 
+    [Fact]
+    public void CaptureAcceptsCanonicalRouteForExactDesktopRouteTruthField()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            desktopRouteTruthRoute: "/downloads/install/test-installer");
+        fixture.Activate("generation-a", "run-a");
+
+        ReleaseShelfSnapshot snapshot = fixture.CreateStore().Capture();
+
+        Assert.Equal("generation-a", snapshot.GenerationId);
+    }
+
+    [Theory]
+    [InlineData("/downloads/install/test-installer/payload")]
+    [InlineData("/downloads/install/test-installer?ticket=x")]
+    [InlineData("/downloads/install/test-installer%2Fpayload")]
+    [InlineData("https://chummer.run/downloads/install/test-installer")]
+    public void CaptureRejectsUnsafeCanonicalRouteForDesktopRouteTruthField(string route)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            desktopRouteTruthRoute: route);
+        fixture.Activate("generation-a", "run-a");
+
+        Assert.Throws<InvalidDataException>(() => fixture.CreateStore().Capture());
+    }
+
+    [Fact]
+    public void CaptureRejectsCanonicalRouteInNestedDesktopRouteTruthLookalike()
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            nestedDesktopRouteTruthRoute: "/downloads/install/test-installer");
+        fixture.Activate("generation-a", "run-a");
+
+        Assert.Throws<InvalidDataException>(() => fixture.CreateStore().Capture());
+    }
+
     [Theory]
     [InlineData("/downloads/g/generation-a/install/test-installer/claim")]
     [InlineData("/downloads/g/generation-a/install/test-installer?ticket=x")]
@@ -1465,7 +1513,9 @@ public sealed class ReleaseShelfGenerationStoreTests
             IReadOnlyList<string>? topLevelProofRoutes = null,
             IReadOnlyList<string>? nestedProofRoutes = null,
             string? externalProofRequestRoute = null,
-            string? nestedExternalProofRequestRoute = null)
+            string? nestedExternalProofRequestRoute = null,
+            string? desktopRouteTruthRoute = null,
+            string? nestedDesktopRouteTruthRoute = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1592,6 +1642,40 @@ public sealed class ReleaseShelfGenerationStoreTests
                             new Dictionary<string, object?>
                             {
                                 ["expectedPublicInstallRoute"] = nestedExternalProofRequestRoute
+                            }
+                        }
+                    }
+                };
+            }
+
+            if (desktopRouteTruthRoute is not null)
+            {
+                var coverage = new Dictionary<string, object?>
+                {
+                    ["desktopRouteTruth"] = new object[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["tupleId"] = "avalonia:linux:linux-x64",
+                            ["publicInstallRoute"] = desktopRouteTruthRoute
+                        }
+                    }
+                };
+                canonical["desktopTupleCoverage"] = coverage;
+                compatibility["desktopTupleCoverage"] = coverage;
+            }
+
+            if (nestedDesktopRouteTruthRoute is not null)
+            {
+                canonical["extension"] = new Dictionary<string, object?>
+                {
+                    ["desktopTupleCoverage"] = new Dictionary<string, object?>
+                    {
+                        ["desktopRouteTruth"] = new object[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["publicInstallRoute"] = nestedDesktopRouteTruthRoute
                             }
                         }
                     }

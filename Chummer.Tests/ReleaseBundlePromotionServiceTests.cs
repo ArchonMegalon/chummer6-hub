@@ -2447,6 +2447,24 @@ public sealed class ReleaseBundlePromotionServiceTests
                         .EnumerateArray()
                         .ToArray());
                 Assert.Equal(expectedRoute, request.GetProperty("expectedPublicInstallRoute").GetString());
+
+                JsonElement[] routeTruth = manifest.RootElement
+                    .GetProperty("desktopTupleCoverage")
+                    .GetProperty("desktopRouteTruth")
+                    .EnumerateArray()
+                    .ToArray();
+                Assert.Equal(
+                    "/downloads/install/avalonia-linux-x64-installer",
+                    routeTruth.Single(row =>
+                            row.GetProperty("tupleId").GetString() == "avalonia:linux:linux-x64")
+                        .GetProperty("publicInstallRoute")
+                        .GetString());
+                Assert.Equal(
+                    "/downloads/install/avalonia-osx-arm64-installer",
+                    routeTruth.Single(row =>
+                            row.GetProperty("tupleId").GetString() == "avalonia:macos:osx-arm64")
+                        .GetProperty("publicInstallRoute")
+                        .GetString());
             }
         }
 
