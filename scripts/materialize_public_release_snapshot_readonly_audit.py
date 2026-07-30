@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -626,6 +627,36 @@ def atomic_write(path: Path, content: str) -> None:
         temp_path.unlink(missing_ok=True)
 
 
+def durable_mirror_write(path: Path, content: str) -> None:
+    """Refresh an existing mirror without replacing its parent directory entry."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        atomic_write(path, content)
+        return
+    if not stat.S_ISREG(before.st_mode):
+        raise OSError(f"refusing to update non-regular release mirror: {path}")
+
+    flags = os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise OSError(f"release mirror changed while opening: {path}")
+        encoded = content.encode("utf-8")
+        os.ftruncate(descriptor, 0)
+        offset = 0
+        while offset < len(encoded):
+            offset += os.write(descriptor, encoded[offset:])
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def materialize_outputs(
     audit: dict[str, Any],
     *,
@@ -636,7 +667,7 @@ def materialize_outputs(
     rendered = json.dumps(audit, indent=2) + "\n"
     atomic_write(output, rendered)
     if root_mirror_output is not None and root_mirror_output.resolve() != output.resolve():
-        atomic_write(root_mirror_output, rendered)
+        durable_mirror_write(root_mirror_output, rendered)
     if below_gold_output is not None:
         atomic_write(below_gold_output, below_gold_markdown(audit))
 

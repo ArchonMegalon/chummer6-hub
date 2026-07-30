@@ -422,6 +422,32 @@ def test_materialized_published_audit_and_root_mirror_are_identical(tmp_path: Pa
     assert "not flagship-product-ready" in below_gold_output.read_text(encoding="utf-8")
 
 
+def test_materialized_root_mirror_preserves_existing_directory_entry(tmp_path: Path) -> None:
+    published_output = tmp_path / "published" / "audit.json"
+    root_mirror_output = tmp_path / "audit.json"
+    root_mirror_output.write_text('{"state":"before"}\n', encoding="utf-8")
+    parent_before = tmp_path.stat()
+    mirror_before = root_mirror_output.stat()
+
+    MODULE.materialize_outputs(
+        {"contract_name": "test", "status": "pass"},
+        output=published_output,
+        root_mirror_output=root_mirror_output,
+        below_gold_output=None,
+    )
+
+    parent_after = tmp_path.stat()
+    mirror_after = root_mirror_output.stat()
+    assert (mirror_after.st_dev, mirror_after.st_ino) == (
+        mirror_before.st_dev,
+        mirror_before.st_ino,
+    )
+    assert (parent_after.st_mtime_ns, parent_after.st_ctime_ns) == (
+        parent_before.st_mtime_ns,
+        parent_before.st_ctime_ns,
+    )
+
+
 def test_default_published_audit_path_matches_release_ready_consumer() -> None:
     expected = MODULE.ROOT / ".codex-studio" / "published" / "PUBLIC_RELEASE_SNAPSHOT_READONLY_AUDIT.generated.json"
 
