@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -2548,6 +2549,104 @@ def test_activate_overlay_tree_copy_cutover_preserves_exact_prior_tree_as_backup
     )
     assert not staging_root.exists()
     assert not module.activation_transaction_journal_path(active_root).exists()
+
+
+def test_overlay_backup_retention_keeps_only_newest_verified_transactions(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    backup_root = tmp_path / "backups"
+    transaction_names = [
+        "20260729T120000Z",
+        "20260729T130000Z",
+        "20260730T120000Z",
+        "20260730T120000Z-1",
+        "20260730T120000Z-2",
+    ]
+    for name in transaction_names:
+        app_root = backup_root / name / "app"
+        app_root.mkdir(parents=True)
+        (app_root / "payload.txt").write_text(name + "\n", encoding="utf-8")
+
+    receipt = module.enforce_overlay_backup_retention(
+        backup_root,
+        retention_count=3,
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["discoveredCount"] == 5
+    assert receipt["retainedCount"] == 3
+    assert receipt["removedCount"] == 2
+    assert receipt["retainedTransactionNames"] == [
+        "20260730T120000Z-2",
+        "20260730T120000Z-1",
+        "20260730T120000Z",
+    ]
+    assert set(receipt["removedTransactionNames"]) == {
+        "20260729T120000Z",
+        "20260729T130000Z",
+    }
+    assert sorted(path.name for path in backup_root.iterdir()) == [
+        "20260730T120000Z",
+        "20260730T120000Z-1",
+        "20260730T120000Z-2",
+    ]
+
+
+def test_overlay_backup_retention_blocks_without_deleting_unexpected_entries(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    backup_root = tmp_path / "backups"
+    valid_root = backup_root / "20260730T120000Z" / "app"
+    valid_root.mkdir(parents=True)
+    (valid_root / "payload.txt").write_text("valid\n", encoding="utf-8")
+    (backup_root / "operator-note.txt").write_text("keep\n", encoding="utf-8")
+
+    receipt = module.enforce_overlay_backup_retention(
+        backup_root,
+        retention_count=1,
+    )
+
+    assert receipt["status"] == "blocked"
+    assert receipt["reason"] == "unexpected_backup_entries"
+    assert receipt["unexpectedEntries"] == ["operator-note.txt"]
+    assert receipt["removedCount"] == 0
+    assert valid_root.is_dir()
+    assert (backup_root / "operator-note.txt").is_file()
+
+
+def test_overlay_backup_retention_blocks_on_symlinked_transaction(
+    tmp_path: Path,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("symlink creation is not guaranteed for an unprivileged Windows test")
+    module = load_module()
+    backup_root = tmp_path / "backups"
+    backup_root.mkdir()
+    outside_root = tmp_path / "outside" / "app"
+    outside_root.mkdir(parents=True)
+    (outside_root / "payload.txt").write_text("outside\n", encoding="utf-8")
+    linked_transaction = backup_root / "20260730T120000Z"
+    linked_transaction.symlink_to(outside_root.parent, target_is_directory=True)
+
+    receipt = module.enforce_overlay_backup_retention(
+        backup_root,
+        retention_count=1,
+    )
+
+    assert receipt["status"] == "blocked"
+    assert receipt["unexpectedEntries"] == ["20260730T120000Z"]
+    assert linked_transaction.is_symlink()
+    assert (outside_root / "payload.txt").read_text(encoding="utf-8") == "outside\n"
+
+
+@pytest.mark.parametrize("value", [0, -1, 33, True, 1.5, "not-a-count"])
+def test_backup_retention_count_validation_rejects_unsafe_values(value: object) -> None:
+    module = load_module()
+
+    with pytest.raises(RuntimeError, match="backup retention count"):
+        module.validated_backup_retention_count(value)
 
 
 def test_activate_overlay_tree_rejects_hardlink_mode_without_mutating_either_tree(

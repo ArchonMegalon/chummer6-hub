@@ -70,6 +70,8 @@ DEFAULT_PUBLISH_TIMEOUT_SECONDS = 30.0 * 60.0
 MAX_VERIFY_TIMEOUT_SECONDS = 10.0 * 60.0
 MAX_VERIFICATION_DEADLINE_SECONDS = 60.0 * 60.0
 MAX_PUBLISH_TIMEOUT_SECONDS = 2.0 * 60.0 * 60.0
+DEFAULT_BACKUP_RETENTION_COUNT = 3
+MAX_BACKUP_RETENTION_COUNT = 32
 DEFAULT_MINIMUM_FREE_DISK_BYTES = 8 * 1024 * 1024 * 1024
 MAX_MINIMUM_FREE_DISK_BYTES = (1 << 63) - 1
 PUBLISH_TIMEOUT_EXIT_CODE = 124
@@ -88,6 +90,9 @@ STAGED_PAYLOAD_FINGERPRINT_ALGORITHM = (
 FULL_DEPLOYMENT_DIGEST_CONTRACT_NAME = "chummer.public_edge_full_deployment_digest.v1"
 FULL_DEPLOYMENT_DIGEST_ALGORITHM = "sha256-canonical-json-v1"
 ACTIVATION_TRANSACTION_CONTRACT_NAME = "chummer.public_edge_portal_overlay_activation_transaction.v1"
+BACKUP_TRANSACTION_DIRECTORY_PATTERN = re.compile(
+    r"^(?P<timestamp>\d{8}T\d{6}Z)(?:-(?P<counter>[1-9]\d*))?$"
+)
 RENAME_NOREPLACE = 1
 RENAME_EXCHANGE = 2
 OVERLAY_BUILD_INFO_RELATIVE_PATH = Path(".codex-studio") / "runtime" / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
@@ -1680,6 +1685,26 @@ def validated_minimum_free_disk_bytes(value: object) -> int:
     return minimum_free_bytes
 
 
+def validated_backup_retention_count(value: object) -> int:
+    if isinstance(value, bool):
+        raise RuntimeError("backup retention count must be a positive integer")
+    try:
+        retention_count = int(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RuntimeError("backup retention count must be a positive integer") from exc
+    if (
+        isinstance(value, float)
+        and (not math.isfinite(value) or value != retention_count)
+    ):
+        raise RuntimeError("backup retention count must be a positive integer")
+    if retention_count < 1 or retention_count > MAX_BACKUP_RETENTION_COUNT:
+        raise RuntimeError(
+            "backup retention count must be between 1 and "
+            f"{MAX_BACKUP_RETENTION_COUNT}"
+        )
+    return retention_count
+
+
 def nearest_existing_capacity_probe(path: Path) -> Path:
     probe = normalized_absolute_path(path)
     while not probe.exists():
@@ -2866,6 +2891,120 @@ def backup_destination_path(backup_root: Path) -> Path:
         except FileExistsError:
             transaction_root = backup_root / f"{timestamp}-{counter}"
             counter += 1
+
+
+def enforce_overlay_backup_retention(
+    backup_root: Path,
+    *,
+    retention_count: int = DEFAULT_BACKUP_RETENTION_COUNT,
+) -> dict[str, Any]:
+    retention_count = validated_backup_retention_count(retention_count)
+    backup_root = normalized_absolute_path(backup_root)
+    assert_no_symlink_components(backup_root, label="backup root")
+    result: dict[str, Any] = {
+        "status": "pass",
+        "retentionCount": retention_count,
+        "discoveredCount": 0,
+        "retainedCount": 0,
+        "removedCount": 0,
+        "retainedTransactionNames": [],
+        "removedTransactionNames": [],
+        "unexpectedEntries": [],
+        "reason": "",
+    }
+    if not backup_root.exists():
+        return result
+    try:
+        root_stat = backup_root.lstat()
+    except OSError as exc:
+        result["status"] = "fail"
+        result["reason"] = f"backup_root_inspection_failed:{type(exc).__name__}"
+        return result
+    if not stat.S_ISDIR(root_stat.st_mode):
+        result["status"] = "blocked"
+        result["reason"] = "backup_root_not_directory"
+        return result
+
+    transactions: list[tuple[str, int, Path]] = []
+    unexpected_entries: list[str] = []
+    try:
+        entries = list(backup_root.iterdir())
+    except OSError as exc:
+        result["status"] = "fail"
+        result["reason"] = f"backup_root_enumeration_failed:{type(exc).__name__}"
+        return result
+    for entry in entries:
+        match = BACKUP_TRANSACTION_DIRECTORY_PATTERN.fullmatch(entry.name)
+        try:
+            entry_stat = entry.lstat()
+        except OSError:
+            unexpected_entries.append(entry.name)
+            continue
+        app_root = entry / "app"
+        try:
+            transaction_children = list(entry.iterdir())
+        except OSError:
+            unexpected_entries.append(entry.name)
+            continue
+        if (
+            match is None
+            or not stat.S_ISDIR(entry_stat.st_mode)
+            or stat.S_ISLNK(entry_stat.st_mode)
+            or len(transaction_children) != 1
+            or transaction_children[0].name != "app"
+            or not app_root.exists()
+            or app_root.is_symlink()
+        ):
+            unexpected_entries.append(entry.name)
+            continue
+        try:
+            assert_regular_overlay_tree(
+                entry,
+                label=f"backup transaction {entry.name}",
+            )
+        except RuntimeError:
+            unexpected_entries.append(entry.name)
+            continue
+        transactions.append(
+            (
+                match.group("timestamp"),
+                int(match.group("counter") or "0"),
+                entry,
+            )
+        )
+
+    transactions.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    result["discoveredCount"] = len(transactions)
+    result["unexpectedEntries"] = sorted(unexpected_entries)
+    if unexpected_entries:
+        result["status"] = "blocked"
+        result["reason"] = "unexpected_backup_entries"
+        result["retainedCount"] = len(transactions)
+        result["retainedTransactionNames"] = [row[2].name for row in transactions]
+        return result
+
+    retained = transactions[:retention_count]
+    expired = transactions[retention_count:]
+    result["retainedCount"] = len(retained)
+    result["retainedTransactionNames"] = [row[2].name for row in retained]
+    for _, _, transaction_root in reversed(expired):
+        try:
+            assert_regular_overlay_tree(
+                transaction_root,
+                label=f"expired backup transaction {transaction_root.name}",
+            )
+            shutil.rmtree(transaction_root)
+            fsync_directory(backup_root)
+        except (OSError, RuntimeError) as exc:
+            result["status"] = "fail"
+            result["reason"] = (
+                "backup_retention_cleanup_failed:"
+                f"{transaction_root.name}:{type(exc).__name__}"
+            )
+            return result
+        result["removedTransactionNames"].append(transaction_root.name)
+    result["removedCount"] = len(result["removedTransactionNames"])
+    return result
 
 
 def retired_overlay_path(active_root: Path) -> Path:
@@ -4539,6 +4678,7 @@ def materialize(
     verify_timeout_seconds: float = DEFAULT_VERIFY_TIMEOUT_SECONDS,
     verification_deadline_seconds: float = DEFAULT_VERIFICATION_DEADLINE_SECONDS,
     publish_timeout_seconds: float = DEFAULT_PUBLISH_TIMEOUT_SECONDS,
+    backup_retention_count: int = DEFAULT_BACKUP_RETENTION_COUNT,
     minimum_free_disk_bytes: int = DEFAULT_MINIMUM_FREE_DISK_BYTES,
     allow_low_disk_capacity: bool = False,
     _preflight_disk_capacity_check: dict[str, Any] | None = None,
@@ -4588,6 +4728,9 @@ def materialize(
     build_root = path_plan["buildRoot"]
     minimum_free_disk_bytes = validated_minimum_free_disk_bytes(
         minimum_free_disk_bytes
+    )
+    backup_retention_count = validated_backup_retention_count(
+        backup_retention_count
     )
     if _preflight_disk_capacity_check is None:
         capacity_check = require_disk_capacity(
@@ -4781,6 +4924,17 @@ def materialize(
     backup_path: Path | None = None
     backup_skipped = False
     backup_skip_reason = ""
+    backup_retention: dict[str, Any] = {
+        "status": "not_requested",
+        "retentionCount": backup_retention_count,
+        "discoveredCount": 0,
+        "retainedCount": 0,
+        "removedCount": 0,
+        "retainedTransactionNames": [],
+        "removedTransactionNames": [],
+        "unexpectedEntries": [],
+        "reason": "",
+    }
     activation_status = "not_requested"
     activation_failure_reason = ""
     activation_rollback_status = "not_required"
@@ -5070,6 +5224,10 @@ def materialize(
                 )
                 if activation_transaction_cleanup_status == "complete":
                     activation_status = "activated"
+                    backup_retention = enforce_overlay_backup_retention(
+                        backup_root,
+                        retention_count=backup_retention_count,
+                    )
                 else:
                     activation_status = "activation_failure_recovery_required"
                     activation_failure_reason = "activation_journal_cleanup_failed"
@@ -5111,12 +5269,18 @@ def materialize(
     activation_satisfied = (
         activation_status == "activated" if activate else activation_status == "staged_only"
     )
+    backup_retention_satisfied = (
+        backup_retention.get("status") == "pass"
+        if activate and activation_status == "activated"
+        else True
+    )
     status = (
         "pass"
         if publish.returncode == 0
         and verification_passed_for_activation
         and source_matches_current
         and activation_satisfied
+        and backup_retention_satisfied
         else "fail"
     )
     computed_status = status
@@ -5200,6 +5364,7 @@ def materialize(
         "backupPath": str(backup_path) if backup_path is not None else "",
         "backupSkipped": backup_skipped,
         "backupSkipReason": backup_skip_reason,
+        "backupRetention": backup_retention,
         "nextAction": next_action,
         "warning": (
             "The public-edge compose service bind-mounts /app from the active overlay root. Rebuilding the image alone does not refresh runtime payload."
@@ -5308,6 +5473,15 @@ def parse_args() -> argparse.Namespace:
             "capacity remain recorded in the publisher receipt."
         ),
     )
+    parser.add_argument(
+        "--backup-retention-count",
+        type=int,
+        default=DEFAULT_BACKUP_RETENTION_COUNT,
+        help=(
+            "Maximum verified rollback snapshots retained after activation "
+            f"(default {DEFAULT_BACKUP_RETENTION_COUNT}, maximum {MAX_BACKUP_RETENTION_COUNT})."
+        ),
+    )
     parser.add_argument("--activate", action="store_true")
     parser.add_argument(
         "--shared-mutation-lock-token",
@@ -5329,6 +5503,7 @@ def main() -> int:
     verify_timeout_seconds: float | None = None
     verification_deadline_seconds: float | None = None
     minimum_free_disk_bytes: int | None = None
+    backup_retention_count: int | None = None
     allow_low_disk_capacity = bool(
         getattr(args, "allow_low_disk_capacity", False)
     )
@@ -5376,6 +5551,16 @@ def main() -> int:
                     args,
                     "minimum_free_disk_bytes",
                     DEFAULT_MINIMUM_FREE_DISK_BYTES,
+                )
+            )
+        except RuntimeError as exc:
+            timeout_validation_errors.append(str(exc))
+        try:
+            backup_retention_count = validated_backup_retention_count(
+                getattr(
+                    args,
+                    "backup_retention_count",
+                    DEFAULT_BACKUP_RETENTION_COUNT,
                 )
             )
         except RuntimeError as exc:
@@ -5431,6 +5616,7 @@ def main() -> int:
                     verify_timeout_seconds=verify_timeout_seconds,
                     verification_deadline_seconds=verification_deadline_seconds,
                     publish_timeout_seconds=publish_timeout_seconds,
+                    backup_retention_count=backup_retention_count,
                     minimum_free_disk_bytes=minimum_free_disk_bytes,
                     allow_low_disk_capacity=allow_low_disk_capacity,
                     _preflight_disk_capacity_check=capacity_check,
@@ -5559,6 +5745,17 @@ def main() -> int:
             "backupPath": "",
             "backupSkipped": False,
             "backupSkipReason": "",
+            "backupRetention": {
+                "status": "not_requested",
+                "retentionCount": backup_retention_count,
+                "discoveredCount": 0,
+                "retainedCount": 0,
+                "removedCount": 0,
+                "retainedTransactionNames": [],
+                "removedTransactionNames": [],
+                "unexpectedEntries": [],
+                "reason": failure_reason,
+            },
             "stagingBuildInfoPath": "",
             "activeBuildInfoPath": "",
             "nextAction": (
