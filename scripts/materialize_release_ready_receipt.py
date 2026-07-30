@@ -174,6 +174,7 @@ GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     ("Chummer/state/", "desktop runtime workspace state"),
     ("Chummer.Portal/downloads/", "published download shelf bound by release receipts"),
     ("Docker/Downloads/", "mirrored download shelf bound by release receipts"),
+    ("wwwroot/proofs/", "published web proof shelf bound by release receipts"),
 )
 GOVERNED_CODE_EXCLUDED_OUTPUT_PREFIXES = tuple(
     prefix for prefix, _reason in GOVERNED_CODE_EXCLUDED_OUTPUTS

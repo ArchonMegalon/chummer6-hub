@@ -1205,6 +1205,9 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertFalse(module.governed_code_path("tests/.pytest_cache/state.json"))
         self.assertFalse(module.governed_code_path("tests/public/.artifacts/result.json"))
         self.assertFalse(module.governed_code_path("Docker/Downloads/releases.json"))
+        self.assertFalse(
+            module.governed_code_path("Chummer.Run.Api/wwwroot/proofs/runtime.generated.json")
+        )
         self.assertTrue(module.governed_code_path("node_modules/injected.js"))
         self.assertTrue(
             module.governed_restored_dependency_path("node_modules/injected.js")
