@@ -612,6 +612,25 @@ public sealed class ReleaseShelfGenerationStoreTests
     }
 
     [Theory]
+    [InlineData("/downloads/g/generation-a/install/test-installer/payload")]
+    [InlineData("/downloads/g/generation-a/install/test-installer/metadata")]
+    public void CaptureAcceptsExactGenerationInstallRoleRoute(string route)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            installAccessClass: "account_required",
+            artifactDownloadUrlOverride: route);
+        fixture.Activate("generation-a", "run-a");
+
+        ReleaseShelfSnapshot snapshot = fixture.CreateStore().Capture();
+
+        Assert.Equal("generation-a", snapshot.GenerationId);
+    }
+
+    [Theory]
     [InlineData("/downloads/g/generation-a/install/test-installer/claim")]
     [InlineData("/downloads/g/generation-a/install/test-installer?ticket=x")]
     [InlineData("/downloads/g/generation-a/install/test-installer#claim")]

@@ -1539,9 +1539,10 @@ public sealed class ReleaseShelfGenerationStore
 
                 string relative = Uri.UnescapeDataString(value)[expectedPrefix.Length..];
                 string[] parts = relative.Split('/', StringSplitOptions.None);
-                bool validInstallDispatch = parts.Length == 2
+                bool validInstallDispatch = parts.Length is 2 or 3
                     && string.Equals(parts[0], "install", StringComparison.Ordinal)
-                    && !string.IsNullOrWhiteSpace(parts[1]);
+                    && !string.IsNullOrWhiteSpace(parts[1])
+                    && (parts.Length == 2 || parts[2] is "payload" or "metadata");
                 bool validImmutableObject = parts[0] is CanonicalManifestFileName
                     or CompatibilityManifestFileName
                     or "files"

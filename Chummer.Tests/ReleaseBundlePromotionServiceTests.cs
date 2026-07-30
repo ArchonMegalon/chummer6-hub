@@ -3273,6 +3273,7 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(
             expectedUrl,
             canonical.RootElement.GetProperty("artifacts")[0].GetProperty("payloadDownloadUrl").GetString());
+        Assert.Equal(result.GenerationId, fixture.CaptureActiveShelf().GenerationId);
     }
 
     [Fact]
