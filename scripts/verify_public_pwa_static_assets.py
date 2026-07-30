@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 try:
     import fcntl
@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover - sealed descriptor mode is a POSIX depl
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_PROBE_HOST_HEADER_ENV = "CHUMMER_PUBLIC_EDGE_PROBE_HOST_HEADER"
 API_ROOT = RUN_SERVICES_ROOT / "Chummer.Run.Api"
 WWWROOT = API_ROOT / "wwwroot"
 MIRROR_CONTRACT = API_ROOT / "play-pwa-mirrors.json"
@@ -621,11 +622,26 @@ def read_bounded_http_body(response: Any, *, path: str, limit: int) -> bytes:
 def fetch(base_url: str, path: str, timeout: float) -> tuple[int, dict[str, str], bytes]:
     origin = validate_clean_origin(base_url)
     clean_path = validate_clean_probe_path(path)
+    host_header = str(os.environ.get(LOCAL_PROBE_HOST_HEADER_ENV) or "").strip()
+    if host_header and re.fullmatch(
+        r"(?:[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?)(?::[0-9]{1,5})?",
+        host_header,
+    ) is None:
+        raise RuntimeError("local probe Host header is invalid")
+    if ":" in host_header and int(host_header.rsplit(":", 1)[1]) > 65535:
+        raise RuntimeError("local probe Host header port is invalid")
+    request_headers = {"User-Agent": BROWSER_USER_AGENT}
+    if host_header:
+        request_headers["Host"] = host_header
     request = Request(
         origin + clean_path,
-        headers={"User-Agent": BROWSER_USER_AGENT},
+        headers=request_headers,
     )
-    opener = build_opener(NoRedirectHandler())
+    opener = (
+        build_opener(ProxyHandler({}), NoRedirectHandler())
+        if host_header
+        else build_opener(NoRedirectHandler())
+    )
     limit = live_read_limit(clean_path)
     try:
         with opener.open(request, timeout=timeout) as response:

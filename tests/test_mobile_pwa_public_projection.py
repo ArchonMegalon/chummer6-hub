@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +25,17 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["bad host", "user@example.test", "example.test/path", "example.test:99999"],
+)
+def test_probe_host_header_rejects_unsafe_authority(value: str) -> None:
+    module = load_module()
+
+    with pytest.raises(ValueError, match="Host header"):
+        module.validate_probe_host_header(value)
 
 
 def test_current_source_reports_default_off_profile_gated_zero_outbound_contract() -> None:
@@ -198,6 +212,12 @@ def test_live_contract_accepts_truthful_readiness_and_role_specific_install_shel
     assert payload["roleProbes"]["repeated_roles"]["expectedRole"] == "player"
     assert payload["roleProbes"]["unknown_role"]["expectedRole"] == "player"
     assert payload["roleProbes"]["mixed_case_alias"]["expectedRole"] == "gm"
+    assert payload["roleProbes"]["unknown_role"]["path"] == "/play"
+    assert payload["roleProbes"]["unknown_role"]["queryParameterNames"] == [
+        "role",
+        "access_token",
+    ]
+    assert "must-not-survive" not in json.dumps(payload["roleProbes"])
     assert all(
         "?" not in location and "must-not-survive" not in location
         for result in payload["roleProbes"].values()
@@ -294,9 +314,9 @@ def test_live_contract_rejects_generic_or_noncanonical_role_shell(monkeypatch) -
     payload = live_projection(module, GenericShellSession())
 
     assert payload["status"] == "fail"
-    assert "gm (/play?role=gm): capability failed" in payload["failures"]
-    assert "gm (/play?role=gm): exactlyOneRedirect failed" in payload["failures"]
-    assert "gm (/play?role=gm): cleanFinalUrl failed" in payload["failures"]
+    assert "gm (/play; query-keys=role): capability failed" in payload["failures"]
+    assert "gm (/play; query-keys=role): exactlyOneRedirect failed" in payload["failures"]
+    assert "gm (/play; query-keys=role): cleanFinalUrl failed" in payload["failures"]
 
 
 def test_live_contract_rejects_multi_hop_or_secret_bearing_redirect_history(monkeypatch) -> None:
@@ -317,8 +337,14 @@ def test_live_contract_rejects_multi_hop_or_secret_bearing_redirect_history(monk
     payload = live_projection(module, LeakyHistorySession())
 
     assert payload["status"] == "fail"
-    assert "gm_secret_extra (/play?role=gm&secret=must-not-survive&extra=1): exactlyOneRedirect failed" in payload["failures"]
-    assert "gm_secret_extra (/play?role=gm&secret=must-not-survive&extra=1): cleanRedirectLocations failed" in payload["failures"]
+    assert (
+        "gm_secret_extra (/play; query-keys=role,secret,extra): "
+        "exactlyOneRedirect failed"
+    ) in payload["failures"]
+    assert (
+        "gm_secret_extra (/play; query-keys=role,secret,extra): "
+        "cleanRedirectLocations failed"
+    ) in payload["failures"]
 
 
 def test_run_writes_v2_audit_without_gating_on_legacy_interactive_proof(monkeypatch) -> None:

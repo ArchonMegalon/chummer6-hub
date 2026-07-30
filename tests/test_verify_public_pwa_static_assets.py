@@ -859,8 +859,8 @@ def test_source_contract_rejects_default_on_or_portal_dependency(tmp_path: Path)
         'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"',
         'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-true}"',
     ).replace(
-        "    depends_on:\n      chummer-public-blazor:",
-        "    depends_on:\n      chummer-play-web:\n        condition: service_healthy\n      chummer-public-blazor:",
+        "    depends_on:\n      chummer-release-storage-init:",
+        "    depends_on:\n      chummer-play-web:\n        condition: service_healthy\n      chummer-release-storage-init:",
     )
     (fixture / "docker-compose.public-edge.yml").write_text(compose, encoding="utf-8")
 

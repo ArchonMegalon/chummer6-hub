@@ -1,24 +1,24 @@
 {
   "contractName": "chummer.mobile_pwa_public_projection.v2",
   "mode": "live",
-  "baseUrl": "https://chummer.run",
-  "generatedAt": "2026-07-30T03:13:35.805457Z",
+  "baseUrl": "http://127.0.0.1:8091",
+  "generatedAt": "2026-07-30T05:21:51.113598Z",
   "status": "pass",
   "readiness": {
     "httpStatus": 200,
     "payload": {
       "ready": true,
       "status": "ready",
-      "generatedAt": "2026-07-30T03:13:33.8684858+00:00",
+      "generatedAt": "2026-07-30T05:21:49.0231027+00:00",
       "hub": {
         "contractName": "chummer.run.api.deep_readiness.v2",
         "service": "chummer.run.api",
         "ready": true,
         "status": "pass",
         "servingReady": true,
-        "publicationReady": false,
+        "publicationReady": true,
         "publicationChecksConfigured": true,
-        "generatedAt": "2026-07-30T03:13:33.3810177+00:00",
+        "generatedAt": "2026-07-30T05:21:48.5156028+00:00",
         "checks": [
           {
             "name": "data_protection_storage",
@@ -48,7 +48,7 @@
         "releaseShelf": {
           "mode": "generation",
           "servingReady": true,
-          "publicationReady": false,
+          "publicationReady": true,
           "publicationChecksConfigured": true,
           "status": "serving",
           "code": "generation_shelf_verified",
@@ -79,9 +79,9 @@
             },
             {
               "name": "release_storage_admission",
-              "ready": false,
-              "status": "blocked",
-              "code": "publication_destination_capacity_exhausted"
+              "ready": true,
+              "status": "ready",
+              "code": "ready"
             }
           ]
         }
@@ -95,8 +95,8 @@
       "deploymentIdentity": {
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
-        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b"
+        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
+        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7"
       }
     },
     "checks": {
@@ -184,7 +184,10 @@
   },
   "roleProbes": {
     "player": {
-      "path": "/play?role=player",
+      "path": "/play",
+      "queryParameterNames": [
+        "role"
+      ],
       "expectedRole": "player",
       "expectedTarget": "/mobile/player",
       "historyCount": 1,
@@ -214,7 +217,10 @@
       }
     },
     "gm": {
-      "path": "/play?role=gm",
+      "path": "/play",
+      "queryParameterNames": [
+        "role"
+      ],
       "expectedRole": "gm",
       "expectedTarget": "/mobile/gm",
       "historyCount": 1,
@@ -244,7 +250,10 @@
       }
     },
     "observer": {
-      "path": "/play?role=observer",
+      "path": "/play",
+      "queryParameterNames": [
+        "role"
+      ],
       "expectedRole": "observer",
       "expectedTarget": "/mobile/observer",
       "historyCount": 1,
@@ -274,7 +283,12 @@
       }
     },
     "gm_secret_extra": {
-      "path": "/play?role=gm&secret=must-not-survive&extra=1",
+      "path": "/play",
+      "queryParameterNames": [
+        "role",
+        "secret",
+        "extra"
+      ],
       "expectedRole": "gm",
       "expectedTarget": "/mobile/gm",
       "historyCount": 1,
@@ -304,7 +318,12 @@
       }
     },
     "repeated_roles": {
-      "path": "/play?role=gm&role=observer&token=must-not-survive",
+      "path": "/play",
+      "queryParameterNames": [
+        "role",
+        "role",
+        "token"
+      ],
       "expectedRole": "player",
       "expectedTarget": "/mobile/player",
       "historyCount": 1,
@@ -334,7 +353,11 @@
       }
     },
     "unknown_role": {
-      "path": "/play?role=owner&access_token=must-not-survive",
+      "path": "/play",
+      "queryParameterNames": [
+        "role",
+        "access_token"
+      ],
       "expectedRole": "player",
       "expectedTarget": "/mobile/player",
       "historyCount": 1,
@@ -364,7 +387,11 @@
       }
     },
     "mixed_case_alias": {
-      "path": "/play?role=GaMe-MaStEr&api_key=must-not-survive",
+      "path": "/play",
+      "queryParameterNames": [
+        "role",
+        "api_key"
+      ],
       "expectedRole": "gm",
       "expectedTarget": "/mobile/gm",
       "historyCount": 1,
@@ -394,7 +421,11 @@
       }
     },
     "missing_role_with_secret": {
-      "path": "/play?secret=must-not-survive&extra=1",
+      "path": "/play",
+      "queryParameterNames": [
+        "secret",
+        "extra"
+      ],
       "expectedRole": "player",
       "expectedTarget": "/mobile/player",
       "historyCount": 1,
@@ -427,30 +458,30 @@
   "staticAssets": {
     "contractName": "chummer.public_pwa_static_assets.v1",
     "assetContractName": "chummer.public_play_install_assets.v2",
-    "generatedAt": "2026-07-30T03:13:33.223728+00:00",
+    "generatedAt": "2026-07-30T05:21:48.378177+00:00",
     "mode": "live",
     "status": "pass",
     "deploymentIdentity": {
       "status": 200,
       "ready": true,
       "code": "overlay_identity_bound",
-      "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
-      "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+      "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
+      "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
       "matchesExpectedFullDeploymentDigest": true,
       "before": {
         "status": 200,
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
-        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
+        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
         "matchesExpectedFullDeploymentDigest": true
       },
       "after": {
         "status": 200,
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "1efb90926152e99153e549029f901a71b6dbeffe3b99f47107dc23ddd6a9f869",
-        "fullDeploymentDigestSha256": "0c34ae6ca69d6cc4dbf28d3f323a5599a5fdfe639496640fb5da8ad0d30e050b",
+        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
+        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
         "matchesExpectedFullDeploymentDigest": true
       },
       "stable": true

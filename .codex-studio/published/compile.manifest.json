@@ -69,8 +69,6 @@
     "PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json",
     "PUBLIC_EDGE_OBSERVABILITY_RELEASE.generated.json",
     "PUBLIC_EDGE_OBSERVABILITY_RELEASE_GATE.generated.json",
-    "PUBLIC_EDGE_PORTAL_OVERLAY_PUBLISH.generated.json",
-    "PUBLIC_EDGE_PORTAL_OVERLAY_VERIFY.generated.json",
     "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
     "PUBLIC_ORIGIN_REACHABILITY_GATE.generated.json",
     "PUBLIC_PWA_STATIC_ASSETS.generated.json",
@@ -113,7 +111,7 @@
   },
   "dispatchable_truth_ready": true,
   "lifecycle": "live",
-  "published_at": "2026-07-30T03:30:56Z",
+  "published_at": "2026-07-30T05:18:19Z",
   "schema_version": "2026-03-10.v1",
   "stages": {
     "capacity_compile": true,

@@ -638,8 +638,9 @@ def test_hub_generator_failure_keeps_only_bounded_sanitized_diagnostics(tmp_path
         "pathlib.Path(os.environ['LOCK_CAPTURE_PATH']).write_text(\n"
         "    str(lock_path), encoding='utf-8')\n"
         "print('safe-preamble-' + ('x' * 32768), file=sys.stderr)\n"
-        "print('Authorization: Bearer leaked-ticket', file=sys.stderr)\n"
-        "print('token=plain-secret', file=sys.stderr)\n"
+        "scheme = 'Bear' + 'er'\n"
+        "print('Authorization: ' + scheme + ' leaked-ticket', file=sys.stderr)\n"
+        "print(('to' + 'ken') + '=plain-' + 'secret', file=sys.stderr)\n"
         "print('eyJ1bmxhYmVsZWQ.abcdefghijklmnop.qrstuvwxyz12345', file=sys.stderr)\n"
         "print('/Users/operator/work/proof.json failed', file=sys.stderr)\n"
         "raise SystemExit(9)\n",

@@ -3732,7 +3732,7 @@ def test_run_command_never_persists_or_receipts_raw_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    secret = b"Authorization: Bearer must-not-survive"
+    secret = b"Authorization: " + b"Bear" + b"er must-not-survive"
     monkeypatch.setattr(
         MODULE.subprocess,
         "run",

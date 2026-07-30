@@ -4,11 +4,12 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urljoin, urlsplit
 
 import requests
 
@@ -72,6 +73,28 @@ ROLE_PROBES = (
     ("missing_role_with_secret", "/play?secret=must-not-survive&extra=1", "player"),
 )
 SENSITIVE_REDIRECT_MARKERS = ("secret", "token", "access_token", "api_key", "must-not-survive")
+LOCAL_PROBE_HOST_HEADER_ENV = "CHUMMER_PUBLIC_EDGE_PROBE_HOST_HEADER"
+
+
+def public_probe_descriptor(path: str) -> tuple[str, list[str]]:
+    """Describe a hostile-input probe without persisting its canary values."""
+
+    parsed = urlsplit(path)
+    return parsed.path or "/", [
+        key for key, _ in parse_qsl(parsed.query, keep_blank_values=True)
+    ]
+
+
+def validate_probe_host_header(value: str) -> str:
+    host = str(value or "").strip()
+    if host and re.fullmatch(
+        r"(?:[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?)(?::[0-9]{1,5})?",
+        host,
+    ) is None:
+        raise ValueError("probe Host header must be a plain hostname with an optional port")
+    if ":" in host and int(host.rsplit(":", 1)[1]) > 65535:
+        raise ValueError("probe Host header port is invalid")
+    return host
 
 
 def load_static_verifier():
@@ -242,6 +265,12 @@ def live_projection(
 ) -> dict[str, Any]:
     failures: list[str] = []
     client = session or requests.Session()
+    host_header = validate_probe_host_header(
+        os.environ.get(LOCAL_PROBE_HOST_HEADER_ENV, "")
+    )
+    if host_header:
+        client.headers["Host"] = host_header
+        client.trust_env = False
     static_verifier = load_static_verifier()
     try:
         expected_full_deployment_digest = (
@@ -309,6 +338,7 @@ def live_projection(
     role_results: dict[str, Any] = {}
     role_probe_results: dict[str, Any] = {}
     for probe_name, path, role in ROLE_PROBES:
+        public_path, query_parameter_names = public_probe_descriptor(path)
         _, manifest, title, purpose, capability, target = ROLE_SHELLS[role]
         response = client.get(f"{base_url.rstrip('/')}{path}", timeout=30, allow_redirects=True)
         markup = response.text
@@ -352,7 +382,8 @@ def live_projection(
             "closedCsp": "connect-src 'none'" in response.headers.get("Content-Security-Policy", ""),
         }
         role_probe_results[probe_name] = {
-            "path": path,
+            "path": public_path,
+            "queryParameterNames": query_parameter_names,
             "expectedRole": role,
             "expectedTarget": target,
             "historyCount": len(history),
@@ -363,7 +394,10 @@ def live_projection(
             role_results[probe_name] = checks
         for name, passed in checks.items():
             if not passed:
-                failures.append(f"{probe_name} ({path}): {name} failed")
+                query_summary = ",".join(query_parameter_names) or "none"
+                failures.append(
+                    f"{probe_name} ({public_path}; query-keys={query_summary}): {name} failed"
+                )
 
     return {
         "contractName": CONTRACT_NAME,
@@ -406,17 +440,28 @@ def run(
     session: requests.Session | None = None,
     expected_full_deployment_digest_sha256: str = "",
     expected_asset_inventory_sha256: str = "",
+    host_header: str = "",
 ) -> int:
-    payload = (
-        live_projection(
-            base_url,
-            session=session,
-            expected_full_deployment_digest_sha256=expected_full_deployment_digest_sha256,
-            expected_asset_inventory_sha256=expected_asset_inventory_sha256,
+    validated_host_header = validate_probe_host_header(host_header)
+    previous_host_header = os.environ.get(LOCAL_PROBE_HOST_HEADER_ENV)
+    if validated_host_header:
+        os.environ[LOCAL_PROBE_HOST_HEADER_ENV] = validated_host_header
+    try:
+        payload = (
+            live_projection(
+                base_url,
+                session=session,
+                expected_full_deployment_digest_sha256=expected_full_deployment_digest_sha256,
+                expected_asset_inventory_sha256=expected_asset_inventory_sha256,
+            )
+            if base_url
+            else source_topology(source_root)
         )
-        if base_url
-        else source_topology(source_root)
-    )
+    finally:
+        if previous_host_header is None:
+            os.environ.pop(LOCAL_PROBE_HOST_HEADER_ENV, None)
+        else:
+            os.environ[LOCAL_PROBE_HOST_HEADER_ENV] = previous_host_header
     payload["legacyMobileReleaseProof"] = {
         "path": str(mobile_release_proof_path) if mobile_release_proof_path else "",
         "gating": False,
@@ -438,6 +483,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mobile-release-proof", type=Path)
     parser.add_argument("--expected-full-deployment-digest-sha256", default="")
     parser.add_argument("--expected-asset-inventory-sha256", default="")
+    parser.add_argument(
+        "--host-header",
+        default="",
+        help="Validated Host header for a loopback public-edge probe; also disables proxy inheritance.",
+    )
     return parser.parse_args()
 
 
@@ -449,6 +499,7 @@ def main() -> int:
         source_root=args.source_root,
         expected_full_deployment_digest_sha256=args.expected_full_deployment_digest_sha256,
         expected_asset_inventory_sha256=args.expected_asset_inventory_sha256,
+        host_header=args.host_header,
     )
 
 
