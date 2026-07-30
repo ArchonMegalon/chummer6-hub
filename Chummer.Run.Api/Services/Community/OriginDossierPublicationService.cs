@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Media.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
@@ -129,7 +130,17 @@ public sealed class OriginDossierPublicationService
             {
                 "book" => CanAccessBookArtifact(entry),
                 "cover" => CanAccessCoverArtifact(entry),
-                "video" => CanAccessVideoArtifact(entry),
+                "audiobook" => HasMediaDispatchReceipt(
+                    entry,
+                    OriginDossierMediaDispatchKind.Audiobook,
+                    entry.AudiobookPath,
+                    entry.AudiobookRenderReceiptPath),
+                "video" => CanAccessVideoArtifact(entry)
+                    || HasMediaDispatchReceipt(
+                        entry,
+                        OriginDossierMediaDispatchKind.CinematicScene,
+                        entry.DossierVideoPath,
+                        entry.DossierVideoReceiptPath),
                 "canon-audit" or "canon" or "audit" => CanAccessCanonAuditArtifact(entry),
                 _ => false
             };
@@ -142,6 +153,7 @@ public sealed class OriginDossierPublicationService
             {
                 "book" => entry.BookArtifactPath,
                 "cover" => entry.StorySceneCoverPath,
+                "audiobook" => entry.AudiobookPath,
                 "video" => entry.DossierVideoPath,
                 "canon-audit" or "canon" or "audit" => entry.CanonAuditReceiptPath,
                 _ => null
@@ -332,6 +344,226 @@ public sealed class OriginDossierPublicationService
             };
         });
 
+    public OriginDossierMediaDispatchSource? GetMediaDispatchSourceForAccount(
+        string userId,
+        string subjectId,
+        string projectId,
+        OriginDossierMediaDispatchKind kind,
+        string selectionId)
+    {
+        string? indexPath = ResolveIndexPath();
+        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            OriginDossierPublicationIndexEntry? entry = LoadEntries(indexPath)
+                .FirstOrDefault(candidate =>
+                    IsOwnedBy(candidate, userId, subjectId)
+                    && Matches(candidate.ProjectId, projectId));
+            if (entry is null
+                || !CanAccessDossierShare(entry)
+                || !HasArchivedArtifact(entry.ProviderManuscriptPath)
+                || !HasArchivedArtifact(entry.SourcePacketPath))
+            {
+                return null;
+            }
+
+            string? revisionId = TryComputeSha256(entry.ProviderManuscriptPath);
+            if (string.IsNullOrWhiteSpace(revisionId))
+            {
+                return null;
+            }
+
+            string selectedLabel;
+            string selectedSummary;
+            if (kind == OriginDossierMediaDispatchKind.Audiobook)
+            {
+                OriginDossierAudiobookVoiceOptionDto? voice = entry.AudiobookVoiceOptions?
+                    .FirstOrDefault(option => option.Selected && Matches(option.VoiceId, selectionId));
+                if (voice is null || !IsValidAudiobookVoiceOption(voice))
+                {
+                    return null;
+                }
+
+                selectedLabel = Clean(voice.Label, "Selected voice");
+                selectedSummary = Clean(voice.Summary, "Owner-selected narration voice.");
+            }
+            else
+            {
+                OriginDossierSceneHighlightDto? scene = entry.SceneHighlights?
+                    .FirstOrDefault(item => item.Selected && Matches(item.SceneId, selectionId));
+                if (scene is null || !IsValidSceneHighlight(scene) || !HasSelectedPortraitChoice(entry))
+                {
+                    return null;
+                }
+
+                selectedLabel = $"{Clean(scene.ChapterLabel, "Chapter")} — {Clean(scene.Title, "Selected scene")}";
+                selectedSummary = Clean(scene.Summary, "Owner-selected cinematic scene.");
+            }
+
+            string ownerRefHash = BuildOwnerRefHash(entry);
+            return new OriginDossierMediaDispatchSource(
+                ProjectId: Clean(entry.ProjectId, "origin-dossier"),
+                OwnerRefHash: ownerRefHash,
+                ApprovedOriginPacketId: $"origin.{NamespaceSegment(entry.ProjectId, "dossier").ToLowerInvariant()}",
+                OriginRevisionId: revisionId,
+                SelectionId: Clean(selectionId, "selected"),
+                SelectionLabel: selectedLabel,
+                SelectionSummary: selectedSummary,
+                ManuscriptPath: Path.GetFullPath(entry.ProviderManuscriptPath!),
+                SourcePacketPath: Path.GetFullPath(entry.SourcePacketPath!),
+                CoverPath: HasArchivedArtifact(entry.StorySceneCoverPath)
+                    ? Path.GetFullPath(entry.StorySceneCoverPath!)
+                    : null,
+                StoryboardPath: HasArchivedArtifact(entry.MovieStoryboardPath)
+                    ? Path.GetFullPath(entry.MovieStoryboardPath!)
+                    : null);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Origin Dossier media dispatch source could not be loaded from {IndexPath}.", indexPath);
+            return null;
+        }
+    }
+
+    public OriginDossierMediaCompletionApplyResult ApplyMediaDispatchReceipt(
+        OriginDossierMediaDispatchReceipt receipt,
+        string receiptPath)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        string expectedProviderClass = receipt.Kind switch
+        {
+            OriginDossierMediaDispatchKind.Audiobook => "approved_tts",
+            OriginDossierMediaDispatchKind.CinematicScene => "preferred_video",
+            _ => string.Empty
+        };
+        string expectedContentType = receipt.Kind switch
+        {
+            OriginDossierMediaDispatchKind.Audiobook => "audio/mp4",
+            OriginDossierMediaDispatchKind.CinematicScene => "video/mp4",
+            _ => string.Empty
+        };
+        string expectedRequestId = OriginDossierMediaDispatchContract.BuildRequestId(
+            receipt.Kind,
+            receipt.ProjectId,
+            receipt.OwnerRefHash,
+            receipt.SelectionId,
+            receipt.OriginRevisionId);
+        if (!string.Equals(
+                receipt.ContractVersion,
+                OriginDossierMediaDispatchContract.Version,
+                StringComparison.Ordinal)
+            || !string.Equals(receipt.Status, "succeeded", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(expectedProviderClass)
+            || !string.Equals(receipt.ProviderClass, expectedProviderClass, StringComparison.Ordinal)
+            || !string.Equals(receipt.OutputContentType, expectedContentType, StringComparison.Ordinal)
+            || !string.Equals(receipt.RequestId, expectedRequestId, StringComparison.Ordinal)
+            || !IsSha256(receipt.OwnerRefHash)
+            || !IsSha256(receipt.OriginRevisionId)
+            || !IsSha256(receipt.RequestSha256)
+            || !IsSha256(receipt.ProviderExecutionRefHash)
+            || receipt.OutputBytes <= 1_024
+            || receipt.ObservedDurationSeconds is null or <= 0
+            || !string.IsNullOrEmpty(receipt.ErrorCode)
+            || string.IsNullOrWhiteSpace(receipt.OutputPath)
+            || string.IsNullOrWhiteSpace(receipt.OutputSha256)
+            || !IsSha256(receipt.OutputSha256)
+            || !IsPathWithinConfiguredRoot(
+                receipt.OutputPath,
+                "CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS",
+                "OriginDossier:MediaFactoryOutputRoot")
+            || !IsPathWithinConfiguredRoot(
+                receiptPath,
+                "CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS",
+                "OriginDossier:MediaFactoryReceiptRoot")
+            || !HasArchivedArtifact(receipt.OutputPath)
+            || !HasArchivedArtifact(receiptPath)
+            || new FileInfo(receipt.OutputPath).Length != receipt.OutputBytes
+            || !string.Equals(
+                TryComputeSha256(receipt.OutputPath),
+                receipt.OutputSha256,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new(false, "receipt_validation_failed");
+        }
+
+        string? indexPath = ResolveIndexPath();
+        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        {
+            return new(false, "publication_index_unavailable");
+        }
+
+        lock (_writeGate)
+        {
+            try
+            {
+                List<OriginDossierPublicationIndexEntry> entries = LoadEntries(indexPath).ToList();
+                int index = entries.FindIndex(entry =>
+                    Matches(entry.ProjectId, receipt.ProjectId)
+                    && string.Equals(
+                        BuildOwnerRefHash(entry),
+                        receipt.OwnerRefHash,
+                        StringComparison.OrdinalIgnoreCase));
+                if (index < 0)
+                {
+                    return new(false, "owner_publication_not_found");
+                }
+
+                OriginDossierPublicationIndexEntry entry = entries[index];
+                if (!string.Equals(
+                        TryComputeSha256(entry.ProviderManuscriptPath),
+                        receipt.OriginRevisionId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return new(false, "origin_revision_superseded");
+                }
+
+                bool selectionMatches = receipt.Kind switch
+                {
+                    OriginDossierMediaDispatchKind.Audiobook => entry.AudiobookVoiceOptions?
+                        .Any(option => option.Selected && Matches(option.VoiceId, receipt.SelectionId)) == true,
+                    OriginDossierMediaDispatchKind.CinematicScene => entry.SceneHighlights?
+                        .Any(scene => scene.Selected && Matches(scene.SceneId, receipt.SelectionId)) == true,
+                    _ => false
+                };
+                if (!selectionMatches)
+                {
+                    return new(false, "selection_superseded");
+                }
+
+                entries[index] = receipt.Kind switch
+                {
+                    OriginDossierMediaDispatchKind.Audiobook => entry with
+                    {
+                        AudiobookPath = Path.GetFullPath(receipt.OutputPath),
+                        AudiobookRenderReceiptPath = Path.GetFullPath(receiptPath)
+                    },
+                    OriginDossierMediaDispatchKind.CinematicScene => entry with
+                    {
+                        DossierVideoPath = Path.GetFullPath(receipt.OutputPath),
+                        DossierVideoReceiptPath = Path.GetFullPath(receiptPath),
+                        DossierVideoVerified = true
+                    },
+                    _ => entry
+                };
+                PersistEntries(indexPath, entries);
+                return new(true, "applied");
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Origin Dossier media completion could not update {ProjectId} from {ReceiptPath}.",
+                    receipt.ProjectId,
+                    receiptPath);
+                return new(false, "publication_update_failed");
+            }
+        }
+    }
+
     public OriginDossierPublicationViewModel? LinkRunnerForAccount(
         string userId,
         string subjectId,
@@ -521,6 +753,31 @@ public sealed class OriginDossierPublicationService
         => (_configuration["CHUMMER_PUBLIC_BASE_URL"]
             ?? _configuration["OriginDossier:PublicBaseUrl"]
             ?? "https://chummer.run").Trim().TrimEnd('/');
+
+    private bool IsPathWithinConfiguredRoot(
+        string path,
+        string environmentKey,
+        string configurationKey)
+    {
+        string? configured = _configuration[environmentKey] ?? _configuration[configurationKey];
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return false;
+        }
+
+        string fullPath = Path.GetFullPath(path);
+        string root = Path.GetFullPath(configured.Trim()).TrimEnd(Path.DirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(root, StringComparison.Ordinal);
+    }
+
+    private static bool IsSha256(string? value)
+        => value is { Length: 64 }
+            && value.All(static character => Uri.IsHexDigit(character));
+
+    private static string BuildOwnerRefHash(OriginDossierPublicationIndexEntry entry)
+        => Sha256Text(
+            $"{Clean(entry.OwnerUserId, "user")}|{Clean(entry.SubjectId ?? entry.OwnerSubjectId, "subject")}");
 
     private static readonly object _writeGate = new();
 
@@ -1121,6 +1378,52 @@ public sealed class OriginDossierPublicationService
             return false;
         }
         catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasMediaDispatchReceipt(
+        OriginDossierPublicationIndexEntry entry,
+        OriginDossierMediaDispatchKind kind,
+        string? artifactPath,
+        string? receiptPath)
+    {
+        if (!HasArchivedArtifact(artifactPath) || !HasArchivedArtifact(receiptPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            OriginDossierMediaDispatchReceipt? receipt = JsonSerializer.Deserialize<OriginDossierMediaDispatchReceipt>(
+                File.ReadAllText(receiptPath!, Encoding.UTF8),
+                JsonOptions);
+            string? artifactHash = TryComputeSha256(artifactPath);
+            bool selectionMatches = kind switch
+            {
+                OriginDossierMediaDispatchKind.Audiobook => entry.AudiobookVoiceOptions?
+                    .Any(option => option.Selected && Matches(option.VoiceId, receipt?.SelectionId ?? string.Empty)) == true,
+                OriginDossierMediaDispatchKind.CinematicScene => entry.SceneHighlights?
+                    .Any(scene => scene.Selected && Matches(scene.SceneId, receipt?.SelectionId ?? string.Empty)) == true,
+                _ => false
+            };
+            string expectedProviderClass = kind == OriginDossierMediaDispatchKind.Audiobook
+                ? "approved_tts"
+                : "preferred_video";
+            return receipt is not null
+                && string.Equals(receipt.ContractVersion, OriginDossierMediaDispatchContract.Version, StringComparison.Ordinal)
+                && receipt.Kind == kind
+                && string.Equals(receipt.Status, "succeeded", StringComparison.Ordinal)
+                && string.Equals(receipt.ProjectId, entry.ProjectId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(receipt.OwnerRefHash, BuildOwnerRefHash(entry), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(receipt.ProviderClass, expectedProviderClass, StringComparison.Ordinal)
+                && string.Equals(Path.GetFullPath(receipt.OutputPath), Path.GetFullPath(artifactPath!), StringComparison.Ordinal)
+                && string.Equals(receipt.OutputSha256, artifactHash, StringComparison.OrdinalIgnoreCase)
+                && receipt.OutputBytes == new FileInfo(artifactPath!).Length
+                && selectionMatches;
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or ArgumentException)
         {
             return false;
         }
@@ -2005,6 +2308,7 @@ public sealed class OriginDossierPublicationService
             entry.EbookAudiobookshelfImportReceiptPath,
             entry.CoverConsistencyReceiptPath,
             entry.AudiobookPath,
+            entry.AudiobookRenderReceiptPath,
             entry.AudiobookshelfImportReceiptPath,
             entry.DossierVideoPath,
             entry.DossierVideoReceiptPath,
@@ -2331,6 +2635,7 @@ public sealed class OriginDossierPublicationService
             "book" when path.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "book" when path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) => "text/markdown; charset=utf-8",
             "book" => "application/pdf",
+            "audiobook" => "audio/mp4",
             "canon-audit" or "canon" or "audit" => "application/json; charset=utf-8",
             _ => "application/octet-stream"
         };
@@ -2339,6 +2644,23 @@ public sealed class OriginDossierPublicationService
 public sealed record OriginDossierPublicationArtifact(
     string Path,
     string ContentType);
+
+public sealed record OriginDossierMediaDispatchSource(
+    string ProjectId,
+    string OwnerRefHash,
+    string ApprovedOriginPacketId,
+    string OriginRevisionId,
+    string SelectionId,
+    string SelectionLabel,
+    string SelectionSummary,
+    string ManuscriptPath,
+    string SourcePacketPath,
+    string? CoverPath,
+    string? StoryboardPath);
+
+public sealed record OriginDossierMediaCompletionApplyResult(
+    bool Applied,
+    string Status);
 
 internal sealed record OriginDossierPublicationIndexSnapshot(
     IReadOnlyList<OriginDossierPublicationIndexEntry>? Publications);
@@ -2389,6 +2711,7 @@ internal sealed record OriginDossierPublicationIndexEntry
     public string? EbookAudiobookshelfImportReceiptPath { get; init; }
     public string? CoverConsistencyReceiptPath { get; init; }
     public string? AudiobookPath { get; init; }
+    public string? AudiobookRenderReceiptPath { get; init; }
     public string? AudiobookshelfImportReceiptPath { get; init; }
     public string? AudiobookProviderAccountAlias { get; init; }
     public string? DossierVideoPath { get; init; }

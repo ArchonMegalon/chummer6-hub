@@ -231,6 +231,85 @@ services:
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
       - chummer-release-upload-sessions:/release-upload-sessions
 
+  chummer-origin-media-storage-init:
+    image: alpine:3.22
+    restart: "no"
+    network_mode: "none"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        mkdir -p /origin-media/inbox /origin-media/receipts /origin-media/outputs
+        && chown "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+        /origin-media /origin-media/inbox /origin-media/receipts /origin-media/outputs
+        && chmod 0700 /origin-media /origin-media/inbox /origin-media/receipts /origin-media/outputs
+    volumes:
+      - chummer-origin-media:/origin-media
+
+  chummer-origin-media-worker:
+    image: chummer-origin-media-worker:local
+    init: true
+    restart: unless-stopped
+    read_only: true
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    build:
+      context: /docker/fleet/repos/chummer-media-factory
+      dockerfile: Dockerfile.origin-dossier-worker
+      args:
+        CHUMMER_MEDIA_FACTORY_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_MEDIA_FACTORY_GID: ${CHUMMER_PORTAL_GID:-1654}
+    depends_on:
+      chummer-origin-media-storage-init:
+        condition: service_completed_successfully
+    env_file:
+      - ${CHUMMER_MEDIA_FACTORY_PROVIDER_ENV_FILE:-/docker/fleet/secrets/chummer-media-factory/providers.env}
+    environment:
+      HOME: /tmp/chummer-media-home
+      CHUMMER_MEDIA_FACTORY_ORIGIN_INBOX: /origin-media/inbox
+      CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS: /origin-media/receipts
+      CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS: /origin-media/outputs
+      CHUMMER_MEDIA_FACTORY_ALLOWED_SOURCE_ROOTS: /app/state
+      CHUMMER_MEDIA_FACTORY_HEALTH_PATH: /origin-media/worker-health.json
+      CHUMMER_MEDIA_FACTORY_POLL_SECONDS: ${CHUMMER_MEDIA_FACTORY_POLL_SECONDS:-5}
+      CHUMMER_MEDIA_FACTORY_MAX_REQUESTS_PER_POLL: ${CHUMMER_MEDIA_FACTORY_MAX_REQUESTS_PER_POLL:-2}
+    volumes:
+      - chummer-run-api-state:/app/state:ro
+      - chummer-origin-media:/origin-media
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=1g,mode=1777
+    shm_size: ${CHUMMER_MEDIA_FACTORY_SHM_SIZE:-1g}
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - >-
+          import pathlib,time;
+          p=pathlib.Path('/origin-media/worker-health.json');
+          raise SystemExit(0 if p.is_file() and time.time()-p.stat().st_mtime < 45 else 1)
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    mem_limit: ${CHUMMER_MEDIA_FACTORY_MEMORY_LIMIT:-3g}
+    cpu_shares: 256
+    cpus: ${CHUMMER_MEDIA_FACTORY_CPUS:-1.50}
+    networks:
+      public-origin: {}
+
   chummer-portal:
     image: chummer-run-api:local
     restart: unless-stopped
@@ -257,6 +336,10 @@ services:
     depends_on:
       chummer-release-storage-init:
         condition: service_completed_successfully
+      chummer-origin-media-storage-init:
+        condition: service_completed_successfully
+      chummer-origin-media-worker:
+        condition: service_healthy
       chummer-public-blazor:
         condition: service_healthy
       chummer-run-identity:
@@ -321,6 +404,9 @@ services:
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
       IDENTITY_EMAIL_START_ENABLED: ${IDENTITY_EMAIL_START_ENABLED:-false}
       CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX: ${CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX:-/app/state/origin-dossier-publications.json}
+      CHUMMER_MEDIA_FACTORY_ORIGIN_INBOX: /origin-media/inbox
+      CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS: /origin-media/receipts
+      CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS: /origin-media/outputs
       CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS: ${CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS:-audio.chummer.run,audiobookshelf.chummer.run,audiobookshelf.girschele.com}
       CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-}
       CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY:-}
@@ -604,6 +690,7 @@ services:
     volumes:
       - ${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro
       - chummer-run-api-state:/app/state
+      - chummer-origin-media:/origin-media
       # Both host files must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
@@ -816,6 +903,7 @@ volumes:
   chummer-public-blazor-data-protection:
   chummer-play-web-state:
   chummer-run-api-state:
+  chummer-origin-media:
   chummer-release-upload-sessions:
   chummer-run-identity-state:
 

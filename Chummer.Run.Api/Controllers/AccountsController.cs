@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Media.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
@@ -48,6 +49,7 @@ public sealed class AccountsController : Controller
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
     private readonly OriginAuthoringAllowanceProjectionService _originAuthoringAllowance;
+    private readonly OriginDossierMediaRequestOutboxService? _originDossierMediaOutbox;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
@@ -82,7 +84,8 @@ public sealed class AccountsController : Controller
         HorizonArtifactRequestService? artifactRequests = null,
         MediaArtifactHorizonsService? mediaHorizons = null,
         HorizonArtifactQuotaService? horizonArtifactQuota = null,
-        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null)
+        OriginAuthoringAllowanceProjectionService? originAuthoringAllowance = null,
+        OriginDossierMediaRequestOutboxService? originDossierMediaOutbox = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -110,6 +113,7 @@ public sealed class AccountsController : Controller
         _originDossierPublications = originDossierPublications;
         _originAuthoringAllowance = originAuthoringAllowance
             ?? new OriginAuthoringAllowanceProjectionService(billing, horizonArtifactQuota);
+        _originDossierMediaOutbox = originDossierMediaOutbox;
         _artifactRequests = artifactRequests;
         _mediaHorizons = mediaHorizons;
         _logger = logger;
@@ -997,6 +1001,7 @@ public sealed class AccountsController : Controller
 
             RecordOriginDossierMediaSelectionRequest(
                 user.UserId,
+                subject.SubjectId,
                 subject.Email,
                 publication,
                 "portrait",
@@ -1038,6 +1043,7 @@ public sealed class AccountsController : Controller
 
             RecordOriginDossierMediaSelectionRequest(
                 user.UserId,
+                subject.SubjectId,
                 subject.Email,
                 publication,
                 "audiobook",
@@ -1079,6 +1085,7 @@ public sealed class AccountsController : Controller
 
             RecordOriginDossierMediaSelectionRequest(
                 user.UserId,
+                subject.SubjectId,
                 subject.Email,
                 publication,
                 "cinematic",
@@ -1135,6 +1142,7 @@ public sealed class AccountsController : Controller
 
     private void RecordOriginDossierMediaSelectionRequest(
         string userId,
+        string subjectId,
         string? email,
         OriginDossierPublicationViewModel publication,
         string selectionKind,
@@ -1211,7 +1219,54 @@ public sealed class AccountsController : Controller
                 normalizedKind,
                 normalizedSelectedId,
                 string.Join(", ", receipt.BlockedReasons));
+            return;
         }
+
+        OriginDossierMediaDispatchKind? dispatchKind =
+            string.Equals(normalizedKind, "audiobook", StringComparison.OrdinalIgnoreCase)
+                ? OriginDossierMediaDispatchKind.Audiobook
+                : string.Equals(normalizedKind, "cinematic", StringComparison.OrdinalIgnoreCase)
+                    ? OriginDossierMediaDispatchKind.CinematicScene
+                    : null;
+        if (dispatchKind is null || _originDossierMediaOutbox is null)
+        {
+            return;
+        }
+
+        OriginDossierMediaDispatchSource? dispatchSource =
+            _originDossierPublications.GetMediaDispatchSourceForAccount(
+                userId,
+                subjectId,
+                publication.ProjectId,
+                dispatchKind.Value,
+                selectedId);
+        if (dispatchSource is null)
+        {
+            _logger.LogWarning(
+                "Origin Dossier media dispatch source was unavailable for {UserId} on {ProjectId}/{SelectionKind}/{SelectedId}.",
+                userId,
+                publication.ProjectId,
+                normalizedKind,
+                normalizedSelectedId);
+            return;
+        }
+
+        OriginDossierMediaEnqueueResult enqueue = _originDossierMediaOutbox.Enqueue(
+            dispatchKind.Value,
+            dispatchSource);
+        if (enqueue.Queued)
+        {
+            Response.Headers["X-Origin-Dossier-Media-Request-Id"] = enqueue.RequestId;
+            return;
+        }
+
+        _logger.LogWarning(
+            "Origin Dossier media request was not queued for {UserId} on {ProjectId}/{SelectionKind}/{SelectedId}; status: {Status}.",
+            userId,
+            publication.ProjectId,
+            normalizedKind,
+            normalizedSelectedId,
+            enqueue.Status);
     }
 
     private static string ResolveOriginDossierSelectionRole(string selectionKind)
@@ -1316,14 +1371,34 @@ public sealed class AccountsController : Controller
                 string shareKind = string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase)
                     ? "audiobook"
                     : "dossier";
+                if (string.Equals(shareKind, "audiobook", StringComparison.Ordinal))
+                {
+                    OriginDossierPublicationArtifact? generatedAudiobook =
+                        _originDossierPublications.GetArtifactForAccount(
+                            user.UserId,
+                            subject.SubjectId,
+                            originDossierProjectId,
+                            "audiobook");
+                    if (generatedAudiobook is not null)
+                    {
+                        return PhysicalFile(
+                            generatedAudiobook.Path,
+                            generatedAudiobook.ContentType,
+                            enableRangeProcessing: true);
+                    }
+                }
+
                 string? audiobookshelfShareUrl = _originDossierPublications.GetAudiobookshelfShareForAccount(
                     user.UserId,
                     subject.SubjectId,
                     originDossierProjectId,
                     shareKind);
-                return string.IsNullOrWhiteSpace(audiobookshelfShareUrl)
-                    ? NotFound()
-                    : Redirect(audiobookshelfShareUrl);
+                if (!string.IsNullOrWhiteSpace(audiobookshelfShareUrl))
+                {
+                    return Redirect(audiobookshelfShareUrl);
+                }
+
+                return NotFound();
             }
 
             string resolvedArtifactKind = artifactKind.Trim().ToLowerInvariant() switch

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Chummer.Media.Contracts;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
@@ -219,6 +220,83 @@ public sealed class OriginDossierAccountRouteTests
         Assert.IsType<NotFoundResult>(canonAuditResult);
     }
 
+    [Fact]
+    public async Task OriginDossierOwnerSelectionsQueueCanonicalMediaFactoryRequests()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-dispatch", fixture.SubjectId);
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult audioResult = await controller.SelectOriginDossierAudiobookVoice(
+            "origin-dispatch",
+            "voice-wire",
+            CancellationToken.None);
+        Assert.IsType<RedirectResult>(audioResult);
+        string audioRequestId = controller.Response.Headers["X-Origin-Dossier-Media-Request-Id"].ToString();
+        Assert.StartsWith("origin-media-", audioRequestId, StringComparison.Ordinal);
+        OriginDossierMediaDispatchRequest audioRequest = fixture.ReadQueuedRequest(audioRequestId);
+        Assert.Equal(OriginDossierMediaDispatchContract.Version, audioRequest.ContractVersion);
+        Assert.Equal(OriginDossierMediaDispatchKind.Audiobook, audioRequest.Kind);
+        Assert.Equal("voice-wire", audioRequest.SelectionId);
+        Assert.Equal("chummer6-hub", audioRequest.Source);
+        Assert.True(File.Exists(audioRequest.ManuscriptPath));
+        Assert.True(File.Exists(audioRequest.SourcePacketPath));
+
+        IActionResult videoResult = await controller.SelectOriginDossierCinematicScene(
+            "origin-dispatch",
+            "scene-simrig-betrayal",
+            CancellationToken.None);
+        Assert.IsType<RedirectResult>(videoResult);
+        string videoRequestId = controller.Response.Headers["X-Origin-Dossier-Media-Request-Id"].ToString();
+        OriginDossierMediaDispatchRequest videoRequest = fixture.ReadQueuedRequest(videoRequestId);
+        Assert.Equal(OriginDossierMediaDispatchKind.CinematicScene, videoRequest.Kind);
+        Assert.Equal("scene-simrig-betrayal", videoRequest.SelectionId);
+        Assert.Contains("Simrig betrayal", videoRequest.SelectionLabel, StringComparison.Ordinal);
+        Assert.Equal(10, videoRequest.DurationTargetSeconds);
+    }
+
+    [Fact]
+    public async Task MediaFactoryReceiptUpdatesOnlyTheCurrentOwnerSelection()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-completion", fixture.SubjectId);
+        AccountsController controller = fixture.CreateController();
+        await controller.SelectOriginDossierAudiobookVoice(
+            "origin-completion",
+            "voice-street",
+            CancellationToken.None);
+        string requestId = controller.Response.Headers["X-Origin-Dossier-Media-Request-Id"].ToString();
+        OriginDossierMediaDispatchRequest request = fixture.ReadQueuedRequest(requestId);
+        string outputPath = Path.Combine(fixture.MediaOutputRoot, "origin-completion", requestId, "story.m4b");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllBytes(outputPath, Enumerable.Repeat((byte)'a', 2_048).ToArray());
+        string receiptPath = fixture.WriteMediaReceipt(request, outputPath, "audio/mp4", "approved_tts");
+
+        OriginDossierMediaReceiptIngestResult result = Assert.Single(
+            fixture.MediaReceiptIngest.IngestPending());
+
+        Assert.True(result.Applied, result.Status);
+        OriginDossierPublicationArtifact artifact = Assert.IsType<OriginDossierPublicationArtifact>(
+            fixture.OriginDossiers.GetArtifactForAccount(
+                fixture.UserId,
+                fixture.SubjectId,
+                "origin-completion",
+                "audiobook"));
+        Assert.Equal(outputPath, artifact.Path);
+        Assert.Equal("audio/mp4", artifact.ContentType);
+        Assert.True(File.Exists(receiptPath + ".ingested.json"));
+        Assert.Empty(fixture.MediaReceiptIngest.IngestPending());
+
+        IActionResult listenResult = await controller.OriginDossierArtifact(
+            "origin-completion",
+            "listen",
+            CancellationToken.None);
+        PhysicalFileResult listen = Assert.IsType<PhysicalFileResult>(listenResult);
+        Assert.Equal(outputPath, listen.FileName);
+        Assert.Equal("audio/mp4", listen.ContentType);
+        Assert.True(listen.EnableRangeProcessing);
+    }
+
     private sealed class OriginDossierRouteFixture : IDisposable
     {
         private const string AccessToken = "origin-route-token";
@@ -243,8 +321,17 @@ public sealed class OriginDossierAccountRouteTests
         public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts
             => _provider.GetRequiredService<HorizonArtifactRequestReceiptStore>();
 
+        public string MediaInboxRoot => Path.Combine(Root, "media-factory", "inbox");
+
+        public string MediaReceiptRoot => Path.Combine(Root, "media-factory", "receipts");
+
+        public string MediaOutputRoot => Path.Combine(Root, "media-factory", "outputs");
+
         public OriginDossierPublicationService OriginDossiers
             => _provider.GetRequiredService<OriginDossierPublicationService>();
+
+        public OriginDossierMediaReceiptIngestService MediaReceiptIngest
+            => _provider.GetRequiredService<OriginDossierMediaReceiptIngestService>();
 
         public static OriginDossierRouteFixture Create()
         {
@@ -263,6 +350,9 @@ public sealed class OriginDossierAccountRouteTests
                     ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(root, "myfirstbook-usage.json"),
                     ["CHUMMER_PAYFUNNELS_BILLING_STORE_PATH"] = Path.Combine(root, "payfunnels-billing.json"),
                     ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = Path.Combine(root, "origin-dossier-publications.json"),
+                    ["CHUMMER_MEDIA_FACTORY_ORIGIN_INBOX"] = Path.Combine(root, "media-factory", "inbox"),
+                    ["CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS"] = Path.Combine(root, "media-factory", "receipts"),
+                    ["CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS"] = Path.Combine(root, "media-factory", "outputs"),
                     ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(root, "horizon-artifact-request-receipts.json"),
                     ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] = AccessToken,
@@ -307,6 +397,51 @@ public sealed class OriginDossierAccountRouteTests
                 HttpContext = httpContext
             };
             return controller;
+        }
+
+        public OriginDossierMediaDispatchRequest ReadQueuedRequest(string requestId)
+        {
+            string path = Path.Combine(MediaInboxRoot, requestId + ".request.json");
+            Assert.True(File.Exists(path), $"Expected queued Origin Dossier media request at {path}.");
+            return JsonSerializer.Deserialize<OriginDossierMediaDispatchRequest>(
+                File.ReadAllText(path, Encoding.UTF8),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        }
+
+        public string WriteMediaReceipt(
+            OriginDossierMediaDispatchRequest request,
+            string outputPath,
+            string contentType,
+            string providerClass)
+        {
+            Directory.CreateDirectory(MediaReceiptRoot);
+            string receiptPath = Path.Combine(MediaReceiptRoot, request.RequestId + ".receipt.json");
+            byte[] output = File.ReadAllBytes(outputPath);
+            var receipt = new OriginDossierMediaDispatchReceipt(
+                ContractVersion: OriginDossierMediaDispatchContract.Version,
+                RequestId: request.RequestId,
+                Kind: request.Kind,
+                ProjectId: request.ProjectId,
+                OwnerRefHash: request.OwnerRefHash,
+                OriginRevisionId: request.OriginRevisionId,
+                SelectionId: request.SelectionId,
+                Status: "succeeded",
+                ProviderClass: providerClass,
+                OutputPath: outputPath,
+                OutputContentType: contentType,
+                OutputSha256: Convert.ToHexString(SHA256.HashData(output)).ToLowerInvariant(),
+                OutputBytes: output.LongLength,
+                ObservedDurationSeconds: 12.5,
+                RequestSha256: new string('a', 64),
+                ProviderExecutionRefHash: new string('b', 64),
+                CompletedAtUtc: DateTimeOffset.UtcNow);
+            File.WriteAllText(
+                receiptPath,
+                JsonSerializer.Serialize(
+                    receipt,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }),
+                Encoding.UTF8);
+            return receiptPath;
         }
 
         public OriginDossierRouteArtifacts ImportGoldPublication(string projectId, string subjectId)
