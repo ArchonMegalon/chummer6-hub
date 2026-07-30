@@ -168,6 +168,7 @@ GOVERNED_CODE_EXCLUDED_OUTPUTS = (
     ("dist/", "packaged distribution output"),
     ("obj/", "compiler intermediate output"),
     ("Chummer.Portal/downloads/", "published download shelf bound by release receipts"),
+    ("Docker/Downloads/", "mirrored download shelf bound by release receipts"),
 )
 GOVERNED_CODE_EXCLUDED_OUTPUT_PREFIXES = tuple(
     prefix for prefix, _reason in GOVERNED_CODE_EXCLUDED_OUTPUTS

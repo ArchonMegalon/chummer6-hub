@@ -1199,6 +1199,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         self.assertFalse(module.governed_code_path("Project/obj/Debug/generated.cs"))
         self.assertFalse(module.governed_code_path(".runtime-temp/session/state.json"))
         self.assertFalse(module.governed_code_path(".vexp/manifest.json"))
+        self.assertFalse(module.governed_code_path("Docker/Downloads/releases.json"))
         self.assertTrue(module.governed_code_path("node_modules/injected.js"))
         self.assertTrue(
             module.governed_restored_dependency_path("node_modules/injected.js")
