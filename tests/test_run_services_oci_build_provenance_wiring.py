@@ -99,3 +99,26 @@ def test_hub_closeout_can_force_fresh_oci_subjects_without_rebuilding_on_deploy(
     assert no_cache_build < no_build_deploy
     assert no_build_deploy < identity_finalize
     assert no_build_deploy < api_finalize
+
+
+def test_hub_closeout_provenance_only_mode_is_explicit_and_requires_a_build() -> None:
+    script = HUB_CLOSEOUT.read_text(encoding="utf-8")
+
+    api_finalize = script.index(
+        'finalize_oci_build_provenance "$api_provenance_invocation_id"'
+    )
+    verify_switch = script.index(
+        'if [[ "$HUB_CLOSEOUT_POST_BUILD_VERIFY" == "0"'
+    )
+    solution_build = script.index("dotnet build Chummer.Run.sln --nologo")
+
+    assert (
+        'HUB_CLOSEOUT_POST_BUILD_VERIFY="${HUB_CLOSEOUT_POST_BUILD_VERIFY:-1}"'
+        in script
+    )
+    assert "Post-build verification can be skipped only after this invocation builds" in script
+    assert (
+        "hub OCI provenance build passed; post-build verification deliberately skipped"
+        in script
+    )
+    assert api_finalize < verify_switch < solution_build

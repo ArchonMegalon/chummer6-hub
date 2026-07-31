@@ -12,6 +12,7 @@ HUB_LIVE_BASE_URL="${HUB_LIVE_BASE_URL:-https://chummer.run}"
 HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
 HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
 HUB_CLOSEOUT_NO_CACHE="${HUB_CLOSEOUT_NO_CACHE:-0}"
+HUB_CLOSEOUT_POST_BUILD_VERIFY="${HUB_CLOSEOUT_POST_BUILD_VERIFY:-1}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
 HUB_CLOSEOUT_INCLUDE_BLAZOR="${HUB_CLOSEOUT_INCLUDE_BLAZOR:-0}"
@@ -197,6 +198,16 @@ if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_C
   finalize_oci_build_provenance "$identity_provenance_invocation_id" "$identity_provenance_state" "$identity_provenance_receipt"
   finalize_oci_build_provenance "$api_provenance_invocation_id" "$api_provenance_state" "$api_provenance_receipt"
   echo "OCI build provenance receipts: $identity_provenance_receipt $api_provenance_receipt"
+fi
+
+if [[ "$HUB_CLOSEOUT_POST_BUILD_VERIFY" == "0" || "$HUB_CLOSEOUT_POST_BUILD_VERIFY" == "false" || "$HUB_CLOSEOUT_POST_BUILD_VERIFY" == "FALSE" ]]; then
+  if [[ "$HUB_CLOSEOUT_BUILD" != "1" && "$HUB_CLOSEOUT_BUILD" != "true" && "$HUB_CLOSEOUT_BUILD" != "TRUE" ]]; then
+    echo "Post-build verification can be skipped only after this invocation builds and finalizes the OCI provenance subjects." >&2
+    exit 2
+  fi
+  echo
+  echo "hub OCI provenance build passed; post-build verification deliberately skipped"
+  exit 0
 fi
 
 echo
