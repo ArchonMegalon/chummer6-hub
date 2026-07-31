@@ -1,0 +1,55 @@
+{
+  "contractName": "chummer.magicai_api_handshake_probe.v1",
+  "controlledLiveProviderPilot": true,
+  "endpoint": "https://api.omagic.ai/api/schema/public/?format=json",
+  "generatedAtUtc": "2026-07-30T15:13:21Z",
+  "goalCompletionClaimAllowed": false,
+  "httpStatus": 200,
+  "noCreditBurnExpected": true,
+  "privacy": {
+    "envValuesExposed": false,
+    "rawCredentialExposed": false
+  },
+  "provider": "magicai",
+  "providerSurface": "omagic_api",
+  "responseHeaders": {
+    "Allow": "",
+    "Content-Type": "application/json",
+    "WWW-Authenticate": ""
+  },
+  "responseUrl": "https://api.omagic.ai/api/schema/public/?format=json",
+  "slot": "01",
+  "status": "pass",
+  "summary": {
+    "body_sha256": "9432a03ed581f89ce230ab8337519277d543a5fc2df24523b972e9965fb14856",
+    "body_size_bytes": 214899,
+    "json": true,
+    "openapi": "3.0.3",
+    "path_count": 11,
+    "sample_paths": [
+      "/api/image-to-3d/",
+      "/api/library/items/",
+      "/api/library/items/{id}/",
+      "/api/render/tasks/",
+      "/api/render/tasks/new/",
+      "/api/render/tasks/v2/new/",
+      "/api/render/tasks/{id}/",
+      "/api/templates/recommend/",
+      "/api/templates/v2/",
+      "/api/templates/v2/s/{slug}/"
+    ],
+    "security": [
+      {
+        "ApiKeyAuth": []
+      }
+    ],
+    "top_level_keys": [
+      "components",
+      "info",
+      "openapi",
+      "paths",
+      "security",
+      "servers"
+    ]
+  }
+}

@@ -1,0 +1,580 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Angle.Windows.Natives@2.1.25547.20250602",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "64bd152dce2cf6bbcd345b75f4fc66e5434092628dca5ba003024f5fdba55d9e895acfe5e9766284f5964f27b36a834e57210f53c61b511b56ed7300b6a5c7e4"
+        }
+      ],
+      "name": "Avalonia.Angle.Windows.Natives",
+      "purl": "pkg:nuget/Avalonia.Angle.Windows.Natives@2.1.25547.20250602",
+      "type": "library",
+      "version": "2.1.25547.20250602"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.BuildServices@11.3.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "93f5b05dbab0682b661346bdd185c1f69953e74a24e8e80b048afe0d460ad7a6a424df3688aebd92090bd6f18377c5c1bdfefb24cdcedbbce706ecbb004a0582"
+        }
+      ],
+      "name": "Avalonia.BuildServices",
+      "purl": "pkg:nuget/Avalonia.BuildServices@11.3.1",
+      "type": "library",
+      "version": "11.3.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Desktop@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c96623f0ce2da60e9826b1b03c8ad73ee554a1c26c0a64fcd4cf90b55664129e0f64e5249b6d6dbe2688e011ab63c790607b91472ee4fef715c701ea9e6430b8"
+        }
+      ],
+      "name": "Avalonia.Desktop",
+      "purl": "pkg:nuget/Avalonia.Desktop@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Fonts.Inter@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "178a3538ab7652f5e4087265771f2be9b4a4a45fe36a5d2b6a38597a7e17142b02e0abc80d4d2cb5f59079b41e38b1a99848436055ac36d4776b8ee1a41652b2"
+        }
+      ],
+      "name": "Avalonia.Fonts.Inter",
+      "purl": "pkg:nuget/Avalonia.Fonts.Inter@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.FreeDesktop@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "e0adfacda7988994ffe92e627f97d718301d24be2ee33b8ed24df756b2e975f9645428e03eb7755a12b7ab126b805f58351c2992f6f19d3b59cd23f65fa01f2a"
+        }
+      ],
+      "name": "Avalonia.FreeDesktop",
+      "purl": "pkg:nuget/Avalonia.FreeDesktop@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Native@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "28e3580d7025a86a4cc1a56b4504e9e0c9db51b886df89c460c525de2624825f6a3f9e2b47f88980387c5e8d147c40bd4e373f377915e209a1712ace4fb3426c"
+        }
+      ],
+      "name": "Avalonia.Native",
+      "purl": "pkg:nuget/Avalonia.Native@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Remote.Protocol@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c48fd0a042dc6ff538a929b52835d145a035ab2f908321e58134ba10dedcad5ffa2ddcddbfdf74ae4e829456b645a8c786f126da2e92f24571da96966483871f"
+        }
+      ],
+      "name": "Avalonia.Remote.Protocol",
+      "purl": "pkg:nuget/Avalonia.Remote.Protocol@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Skia@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "9c34e8a7976e15005db11dd8ccbb3fc34ae139d381eaccd940b0f6bcc09ef050e42903388f7e6c5cc29551c4edbd2b6cdf1f32a390c46ab5df594d6f898da09e"
+        }
+      ],
+      "name": "Avalonia.Skia",
+      "purl": "pkg:nuget/Avalonia.Skia@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Themes.Fluent@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "4ad032c62f455d4fe4f55e0b85bbda5587cc75d8b78af0fcf22ba0bb49fcb913de599252964929343e5f7ea5b55a88ed8bf23016c4a661be8b8fb9d881008291"
+        }
+      ],
+      "name": "Avalonia.Themes.Fluent",
+      "purl": "pkg:nuget/Avalonia.Themes.Fluent@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.Win32@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7ba11d58a9c6bebed64a0e10df38de8f40d0a39163cf0b81fb992aa2d615adff911bf12f3ffe3d3fd4b6e7b0a3cfd03906bd1308d2e7cb75416ea3e5b788b802"
+        }
+      ],
+      "name": "Avalonia.Win32",
+      "purl": "pkg:nuget/Avalonia.Win32@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia.X11@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "d7f0b7a0cfea2110c69c15625c3a42bf0b103eaef8f90af05c60b319bde6785d2efbb9d367fa1b87e7f130681cabfd101dcab4b7bb5ac6c52bd65855c81b4463"
+        }
+      ],
+      "name": "Avalonia.X11",
+      "purl": "pkg:nuget/Avalonia.X11@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/Avalonia@11.3.7",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "42556f6984d24eace851f96600432e3f38b7bd87726c42179854202d9c5d4dbcd37b2865c0a6755aab4bc0755ed456edf281920aa6182ac53c495899b1d5d1d9"
+        }
+      ],
+      "name": "Avalonia",
+      "purl": "pkg:nuget/Avalonia@11.3.7",
+      "type": "library",
+      "version": "11.3.7"
+    },
+    {
+      "bom-ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.Linux@8.3.1.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "dc46759a922229644b2f9854600f36647b5e78321568403f674ac0ff053ab63c7a72b7009099c13f00d766e80149fa3cf89dc4ce7bd125fe3db8cb2a61f2ab1e"
+        }
+      ],
+      "name": "HarfBuzzSharp.NativeAssets.Linux",
+      "purl": "pkg:nuget/HarfBuzzSharp.NativeAssets.Linux@8.3.1.1",
+      "type": "library",
+      "version": "8.3.1.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.WebAssembly@8.3.1.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "96827078adaefe61ffdc2db305ad208099484c8b333a42bae072c0641ec5513ebbd1d4e0f7ae7084b1581c3428ebd3660b8f9df5437489c2c2f551e275769508"
+        }
+      ],
+      "name": "HarfBuzzSharp.NativeAssets.WebAssembly",
+      "purl": "pkg:nuget/HarfBuzzSharp.NativeAssets.WebAssembly@8.3.1.1",
+      "type": "library",
+      "version": "8.3.1.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.Win32@8.3.1.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "52c26d42c7c026814366b5dce210947d13cca9c71f299d22ba627fba97148f3fdc9ac4e054518d10be726895a692ab2e15874c59b8ff127e7f912e0f165f6104"
+        }
+      ],
+      "name": "HarfBuzzSharp.NativeAssets.Win32",
+      "purl": "pkg:nuget/HarfBuzzSharp.NativeAssets.Win32@8.3.1.1",
+      "type": "library",
+      "version": "8.3.1.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.macOS@8.3.1.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8dbb42b207ed71a14b080d77b552a8e6259d12525272bba52d3289adedfa3b86104c89700ed3cfaa1459364f98d2fbf80f58316ec71ab0646e7140df4b8e287d"
+        }
+      ],
+      "name": "HarfBuzzSharp.NativeAssets.macOS",
+      "purl": "pkg:nuget/HarfBuzzSharp.NativeAssets.macOS@8.3.1.1",
+      "type": "library",
+      "version": "8.3.1.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/HarfBuzzSharp@8.3.1.1",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b4b64debaa1efee8913d365fac25388bc49c546c2a1cd879307ad78f4c957f897b333d058531a743bd511b249139399da209c0b3426d96e1e42f8d6921a6d6b9"
+        }
+      ],
+      "name": "HarfBuzzSharp",
+      "purl": "pkg:nuget/HarfBuzzSharp@8.3.1.1",
+      "type": "library",
+      "version": "8.3.1.1"
+    },
+    {
+      "bom-ref": "pkg:nuget/MicroCom.Runtime@0.11.0",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3049eb677508887e34863ccc0ecc6b4f28bc76da81e738afde205e794e1b5ec2ffecd2d26a5f45d6564aa4afad7c14675280d276d716dcab9f138ca101338c08"
+        }
+      ],
+      "name": "MicroCom.Runtime",
+      "purl": "pkg:nuget/MicroCom.Runtime@0.11.0",
+      "type": "library",
+      "version": "0.11.0"
+    },
+    {
+      "bom-ref": "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@10.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "2f701d999d5638ae175d3e5814f130cadd1ea7a97c94620fb3b17938e05973bed9a9ea34d4e7fb5d7202cb8efadbcb1d565d2ffe8c316094def3a0d3805c0a08"
+        }
+      ],
+      "name": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "purl": "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@10.0.0",
+      "type": "library",
+      "version": "10.0.0"
+    },
+    {
+      "bom-ref": "pkg:nuget/Microsoft.Extensions.DependencyInjection@10.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7f444169bb3026afa046ee5afa1588a1bacb5a25183ca321083f563b7b18040752cb71451f5e0b32f2d515973690f4828a604bc52ba2b5486c77ab5bd13018e8"
+        }
+      ],
+      "name": "Microsoft.Extensions.DependencyInjection",
+      "purl": "pkg:nuget/Microsoft.Extensions.DependencyInjection@10.0.0",
+      "type": "library",
+      "version": "10.0.0"
+    },
+    {
+      "bom-ref": "pkg:nuget/SkiaSharp.NativeAssets.Linux@2.88.9",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "71649a24a54f580693fd6227f5cf13e6e4ff978113c07c4d2539043ad34a8e984da3c016e9317d3b7d9a464c6ac3797c194754a3ae81bbb122aad161fd71b466"
+        }
+      ],
+      "name": "SkiaSharp.NativeAssets.Linux",
+      "purl": "pkg:nuget/SkiaSharp.NativeAssets.Linux@2.88.9",
+      "type": "library",
+      "version": "2.88.9"
+    },
+    {
+      "bom-ref": "pkg:nuget/SkiaSharp.NativeAssets.WebAssembly@2.88.9",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "92dd3a45c7011d29c0b36c0361d0527ec8c80db637129b0e56a9e50e029d82fcae440f1914368745d58dc755478c6818ce69c50868932419d7165e41a86c069c"
+        }
+      ],
+      "name": "SkiaSharp.NativeAssets.WebAssembly",
+      "purl": "pkg:nuget/SkiaSharp.NativeAssets.WebAssembly@2.88.9",
+      "type": "library",
+      "version": "2.88.9"
+    },
+    {
+      "bom-ref": "pkg:nuget/SkiaSharp.NativeAssets.Win32@2.88.9",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c1bda462053b8b2f389d02d867031e2578b1bcafbe1a822e1028d4e0409a50a36e7e5c919492b289184dd4c007b30be5bf3baf92b8d15a52b465aebe91840aef"
+        }
+      ],
+      "name": "SkiaSharp.NativeAssets.Win32",
+      "purl": "pkg:nuget/SkiaSharp.NativeAssets.Win32@2.88.9",
+      "type": "library",
+      "version": "2.88.9"
+    },
+    {
+      "bom-ref": "pkg:nuget/SkiaSharp.NativeAssets.macOS@2.88.9",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "36fe6ca6629ce39d39129ee8528279be9dcac1e16978dab1a721835b27843d35f6b91e92eacc97226de08fbe5d334609cfb34fbdc8b1e3c991e656aab3c74fb8"
+        }
+      ],
+      "name": "SkiaSharp.NativeAssets.macOS",
+      "purl": "pkg:nuget/SkiaSharp.NativeAssets.macOS@2.88.9",
+      "type": "library",
+      "version": "2.88.9"
+    },
+    {
+      "bom-ref": "pkg:nuget/SkiaSharp@2.88.9",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "dcc0f95478d75e27921c295e44bb9a4d798bda90f4981ec270e075c76900d48e1b869b5fe1edd1dbb88cf77dbae1962e02aea6914c97e576dcc6766f30961cd5"
+        }
+      ],
+      "name": "SkiaSharp",
+      "purl": "pkg:nuget/SkiaSharp@2.88.9",
+      "type": "library",
+      "version": "2.88.9"
+    },
+    {
+      "bom-ref": "pkg:nuget/System.Security.Cryptography.ProtectedData@10.0.0",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "ab2e82de04114eb7e115fba22185358cdc167c5749a41568d410115bb8e0326d734c49b72d1ccb2f238b246680b8a13e9d90869043fbd72e2b8fd3568ea2c675"
+        }
+      ],
+      "name": "System.Security.Cryptography.ProtectedData",
+      "purl": "pkg:nuget/System.Security.Cryptography.ProtectedData@10.0.0",
+      "type": "library",
+      "version": "10.0.0"
+    },
+    {
+      "bom-ref": "pkg:nuget/Tmds.DBus.Protocol@0.21.3",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "843c01f16b10a3200b40aa886f0cd2ebc50a7659da7c39b84ff0e43bf26b03f6089de3ffacabfde92c583d55de87714fe22fd25df4a1ad87ed28bb5c88900897"
+        }
+      ],
+      "name": "Tmds.DBus.Protocol",
+      "purl": "pkg:nuget/Tmds.DBus.Protocol@0.21.3",
+      "type": "library",
+      "version": "0.21.3"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia.Angle.Windows.Natives@2.1.25547.20250602",
+        "pkg:nuget/Avalonia.BuildServices@11.3.1",
+        "pkg:nuget/Avalonia.Desktop@11.3.7",
+        "pkg:nuget/Avalonia.Fonts.Inter@11.3.7",
+        "pkg:nuget/Avalonia.FreeDesktop@11.3.7",
+        "pkg:nuget/Avalonia.Native@11.3.7",
+        "pkg:nuget/Avalonia.Remote.Protocol@11.3.7",
+        "pkg:nuget/Avalonia.Skia@11.3.7",
+        "pkg:nuget/Avalonia.Themes.Fluent@11.3.7",
+        "pkg:nuget/Avalonia.Win32@11.3.7",
+        "pkg:nuget/Avalonia.X11@11.3.7",
+        "pkg:nuget/Avalonia@11.3.7",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.Linux@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.WebAssembly@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.Win32@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.macOS@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp@8.3.1.1",
+        "pkg:nuget/MicroCom.Runtime@0.11.0",
+        "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@10.0.0",
+        "pkg:nuget/Microsoft.Extensions.DependencyInjection@10.0.0",
+        "pkg:nuget/SkiaSharp.NativeAssets.Linux@2.88.9",
+        "pkg:nuget/SkiaSharp.NativeAssets.WebAssembly@2.88.9",
+        "pkg:nuget/SkiaSharp.NativeAssets.Win32@2.88.9",
+        "pkg:nuget/SkiaSharp.NativeAssets.macOS@2.88.9",
+        "pkg:nuget/SkiaSharp@2.88.9",
+        "pkg:nuget/System.Security.Cryptography.ProtectedData@10.0.0",
+        "pkg:nuget/Tmds.DBus.Protocol@0.21.3"
+      ],
+      "ref": "urn:chummer:project:desktop-avalonia"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/Avalonia.Angle.Windows.Natives@2.1.25547.20250602"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/Avalonia.BuildServices@11.3.1"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia.Native@11.3.7",
+        "pkg:nuget/Avalonia.Skia@11.3.7",
+        "pkg:nuget/Avalonia.Win32@11.3.7",
+        "pkg:nuget/Avalonia.X11@11.3.7",
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.Desktop@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.Fonts.Inter@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia@11.3.7",
+        "pkg:nuget/Tmds.DBus.Protocol@0.21.3"
+      ],
+      "ref": "pkg:nuget/Avalonia.FreeDesktop@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.Native@11.3.7"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/Avalonia.Remote.Protocol@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia@11.3.7",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.Linux@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.WebAssembly@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp@8.3.1.1",
+        "pkg:nuget/SkiaSharp.NativeAssets.Linux@2.88.9",
+        "pkg:nuget/SkiaSharp.NativeAssets.WebAssembly@2.88.9",
+        "pkg:nuget/SkiaSharp@2.88.9"
+      ],
+      "ref": "pkg:nuget/Avalonia.Skia@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.Themes.Fluent@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia.Angle.Windows.Natives@2.1.25547.20250602",
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.Win32@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia.FreeDesktop@11.3.7",
+        "pkg:nuget/Avalonia.Skia@11.3.7",
+        "pkg:nuget/Avalonia@11.3.7"
+      ],
+      "ref": "pkg:nuget/Avalonia.X11@11.3.7"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Avalonia.BuildServices@11.3.1",
+        "pkg:nuget/Avalonia.Remote.Protocol@11.3.7",
+        "pkg:nuget/MicroCom.Runtime@0.11.0"
+      ],
+      "ref": "pkg:nuget/Avalonia@11.3.7"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.Linux@8.3.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.WebAssembly@8.3.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.Win32@8.3.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/HarfBuzzSharp.NativeAssets.macOS@8.3.1.1"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.Win32@8.3.1.1",
+        "pkg:nuget/HarfBuzzSharp.NativeAssets.macOS@8.3.1.1"
+      ],
+      "ref": "pkg:nuget/HarfBuzzSharp@8.3.1.1"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/MicroCom.Runtime@0.11.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@10.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/Microsoft.Extensions.DependencyInjection.Abstractions@10.0.0"
+      ],
+      "ref": "pkg:nuget/Microsoft.Extensions.DependencyInjection@10.0.0"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/SkiaSharp@2.88.9"
+      ],
+      "ref": "pkg:nuget/SkiaSharp.NativeAssets.Linux@2.88.9"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/SkiaSharp.NativeAssets.WebAssembly@2.88.9"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/SkiaSharp.NativeAssets.Win32@2.88.9"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/SkiaSharp.NativeAssets.macOS@2.88.9"
+    },
+    {
+      "dependsOn": [
+        "pkg:nuget/SkiaSharp.NativeAssets.Win32@2.88.9",
+        "pkg:nuget/SkiaSharp.NativeAssets.macOS@2.88.9"
+      ],
+      "ref": "pkg:nuget/SkiaSharp@2.88.9"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/System.Security.Cryptography.ProtectedData@10.0.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:nuget/Tmds.DBus.Protocol@0.21.3"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "urn:chummer:project:desktop-avalonia",
+      "name": "desktop-avalonia",
+      "properties": [
+        {
+          "name": "chummer:projectPath",
+          "value": "Chummer.Avalonia/Chummer.Avalonia.csproj"
+        },
+        {
+          "name": "chummer:dependencyInventorySha256",
+          "value": "903c811cac6437c82454b3c7fe916e2a66a4b13ac215fa51ce40e2a188ab4535"
+        },
+        {
+          "name": "chummer:evidenceKind",
+          "value": "restore-assets-inventory"
+        },
+        {
+          "name": "chummer:releaseVersion",
+          "value": "run-20260731-095000"
+        }
+      ],
+      "type": "application",
+      "version": "run-20260731-095000"
+    },
+    "tools": {
+      "components": [
+        {
+          "name": "chummer-supply-chain-release-gate",
+          "type": "application",
+          "version": "1"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:f944686f-e320-56e8-a0ef-3bfc2efb386e",
+  "specVersion": "1.5",
+  "version": 1
+}

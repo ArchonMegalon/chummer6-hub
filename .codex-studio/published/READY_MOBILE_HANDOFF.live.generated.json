@@ -1,0 +1,95 @@
+{
+  "base_url": "https://chummer.run",
+  "contractName": "chummer.ready_mobile_handoff_contract.v1",
+  "failures": [],
+  "frontdoor_launch_route": "/mobile/player",
+  "generatedAtUtc": "2026-07-03T16:58:05.514564+00:00",
+  "live": {
+    "base_url": "https://chummer.run",
+    "content_type": "application/json",
+    "continuity_route": "/play/continuity",
+    "failures": [],
+    "final_url": "https://chummer.run/ready/handoff/mobile.json",
+    "frontdoor_launch_route": "/mobile/player",
+    "next_best_screen": "/mobile",
+    "packet_roles": [
+      "player",
+      "gm",
+      "organizer"
+    ],
+    "pwa_route": "/mobile",
+    "role_routes": [
+      {
+        "frontdoor_default": true,
+        "manifest_id": "/mobile/player",
+        "manifest_path": "/manifest.player.webmanifest",
+        "manifest_start_url": "/mobile/player?role=Player",
+        "mode": "player",
+        "role": "Player",
+        "route": "/mobile/player",
+        "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player"
+      },
+      {
+        "frontdoor_default": false,
+        "manifest_id": "/mobile/gm",
+        "manifest_path": "/manifest.gm.webmanifest",
+        "manifest_start_url": "/mobile/gm?role=GameMaster",
+        "mode": "gm",
+        "role": "GameMaster",
+        "route": "/mobile/gm",
+        "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster"
+      }
+    ],
+    "route": "/ready/handoff/mobile.json",
+    "status": "pass",
+    "status_code": 200,
+    "tool_ids": [
+      "inventory",
+      "health",
+      "ammo",
+      "modifiers",
+      "quick_rolls",
+      "living_world"
+    ]
+  },
+  "packet_roles": [
+    "player",
+    "gm",
+    "organizer"
+  ],
+  "role_routes": [
+    {
+      "frontdoor_default": true,
+      "manifest_id": "/mobile/player",
+      "manifest_path": "/manifest.player.webmanifest",
+      "manifest_start_url": "/mobile/player?role=Player",
+      "mode": "player",
+      "role": "Player",
+      "route": "/mobile/player",
+      "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player"
+    },
+    {
+      "frontdoor_default": false,
+      "manifest_id": "/mobile/gm",
+      "manifest_path": "/manifest.gm.webmanifest",
+      "manifest_start_url": "/mobile/gm?role=GameMaster",
+      "mode": "gm",
+      "role": "GameMaster",
+      "route": "/mobile/gm",
+      "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster"
+    }
+  ],
+  "source": {
+    "failures": [],
+    "status": "pass"
+  },
+  "status": "pass",
+  "tool_ids": [
+    "inventory",
+    "health",
+    "ammo",
+    "modifiers",
+    "quick_rolls",
+    "living_world"
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.external_distribution_mirror_proof",
-  "generated_at_utc": "2026-07-30T03:14:03Z",
+  "generated_at_utc": "2026-07-31T21:55:47Z",
   "registry_root": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published",
   "public_install_count": 0,
   "downloads_paused": true,
@@ -23,16 +23,16 @@
           "id": "avalonia-linux-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-linux-x64-installer.deb",
-          "size": 39118902,
-          "sha256": "c310febe74ea2250f90bde60309bb2a290b443b29691c41de6343d6fde2a85fa",
+          "size": 37169174,
+          "sha256": "7b5accc63d1cacb9ff49ae5260620cf216d5ad843721d20abf915226b9ae8b62",
           "status": "pass"
         },
         {
           "id": "avalonia-win-x64-installer",
           "exists": true,
           "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/files/chummer-avalonia-win-x64-installer.exe",
-          "size": 2734299,
-          "sha256": "d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca",
+          "size": 2735257,
+          "sha256": "17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d",
           "status": "pass"
         }
       ]

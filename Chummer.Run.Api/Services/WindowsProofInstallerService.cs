@@ -13,6 +13,7 @@ public sealed class WindowsProofInstallerService
     private const string DownloadsRootKey = "CHUMMER_DOWNLOADS_SOURCE_ROOT";
     private const string PublicDisabledArtifactIdsKey = "CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS";
     private const string ReleaseDisabledArtifactIdsKey = "CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS";
+    private const string ReleaseRevokedArtifactIdsKey = "CHUMMER_RELEASE_REVOKED_ARTIFACT_IDS";
     private const string ReleaseRevokedSha256Key = "CHUMMER_RELEASE_REVOKED_SHA256";
     private const string DefaultDownloadsRoot = "/downloads-source";
     private const string SigningReceiptContractName = "chummer6-ui.desktop_artifact_signing";
@@ -37,6 +38,14 @@ public sealed class WindowsProofInstallerService
             _configuration[LegacyShelfFallbackKey]?.Trim(),
             "true",
             StringComparison.OrdinalIgnoreCase);
+
+    public string? ResolveKnownInstallerArtifactId(string? fileName)
+    {
+        string normalizedFileName = NormalizeFileName(fileName);
+        string? allowedFileName = PreferredFileNames.FirstOrDefault(candidate =>
+            string.Equals(candidate, normalizedFileName, StringComparison.OrdinalIgnoreCase));
+        return allowedFileName is null ? null : ResolveArtifactId(allowedFileName);
+    }
 
     public WindowsProofInstallerService(IConfiguration configuration)
         : this(configuration, new ReleaseShelfGenerationStore(configuration), proofStore: null)
@@ -816,6 +825,7 @@ public sealed class WindowsProofInstallerService
         HashSet<string> disabledArtifactIds = new(StringComparer.OrdinalIgnoreCase);
         AddDisabledArtifacts(disabledArtifactIds, _configuration[PublicDisabledArtifactIdsKey]);
         AddDisabledArtifacts(disabledArtifactIds, _configuration[ReleaseDisabledArtifactIdsKey]);
+        AddDisabledArtifacts(disabledArtifactIds, _configuration[ReleaseRevokedArtifactIdsKey]);
         return disabledArtifactIds.Contains(artifactId.Trim());
     }
 

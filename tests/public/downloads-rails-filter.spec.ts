@@ -35,8 +35,10 @@ test('windows users see only stable and nightly in the primary downloads rail', 
   await page.locator('#other-downloads > summary').click();
   await expect(otherSection).toBeVisible();
   await expect(otherSection).toBeInViewport();
-  await expect(otherSection.locator('article#linux-source')).toBeVisible();
-  await expect(otherSection.locator('a.button-like', { hasText: 'Download script' })).toBeVisible();
+  const sourceBuild = page.locator('#source-build');
+  await expect(sourceBuild).toHaveAttribute('open', '');
+  await expect(sourceBuild.locator('article#linux-source')).toBeVisible();
+  await expect(sourceBuild.locator('a.button-like', { hasText: 'Download script' })).toBeVisible();
 
   await page.close();
 });

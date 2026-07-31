@@ -35,7 +35,7 @@ def test_public_edge_forwards_origin_provider_registry_and_visual_runtime_env() 
 
     for snippet in (
         "CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS: ${CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS:-audio.chummer.run,audiobookshelf.chummer.run,audiobookshelf.girschele.com}",
-        "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-}",
+        "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-/app/state/origin-provider-accounts.json}",
         "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY:-}",
         "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES:-}",
         "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES:-}",
@@ -51,6 +51,8 @@ def test_public_edge_forwards_origin_provider_registry_and_visual_runtime_env() 
         "CHUMMER_RENDER_POOL_PROVIDER_TOKENS: ${CHUMMER_RENDER_POOL_PROVIDER_TOKENS:-}",
     ):
         assert snippet in source
+
+    assert ".state/origin-provider-accounts.json:/app/state/origin-provider-accounts.json:ro" in source
 
 
 def test_env_example_documents_origin_publication_index_path() -> None:

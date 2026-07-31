@@ -30,8 +30,8 @@ test('onramp public route stays available and points at the signed-in starter de
 
   await page.goto(`${baseUrl}/onramp`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'ONRAMP', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('ONRAMP now ships a bounded first-party starter lane');
-  await expect(page.locator('body')).toContainText('Signed-in starter desk');
+  await expect(page.locator('body')).toContainText('ONRAMP keeps first-session setup calm');
+  await expect(page.locator('body')).toContainText('Signed-in workspace');
   await expect(page.locator('body')).toContainText('Guided starter surface only.');
 
   writeJsonArtifact('ONRAMP_ROUTE_PROOF.generated.json', {

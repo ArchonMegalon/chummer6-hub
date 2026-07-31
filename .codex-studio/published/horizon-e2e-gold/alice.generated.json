@@ -1,0 +1,28 @@
+{
+  "assertion_count": 13,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "chummer_owns_compare_apply",
+    "no_assistant_legality",
+    "no_silent_runner_mutation",
+    "private_handoff_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "login_location": "/login?next=%2Faccount%2Falice%2Fopen",
+    "receipt_route": "/alice/receipts/build-ghost.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:31.461Z",
+  "horizon_id": "alice",
+  "journey_steps": [
+    "load public compare receipt",
+    "render character-help surface",
+    "inspect signed-in handoff",
+    "verify unauthenticated access boundary"
+  ],
+  "receipt_route": "/alice/receipts/build-ghost.json",
+  "route": "/alice",
+  "status": "pass",
+  "verdict": "GOLD"
+}

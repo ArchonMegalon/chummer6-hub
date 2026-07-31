@@ -1,0 +1,366 @@
+{
+  "all_horizons_gold": true,
+  "base_url": "https://chummer.run",
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold_matrix/v1",
+  "failures": [],
+  "generated_at_utc": "2026-07-31T21:54:36Z",
+  "horizons": [
+    {
+      "assertion_count": 13,
+      "boundaries_verified": [
+        "chummer_owns_compare_apply",
+        "no_assistant_legality",
+        "no_silent_runner_mutation",
+        "private_handoff_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/alice.generated.json",
+      "evidence_sha256": "c476042c55bdf331f75a44246375f89e4c49d6f9b6f403bef24a4f2a47011b92",
+      "failures": [],
+      "id": "alice",
+      "journey_steps": [
+        "load public compare receipt",
+        "render character-help surface",
+        "inspect signed-in handoff",
+        "verify unauthenticated access boundary"
+      ],
+      "owning_repos": [
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-hub"
+      ],
+      "receipt_route": "/alice/receipts/build-ghost.json",
+      "route": "/alice",
+      "status": "pass",
+      "title": "ALICE",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 15,
+      "boundaries_verified": [
+        "approved_story_is_chummer_owned",
+        "no_silent_mechanics_mutation",
+        "provider_output_not_truth",
+        "private_dossier_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/origin-dossier.generated.json",
+      "evidence_sha256": "c62ae70fdc15b96f8d6ef6e3521a4f52753f179b6f49909147e58273e7864f06",
+      "failures": [],
+      "id": "origin-dossier",
+      "journey_steps": [
+        "load story-network receipt",
+        "render origin surface",
+        "open first-party story edition",
+        "download ebook PDF",
+        "verify private library identity boundary"
+      ],
+      "owning_repos": [
+        "chummer6-ui",
+        "chummer6-core",
+        "chummer6-hub",
+        "chummer6-media-factory"
+      ],
+      "receipt_route": "/origin-dossier/receipts/story-network.json",
+      "route": "/origin-dossier",
+      "status": "pass",
+      "title": "ORIGIN DOSSIER",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 13,
+      "boundaries_verified": [
+        "no_public_rules_truth_claim",
+        "approval_stays_chummer_owned",
+        "roadmap_stays_separate",
+        "discovery_handoff_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/karma-forge.generated.json",
+      "evidence_sha256": "3f74785a91db3db1b2a39066942a5a30cc11f31113eea4613178d72ca2fe3e20",
+      "failures": [],
+      "id": "karma-forge",
+      "journey_steps": [
+        "load discovery-network receipt",
+        "render first-party intake",
+        "verify form exists",
+        "verify governed discovery handoff requires identity"
+      ],
+      "owning_repos": [
+        "chummer6-core",
+        "chummer6-hub",
+        "chummer6-hub-registry"
+      ],
+      "receipt_route": "/participate/karma-forge/receipts/discovery-network.json",
+      "route": "/participate/karma-forge",
+      "status": "pass",
+      "title": "KARMA FORGE",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 14,
+      "boundaries_verified": [
+        "answer_has_provenance",
+        "public_route_is_source_safe",
+        "official_text_not_dumped",
+        "private_campaign_data_excluded"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/knowledge-fabric.generated.json",
+      "evidence_sha256": "b05e9db0d4176a3e099268d399f670dfefb2a1957171361f8905ea896355c047",
+      "failures": [],
+      "id": "knowledge-fabric",
+      "journey_steps": [
+        "load explanation index",
+        "select a live receipt",
+        "open cited answer JSON",
+        "render source-safe rules surface"
+      ],
+      "owning_repos": [
+        "chummer6-core",
+        "chummer6-hub",
+        "chummer6-ui"
+      ],
+      "receipt_route": "/rules/explanations",
+      "route": "/rules",
+      "status": "pass",
+      "title": "KNOWLEDGE FABRIC",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 14,
+      "boundaries_verified": [
+        "public_packets_are_player_safe",
+        "publication_truth_is_chummer_owned",
+        "gm_spoilers_stay_private",
+        "media_handoff_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/jackpoint.generated.json",
+      "evidence_sha256": "4268926ec9d889217c80b5ba155969dcb25097ce74ef71ac78baed1c582c6c22",
+      "failures": [],
+      "id": "jackpoint",
+      "journey_steps": [
+        "load briefing-network receipt",
+        "render public desk",
+        "open markdown briefing",
+        "open JSON briefing",
+        "verify narrated media identity boundary"
+      ],
+      "owning_repos": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "chummer6-media-factory"
+      ],
+      "receipt_route": "/jackpoint/receipts/briefing-network.json",
+      "route": "/jackpoint",
+      "status": "pass",
+      "title": "JACKPOINT",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 16,
+      "boundaries_verified": [
+        "provider_not_world_truth",
+        "viewer_not_tactical_truth",
+        "route_truth_is_first_party",
+        "external_handoff_is_receipted"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/black-ledger.generated.json",
+      "evidence_sha256": "eef6a77dbf66da87d9c1511d92b7681a4c4b91e1227e4b0a87a789eaa6cad68b",
+      "failures": [],
+      "id": "black-ledger",
+      "journey_steps": [
+        "load viewer-network receipt",
+        "render city board",
+        "request governed 3D viewer",
+        "verify provider allowlist and request receipt"
+      ],
+      "owning_repos": [
+        "chummer6-hub",
+        "chummer6-core",
+        "chummer6-ui",
+        "chummer6-mobile",
+        "chummer6-media-factory",
+        "chummer6-hub-registry",
+        "executive-assistant"
+      ],
+      "receipt_route": "/ledger/receipts/viewer-network.json",
+      "route": "/ledger",
+      "status": "pass",
+      "title": "BLACK LEDGER",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 15,
+      "boundaries_verified": [
+        "pack_remains_inspectable",
+        "no_tactical_authority",
+        "not_a_vtt_replacement",
+        "tour_handoff_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/runsite.generated.json",
+      "evidence_sha256": "5dd3a2789d549fd8a3f1230c2210c8649c46650f77317c0985267f00e4d3e611",
+      "failures": [],
+      "id": "runsite",
+      "journey_steps": [
+        "load prep-network receipt",
+        "render prep board",
+        "open JSON pack",
+        "open markdown pack",
+        "verify tour identity boundary"
+      ],
+      "owning_repos": [
+        "chummer6-hub",
+        "chummer6-media-factory"
+      ],
+      "receipt_route": "/runsites/receipts/prep-network.json",
+      "route": "/runsites",
+      "status": "pass",
+      "title": "RUNSITE",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 15,
+      "boundaries_verified": [
+        "primer_source_is_chummer_owned",
+        "full_publication_studio_not_claimed",
+        "provider_not_truth",
+        "formatted_export_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/runbook-press.generated.json",
+      "evidence_sha256": "8f9e65d483278972abcca25fc773bec6aee8a297361edfcbb41e30d3cde62692",
+      "failures": [],
+      "id": "runbook-press",
+      "journey_steps": [
+        "load primer-network receipt",
+        "render primer shelf",
+        "open JSON primer",
+        "open markdown primer",
+        "verify export identity boundary"
+      ],
+      "owning_repos": [
+        "chummer6-hub",
+        "chummer6-hub-registry",
+        "chummer6-media-factory"
+      ],
+      "receipt_route": "/runbook/receipts/primer-network.json",
+      "route": "/runbook",
+      "status": "pass",
+      "title": "RUNBOOK PRESS",
+      "verdict": "GOLD"
+    },
+    {
+      "assertion_count": 14,
+      "boundaries_verified": [
+        "live_and_aftermath_separate",
+        "no_automatic_world_changes",
+        "no_player_scoring",
+        "no_public_surveillance",
+        "aftermath_requires_identity"
+      ],
+      "claim_scope": "registered_shipped_mvp_public_journey",
+      "evidence_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/horizon-e2e-gold/table-pulse.generated.json",
+      "evidence_sha256": "5a0a975c222e503f5cfa932ed227c6ba8e4e10c66aa65563ca13ff7a4576a916",
+      "failures": [],
+      "id": "table-pulse",
+      "journey_steps": [
+        "load live-and-aftermath receipt",
+        "render separated rails",
+        "inspect private debrief handoff",
+        "verify identity boundary"
+      ],
+      "owning_repos": [
+        "chummer6-hub",
+        "chummer6-media-factory"
+      ],
+      "receipt_route": "/table-pulse/receipts/live-and-aftermath.json",
+      "route": "/table-pulse",
+      "status": "pass",
+      "title": "TABLE PULSE",
+      "verdict": "GOLD"
+    }
+  ],
+  "proof_boundaries": {
+    "does_not_prove_without_separate_receipts": [
+      "future roadmap capabilities outside registered shipped-MVP scope",
+      "authenticated owner flows when no governed test identity is available",
+      "native desktop behavior on operating systems not executing this browser lane",
+      "external provider generation or delivery beyond the verified handoff boundary"
+    ],
+    "proves": [
+      "fresh rendered-browser execution for every registered shipped-MVP public journey",
+      "first-party receipt and artifact routes used by those journeys",
+      "identity, authority, privacy, and non-claim boundaries asserted by each journey"
+    ]
+  },
+  "registry_path": "/docker/chummercomplete/chummer.run-services/.codex-design/product/HORIZON_REGISTRY.yaml",
+  "required_horizon_ids": [
+    "alice",
+    "origin-dossier",
+    "karma-forge",
+    "knowledge-fabric",
+    "jackpoint",
+    "black-ledger",
+    "runsite",
+    "runbook-press",
+    "table-pulse"
+  ],
+  "runner": {
+    "command": [
+      "/usr/bin/node",
+      "node_modules/playwright/cli.js",
+      "test",
+      "--config",
+      "playwright.config.ts",
+      "tests/public/horizon-e2e-gold.spec.ts",
+      "--reporter=json"
+    ],
+    "finished_at_utc": "2026-07-31T21:54:36Z",
+    "parse_failure": "",
+    "returncode": 0,
+    "started_at_utc": "2026-07-31T21:54:27Z",
+    "stats": {
+      "duration_ms": 8087,
+      "expected": 9,
+      "flaky": 0,
+      "skipped": 0,
+      "unexpected": 0
+    },
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_tail": "",
+    "stdout_sha256": "5138073f30b808f2f1e77f4a953ccce69ad1358334e99f2908622d99b2394b1f",
+    "timed_out": false
+  },
+  "source_inputs": {
+    "browser_spec": {
+      "path": "/docker/chummercomplete/chummer.run-services/tests/public/horizon-e2e-gold.spec.ts",
+      "sha256": "0ff40d7aa5bef940c04d685d6ce32d5560022c492283bd225bb1c06b6ab5ecd0"
+    },
+    "materializer": {
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/materialize_horizon_e2e_gold_matrix.py",
+      "sha256": "87fe15fc8c83e3318ff433cbb051ab9d4f84a9e37a9b27c9bc7b741460855cae"
+    },
+    "playwright_config": {
+      "path": "/docker/chummercomplete/chummer.run-services/playwright.config.ts",
+      "sha256": "f6c3286bc7b440dec6bd6764ce5c28301e09ad0794ca532932012954abecf778"
+    },
+    "registry": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-design/product/HORIZON_REGISTRY.yaml",
+      "sha256": "02f341b0740d557ce54eaef0150b86af9292acdbce35a1a0086ce948b825c9b6"
+    }
+  },
+  "status": "pass",
+  "summary": {
+    "assertion_count": 129,
+    "expected_count": 9,
+    "failed_count": 0,
+    "gold_count": 9,
+    "horizon_count": 9
+  },
+  "verdict": "HORIZON_PORTFOLIO_GOLD"
+}

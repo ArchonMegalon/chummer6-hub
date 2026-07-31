@@ -1,42 +1,40 @@
 # Next Session Handoff
 
-Updated: 2026-07-30T05:28:31+02:00
+Updated: 2026-07-31T20:32:02+02:00
 
-## Handoff refresh (2026-07-30T05:28:31+02:00)
+## Handoff refresh (2026-07-31T20:32:02+02:00)
 
 - Canonical live handoffs for the release/controller lane are:
   - `/docker/chummercomplete/CODEX_HANDOFF_2026-07-06.md`
   - `/docker/chummercomplete/chummer.run-services/NEXT_SESSION_HANDOFF.md`
   - Repo-local deploy and scratch NEXT_SESSION_HANDOFF.md files are mirrors or stale history; do not treat them as release truth.
 - Current root blocker truth is now:
-  - `registry_release_channel`
   - `release_posture:non_flagship_channel`
-  - `proof:desktop_executable_exit_gate`
-  - `proof:desktop_gold_gate`
   - `proof:user_journey_tester_audit`
   - `proof:core_release_receipts`
+  - `release_truth:public_edge_postdeploy_gate`
   - `release_truth:release_ready`
   - `release_truth:google_oauth_linking_proof`
   - `release_truth:windows_installer_visual_audit`
   - `blocked_route:avalonia:macos:osx-arm64`
 - Current authoritative receipts:
   - `RELEASE_BLOCKERS.generated.json`
-    - `generated_at=2026-07-30T03:30:54Z`
+    - `generated_at=2026-07-31T18:35:08Z`
     - `load_status=loaded`
     - `release_posture:non_flagship_channel` now includes:
-      - `stable_promotion_command=RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260712-174412 RELEASE_PUBLISHED_AT=2026-07-12T18:46:26Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads`
+      - `stable_promotion_command=RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260731-095000 RELEASE_PUBLISHED_AT=2026-07-31T07:59:45Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads`
       - stable promotion guard: The public_stable publisher fails closed unless RELEASE_BLOCKERS.generated.json is fresh and contains no root blockers other than release_posture:non_flagship_channel.
       - `stable_promotion_guard_max_age_seconds=86400`
       - `stable_promotion_guard_env=CHUMMER_PUBLIC_STABLE_BLOCKERS_MAX_AGE_SECONDS`
       - `post_promotion_verify_command=python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && python3 scripts/materialize_operator_release_dashboard.py && python3 scripts/final_gold_janitor.py && python3 ../scripts/release/_release_gate_common.py && python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp "$(date --iso-8601=seconds)"`
   - `chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:34Z`
+    - `generated_at_utc=2026-07-31T18:34:45Z`
     - `status=fail`
     - stale source digest still recorded: `80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a`
-    - promoted digest still required: `d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca`
-    - missing gold-proof bundle path: `/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip`
+    - promoted digest still required: `17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d`
+    - missing gold-proof bundle path: `/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip`
   - `chummer.run-services/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:54Z`
+    - `generated_at_utc=2026-07-31T18:35:08Z`
     - `status=waiting_for_artifact`
     - `actionable_candidate_count=0`
     - `all_discovery_roots_checked=/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof; /tmp; ~/Downloads; ~/pCloud Drive/EA`
@@ -48,30 +46,25 @@ Updated: 2026-07-30T05:28:31+02:00
     - `stage_startup_smoke_receipt_count=0`
     - `matching_promoted_stage_startup_smoke_receipt_count=0`
   - `chummer.run-services/.state/windows_installer_gold_proof_watcher.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:54Z`
+    - `generated_at_utc=2026-07-31T18:35:08Z`
     - `status=not_running`
     - `pid=missing`
     - `process_alive=False`
     - `matching_process_count=0`
     - `duplicate_process_count=0`
     - watcher sees `auto_import_receipt_status=waiting_for_artifact`
-    - watcher sees `auto_import_receipt_generated_at_utc=2026-07-30T03:30:54Z`
-  - Windows proof operator ask currentness (advisory only; not a root blocker):
-    - latest delivery receipt does not match the current ask text yet
-    - `generated_at_utc=2026-07-28T04:54:26Z`
-    - `message_ids=4848`
-    - resend is still required before reusing the current ask delivery receipt
+    - watcher sees `auto_import_receipt_generated_at_utc=2026-07-31T18:35:08Z`
   - `chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:26Z`
+    - `generated_at_utc=2026-07-31T18:34:37Z`
     - `release_lane_posture` now carries the exact stable promotion command and post-promotion verify chain
   - `chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:26Z`
+    - `generated_at_utc=2026-07-31T18:34:37Z`
     - `release_lane_posture` now carries the exact stable promotion command and post-promotion verify chain
   - `chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json`
-    - `generated_at_utc=2026-07-30T03:30:56Z`
+    - `generated_at_utc=2026-07-31T18:35:10Z`
     - `status=fail`
     - `verdict=NOT_FLAGSHIP_PRODUCT_READY`
-    - `launch_critical_nested_blocker_count=75`
+    - `launch_critical_nested_blocker_count=69`
     - `coverage_gap_keys=desktop_client`
   - published markdown surfaces still split the hint families cleanly:
     - `RELEASE_BLOCKERS.generated.md`

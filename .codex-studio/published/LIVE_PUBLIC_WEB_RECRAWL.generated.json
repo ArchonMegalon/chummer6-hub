@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-07-30T03:12:35Z",
+  "generated_at_utc": "2026-07-31T21:54:03Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -20,7 +20,7 @@
       "path": "/",
       "url": "https://chummer.run/",
       "status_code": 200,
-      "sha256": "e960b97a30069068bab7d634c497261878f63e6ae35ea1cba9be8018370c3565",
+      "sha256": "47b92776db534757195fc0e1a3ad60e2948a37b9d3e2b72df4c31a5fc47029c5",
       "excerpt": "Chummer \u2014 Shadowrun character manager \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Linux\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/\",\"description\":\"Desktop character manager for Shadowrun.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; }",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -29,8 +29,8 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "aa8deaaf88a464a131212e734b444bf7caa919bac62c1d0c0194a8b39b430057",
-      "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current Chummer release status.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function ()",
+      "sha256": "0376b979a48dfda9043aad1c0e4eeee3cefa3d8c7134edeb893a10a47f264fdf",
+      "excerpt": "Status \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"Status\",\"url\":\"https://chummer.run/status\",\"description\":\"Current Chummer release and service status.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit =",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -38,7 +38,7 @@
       "path": "/downloads",
       "url": "https://chummer.run/downloads",
       "status_code": 200,
-      "sha256": "e3ed52dc74e31e22730962a799b2b6b7e85440c0dfba254683aac4cde28833f1",
+      "sha256": "150d4f9fa27234936186fd5b4db7126b9b1edc7cd9e860ebd97b7c2418e19a57",
       "excerpt": "Downloads \u00b7 Chummer {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Chummer\",\"operatingSystem\":\"Linux\",\"applicationCategory\":\"GameApplication\",\"url\":\"https://chummer.run/downloads\",\"description\":\"Current Chummer installers and platform availability.\"} (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit =",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -47,8 +47,8 @@
       "path": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
-      "sha256": "596dec7f22abc6367e1a7b03788abe7ea831c364ae8b9581ee18641f5d479632",
-      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map with live district overlays.",
+      "sha256": "4332679d4dcee19cc1d3c75edea1ffbb3cc764167f67845b87aba3110aa5cfab",
+      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Install Chummer on Windows The public globe page shows the Black Ledger command map with live district",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -56,8 +56,8 @@
       "path": "/ledger/map",
       "url": "https://chummer.run/ledger/map",
       "status_code": 200,
-      "sha256": "02e62ec32c63bfa8d3df6d1c2ec01b93a20421504a1abf6cb891639993c2a0bc",
-      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map with live district overlays.",
+      "sha256": "594b61ffdbcb114a7b3d26a0a10c08709bd2e911615bb81f51aa022e1c1b0552",
+      "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Install Chummer on Windows The public globe page shows the Black Ledger command map with live district",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -65,8 +65,8 @@
       "path": "/ledger/factions",
       "url": "https://chummer.run/ledger/factions",
       "status_code": 200,
-      "sha256": "1be42b40660527c51eb65821ac0e27034d017673d1a88d47ddd02f7c27d35e02",
-      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map",
+      "sha256": "bc9dd171d451da86f600747f6188b716542eb0d7e04dc3773cd8f5327bcf6096",
+      "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Install Chummer on Windows The public globe page shows the Black Ledger command",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     },
@@ -74,8 +74,8 @@
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
       "status_code": 200,
-      "sha256": "adb287ea46f1ae363392aa0334b61ba8e6a5c9b1f16e5a52da2e45fae6d2860a",
-      "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Request early access The public globe page shows the Black Ledger command map",
+      "sha256": "b09c33d4fa9b73b2d4000228499ff359d02bdeecdb46070e8ec5f6b67eabdc45",
+      "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Build Help Open Chummer Build Play Sign in first Install Chummer on Windows The public globe page shows the Black Ledger command",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
     }

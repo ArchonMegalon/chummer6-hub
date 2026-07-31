@@ -231,6 +231,39 @@ public sealed class ArtifactDeliveryPolicy
         return new ArtifactDeliveryDecision(true, ArtifactDeliveryFailure.None, "allowed");
     }
 
+    public ArtifactDeliveryDecision EvaluateGlobalArtifactIdRevocation(string? artifactId)
+    {
+        string normalizedId = (artifactId ?? string.Empty).Trim();
+        if (normalizedId.Length == 0
+            || normalizedId.Length > 128
+            || !normalizedId.All(static character => char.IsAsciiLetterOrDigit(character)
+                || character is '-' or '_' or '.'))
+        {
+            return new ArtifactDeliveryDecision(
+                false,
+                ArtifactDeliveryFailure.InvalidContract,
+                "artifact_delivery_contract_invalid");
+        }
+
+        if (!TryLoadGlobalRevocations(out ArtifactRevocationSet? revocations))
+        {
+            return new ArtifactDeliveryDecision(
+                false,
+                ArtifactDeliveryFailure.RevocationTruthUnavailable,
+                "artifact_revocation_truth_unavailable");
+        }
+
+        if (revocations!.AllArtifactsRevoked || revocations.ArtifactIds.Contains(normalizedId))
+        {
+            return new ArtifactDeliveryDecision(
+                false,
+                ArtifactDeliveryFailure.Revoked,
+                "artifact_revoked");
+        }
+
+        return new ArtifactDeliveryDecision(true, ArtifactDeliveryFailure.None, "allowed");
+    }
+
     public IReadOnlyList<InstallBootstrapArtifactBinding> BuildCredentialBindings(
         ReleaseShelfSnapshot snapshot,
         IEnumerable<PublicReleaseArtifactDto> artifacts)

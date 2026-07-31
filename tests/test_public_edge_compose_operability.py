@@ -112,6 +112,83 @@ class PublicEdgeComposeOperabilityTests(unittest.TestCase):
             module.validate_compose(payload),
         )
 
+    def test_portal_waits_for_healthy_internal_prometheus(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        payload["services"]["chummer-portal"]["depends_on"][
+            "chummer-observability-prometheus"
+        ]["condition"] = "service_started"
+
+        self.assertIn(
+            "chummer-portal dependency chummer-observability-prometheus must require service_healthy",
+            module.validate_compose(payload),
+        )
+
+    def test_prometheus_is_immutable_non_root_internal_only_and_otlp_enabled(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        service = payload["services"]["chummer-observability-prometheus"]
+        service["image"] = "prom/prometheus:latest"
+        service["user"] = "0:0"
+        service["ports"] = ["9090:9090"]
+        service["command"].remove("--web.enable-otlp-receiver")
+
+        failures = module.validate_compose(payload)
+
+        self.assertTrue(any("immutable supported runtime pin" in item for item in failures))
+        self.assertIn(
+            "chummer-observability-prometheus must run as uid/gid 65532",
+            failures,
+        )
+        self.assertIn(
+            "chummer-observability-prometheus must not publish a host port",
+            failures,
+        )
+        self.assertTrue(any("--web.enable-otlp-receiver" in item for item in failures))
+
+    def test_alertmanager_is_immutable_non_root_internal_only_and_secret_file_bound(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        service = payload["services"]["chummer-observability-alertmanager"]
+        service["image"] = "prom/alertmanager:latest"
+        service["user"] = "0:0"
+        service["ports"] = ["9093:9093"]
+        service["volumes"] = [
+            volume
+            for volume in service["volumes"]
+            if not isinstance(volume, dict)
+        ]
+
+        failures = module.validate_compose(payload)
+
+        self.assertTrue(any("immutable supported runtime pin" in item for item in failures))
+        self.assertIn(
+            "chummer-observability-alertmanager must run as the governed non-root uid/gid",
+            failures,
+        )
+        self.assertIn(
+            "chummer-observability-alertmanager must not publish a host port",
+            failures,
+        )
+        self.assertIn(
+            "chummer-observability-alertmanager must mount the governed secret directory read-only",
+            failures,
+        )
+
+    def test_portal_otlp_binding_cannot_be_removed(self) -> None:
+        module = load_module()
+        payload = copy.deepcopy(module.load_compose())
+        del payload["services"]["chummer-portal"]["environment"][
+            "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+        ]
+
+        self.assertTrue(
+            any(
+                "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT" in failure
+                for failure in module.validate_compose(payload)
+            )
+        )
+
     def test_cloudflared_probe_must_verify_an_active_tunnel(self) -> None:
         module = load_module()
         payload = copy.deepcopy(module.load_compose())

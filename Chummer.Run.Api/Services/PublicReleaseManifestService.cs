@@ -1260,7 +1260,8 @@ public sealed class PublicReleaseManifestService
                 PayloadFileName: item.PayloadFileName,
                 PayloadDownloadUrl: item.PayloadDownloadUrl,
                 PayloadSha256: item.PayloadSha256,
-                PayloadSizeBytes: item.PayloadSizeBytes))
+                PayloadSizeBytes: item.PayloadSizeBytes,
+                PayloadAcquisitionMode: item.PayloadAcquisitionMode))
             .ToList();
 
         var status = NormalizeOptional(parsed.Status)
@@ -3344,7 +3345,8 @@ public sealed class PublicReleaseManifestService
         string? PayloadFileName,
         string? PayloadDownloadUrl,
         string? PayloadSha256,
-        long? PayloadSizeBytes);
+        long? PayloadSizeBytes,
+        string? PayloadAcquisitionMode);
 
     private sealed record LocalReleaseProof(
         [property: JsonPropertyName("contract_name")] string? ContractName,

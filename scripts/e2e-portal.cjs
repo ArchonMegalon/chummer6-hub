@@ -135,7 +135,7 @@ const currentDownloadShelfRequirements = [
       || text.includes('Stable release')
       || text.includes('Current public build'),
   ],
-  ['operator-facing Nightly label must stay absent', text => !text.includes('Nightly')],
+  ['Nightly lane', text => text.includes('Nightly')],
   ['version label', text => text.includes('Version ')],
   ['source-build option', text => text.includes('Build from source')],
   ['download-script label', text => text.includes('Download script')],

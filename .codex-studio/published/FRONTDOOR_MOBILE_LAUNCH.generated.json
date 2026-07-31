@@ -1,0 +1,24 @@
+{
+  "generated_at_utc": "2026-06-30T04:04:30.673Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "homepage_overflow_x": 0,
+  "build_route": "/build",
+  "effective_build_route": "https://chummer.run/app?command=character_roster",
+  "play_route": "/play",
+  "account_route": "/login?next=%2Faccount%2Faccess",
+  "effective_launches": [
+    {
+      "route": "/build",
+      "heading": "Character Roster"
+    },
+    {
+      "route": "/play",
+      "heading": "Player entry"
+    }
+  ]
+}

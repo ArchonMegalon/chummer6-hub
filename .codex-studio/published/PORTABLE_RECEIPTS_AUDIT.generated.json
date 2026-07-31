@@ -1,9 +1,9 @@
 {
   "contract_name": "chummer.run.portable_receipts_audit",
   "status": "pass",
-  "generated_at": "2026-07-28T05:16:10.952664Z",
+  "generated_at": "2026-07-31T21:32:38.202279Z",
   "summary": "Portable receipts audit passed. Published proof artifacts do not embed machine-specific home paths.",
-  "scanned_artifact_count": 915,
+  "scanned_artifact_count": 939,
   "machine_specific_hits": [],
   "machine_specific_path_hits": [],
   "artifact_integrity_hits": [],

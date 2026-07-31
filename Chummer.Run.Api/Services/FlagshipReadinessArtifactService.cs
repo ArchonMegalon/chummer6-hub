@@ -86,7 +86,7 @@ public sealed class FlagshipReadinessArtifactService
         ];
 
         bool hasWorkspaceCandidate = candidates.Any(File.Exists);
-        if (!hasWorkspaceCandidate)
+        if (!hasWorkspaceCandidate && string.IsNullOrWhiteSpace(configuredFallbackPath))
         {
             candidates.AddRange(
                 new[]
@@ -96,14 +96,14 @@ public sealed class FlagshipReadinessArtifactService
                 });
         }
 
-        candidates.AddRange(
-            new string?[]
-            {
-                !string.IsNullOrWhiteSpace(configuredFallbackPath) ? Path.GetFullPath(configuredFallbackPath) : null,
-                DefaultFleetReadinessPath
-            }
-            .OfType<string>()
-            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate)));
+        if (!string.IsNullOrWhiteSpace(configuredFallbackPath))
+        {
+            candidates.Add(Path.GetFullPath(configuredFallbackPath));
+        }
+        else
+        {
+            candidates.Add(DefaultFleetReadinessPath);
+        }
 
         string[] distinctCandidates = candidates
             .Distinct(StringComparer.OrdinalIgnoreCase)

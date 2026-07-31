@@ -72,6 +72,20 @@ def url_file_name(value: str) -> str:
     return Path(parsed.path).name
 
 
+def is_governed_payload_role_url(value: str) -> bool:
+    parsed = urlparse(value)
+    parts = [part for part in parsed.path.split("/") if part]
+    return (
+        len(parts) == 6
+        and parts[0] == "downloads"
+        and parts[1] == "g"
+        and bool(parts[2])
+        and parts[3] == "install"
+        and bool(parts[4])
+        and parts[5] == "payload"
+    )
+
+
 def is_https_download_url(value: str) -> bool:
     parsed = urlparse(value)
     return parsed.scheme.lower() == "https" and bool(parsed.netloc)
@@ -284,7 +298,10 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
             failures.append("manifest installerMode=bootstrap is missing payloadSizeBytes")
         if manifest_row.payload_file_name and manifest_row.payload_download_url:
             download_file_name = url_file_name(manifest_row.payload_download_url)
-            if download_file_name != manifest_row.payload_file_name:
+            if (
+                not is_governed_payload_role_url(manifest_row.payload_download_url)
+                and download_file_name != manifest_row.payload_file_name
+            ):
                 failures.append(
                     f"manifest payloadDownloadUrl file name {download_file_name or '<empty>'} does not match payloadFileName {manifest_row.payload_file_name}"
                 )
@@ -385,11 +402,19 @@ def validate_bootstrap_installer_metadata(
 
     installer_bytes = installer_path.read_bytes()
     required_values = {
-        "payloadDownloadUrl": payload_download_url,
         "payloadSha256": payload_sha256,
         "payloadSizeBytes": str(payload_size_bytes),
     }
     failures: list[str] = []
+    if payload_download_url.encode("utf-8") not in installer_bytes:
+        parsed = urlparse(payload_download_url)
+        compatibility_url = (
+            f"{parsed.scheme}://{parsed.netloc}/downloads/files/{Path(candidate.source).name}"
+            if is_governed_payload_role_url(payload_download_url) and parsed.scheme and parsed.netloc
+            else ""
+        )
+        if not compatibility_url or compatibility_url.encode("utf-8") not in installer_bytes:
+            failures.append("bootstrap installer does not contain embedded payloadDownloadUrl metadata")
     for label, value in required_values.items():
         if value.encode("utf-8") not in installer_bytes:
             failures.append(f"bootstrap installer does not contain embedded {label} metadata")

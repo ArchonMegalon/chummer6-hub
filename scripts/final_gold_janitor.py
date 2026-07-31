@@ -621,7 +621,7 @@ PUBLIC_EDGE_REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/player",
         "manifest_path": "/manifest.player.webmanifest",
         "manifest_id": "/mobile/player",
-        "manifest_start_url": "/mobile/player?role=Player",
+        "manifest_start_url": "/mobile/player",
         "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
         "frontdoor_default": True,
     },
@@ -630,7 +630,7 @@ PUBLIC_EDGE_REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/gm",
         "manifest_path": "/manifest.gm.webmanifest",
         "manifest_id": "/mobile/gm",
-        "manifest_start_url": "/mobile/gm?role=GameMaster",
+        "manifest_start_url": "/mobile/gm",
         "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
         "frontdoor_default": False,
     },
@@ -647,8 +647,8 @@ PUBLIC_EDGE_REQUIRED_MOBILE_PWA_VIEWPORT_COUNT = 3
 PUBLIC_EDGE_REQUIRED_PARTICIPATE_IFRAME_ROUTES = 2
 PUBLIC_EDGE_REQUIRED_PWA_MANIFEST_COUNT = 3
 PUBLIC_EDGE_REQUIRED_ROLE_PWA_MANIFESTS = {
-    "Player": ("/manifest.player.webmanifest", "/mobile/player", "/mobile/player?role=Player"),
-    "GameMaster": ("/manifest.gm.webmanifest", "/mobile/gm", "/mobile/gm?role=GameMaster"),
+    "Player": ("/manifest.player.webmanifest", "/mobile/player", "/mobile/player"),
+    "GameMaster": ("/manifest.gm.webmanifest", "/mobile/gm", "/mobile/gm"),
 }
 PUBLIC_EDGE_MINIMUM_PWA_ASSET_COUNT = 1
 
@@ -1252,7 +1252,7 @@ def final_gold_root_blocker_families(
             {
                 "id": "google_oauth_operator_evidence",
                 "kind": "external_operator_evidence",
-                "summary": "Browser-backed Google OAuth linking evidence is still missing.",
+                "summary": "Browser-backed Google OAuth linking evidence is still missing or invalid.",
                 "blocking_checks": ["google_oauth_linking_proof", "flagship_product_readiness", "release_ready"],
                 "details": google_details,
                 "required_path": str(google_request.get("required_operator_evidence_path") or "").strip(),
@@ -3184,7 +3184,12 @@ def google_oauth_operator_evidence_missing_failure(
     if not failure_reasons:
         failure_reasons = normalized_string_list(payload.get("failures"))
 
-    if not any("missing operator evidence receipt" in reason.casefold() for reason in failure_reasons):
+    explicitly_missing = any(
+        "missing operator evidence receipt" in reason.casefold()
+        for reason in failure_reasons
+    )
+    operator_action_required = request_artifacts.get("operator_action_still_required") is True
+    if operator_evidence.get("pass") is True or not explicitly_missing and not operator_action_required:
         return None
 
     evidence_path = str(
@@ -3192,9 +3197,10 @@ def google_oauth_operator_evidence_missing_failure(
         or request_artifacts.get("required_operator_evidence_path")
         or ""
     ).strip()
+    disposition = "is still missing" if explicitly_missing else "is missing or invalid"
     if evidence_path:
-        return f"google oauth operator evidence is still missing: {evidence_path}"
-    return "google oauth operator evidence is still missing"
+        return f"google oauth operator evidence {disposition}: {evidence_path}"
+    return f"google oauth operator evidence {disposition}"
 
 
 def google_oauth_operator_ask_resend_failure(

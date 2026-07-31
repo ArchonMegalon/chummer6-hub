@@ -359,10 +359,37 @@
 
 <section class="minimal-section minimal-section--tight" id="origin-edition-watch" data-origin-edition-tab="watch">
     <article class="app-action-card"
-             data-origin-scene-highlight-count="@sceneHighlights.Count">
+             data-origin-scene-highlight-count="@sceneHighlights.Count"
+             data-origin-cinematic-minimum-seconds="120"
+             data-origin-cinematic-target-seconds="135"
+             data-origin-cinematic-dialogue-minimum="4"
+             data-origin-cinematic-continuity-locked="true">
         <span class="tag">Watch</span>
         <h2>Chapter movie</h2>
-        <p>Choose a chapter-scale story unit for a cinematic adaptation of at least two minutes, with spoken dialogue and the selected runner visible in it.</p>
+        <p>Choose one chapter-scale scene for a 2¼-minute cinematic adaptation—not a trailer—with recurring characters speaking, reacting, and taking action together.</p>
+        <div class="settings-summary-list" data-origin-cinematic-promise>
+            <div class="settings-summary-row">
+                <span>Story shape</span>
+                <strong>One complete chapter scene</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Cast</span>
+                <strong>Two or more recurring characters</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Performance</span>
+                <strong>Canonical dialogue, action, and reactions</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Continuity</span>
+                <strong>One location, time, weather, and wardrobe</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Runtime</span>
+                <strong>2:15 target · never under 2:00</strong>
+            </div>
+        </div>
+        <p class="muted-copy">Chummer locks the screenplay before rendering. If the selected chapter cannot support a coherent multi-character scene with naturally paced dialogue, it stops before provider credits are spent.</p>
         @if (canShowSceneHighlights)
         {
             <div class="settings-summary-list">
@@ -378,7 +405,7 @@
                         <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene" class="minimal-actions">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="sceneId" value="@scene.SceneId" />
-                            <button class="button-like button-like--secondary" type="submit">Render this chapter movie</button>
+                            <button class="button-like button-like--secondary" type="submit">Render this 2¼-minute chapter movie</button>
                         </form>
                     }
                 }

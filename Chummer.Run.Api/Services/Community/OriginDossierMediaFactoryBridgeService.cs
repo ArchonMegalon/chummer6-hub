@@ -38,7 +38,7 @@ public sealed class OriginDossierMediaRequestOutboxService
         }
 
         string requestId = BuildRequestId(kind, source);
-        var request = new OriginDossierMediaDispatchRequest(
+        OriginDossierMediaDispatchRequest request = new(
             ContractVersion: OriginDossierMediaDispatchContract.Version,
             RequestId: requestId,
             Kind: kind,
@@ -55,17 +55,43 @@ public sealed class OriginDossierMediaRequestOutboxService
             ManuscriptPath: source.ManuscriptPath,
             SourcePacketPath: source.SourcePacketPath,
             CoverPath: source.CoverPath,
-            StoryboardPath: source.StoryboardPath,
+            SequencePlanPath: source.StoryboardPath,
             DurationTargetSeconds: kind == OriginDossierMediaDispatchKind.CinematicScene
                 ? OriginDossierMediaDispatchContract.DefaultCinematicDurationSeconds
                 : 1,
-            NarrativeScope: kind == OriginDossierMediaDispatchKind.CinematicScene
-                ? OriginDossierMediaDispatchContract.ChapterNarrativeScope
-                : OriginDossierMediaDispatchContract.FullBookNarrativeScope,
+            RenderScope: kind == OriginDossierMediaDispatchKind.CinematicScene
+                ? OriginDossierMediaDispatchContract.ChapterRenderScope
+                : OriginDossierMediaDispatchContract.FullBookRenderScope,
             DialogueRequired: kind == OriginDossierMediaDispatchKind.CinematicScene,
             MinimumDialogueTurns: kind == OriginDossierMediaDispatchKind.CinematicScene
                 ? OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns
                 : 0);
+        if (kind == OriginDossierMediaDispatchKind.CinematicScene)
+        {
+            try
+            {
+                int plannedShotCount = (int)Math.Ceiling(
+                    request.DurationTargetSeconds
+                    / (double)OriginDossierScreenplayContract.DefaultShotDurationSeconds);
+                request = request with
+                {
+                    Screenplay = OriginDossierScreenplayGenerator.GenerateFromManuscript(
+                        request,
+                        plannedShotCount)
+                };
+            }
+            catch (Exception exception) when (exception is
+                       IOException
+                       or UnauthorizedAccessException
+                       or InvalidOperationException)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Origin Dossier cinematic request {RequestId} failed screenplay generation before provider enqueue.",
+                    requestId);
+                return new(false, "screenplay_generation_failed", requestId, string.Empty);
+            }
+        }
 
         try
         {

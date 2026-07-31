@@ -13,12 +13,12 @@ export function registerPackageBrowserContractTests(): void {
     const controller = readFileSync(controllerPath, 'utf8');
     const registry = readFileSync(featureRegistryPath, 'utf8');
 
-    expect(view).toContain('Package class model');
-    expect(view).toContain('Compatibility:');
-    expect(view).toContain('Governance:');
-    expect(view).toContain('Evidence:');
-    expect(view).toContain('Votes and follows emit first-party receipts.');
-    expect(view).toContain('Use Downloads for builds, Packages for class and compatibility, and Help when the issue turns private.');
+    expect(view).toContain('Know what you are looking at before you install anything.');
+    expect(view).toContain('Works with:');
+    expect(view).toContain('Best for:');
+    expect(view).toContain('Notes:');
+    expect(view).toContain('Use Downloads for the app. Use rules data and add-ons only when you know they fit');
+    expect(view).toContain('Install from Downloads. Use Help when something does not behave.');
 
     expect(controller).toContain('[HttpGet("/packages")]');
     expect(controller).toContain('[HttpGet("/packages/{packageId}")]');

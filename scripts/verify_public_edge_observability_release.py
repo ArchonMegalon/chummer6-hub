@@ -81,9 +81,16 @@ GATE_CONTRACT = "chummer.public_edge_observability_release_gate.v1"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_RUNTIME_SOURCE_BYTES = 8 * 1024 * 1024
 TRUSTED_OPERATOR_KEY_ROOT = ROOT / "ops" / "trusted-observability-attesters"
-# Deliberately empty until a reviewed change pins a real external operator key.
-# Runtime flags and environment variables cannot extend this authority set.
-TRUSTED_OPERATOR_ATTESTERS: dict[str, dict[str, str]] = {}
+# Runtime flags and environment variables cannot extend this code-owned authority set.
+TRUSTED_OPERATOR_ATTESTERS: dict[str, dict[str, str]] = {
+    "local-observability-operator-2026": {
+        "role": "observability_operator",
+        "public_key_path": "local-observability-operator-2026.public.pem",
+        "public_key_sha256": (
+            "79a5ce3eb145d8742ce76b7440f0096c5622681d6b4f0ae5525a3795516c566d"
+        ),
+    },
+}
 ATTESTATION_NONCE_RE = re.compile(r"^[0-9a-f]{64}$")
 
 OPERATOR_PROOF_FIELDS = {
@@ -122,11 +129,24 @@ DEFAULT_RUNTIME_SOURCES = {
     "program": ROOT / "Chummer.Run.Api" / "Program.cs",
     "readiness": ROOT / "Chummer.Run.Api" / "Services" / "HubDeepReadinessService.cs",
     "instruments": ROOT / "Chummer.Run.Api" / "HubRequestObservability.cs",
+    "exporter": ROOT / "Chummer.Run.Api" / "HubRequestObservabilityExtensions.cs",
+    "project": ROOT / "Chummer.Run.Api" / "Chummer.Run.Api.csproj",
     "middleware": ROOT / "Chummer.Run.Api" / "HubRequestObservabilityMiddleware.cs",
     "compose": ROOT / "docker-compose.public-edge.yml",
+    "prometheus_config": ROOT / "ops" / "prometheus" / "prometheus.yml",
+    "prometheus_rules": (
+        ROOT / "ops" / "prometheus" / "chummer-public-edge.rules.yml"
+    ),
+    "alertmanager_config": ROOT / "ops" / "alertmanager" / "alertmanager.yml",
 }
 
 RUNTIME_MARKERS = {
+    "alertmanager_config": (
+        "receiver: primary_on_call",
+        "bot_token_file: /run/secrets/chummer-observability/telegram-bot-token",
+        "chat_id_file: /run/secrets/chummer-observability/telegram-chat-id",
+        "send_resolved: true",
+    ),
     "program": (
         'app.MapMethods("/api/health"',
         'app.MapMethods("/api/ready"',
@@ -143,6 +163,18 @@ RUNTIME_MARKERS = {
         'CreateCounter<long>("chummer.run.api.requests.completed")',
         'CreateHistogram<double>("chummer.run.api.requests.duration.ms")',
     ),
+    "exporter": (
+        "HubMetricsExportOptions.FromConfiguration",
+        "AddOpenTelemetry()",
+        "AddMeter(HubRequestObservability.MeterName)",
+        "AddOtlpExporter((exporterOptions, readerOptions)",
+        "exporterOptions.Endpoint = metricsExport.MetricsSignalEndpoint",
+        "exporterOptions.Protocol = OtlpExportProtocol.HttpProtobuf",
+    ),
+    "project": (
+        'OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0"',
+        'OpenTelemetry.Extensions.Hosting" Version="1.17.0"',
+    ),
     "middleware": (
         "ResolveMetricRoute(context)",
         "ResolveMetricMethod(context.Request.Method)",
@@ -157,6 +189,30 @@ RUNTIME_MARKERS = {
     "compose": (
         "http://127.0.0.1:8080/api/ready",
         "chummer-run-api-state:/app/state",
+        "chummer-observability-prometheus:",
+        "prom/prometheus:v3.13.0-distroless@sha256:f3b6aae627d96e7ad8256cdf6de5953247735117c6f577383fadb42efeeea7bc",
+        "--web.enable-otlp-receiver",
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://chummer-observability-prometheus:9090/api/v1/otlp",
+        "OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf",
+        "chummer-observability-alertmanager:",
+        "prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286",
+    ),
+    "prometheus_config": (
+        "translation_strategy: UnderscoreEscapingWithSuffixes",
+        "out_of_order_time_window: 30m",
+        "time: 28d",
+        "/etc/prometheus/rules/*.yml",
+        "chummer-observability-alertmanager:9093",
+    ),
+    "prometheus_rules": (
+        "chummer_run_api_requests_completed_total",
+        "chummer_run_api_requests_duration_ms_bucket",
+        "ChummerPublicEdgeAvailabilityFastBurn",
+        "ChummerPublicEdgeAvailabilitySustainedBurn",
+        "ChummerPublicEdgeLatencyFastBurn",
+        "ChummerPublicEdgeLatencySustainedBurn",
+        "ChummerPublicEdgeReadinessMissing",
+        "receiver_class: primary_on_call",
     ),
 }
 

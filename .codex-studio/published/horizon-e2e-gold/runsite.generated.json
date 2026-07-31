@@ -1,0 +1,31 @@
+{
+  "assertion_count": 15,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "pack_remains_inspectable",
+    "no_tactical_authority",
+    "not_a_vtt_replacement",
+    "tour_handoff_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "json_route": "/runsites/packs/redmond-dockyard-pack.json",
+    "login_location": "/login?next=%2Frunsites%2Fpacks%2Fredmond-dockyard-pack%2Ftour",
+    "markdown_route": "/runsites/packs/redmond-dockyard-pack.md",
+    "receipt_route": "/runsites/receipts/prep-network.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:35.162Z",
+  "horizon_id": "runsite",
+  "journey_steps": [
+    "load prep-network receipt",
+    "render prep board",
+    "open JSON pack",
+    "open markdown pack",
+    "verify tour identity boundary"
+  ],
+  "receipt_route": "/runsites/receipts/prep-network.json",
+  "route": "/runsites",
+  "status": "pass",
+  "verdict": "GOLD"
+}

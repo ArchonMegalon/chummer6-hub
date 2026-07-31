@@ -4,7 +4,7 @@
   "status": "passed",
   "status_scope": "executed_public_signal_packet_capability",
   "proof_kind": "source_digest_and_executed_test_contract",
-  "generated_at": "2026-07-29T09:50:59Z",
+  "generated_at": "2026-07-31T21:04:49Z",
   "verification_command": "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m125_hub_public_signal_packets.py",
   "release_binding": {
     "scope": "release_independent_product_capability",
@@ -55,8 +55,8 @@
     },
     {
       "path": "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-      "sha256": "86c8a69be33a0c070301b1100b0d7faa7e48d1d8ec05df91c147487380846518",
-      "size_bytes": 16253
+      "sha256": "57815de1d4114c9ea9747208ee53473d2abd97d72d542ac54779d7d52ccae8b9",
+      "size_bytes": 16475
     },
     {
       "path": "Chummer.Tests/PublicSignalToCanonPacketServiceTests.cs",
@@ -79,7 +79,7 @@
       "size_bytes": 18295
     }
   ],
-  "source_evidence_set_sha256": "f08508577e8f46d19cc07714a4485d169d61d2d8abd1b84596b0c58022f54d84",
+  "source_evidence_set_sha256": "0810d31b22530f43c09340e1fccb8ebaa4d65f4f3cd43889f0137e4eb9b48aa3",
   "queue_evidence": [
     {
       "path": "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
@@ -95,7 +95,7 @@
   "queue_evidence_set_sha256": "5d18da5c389ef85209851596e5d23b8911bb1fdd2285e522226469a6ca575285",
   "test_receipt": {
     "status": "passed",
-    "executed_at": "2026-07-29T09:50:59Z",
+    "executed_at": "2026-07-31T21:04:49Z",
     "command": [
       "dotnet",
       "test",
@@ -110,6 +110,6 @@
     "fully_qualified_name": "Chummer.Tests.PublicSignalToCanonPacketServiceTests.PublicSignalPacketsCoverFeedbackRoadmapChangelogSupportAndSignalIntake",
     "exit_code": 0,
     "executed_test_count": 2,
-    "output_sha256": "7d0c5cd80ee501d413cc12f04036733088af3aa979ee88e63fbe7200dfc50998"
+    "output_sha256": "2c5d439bee1aab92422fed66961fb6f98998b89b851e18afff67fb02ddb29b4a"
   }
 }

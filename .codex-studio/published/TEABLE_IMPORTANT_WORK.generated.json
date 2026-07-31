@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-07-30T03:13:27Z",
+  "generated_at_utc": "2026-07-31T21:55:07Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 40,
@@ -217,8 +217,8 @@
       "cadence": "now; before release-ready",
       "source": "Operator dashboard and Windows installer visual audit receipt",
       "why_it_matters": "The promoted Windows installer is live, but the native visual audit source still belongs to a different installer digest.",
-      "next_action": "Run the native Windows visual recapture for promoted installer digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca, import the proof bundle with scripts/import_windows_installer_gold_proof_artifact.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --verify, let that --verify import rerun the full post-import gate chain, then rerun release-ready, the operator dashboard, and final-gold.",
-      "acceptance_gate": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json records artifactSha256 d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca, required install-progress and completion screenshots pass at default and scaled DPI, verify_windows_installer_visual_audit.py passes, and final-gold no longer fails on Windows installer visual audit."
+      "next_action": "Run the native Windows visual recapture for promoted installer digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d, import the proof bundle with scripts/import_windows_installer_gold_proof_artifact.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --verify, let that --verify import rerun the full post-import gate chain, then rerun release-ready, the operator dashboard, and final-gold.",
+      "acceptance_gate": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json records artifactSha256 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d, required install-progress and completion screenshots pass at default and scaled DPI, verify_windows_installer_visual_audit.py passes, and final-gold no longer fails on Windows installer visual audit."
     },
     {
       "item_id": "windows-installer-current-shelf-proof",
@@ -229,8 +229,8 @@
       "cadence": "now; before release-ready",
       "source": "Operator dashboard and Windows installer visual audit receipt",
       "why_it_matters": "The promoted Windows installer is live, but the native visual audit source still belongs to a different installer digest.",
-      "next_action": "Run the native Windows visual recapture for promoted installer digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca, import the proof bundle with scripts/import_windows_installer_gold_proof_artifact.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --verify, let that --verify import rerun the full post-import gate chain, then rerun release-ready, the operator dashboard, and final-gold.",
-      "acceptance_gate": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json records artifactSha256 d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca, required install-progress and completion screenshots pass at default and scaled DPI, verify_windows_installer_visual_audit.py passes, and final-gold no longer fails on Windows installer visual audit."
+      "next_action": "Run the native Windows visual recapture for promoted installer digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d, import the proof bundle with scripts/import_windows_installer_gold_proof_artifact.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --verify, let that --verify import rerun the full post-import gate chain, then rerun release-ready, the operator dashboard, and final-gold.",
+      "acceptance_gate": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json records artifactSha256 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d, required install-progress and completion screenshots pass at default and scaled DPI, verify_windows_installer_visual_audit.py passes, and final-gold no longer fails on Windows installer visual audit."
     },
     {
       "item_id": "aur-linux-package",
@@ -536,8 +536,8 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-07-30T03:13:27Z",
-    "finished_at_utc": "2026-07-30T03:13:29Z",
+    "started_at_utc": "2026-07-31T21:55:07Z",
+    "finished_at_utc": "2026-07-31T21:55:11Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bset367EDGBD4NaB6LZ",
     "table_id": "tblxwx10oPF8KyBggsQ",

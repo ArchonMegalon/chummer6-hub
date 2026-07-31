@@ -282,7 +282,9 @@ public sealed class AurPackageCatalogService
 
             _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
                 .GetString(bytes);
-            return bytes;
+            return bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble)
+                ? bytes[Encoding.UTF8.Preamble.Length..]
+                : bytes;
         }
         catch (IOException)
         {

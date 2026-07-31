@@ -706,6 +706,25 @@ def _generated_nuget_import_items(root: Path) -> list[tuple[str, Path]]:
 
 def _validate_safe_msbuild_target(element: ET.Element) -> None:
     name = element.attrib.get("Name")
+    if name == "RejectDirectMediaContractsPackageProduction":
+        children = list(element)
+        if (
+            element.attrib != {
+                "Name": "RejectDirectMediaContractsPackageProduction",
+                "BeforeTargets": "GenerateNuspec;Pack",
+                "Condition": "'$(IsPackable)' == 'true'",
+            }
+            or len(children) != 1
+            or children[0].tag.rsplit("}", 1)[-1] != "Error"
+            or children[0].attrib != {
+                "Text": (
+                    "Direct MSBuild package production is forbidden. Package licensing is authorized and final "
+                    "nupkg bytes are validated only by the external media-contract package policy lane."
+                )
+            }
+        ):
+            raise ProofContractError("msbuild_target_untrusted")
+        return
     if name == "EnsureRuntimeMetadataForReferencingProjects":
         if element.attrib != {
             "Name": "EnsureRuntimeMetadataForReferencingProjects",
@@ -802,9 +821,9 @@ def _validate_closed_msbuild_definitions(root: Path) -> None:
         "IsPackable", "MaxCpuCount", "NoWarn", "NuGetPackageFolders", "NuGetPackageRoot",
         "NuGetProjectStyle", "NuGetToolVersion", "Nullable", "OutputType", "PackageId",
         "PackageReadmeFile", "PackageTags", "PreferBundledChummerMediaContracts",
-        "ProduceReferenceAssembly", "ProjectAssetsFile", "RazorCompileOnBuild",
-        "RazorCompileOnPublish", "RepositoryType", "RestoreAdditionalProjectSources",
-        "RestorePackagesPath", "RestoreSuccess", "RestoreTool", "RestoreUseStaticGraphEvaluation",
+        "ProduceReferenceAssembly", "ProjectAssetsFile", "PublishRepositoryUrl", "RazorCompileOnBuild",
+        "RazorCompileOnPublish", "RepositoryType", "RepositoryUrl", "RestoreAdditionalProjectSources",
+        "RestoreLockedMode", "RestorePackagesPath", "RestorePackagesWithLockFile", "RestoreSuccess", "RestoreTool", "RestoreUseStaticGraphEvaluation",
         "RootNamespace", "RunBrowserSurfaceProxyTimeoutApiOnly", "RuntimeIdentifiers",
         "TargetFramework", "Title", "TreatWarningsAsErrors", "Version",
     ))
@@ -829,6 +848,7 @@ def _validate_closed_msbuild_definitions(root: Path) -> None:
         "'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true'",
         "'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == ''",
         "'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'",
+        "'$(RestoreLockedMode)' == ''",
         "'$(RuntimeIdentifiers)' == ''",
         "'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''",
         "'$(UseChummerEngineContractsLocalFeed)' != 'false' and Exists('$(ChummerEngineContractsLocalFeed)')",
@@ -881,7 +901,10 @@ def _validate_closed_msbuild_definitions(root: Path) -> None:
     }
     expected_project_paths = tuple(Path(path) for path in sorted(primary_projects))
     expected_package_references = frozenset((
+        ("Chummer.Hub.Registry.Contracts", "0.0.0-packageplane.20260718.2"),
         ("Npgsql", "10.0.3"),
+        ("OpenTelemetry.Exporter.OpenTelemetryProtocol", "1.17.0"),
+        ("OpenTelemetry.Extensions.Hosting", "1.17.0"),
         ("YamlDotNet", "16.3.0"),
     ))
     expected_reference_outputs: set[str] = set()

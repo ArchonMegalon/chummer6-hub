@@ -147,7 +147,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("verify_participate_iframe_shell.py", runbook, StringComparison.Ordinal);
         Assert.Contains(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml", runbook, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PUBLIC_ROUTE_PROOF.generated.json", runbook, StringComparison.Ordinal);
-        Assert.Contains("/tmp/chummer-public-edge-deploy-preflight.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-source-preflight.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-overlay-preflight.json", runbook, StringComparison.Ordinal);
         Assert.Contains("/tmp/chummer-public-edge-postdeploy-local.json", runbook, StringComparison.Ordinal);
         Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical.json", runbook, StringComparison.Ordinal);
         Assert.Contains("--require-downloads-status-playwright", runbook, StringComparison.Ordinal);
@@ -368,7 +369,7 @@ public sealed class PublicSurfaceReferenceFilesTests
     public void HorizonRegistryMatchesTheShippedPortfolioForImplementedHorizons()
     {
         string registryPath = RepoPaths.FromRoot(".codex-design", "product", "HORIZON_REGISTRY.yaml");
-        string statusMatrixPath = RepoPaths.FromRoot("..", "_completion", "all_horizons_missed_potential", "HORIZON_STATUS_MATRIX.generated.yaml");
+        string statusMatrixPath = RepoPaths.FromRoot(".codex-studio", "published", "HORIZON_E2E_GOLD_MATRIX.generated.json");
 
         string registry = File.ReadAllText(registryPath);
         string statusMatrix = File.ReadAllText(statusMatrixPath);

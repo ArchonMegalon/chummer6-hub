@@ -1,0 +1,17 @@
+{
+  "generated_at_utc": "2026-06-30T04:04:25.108Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "path": "https://chummer.run/service-worker.js?v=1782719395",
+  "has_fetch_handler": true,
+  "has_push_handler": true,
+  "has_notification_click_handler": true,
+  "has_notification_close_handler": true,
+  "has_precache": true,
+  "registration": {
+    "supported": true,
+    "controller": false,
+    "ready": false,
+    "scriptURL": "https://chummer.run/service-worker.js?v=1782719395"
+  }
+}

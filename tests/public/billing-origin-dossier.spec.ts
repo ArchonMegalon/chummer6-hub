@@ -36,6 +36,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   const originBookStudioReceipt = await request.get(`${baseUrl}/docs/origin-book-studio/receipts/publication.json`);
   const originBookStudioPdf = await request.get(`${baseUrl}/docs/origin-book-studio/download.pdf`);
   const originBookStudioSource = await request.get(`${baseUrl}/docs/origin-book-studio/source.md`);
+  const originMediaWorkspace = await request.get(`${baseUrl}/origin-dossier/media`, { maxRedirects: 0 });
   const originVideo = await request.get(`${baseUrl}/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4`);
 
   expect(payfunnelsPage.status()).toBe(200);
@@ -59,6 +60,8 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(originBookStudioPdf.headers()['content-type']).toContain('application/pdf');
   expect(originBookStudioSource.status()).toBe(200);
   expect(originBookStudioSource.headers()['content-type']).toContain('text/markdown');
+  expect(originMediaWorkspace.status()).toBe(302);
+  expect(originMediaWorkspace.headers()['location']).toBe('/account/work/origin-dossiers');
   expect(originVideo.status()).toBe(404);
 
   const payfunnelsText = await payfunnelsPage.text();
@@ -105,7 +108,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   await expect(dossierPage.locator('body')).toContainText('The sheet stays authoritative');
   await expect(dossierPage.getByRole('link', { name: 'Open the story edition sample' })).toBeVisible();
   await expect(dossierPage.getByRole('link', { name: 'Read the book-studio design' })).toBeVisible();
-  await expect(dossierPage.getByRole('link', { name: 'Watch the story-to-cinema path' })).toHaveAttribute('href', '/origin-dossier/media');
+  await expect(dossierPage.getByRole('link', { name: 'Open the story-to-cinema workspace' })).toHaveAttribute('href', '/origin-dossier/media');
   await dossierPage.close();
 
   const storyPage = await openPublicPage(browser, '/docs/origin-dossier-the-name-she-chose');

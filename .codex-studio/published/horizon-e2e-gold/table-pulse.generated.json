@@ -1,0 +1,29 @@
+{
+  "assertion_count": 14,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "live_and_aftermath_separate",
+    "no_automatic_world_changes",
+    "no_player_scoring",
+    "no_public_surveillance",
+    "aftermath_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "login_location": "/login?next=%2Ftable-pulse%2Fdebrief",
+    "receipt_route": "/table-pulse/receipts/live-and-aftermath.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:35.918Z",
+  "horizon_id": "table-pulse",
+  "journey_steps": [
+    "load live-and-aftermath receipt",
+    "render separated rails",
+    "inspect private debrief handoff",
+    "verify identity boundary"
+  ],
+  "receipt_route": "/table-pulse/receipts/live-and-aftermath.json",
+  "route": "/table-pulse",
+  "status": "pass",
+  "verdict": "GOLD"
+}

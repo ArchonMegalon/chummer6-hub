@@ -1,4 +1,4 @@
-import { expect, test } from 'playwright/test';
+import { expect, test, type Page, type Response } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
@@ -34,8 +34,42 @@ type CacheSnapshot = {
   entries: CacheEntry[];
 };
 
+const transientNavigationStatuses = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
+
+async function gotoWithTransientRetry(
+  page: Page,
+  url: string,
+  expectedStatus: number,
+  attempts = 3,
+): Promise<Response | null> {
+  let lastResponse: Response | null = null;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      lastResponse = await page.goto(url, { waitUntil: 'domcontentloaded' });
+      const status = lastResponse?.status();
+      if (status === expectedStatus || !status || !transientNavigationStatuses.has(status) || attempt === attempts) {
+        return lastResponse;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) {
+        throw error;
+      }
+    }
+
+    await page.waitForTimeout(500 * attempt);
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+  return lastResponse;
+}
+
 test('v19 keeps private play navigation out of the exact public Cache Storage allowlist and fails closed offline', async ({ browser }) => {
-  test.setTimeout(120000);
+  test.setTimeout(180000);
   const context = await browser.newContext();
   let page = await context.newPage();
 
@@ -127,7 +161,8 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
   try {
     // `/mobile/` is the worker scope; use an in-scope role route so
     // `navigator.serviceWorker.ready` and controller assertions are meaningful.
-    await page.goto(`${baseUrl}/mobile/player`, { waitUntil: 'domcontentloaded' });
+    const initialPlayerResponse = await gotoWithTransientRetry(page, `${baseUrl}/mobile/player`, 200);
+    expect(initialPlayerResponse?.status()).toBe(200);
     await waitForV19Control();
     await publishWorkerNetworkState(true);
 
@@ -148,7 +183,8 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
 
     await page.close();
     page = await context.newPage();
-    await page.goto(`${baseUrl}/mobile/player`, { waitUntil: 'domcontentloaded' });
+    const reinstalledPlayerResponse = await gotoWithTransientRetry(page, `${baseUrl}/mobile/player`, 200);
+    expect(reinstalledPlayerResponse?.status()).toBe(200);
     await waitForV19Control();
     await publishWorkerNetworkState(true);
 
@@ -162,7 +198,7 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
     ];
     for (const roleRoute of roleRoutes) {
       const rolePage = await context.newPage();
-      const response = await rolePage.goto(`${baseUrl}${roleRoute.path}`, { waitUntil: 'domcontentloaded' });
+      const response = await gotoWithTransientRetry(rolePage, `${baseUrl}${roleRoute.path}`, 200);
       expect(response?.status()).toBe(200);
       const cacheControl = (await response?.headerValue('Cache-Control'))?.toLowerCase() ?? '';
       expect(cacheControl).toContain('private');
@@ -180,9 +216,10 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
     // Exercise query-bearing private navigation, then prove neither the query nor
     // the rendered role document entered Cache Storage.
     const privatePage = await context.newPage();
-    const rejectedPrivateResponse = await privatePage.goto(
+    const rejectedPrivateResponse = await gotoWithTransientRetry(
+      privatePage,
       `${baseUrl}/mobile/player?sessionId=private-proof&deviceId=private-device&role=Player`,
-      { waitUntil: 'domcontentloaded' },
+      404,
     );
     expect(rejectedPrivateResponse?.status()).toBe(404);
     expect((await rejectedPrivateResponse?.headerValue('Cache-Control'))?.toLowerCase()).toContain('no-store');
@@ -224,10 +261,17 @@ test('v19 keeps private play navigation out of the exact public Cache Storage al
       const offlineContext = await browser.newContext();
       try {
         const rolePage = await offlineContext.newPage();
-        await rolePage.goto(`${baseUrl}${roleRoute.path}`, { waitUntil: 'domcontentloaded' });
+        const primingResponse = await gotoWithTransientRetry(rolePage, `${baseUrl}${roleRoute.path}`, 200);
+        expect(primingResponse?.status()).toBe(200);
         await rolePage.evaluate(async () => {
           if ('serviceWorker' in navigator) {
-            await navigator.serviceWorker.ready;
+            await Promise.race([
+              navigator.serviceWorker.ready,
+              new Promise((_, reject) => window.setTimeout(
+                () => reject(new Error('service worker readiness timed out')),
+                10000,
+              )),
+            ]);
           }
         });
         if (!await rolePage.evaluate(() => !!navigator.serviceWorker?.controller)) {

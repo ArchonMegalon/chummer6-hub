@@ -59,7 +59,7 @@ public sealed class PublicLandingBuildLabHandoffViewTests
         Assert.Contains("Output background:", view, StringComparison.Ordinal);
         Assert.Contains("Output type:", view, StringComparison.Ordinal);
         Assert.Contains("Output publication:", view, StringComparison.Ordinal);
-        Assert.Contains("Output status:", view, StringComparison.Ordinal);
+        Assert.Contains("Output:", view, StringComparison.Ordinal);
         Assert.Contains("Output note:", view, StringComparison.Ordinal);
         Assert.Contains("More next steps:", view, StringComparison.Ordinal);
         Assert.DoesNotContain("More outputs:", view, StringComparison.Ordinal);

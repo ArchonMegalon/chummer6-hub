@@ -18,6 +18,18 @@ HEALTHCHECK_CONTRACTS: dict[str, tuple[str, ...]] = {
     "chummer-public-blazor": ("curl", "http://127.0.0.1:8080/blazor/health"),
     "chummer-play-web": ("curl", "http://127.0.0.1:8080/health"),
     "chummer-run-identity": ("curl", "http://127.0.0.1:8080/health"),
+    "chummer-observability-alertmanager": (
+        "/bin/amtool",
+        "http://127.0.0.1:9093",
+        "config",
+        "show",
+    ),
+    "chummer-observability-prometheus": (
+        "/bin/promtool",
+        "check",
+        "healthy",
+        "http://127.0.0.1:9090",
+    ),
     "chummer-portal": ("curl", "http://127.0.0.1:8080/api/ready"),
     "chummer-run-cloudflared": ("cloudflared", "tunnel", "127.0.0.1:2000", "ready"),
     "chummer-run-cloudflared-replica": (
@@ -38,13 +50,36 @@ CLOUDFLARED_SERVICE_NAMES = (
     "chummer-run-cloudflared-replica",
 )
 CLOUDFLARED_RUNTIME_COMMAND_FRAGMENTS = ("--metrics", "0.0.0.0:2000", "run")
+PROMETHEUS_PINNED_IMAGE = (
+    "prom/prometheus:v3.13.0-distroless"
+    "@sha256:f3b6aae627d96e7ad8256cdf6de5953247735117c6f577383fadb42efeeea7bc"
+)
+PROMETHEUS_RUNTIME_COMMAND_FRAGMENTS = (
+    "--config.file=/etc/prometheus/prometheus.yml",
+    "--storage.tsdb.path=/prometheus",
+    "--web.enable-otlp-receiver",
+    "--web.listen-address=0.0.0.0:9090",
+)
+ALERTMANAGER_PINNED_IMAGE = (
+    "prom/alertmanager:v0.32.1"
+    "@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286"
+)
+ALERTMANAGER_RUNTIME_COMMAND_FRAGMENTS = (
+    "--config.file=/etc/alertmanager/alertmanager.yml",
+    "--storage.path=/alertmanager",
+    "--web.listen-address=0.0.0.0:9093",
+)
 
 DEPENDENCY_CONTRACTS = {
     "chummer-public-blazor": {"chummer-presentation-api"},
     "chummer-portal": {
         "chummer-public-blazor",
         "chummer-run-identity",
+        "chummer-observability-prometheus",
         "support-progress-mock",
+    },
+    "chummer-observability-prometheus": {
+        "chummer-observability-alertmanager",
     },
     "chummer-run-cloudflared": {"chummer-portal"},
     "chummer-run-cloudflared-replica": {"chummer-portal"},
@@ -56,6 +91,8 @@ MEMORY_LIMIT_CONTRACTS = {
     "chummer-public-blazor": "${CHUMMER_PUBLIC_BLAZOR_MEMORY_LIMIT:-1g}",
     "chummer-play-web": "${CHUMMER_PLAY_WEB_MEMORY_LIMIT:-768m}",
     "chummer-run-identity": "${CHUMMER_IDENTITY_MEMORY_LIMIT:-512m}",
+    "chummer-observability-alertmanager": "${CHUMMER_OBSERVABILITY_ALERTMANAGER_MEMORY_LIMIT:-256m}",
+    "chummer-observability-prometheus": "${CHUMMER_OBSERVABILITY_PROMETHEUS_MEMORY_LIMIT:-512m}",
     "chummer-portal": "${CHUMMER_PORTAL_MEMORY_LIMIT:-1536m}",
     "chummer-run-cloudflared": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
     "chummer-run-cloudflared-replica": "${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}",
@@ -96,6 +133,41 @@ HEALTH_ROUTE_SOURCE_CONTRACTS = {
     RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Program.cs": (
         'app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }',
         'app.MapMethods("/api/ready", new[] { HttpMethods.Get, HttpMethods.Head }',
+    ),
+}
+
+OBSERVABILITY_RUNTIME_SOURCE_CONTRACTS = {
+    RUN_SERVICES_ROOT / "Chummer.Run.Api" / "HubRequestObservabilityExtensions.cs": (
+        "AddOpenTelemetry()",
+        "AddMeter(HubRequestObservability.MeterName)",
+        "AddOtlpExporter((exporterOptions, readerOptions)",
+        "exporterOptions.Endpoint = metricsExport.MetricsSignalEndpoint",
+        "exporterOptions.Protocol = OtlpExportProtocol.HttpProtobuf",
+    ),
+    RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Chummer.Run.Api.csproj": (
+        'OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0"',
+        'OpenTelemetry.Extensions.Hosting" Version="1.17.0"',
+    ),
+    RUN_SERVICES_ROOT / "ops" / "prometheus" / "prometheus.yml": (
+        "translation_strategy: UnderscoreEscapingWithSuffixes",
+        "out_of_order_time_window: 30m",
+        "time: 28d",
+        "/etc/prometheus/rules/*.yml",
+        "chummer-observability-alertmanager:9093",
+    ),
+    RUN_SERVICES_ROOT / "ops" / "alertmanager" / "alertmanager.yml": (
+        "receiver: primary_on_call",
+        "bot_token_file: /run/secrets/chummer-observability/telegram-bot-token",
+        "chat_id_file: /run/secrets/chummer-observability/telegram-chat-id",
+    ),
+    RUN_SERVICES_ROOT / "ops" / "prometheus" / "chummer-public-edge.rules.yml": (
+        "chummer_run_api_requests_completed_total",
+        "chummer_run_api_requests_duration_ms_bucket",
+        "14.4 * 0.001",
+        "6 * 0.001",
+        "14.4 * 0.05",
+        "6 * 0.05",
+        "receiver_class: primary_on_call",
     ),
 }
 
@@ -194,6 +266,141 @@ def validate_compose(payload: dict[str, Any]) -> list[str]:
                 "require service_completed_successfully"
             )
 
+        environment = portal.get("environment")
+        expected_otlp_environment = {
+            "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": (
+                "http://chummer-observability-prometheus:9090/api/v1/otlp"
+            ),
+            "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+            "OTEL_METRIC_EXPORT_INTERVAL": "15000",
+            "OTEL_SERVICE_NAME": "chummer.run.api",
+            "OTEL_RESOURCE_ATTRIBUTES": "deployment.environment.name=production",
+        }
+        if not isinstance(environment, dict):
+            failures.append("chummer-portal environment mapping is missing")
+        else:
+            for key, expected in expected_otlp_environment.items():
+                if str(environment.get(key)) != expected:
+                    failures.append(
+                        f"chummer-portal {key} must be the governed OTLP value {expected}"
+                    )
+
+    observability_init = services.get("chummer-observability-storage-init")
+    if not isinstance(observability_init, dict):
+        failures.append("required service is missing: chummer-observability-storage-init")
+    else:
+        if observability_init.get("network_mode") != "none":
+            failures.append("chummer-observability-storage-init network_mode must be none")
+        init_dependencies = observability_init.get("networks")
+        if init_dependencies is not None:
+            failures.append("chummer-observability-storage-init must not join compose networks")
+
+    prometheus = services.get("chummer-observability-prometheus")
+    if isinstance(prometheus, dict):
+        if prometheus.get("image") != PROMETHEUS_PINNED_IMAGE:
+            failures.append(
+                "chummer-observability-prometheus image must use the immutable supported runtime pin"
+            )
+        if prometheus.get("user") != "65532:65532":
+            failures.append("chummer-observability-prometheus must run as uid/gid 65532")
+        if prometheus.get("read_only") is not True:
+            failures.append("chummer-observability-prometheus root filesystem must be read-only")
+        if prometheus.get("cap_drop") != ["ALL"]:
+            failures.append("chummer-observability-prometheus must drop every capability")
+        if "ports" in prometheus:
+            failures.append("chummer-observability-prometheus must not publish a host port")
+        dependencies = prometheus.get("depends_on")
+        init_dependency = (
+            dependencies.get("chummer-observability-storage-init")
+            if isinstance(dependencies, dict)
+            else None
+        )
+        if not isinstance(init_dependency, dict) or init_dependency.get(
+            "condition"
+        ) != "service_completed_successfully":
+            failures.append(
+                "chummer-observability-prometheus must wait for successful storage initialization"
+            )
+        runtime_command = prometheus.get("command")
+        if not isinstance(runtime_command, list):
+            failures.append("chummer-observability-prometheus command must use exec-list syntax")
+        else:
+            for fragment in PROMETHEUS_RUNTIME_COMMAND_FRAGMENTS:
+                if fragment not in runtime_command:
+                    failures.append(
+                        "chummer-observability-prometheus runtime command is missing "
+                        f"required fragment: {fragment}"
+                    )
+
+    alertmanager = services.get("chummer-observability-alertmanager")
+    if isinstance(alertmanager, dict):
+        if alertmanager.get("image") != ALERTMANAGER_PINNED_IMAGE:
+            failures.append(
+                "chummer-observability-alertmanager image must use the immutable supported runtime pin"
+            )
+        expected_user = (
+            "${CHUMMER_OBSERVABILITY_ALERTMANAGER_UID:-1000}:"
+            "${CHUMMER_OBSERVABILITY_ALERTMANAGER_GID:-1000}"
+        )
+        if alertmanager.get("user") != expected_user:
+            failures.append(
+                "chummer-observability-alertmanager must run as the governed non-root uid/gid"
+            )
+        if alertmanager.get("read_only") is not True:
+            failures.append(
+                "chummer-observability-alertmanager root filesystem must be read-only"
+            )
+        if alertmanager.get("cap_drop") != ["ALL"]:
+            failures.append(
+                "chummer-observability-alertmanager must drop every capability"
+            )
+        if "ports" in alertmanager:
+            failures.append(
+                "chummer-observability-alertmanager must not publish a host port"
+            )
+        dependencies = alertmanager.get("depends_on")
+        init_dependency = (
+            dependencies.get("chummer-observability-storage-init")
+            if isinstance(dependencies, dict)
+            else None
+        )
+        if not isinstance(init_dependency, dict) or init_dependency.get(
+            "condition"
+        ) != "service_completed_successfully":
+            failures.append(
+                "chummer-observability-alertmanager must wait for successful storage initialization"
+            )
+        runtime_command = alertmanager.get("command")
+        if not isinstance(runtime_command, list):
+            failures.append(
+                "chummer-observability-alertmanager command must use exec-list syntax"
+            )
+        else:
+            for fragment in ALERTMANAGER_RUNTIME_COMMAND_FRAGMENTS:
+                if fragment not in runtime_command:
+                    failures.append(
+                        "chummer-observability-alertmanager runtime command is missing "
+                        f"required fragment: {fragment}"
+                    )
+        secret_mount = False
+        volumes = alertmanager.get("volumes")
+        if isinstance(volumes, list):
+            for volume in volumes:
+                if not isinstance(volume, dict):
+                    continue
+                if (
+                    volume.get("target") == "/run/secrets/chummer-observability"
+                    and volume.get("read_only") is True
+                    and isinstance(volume.get("bind"), dict)
+                    and volume["bind"].get("create_host_path") is False
+                ):
+                    secret_mount = True
+                    break
+        if not secret_mount:
+            failures.append(
+                "chummer-observability-alertmanager must mount the governed secret directory read-only"
+            )
+
     for service_name in CLOUDFLARED_SERVICE_NAMES:
         cloudflared = services.get(service_name)
         if not isinstance(cloudflared, dict):
@@ -241,6 +448,16 @@ def validate_runtime_sources() -> list[str]:
             if marker not in source:
                 failures.append(
                     f"health route source {source_path} is missing required marker: {marker}"
+                )
+    for source_path, required_markers in OBSERVABILITY_RUNTIME_SOURCE_CONTRACTS.items():
+        if not source_path.is_file():
+            failures.append(f"observability runtime source is missing: {source_path}")
+            continue
+        source = source_path.read_text(encoding="utf-8")
+        for marker in required_markers:
+            if marker not in source:
+                failures.append(
+                    f"observability runtime source {source_path} is missing required marker: {marker}"
                 )
     return failures
 

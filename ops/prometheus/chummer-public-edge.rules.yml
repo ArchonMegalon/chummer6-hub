@@ -1,0 +1,94 @@
+groups:
+  - name: chummer-public-edge-sli-recording
+    interval: 15s
+    rules:
+      - record: chummer:public_edge_requests:rate5m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)"}[5m]))
+      - record: chummer:public_edge_requests:rate30m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)"}[30m]))
+      - record: chummer:public_edge_requests:rate60m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)"}[60m]))
+      - record: chummer:public_edge_requests:rate360m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)"}[360m]))
+      - record: chummer:public_edge_availability_error:ratio5m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)",http_status_code=~"5.."}[5m])) / clamp_min(chummer:public_edge_requests:rate5m, 0.000000001)
+      - record: chummer:public_edge_availability_error:ratio30m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)",http_status_code=~"5.."}[30m])) / clamp_min(chummer:public_edge_requests:rate30m, 0.000000001)
+      - record: chummer:public_edge_availability_error:ratio60m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)",http_status_code=~"5.."}[60m])) / clamp_min(chummer:public_edge_requests:rate60m, 0.000000001)
+      - record: chummer:public_edge_availability_error:ratio360m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route!~"/api/(health|ready)",http_status_code=~"5.."}[360m])) / clamp_min(chummer:public_edge_requests:rate360m, 0.000000001)
+      - record: chummer:public_edge_latency_bad:ratio5m
+        expr: 1 - (sum(rate(chummer_run_api_requests_duration_ms_bucket{http_route!~"/api/(health|ready)",le="1000"}[5m])) / clamp_min(sum(rate(chummer_run_api_requests_duration_ms_count{http_route!~"/api/(health|ready)"}[5m])), 0.000000001))
+      - record: chummer:public_edge_latency_bad:ratio30m
+        expr: 1 - (sum(rate(chummer_run_api_requests_duration_ms_bucket{http_route!~"/api/(health|ready)",le="1000"}[30m])) / clamp_min(sum(rate(chummer_run_api_requests_duration_ms_count{http_route!~"/api/(health|ready)"}[30m])), 0.000000001))
+      - record: chummer:public_edge_latency_bad:ratio60m
+        expr: 1 - (sum(rate(chummer_run_api_requests_duration_ms_bucket{http_route!~"/api/(health|ready)",le="1000"}[60m])) / clamp_min(sum(rate(chummer_run_api_requests_duration_ms_count{http_route!~"/api/(health|ready)"}[60m])), 0.000000001))
+      - record: chummer:public_edge_latency_bad:ratio360m
+        expr: 1 - (sum(rate(chummer_run_api_requests_duration_ms_bucket{http_route!~"/api/(health|ready)",le="1000"}[360m])) / clamp_min(sum(rate(chummer_run_api_requests_duration_ms_count{http_route!~"/api/(health|ready)"}[360m])), 0.000000001))
+      - record: chummer:public_edge_readiness_success:rate5m
+        expr: sum(rate(chummer_run_api_requests_completed_total{http_route="/api/ready",http_status_code="200"}[5m]))
+
+  - name: chummer-public-edge-slo-alerts
+    interval: 15s
+    rules:
+      - alert: ChummerPublicEdgeAvailabilityFastBurn
+        expr: (chummer:public_edge_availability_error:ratio5m > (14.4 * 0.001)) and (chummer:public_edge_availability_error:ratio60m > (14.4 * 0.001))
+        for: 2m
+        labels:
+          severity: page
+          receiver_class: primary_on_call
+          slo: availability
+        annotations:
+          summary: Chummer public-edge availability error budget is burning at page rate
+          runbook: Verify /api/ready, recent 5xx routes, and the active release overlay before rollback or mitigation.
+      - alert: ChummerPublicEdgeAvailabilitySustainedBurn
+        expr: (chummer:public_edge_availability_error:ratio30m > (6 * 0.001)) and (chummer:public_edge_availability_error:ratio360m > (6 * 0.001))
+        for: 15m
+        labels:
+          severity: ticket
+          receiver_class: primary_on_call
+          slo: availability
+        annotations:
+          summary: Chummer public-edge availability error budget is burning at ticket rate
+          runbook: Review route-template 5xx ratios and the release-candidate change window.
+      - alert: ChummerPublicEdgeLatencyFastBurn
+        expr: (chummer:public_edge_latency_bad:ratio5m > (14.4 * 0.05)) and (chummer:public_edge_latency_bad:ratio60m > (14.4 * 0.05))
+        for: 2m
+        labels:
+          severity: page
+          receiver_class: primary_on_call
+          slo: latency
+        annotations:
+          summary: Chummer public-edge latency error budget is burning at page rate
+          runbook: Inspect route-template duration histograms and current backend saturation before mitigation.
+      - alert: ChummerPublicEdgeLatencySustainedBurn
+        expr: (chummer:public_edge_latency_bad:ratio30m > (6 * 0.05)) and (chummer:public_edge_latency_bad:ratio360m > (6 * 0.05))
+        for: 15m
+        labels:
+          severity: ticket
+          receiver_class: primary_on_call
+          slo: latency
+        annotations:
+          summary: Chummer public-edge latency error budget is burning at ticket rate
+          runbook: Review slow route templates and the release-candidate change window.
+      - alert: ChummerPublicEdgeReadinessMissing
+        expr: absent(chummer:public_edge_readiness_success:rate5m) or chummer:public_edge_readiness_success:rate5m <= 0
+        for: 5m
+        labels:
+          severity: page
+          receiver_class: primary_on_call
+          slo: readiness
+        annotations:
+          summary: Chummer public-edge readiness success telemetry is missing
+          runbook: Check the portal container, /api/ready health probe, OTLP export, and Prometheus ingestion.
+      - alert: ChummerPublicEdgeTelemetryMissing
+        expr: absent(chummer_run_api_requests_completed_total)
+        for: 5m
+        labels:
+          severity: page
+          receiver_class: primary_on_call
+          slo: telemetry
+        annotations:
+          summary: Chummer public-edge request telemetry is missing
+          runbook: Check portal OTLP exporter configuration and the internal Prometheus OTLP receiver.

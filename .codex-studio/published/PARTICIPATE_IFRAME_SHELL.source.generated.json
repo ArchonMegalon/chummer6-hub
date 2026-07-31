@@ -1,0 +1,26 @@
+{
+  "base_url": "",
+  "contractName": "chummer.participate_iframe_shell.v1",
+  "failures": [],
+  "generatedAtUtc": "2026-07-01T17:47:06.673893+00:00",
+  "iframe_route_count": 0,
+  "live": [],
+  "offline_fallback_route_count": 0,
+  "route_count": 0,
+  "source": {
+    "failures": [],
+    "required": {
+      "legacy_builder_summary_is_minimal": true,
+      "public_builder_summary_is_minimal": true,
+      "view_has_offline_fallback": true,
+      "view_has_real_iframe": true,
+      "view_has_screen_reader_title": true,
+      "view_removes_board_eyebrow": true,
+      "view_removes_old_summary": true,
+      "view_removes_visible_header": true,
+      "view_uses_existing_embed_href": true
+    },
+    "status": "pass"
+  },
+  "status": "pass"
+}

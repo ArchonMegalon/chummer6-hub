@@ -1,0 +1,37 @@
+{
+  "contract_name": "chummer6-ui.windows_installer_visual_proof",
+  "contractName": "chummer6-ui.windows_installer_visual_proof",
+  "status": "pass",
+  "generated_at": "2026-06-28T00:00:00Z",
+  "generatedAt": "2026-06-28T00:00:00Z",
+  "recordedAtUtc": "2026-06-28T00:00:00Z",
+  "channelId": "public_stable",
+  "releaseVersion": "run-20260627-005402",
+  "version": "run-20260627-005402",
+  "headId": "avalonia",
+  "head": "avalonia",
+  "platform": "windows",
+  "rid": "win-x64",
+  "artifactDigest": "sha256:d9d25b2c93dbd4887590b52b03431c4aba3c5614dbc4b18ec2f282222067466c",
+  "screenshots": [
+    {
+      "role": "progress",
+      "path": "windows-installer-visual-proof/windows-installer-progress.png",
+      "sha256": "df4c1e0fdafaa87cc60b74c8b603df89c0f172aee049c3b85ed3006c9a22f26b"
+    },
+    {
+      "role": "completion",
+      "path": "windows-installer-visual-proof/windows-installer-completion.png",
+      "sha256": "eb3f92ca31ea32110c1224ef93ca409278f2593d547426e8b87c655f15d91cfb"
+    }
+  ],
+  "readabilityReview": {
+    "status": "pass"
+  },
+  "contrastReview": {
+    "status": "pass"
+  },
+  "clippingReview": {
+    "status": "pass"
+  }
+}

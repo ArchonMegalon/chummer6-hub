@@ -3788,7 +3788,7 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public async Task OriginDossierMediaDispatchPersistsSharedArtifactReceipt()
+    public async Task OriginDossierMediaDispatchRoutesToOwnedWorkspaceWithoutConsumingQuota()
     {
         using Fixture fixture = new(authenticated: true, configureSettings: settings =>
         {
@@ -3804,13 +3804,8 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.OriginDossierMediaDispatch(CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        AssertProtectedMediaRedirect(redirect.Url, "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4");
-        HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.DispatchUserId, limit: 10));
-        Assert.Equal("accepted", receipt.Status);
-        Assert.Equal("origin-dossier-media", receipt.CapabilityId);
-        Assert.Equal("dossier_media", receipt.ArtifactKind);
-        Assert.Equal("origin-dossier:public-story-edition", receipt.SourceRef);
-        Assert.Equal(1, receipt.Quota?.WeeklyUsed);
+        Assert.Equal("/account/work/origin-dossiers", redirect.Url);
+        Assert.Empty(fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.DispatchUserId, limit: 10));
     }
 
     [Fact]

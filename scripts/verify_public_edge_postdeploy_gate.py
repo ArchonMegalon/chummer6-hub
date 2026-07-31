@@ -1533,7 +1533,13 @@ def pwa_offline_artifact_matches_privacy_contract(artifact: dict[str, Any]) -> b
         (result := role_results_by_role.get(role)) is not None
         and result.get("path") == path
         and int_value(result.get("status")) == 503
-        and "no-store" in str(result.get("cache_control") or "").lower()
+        and {"private", "no-store"}.issubset(
+            {
+                token.strip()
+                for token in str(result.get("cache_control") or "").lower().split(",")
+                if token.strip()
+            }
+        )
         and result.get("private_projection_restored") is False
         for role, path in REQUIRED_PWA_OFFLINE_ROLE_FALLBACKS.items()
     )
@@ -2149,8 +2155,13 @@ def compose_status(
                 failures.append(f"PWA offline cache proof {role} fallback path is not {path}")
             if int_value(result.get("status")) != 503:
                 failures.append(f"PWA offline cache proof {role} fallback did not return HTTP 503")
-            if "no-store" not in str(result.get("cache_control") or "").lower():
-                failures.append(f"PWA offline cache proof {role} fallback is not no-store")
+            cache_control_tokens = {
+                token.strip()
+                for token in str(result.get("cache_control") or "").lower().split(",")
+                if token.strip()
+            }
+            if not {"private", "no-store"}.issubset(cache_control_tokens):
+                failures.append(f"PWA offline cache proof {role} fallback is not private, no-store")
             if result.get("private_projection_restored") is not False:
                 failures.append(f"PWA offline cache proof {role} fallback restored private projection state")
     if blazor_new_runner_menu:

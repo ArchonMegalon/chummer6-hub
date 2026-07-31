@@ -1,0 +1,386 @@
+{
+  "checked_at": "2026-07-05T17:11:39.361377+00:00",
+  "repo_root": "/docker/chummercomplete/chummer.run-services",
+  "repo_assets": [
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.sh",
+      "exists": true,
+      "sha256": "fc5a7aee4a9a383ff12da95754d088681d18c88a2472cc3a9e9efc77404f6c39",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.service",
+      "exists": true,
+      "sha256": "169719ac6e3ae35befa87c467900c9208f32c8a41b369bc02ea602d1f8f23e38",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.timer",
+      "exists": true,
+      "sha256": "a51f6d6a626fd19f24245ae54e5fc9d7d9dc089b70c813e8fc774b5e3fe370d7",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.service.d-10-budget.conf",
+      "exists": true,
+      "sha256": "49589b9a45e22a95bd7214bb5b5ed9185fdc49a916e768845d3dcb51271ac31e",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.sh",
+      "exists": true,
+      "sha256": "acf5faf0232284cfd4fdd51f9d3c8127b5fce6db8b689ec755c48b6b394175a7",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.service",
+      "exists": true,
+      "sha256": "0a904c049a5fa448c4794dc77ebb1eaf5cd401e3d614a04642eadae245962e44",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.timer",
+      "exists": true,
+      "sha256": "3a8b51c14328a7482fea109898ac99c051c54293d03e1284ead9f0333d9799ab",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.default",
+      "exists": true,
+      "sha256": "fcc75afe544a7ac4fae8797795873db9a76eaf9a887fea45f133adb17a686d85",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.timer.d-10-fast-container-check.conf",
+      "exists": true,
+      "sha256": "fa38e3b9c00e983daa46ae3e32a6fe81a559397c76c454eff10f84aab12e0317",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-pcloud-cache-tuning.conf",
+      "exists": true,
+      "sha256": "4b02be9d707cd439e1c58fc5a80859ab04494a1c61d56a9f02ed511659473c4a",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-internxt-cache-tuning.conf",
+      "exists": true,
+      "sha256": "159700276e8c23b2f37ab2c741a693736c0306cf689cddbfd5232e297e749e10",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount@.service.d-80-media-priority.conf",
+      "exists": true,
+      "sha256": "14991ae40466efc2474b6543d7421bea492f2794a549dcda666d290c02c6098b",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.sh",
+      "exists": true,
+      "sha256": "f59686a544eb0015d91653626ce1e71c67449a4a3dcfa6036b4cf6373d376510",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.service",
+      "exists": true,
+      "sha256": "ed6f45a3fd6200bcd3101a7fac6acd22f66b3bb10f933d922fc0b5f913dfda7c",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.timer",
+      "exists": true,
+      "sha256": "3d60ae899dd5f6254a5705067e35e575764f39b4711bd72c9c52effc883ea8c1",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.sh",
+      "exists": true,
+      "sha256": "6ca023ba865611a18d95639b961c18ac2b99e4b6820c4072619eab6fe14e80e6",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.service",
+      "exists": true,
+      "sha256": "0940de9c1dc339235bffbb1f399f41a688147907162d69c372e879314fbac189",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.timer",
+      "exists": true,
+      "sha256": "9ed3e442da96f279f562130f5e6a9dc08e0d676e1b49e71a06f4d88046731a2f",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.sh",
+      "exists": true,
+      "sha256": "728c94cee0e79b2ecc296c171b3c6f6f82cbf9c6ee936a663359e1e896e9a4be",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.service",
+      "exists": true,
+      "sha256": "002b9a366da7d727f1deee1c7b3a577abeab3f04ee70b6971a99f70073839b45",
+      "expected_snippets_ok": true
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.timer",
+      "exists": true,
+      "sha256": "a16fc0772d2f0f12d47d38ff6e4b12a97b305ea957d1a3333b9d67a4c1684c8b",
+      "expected_snippets_ok": true
+    }
+  ],
+  "live_assets": [
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.sh",
+      "host_path": "/usr/local/sbin/media-cache-guard.sh",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "fc5a7aee4a9a383ff12da95754d088681d18c88a2472cc3a9e9efc77404f6c39"
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.service",
+      "host_path": "/etc/systemd/system/media-cache-guard.service",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "169719ac6e3ae35befa87c467900c9208f32c8a41b369bc02ea602d1f8f23e38"
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.timer",
+      "host_path": "/etc/systemd/system/media-cache-guard.timer",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "a51f6d6a626fd19f24245ae54e5fc9d7d9dc089b70c813e8fc774b5e3fe370d7"
+    },
+    {
+      "repo_path": "ops/host-workload/media-cache-guard.service.d-10-budget.conf",
+      "host_path": "/etc/systemd/system/media-cache-guard.service.d/10-budget.conf",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "49589b9a45e22a95bd7214bb5b5ed9185fdc49a916e768845d3dcb51271ac31e"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.sh",
+      "host_path": "/usr/local/sbin/plex-stream-watchdog.sh",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "acf5faf0232284cfd4fdd51f9d3c8127b5fce6db8b689ec755c48b6b394175a7"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.service",
+      "host_path": "/etc/systemd/system/plex-stream-watchdog.service",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "0a904c049a5fa448c4794dc77ebb1eaf5cd401e3d614a04642eadae245962e44"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.timer",
+      "host_path": "/etc/systemd/system/plex-stream-watchdog.timer",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "3a8b51c14328a7482fea109898ac99c051c54293d03e1284ead9f0333d9799ab"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.default",
+      "host_path": "/etc/default/plex-stream-watchdog",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "fcc75afe544a7ac4fae8797795873db9a76eaf9a887fea45f133adb17a686d85"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-stream-watchdog.timer.d-10-fast-container-check.conf",
+      "host_path": "/etc/systemd/system/plex-stream-watchdog.timer.d/10-fast-container-check.conf",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "fa38e3b9c00e983daa46ae3e32a6fe81a559397c76c454eff10f84aab12e0317"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-pcloud-cache-tuning.conf",
+      "host_path": "/etc/systemd/system/rclone-mount@pcloud.service.d/20-cache-tuning.conf",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "4b02be9d707cd439e1c58fc5a80859ab04494a1c61d56a9f02ed511659473c4a"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-internxt-cache-tuning.conf",
+      "host_path": "/etc/systemd/system/rclone-mount@internxt.service.d/zz-cache-budget.conf",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "159700276e8c23b2f37ab2c741a693736c0306cf689cddbfd5232e297e749e10"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount@.service.d-80-media-priority.conf",
+      "host_path": "/etc/systemd/system/rclone-mount@.service.d/80-media-priority.conf",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "14991ae40466efc2474b6543d7421bea492f2794a549dcda666d290c02c6098b"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.sh",
+      "host_path": "/usr/local/sbin/plex-internxt-mirror.sh",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "f59686a544eb0015d91653626ce1e71c67449a4a3dcfa6036b4cf6373d376510"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.service",
+      "host_path": "/etc/systemd/system/plex-internxt-mirror.service",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "ed6f45a3fd6200bcd3101a7fac6acd22f66b3bb10f933d922fc0b5f913dfda7c"
+    },
+    {
+      "repo_path": "ops/host-workload/plex-internxt-mirror.timer",
+      "host_path": "/etc/systemd/system/plex-internxt-mirror.timer",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "3d60ae899dd5f6254a5705067e35e575764f39b4711bd72c9c52effc883ea8c1"
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.sh",
+      "host_path": "/usr/local/sbin/qbittorrent-storage-watchdog.sh",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "6ca023ba865611a18d95639b961c18ac2b99e4b6820c4072619eab6fe14e80e6"
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.service",
+      "host_path": "/etc/systemd/system/qbittorrent-storage-watchdog.service",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "0940de9c1dc339235bffbb1f399f41a688147907162d69c372e879314fbac189"
+    },
+    {
+      "repo_path": "ops/host-workload/qbittorrent-storage-watchdog.timer",
+      "host_path": "/etc/systemd/system/qbittorrent-storage-watchdog.timer",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "9ed3e442da96f279f562130f5e6a9dc08e0d676e1b49e71a06f4d88046731a2f"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.sh",
+      "host_path": "/usr/local/bin/rclone-mount-watchdog.sh",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "728c94cee0e79b2ecc296c171b3c6f6f82cbf9c6ee936a663359e1e896e9a4be"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.service",
+      "host_path": "/etc/systemd/system/rclone-mount-watchdog.service",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "002b9a366da7d727f1deee1c7b3a577abeab3f04ee70b6971a99f70073839b45"
+    },
+    {
+      "repo_path": "ops/host-workload/rclone-mount-watchdog.timer",
+      "host_path": "/etc/systemd/system/rclone-mount-watchdog.timer",
+      "host_exists": true,
+      "matches_repo": true,
+      "host_sha256": "a16fc0772d2f0f12d47d38ff6e4b12a97b305ea957d1a3333b9d67a4c1684c8b"
+    }
+  ],
+  "runtime": {
+    "checked_at": "2026-07-05T17:11:39.445139+00:00",
+    "disk_free_gib": {
+      "/": 13.64,
+      "/var/cache/rclone": 13.64
+    },
+    "timers": {
+      "plex-stream-watchdog.timer": {
+        "command_status": "0",
+        "NextElapseUSecRealtime": "",
+        "LastTriggerUSec": "Sun 2026-07-05 19:09:33 CEST",
+        "Result": "success",
+        "ActiveState": "active",
+        "SubState": "waiting"
+      },
+      "plex-internxt-mirror.timer": {
+        "command_status": "0",
+        "NextElapseUSecRealtime": "",
+        "LastTriggerUSec": "Sun 2026-07-05 19:11:19 CEST",
+        "Result": "success",
+        "ActiveState": "active",
+        "SubState": "running"
+      },
+      "qbittorrent-storage-watchdog.timer": {
+        "command_status": "0",
+        "NextElapseUSecRealtime": "",
+        "LastTriggerUSec": "Sun 2026-07-05 19:10:58 CEST",
+        "Result": "success",
+        "ActiveState": "active",
+        "SubState": "waiting"
+      },
+      "rclone-mount-watchdog.timer": {
+        "command_status": "0",
+        "NextElapseUSecRealtime": "Sun 2026-07-05 19:12:03 CEST",
+        "LastTriggerUSec": "Sun 2026-07-05 19:11:03 CEST",
+        "Result": "success",
+        "ActiveState": "active",
+        "SubState": "waiting"
+      },
+      "media-cache-guard.timer": {
+        "command_status": "0",
+        "NextElapseUSecRealtime": "",
+        "LastTriggerUSec": "Sun 2026-07-05 19:05:42 CEST",
+        "Result": "success",
+        "ActiveState": "active",
+        "SubState": "waiting"
+      }
+    },
+    "host_aliases": {
+      "/docker/plex/media/Movies": {
+        "exists": true,
+        "is_symlink": true,
+        "target": "/mnt/pcloud/PLEX/Movies"
+      },
+      "/docker/plex/media/TV Shows": {
+        "exists": true,
+        "is_symlink": true,
+        "target": "/mnt/pcloud/PLEX/TV"
+      },
+      "/docker/plex/media/Requested": {
+        "exists": true,
+        "is_symlink": true,
+        "target": "/mnt/pcloud/PLEX/Requested"
+      }
+    },
+    "plex_container": {
+      "command_status": 0,
+      "status": "Up 27 minutes (healthy)",
+      "stderr": null
+    },
+    "container_probes": {
+      "pcloud_stream": {
+        "path": "/mnt/pcloud/PLEX/Movies/11.14 (2003)/11.14 (2003).avi",
+        "ok": true,
+        "stderr": null
+      },
+      "internxt_stream": {
+        "path": "/mnt/internxt/PLEX/Movies/0-9/11.14 (2003)/11.14 (2003).avi",
+        "ok": true,
+        "stderr": null
+      }
+    },
+    "container_alias_probe": {
+      "paths": [
+        "/media/Movies",
+        "/media/TV Shows",
+        "/media/Requested"
+      ],
+      "ok": true,
+      "stderr": null
+    },
+    "qbittorrent_storage": {
+      "container_status": "Up 17 minutes",
+      "config_exists": true,
+      "log_exists": true,
+      "save_path": "/mnt/pcloud/staging/downloads",
+      "write_probe": {
+        "path": "/mnt/pcloud/staging/downloads",
+        "ok": true,
+        "stderr": null
+      }
+    }
+  },
+  "status": "pass",
+  "failures": []
+}

@@ -2585,6 +2585,24 @@ def test_postdeploy_gate_can_require_pwa_offline_cache_browser_proof() -> None:
     assert result["pwaOfflineCachePersonalizedLedgerCached"] is False
     assert {item["role"] for item in result["pwaOfflineCacheOfflineRoleFallbacks"]} == {"Player", "GameMaster"}
 
+    no_private_fallback = passing_pwa_offline_browser_proof()
+    no_private_fallback["artifact"]["offline_role_fallbacks"][0]["cache_control"] = "no-store"
+    privacy_failure = module.compose_status(
+        preflight,
+        downloads,
+        pwa_static,
+        mobile_ledger,
+        ready_mobile_handoff,
+        participate_iframe_shell,
+        None,
+        None,
+        None,
+        no_private_fallback,
+    )
+
+    assert privacy_failure["status"] == "fail"
+    assert "PWA offline cache proof Player fallback is not private, no-store" in privacy_failure["failures"]
+
     failing = module.compose_status(
         preflight,
         downloads,

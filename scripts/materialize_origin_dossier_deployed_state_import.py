@@ -33,6 +33,7 @@ PATH_FIELDS = (
     "storySceneCoverReceiptPath",
     "coverConsistencyReceiptPath",
     "audiobookPath",
+    "audiobookRenderReceiptPath",
     "m4bProviderImportReceiptPath",
     "audiobookshelfImportReceiptPath",
     "dossierVideoPath",
@@ -55,7 +56,9 @@ def now_iso() -> str:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    parsed = json.loads(path.read_text(encoding="utf-8"))
+    # The deployed index may be emitted by .NET's UTF-8 writer with a BOM.
+    # utf-8-sig accepts both BOM and BOM-less JSON without changing content.
+    parsed = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(parsed, dict):
         raise StateImportError(f"{path}: expected JSON object")
     return parsed

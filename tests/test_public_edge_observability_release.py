@@ -289,6 +289,54 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
         self.assertEqual("fail", middleware_check["status"])
         self.assertTrue(any("runtime:middleware" in failure for failure in failures))
 
+    def test_runtime_gate_rejects_prometheus_retention_drift(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="observability-runtime-retention-") as temp_dir:
+            mutated_config = Path(temp_dir) / "prometheus.yml"
+            source = self.module.DEFAULT_RUNTIME_SOURCES["prometheus_config"].read_text(
+                encoding="utf-8"
+            )
+            mutated_config.write_text(
+                source.replace("time: 28d", "time: 15d", 1),
+                encoding="utf-8",
+            )
+            runtime_sources = dict(self.module.DEFAULT_RUNTIME_SOURCES)
+            runtime_sources["prometheus_config"] = mutated_config
+
+            checks, failures = self.module.validate_runtime_contracts(runtime_sources)
+
+        config_check = next(
+            check for check in checks if check["id"] == "runtime:prometheus_config"
+        )
+        self.assertEqual("fail", config_check["status"])
+        self.assertTrue(
+            any("runtime:prometheus_config" in failure for failure in failures)
+        )
+
+    def test_runtime_gate_rejects_missing_otlp_compose_binding(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="observability-runtime-compose-") as temp_dir:
+            mutated_compose = Path(temp_dir) / "docker-compose.public-edge.yml"
+            source = self.module.DEFAULT_RUNTIME_SOURCES["compose"].read_text(
+                encoding="utf-8"
+            )
+            mutated_compose.write_text(
+                source.replace(
+                    "OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL: grpc",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            runtime_sources = dict(self.module.DEFAULT_RUNTIME_SOURCES)
+            runtime_sources["compose"] = mutated_compose
+
+            checks, failures = self.module.validate_runtime_contracts(runtime_sources)
+
+        compose_check = next(
+            check for check in checks if check["id"] == "runtime:compose"
+        )
+        self.assertEqual("fail", compose_check["status"])
+        self.assertTrue(any("runtime:compose" in failure for failure in failures))
+
     def test_policy_rejects_high_cardinality_or_private_metric_dimensions(self) -> None:
         policy, error = self.module.load_json(self.module.DEFAULT_POLICY)
         self.assertIsNone(error)

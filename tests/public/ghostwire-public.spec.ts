@@ -21,8 +21,8 @@ test('ghostwire public route stays available and shipped as a replay lane', asyn
 
   await page.goto(`${baseUrl}/ghostwire`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'GHOSTWIRE' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('GHOSTWIRE now ships after-action packets');
-  await expect(page.locator('body')).toContainText('Replay stays public-safe.');
+  await expect(page.locator('body')).toContainText('GHOSTWIRE now ships after-action notes');
+  await expect(page.locator('body')).toContainText('Replay stays public.');
 
   writeJsonArtifact('GHOSTWIRE_PUBLIC_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

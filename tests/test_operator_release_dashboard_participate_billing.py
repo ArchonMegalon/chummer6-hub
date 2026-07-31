@@ -281,14 +281,14 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "path": "/manifest.player.webmanifest",
                 "role": "Player",
                 "id": "/mobile/player",
-                "start_url": "/mobile/player?role=Player",
+                "start_url": "/mobile/player",
                 "display": "standalone",
             },
             {
                 "path": "/manifest.gm.webmanifest",
                 "role": "GameMaster",
                 "id": "/mobile/gm",
-                "start_url": "/mobile/gm?role=GameMaster",
+                "start_url": "/mobile/gm",
                 "display": "standalone",
             },
         ],
@@ -310,7 +310,7 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "route": "/mobile/player",
                 "manifest_path": "/manifest.player.webmanifest",
                 "manifest_id": "/mobile/player",
-                "manifest_start_url": "/mobile/player?role=Player",
+                "manifest_start_url": "/mobile/player",
                 "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
                 "frontdoor_default": True,
             },
@@ -320,7 +320,7 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "route": "/mobile/gm",
                 "manifest_path": "/manifest.gm.webmanifest",
                 "manifest_id": "/mobile/gm",
-                "manifest_start_url": "/mobile/gm?role=GameMaster",
+                "manifest_start_url": "/mobile/gm",
                 "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
                 "frontdoor_default": False,
             },
@@ -2881,9 +2881,9 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         )
         self.assertIn("role PWA manifests: count=2", markdown)
         self.assertIn("/manifest.player.webmanifest", markdown)
-        self.assertIn("/mobile/player?role=Player", markdown)
+        self.assertIn("/mobile/player", markdown)
         self.assertIn("/manifest.gm.webmanifest", markdown)
-        self.assertIn("/mobile/gm?role=GameMaster", markdown)
+        self.assertIn("/mobile/gm", markdown)
         self.assertIn("static_paths=['/manifest.player.webmanifest', '/manifest.gm.webmanifest', '/mobile.css', '/mobile-install-shell.js']", markdown)
         self.assertIn("personalized_ledger_cached=False", markdown)
         self.assertIn(
@@ -5930,7 +5930,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             oauth["advisoryActions"],
         )
         self.assertIn(
-            "`google_oauth_operator_evidence`: Browser-backed Google OAuth linking evidence is still missing.",
+            "`google_oauth_operator_evidence`: Browser-backed Google OAuth linking evidence is still missing or invalid.",
             markdown,
         )
         self.assertIn(
@@ -5961,6 +5961,27 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn(
             "google oauth proof verifier: structural_status=fail operator_evidence_pass=false recovery_pack=false",
             markdown,
+        )
+
+    def test_dashboard_classifies_present_but_invalid_google_operator_evidence(self) -> None:
+        module = load_module()
+        failure = module.google_oauth_operator_evidence_missing_failure(
+            {
+                "operator_end_to_end_evidence": {
+                    "pass": False,
+                    "path": "/tmp/operator-evidence.json",
+                    "failures": ["contract_name must use the current v2 contract"],
+                },
+                "operator_request_artifacts": {
+                    "operator_action_still_required": True,
+                    "required_operator_evidence_path": "/tmp/operator-evidence.json",
+                },
+            }
+        )
+
+        self.assertEqual(
+            "google oauth operator evidence is missing or invalid: /tmp/operator-evidence.json",
+            failure,
         )
 
     def test_dashboard_treats_google_signed_in_preflight_only_failure_as_nonblocking_context(self) -> None:

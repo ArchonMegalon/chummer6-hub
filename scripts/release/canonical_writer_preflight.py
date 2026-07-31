@@ -166,6 +166,7 @@ REQUIRED_RELEASE_PROOF_ROUTES = (
     "/home/work",
     "/account/access",
     "/account/work",
+    "/account/roster",
     "/account/support",
     "/contact",
     "/downloads",

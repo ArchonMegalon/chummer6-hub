@@ -83,7 +83,7 @@ def _assert_shared_privacy_semantics(script: str, expected_cache_version: str) -
     )
     assert "play_api_network_unavailable" in script
     assert "status: 503" in script
-    assert '"cache-control": "no-store"' in script
+    assert '"cache-control": "private, no-store"' in script
     assert '"content-security-policy": "default-src \'none\'' in script
     assert '"x-content-type-options": "nosniff"' in script
 

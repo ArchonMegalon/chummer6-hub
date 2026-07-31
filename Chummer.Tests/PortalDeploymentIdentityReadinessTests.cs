@@ -139,6 +139,25 @@ public sealed class PortalDeploymentIdentityReadinessTests
         Assert.Equal(PortalDeploymentIdentityReadinessService.BoundCode, result.Code);
     }
 
+    [Theory]
+    [InlineData(RuntimeProofRelativePath, 0u, true)]
+    [InlineData(RuntimeProofRelativePath, 1u, true)]
+    [InlineData(RuntimeProofRelativePath, 2u, false)]
+    [InlineData("app.dll", 0u, false)]
+    [InlineData("app.dll", 1u, true)]
+    [InlineData("app.dll", 2u, false)]
+    public void Payload_link_count_policy_accepts_only_declared_bind_mount_zero_links(
+        string relativePath,
+        uint linkCount,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            PortalDeploymentIdentityReadinessService.HasAcceptablePayloadFileLinkCount(
+                relativePath,
+                linkCount));
+    }
+
     [Fact]
     public void Production_rejects_missing_runtime_proof_mountpoint()
     {

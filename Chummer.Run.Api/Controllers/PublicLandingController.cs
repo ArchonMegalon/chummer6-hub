@@ -416,7 +416,7 @@ public sealed class PublicLandingController : Controller
         var model = new StoryPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 "What Is Chummer?",
-                "Character tools for Shadowrun.",
+                "Desktop character tools for Shadowrun players and game masters.",
                 "/what-is-chummer",
                 cancellationToken));
         return View("~/Views/PublicLanding/ProductStory.cshtml", model);
@@ -4566,7 +4566,7 @@ document.addEventListener('DOMContentLoaded', function () {
             [
                 new TrustPageActionViewModel("Open the story edition sample", "/docs/origin-dossier-the-name-she-chose", "primary"),
                 new TrustPageActionViewModel("Read the book-studio design", "/docs/origin-book-studio", "secondary"),
-                new TrustPageActionViewModel("Watch the story-to-cinema path", "/origin-dossier/media", "secondary"),
+                new TrustPageActionViewModel("Open the story-to-cinema workspace", "/origin-dossier/media", "secondary"),
                 new TrustPageActionViewModel("Download the sample PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -5003,18 +5003,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/origin-dossier/media")]
-    public async Task<IActionResult> OriginDossierMediaDispatch(CancellationToken cancellationToken)
+    public Task<IActionResult> OriginDossierMediaDispatch(CancellationToken cancellationToken)
     {
-        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("origin-dossier");
-        return await DispatchResolvedHorizonArtifactAsync(
-            operationLabel: "origin dossier media",
-            dispatchRoute: "/origin-dossier/media",
-            sourceId: "public-story-edition",
-            surface: surface,
-            dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
-            emitRunsiteHeaders: false,
-            fallbackQuotaUnavailableMessage: "Unable to confirm dossier media allowance receipt right now.",
-            cancellationToken: cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The historical public-story sample is a 90-second explainer, not a
+        // contract-v4 chapter movie. Keep it protected for archival parity,
+        // but never dispatch it as if it satisfied the current Origin Dossier
+        // promise. The signed-in workspace resolves the account-owned film,
+        // where duration, dialogue, continuity, and consent are receipt-bound.
+        return Task.FromResult<IActionResult>(Redirect("/account/work/origin-dossiers"));
     }
 
     private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
@@ -7611,7 +7609,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         PublicTrustPulseSnapshot? pulse = _trustPulse.LoadSnapshot();
         var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release status.", "/status", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release and service status.", "/status", cancellationToken),
             Manifest: manifest,
             ReleaseTruth: BuildReleaseTruthDisplay(manifest),
             ReleaseExperience: releaseExperience,

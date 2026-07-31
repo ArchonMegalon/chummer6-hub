@@ -272,6 +272,62 @@ def test_windows_installer_verifier_accepts_bootstrap_payload_with_sidecar_metad
     assert "windows_installer_payload_gate:ok checked=1" in result.stdout
 
 
+def test_windows_installer_verifier_accepts_generation_payload_role_with_hash_bound_compatibility_url(
+    tmp_path: Path,
+) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    role_url = (
+        "https://example.invalid/downloads/g/gen-test/install/"
+        "avalonia-win-x64-installer/payload"
+    )
+    compatibility_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    installer_bytes = _windows_installer_stub_with_payload_metadata(
+        payload_download_url=compatibility_url,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(installer_bytes)
+    _write_payload_sidecar(
+        files_dir / f"{payload_path.name}.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=role_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes),
+        payload_name=payload_path.name,
+        payload_download_url=role_url,
+        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifest_path),
+            "--require-embedded-bootstrap-metadata",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_windows_installer_verifier_rejects_sidecar_acquisition_mode_drift(
     tmp_path: Path,
 ) -> None:

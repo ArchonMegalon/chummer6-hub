@@ -5,7 +5,7 @@ namespace Chummer.Tests;
 public sealed class PublicEdgeDeployIsolationTests
 {
     [Fact]
-    public void PublicEdgeComposeDoesNotForcePortalToWaitForBlazor()
+    public void PublicEdgeComposeWaitsForBlazorBeforeServingInteractiveEntrypoints()
     {
         string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
         string compose = File.ReadAllText(composePath);
@@ -17,9 +17,10 @@ public sealed class PublicEdgeDeployIsolationTests
 
         Assert.Contains("chummer-portal:", compose, StringComparison.Ordinal);
         Assert.Contains("depends_on:", portalBlock, StringComparison.Ordinal);
-        Assert.Contains("- chummer-run-identity", portalBlock, StringComparison.Ordinal);
-        Assert.Contains("- support-progress-mock", portalBlock, StringComparison.Ordinal);
-        Assert.DoesNotContain("- chummer-public-blazor", portalBlock, StringComparison.Ordinal);
+        Assert.Contains("chummer-run-identity:", portalBlock, StringComparison.Ordinal);
+        Assert.Contains("support-progress-mock:", portalBlock, StringComparison.Ordinal);
+        Assert.Contains("chummer-public-blazor:", portalBlock, StringComparison.Ordinal);
+        Assert.Contains("condition: service_healthy", portalBlock, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PUBLIC_BLAZOR_PROXY_URL", compose, StringComparison.Ordinal);
     }
 
@@ -32,7 +33,7 @@ public sealed class PublicEdgeDeployIsolationTests
         Assert.Contains("HUB_CLOSEOUT_INCLUDE_BLAZOR", script, StringComparison.Ordinal);
         Assert.Contains("public_edge_services=(chummer-run-identity chummer-portal)", script, StringComparison.Ordinal);
         Assert.Contains("public_edge_services+=(chummer-public-blazor)", script, StringComparison.Ordinal);
-        Assert.Contains("docker compose \"${compose_args[@]}\" up -d --build --remove-orphans \"${public_edge_services[@]}\"", script, StringComparison.Ordinal);
+        Assert.Contains("\"$BUILD_PROVENANCE_DOCKER_BINARY\" compose \"${compose_args[@]}\" up -d --build --remove-orphans \"${public_edge_services[@]}\"", script, StringComparison.Ordinal);
         Assert.DoesNotContain("up -d --build --remove-orphans chummer-run-identity chummer-portal", script, StringComparison.Ordinal);
     }
 

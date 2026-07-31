@@ -278,6 +278,8 @@ WORK_QUEUE.md
 /Chummer.Portal/downloads/.release-shelf-activation-journal/
 /Chummer.Portal/downloads/.release-shelf-mirror-repair-*
 /Chummer.Portal/downloads/.release-shelf-compatibility-quarantine-*
+/Chummer.Portal/downloads/quarantine/
+/Chummer.Portal/downloads/*.root-backup-*
 
 # Generated installer payloads
 /Chummer.Portal/downloads/chummer6_full_product_reaudit_*.zip
@@ -347,3 +349,22 @@ Chummer/Resources/source/upscaling/4x_FireAlpha.pth
 !/.codex-studio/published/
 !/.codex-studio/published/QUEUE.generated.yaml
 !/.codex-studio/published/WORKPACKAGES.generated.yaml
+/.codex-studio/published/.PUBLIC_PROJECTION.lock
+
+# Content-addressed runtime snapshots and browser scratch receipts are retained
+# on the self-hosted proof volume. Canonical aggregate receipts remain tracked.
+/.codex-studio/published/.release-channel-authority/
+/.codex-studio/published/.verification-program-authority/
+/.codex-studio/published/public-projection-*/
+/.codex-studio/published/public-edge-browser-proofs/
+/.codex-studio/published/public-edge-postdeploy*/
+
+# Intake heartbeats, rejected operator evidence, and private campaign drafts
+# are mutable local operations state rather than reviewed release source.
+/.codex-studio/published/CURRENT.json
+/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json
+/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json
+/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json
+/.codex-studio/published/black_ledger_sendr_*.generated.json
+/.codex-studio/published/windows-installer-visual-proof/
+/Chummer.Portal/downloads/windows-installer-visual-proof/

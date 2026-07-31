@@ -31,9 +31,9 @@ test('local co-processor public route stays available and points at the signed-i
 
   await page.goto(`${baseUrl}/local-co-processor`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'LOCAL CO-PROCESSOR', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('LOCAL CO-PROCESSOR now ships a bounded first-party optional-acceleration lane');
-  await expect(page.locator('body')).toContainText('Signed-in optional profile desk');
-  await expect(page.locator('body')).toContainText('LOCAL CO-PROCESSOR does not move truth into local runtime');
+  await expect(page.locator('body')).toContainText('LOCAL CO-PROCESSOR keeps optional acceleration readable in public');
+  await expect(page.locator('body')).toContainText('Sign in for LOCAL CO-PROCESSOR');
+  await expect(page.locator('body')).toContainText('Optional acceleration surface only.');
 
   writeJsonArtifact('LOCAL_CO_PROCESSOR_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

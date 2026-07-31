@@ -1,0 +1,636 @@
+{
+  "activateRequested": true,
+  "activationAtomicCutover": true,
+  "activationFailureReason": "",
+  "activationMode": "copy",
+  "activationRecoveryPath": "",
+  "activationRetiredCleanupStatus": "not_applicable",
+  "activationRetiredRecoveryPath": "",
+  "activationRollbackStatus": "not_required",
+  "activationStatus": "activated",
+  "activationTransactionCleanupStatus": "complete",
+  "activationTransactionJournalPath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/.app.activation-transaction.json",
+  "activeBuildInfoPath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json",
+  "activeRoot": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app",
+  "authoritativeReceipt": true,
+  "backupPath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-backups/20260731T221521Z/app",
+  "backupRetention": {
+    "discoveredCount": 3,
+    "reason": "",
+    "removedCount": 1,
+    "removedTransactionNames": [
+      "20260731T212647Z"
+    ],
+    "retainedCount": 2,
+    "retainedTransactionNames": [
+      "20260731T221521Z",
+      "20260731T214905Z"
+    ],
+    "retentionCount": 2,
+    "status": "pass",
+    "unexpectedEntries": []
+  },
+  "backupRoot": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-backups",
+  "backupSkipReason": "",
+  "backupSkipped": false,
+  "buildProjectPath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj",
+  "buildRoot": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build",
+  "buildSourceRoot": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services",
+  "cleanedPaths": [
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app"
+  ],
+  "composeMountpointsCreated": [],
+  "configuration": "Release",
+  "contractName": "chummer.public_edge_portal_overlay_publish.v1",
+  "copiedBlackLedger": true,
+  "copiedBuildWorkspaceRoots": [
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-design",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-core-engine",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-hub-registry",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/fleet/repos/chummer-media-factory",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/fleet"
+  ],
+  "copiedCodexDesign": true,
+  "copiedSourceWwwroot": false,
+  "diskCapacityCheck": {
+    "checkedAtUtc": "2026-07-31T22:14:11.894775Z",
+    "defaultMinimumFreeBytes": 8589934592,
+    "failures": [],
+    "filesystems": [
+      {
+        "device": 64769,
+        "freeBytes": 42714976256,
+        "probePath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next",
+        "roots": [
+          {
+            "label": "stagingRoot",
+            "path": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app"
+          },
+          {
+            "label": "buildRoot",
+            "path": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build"
+          }
+        ],
+        "sufficient": true,
+        "totalBytes": 747760488448,
+        "usedBytes": 705028734976
+      }
+    ],
+    "minimumFreeBytes": 8589934592,
+    "overrideRequested": false,
+    "status": "pass"
+  },
+  "generatedAtUtc": "2026-07-31T22:15:23.730918Z",
+  "goalCompletionClaimAllowed": false,
+  "nextAction": "Recreate chummer-portal from the refreshed mounted overlay and rerun local /status postdeploy proof.",
+  "payloadModeIntegrityCheck": {
+    "actual": {
+      "entryBindingSha256": "c34931d7d8a6c92ee430054a1eca1bc8677c3b6177618d1dc9a8db8a7dcf09f0",
+      "entryCount": 603
+    },
+    "algorithm": "sha256-canonical-json-sorted-relative-path-kind-mode-v1",
+    "checks": {
+      "currentPayloadModePolicyPasses": true,
+      "entryBindingSha256Matches": true,
+      "exactSortedRelativePathKindModeRowsMatch": true
+    },
+    "contractName": "chummer.public_edge_payload_mode_receipt_binding.v1",
+    "expected": {
+      "entryBindingSha256": "c34931d7d8a6c92ee430054a1eca1bc8677c3b6177618d1dc9a8db8a7dcf09f0",
+      "entryCount": 603
+    },
+    "failures": [],
+    "stateContentsInspected": false,
+    "status": "pass"
+  },
+  "payloadModeNormalization": {
+    "changedEntryCount": 584,
+    "entryBinding": {
+      "algorithm": "sha256-canonical-json-sorted-relative-path-kind-mode-v1",
+      "rowCount": 603,
+      "sha256": "c34931d7d8a6c92ee430054a1eca1bc8677c3b6177618d1dc9a8db8a7dcf09f0"
+    },
+    "status": "pass"
+  },
+  "productionExecutionEvidenceMatches": true,
+  "projectPath": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj",
+  "publish": {
+    "exitCode": 0,
+    "skipReason": "",
+    "skipped": false,
+    "stderrTail": "",
+    "stdoutTail": "stored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Control.Contracts/Chummer.Control.Contracts.csproj (in 2 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj (in 3 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj (in 23 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj (in 1 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj (in 1 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj (in 1 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj (in 0.7 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj (in 22 ms).\n  Restored /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj (in 520 ms).\n  Chummer.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-core-engine/Chummer.Contracts/bin/Release/net10.0/Chummer.Engine.Contracts.dll\n  Chummer.Hub.Registry.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Release/net10.0/Chummer.Hub.Registry.Contracts.dll\n  Chummer.Run.Registry -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer-hub-registry/Chummer.Run.Registry/bin/Release/net10.0/Chummer.Run.Registry.dll\n  Chummer.Media.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Release/net10.0/Chummer.Media.Contracts.dll\n  Chummer.Campaign.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Campaign.Contracts/bin/Release/net10.0/Chummer.Campaign.Contracts.dll\n  Chummer.Control.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Control.Contracts/bin/Release/net10.0/Chummer.Control.Contracts.dll\n  Chummer.Play.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Play.Contracts/bin/Release/net10.0/Chummer.Play.Contracts.dll\n  Chummer.Run.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Contracts/bin/Release/net10.0/Chummer.Run.Contracts.dll\n  Chummer.World.Contracts -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.World.Contracts/bin/Release/net10.0/Chummer.World.Contracts.dll\n  Chummer.Run.Api -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Api/bin/Release/net10.0/Chummer.Run.Api.dll\n  Chummer.Run.Api -> /docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app/\n",
+    "timedOut": false,
+    "timeoutSeconds": 1800.0
+  },
+  "publishCommand": [
+    "dotnet",
+    "publish",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-build/workspace/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj",
+    "-c",
+    "Release",
+    "-o",
+    "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app",
+    "--nologo",
+    "-m:1",
+    "-p:BuildInParallel=false",
+    "-p:UseSharedCompilation=false",
+    "-p:ChummerDesktopRuntimeIdentifiers="
+  ],
+  "publishTimeoutSeconds": 1800.0,
+  "releaseChannelReceipt": {
+    "byteLength": 74869,
+    "channel": "preview",
+    "proofFreshnessStatus": "stale",
+    "publishedAt": "2026-07-31T07:59:45Z",
+    "selectedPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/portal/RELEASE_CHANNEL.generated.json",
+    "sha256Actual": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+    "sha256Expected": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+    "sha256Matches": true,
+    "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.release-channel-authority/RELEASE_CHANNEL.6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4.json",
+    "status": "published",
+    "supportabilityState": "review_required",
+    "version": "run-20260731-095000"
+  },
+  "reuseStaging": false,
+  "sharedMutationLock": {
+    "acquiredBeforeOverlayPublishLock": true,
+    "inherited": false,
+    "path": "/docker/chummercomplete/.state/public-edge-mutation.lock",
+    "required": true,
+    "status": "held"
+  },
+  "skipBackupOnActivate": false,
+  "sourceRoot": "/docker/chummercomplete/chummer.run-services",
+  "stagedPayloadIntegrityCheck": {
+    "afterVerification": {
+      "aggregateSha256": "3a32fe59cbcb778930db9bacc7fe3a4a45664065ed1e5c514d982242213be450",
+      "algorithm": "sha256-canonical-path-content-size-posix-mode-runtime-mount-exclusions-v3",
+      "excludedRelativePaths": [
+        "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+      ],
+      "fileCount": 567
+    },
+    "beforeVerification": {
+      "aggregateSha256": "3a32fe59cbcb778930db9bacc7fe3a4a45664065ed1e5c514d982242213be450",
+      "algorithm": "sha256-canonical-path-content-size-posix-mode-runtime-mount-exclusions-v3",
+      "excludedRelativePaths": [
+        "wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+      ],
+      "fileCount": 567
+    },
+    "inspectionError": "",
+    "reason": "",
+    "status": "pass"
+  },
+  "stagingBuildInfoPath": "",
+  "stagingRoot": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app",
+  "stagingSourceFingerprintCheck": {
+    "buildInfoPath": "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay-next/app/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json",
+    "buildInputAlgorithmMatches": true,
+    "buildInputsMatchCurrentSource": true,
+    "criticalFileDetailMismatches": [],
+    "criticalFileDetailsMatchCurrentSource": true,
+    "criticalFilesMatchCurrentSource": true,
+    "expectedAggregateSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+    "expectedBuildInputAggregateSha256": "b5df635c5ad668e00af975db7a330e4a35ab68b8958aadb9f3c00fc1508c9c46",
+    "expectedBuildInputAlgorithm": "sha256-canonical-path-content-size-v1",
+    "expectedBuildInputFileCount": 1645,
+    "expectedOverlayPayloadInputAggregateSha256": "2b68515f71d439d4ac84cbc7349c2319a02cc841c222dd958811428979faca5a",
+    "expectedOverlayPayloadInputAlgorithm": "sha256-canonical-path-content-size-v1",
+    "expectedOverlayPayloadInputFileCount": 208,
+    "expectedSourceFingerprint": {
+      "aggregateSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+      "buildInputs": {
+        "aggregateSha256": "b5df635c5ad668e00af975db7a330e4a35ab68b8958aadb9f3c00fc1508c9c46",
+        "algorithm": "sha256-canonical-path-content-size-v1",
+        "fileCount": 1645
+      },
+      "files": {
+        "authController": {
+          "relativePath": "Chummer.Run.Api/Controllers/AuthController.cs",
+          "sha256": "fc2cbd882b65f9d6a86b2239bbfb2b52ae63ced636db49d86399a1dc7dfdd0c7"
+        },
+        "authEntryView": {
+          "relativePath": "Chummer.Run.Api/Views/Auth/Entry.cshtml",
+          "sha256": "ae9bbbc9fd9ded480fd5da9627742aae6f8ebffe22b3a5303eb61d4574e46d09"
+        },
+        "authPolicy": {
+          "relativePath": "Chummer.Run.Api/Services/HubEmailSignInPolicy.cs",
+          "sha256": "8f94018b1eee5a46fcb98e383fb8320f8244dfdac799dda175446668c2601402"
+        },
+        "billingAuthController": {
+          "relativePath": "Chummer.Run.Api/Controllers/BrilliantDirectoriesBillingController.cs",
+          "sha256": "07b0da810356fb5e3712b4fdabc285b83c9d34d7687c3db8cfbbdbb66408ac61"
+        },
+        "billingMembershipView": {
+          "relativePath": "Chummer.Run.Api/Views/Billing/Membership.cshtml",
+          "sha256": "6880a050e2c4a63a9ffe4e7fc82f49a66aee6570ac6fd533f48fa60f963e230b"
+        },
+        "downloads": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml",
+          "sha256": "40da7131ff32f573538357a384356bbb484ed6aa8be8e4dff1c4a8b37d771a01"
+        },
+        "landing": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+          "sha256": "1ce81297d90c26193018bbcbd02fc70991aa4ab82027e74dc5dfec96b8c8d648"
+        },
+        "program": {
+          "relativePath": "Chummer.Run.Api/Program.cs",
+          "sha256": "8236cf735fa65a7fce710858811fb4859992fc8175fcb7b0d6ef9236951ffd50"
+        },
+        "readyForTonight": {
+          "relativePath": "Chummer.Run.Api/Services/ReadyForTonightService.cs",
+          "sha256": "b28a800fe31b9b1310a7626a68fef55d6edca61f62649f916cbf924f7c9dcff9"
+        },
+        "siteViewModels": {
+          "relativePath": "Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+          "sha256": "ed085da811b77dbd96911adf30cfe0fc6dac87def37a6f1176012559bbb7298b"
+        },
+        "status": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+          "sha256": "c7e7f744b0b6fb3aa4ba7857d89848a10256b9449d6736123a7e3e3f63188bb0"
+        }
+      },
+      "overlayPayloadInputs": {
+        "aggregateSha256": "2b68515f71d439d4ac84cbc7349c2319a02cc841c222dd958811428979faca5a",
+        "algorithm": "sha256-canonical-path-content-size-v1",
+        "fileCount": 208
+      }
+    },
+    "matchesCurrentSource": true,
+    "overlayPayloadInputsMatchCurrentSource": true,
+    "reason": "",
+    "recordedAggregateSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+    "recordedBuildInputAggregateSha256": "b5df635c5ad668e00af975db7a330e4a35ab68b8958aadb9f3c00fc1508c9c46",
+    "recordedBuildInputAlgorithm": "sha256-canonical-path-content-size-v1",
+    "recordedBuildInputFileCount": 1645,
+    "recordedOverlayPayloadInputAggregateSha256": "2b68515f71d439d4ac84cbc7349c2319a02cc841c222dd958811428979faca5a",
+    "recordedOverlayPayloadInputAlgorithm": "sha256-canonical-path-content-size-v1",
+    "recordedOverlayPayloadInputFileCount": 208,
+    "recordedSourceFingerprint": {
+      "aggregateSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+      "buildInputs": {
+        "aggregateSha256": "b5df635c5ad668e00af975db7a330e4a35ab68b8958aadb9f3c00fc1508c9c46",
+        "algorithm": "sha256-canonical-path-content-size-v1",
+        "fileCount": 1645
+      },
+      "files": {
+        "authController": {
+          "relativePath": "Chummer.Run.Api/Controllers/AuthController.cs",
+          "sha256": "fc2cbd882b65f9d6a86b2239bbfb2b52ae63ced636db49d86399a1dc7dfdd0c7"
+        },
+        "authEntryView": {
+          "relativePath": "Chummer.Run.Api/Views/Auth/Entry.cshtml",
+          "sha256": "ae9bbbc9fd9ded480fd5da9627742aae6f8ebffe22b3a5303eb61d4574e46d09"
+        },
+        "authPolicy": {
+          "relativePath": "Chummer.Run.Api/Services/HubEmailSignInPolicy.cs",
+          "sha256": "8f94018b1eee5a46fcb98e383fb8320f8244dfdac799dda175446668c2601402"
+        },
+        "billingAuthController": {
+          "relativePath": "Chummer.Run.Api/Controllers/BrilliantDirectoriesBillingController.cs",
+          "sha256": "07b0da810356fb5e3712b4fdabc285b83c9d34d7687c3db8cfbbdbb66408ac61"
+        },
+        "billingMembershipView": {
+          "relativePath": "Chummer.Run.Api/Views/Billing/Membership.cshtml",
+          "sha256": "6880a050e2c4a63a9ffe4e7fc82f49a66aee6570ac6fd533f48fa60f963e230b"
+        },
+        "downloads": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml",
+          "sha256": "40da7131ff32f573538357a384356bbb484ed6aa8be8e4dff1c4a8b37d771a01"
+        },
+        "landing": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+          "sha256": "1ce81297d90c26193018bbcbd02fc70991aa4ab82027e74dc5dfec96b8c8d648"
+        },
+        "program": {
+          "relativePath": "Chummer.Run.Api/Program.cs",
+          "sha256": "8236cf735fa65a7fce710858811fb4859992fc8175fcb7b0d6ef9236951ffd50"
+        },
+        "readyForTonight": {
+          "relativePath": "Chummer.Run.Api/Services/ReadyForTonightService.cs",
+          "sha256": "b28a800fe31b9b1310a7626a68fef55d6edca61f62649f916cbf924f7c9dcff9"
+        },
+        "siteViewModels": {
+          "relativePath": "Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+          "sha256": "ed085da811b77dbd96911adf30cfe0fc6dac87def37a6f1176012559bbb7298b"
+        },
+        "status": {
+          "relativePath": "Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+          "sha256": "c7e7f744b0b6fb3aa4ba7857d89848a10256b9449d6736123a7e3e3f63188bb0"
+        }
+      },
+      "overlayPayloadInputs": {
+        "aggregateSha256": "2b68515f71d439d4ac84cbc7349c2319a02cc841c222dd958811428979faca5a",
+        "algorithm": "sha256-canonical-path-content-size-v1",
+        "fileCount": 208
+      }
+    },
+    "status": "pass"
+  },
+  "status": "pass",
+  "testOnly": false,
+  "testOutcomeStatus": "",
+  "verification": {
+    "baseUrl": "http://127.0.0.1:44081",
+    "childReceiptSha256BeforeProgramBinding": "60ec61ce5c6e06a7de76ba344869ea36ba3d0d479af2782abf4a8f318e91599f",
+    "combinedReadiness": {
+      "bodyReady": true,
+      "bodyStatus": "ready",
+      "checks": {
+        "bodyReady": true,
+        "bodyStatus": true,
+        "combinedConsistent": true,
+        "http200": true,
+        "hubObject": true,
+        "hubReady": true,
+        "hubStatus": true,
+        "jsonObject": true,
+        "projectionDisabled": true,
+        "projectionObject": true,
+        "projectionReady": true,
+        "projectionStatus": true,
+        "transport": true
+      },
+      "httpStatus": 200,
+      "hub": {
+        "ready": true,
+        "status": "pass"
+      },
+      "jsonError": "",
+      "playProjection": {
+        "detail": "Remote Play projection is off; local digest-pinned install mirrors are authoritative.",
+        "enabled": false,
+        "ready": true,
+        "status": "disabled"
+      },
+      "status": "pass",
+      "transportError": "",
+      "url": "http://127.0.0.1:44081/api/ready"
+    },
+    "exitCode": 1,
+    "landingBrowserRedirect": {
+      "browserName": "chromium",
+      "entryUrl": "http://127.0.0.1:44081/#turn-runsite-card",
+      "error": "",
+      "expectedHash": "#turn-runsite-card",
+      "expectedPath": "/mobile/player",
+      "finalUrl": "http://127.0.0.1:44081/mobile/player#turn-runsite-card",
+      "hashMatches": true,
+      "heading": "Keep your runner ready at the table.",
+      "pathMatches": true,
+      "reason": "",
+      "status": "pass",
+      "title": "Install Chummer Player Companion"
+    },
+    "landingForbiddenMarkerChecks": {
+      "playDisabledButton": true,
+      "playDisabledTarget": true,
+      "playSignInRoute": true,
+      "turnAnchorQueryReplay": true
+    },
+    "landingForbiddenMarkers": [],
+    "landingMarkerChecks": {
+      "playDirectTarget": true,
+      "playInstallHandoff": true,
+      "turnAnchor": true,
+      "turnAnchorNormalizedHash": true,
+      "turnAnchorRedirect": true
+    },
+    "landingMarkerStatus": "pass",
+    "landingMissingMarkers": [],
+    "localLiveSurfaceParity": {
+      "failureCount": 0,
+      "failures": [],
+      "programBinding": {
+        "byteLength": 37909,
+        "error": "",
+        "name": "liveSurfaceParity",
+        "sha256Expected": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "snapshotDevice": 64769,
+        "snapshotIdentityMatches": true,
+        "snapshotIndependentInode": true,
+        "snapshotInode": 3691169,
+        "snapshotLinkCount": 1,
+        "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_live_surface_parity.34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30.py",
+        "snapshotSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "snapshotSha256Matches": true,
+        "snapshotWriteBits": 0,
+        "sourcePath": "/docker/chummercomplete/chummer.run-services/scripts/verify_live_surface_parity.py",
+        "sourceSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "sourceSha256Matches": true,
+        "status": "pass"
+      },
+      "programBindingMatches": true,
+      "programSnapshotImported": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_live_surface_parity.34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30.py",
+      "receiptPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.local-overlay.generated.json",
+      "status": "pass",
+      "verdict": "LIVE_SURFACE_PARITY_READY"
+    },
+    "localRuntimeDependencyBaseUrl": "http://127.0.0.1:51753",
+    "parityProgramSnapshotImported": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_live_surface_parity.34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30.py",
+    "passReceiptContractSatisfied": true,
+    "probeError": "",
+    "productionExecutionEvidence": {
+      "checks": {
+        "childProducerDigest": true,
+        "childProgramEnvelope": true,
+        "outerProgramEnvelope": true,
+        "parityBinding": true,
+        "paritySnapshotPath": true,
+        "receiptDigest": true,
+        "receiptIndependentFile": true,
+        "receiptPath": true,
+        "sealedExecutionDigest": true,
+        "sealedExecutionMode": true,
+        "verifierSnapshotPath": true
+      },
+      "failures": [],
+      "status": "pass"
+    },
+    "productionExecutionEvidenceMatches": true,
+    "reason": "",
+    "receiptAllowsOverlayActivation": true,
+    "receiptBindingMatchesSelectedInput": true,
+    "receiptInvocationMatchesCurrent": true,
+    "receiptPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_PORTAL_OVERLAY_VERIFY.generated.json",
+    "receiptProcessResultConsistent": true,
+    "receiptProgramBindingsMatch": true,
+    "receiptSha256": "edfc7f50648c91e665658f0885d4cd34d12688eca60ec062eced4be0ec86463b",
+    "receiptStatus": "fail",
+    "receiptSummary": {
+      "combinedReadinessBodyReady": true,
+      "combinedReadinessHttpStatus": 200,
+      "combinedReadinessStatus": "pass",
+      "downloadsHasMarker": true,
+      "landingBrowserRedirectHashMatches": true,
+      "landingBrowserRedirectPathMatches": true,
+      "landingBrowserRedirectStatus": "pass",
+      "landingHasPlayDirectTarget": true,
+      "landingHasPlayInstallHandoff": true,
+      "landingHasTurnAnchor": true,
+      "landingHasTurnAnchorRedirect": true,
+      "landingOmitsPlayDisabledButton": true,
+      "landingOmitsPlayDisabledTarget": true,
+      "landingOmitsPlaySignInRoute": true,
+      "landingOmitsTurnAnchorQueryReplay": true,
+      "localLiveSurfaceParityFailureCount": 0,
+      "localLiveSurfaceParityStatus": "pass",
+      "passReceiptContractSatisfied": true,
+      "playProjectionStatus": "disabled",
+      "receiptAllowsOverlayActivation": true,
+      "receiptBindingMatchesSelectedInput": true,
+      "receiptInvocationMatchesCurrent": true,
+      "receiptProcessResultConsistent": true,
+      "receiptProgramBindingsMatch": true,
+      "releaseChannelPublishedAt": "2026-07-31T07:59:45Z",
+      "releaseChannelReceiptSha256": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+      "releaseChannelVersion": "run-20260731-095000",
+      "releaseManifestConservativeReviewFloorApplied": false,
+      "statusRedirectHasMarker": true,
+      "statusRedirectHeading": "Preview downloads",
+      "statusRedirectHeadingExpected": "Preview downloads",
+      "verificationProgramsMatch": true
+    },
+    "releaseChannelPublishedAt": "2026-07-31T07:59:45Z",
+    "releaseChannelReceiptPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.release-channel-authority/RELEASE_CHANNEL.6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4.json",
+    "releaseChannelReceiptSha256Actual": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+    "releaseChannelReceiptSha256Expected": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+    "releaseChannelReceiptSha256Matches": true,
+    "releaseChannelReceiptSnapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.release-channel-authority/RELEASE_CHANNEL.6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4.json",
+    "releaseChannelVersion": "run-20260731-095000",
+    "releaseManifestConservativeReviewFloorApplied": false,
+    "releaseManifestRolloutCompatible": true,
+    "releaseManifestRolloutExact": true,
+    "releaseManifestSupportabilityCompatible": true,
+    "releaseManifestSupportabilityExact": true,
+    "runtimeReleaseShelf": {
+      "byteLength": 74869,
+      "canonicalManifestPath": "/tmp/chummer-public-edge-overlay-verify-3qyo26nx/release-shelf/RELEASE_CHANNEL.generated.json",
+      "canonicalManifestSha256": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+      "contractName": "chummer.public_edge.bound_release_channel_shelf.v1",
+      "matchesSelectedReceipt": true,
+      "rootPath": "/tmp/chummer-public-edge-overlay-verify-3qyo26nx/release-shelf",
+      "selectedReceiptSha256": "6053f3de6fe7d1fd2d982a1d7111e906cd5c6593d239d1458d67467d71bc5dd4",
+      "status": "pass"
+    },
+    "startupLogPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_PORTAL_OVERLAY_VERIFY.startup.log",
+    "startupLogTail": "     Hub request started: GET participate/board (3ce969376343dc41b4e1afe9e8027cc6).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET participate/board -> 302 in 0.3041 ms (3ce969376343dc41b4e1afe9e8027cc6).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET participate (5f101cddcd86a53412df903558eb3969).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET participate -> 200 in 1.5396 ms (5f101cddcd86a53412df903558eb3969).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET mobile (94b1afd5345b2ff3c51f9589afdbbce4).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET mobile -> 200 in 22.071 ms (94b1afd5345b2ff3c51f9589afdbbce4).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET mobile/{role} (ac8e94573ab178f5fd1ba381b6ee6d86).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET mobile/{role} -> 200 in 12.252 ms (ac8e94573ab178f5fd1ba381b6ee6d86).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET mobile/{role} (7f59ccce642c470a91a262affb74c25a).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET mobile/{role} -> 200 in 9.2484 ms (7f59ccce642c470a91a262affb74c25a).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET mobile/{role} (0f00fce4279032027d0d36c341055775).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET mobile/{role} -> 200 in 11.1822 ms (0f00fce4279032027d0d36c341055775).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET play (3d8a0da002453a5fa3b9129a1ab08ed1).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET play -> 302 in 5.6623 ms (3d8a0da002453a5fa3b9129a1ab08ed1).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET mobile/{role} (fc79d94cb61e50a2808d7bebb842c290).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET mobile/{role} -> 200 in 12.1045 ms (fc79d94cb61e50a2808d7bebb842c290).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET play/continuity (7a28aea2f1da9b575b633d4b8d83159c).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET play/continuity -> 200 in 115.812 ms (7a28aea2f1da9b575b633d4b8d83159c).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET ledger (a116dbbe38bc6d11574aa3744405dd6b).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET ledger -> 302 in 10.0174 ms (a116dbbe38bc6d11574aa3744405dd6b).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET ledger/map (69b3b65bf6affa491fb2dede5c945cdf).\ninfo: Chummer.Run.Api.Services.Community.BlackLedgerDispatchService[0]\n      Seeded 7 Black Ledger dispatch records into CommunityStore.\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET ledger/map -> 200 in 621.5136 ms (69b3b65bf6affa491fb2dede5c945cdf).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET ledger/newsroom (1a1a9a0dc602ad7caa2aa93bb050fb62).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET ledger/newsroom -> 302 in 45.2759 ms (1a1a9a0dc602ad7caa2aa93bb050fb62).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request started: GET ledger/newsroom/{episodeId} (9cdefbacf69e6e4d2e521ece2b3949c9).\ninfo: Chummer.Run.Api.HubRequestObservabilityMiddleware[0]\n      Hub request completed: GET ledger/newsroom/{episodeId} -> 200 in 554.5815 ms (9cdefbacf69e6e4d2e521ece2b3949c9).\n",
+    "status": "pass",
+    "stderr": "",
+    "stdout": "",
+    "testOnlyHooksInjected": false,
+    "timedOut": false,
+    "verificationDeadline": {
+      "deadlineSeconds": 900.0,
+      "elapsedSeconds": 7.982513524999376,
+      "phase": "live_surface_parity_complete",
+      "remainingSeconds": 892.0174838309758,
+      "status": "pass",
+      "timedOut": false
+    },
+    "verificationInvocationId": "7921c6eb3868234a56a0485d7bebf762",
+    "verificationPrograms": {
+      "contractName": "chummer.public_edge_verification_programs.v1",
+      "programs": {
+        "downloadsVersionMarker": {
+          "byteLength": 106122,
+          "error": "",
+          "name": "downloadsVersionMarker",
+          "sha256Expected": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+          "snapshotDevice": 64769,
+          "snapshotIdentityMatches": true,
+          "snapshotIndependentInode": true,
+          "snapshotInode": 3672942,
+          "snapshotLinkCount": 1,
+          "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_downloads_version_marker.4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf.py",
+          "snapshotSha256Actual": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+          "snapshotSha256Matches": true,
+          "snapshotWriteBits": 0,
+          "sourcePath": "/docker/chummercomplete/chummer.run-services/scripts/verify_downloads_version_marker.py",
+          "sourceSha256Actual": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+          "sourceSha256Matches": true,
+          "status": "pass"
+        },
+        "liveSurfaceParity": {
+          "byteLength": 37909,
+          "error": "",
+          "name": "liveSurfaceParity",
+          "sha256Expected": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+          "snapshotDevice": 64769,
+          "snapshotIdentityMatches": true,
+          "snapshotIndependentInode": true,
+          "snapshotInode": 3691169,
+          "snapshotLinkCount": 1,
+          "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_live_surface_parity.34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30.py",
+          "snapshotSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+          "snapshotSha256Matches": true,
+          "snapshotWriteBits": 0,
+          "sourcePath": "/docker/chummercomplete/chummer.run-services/scripts/verify_live_surface_parity.py",
+          "sourceSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+          "sourceSha256Matches": true,
+          "status": "pass"
+        }
+      },
+      "status": "pass"
+    },
+    "verificationProgramsMatch": true,
+    "verifierProgramExecutionMode": "sealed_memfd_from_content_addressed_snapshot",
+    "verifierProgramExecutionSha256Actual": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+    "verifierProgramExecutionSha256Expected": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+    "verifierProgramExecutionSha256Matches": true,
+    "verifierProgramSnapshotExecuted": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_downloads_version_marker.4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf.py"
+  },
+  "verificationDeadlineSeconds": 900.0,
+  "verificationPrograms": {
+    "contractName": "chummer.public_edge_verification_programs.v1",
+    "programs": {
+      "downloadsVersionMarker": {
+        "byteLength": 106122,
+        "error": "",
+        "name": "downloadsVersionMarker",
+        "sha256Expected": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+        "snapshotDevice": 64769,
+        "snapshotIdentityMatches": true,
+        "snapshotIndependentInode": true,
+        "snapshotInode": 3672942,
+        "snapshotLinkCount": 1,
+        "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_downloads_version_marker.4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf.py",
+        "snapshotSha256Actual": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+        "snapshotSha256Matches": true,
+        "snapshotWriteBits": 0,
+        "sourcePath": "/docker/chummercomplete/chummer.run-services/scripts/verify_downloads_version_marker.py",
+        "sourceSha256Actual": "4ba92319207e2567a709a9e7447691abfeec3687feec95ce676bfe40db7997bf",
+        "sourceSha256Matches": true,
+        "status": "pass"
+      },
+      "liveSurfaceParity": {
+        "byteLength": 37909,
+        "error": "",
+        "name": "liveSurfaceParity",
+        "sha256Expected": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "snapshotDevice": 64769,
+        "snapshotIdentityMatches": true,
+        "snapshotIndependentInode": true,
+        "snapshotInode": 3691169,
+        "snapshotLinkCount": 1,
+        "snapshotPath": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/.verification-program-authority/verify_live_surface_parity.34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30.py",
+        "snapshotSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "snapshotSha256Matches": true,
+        "snapshotWriteBits": 0,
+        "sourcePath": "/docker/chummercomplete/chummer.run-services/scripts/verify_live_surface_parity.py",
+        "sourceSha256Actual": "34f00c27c0bef04c37368fa94b742ecaf87e84727d1c0b6e0386c4799499cf30",
+        "sourceSha256Matches": true,
+        "status": "pass"
+      }
+    },
+    "status": "pass"
+  },
+  "verificationProgramsMatch": true,
+  "verifyTimeoutSeconds": 30.0,
+  "warning": "The public-edge compose service bind-mounts /app from the active overlay root. Rebuilding the image alone does not refresh runtime payload."
+}

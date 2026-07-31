@@ -4647,7 +4647,7 @@
                             @foreach (var surface in entitlementSyncReceipts.ReceiptSurfaces)
                             {
                                 <details class="details-drawer">
-                                    <summary>@surface.Label · @surface.Status.LeadReceiptId</summary>
+                                    <summary>@surface.Label</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Recovery hint</span>
@@ -4714,10 +4714,6 @@
                         <h3>Workspace restore</h3>
                         <div class="settings-summary-list">
                             <div class="settings-summary-row">
-                                <span>Lead subject</span>
-                                <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
-                            </div>
-                            <div class="settings-summary-row">
                                 <span>Safe to continue</span>
                                 <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
                             </div>
@@ -4732,7 +4728,7 @@
                             @foreach (var surface in selectedWorkspaceServerPlane.RestoreReceiptSurfaces)
                             {
                                 <details class="details-drawer">
-                                    <summary>@surface.Label · @surface.Status.LeadReceiptId</summary>
+                                    <summary>@surface.Label</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Recovery hint</span>

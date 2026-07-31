@@ -195,8 +195,8 @@ PUBLIC_EDGE_HOME_VIEW_RELATIVE_PATH = Path("Chummer.Run.Api") / "Views" / "Publi
 PUBLIC_EDGE_HORIZONS_VIEW_RELATIVE_PATH = Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Horizons.cshtml"
 PUBLIC_EDGE_STATUS_CONTROLLER_RELATIVE_PATH = Path("Chummer.Run.Api") / "Controllers" / "PublicLandingController.cs"
 PUBLIC_EDGE_SERVICE_WORKER_RELATIVE_PATH = Path("Chummer.Run.Api") / "wwwroot" / "service-worker.js"
-PUBLIC_EDGE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release status.", "/status", cancellationToken)'
-PUBLIC_EDGE_STALE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer release status.", "/status", cancellationToken)'
+PUBLIC_EDGE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release and service status.", "/status", cancellationToken)'
+PUBLIC_EDGE_STALE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer release and service status.", "/status", cancellationToken)'
 PUBLIC_EDGE_OPERATIONAL_MIRROR_EXACT_PATH_SPECS: tuple[tuple[str, Path, str, str], ...] = (
     ("statusView", PUBLIC_EDGE_STATUS_VIEW_RELATIVE_PATH, "status view", "public_edge_operational_mirror_status_view"),
     ("downloadsView", PUBLIC_EDGE_DOWNLOADS_VIEW_RELATIVE_PATH, "downloads view", "public_edge_operational_mirror_downloads_view"),

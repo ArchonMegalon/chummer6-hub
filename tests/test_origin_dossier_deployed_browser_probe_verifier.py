@@ -98,6 +98,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "next_action": "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected." if passed else "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN for a real deployed owner session and rerun this probe.",
         "blocking_reason": "" if passed else ",".join(blockers),
         "goldEligible": passed,
+        "goldBlockers": [] if passed else ["canon_privacy_receipts_present", "no_fallback_media_verified"],
         "deployedRouteClaimAllowed": passed,
         "local_fixture_artifacts": False,
         "live_provider_artifacts_verified": True,
@@ -112,6 +113,9 @@ def probe_payload(*, status: str = "blocked") -> dict:
         },
         "envFile": {"valuesStoredInReceipt": False},
         "blockers": blockers,
+        "listen_delivery_mode": "audiobookshelf_redirect" if passed else "blocked",
+        "listen_direct_artifact_verified": False,
+        "audiobook_sha_matches_import": False,
         "progress": {
             "passedChecks": len([value for value in flags.values() if value]),
             "totalChecks": len(flags),
@@ -184,6 +188,27 @@ def test_verifier_accepts_pass_probe_when_require_pass(tmp_path: Path) -> None:
     module = load_module()
     path = tmp_path / "probe.json"
     write_json(path, probe_payload(status="pass"))
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is True
+    assert issues == []
+
+
+def test_verifier_accepts_direct_audio_owner_delivery(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    audio_sha = "e" * 64
+    payload["listen_delivery_mode"] = "direct_artifact"
+    payload["listen_direct_artifact_verified"] = True
+    payload["audiobook_sha_matches_import"] = True
+    payload["http_statuses"]["listen"] = 200
+    payload["response_body_sizes"]["listen"] = 42
+    payload["response_sha256"]["listen"] = audio_sha
+    payload["expected_import_sha256"]["listen"] = audio_sha
+    payload["redirect_location_sha256"]["listen"] = ""
+    write_json(path, payload)
 
     ok, issues = module.verify(path, require_pass=True)
 
@@ -317,8 +342,7 @@ def test_verifier_rejects_listen_gate_without_expected_redirect_location(tmp_pat
     ok, issues = module.verify(path, require_pass=True)
 
     assert ok is False
-    assert "redirect_gate_flag_not_backed_by_location:listen" in issues
-    assert "pass_probe_redirect_location_mismatch:listen" in issues
+    assert "listen_redirect_mode_location_invalid" in issues
 
 
 def test_verifier_rejects_pass_probe_with_missing_canon_audit_content(tmp_path: Path) -> None:

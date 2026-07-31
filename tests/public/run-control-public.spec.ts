@@ -28,8 +28,8 @@ test('run control public route stays available and points at the signed-in contr
 
   await page.goto(`${baseUrl}/run-control`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'RUN CONTROL', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('RUN CONTROL now ships a real first-party GM operations lane');
-  await expect(page.locator('body')).toContainText('Signed-in control desk');
+  await expect(page.locator('body')).toContainText('RUN CONTROL keeps board status readable in public');
+  await expect(page.locator('body')).toContainText('Sign in for RUN CONTROL');
   await expect(page.locator('body')).toContainText('GM-control surface only.');
 
   writeJsonArtifact('RUN_CONTROL_ROUTE_PROOF.generated.json', {

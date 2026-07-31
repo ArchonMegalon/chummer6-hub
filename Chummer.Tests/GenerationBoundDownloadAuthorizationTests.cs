@@ -206,6 +206,34 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         Assert.IsType<UnauthorizedObjectResult>(payloadDenied);
 
         ReleaseShelfSnapshot snapshot = fixture.ManifestService.CaptureShelfGeneration("generation-a");
+        byte[] sidecar = Assert.IsType<byte[]>(snapshot.ReadVerifiedFileBytes(
+            $"files/{GenerationFixture.PayloadFileName}.json",
+            64 * 1024));
+        bool sidecarValid = PayloadSidecarContractValidator.TryValidate(
+            sidecar,
+            artifact.FileName,
+            artifact.PayloadFileName,
+            artifact.PayloadDownloadUrl,
+            artifact.PayloadSha256,
+            artifact.PayloadSizeBytes,
+            manifest.Version,
+            artifact.PayloadAcquisitionMode,
+            allowMutableIncomingUrl: false,
+            out string? sidecarFailure);
+        Assert.True(sidecarValid, sidecarFailure);
+        foreach (string role in new[]
+                 {
+                     ArtifactDeliveryRoles.Primary,
+                     ArtifactDeliveryRoles.Payload,
+                     ArtifactDeliveryRoles.PayloadMetadata
+                 })
+        {
+            ArtifactDeliveryResolution resolution = fixture.DeliveryPolicy.ResolveByArtifactId(
+                snapshot,
+                artifact.Id,
+                role);
+            Assert.True(resolution.Allowed, $"{role}: {resolution.Code}");
+        }
         IReadOnlyList<InstallBootstrapArtifactBinding> bindings = fixture.DeliveryPolicy.BuildCredentialBindings(
             snapshot,
             [artifact]);
@@ -729,7 +757,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             string payloadPath = Path.Combine(filesRoot, PayloadFileName);
             File.WriteAllBytes(payloadPath, payloadBytes);
             string payloadSha256 = Convert.ToHexStringLower(SHA256.HashData(payloadBytes));
-            string payloadUrl = $"/downloads/g/{generationId}/files/{PayloadFileName}";
+            string payloadUrl = $"/downloads/g/{generationId}/install/{ArtifactId}/payload";
             File.WriteAllText(
                 Path.Combine(filesRoot, PayloadFileName + ".json"),
                 JsonSerializer.Serialize(new Dictionary<string, object?>
@@ -740,7 +768,8 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                     ["sha256"] = payloadSha256,
                     ["sizeBytes"] = payloadBytes.Length,
                     ["installerFileName"] = FileName,
-                    ["releaseVersion"] = version
+                    ["releaseVersion"] = version,
+                    ["payloadAcquisitionMode"] = "download"
                 }));
             WriteWindowsProofInstaller(generationRoot, version);
             WriteAurCatalog(
@@ -774,6 +803,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["payloadDownloadUrl"] = payloadUrl,
                         ["payloadSha256"] = payloadSha256,
                         ["payloadSizeBytes"] = payloadBytes.Length,
+                        ["payloadAcquisitionMode"] = "download",
                         ["sha256"] = artifactSha256,
                         ["sizeBytes"] = artifactBytes.Length,
                         ["installAccessClass"] = installAccessClass
@@ -813,6 +843,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                         ["payloadDownloadUrl"] = payloadUrl,
                         ["payloadSha256"] = payloadSha256,
                         ["payloadSizeBytes"] = payloadBytes.Length,
+                        ["payloadAcquisitionMode"] = "download",
                         ["sha256"] = artifactSha256,
                         ["sizeBytes"] = artifactBytes.Length,
                         ["head"] = "avalonia",

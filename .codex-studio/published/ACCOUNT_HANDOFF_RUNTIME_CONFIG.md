@@ -1,6 +1,6 @@
 # Account Handoff Runtime Config
 
-- Generated: 2026-07-30T03:14:05Z
+- Generated: 2026-07-31T21:55:49Z
 - Status: `pass`
 - Verdict: `READY`
 - Billing mode: `unavailable`

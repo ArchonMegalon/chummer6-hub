@@ -40,8 +40,8 @@ test('document portal exposes the quickstart guide with a PDF fallback', async (
 
   await page.goto(`${baseUrl}/docs/chummer6-quickstart`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Chummer6 Quickstart Guide' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Open the Chummer quickstart as a flipbook or PDF.');
-  await expect(page.locator('body')).toContainText('The external FlipLink viewer remains optional');
+  await expect(page.locator('body')).toContainText('Open this Chummer document as a Chummer page or PDF.');
+  await expect(page.locator('body')).toContainText('External viewer optional');
   await expect(page.locator('body')).toContainText('PDF fallback is current');
   await expect(page.locator('body')).not.toContainText('Source hash recorded');
   await expect(page.locator('body')).not.toContainText('Operator-managed');

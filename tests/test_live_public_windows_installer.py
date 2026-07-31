@@ -143,6 +143,20 @@ class _LiveDownloadsHandler(BaseHTTPRequestHandler):
 
 
 class LivePublicWindowsInstallerTests(unittest.TestCase):
+    def test_payload_metadata_url_uses_the_governed_metadata_role(self) -> None:
+        module = load_module()
+
+        self.assertEqual(
+            "https://chummer.run/downloads/g/gen-123/install/avalonia-win-x64-installer/metadata",
+            module.payload_metadata_url(
+                "https://chummer.run/downloads/g/gen-123/install/avalonia-win-x64-installer/payload"
+            ),
+        )
+        self.assertEqual(
+            "https://chummer.run/downloads/files/payload.zip.json",
+            module.payload_metadata_url("https://chummer.run/downloads/files/payload.zip"),
+        )
+
     def build_stub_verify_script(self) -> Path:
         temp_dir = tempfile.mkdtemp(prefix="chummer-live-public-windows-stub-")
         script_path = Path(temp_dir) / "verify-windows-installer-payloads.py"

@@ -1,0 +1,224 @@
+{
+  "contract_name": "chummer.public_edge_observability_operator_proof_intake_request.v2",
+  "status": "ready",
+  "verdict": "INTAKE_REQUEST_READY",
+  "generated_at_utc": "2026-07-31T20:17:09.148176Z",
+  "challenge_nonce": "7aba783f21b9eb8355dab1ffc3683f767d6d8d136719012f481840916c456b04",
+  "proof_origin": "external_operator_evidence",
+  "required_proof_contract": "chummer.public_edge_observability_operator_proof.v1",
+  "external_evidence_required": true,
+  "proof_generated_by_repository": false,
+  "sends_alerts": false,
+  "configures_monitoring": false,
+  "current_bindings": {
+    "binding_algorithm": "sha256-canonical-json-v1",
+    "binding_sha256": "f535c3f714cd5d5263e8de4c15be017b0b2a6a595d1fd80ec284386c7c2ff190",
+    "policy": {
+      "path": "ops/public-edge-observability-policy.json",
+      "sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4"
+    },
+    "release_candidate": {
+      "path": "Chummer.Portal/downloads/generations/gen-20260731T082441Z-c6e5c31ce81e4ef4/RELEASE_CHANNEL.generated.json",
+      "load_status": "loaded",
+      "sha256": "0b8ea9f24560180e61f3822e2578f9a2a7a401f5509e01bf0f810358b25a0d2b",
+      "version": "run-20260731-095000",
+      "channel": "preview",
+      "status": "published",
+      "rollout_state": "coverage_incomplete",
+      "supportability_state": "review_required",
+      "published_at_utc": "2026-07-31T07:59:45Z"
+    },
+    "runtime_source_binding": {
+      "algorithm": "sha256-canonical-json-v1",
+      "aggregate_sha256": "a87ad402115bebdb06c02fc25d8af2afe6c8ef6ed00550a7d9a4beb47a348232",
+      "sources": [
+        {
+          "id": "alertmanager_config",
+          "path": "/docker/chummercomplete/chummer.run-services/ops/alertmanager/alertmanager.yml",
+          "load_status": "loaded",
+          "sha256": "a5bca76ff4496cd0969ed1ca3414d65f559296eeb8c2ea0df7cc933975a4f1f7"
+        },
+        {
+          "id": "compose",
+          "path": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+          "load_status": "loaded",
+          "sha256": "69cb92f9edcfac1eb6a85fb9dd2c322f2a8f8d455aed9276785bbef698d531df"
+        },
+        {
+          "id": "exporter",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/HubRequestObservabilityExtensions.cs",
+          "load_status": "loaded",
+          "sha256": "ff587faa918778c93f5e8c224e45a85c60837a7b44d4927501c19346f78e7eff"
+        },
+        {
+          "id": "instruments",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/HubRequestObservability.cs",
+          "load_status": "loaded",
+          "sha256": "cdce1fe5e01ff978ff234bc508b75079a2abdcf19fc662ff01609f485af774bf"
+        },
+        {
+          "id": "middleware",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/HubRequestObservabilityMiddleware.cs",
+          "load_status": "loaded",
+          "sha256": "5767c98de1ca7bdfc2db6b734b46419b38ab1560e374aa4f8abb30ed27aa6b85"
+        },
+        {
+          "id": "program",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Program.cs",
+          "load_status": "loaded",
+          "sha256": "8236cf735fa65a7fce710858811fb4859992fc8175fcb7b0d6ef9236951ffd50"
+        },
+        {
+          "id": "project",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj",
+          "load_status": "loaded",
+          "sha256": "c906f15d8e04da53a675a4013782e908a48980c4f5406e8bd24e348f0aea4933"
+        },
+        {
+          "id": "prometheus_config",
+          "path": "/docker/chummercomplete/chummer.run-services/ops/prometheus/prometheus.yml",
+          "load_status": "loaded",
+          "sha256": "e5b576a7fe0188d8cf9b6b7041aa2f615d48b13f3ff931ae7625b615e073815d"
+        },
+        {
+          "id": "prometheus_rules",
+          "path": "/docker/chummercomplete/chummer.run-services/ops/prometheus/chummer-public-edge.rules.yml",
+          "load_status": "loaded",
+          "sha256": "334c84d1c57807ec2b88c9f0aba3090290a747e742dd2db7f7a263761b85790f"
+        },
+        {
+          "id": "readiness",
+          "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/HubDeepReadinessService.cs",
+          "load_status": "loaded",
+          "sha256": "dd034e7e44eb2ad717a733407e261e639286f4b554cf7e97452ca7ffa635f81a"
+        }
+      ]
+    }
+  },
+  "runtime_checks": [
+    {
+      "id": "runtime:alertmanager_config",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:program",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:readiness",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:instruments",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:exporter",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:project",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:middleware",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:compose",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:prometheus_config",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:prometheus_rules",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    }
+  ],
+  "intake": {
+    "source_path": ".state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "canonical_proof_path": ".codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "source_attestation_path": ".state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json",
+    "canonical_attestation_path": ".codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json",
+    "request_receipt_path": ".codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json",
+    "validate_only_by_default": true,
+    "import_requires_explicit_flag": true,
+    "deterministic_source_only": true
+  },
+  "required_proof_fields": {
+    "top_level": [
+      "alert_route",
+      "contract_name",
+      "generated_at_utc",
+      "monitor_backend",
+      "policy_sha256",
+      "release_candidate",
+      "runtime_source_fingerprint_sha256",
+      "sli_bindings",
+      "status"
+    ],
+    "nested": {
+      "alert_route": [
+        "binding_status",
+        "delivery_test_result",
+        "delivery_tested_at_utc",
+        "receiver_class"
+      ],
+      "monitor_backend": [
+        "binding_status",
+        "deployment_id",
+        "provider"
+      ],
+      "release_candidate": [
+        "channel",
+        "sha256",
+        "version"
+      ],
+      "sli_bindings": [
+        "availability",
+        "latency",
+        "readiness"
+      ]
+    }
+  },
+  "required_attestation": {
+    "contract_name": "chummer.public_edge_observability_operator_proof_attestation.v1",
+    "algorithm": "ed25519",
+    "role": "observability_operator",
+    "challenge_nonce": "7aba783f21b9eb8355dab1ffc3683f767d6d8d136719012f481840916c456b04",
+    "subject_sha256_source": "exact intake.source_path bytes",
+    "request_sha256_source": "exact intake.request_receipt_path bytes",
+    "trusted_identity_count": 1
+  },
+  "proof_requirements": [
+    "Use the exact current_bindings values from this request.",
+    "Obtain a real monitoring-backend binding for availability, latency, and readiness.",
+    "Deliver a real test alert to the primary_on_call receiver class.",
+    "Do not include credentials, receiver addresses, tokens, or message contents.",
+    "Do not edit or restamp stale proof; produce new external evidence after any binding change.",
+    "Sign a detached attestation over the exact proof bytes, this challenge_nonce, the exact request digest, and current_bindings with a code-pinned observability_operator identity."
+  ],
+  "commands": {
+    "refresh_request": "python3 scripts/materialize_public_edge_observability_operator_proof_intake_request.py --policy ops/public-edge-observability-policy.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --source .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --canonical-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --output .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json",
+    "validate_only": "python3 scripts/import_public_edge_observability_operator_proof.py --source .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --policy ops/public-edge-observability-policy.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --canonical-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --attestation .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json --canonical-attestation .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json --intake-request .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json",
+    "import_after_review": "python3 scripts/import_public_edge_observability_operator_proof.py --source .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --policy ops/public-edge-observability-policy.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --canonical-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --attestation .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json --canonical-attestation .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json --intake-request .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json --import-proof",
+    "verify_after_import": "python3 scripts/verify_public_edge_observability_release.py --policy ops/public-edge-observability-policy.json --operator-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --operator-attestation .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json --intake-request .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --output /docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_RELEASE_GATE.generated.json",
+    "watch_validate_only": "python3 scripts/watch_public_edge_observability_operator_proof.py --source .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --request .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json --policy ops/public-edge-observability-policy.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --canonical-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --wait-seconds 900 --poll-seconds 10",
+    "watch_and_import_explicit": "python3 scripts/watch_public_edge_observability_operator_proof.py --source .state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --request .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json --policy ops/public-edge-observability-policy.json --release-channel Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --canonical-proof .codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json --wait-seconds 900 --poll-seconds 10 --import-proof"
+  },
+  "failure_count": 0,
+  "failures": [],
+  "next_action": "Have a governed live-ops process produce fresh external proof for these exact bindings, place it at intake.source_path, and run commands.validate_only."
+}

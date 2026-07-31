@@ -1,15 +1,15 @@
 {
   "contractName": "chummer.mobile_pwa_public_projection.v2",
   "mode": "live",
-  "baseUrl": "http://127.0.0.1:8091",
-  "generatedAt": "2026-07-30T05:21:51.113598Z",
+  "baseUrl": "https://chummer.run",
+  "generatedAt": "2026-07-31T21:55:17.456136Z",
   "status": "pass",
   "readiness": {
     "httpStatus": 200,
     "payload": {
       "ready": true,
       "status": "ready",
-      "generatedAt": "2026-07-30T05:21:49.0231027+00:00",
+      "generatedAt": "2026-07-31T21:55:15.5334411+00:00",
       "hub": {
         "contractName": "chummer.run.api.deep_readiness.v2",
         "service": "chummer.run.api",
@@ -18,7 +18,7 @@
         "servingReady": true,
         "publicationReady": true,
         "publicationChecksConfigured": true,
-        "generatedAt": "2026-07-30T05:21:48.5156028+00:00",
+        "generatedAt": "2026-07-31T21:55:15.0306217+00:00",
         "checks": [
           {
             "name": "data_protection_storage",
@@ -52,12 +52,12 @@
           "publicationChecksConfigured": true,
           "status": "serving",
           "code": "generation_shelf_verified",
-          "generationId": "g-20260727T205345Z-19e9c4d1afb64dd5",
-          "activationReceiptId": "activation-9466c7a9517642d8af3f9979061dc726",
-          "inventoryDigest": "deb3a3050fffbacdd005cd4dde37a315577aa7b2f6275451a73c33819c506ac0",
-          "releaseVersion": "run-20260712-174412",
+          "generationId": "gen-20260731T082441Z-c6e5c31ce81e4ef4",
+          "activationReceiptId": "activation-78b4f088a21845569a8913327fc32bae",
+          "inventoryDigest": "3bab0ab36aee879161d6a6b558bf2a2fb43d3531f67b091f293c8b269342c7a4",
+          "releaseVersion": "run-20260731-095000",
           "channel": "preview",
-          "publishedAt": "2026-07-12T18:46:26+00:00",
+          "publishedAt": "2026-07-31T07:59:45+00:00",
           "publicationChecks": [
             {
               "name": "release_shelf_serving",
@@ -95,8 +95,8 @@
       "deploymentIdentity": {
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
-        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7"
+        "sourceFingerprintSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+        "fullDeploymentDigestSha256": "128802d93a4658ffd1de7a68557f82bf096be52ca11a9e728b15a629839df954"
       }
     },
     "checks": {
@@ -458,30 +458,30 @@
   "staticAssets": {
     "contractName": "chummer.public_pwa_static_assets.v1",
     "assetContractName": "chummer.public_play_install_assets.v2",
-    "generatedAt": "2026-07-30T05:21:48.378177+00:00",
+    "generatedAt": "2026-07-31T21:55:14.880893+00:00",
     "mode": "live",
     "status": "pass",
     "deploymentIdentity": {
       "status": 200,
       "ready": true,
       "code": "overlay_identity_bound",
-      "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
-      "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
+      "sourceFingerprintSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+      "fullDeploymentDigestSha256": "128802d93a4658ffd1de7a68557f82bf096be52ca11a9e728b15a629839df954",
       "matchesExpectedFullDeploymentDigest": true,
       "before": {
         "status": 200,
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
-        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
+        "sourceFingerprintSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+        "fullDeploymentDigestSha256": "128802d93a4658ffd1de7a68557f82bf096be52ca11a9e728b15a629839df954",
         "matchesExpectedFullDeploymentDigest": true
       },
       "after": {
         "status": 200,
         "ready": true,
         "code": "overlay_identity_bound",
-        "sourceFingerprintSha256": "68ab11ae5e0497b607d428a7043e6fde8bef890bd37feee9f6b5ec76240591a7",
-        "fullDeploymentDigestSha256": "a3602c21c2ad8fa4c38eee091d5d9b4f4a6d20c236db977cfca29b57bce806a7",
+        "sourceFingerprintSha256": "7a44bb1465c1bde2a10df9b704c5d6221aee3eb510222d8642c0109372b2c14c",
+        "fullDeploymentDigestSha256": "128802d93a4658ffd1de7a68557f82bf096be52ca11a9e728b15a629839df954",
         "matchesExpectedFullDeploymentDigest": true
       },
       "stable": true
@@ -588,9 +588,9 @@
         "path": "/service-worker.js",
         "status": 200,
         "contentType": "application/javascript",
-        "sizeBytes": 23415,
-        "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
-        "expectedSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+        "sizeBytes": 23442,
+        "sha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
+        "expectedSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
         "digestMatches": true
       },
       {
@@ -688,9 +688,9 @@
       "contractName": "chummer.public_pwa_asset_digest_inventory.v1",
       "algorithm": "sha256-canonical-json-v1",
       "assetCount": 14,
-      "expectedSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
-      "sealedExpectedSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
-      "actualSha256": "600ba36c582d500c1b2a624c1c7592c47fff0eed4604a088da2ccd62ee7aa993",
+      "expectedSha256": "bdfac5062f4c93d55b0970895251a72187cc0e17143653b94d2192c50290f8a9",
+      "sealedExpectedSha256": "bdfac5062f4c93d55b0970895251a72187cc0e17143653b94d2192c50290f8a9",
+      "actualSha256": "bdfac5062f4c93d55b0970895251a72187cc0e17143653b94d2192c50290f8a9",
       "matchesExpected": true,
       "sourceStable": true,
       "assets": [
@@ -730,8 +730,8 @@
           "cacheControl": "no-cache, no-store, must-revalidate",
           "nosniff": true,
           "mirrorBound": true,
-          "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
-          "sizeBytes": 23415,
+          "sha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
+          "sizeBytes": 23442,
           "matchesExpected": true
         },
         {

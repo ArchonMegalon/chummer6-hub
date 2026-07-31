@@ -1,0 +1,31 @@
+{
+  "assertion_count": 15,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "primer_source_is_chummer_owned",
+    "full_publication_studio_not_claimed",
+    "provider_not_truth",
+    "formatted_export_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "json_route": "/runbook/primers/new-runner-primer.json",
+    "login_location": "/login?next=%2Frunbook%2Fprimers%2Fnew-runner-primer%2Fexport",
+    "markdown_route": "/runbook/primers/new-runner-primer.md",
+    "receipt_route": "/runbook/receipts/primer-network.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:35.569Z",
+  "horizon_id": "runbook-press",
+  "journey_steps": [
+    "load primer-network receipt",
+    "render primer shelf",
+    "open JSON primer",
+    "open markdown primer",
+    "verify export identity boundary"
+  ],
+  "receipt_route": "/runbook/receipts/primer-network.json",
+  "route": "/runbook",
+  "status": "pass",
+  "verdict": "GOLD"
+}

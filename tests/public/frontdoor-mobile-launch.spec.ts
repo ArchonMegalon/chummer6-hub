@@ -129,7 +129,16 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
         || /^\/api\/(?:v\d+\/)?(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname)
         || /^\/(analytics|events|telemetry|tracking)(?:[/?]|$)/i.test(url.pathname);
     });
-    expect(analyticsRequestUrls).toEqual([]);
+    const unexpectedAnalyticsRequestUrls = analyticsRequestUrls.filter((value) => {
+      const url = new URL(value);
+      const approvedHostedRybbit = url.protocol === 'https:'
+        && url.hostname === 'app.rybbit.io'
+        && url.pathname === '/api/track';
+      const approvedSameOriginRybbit = url.origin === publicOrigin
+        && url.pathname === '/api/rybbit/track';
+      return url.search !== '' || (!approvedHostedRybbit && !approvedSameOriginRybbit);
+    });
+    expect(unexpectedAnalyticsRequestUrls).toEqual([]);
     expect(pageErrors.length).toBe(0);
 
     proofStage = 'complete';
@@ -146,7 +155,8 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
       private_browser_state_keys: 0,
       play_api_requests: 0,
       blazor_circuit_requests: 0,
-      analytics_requests: 0,
+      analytics_requests: analyticsRequestUrls.length,
+      analytics_posture: 'approved_public_aggregate_endpoint_only',
       private_query_requests: 0,
       page_errors: [],
     });

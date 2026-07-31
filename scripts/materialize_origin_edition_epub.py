@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
+from PIL import Image
+
 
 CONTRACT_NAME = "chummer.origin_edition.epub_materialization.v1"
 PREAMBLE_PREFIXES = (
@@ -169,8 +171,19 @@ def _write_epub_tree(
 """,
         encoding="utf-8",
     )
-    (images / "cover.jpg").write_bytes(cover.read_bytes())
-    return {"manuscriptSha256": _sha256_file(manuscript), "coverSha256": _sha256_file(cover)}
+    embedded_cover = images / "cover.jpg"
+    with Image.open(cover) as source_cover:
+        source_cover.convert("RGB").save(
+            embedded_cover,
+            format="JPEG",
+            quality=95,
+            optimize=True,
+        )
+    return {
+        "manuscriptSha256": _sha256_file(manuscript),
+        "coverSha256": _sha256_file(cover),
+        "embeddedCoverSha256": _sha256_file(embedded_cover),
+    }
 
 
 def _zip_epub(dossier_dir: Path, output_epub: Path) -> None:
@@ -229,6 +242,7 @@ def materialize(
         "epubPath": (Path(namespace) / "dossier" / output_epub.name).as_posix(),
         "epubSha256": epub_sha,
         "coverSha256": hashes["coverSha256"],
+        "embeddedCoverSha256": hashes["embeddedCoverSha256"],
         "manuscriptSha256": hashes["manuscriptSha256"],
         "storyStartsWithoutPreamble": story_starts_without_preamble,
         "coverEmbedded": True,

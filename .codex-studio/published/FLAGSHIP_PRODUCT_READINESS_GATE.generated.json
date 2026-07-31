@@ -1,0 +1,402 @@
+{
+  "contract_name": "chummer.flagship_product_readiness_gate.v1",
+  "generated_at_utc": "2026-07-31T22:20:43Z",
+  "status": "fail",
+  "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
+  "readiness_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+  "readiness_load_status": "loaded",
+  "readiness_receipt_fail_closed": true,
+  "pass": false,
+  "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is blocking: coverage_incomplete, binding: evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2, binding: evidence: observed_at_utc is stale, binding: evidence: observed_at_utc predates the current request, binding: evidence: request_nonce does not match the current request/release binding, binding: evidence: request_sha256 does not match the current request/release binding, binding: evidence: release_authority_sha256 does not match the current request/release binding, binding: evidence: portal_release_manifest_sha256 does not match the current request/release binding, binding: evidence: hub_release_manifest_sha256 does not match the current request/release binding, binding: evidence: live_release_manifest_sha256 does not match the current request/release binding, binding: evidence: screenshots must contain at least 2 entries, binding: evidence: detached operator attestation is missing, binding: evidence: import_provenance is missing, binding: evidence: import provenance source_artifact_sha256 is invalid, binding: evidence: import provenance source_receipt_sha256 is invalid, binding: evidence: import provenance importer_program_sha256 is stale, binding: evidence: imported_at_utc must be a timezone-aware timestamp, binding: evidence: import_source_artifact contains pytest/test-fixture provenance, binding: evidence: import_source_receipt_path contains pytest/test-fixture provenance, binding: evidence: import_source_screenshot_paths contains pytest/test-fixture provenance, operator_end_to_end_evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2, operator_end_to_end_evidence: observed_at_utc is stale, operator_end_to_end_evidence: observed_at_utc predates the current request, operator_end_to_end_evidence: request_nonce does not match the current request/release binding, operator_end_to_end_evidence: request_sha256 does not match the current request/release binding, operator_end_to_end_evidence: release_authority_sha256 does not match the current request/release binding, operator_end_to_end_evidence: portal_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: hub_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: live_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: screenshots must contain at least 2 entries, operator_end_to_end_evidence: detached operator attestation is missing, operator_end_to_end_evidence: import_provenance is missing, operator_end_to_end_evidence: import provenance source_artifact_sha256 is invalid, operator_end_to_end_evidence: import provenance source_receipt_sha256 is invalid, operator_end_to_end_evidence: import provenance importer_program_sha256 is stale, operator_end_to_end_evidence: imported_at_utc must be a timezone-aware timestamp, operator_end_to_end_evidence: import_source_artifact contains pytest/test-fixture provenance, operator_end_to_end_evidence: import_source_receipt_path contains pytest/test-fixture provenance, operator_end_to_end_evidence: import_source_screenshot_paths contains pytest/test-fixture provenance, auth_signin_automation_paused: paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval (/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag), Windows installer visual audit source digest does not match promoted installer, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent., Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch). Coverage gaps: desktop_client.",
+  "coverage_gap_keys": [
+    "desktop_client"
+  ],
+  "scoped_coverage_gap_keys": [
+    "desktop_client"
+  ],
+  "launch_critical_nested_blockers": [
+    "release channel channel is preview, not a flagship stable lane",
+    "release channel supportability is not gold_supported",
+    "release channel rollout is blocking: coverage_incomplete",
+    "binding: evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+    "binding: evidence: observed_at_utc is stale",
+    "binding: evidence: observed_at_utc predates the current request",
+    "binding: evidence: request_nonce does not match the current request/release binding",
+    "binding: evidence: request_sha256 does not match the current request/release binding",
+    "binding: evidence: release_authority_sha256 does not match the current request/release binding",
+    "binding: evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: live_release_manifest_sha256 does not match the current request/release binding",
+    "binding: evidence: screenshots must contain at least 2 entries",
+    "binding: evidence: detached operator attestation is missing",
+    "binding: evidence: import_provenance is missing",
+    "binding: evidence: import provenance source_artifact_sha256 is invalid",
+    "binding: evidence: import provenance source_receipt_sha256 is invalid",
+    "binding: evidence: import provenance importer_program_sha256 is stale",
+    "binding: evidence: imported_at_utc must be a timezone-aware timestamp",
+    "binding: evidence: import_source_artifact contains pytest/test-fixture provenance",
+    "binding: evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+    "binding: evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+    "operator_end_to_end_evidence: observed_at_utc is stale",
+    "operator_end_to_end_evidence: observed_at_utc predates the current request",
+    "operator_end_to_end_evidence: request_nonce does not match the current request/release binding",
+    "operator_end_to_end_evidence: request_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: release_authority_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: live_release_manifest_sha256 does not match the current request/release binding",
+    "operator_end_to_end_evidence: screenshots must contain at least 2 entries",
+    "operator_end_to_end_evidence: detached operator attestation is missing",
+    "operator_end_to_end_evidence: import_provenance is missing",
+    "operator_end_to_end_evidence: import provenance source_artifact_sha256 is invalid",
+    "operator_end_to_end_evidence: import provenance source_receipt_sha256 is invalid",
+    "operator_end_to_end_evidence: import provenance importer_program_sha256 is stale",
+    "operator_end_to_end_evidence: imported_at_utc must be a timezone-aware timestamp",
+    "operator_end_to_end_evidence: import_source_artifact contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+    "operator_end_to_end_evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+    "auth_signin_automation_paused: paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval (/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag)",
+    "Windows installer visual audit source digest does not match promoted installer",
+    "windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+    "windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip",
+    "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.",
+    "Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent.",
+    "Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch)."
+  ],
+  "launch_critical_nested_blocker_count": 48,
+  "root_blocker_ids": [
+    "release_posture:non_flagship_channel",
+    "release_truth:release_ready",
+    "release_truth:google_oauth_linking_proof",
+    "release_truth:windows_installer_visual_audit",
+    "blocked_route:avalonia:macos:osx-arm64"
+  ],
+  "root_blockers_generated_at": "2026-07-31T19:34:29Z",
+  "root_release_truth_failures": [],
+  "stable_promotion_command": "RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260731-095000 RELEASE_PUBLISHED_AT=2026-07-31T07:59:45Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads",
+  "post_promotion_verify_command": "python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && python3 scripts/materialize_operator_release_dashboard.py && python3 scripts/final_gold_janitor.py && python3 ../scripts/release/_release_gate_common.py && python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp \"$(date --iso-8601=seconds)\"",
+  "root_release_truth_source": "/docker/chummercomplete/RELEASE_BLOCKERS.generated.json",
+  "privacy_launch_gate": {
+    "contract_name": "chummer.privacy_launch_gate",
+    "contract_version": 1,
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-design/product/PRIVACY_LAUNCH_GATE.json",
+    "load_status": "loaded",
+    "status": "review_required",
+    "review_required": true,
+    "scope": "flagship_launch_and_release_supportability",
+    "blocked_claims": [
+      "flagship_launch",
+      "public_release_supportability",
+      "hosted_build_recovery_and_erasure"
+    ],
+    "reason": "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.",
+    "blockers": [
+      "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified."
+    ],
+    "pass": false
+  },
+  "hosted_build_operator_decisions": {
+    "contract_name": "chummer.hosted_build_v002_operator_decision_gate",
+    "contract_version": 1,
+    "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/HOSTED_BUILD_V002_OPERATOR_DECISION_GATE.generated.json",
+    "load_status": "loaded",
+    "status": "review_required",
+    "review_required": true,
+    "decision_gate_passed": false,
+    "canonical_provenance": true,
+    "scope": "hosted_build_workspace_lifecycle_and_quota_v002",
+    "candidate_release_identity": null,
+    "decision_count": 12,
+    "approved_decision_ids": [],
+    "unresolved_decision_ids": [
+      "quota_policy",
+      "logical_bytes",
+      "recreation_and_undo",
+      "offline_compatibility",
+      "tombstone_privacy_policy",
+      "stable_owner_identity",
+      "writer_epoch",
+      "delete_replay_and_rpo",
+      "provider_and_topology",
+      "enforcement_boundary",
+      "migration_posture",
+      "capacity_and_retention"
+    ],
+    "invalid_decision_ids": [],
+    "blocked_claims": [
+      "flagship_launch",
+      "public_release_supportability",
+      "hosted_build_v002_contract_freeze",
+      "hosted_build_v002_authoring",
+      "hosted_build_v002_migration",
+      "hosted_build_production_launch"
+    ],
+    "does_not_authorize": [
+      "hosted_build_v002_authoring",
+      "hosted_build_v002_application",
+      "quota_enforcement",
+      "tombstone_deletion",
+      "hosted_build_production_launch",
+      "public_recovery_or_retention_claims"
+    ],
+    "source_contract": {
+      "path": "docs/HOSTED_BUILD_WORKSPACE_LIFECYCLE_AND_QUOTA_CONTRACT.md",
+      "sha256": "sha256:5d2c0496a6a7466b9d03fe778e68170c8db9943e7fa92de10c8b4b4f3da5f976"
+    },
+    "approval_key_registry": {
+      "path": ".codex-design/product/HOSTED_BUILD_V002_APPROVAL_KEY_REGISTRY.json",
+      "sha256": "sha256:a7a32d340016ba6801bf47a5f407b2ea245f481d7102a3396f79afe722535c00",
+      "status": "unconfigured",
+      "activeKeyCount": 0
+    },
+    "packet": {
+      "path": ".codex-design/product/HOSTED_BUILD_V002_OPERATOR_DECISIONS.json",
+      "sha256": "sha256:4a07e980acd5eda7b86a599b9f908399fc064e4ec73201743831c0848dd6be82"
+    },
+    "validation_failures": [
+      "generated_at_utc_stale",
+      "source_material_verification_unavailable"
+    ],
+    "reason": "Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention.",
+    "blockers": [
+      "Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent."
+    ],
+    "pass": false
+  },
+  "campaign_os_local_proof": {
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+    "load_status": "invalid",
+    "contract_name": null,
+    "contract_version": null,
+    "status": null,
+    "proof_kind": null,
+    "run_id": null,
+    "dependency_mode": null,
+    "generated_at": null,
+    "expires_at": null,
+    "journey_count": 0,
+    "receipt_identity": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+      "sha256": "10a807f846affbec736c6dfbed98e3b9131e525fcc15009c695278ca74d4a4d6",
+      "size_bytes": 31459
+    },
+    "validator_identity": {
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/campaign_os_local_proof_v3.py",
+      "sha256": "e2dc37759172a7d25e9c089a138dfe801776df591ab41b54038a134d4a9ae9e3",
+      "size_bytes": 135607
+    },
+    "reason_code": "candidate_source_build_inputs_current_mismatch",
+    "blockers": [
+      "Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch)."
+    ],
+    "pass": false
+  },
+  "summary": {
+    "contract_name": "fleet.flagship_product_readiness",
+    "status": "fail",
+    "generated_at": "2026-07-31T22:20:43Z",
+    "readiness_load_status": "loaded",
+    "completion_audit_status": "fail",
+    "flagship_readiness_audit_status": "fail",
+    "ready_count": 7,
+    "missing_count": 1,
+    "scoped_missing_count": 1,
+    "warning_count": 0,
+    "coverage_gap_keys": [
+      "desktop_client"
+    ],
+    "scoped_coverage_gap_keys": [
+      "desktop_client"
+    ],
+    "launch_critical_nested_blockers": [
+      "release channel channel is preview, not a flagship stable lane",
+      "release channel supportability is not gold_supported",
+      "release channel rollout is blocking: coverage_incomplete",
+      "binding: evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+      "binding: evidence: observed_at_utc is stale",
+      "binding: evidence: observed_at_utc predates the current request",
+      "binding: evidence: request_nonce does not match the current request/release binding",
+      "binding: evidence: request_sha256 does not match the current request/release binding",
+      "binding: evidence: release_authority_sha256 does not match the current request/release binding",
+      "binding: evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+      "binding: evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+      "binding: evidence: live_release_manifest_sha256 does not match the current request/release binding",
+      "binding: evidence: screenshots must contain at least 2 entries",
+      "binding: evidence: detached operator attestation is missing",
+      "binding: evidence: import_provenance is missing",
+      "binding: evidence: import provenance source_artifact_sha256 is invalid",
+      "binding: evidence: import provenance source_receipt_sha256 is invalid",
+      "binding: evidence: import provenance importer_program_sha256 is stale",
+      "binding: evidence: imported_at_utc must be a timezone-aware timestamp",
+      "binding: evidence: import_source_artifact contains pytest/test-fixture provenance",
+      "binding: evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+      "binding: evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+      "operator_end_to_end_evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2",
+      "operator_end_to_end_evidence: observed_at_utc is stale",
+      "operator_end_to_end_evidence: observed_at_utc predates the current request",
+      "operator_end_to_end_evidence: request_nonce does not match the current request/release binding",
+      "operator_end_to_end_evidence: request_sha256 does not match the current request/release binding",
+      "operator_end_to_end_evidence: release_authority_sha256 does not match the current request/release binding",
+      "operator_end_to_end_evidence: portal_release_manifest_sha256 does not match the current request/release binding",
+      "operator_end_to_end_evidence: hub_release_manifest_sha256 does not match the current request/release binding",
+      "operator_end_to_end_evidence: live_release_manifest_sha256 does not match the current request/release binding",
+      "operator_end_to_end_evidence: screenshots must contain at least 2 entries",
+      "operator_end_to_end_evidence: detached operator attestation is missing",
+      "operator_end_to_end_evidence: import_provenance is missing",
+      "operator_end_to_end_evidence: import provenance source_artifact_sha256 is invalid",
+      "operator_end_to_end_evidence: import provenance source_receipt_sha256 is invalid",
+      "operator_end_to_end_evidence: import provenance importer_program_sha256 is stale",
+      "operator_end_to_end_evidence: imported_at_utc must be a timezone-aware timestamp",
+      "operator_end_to_end_evidence: import_source_artifact contains pytest/test-fixture provenance",
+      "operator_end_to_end_evidence: import_source_receipt_path contains pytest/test-fixture provenance",
+      "operator_end_to_end_evidence: import_source_screenshot_paths contains pytest/test-fixture provenance",
+      "auth_signin_automation_paused: paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval (/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag)",
+      "Windows installer visual audit source digest does not match promoted installer",
+      "windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+      "windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip",
+      "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.",
+      "Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent.",
+      "Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch)."
+    ],
+    "root_blocker_ids": [
+      "release_posture:non_flagship_channel",
+      "release_truth:release_ready",
+      "release_truth:google_oauth_linking_proof",
+      "release_truth:windows_installer_visual_audit",
+      "blocked_route:avalonia:macos:osx-arm64"
+    ],
+    "root_blockers_generated_at": "2026-07-31T19:34:29Z",
+    "root_release_truth_failures": [],
+    "stable_promotion_command": "RELEASE_CHANNEL=public_stable RELEASE_VERSION=run-20260731-095000 RELEASE_PUBLISHED_AT=2026-07-31T07:59:45Z bash /docker/chummercomplete/chummer6-ui/scripts/publish-download-bundle.sh /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads",
+    "post_promotion_verify_command": "python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && python3 scripts/materialize_operator_release_dashboard.py && python3 scripts/final_gold_janitor.py && python3 ../scripts/release/_release_gate_common.py && python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp \"$(date --iso-8601=seconds)\"",
+    "root_release_truth_source": "/docker/chummercomplete/RELEASE_BLOCKERS.generated.json",
+    "privacy_launch_gate": {
+      "contract_name": "chummer.privacy_launch_gate",
+      "contract_version": 1,
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-design/product/PRIVACY_LAUNCH_GATE.json",
+      "load_status": "loaded",
+      "status": "review_required",
+      "review_required": true,
+      "scope": "flagship_launch_and_release_supportability",
+      "blocked_claims": [
+        "flagship_launch",
+        "public_release_supportability",
+        "hosted_build_recovery_and_erasure"
+      ],
+      "reason": "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.",
+      "blockers": [
+        "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified."
+      ],
+      "pass": false
+    },
+    "hosted_build_operator_decisions": {
+      "contract_name": "chummer.hosted_build_v002_operator_decision_gate",
+      "contract_version": 1,
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/HOSTED_BUILD_V002_OPERATOR_DECISION_GATE.generated.json",
+      "load_status": "loaded",
+      "status": "review_required",
+      "review_required": true,
+      "decision_gate_passed": false,
+      "canonical_provenance": true,
+      "scope": "hosted_build_workspace_lifecycle_and_quota_v002",
+      "candidate_release_identity": null,
+      "decision_count": 12,
+      "approved_decision_ids": [],
+      "unresolved_decision_ids": [
+        "quota_policy",
+        "logical_bytes",
+        "recreation_and_undo",
+        "offline_compatibility",
+        "tombstone_privacy_policy",
+        "stable_owner_identity",
+        "writer_epoch",
+        "delete_replay_and_rpo",
+        "provider_and_topology",
+        "enforcement_boundary",
+        "migration_posture",
+        "capacity_and_retention"
+      ],
+      "invalid_decision_ids": [],
+      "blocked_claims": [
+        "flagship_launch",
+        "public_release_supportability",
+        "hosted_build_v002_contract_freeze",
+        "hosted_build_v002_authoring",
+        "hosted_build_v002_migration",
+        "hosted_build_production_launch"
+      ],
+      "does_not_authorize": [
+        "hosted_build_v002_authoring",
+        "hosted_build_v002_application",
+        "quota_enforcement",
+        "tombstone_deletion",
+        "hosted_build_production_launch",
+        "public_recovery_or_retention_claims"
+      ],
+      "source_contract": {
+        "path": "docs/HOSTED_BUILD_WORKSPACE_LIFECYCLE_AND_QUOTA_CONTRACT.md",
+        "sha256": "sha256:5d2c0496a6a7466b9d03fe778e68170c8db9943e7fa92de10c8b4b4f3da5f976"
+      },
+      "approval_key_registry": {
+        "path": ".codex-design/product/HOSTED_BUILD_V002_APPROVAL_KEY_REGISTRY.json",
+        "sha256": "sha256:a7a32d340016ba6801bf47a5f407b2ea245f481d7102a3396f79afe722535c00",
+        "status": "unconfigured",
+        "activeKeyCount": 0
+      },
+      "packet": {
+        "path": ".codex-design/product/HOSTED_BUILD_V002_OPERATOR_DECISIONS.json",
+        "sha256": "sha256:4a07e980acd5eda7b86a599b9f908399fc064e4ec73201743831c0848dd6be82"
+      },
+      "validation_failures": [
+        "generated_at_utc_stale",
+        "source_material_verification_unavailable"
+      ],
+      "reason": "Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention.",
+      "blockers": [
+        "Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent."
+      ],
+      "pass": false
+    },
+    "campaign_os_local_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+      "load_status": "invalid",
+      "contract_name": null,
+      "contract_version": null,
+      "status": null,
+      "proof_kind": null,
+      "run_id": null,
+      "dependency_mode": null,
+      "generated_at": null,
+      "expires_at": null,
+      "journey_count": 0,
+      "receipt_identity": {
+        "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
+        "sha256": "10a807f846affbec736c6dfbed98e3b9131e525fcc15009c695278ca74d4a4d6",
+        "size_bytes": 31459
+      },
+      "validator_identity": {
+        "path": "/docker/chummercomplete/chummer.run-services/scripts/campaign_os_local_proof_v3.py",
+        "sha256": "e2dc37759172a7d25e9c089a138dfe801776df591ab41b54038a134d4a9ae9e3",
+        "size_bytes": 135607
+      },
+      "reason_code": "candidate_source_build_inputs_current_mismatch",
+      "blockers": [
+        "Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch)."
+      ],
+      "pass": false
+    },
+    "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is blocking: coverage_incomplete, binding: evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2, binding: evidence: observed_at_utc is stale, binding: evidence: observed_at_utc predates the current request, binding: evidence: request_nonce does not match the current request/release binding, binding: evidence: request_sha256 does not match the current request/release binding, binding: evidence: release_authority_sha256 does not match the current request/release binding, binding: evidence: portal_release_manifest_sha256 does not match the current request/release binding, binding: evidence: hub_release_manifest_sha256 does not match the current request/release binding, binding: evidence: live_release_manifest_sha256 does not match the current request/release binding, binding: evidence: screenshots must contain at least 2 entries, binding: evidence: detached operator attestation is missing, binding: evidence: import_provenance is missing, binding: evidence: import provenance source_artifact_sha256 is invalid, binding: evidence: import provenance source_receipt_sha256 is invalid, binding: evidence: import provenance importer_program_sha256 is stale, binding: evidence: imported_at_utc must be a timezone-aware timestamp, binding: evidence: import_source_artifact contains pytest/test-fixture provenance, binding: evidence: import_source_receipt_path contains pytest/test-fixture provenance, binding: evidence: import_source_screenshot_paths contains pytest/test-fixture provenance, operator_end_to_end_evidence: contract_name must be chummer.run.google_oauth_linking_operator_evidence.v2, operator_end_to_end_evidence: observed_at_utc is stale, operator_end_to_end_evidence: observed_at_utc predates the current request, operator_end_to_end_evidence: request_nonce does not match the current request/release binding, operator_end_to_end_evidence: request_sha256 does not match the current request/release binding, operator_end_to_end_evidence: release_authority_sha256 does not match the current request/release binding, operator_end_to_end_evidence: portal_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: hub_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: live_release_manifest_sha256 does not match the current request/release binding, operator_end_to_end_evidence: screenshots must contain at least 2 entries, operator_end_to_end_evidence: detached operator attestation is missing, operator_end_to_end_evidence: import_provenance is missing, operator_end_to_end_evidence: import provenance source_artifact_sha256 is invalid, operator_end_to_end_evidence: import provenance source_receipt_sha256 is invalid, operator_end_to_end_evidence: import provenance importer_program_sha256 is stale, operator_end_to_end_evidence: imported_at_utc must be a timezone-aware timestamp, operator_end_to_end_evidence: import_source_artifact contains pytest/test-fixture provenance, operator_end_to_end_evidence: import_source_receipt_path contains pytest/test-fixture provenance, operator_end_to_end_evidence: import_source_screenshot_paths contains pytest/test-fixture provenance, auth_signin_automation_paused: paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval (/docker/chummercomplete/chummer.run-services/.state/auth_signin_automation_paused.flag), Windows installer visual audit source digest does not match promoted installer, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest 17a02613f7d91e66c4077c09b9a6ddd80fbcc5fa51ebfbabe62266fe4cead45d: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent., Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch). Coverage gaps: desktop_client.",
+    "launch_critical_nested_blocker_count": 48,
+    "pass": false
+  },
+  "recoverable_wrapper_blockers_only": false,
+  "materializer": {
+    "command": "python3 /docker/fleet/scripts/materialize_flagship_product_readiness.py --out /docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json --mirror-out ''",
+    "returncode": 0,
+    "stdout_tail": [
+      "wrote flagship product readiness: /docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json (fail; ready=7, warning=0, missing=1)"
+    ],
+    "stderr_tail": []
+  }
+}

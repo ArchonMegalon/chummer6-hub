@@ -1911,6 +1911,7 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
     copied_roots_relative = sorted(
         Path(copied_root).relative_to(build_root / "workspace").as_posix()
         for copied_root in copied_roots
+        if Path(copied_root).is_relative_to(build_root / "workspace")
     )
     assert copied_roots_relative == [
         ".",
@@ -1920,6 +1921,7 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
         "chummer.run-services",
         "fleet/repos/chummer-media-factory",
     ]
+    assert str(build_root / "fleet") in copied_roots
     assert (build_source_root / "Chummer.Run.Api" / "Chummer.Run.Api.csproj").is_file()
     assert (build_source_root / "Chummer.Campaign.Contracts" / "marker.txt").is_file()
     assert (build_source_root / "Directory.Build.props").is_file()
@@ -1945,6 +1947,15 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
     assert (
         build_root
         / "workspace"
+        / "fleet"
+        / "repos"
+        / "chummer-media-factory"
+        / "src"
+        / "Chummer.Media.Contracts"
+        / "marker.txt"
+    ).is_file()
+    assert (
+        build_root
         / "fleet"
         / "repos"
         / "chummer-media-factory"

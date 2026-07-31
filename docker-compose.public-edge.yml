@@ -232,7 +232,7 @@ services:
       - chummer-release-upload-sessions:/release-upload-sessions
 
   chummer-origin-media-storage-init:
-    image: alpine:3.22
+    image: "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
     restart: "no"
     network_mode: "none"
     user: "0:0"
@@ -311,6 +311,120 @@ services:
     networks:
       public-origin: {}
 
+  chummer-observability-storage-init:
+    image: "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    restart: "no"
+    network_mode: "none"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - /bin/sh
+      - -ec
+      - >-
+        chown -R 65532:65532 /prometheus
+        && chown -R "${CHUMMER_OBSERVABILITY_ALERTMANAGER_UID:-1000}:${CHUMMER_OBSERVABILITY_ALERTMANAGER_GID:-1000}" /alertmanager
+    volumes:
+      - chummer-observability-prometheus-data:/prometheus
+      - chummer-observability-alertmanager-data:/alertmanager
+
+  chummer-observability-alertmanager:
+    image: "prom/alertmanager:v0.32.1@sha256:51a825c2a40acc3e338fdd00d622e01ec090f72be2b3ea46be0839cd47a4d286"
+    init: true
+    restart: unless-stopped
+    user: "${CHUMMER_OBSERVABILITY_ALERTMANAGER_UID:-1000}:${CHUMMER_OBSERVABILITY_ALERTMANAGER_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    depends_on:
+      chummer-observability-storage-init:
+        condition: service_completed_successfully
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+      - --web.external-url=http://chummer-observability-alertmanager:9093
+      - --log.format=json
+    volumes:
+      - /docker/chummercomplete/chummer.run-services/ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - chummer-observability-alertmanager-data:/alertmanager
+      - type: bind
+        source: "${CHUMMER_OBSERVABILITY_ALERTMANAGER_SECRET_DIR:-/docker/fleet/state/chummer-secrets/chummer-observability-alertmanager}"
+        target: /run/secrets/chummer-observability
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
+    healthcheck:
+      test: ["CMD", "/bin/amtool", "--alertmanager.url=http://127.0.0.1:9093", "config", "show"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: ${CHUMMER_OBSERVABILITY_ALERTMANAGER_MEMORY_LIMIT:-256m}
+    cpu_shares: 32
+    cpus: ${CHUMMER_OBSERVABILITY_ALERTMANAGER_CPUS:-0.20}
+    networks:
+      public-origin:
+        aliases:
+          - chummer-observability-alertmanager
+
+  chummer-observability-prometheus:
+    image: "prom/prometheus:v3.13.0-distroless@sha256:f3b6aae627d96e7ad8256cdf6de5953247735117c6f577383fadb42efeeea7bc"
+    init: true
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    depends_on:
+      chummer-observability-storage-init:
+        condition: service_completed_successfully
+      chummer-observability-alertmanager:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-otlp-receiver
+      - --web.listen-address=0.0.0.0:9090
+      - --web.max-connections=128
+      - --log.format=json
+    volumes:
+      - /docker/chummercomplete/chummer.run-services/ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /docker/chummercomplete/chummer.run-services/ops/prometheus/chummer-public-edge.rules.yml:/etc/prometheus/rules/chummer-public-edge.rules.yml:ro
+      - chummer-observability-prometheus-data:/prometheus
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+    healthcheck:
+      test: ["CMD", "/bin/promtool", "check", "healthy", "--url=http://127.0.0.1:9090"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: ${CHUMMER_OBSERVABILITY_PROMETHEUS_MEMORY_LIMIT:-512m}
+    cpu_shares: 64
+    cpus: ${CHUMMER_OBSERVABILITY_PROMETHEUS_CPUS:-0.35}
+    networks:
+      public-origin:
+        aliases:
+          - chummer-observability-prometheus
+
   chummer-portal:
     image: chummer-run-api:local
     restart: unless-stopped
@@ -347,6 +461,8 @@ services:
         condition: service_healthy
       support-progress-mock:
         condition: service_healthy
+      chummer-observability-prometheus:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
       # Keep the TLS hostname stable while pinning the managed database endpoint selected by
@@ -359,6 +475,11 @@ services:
       AllowedHosts: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
       CHUMMER_PUBLIC_ALLOWED_HOSTS: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
       CHUMMER_PUBLIC_CANONICAL_ORIGIN: ${CHUMMER_PUBLIC_CANONICAL_ORIGIN:-https://chummer.run}
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://chummer-observability-prometheus:9090/api/v1/otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "15000"
+      OTEL_SERVICE_NAME: chummer.run.api
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=production
       CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
@@ -409,7 +530,7 @@ services:
       CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS: /origin-media/receipts
       CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS: /origin-media/outputs
       CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS: ${CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS:-audio.chummer.run,audiobookshelf.chummer.run,audiobookshelf.girschele.com}
-      CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-}
+      CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-/app/state/origin-provider-accounts.json}
       CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY:-}
       CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES:-}
       CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES:-}
@@ -565,6 +686,11 @@ services:
       CHUMMER_EA_MAGICFIT_PASSWORD: ${CHUMMER_EA_MAGICFIT_PASSWORD:-}
       CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL: ${CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL:-}
       CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD: ${CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD:-}
+      CHUMMER_EA_SENDR_EMAIL: ${CHUMMER_EA_SENDR_EMAIL:-}
+      CHUMMER_EA_SENDR_PASSWORD: ${CHUMMER_EA_SENDR_PASSWORD:-}
+      CHUMMER_EA_SENDR_API_KEY: ${CHUMMER_EA_SENDR_API_KEY:-}
+      SENDR_API_KEY: ${SENDR_API_KEY:-}
+      SENDR_WEBHOOK_SECRET: ${SENDR_WEBHOOK_SECRET:-}
       PROMPTING_SYSTEMS_API_KEY: ${PROMPTING_SYSTEMS_API_KEY:-}
       PROMPT_ARCHITECTS_TIER4_VERIFIED: ${PROMPT_ARCHITECTS_TIER4_VERIFIED:-}
       PROMPT_ARCHITECTS_API_AVAILABLE: ${PROMPT_ARCHITECTS_API_AVAILABLE:-}
@@ -691,6 +817,7 @@ services:
     volumes:
       - ${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro
       - chummer-run-api-state:/app/state
+      - /docker/chummercomplete/chummer.run-services/.state/origin-provider-accounts.json:/app/state/origin-provider-accounts.json:ro
       - chummer-origin-media:/origin-media
       # Both host files must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
       - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
@@ -907,6 +1034,8 @@ volumes:
   chummer-origin-media:
   chummer-release-upload-sessions:
   chummer-run-identity-state:
+  chummer-observability-prometheus-data:
+  chummer-observability-alertmanager-data:
 
 networks:
   public-origin:

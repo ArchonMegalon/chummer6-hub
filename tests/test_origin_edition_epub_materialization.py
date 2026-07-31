@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+from io import BytesIO
 import json
 from pathlib import Path
 from zipfile import ZipFile
@@ -104,6 +105,32 @@ def test_materializes_epub_with_explicit_title_and_runner(tmp_path: Path) -> Non
     assert result["runnerName"] == "Cipher Ghost"
     assert "<dc:title>Ghost: Deluxe Origin</dc:title>" in package
     assert "<meta property=\"chummer:runner-name\">Cipher Ghost</meta>" in package
+
+
+def test_materializes_png_source_cover_as_real_jpeg_epub_member(tmp_path: Path) -> None:
+    module = load_module()
+    manuscript = tmp_path / "accepted.md"
+    manuscript.write_text("Night rain held the clinic door.\n", encoding="utf-8")
+    cover = tmp_path / "cover.png"
+    Image.new("RGB", (600, 900), (8, 24, 36)).save(cover, format="PNG")
+    output = tmp_path / "dossier" / "ebook.epub"
+
+    result = module.materialize(
+        manuscript=manuscript,
+        cover=cover,
+        dossier_dir=tmp_path / "dossier",
+        output_epub=output,
+        receipt=tmp_path / "dossier" / "ebook.receipt.json",
+        namespace="origin.chummer.run/Varga/Mira/Kestrel",
+    )
+
+    with ZipFile(output) as archive:
+        embedded = archive.read("EPUB/images/cover.jpg")
+    with Image.open(BytesIO(embedded)) as image:
+        assert image.format == "JPEG"
+        assert image.size == (600, 900)
+    assert result["coverSha256"] == sha256_file(cover)
+    assert result["embeddedCoverSha256"] == hashlib.sha256(embedded).hexdigest()
 
 
 def test_materialize_epub_marks_known_preamble_start_as_not_story_start(tmp_path: Path) -> None:

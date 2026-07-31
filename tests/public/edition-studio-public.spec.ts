@@ -31,9 +31,9 @@ test('edition studio public route stays available and points at the signed-in ed
 
   await page.goto(`${baseUrl}/edition-studio`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'EDITION STUDIO', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('EDITION STUDIO now ships a bounded first-party ruleset-head lane');
-  await expect(page.locator('body')).toContainText('Signed-in edition desk');
-  await expect(page.locator('body')).toContainText('Ruleset-head surface only.');
+  await expect(page.locator('body')).toContainText('EDITION STUDIO now ships a focused ruleset path');
+  await expect(page.locator('body')).toContainText('Sign in for EDITION STUDIO');
+  await expect(page.locator('body')).toContainText('Edition-focused surface only.');
 
   writeJsonArtifact('EDITION_STUDIO_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

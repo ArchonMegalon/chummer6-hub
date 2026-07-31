@@ -99,10 +99,19 @@ public sealed class AurPackageCatalogServiceTests
         Assert.Equal("Arch / CachyOS", package.PlatformLabel);
         Assert.Contains("makepkg -si", package.InstallCommand, StringComparison.Ordinal);
         Assert.Equal("avalonia-linux-x64-installer", package.UpstreamArtifactId);
-        Assert.StartsWith("https://chummer.run/downloads/files/", package.SourceArchiveUrl, StringComparison.Ordinal);
-        Assert.StartsWith("https://chummer.run/downloads/files/", package.PkgbuildUrl, StringComparison.Ordinal);
-        Assert.StartsWith("https://chummer.run/downloads/files/", package.SrcinfoUrl, StringComparison.Ordinal);
-        Assert.StartsWith("https://chummer.run/downloads/files/", package.UpstreamArtifactUrl, StringComparison.Ordinal);
+        foreach (string url in new[]
+        {
+            package.SourceArchiveUrl,
+            package.PkgbuildUrl,
+            package.SrcinfoUrl,
+            package.UpstreamArtifactUrl
+        })
+        {
+            Assert.StartsWith("/downloads/g/", url, StringComparison.Ordinal);
+            Assert.Contains("/files/", url, StringComparison.Ordinal);
+            Assert.DoesNotContain('?', url);
+            Assert.DoesNotContain('#', url);
+        }
         AssertSha256Shape(package.SourceArchiveSha256);
         AssertSha256Shape(package.PkgbuildSha256);
         AssertSha256Shape(package.SrcinfoSha256);

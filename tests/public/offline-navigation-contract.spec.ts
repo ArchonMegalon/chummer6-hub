@@ -36,6 +36,7 @@ function createOfflineWorkerHarness() {
     },
     self: {
       location: { origin: 'https://chummer.run' },
+      registration: { scope: 'https://chummer.run/' },
       addEventListener: (name: string, listener: (event: FetchEventFixture) => void) => {
         listeners.set(name, listener);
       },

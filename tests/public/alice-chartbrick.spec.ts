@@ -48,6 +48,11 @@ test('signed-in alice handoff can show chartbrick runner boards', async ({ brows
   test.setTimeout(90_000);
   test.skip(!signedInToken, 'signed-in ALICE ChartBrick verification needs CHUMMER_E2E_IDENTITY_TOKEN or CHUMMER_E2E_LOCAL_IDENTITY_TOKEN');
 
+  const receiptResponse = await request.get(`${baseUrl}/alice/receipts/build-ghost.json`);
+  expect(receiptResponse.status()).toBe(200);
+  const receipt = await receiptResponse.json();
+  const chartbrickConfigured = Array.isArray(receipt.insights) && receipt.insights.length > 0;
+
   const parsedBaseUrl = new URL(baseUrl);
   const context = await browser.newContext();
   await context.addCookies([
@@ -76,10 +81,35 @@ test('signed-in alice handoff can show chartbrick runner boards', async ({ brows
 
   const page = await context.newPage();
   await page.goto(`${baseUrl}${location}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('body')).toContainText('ALICE boards');
-  await expect(page.locator('body')).toContainText('See the current handoff before you commit.');
-  await expect(page.locator('iframe[title="Why ALICE leans this way"]')).toHaveAttribute('src', /chartbrick\.com/i);
-  await expect(page.locator('iframe[title="Runner stats"]')).toHaveAttribute('src', /chartbrick\.com/i);
+  const aliceBoards = page.locator('details').filter({ hasText: 'ALICE boards' });
+  if (!chartbrickConfigured) {
+    await expect(aliceBoards).toHaveCount(0);
+    await expect(page.locator('a[href*="chartbrick.com"]')).toHaveCount(0);
+    await signedInRequest.dispose();
+    await page.close();
+    await context.close();
+    writeJsonArtifact('ALICE_CHARTBRICK_SIGNED_IN_E2E.generated.json', {
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      open_route_status: openResponse.status(),
+      handoff_location: location,
+      chartbrick_configured: false,
+      configured_only_controls_hidden: true,
+    });
+    return;
+  }
+  await aliceBoards.locator('summary').click();
+  await expect(aliceBoards).toHaveAttribute('open', '');
+  await expect(page.locator('body')).toContainText('visual tradeoff read');
+  const explanationBoard = page.getByRole('link', { name: 'Open explanation board' });
+  const statsBoard = page.getByRole('link', { name: 'Open stats board' });
+  for (const boardLink of [explanationBoard, statsBoard]) {
+    await expect(boardLink).toBeVisible();
+    await expect(boardLink).toHaveAttribute('href', /chartbrick\.com/i);
+    await expect(boardLink).toHaveAttribute('target', '_blank');
+    await expect(boardLink).toHaveAttribute('rel', /noreferrer/i);
+  }
 
   await signedInRequest.dispose();
   await page.close();
@@ -91,5 +121,6 @@ test('signed-in alice handoff can show chartbrick runner boards', async ({ brows
     base_url: baseUrl,
     open_route_status: openResponse.status(),
     handoff_location: location,
+    chartbrick_configured: true,
   });
 });

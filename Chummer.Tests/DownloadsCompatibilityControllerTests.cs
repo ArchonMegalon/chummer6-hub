@@ -543,7 +543,7 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
-    public void DisabledWindowsArtifactsDoNotSurfaceThroughProofRoutes()
+    public void DisabledWindowsArtifactsAreRevokedAcrossProofRoutes()
     {
         using Fixture fixture = new(new Dictionary<string, string?>
         {
@@ -555,8 +555,12 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult byArtifact = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-x64-installer");
 
         Assert.IsType<NotFoundObjectResult>(catalog);
-        Assert.IsType<NotFoundResult>(byFile);
-        Assert.IsType<NotFoundResult>(byArtifact);
+        Assert.Equal(
+            StatusCodes.Status410Gone,
+            Assert.IsType<ObjectResult>(byFile).StatusCode);
+        Assert.Equal(
+            StatusCodes.Status410Gone,
+            Assert.IsType<ObjectResult>(byArtifact).StatusCode);
     }
 
     private static void WriteEmbeddedPayloadInstaller(string path, string head)

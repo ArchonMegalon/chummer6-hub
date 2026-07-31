@@ -168,7 +168,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("<span>Current update</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span>Current area</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span>Lead subject</span>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@surface.Status.LeadReceiptId", view, StringComparison.Ordinal);
     }
 

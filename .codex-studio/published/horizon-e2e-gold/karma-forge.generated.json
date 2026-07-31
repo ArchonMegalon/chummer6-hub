@@ -1,0 +1,28 @@
+{
+  "assertion_count": 13,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "no_public_rules_truth_claim",
+    "approval_stays_chummer_owned",
+    "roadmap_stays_separate",
+    "discovery_handoff_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "login_location": "/login?next=%2Fparticipate%2Fkarma-forge%2Fdiscovery",
+    "receipt_route": "/participate/karma-forge/receipts/discovery-network.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:32.448Z",
+  "horizon_id": "karma-forge",
+  "journey_steps": [
+    "load discovery-network receipt",
+    "render first-party intake",
+    "verify form exists",
+    "verify governed discovery handoff requires identity"
+  ],
+  "receipt_route": "/participate/karma-forge/receipts/discovery-network.json",
+  "route": "/participate/karma-forge",
+  "status": "pass",
+  "verdict": "GOLD"
+}

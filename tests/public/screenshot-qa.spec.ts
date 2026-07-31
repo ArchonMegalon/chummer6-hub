@@ -20,7 +20,7 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Downloads', 'Version', 'No build is available right now', 'Build from source'],
+    requiredText: ['Downloads', 'Version', 'Current public installer', 'Build from source'],
   },
   {
     id: 'status',
@@ -66,8 +66,8 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
 
     await expect(heroTitle).toContainText('Chummer');
     await expect(primaryCta).toHaveAttribute('aria-label', 'Download Chummer');
-    await expect(page.locator('.minimal-meta').first()).toContainText('No public installer right now');
-    await expect(page.locator('.minimal-meta').last()).toContainText('Current public lane: Downloads paused');
+    await expect(page.locator('.minimal-meta').first()).toContainText('Current public installers: Windows and Linux.');
+    await expect(page.locator('.minimal-meta').last()).toContainText('Current public lane: Preview. Review required.');
     await expect(page.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(page.locator('.minimal-inline-links')).toContainText('Help');

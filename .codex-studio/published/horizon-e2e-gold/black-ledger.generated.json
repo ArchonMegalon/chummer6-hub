@@ -1,0 +1,30 @@
+{
+  "assertion_count": 16,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "provider_not_world_truth",
+    "viewer_not_tactical_truth",
+    "route_truth_is_first_party",
+    "external_handoff_is_receipted"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "receipt_route": "/ledger/receipts/viewer-network.json",
+    "request_id": "horizon-artifact-8261956d597a2ebc",
+    "viewer_location": "https://my.matterport.com/show/?m=ax2JhiPGk5P",
+    "viewer_route": "/ledger/viewers/3d-tour"
+  },
+  "generated_at_utc": "2026-07-31T21:54:34.720Z",
+  "horizon_id": "black-ledger",
+  "journey_steps": [
+    "load viewer-network receipt",
+    "render city board",
+    "request governed 3D viewer",
+    "verify provider allowlist and request receipt"
+  ],
+  "receipt_route": "/ledger/receipts/viewer-network.json",
+  "route": "/ledger",
+  "status": "pass",
+  "verdict": "GOLD"
+}

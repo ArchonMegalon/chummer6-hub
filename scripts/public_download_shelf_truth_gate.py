@@ -424,6 +424,10 @@ def resolve_effective_install_access_class(row: dict[str, Any], payload: dict[st
 
 
 def embedded_flagship_readiness_blocks_public_shelf(payload: dict[str, Any]) -> bool:
+    channel = normalize_token(payload.get("channelId") or payload.get("channel"))
+    rollout = normalize_token(payload.get("rolloutState"))
+    if channel != "public_stable" and rollout != "public_stable":
+        return False
     release_proof = payload.get("releaseProof")
     if not isinstance(release_proof, dict):
         return False

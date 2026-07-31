@@ -1,0 +1,13 @@
+{
+  "contractName": "chummer.online_character_roster_launch.v1",
+  "status": "pass",
+  "launch_url": "https://chummer.run/app?command=character_roster",
+  "final_url": "https://chummer.run/blazor/app?command=character_roster",
+  "http_status": 200,
+  "generated_at": "2026-07-31T20:43:17.885610Z",
+  "body_size": 54617,
+  "has_blazor_marker": true,
+  "has_roster_marker": true,
+  "failure_reason": null,
+  "body_excerpt": "<!DOCTYPE html>\n<html lang=\"en\" b-gs90fa3ou7><head b-gs90fa3ou7><meta charset=\"utf-8\" b-gs90fa3ou7>\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" b-gs90fa3ou7>\n    <meta name=\"theme-color\" content=\"#0f3b3e\" b-gs90fa3ou7>\n    <meta name=\"mobile-web-app-capable\" content=\"yes\" b-gs90fa3ou7>\n    <meta name=\"apple-mobile-web-app-capable\" content=\"yes\" b-gs90fa3ou7>\n    <meta name=\"apple-mobile-web-app-title\" content=\"Chummer Build\" b-gs90fa3ou7>\n    <meta name=\"application..."
+}

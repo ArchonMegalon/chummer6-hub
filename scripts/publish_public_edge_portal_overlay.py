@@ -2657,6 +2657,25 @@ def materialize_isolated_build_workspace(source_root: Path, build_root: Path) ->
         if copied_root not in copied_roots:
             copied_roots.append(copied_root)
 
+    # Chummer.Run.Api reaches the fleet-owned media contract through three parent
+    # traversals. Preserve the normal /docker/chummercomplete -> /docker/fleet
+    # sibling geometry inside the isolated build root while retaining the
+    # workspace copy used by source-fingerprint verification.
+    if source_relative_root == Path("chummer.run-services"):
+        workspace_fleet_root = isolated_workspace_root / "fleet"
+        build_fleet_root = build_root / "fleet"
+        if workspace_fleet_root.exists():
+            shutil.copytree(
+                workspace_fleet_root,
+                build_fleet_root,
+                ignore=ignored_isolated_build_entries,
+                copy_function=copy_file_with_hardlink_fallback,
+                dirs_exist_ok=True,
+            )
+            copied_root = str(build_fleet_root)
+            if copied_root not in copied_roots:
+                copied_roots.append(copied_root)
+
     return (isolated_workspace_root / source_relative_root, copied_roots)
 
 

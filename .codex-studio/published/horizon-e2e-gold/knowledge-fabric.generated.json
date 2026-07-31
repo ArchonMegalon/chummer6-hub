@@ -1,0 +1,29 @@
+{
+  "assertion_count": 14,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "answer_has_provenance",
+    "public_route_is_source_safe",
+    "official_text_not_dumped",
+    "private_campaign_data_excluded"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "detail_route": "/rules/explanations/kf_explain_initiative_sr5.json",
+    "index_route": "/rules/explanations",
+    "receipt_id": "kf_explain_initiative_sr5"
+  },
+  "generated_at_utc": "2026-07-31T21:54:32.821Z",
+  "horizon_id": "knowledge-fabric",
+  "journey_steps": [
+    "load explanation index",
+    "select a live receipt",
+    "open cited answer JSON",
+    "render source-safe rules surface"
+  ],
+  "receipt_route": "/rules/explanations",
+  "route": "/rules",
+  "status": "pass",
+  "verdict": "GOLD"
+}

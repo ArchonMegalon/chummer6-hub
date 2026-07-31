@@ -1,0 +1,38 @@
+{
+  "base_url": "https://chummer.run",
+  "cache_control": "private, no-store, no-cache, max-age=0",
+  "contractName": "chummer.mobile_pwa_ledger_boundary.v1",
+  "failures": [],
+  "generatedAtUtc": "2026-07-02T11:32:21.549683+00:00",
+  "live": {
+    "base_url": "https://chummer.run",
+    "cache_control": "private, no-store, no-cache, max-age=0",
+    "expires": "0",
+    "failures": [],
+    "final_url": "https://chummer.run/mobile/pwa/ledger.json",
+    "payload_mode": "mobile_pwa_living_world",
+    "payload_status": "opt_in_required",
+    "pragma": "no-cache",
+    "route": "/mobile/pwa/ledger.json",
+    "status": "pass",
+    "status_code": 200,
+    "updates_route": "/mobile/pwa/ledger.json",
+    "vary": "Cookie, Authorization"
+  },
+  "payload_status": "opt_in_required",
+  "source": {
+    "failures": [],
+    "required": {
+      "controller_gates_continuity": true,
+      "controller_private_no_store": true,
+      "controller_vary_cookie_authorization": true,
+      "controller_world_not_followed_hides_turn": true,
+      "playwright_gated_links": true,
+      "service_worker_non_cacheable": true,
+      "view_follow_required_turn": true
+    },
+    "status": "pass"
+  },
+  "status": "pass",
+  "vary": "Cookie, Authorization"
+}

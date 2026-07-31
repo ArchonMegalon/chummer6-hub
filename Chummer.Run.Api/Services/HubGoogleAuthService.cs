@@ -189,7 +189,7 @@ public sealed class HubGoogleAuthService
             Expires = expiresAtUtc.UtcDateTime,
             IsEssential = true,
             Path = "/",
-            Domain = null
+            Domain = ResolveStateCookieDomain(request)
         };
 
     public void ClearStateCookie(HttpRequest request, HttpResponse response)
@@ -1089,6 +1089,23 @@ public sealed class HubGoogleAuthService
         }
 
         return NormalizeCookieDomainHost(redirectUri.Host);
+    }
+
+    private string? ResolveStateCookieDomain(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        string? callbackHost = ResolveConfiguredStateCookieDomain();
+        string? requestHost = NormalizeCookieDomainHost(request.Host.Host);
+        if (callbackHost is null
+            || requestHost is null
+            || string.Equals(requestHost, callbackHost, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return requestHost.EndsWith("." + callbackHost, StringComparison.OrdinalIgnoreCase)
+            ? callbackHost
+            : null;
     }
 
     private static string? NormalizeCookieDomainHost(string? host)

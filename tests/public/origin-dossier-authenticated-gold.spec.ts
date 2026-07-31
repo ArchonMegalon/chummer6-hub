@@ -79,8 +79,8 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   await expect(page.locator('#origin-edition-read')).toContainText('real full approved story');
   await expect(page.locator('#origin-edition-portraits')).toContainText('three portraits that fit the story');
   await expect(page.locator('#origin-edition-listen')).toContainText('request the full audiobook in a chosen voice');
-  await expect(page.locator('#origin-edition-watch')).toContainText('at least two minutes');
-  await expect(page.locator('#origin-edition-watch')).toContainText('spoken dialogue');
+  await expect(page.locator('#origin-edition-watch')).toContainText('2:15 target · never under 2:00');
+  await expect(page.locator('#origin-edition-watch')).toContainText('Canonical dialogue, action, and reactions');
 
   const unauthenticatedRequest = await playwrightRequest.newContext({ baseURL: baseUrl });
   const unauthenticatedDetail = await unauthenticatedRequest.get(`/account/work/origin-dossiers/${projectId}`, { maxRedirects: 0 });

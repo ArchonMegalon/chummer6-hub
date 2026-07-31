@@ -33,8 +33,6 @@ REQUIRED_PASS_FLAGS = (
     "canon_audit_section_visible",
     "chummer_canon_owner_visible",
     "provider_created_facts_blocked_visible",
-    "canon_privacy_receipts_present",
-    "no_fallback_media_verified",
     "canon_audit_content_verified",
     "canon_audit_route_verified",
     "read_gate_verified",
@@ -158,7 +156,18 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
 
     if payload.get("deployedRouteClaimAllowed") is not passed:
         issues.append("deployed_route_claim_mismatch")
-    if payload.get("goldEligible") is not passed:
+    gold_eligible = payload.get("goldEligible") is True
+    gold_blockers = payload.get("goldBlockers") if isinstance(payload.get("goldBlockers"), list) else None
+    expected_gold_blockers = [
+        flag
+        for flag in ("canon_privacy_receipts_present", "no_fallback_media_verified")
+        if payload.get(flag) is not True
+    ]
+    if gold_blockers is None:
+        issues.append("gold_blockers_missing")
+    elif sorted(str(item) for item in gold_blockers) != sorted(expected_gold_blockers):
+        issues.append("gold_blockers_mismatch")
+    if gold_eligible is not (passed and not expected_gold_blockers):
         issues.append("gold_eligible_mismatch")
     if payload.get("local_fixture_artifacts") is not False:
         issues.append("local_fixture_artifacts_not_false")
@@ -257,10 +266,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
     expected_redirect_hashes = payload.get("expected_redirect_location_sha256") if isinstance(payload.get("expected_redirect_location_sha256"), dict) else {}
     response_body_sizes = payload.get("response_body_sizes") if isinstance(payload.get("response_body_sizes"), dict) else {}
     http_statuses = payload.get("http_statuses") if isinstance(payload.get("http_statuses"), dict) else {}
-    redirect_gate_flags = {
-        "read": "read_gate_verified",
-        "listen": "chummer_run_listen_gate_verified",
-    }
+    redirect_gate_flags = {"read": "read_gate_verified"}
     for route, flag in redirect_gate_flags.items():
         status_code = http_statuses.get(route)
         actual_hash = str(redirect_hashes.get(route) or "")
@@ -276,6 +282,34 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
             issues.append(f"redirect_gate_flag_not_backed_by_location:{route}")
         if passed and actual_hash != expected_hash:
             issues.append(f"pass_probe_redirect_location_mismatch:{route}")
+    listen_mode = str(payload.get("listen_delivery_mode") or "")
+    listen_status = http_statuses.get("listen")
+    listen_gate_claimed = payload.get("chummer_run_listen_gate_verified") is True
+    if listen_mode == "audiobookshelf_redirect":
+        actual_hash = str(redirect_hashes.get("listen") or "")
+        expected_hash = str(expected_redirect_hashes.get("listen") or "")
+        if listen_status not in {302, 303, 307, 308}:
+            issues.append("listen_redirect_mode_status_invalid")
+        if not valid_sha256(actual_hash) or actual_hash != expected_hash:
+            issues.append("listen_redirect_mode_location_invalid")
+    elif listen_mode == "direct_artifact":
+        expected_hash = str(expected_hashes.get("listen") or "")
+        response_hash = str(response_hashes.get("listen") or "")
+        listen_size = response_body_sizes.get("listen")
+        if listen_status != 200:
+            issues.append("listen_direct_mode_status_invalid")
+        if not isinstance(listen_size, int) or listen_size <= 0:
+            issues.append("listen_direct_mode_body_empty")
+        if not valid_sha256(expected_hash) or response_hash != expected_hash:
+            issues.append("listen_direct_mode_hash_mismatch")
+        if payload.get("listen_direct_artifact_verified") is not True:
+            issues.append("listen_direct_mode_flag_not_true")
+        if payload.get("audiobook_sha_matches_import") is not True:
+            issues.append("listen_direct_mode_sha_flag_not_true")
+    elif passed or listen_gate_claimed:
+        issues.append("listen_delivery_mode_invalid")
+    if passed and not listen_gate_claimed:
+        issues.append("pass_probe_listen_gate_not_verified")
     nonempty_artifact_flags = {
         "cover": "cover_artifact_nonempty",
         "book": "book_artifact_nonempty",

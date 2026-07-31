@@ -1,0 +1,15 @@
+{
+  "generated_at_utc": "2026-06-30T04:04:42.096Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "route": "/mobile",
+  "offline_reload": "pass",
+  "cached_paths": [
+    "/mobile",
+    "/mobile/pwa.json",
+    "/play",
+    "/play/continuity",
+    "/ready/handoff/mobile.json"
+  ],
+  "personalized_ledger_cached": false
+}

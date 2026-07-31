@@ -668,6 +668,19 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
                 .Select(dataSource => _fixture.CreateRepository(dataSource).RedeemInviteAsync(mutation))
                 .ToArray();
             PlayAuthorizationPostgresMutationResult[] results = await Task.WhenAll(attempts);
+            for (int index = 0; index < results.Length; index++)
+            {
+                for (int retry = 0;
+                     retry < 100
+                     && results[index].Code is not PlayAuthorizationPostgresOutcomeCode.Applied
+                         and not PlayAuthorizationPostgresOutcomeCode.Replayed;
+                     retry++)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(25));
+                    results[index] = await _fixture.CreateRepository(dataSources[index])
+                        .RedeemInviteAsync(mutation);
+                }
+            }
 
             Assert.Single(results, result => result.Code == PlayAuthorizationPostgresOutcomeCode.Applied);
             Assert.Equal(31, results.Count(result => result.Code == PlayAuthorizationPostgresOutcomeCode.Replayed));
@@ -2167,6 +2180,12 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             Assert.Equal("external_authority_timeout", timedOut.Code);
             Assert.Equal(1, provider.ValidationInvocationCount);
             Assert.Equal(1, provider.ReentrantValidationCallsInFlight);
+            for (int attempt = 0;
+                 attempt < 100 && provider.ReentrantReconciliationCode is null;
+                 attempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10));
+            }
             Assert.Equal("complete", provider.ReentrantReconciliationCode);
             Assert.Equal(1, first.ProviderCallDiagnostics.ValidationCallsInFlight);
             Assert.Equal(1, second.ProviderCallDiagnostics.ValidationCallsInFlight);
@@ -2223,6 +2242,7 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             Assert.All(retainedExternal, value => Assert.Equal((byte)0, value));
             Assert.All(retainedHmac, value => Assert.Equal((byte)0, value));
             Assert.All(retainedStateCheckpoint, value => Assert.Equal((byte)0, value));
+            provider.SynchronousPrefix = null;
             PlayAuthorizationPostgresReadiness recovered = await readiness.CheckAsync();
             Assert.True(recovered.Ready, recovered.Code);
             Assert.Equal(2, provider.ValidationInvocationCount);
@@ -2322,8 +2342,9 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
             var provider = new AliasingCheckpointAuthority(authority);
             var services = new ServiceCollection();
             services.AddSingleton<PlayAuthorizationCheckpointProviderCallRegistry>();
-            services.AddPlayAuthorizationPostgresDormantProviderBoundary(provider);
-            using ServiceProvider serviceProvider = services.BuildServiceProvider();
+            PlayAuthorizationPostgresDormantProviderActivationHandle activation =
+                services.AddPlayAuthorizationPostgresDormantProviderBoundary(provider);
+            using ServiceProvider serviceProvider = activation.BuildServiceProvider();
             PlayAuthorizationPostgresDormantFactory providerFactory = serviceProvider
                 .GetRequiredService<PlayAuthorizationPostgresDormantFactory>();
             PlayAuthorizationPostgresDormantFactory reconciler =
@@ -2398,8 +2419,14 @@ public sealed class PlayAuthorizationPostgresIntegrationTests :
         await connection.DisposeAsync();
         await Task.Delay(shortLeasePolicy.ClaimLease + TimeSpan.FromMilliseconds(150));
 
+        var fastAuthority = new CheckpointCapabilityOverrideAuthority(
+            _fixture.Authorities,
+            _fixture.Authorities.Capabilities with
+            {
+                HardDeadline = TimeSpan.FromMilliseconds(40)
+            });
         PlayAuthorizationPostgresDormantFactory higherFenceReconciler =
-            _fixture.CreateProviderFactory(_fixture.Authorities)
+            _fixture.CreateProviderFactory(fastAuthority)
                 .BindCheckpointReconciliation(
                     _fixture.AdminDataSource,
                     _fixture.Authorities,

@@ -28,7 +28,7 @@ internal readonly record struct ReleaseProofTrustEvaluation(
 
 /// <summary>
 /// Validates the evidence that proof-freshness metrics summarize. Freshness is
-/// never an independent assertion: the Registry-compatible release proof,
+/// never an independent assertion: the Registry-compatible release evidence,
 /// localization gate, and digest-bound flagship readiness snapshot must all be
 /// present and structurally valid before their timestamps can be considered.
 /// </summary>
@@ -214,7 +214,7 @@ internal static partial class ReleaseProofTrustEvaluator
 
         return new ReleaseProofTrustEvaluation(
             true,
-            "release proof evidence is structurally valid and digest-bound",
+            "release evidence is structurally valid and digest-bound",
             proofGeneratedAt,
             localizationGeneratedAt,
             flagshipGeneratedAt,

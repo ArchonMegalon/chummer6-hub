@@ -1,0 +1,80 @@
+{
+  "contract_name": "chummer.magicai_platform_access_audit.v1",
+  "generated_at_utc": "2026-06-30T00:45:28Z",
+  "checked_at_utc": "2026-06-30T00:45:28Z",
+  "site": "platform.omagic.ai",
+  "slots": [
+    {
+      "slot": "02",
+      "keys_status": "forbidden",
+      "logged_in": true,
+      "tier": "AppSumo Tier 1",
+      "keys_url": "https://platform.omagic.ai/forbidden",
+      "notes": [
+        "platform login succeeded",
+        "API keys page returned 403 forbidden"
+      ],
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot02_api_platform_receipt.json"
+    },
+    {
+      "slot": "03",
+      "keys_status": "ok",
+      "logged_in": true,
+      "tier": "AppSumo Tier 4",
+      "keys_url": "https://platform.omagic.ai/platform/keys",
+      "api_key_minted_previous_turn": true,
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot03_api_key_receipt.json"
+    },
+    {
+      "slot": "04",
+      "keys_status": "ok",
+      "logged_in": true,
+      "tier": "unknown",
+      "keys_url": "https://platform.omagic.ai/platform/keys",
+      "api_key_minted_this_turn": true,
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot04_api_platform_receipt.json"
+    },
+    {
+      "slot": "05",
+      "keys_status": "ok",
+      "logged_in": true,
+      "tier": "unknown",
+      "keys_url": "https://platform.omagic.ai/platform/keys",
+      "api_key_minted_this_turn": true,
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot05_api_platform_receipt.json"
+    },
+    {
+      "slot": "08",
+      "keys_status": "ok",
+      "logged_in": true,
+      "tier": "AppSumo Tier 4",
+      "keys_url": "https://platform.omagic.ai/platform/keys",
+      "api_key_minted_this_turn": true,
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot08_api_platform_receipt.json"
+    },
+    {
+      "slot": "09",
+      "keys_status": "login_failed",
+      "logged_in": false,
+      "keys_url": "https://platform.omagic.ai/platform",
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot09_api_platform_receipt.json",
+      "notes": [
+        "app login failed",
+        "platform login failed and returned to the marketing/login surface"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/.tmp/magicai-browser/slot09-app-login-check.png",
+        "/docker/chummercomplete/.tmp/magicai-browser/slot09-platform-login-check.png"
+      ]
+    },
+    {
+      "slot": "10",
+      "keys_status": "ok",
+      "logged_in": true,
+      "tier": "unknown",
+      "keys_url": "https://platform.omagic.ai/platform/keys",
+      "api_key_minted_this_turn": true,
+      "receipt_path": "/docker/chummercomplete/.tmp/magicai-browser/slot10_api_platform_receipt.json"
+    }
+  ]
+}

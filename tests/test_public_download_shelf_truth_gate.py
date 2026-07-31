@@ -345,6 +345,30 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["local"]["canonicalManifest"]["artifactCount"], 1)
         self.assertEqual(receipt["local"]["projectedPublicManifest"]["artifactCount"], 0)
 
+    def test_failed_flagship_readiness_does_not_hide_an_explicit_preview_installer(self) -> None:
+        canonical_payload = make_canonical_manifest()
+        canonical_payload.update(
+            {
+                "channel": "preview",
+                "channelId": "preview",
+                "rolloutState": "coverage_incomplete",
+                "supportabilityState": "review_required",
+                "releaseProof": {
+                    "status": "passed",
+                    "flagshipReadiness": {"status": "fail"},
+                },
+            }
+        )
+        canonical_payload["artifacts"][0]["channel"] = "preview"
+        canonical_payload["artifacts"][0]["channelId"] = "preview"
+
+        projected = MODULE.projected_public_manifest_summary(
+            canonical_payload,
+            base_url="https://chummer.run",
+        )
+
+        self.assertEqual(projected["artifactIds"], ["avalonia-linux-x64-installer"])
+
     def test_matching_local_and_live_bundle_truth_passes_for_linux_and_windows_public_installers(self) -> None:
         releases_payload, canonical_payload = add_windows_bootstrap_artifact(
             releases_payload=make_releases_manifest(),

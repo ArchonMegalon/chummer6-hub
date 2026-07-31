@@ -81,6 +81,21 @@ def normalize_url(base_url: str, value: str) -> str:
     return urllib.parse.urljoin(f"{base_url.rstrip('/')}/", value)
 
 
+def payload_metadata_url(payload_url: str) -> str:
+    parsed = urllib.parse.urlparse(payload_url)
+    parts = [part for part in parsed.path.split("/") if part]
+    if (
+        len(parts) == 6
+        and parts[0] == "downloads"
+        and parts[1] == "g"
+        and parts[3] == "install"
+        and parts[5] == "payload"
+    ):
+        path = parsed.path[: -len("payload")] + "metadata"
+        return urllib.parse.urlunparse(parsed._replace(path=path))
+    return f"{payload_url}.json" if payload_url else ""
+
+
 def is_windows_bootstrap_installer(row: dict[str, Any]) -> bool:
     kind = str(row.get("kind") or "").strip().lower()
     installer_mode = str(row.get("installerMode") or "").strip().lower()
@@ -183,7 +198,7 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
             installer_url = normalize_url(base, str(row.get("url") or ""))
             payload_file_name = str(row.get("payloadFileName") or "")
             payload_url = normalize_url(base, str(row.get("payloadDownloadUrl") or ""))
-            sidecar_url = f"{payload_url}.json" if payload_url else ""
+            sidecar_url = payload_metadata_url(payload_url)
             expected_installer_sha256 = str(row.get("sha256") or "").lower()
             expected_payload_sha256 = str(row.get("payloadSha256") or "").lower()
             expected_installer_size = int(row.get("sizeBytes") or 0)

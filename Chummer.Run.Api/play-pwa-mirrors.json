@@ -16,8 +16,8 @@
       "contentType": "application/javascript",
       "cacheControl": "no-cache, no-store, must-revalidate",
       "contract": "play-root-worker-public-edge-projection-v2",
-      "sourceSha256": "f3cef86bbf454b1a93c8ff9ccfe84f4c83dc7b505901471d702493a37960b83c",
-      "projectionSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+      "sourceSha256": "65d7f5d76dcb62b40c3c3d90d5ceb3a837b9e199bc37f5a4058ee87615e7fb64",
+      "projectionSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
       "transformation": {
         "cacheContract": "play-source-v2 -> run-api-projection-v2",
         "baseManifest": "/manifest.webmanifest -> /manifest.play.webmanifest",
@@ -134,9 +134,9 @@
     "script": "scripts/generate_public_play_worker_projection.py",
     "scriptSha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17",
     "config": "Chummer.Run.Api/play-worker-projection.json",
-    "configSha256": "ce3255c0aa661105d6139c21decc618e7bd3d5c6c90478a2d5d32e381387ca19",
+    "configSha256": "9a27b0b801dde6db8e39300b5c4af0673d3effc4b04a4a7668f58158d3dca1da",
     "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
-    "templateSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+    "templateSha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f",
     "inventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
     "inventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
     "dependencies": [
@@ -152,14 +152,14 @@
         "kind": "json",
         "role": "projection_config",
         "contentType": "application/json",
-        "sha256": "ce3255c0aa661105d6139c21decc618e7bd3d5c6c90478a2d5d32e381387ca19"
+        "sha256": "9a27b0b801dde6db8e39300b5c4af0673d3effc4b04a4a7668f58158d3dca1da"
       },
       {
         "path": "Chummer.Run.Api/service-worker.public-edge.template.js",
         "kind": "template",
         "role": "projection_template",
         "contentType": "application/javascript",
-        "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13"
+        "sha256": "3922697a6e7b473ae978603fe265c71d5bff9863de37e00b6e6a0a8d8cdb192f"
       },
       {
         "path": "Chummer.Run.Api/play-pwa-required-inventory.json",

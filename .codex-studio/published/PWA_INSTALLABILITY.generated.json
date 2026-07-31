@@ -1,0 +1,14 @@
+{
+  "generated_at_utc": "2026-06-30T04:04:25.108Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "route": "/play",
+  "truthful_copy": "Installable app shell live; offline and reconnect lane cached.",
+  "installability_posture": "live_public_installable_shell",
+  "registration": {
+    "supported": true,
+    "controller": false,
+    "ready": false,
+    "scriptURL": "https://chummer.run/service-worker.js?v=1782719395"
+  }
+}

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-07-30T03:13:11Z",
+  "generated_at_utc": "2026-07-31T21:54:39Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "release_posture": {
@@ -12,15 +12,15 @@
     "fetch_error": null,
     "parse_error": null,
     "status": "published",
-    "version": "run-20260712-174412",
+    "version": "run-20260731-095000",
     "channel": "preview",
     "supportability_state": "review_required",
     "rollout_state": "coverage_incomplete",
     "review_required": true,
-    "public_installer_available": false,
-    "downloads_paused": true,
+    "public_installer_available": true,
+    "downloads_paused": false,
     "expected_status": "published",
-    "expected_version": "run-20260712-174412",
+    "expected_version": "run-20260731-095000",
     "expected_channel": "preview",
     "expected_supportability_state": "review_required",
     "expected_rollout_state": "coverage_incomplete",
@@ -47,9 +47,8 @@
       "required_texts": [
         "A Shadowrun character manager for clean sheets and faster tables.",
         "Download Chummer",
-        "No public installer right now.",
-        "Help",
-        "Current public lane: Downloads paused."
+        "Current public installer",
+        "Help"
       ],
       "required_any_texts": [],
       "required_html_texts": [
@@ -100,11 +99,12 @@
       "required_texts": [
         "Downloads",
         "Chummer selects the best installer when it can.",
-        "Current public installer",
-        "No build is available right now",
+        "Nightly",
+        "Stable",
         "Build from source",
         "Download script",
-        "Help"
+        "No Stable build on this shelf.",
+        "Preview build. Review required."
       ],
       "required_any_texts": [],
       "required_html_texts": [
@@ -131,9 +131,7 @@
         "Signals and horizons",
         "Trust and support",
         "Account and quick actions",
-        "Stable release.",
-        "No Stable build on this shelf.",
-        "Preview build. Review required."
+        "Stable release."
       ],
       "forbidden_html_texts": [],
       "forbidden_hits": [],
@@ -154,7 +152,7 @@
       "fetch_error": null,
       "required_texts": [
         "Now",
-        "Downloads paused",
+        "Preview downloads",
         "Downloads",
         "Help"
       ],

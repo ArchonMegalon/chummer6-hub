@@ -1,0 +1,31 @@
+{
+  "assertion_count": 14,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "public_packets_are_player_safe",
+    "publication_truth_is_chummer_owned",
+    "gm_spoilers_stay_private",
+    "media_handoff_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "json_route": "/jackpoint/briefings/emerald-sprawl-briefing.json",
+    "login_location": "/login?next=%2Fjackpoint%2Fbriefings%2Femerald-sprawl-briefing%2Fvideo",
+    "markdown_route": "/jackpoint/briefings/emerald-sprawl-briefing.md",
+    "receipt_route": "/jackpoint/receipts/briefing-network.json"
+  },
+  "generated_at_utc": "2026-07-31T21:54:33.284Z",
+  "horizon_id": "jackpoint",
+  "journey_steps": [
+    "load briefing-network receipt",
+    "render public desk",
+    "open markdown briefing",
+    "open JSON briefing",
+    "verify narrated media identity boundary"
+  ],
+  "receipt_route": "/jackpoint/receipts/briefing-network.json",
+  "route": "/jackpoint",
+  "status": "pass",
+  "verdict": "GOLD"
+}

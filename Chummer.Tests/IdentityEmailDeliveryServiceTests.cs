@@ -234,6 +234,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["IDENTITY_EMAIL_START_WINDOW_SECONDS"] = "900",
                     ["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW"] = "10",
@@ -385,6 +386,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS"] = "true",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
@@ -430,6 +432,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
                 })
@@ -469,6 +472,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["ASPNETCORE_ENVIRONMENT"] = "Development",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
                     ["IDENTITY_PUBLIC_BASE_URL"] = "http://localhost:5101",
                     ["CHUMMER_IDENTITY_STORE_PATH"] = storePath
                 })

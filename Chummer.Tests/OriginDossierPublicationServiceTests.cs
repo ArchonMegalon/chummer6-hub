@@ -116,6 +116,57 @@ public sealed class OriginDossierPublicationServiceTests
     }
 
     [Fact]
+    public void FailedMediaReceiptWithEmptyOutputPathFailsClosedWithoutThrowing()
+    {
+        string tempRoot = Path.Combine(
+            Path.GetTempPath(),
+            "chummer-origin-dossier-empty-media-receipt",
+            Guid.NewGuid().ToString("N"));
+        string outputRoot = Path.Combine(tempRoot, "outputs");
+        string receiptRoot = Path.Combine(tempRoot, "receipts");
+        Directory.CreateDirectory(outputRoot);
+        Directory.CreateDirectory(receiptRoot);
+        string receiptPath = Path.Combine(receiptRoot, "failed.receipt.json");
+        File.WriteAllText(receiptPath, "{}", Encoding.UTF8);
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS"] = outputRoot,
+                ["CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS"] = receiptRoot
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+        var receipt = new OriginDossierMediaDispatchReceipt(
+            ContractVersion: OriginDossierMediaDispatchContract.Version,
+            RequestId: "origin-media-failed",
+            Kind: OriginDossierMediaDispatchKind.CinematicScene,
+            ProjectId: "origin-failed",
+            OwnerRefHash: new string('a', 64),
+            OriginRevisionId: new string('b', 64),
+            SelectionId: "scene-failed",
+            Status: "failed",
+            ProviderClass: string.Empty,
+            OutputPath: string.Empty,
+            OutputContentType: string.Empty,
+            OutputSha256: string.Empty,
+            OutputBytes: 0,
+            ObservedDurationSeconds: null,
+            RequestSha256: new string('c', 64),
+            ProviderExecutionRefHash: string.Empty,
+            CompletedAtUtc: DateTimeOffset.UtcNow,
+            ErrorCode: "origin_dossier_media_magicfit_render_failed");
+
+        OriginDossierMediaCompletionApplyResult result =
+            service.ApplyMediaDispatchReceipt(receipt, receiptPath);
+
+        Assert.False(result.Applied);
+        Assert.Equal("receipt_validation_failed", result.Status);
+    }
+
+    [Fact]
     public void RunnerLinkCodeConnectsTwoOriginStoriesWithoutSharingPrivateArtifacts()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
@@ -236,6 +287,60 @@ public sealed class OriginDossierPublicationServiceTests
             service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-book-first", "read"));
         Assert.Null(service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-book-first", "listen"));
         Assert.Null(service.GetArtifactForAccount("user-1", "subject-1", "origin-book-first", "video"));
+    }
+
+    [Fact]
+    public void ReviewedStoryArtifactsRemainAccessibleWithoutFalselyClaimingHumanizerGold()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-reviewed-clean");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new object[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-reviewed-clean",
+                            "Glass Rain",
+                            "Vanta",
+                            artifacts,
+                            undetectableHumanizerApplied: false,
+                            includeHumanizerReceipt: false)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+        Assert.False(publication.GoldReady);
+        Assert.False(publication.UndetectableHumanizerApplied);
+        Assert.Contains("Undetectable Humanizer receipt", publication.MissingGoldRequirements);
+        Assert.Contains("Undetectable Humanizer receipt path", publication.MissingGoldRequirements);
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-reviewed-clean", "book"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-reviewed-clean", "cover"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-reviewed-clean", "canon-audit"));
+        Assert.Equal(
+            "https://audio.chummer.run/share/origin-reviewed-clean-dossier",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-reviewed-clean", "read"));
+        Assert.Equal(
+            "https://audio.chummer.run/share/origin-reviewed-clean-audiobook",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-reviewed-clean", "listen"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-reviewed-clean", "video"));
     }
 
     [Fact]
@@ -1937,6 +2042,12 @@ public sealed class OriginDossierPublicationServiceTests
 
         Assert.False(publication.GoldReady);
         Assert.Contains("fitted cover art receipt path", publication.MissingGoldRequirements);
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-cover-provider", "book"));
+        Assert.Null(service.GetArtifactForAccount("user-1", "subject-1", "origin-cover-provider", "cover"));
+        Assert.Equal(
+            "https://audio.chummer.run/share/origin-cover-provider-audiobook",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-cover-provider", "listen"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-cover-provider", "video"));
     }
 
     [Fact]
@@ -2442,7 +2553,8 @@ public sealed class OriginDossierPublicationServiceTests
         bool dossierVideoVerified = true,
         bool storySceneCoverUsesSelectedCharacterFace = true,
         bool audiobookshelfPlaybackVerified = true,
-        bool telegramShareDelivered = true)
+        bool telegramShareDelivered = true,
+        bool includeHumanizerReceipt = true)
         => new
         {
             ownerUserId,
@@ -2476,7 +2588,7 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.ProviderManuscriptPath,
             artifacts.ProviderManuscriptReceiptPath,
             providerManuscriptAccountAlias,
-            artifacts.HumanizerReceiptPath,
+            humanizerReceiptPath = includeHumanizerReceipt ? artifacts.HumanizerReceiptPath : null,
             artifacts.BookArtifactPath,
             artifacts.BookArtifactReceiptPath,
             bookPackagingAccountAlias,
@@ -2715,6 +2827,11 @@ public sealed class OriginDossierPublicationServiceTests
         for (int chapter = 0; chapter < chapterTitles.Length; chapter++)
         {
             builder.AppendLine($"# Chapter {chapter + 1} - {chapterTitles[chapter]}");
+            builder.AppendLine();
+            builder.AppendLine($"\"Stay where I can see you,\" Vela said.");
+            builder.AppendLine($"\"Then keep pace with me,\" {runnerAlias} replied.");
+            builder.AppendLine($"\"The patrol is closing the street,\" Vela warned.");
+            builder.AppendLine($"\"Take the case and cover the exit,\" {runnerAlias} said.");
             builder.AppendLine();
             for (int beat = 0; beat < 18; beat++)
             {

@@ -1,0 +1,128 @@
+{
+  "assets": [
+    {
+      "bytes": 584,
+      "path": "/pwa-icon.svg",
+      "sha256": "cf764fa25a929641611c325ac6f8a23caa817611bcb6ccfc604490eced5a4111",
+      "source_path": "Chummer.Run.Api/wwwroot/pwa-icon.svg"
+    },
+    {
+      "bytes": 680,
+      "path": "/pwa-maskable.svg",
+      "sha256": "6ea67fd6e7dd490aa91bd0afd3f748c8339da7e5f6f2a5898c014807fd713b15",
+      "source_path": "Chummer.Run.Api/wwwroot/pwa-maskable.svg"
+    },
+    {
+      "bytes": 4670,
+      "path": "/pwa-screenshot-mobile.svg",
+      "sha256": "d1ca5771e49923454d69477e92a46a700b9776bc5eeec361f73f876beb10afaf",
+      "source_path": "Chummer.Run.Api/wwwroot/pwa-screenshot-mobile.svg"
+    },
+    {
+      "bytes": 2434,
+      "path": "/pwa-screenshot-wide.svg",
+      "sha256": "e935b9ae93d4af7fc5ba37a44a709518d19d95d9115cad1fdbdae126be2268e4",
+      "source_path": "Chummer.Run.Api/wwwroot/pwa-screenshot-wide.svg"
+    },
+    {
+      "bytes": 13428,
+      "path": "/apple-touch-icon.png",
+      "sha256": "212df00c4703cc96289468c14b256f3fbf2b9c18448af52723f59c7b033c5dca",
+      "source_path": "Chummer.Run.Api/wwwroot/apple-touch-icon.png"
+    },
+    {
+      "bytes": 17014,
+      "path": "/favicon.ico",
+      "sha256": "eeafd266c1cb95da587bef36f1f3e22ebd56faa5b32fd4d54dc7128382f80ffb",
+      "source_path": "Chummer.Run.Api/wwwroot/favicon.ico"
+    },
+    {
+      "bytes": 589,
+      "path": "/favicon.svg",
+      "sha256": "2314fdcc85173e7ee8c13fc1841cd094c253f9101e3716d999d1f5e400563beb",
+      "source_path": "Chummer.Run.Api/wwwroot/favicon.svg"
+    }
+  ],
+  "base_url": "",
+  "contractName": "chummer.public_pwa_static_assets.v1",
+  "failures": [],
+  "generated_at_utc": "2026-07-01T17:47:06.366180+00:00",
+  "manifests": [
+    {
+      "bytes": 1770,
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/manifest.json",
+      "screenshot_count": 2,
+      "sha256": "ecc52d060a121e89f9193716ceb53c8b34d7742fd3cd64d3c231d76ae3e4734c",
+      "shortcut_count": 4,
+      "source_path": "Chummer.Run.Api/wwwroot/manifest.json",
+      "start_url": "/mobile"
+    },
+    {
+      "bytes": 1786,
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/manifest.webmanifest",
+      "screenshot_count": 2,
+      "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+      "shortcut_count": 4,
+      "source_path": "Chummer.Run.Api/wwwroot/manifest.webmanifest",
+      "start_url": "/mobile"
+    },
+    {
+      "bytes": 1786,
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/site.webmanifest",
+      "screenshot_count": 2,
+      "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+      "shortcut_count": 4,
+      "source_path": "Chummer.Run.Api/wwwroot/site.webmanifest",
+      "start_url": "/mobile"
+    }
+  ],
+  "mode": "source",
+  "routes": [
+    {
+      "path": "/mobile",
+      "present": true,
+      "route_attribute": "[HttpGet(\"/mobile\")]",
+      "source": "PublicLandingController.cs"
+    },
+    {
+      "path": "/play",
+      "present": true,
+      "route_attribute": "[HttpGet(\"/play\")]",
+      "source": "PublicLandingController.cs"
+    },
+    {
+      "path": "/play/continuity",
+      "present": true,
+      "route_attribute": "[HttpGet(\"/play/continuity\")]",
+      "source": "PublicLandingController.cs"
+    },
+    {
+      "path": "/ready/handoff/mobile.json",
+      "present": true,
+      "route_attribute": "[HttpGet(\"/ready/handoff/mobile.json\")]",
+      "source": "PublicLandingController.cs"
+    }
+  ],
+  "service_worker": {
+    "bytes": 9058,
+    "cache_name": null,
+    "cache_version": "play-shell-v14",
+    "ledger_stream_non_cacheable": true,
+    "ledger_stream_precached": false,
+    "play_shell_asset_count": 19,
+    "required_precache_count": 14,
+    "sha256": "bd4c1b02022ee2a7c68f27953695710c8a005ed6dcb90461f1fce9ae0d9de065",
+    "source_path": "Chummer.Run.Api/wwwroot/service-worker.js",
+    "worker_kind": "play"
+  },
+  "status": "pass"
+}

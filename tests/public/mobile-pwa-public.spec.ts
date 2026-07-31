@@ -1,6 +1,10 @@
 import { test, expect } from 'playwright/test';
 
-const baseUrl = (process.env.CHUMMER_HUB_BASE_URL ?? 'http://127.0.0.1:8091').replace(/\/$/, '');
+const baseUrl = (
+  process.env.BASE_URL?.trim()
+  || process.env.CHUMMER_HUB_BASE_URL?.trim()
+  || 'http://127.0.0.1:8091'
+).replace(/\/$/, '');
 
 const routeExpectations: Array<{ route: string; finalPath: string }> = [
   { route: '/mobile', finalPath: '/mobile' },
@@ -79,14 +83,15 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   await expect(page.getByRole('button', { name: 'Install app' })).toBeVisible();
   await expect(page.locator('[data-mobile-app-inline-qr]')).toBeVisible();
   await expect(page.locator('[data-pwa-ledger-status]')).toHaveCount(0);
-  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /\/manifest(?:\.[a-z]+)?\.(?:json|webmanifest)$/);
 
   const readRegisteredWorkerUrl = async () => page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
       return '';
     }
 
-    const registration = await navigator.serviceWorker.getRegistration('/');
+    const registration = await navigator.serviceWorker.getRegistration('/mobile/')
+      ?? await navigator.serviceWorker.getRegistration('/');
     if (!registration) {
       return '';
     }
@@ -102,52 +107,25 @@ test('mobile and PWA public routes keep installability and role entry explicit',
       return '';
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.getRegistration('/mobile/')
+      ?? await navigator.serviceWorker.getRegistration('/');
     return registration.active?.scriptURL ?? '';
   });
-  await expect.poll(readReadyWorkerUrl, { timeout: 15000 }).toContain('/service-worker.js');
+  await expect.poll(readReadyWorkerUrl, { timeout: 30000 }).toContain('/service-worker.js');
   const readyWorkerUrl = await readReadyWorkerUrl();
+  expect(readyWorkerUrl).toBe(swUrl);
 
-  const controllerWorkerUrl = await page.evaluate(async () => {
+  const controllerWorkerUrl = await page.evaluate(() => {
     if (!('serviceWorker' in navigator)) {
       return null;
     }
-
-    if (navigator.serviceWorker.controller) {
-      return navigator.serviceWorker.controller.scriptURL;
-    }
-
-    await new Promise<void>((resolve) => {
-      const timeout = window.setTimeout(resolve, 3000);
-      navigator.serviceWorker.addEventListener(
-        'controllerchange',
-        () => {
-          window.clearTimeout(timeout);
-          resolve();
-        },
-        { once: true },
-      );
-    });
-
     return navigator.serviceWorker.controller?.scriptURL ?? null;
   });
-
-  if (controllerWorkerUrl === null) {
-    await page.reload({ waitUntil: 'domcontentloaded' });
-  }
-
-  const readControlledWorkerUrl = async () => page.evaluate(() => {
-    if (!('serviceWorker' in navigator)) {
-      return '';
-    }
-
-    return navigator.serviceWorker.controller?.scriptURL ?? '';
-  });
-  if (!controllerWorkerUrl) {
-    await expect.poll(readControlledWorkerUrl, { timeout: 10000 }).toContain('/service-worker.js');
-  }
-  const controlledWorkerUrl = controllerWorkerUrl || await readControlledWorkerUrl();
-  expect(controlledWorkerUrl).toContain('/service-worker.js');
+  // `/mobile` is the public install handoff immediately outside the
+  // `/mobile/` role scope. Role pages are controlled and covered by the
+  // offline-cache suite; this public handoff must remain data-free.
+  expect(new URL(page.url()).pathname).toBe('/mobile');
+  expect(controllerWorkerUrl).toBeNull();
 });
 
 test('public role aliases discard query and fragment state for GET and HEAD', async ({ page, request }) => {

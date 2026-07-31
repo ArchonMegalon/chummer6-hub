@@ -17,8 +17,8 @@ test('document portal stays readable on desktop and mobile with a visible fallba
 
     await expect(page.getByRole('heading', { name: 'Chummer6 Quickstart Guide' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible();
-    await expect(page.locator('body')).toContainText('Open the Chummer quickstart as a flipbook or PDF.');
-    await expect(page.locator('body')).toContainText('External viewer remains optional');
+    await expect(page.locator('body')).toContainText('Open this Chummer document as a Chummer page or PDF.');
+    await expect(page.locator('body')).toContainText('External viewer optional');
 
     results.push({
       viewport: viewport.name,

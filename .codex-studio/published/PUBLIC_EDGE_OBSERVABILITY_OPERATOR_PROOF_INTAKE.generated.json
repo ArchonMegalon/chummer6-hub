@@ -1,0 +1,129 @@
+{
+  "contract_name": "chummer.public_edge_observability_operator_proof_intake.v2",
+  "status": "pass",
+  "verdict": "OPERATOR_PROOF_IMPORTED",
+  "generated_at_utc": "2026-07-31T20:17:23.406645Z",
+  "mode": "import",
+  "source": {
+    "name": "PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "load_status": "loaded",
+    "sha256": "87d5750aab0a4ec48d80843891a8591b57ca0f4cb7ac2023208f6017b7ba7163",
+    "attestation": {
+      "name": "PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json",
+      "load_status": "loaded",
+      "sha256": "622b7e32e63673cf8c3860fdfb34f992dbce770f5a0a860230698ef19cc82bb6",
+      "contract_name": "chummer.public_edge_observability_operator_proof_attestation.v1",
+      "status": "pass",
+      "algorithm": "ed25519",
+      "role": "observability_operator",
+      "key_id": "local-observability-operator-2026",
+      "public_key_sha256": "79a5ce3eb145d8742ce76b7440f0096c5622681d6b4f0ae5525a3795516c566d",
+      "generated_at_utc": "2026-07-31T20:17:23.020020Z",
+      "verification_program": {
+        "path": "/usr/bin/openssl",
+        "load_status": "loaded",
+        "sha256": "b86b739329008369aebe1f7cff6c2adb18965609d68a19456fca55232f2908f5",
+        "size_bytes": 1005368,
+        "environment_contract": {
+          "LANG": "C",
+          "LC_ALL": "C",
+          "OPENSSL_CONF": "/dev/null"
+        },
+        "inherits_process_environment": false
+      },
+      "subject_sha256": "87d5750aab0a4ec48d80843891a8591b57ca0f4cb7ac2023208f6017b7ba7163",
+      "challenge_nonce": "7aba783f21b9eb8355dab1ffc3683f767d6d8d136719012f481840916c456b04",
+      "request_sha256": "c0f2409777f6bb3e395b2adb3b2074387b3337bffccf41a22a4fc53e35a65611",
+      "bindings": {
+        "policy_sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4",
+        "release_candidate": {
+          "sha256": "0b8ea9f24560180e61f3822e2578f9a2a7a401f5509e01bf0f810358b25a0d2b",
+          "version": "run-20260731-095000",
+          "channel": "preview"
+        },
+        "runtime_source_fingerprint_sha256": "a87ad402115bebdb06c02fc25d8af2afe6c8ef6ed00550a7d9a4beb47a348232"
+      }
+    }
+  },
+  "destination": {
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "imported": true,
+    "sha256": "87d5750aab0a4ec48d80843891a8591b57ca0f4cb7ac2023208f6017b7ba7163",
+    "attestation_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json.attestation.json",
+    "attestation_sha256": "622b7e32e63673cf8c3860fdfb34f992dbce770f5a0a860230698ef19cc82bb6"
+  },
+  "intake_request": {
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF_INTAKE_REQUEST.generated.json",
+    "load_status": "loaded",
+    "sha256": "c0f2409777f6bb3e395b2adb3b2074387b3337bffccf41a22a4fc53e35a65611",
+    "challenge_nonce": "7aba783f21b9eb8355dab1ffc3683f767d6d8d136719012f481840916c456b04"
+  },
+  "current_bindings": {
+    "policy_sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4",
+    "release_candidate": {
+      "sha256": "0b8ea9f24560180e61f3822e2578f9a2a7a401f5509e01bf0f810358b25a0d2b",
+      "version": "run-20260731-095000",
+      "channel": "preview"
+    },
+    "runtime_source_fingerprint_sha256": "a87ad402115bebdb06c02fc25d8af2afe6c8ef6ed00550a7d9a4beb47a348232"
+  },
+  "runtime_checks": [
+    {
+      "id": "runtime:alertmanager_config",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:program",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:readiness",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:instruments",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:exporter",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:project",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:middleware",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:compose",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:prometheus_config",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:prometheus_rules",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    }
+  ],
+  "proof_origin": "external_operator_evidence",
+  "external_evidence_pending": false,
+  "sends_alerts": false,
+  "configures_monitoring": false,
+  "failure_count": 0,
+  "failures": [],
+  "next_action": "Regenerate the public-edge observability release gate."
+}

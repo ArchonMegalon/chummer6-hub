@@ -788,7 +788,7 @@ public sealed class OriginDossierPublicationService
         string configurationKey)
     {
         string? configured = _configuration[environmentKey] ?? _configuration[configurationKey];
-        if (string.IsNullOrWhiteSpace(configured))
+        if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(configured))
         {
             return false;
         }
@@ -1095,7 +1095,9 @@ public sealed class OriginDossierPublicationService
     private bool HasStoryCoreReady(OriginDossierPublicationIndexEntry entry)
         => IsPublishedForOwner(entry.PublicationState)
             && entry.ProviderAuthoredManuscriptImported
-            && entry.UndetectableHumanizerApplied
+            // Humanization is a Gold-certification requirement, not an owner-access
+            // requirement. ResolveMissingRequirements keeps that certification
+            // fail-closed while a clean, reviewed provider manuscript remains usable.
             && HasOriginEditionNamespace(entry)
             && IsChummerRunOwnerUrl(entry)
             && !ContainsFakeMarker(entry)
@@ -1118,14 +1120,15 @@ public sealed class OriginDossierPublicationService
             && IsChummerRunArtifactUrl(entry, entry.StorySceneCoverUrl, "cover")
             && HasArchivedArtifact(entry.StorySceneCoverPath)
             && HasStorySceneCoverReceipt(entry)
-            && HasProviderAccountAliasReceipt(entry.StorySceneCoverAccountAlias, entry.StorySceneCoverReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases")
-            && HasCoverConsistencyReceipt(entry);
+            && HasProviderAccountAliasReceipt(entry.StorySceneCoverAccountAlias, entry.StorySceneCoverReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases");
 
     private bool CanAccessBookArtifact(OriginDossierPublicationIndexEntry entry)
-        => HasStoryCoverReady(entry);
+        // Each owner artifact is authorized by its own archived bytes and receipt.
+        // Cross-surface cover consistency remains an independent Gold requirement.
+        => HasStoryCoreReady(entry);
 
     private bool CanAccessDossierShare(OriginDossierPublicationIndexEntry entry)
-        => HasStoryCoverReady(entry)
+        => HasStoryCoreReady(entry)
             && IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfDossierShareUrl)
             && HasArchivedArtifact(entry.EbookArtifactPath)
             && HasAudiobookshelfDossierImportReceipt(entry);
@@ -1155,7 +1158,7 @@ public sealed class OriginDossierPublicationService
         => HasStoryCoverReady(entry);
 
     private bool CanAccessAudiobookShare(OriginDossierPublicationIndexEntry entry)
-        => HasStoryCoverReady(entry)
+        => HasStoryCoreReady(entry)
             && entry.AudiobookshelfPlaybackVerified
             && IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl)
             && HasArchivedArtifact(entry.AudiobookPath)
@@ -1163,7 +1166,7 @@ public sealed class OriginDossierPublicationService
             && HasProviderAccountAliasReceipt(entry.AudiobookProviderAccountAlias, entry.AudiobookshelfImportReceiptPath, "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES", "OriginDossier:AudioAccountAliases");
 
     private bool CanAccessVideoArtifact(OriginDossierPublicationIndexEntry entry)
-        => HasStoryCoverReady(entry)
+        => HasStoryCoreReady(entry)
             && entry.DossierVideoVerified
             && IsChummerRunArtifactUrl(entry, entry.DossierVideoUrl, "video")
             && HasArchivedArtifact(entry.DossierVideoPath)
@@ -1484,8 +1487,8 @@ public sealed class OriginDossierPublicationService
             && (receipt.Kind != OriginDossierMediaDispatchKind.CinematicScene
                 || receipt.ObservedDurationSeconds >= OriginDossierMediaDispatchContract.MinimumCinematicDurationSeconds
                 && string.Equals(
-                    receipt.NarrativeScope,
-                    OriginDossierMediaDispatchContract.ChapterNarrativeScope,
+                    receipt.RenderScope,
+                    OriginDossierMediaDispatchContract.ChapterRenderScope,
                     StringComparison.Ordinal)
                 && receipt.DialogueTurnCount >= OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns
                 && receipt.AudioTrackVerified);

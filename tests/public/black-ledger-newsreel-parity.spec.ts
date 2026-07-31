@@ -22,7 +22,18 @@ test('black ledger newsreel packet stays route-backed and professional', async (
   expect(payload.broadcast.videoMp4Href).toContain('/media/ledger/newsreels/turn-1-newsreel.mp4');
   expect(payload.broadcast.captionsHref).toContain('.vtt');
 
-  await page.goto(`${baseUrl}/ledger/turns/1`, { waitUntil: 'domcontentloaded' });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(`${baseUrl}/ledger/turns/1`, { waitUntil: 'domcontentloaded' });
+      break;
+    } catch (error) {
+      const transientNetworkChange = String(error).includes('ERR_NETWORK_CHANGED');
+      if (!transientNetworkChange || attempt === 1) {
+        throw error;
+      }
+      await page.waitForTimeout(250);
+    }
+  }
   await expect(page.locator('body')).toContainText('command map');
   await expect(page.locator('#newsreel-player video')).toBeVisible();
   await expect(page.locator('body')).toContainText(/(First-party|Chummer) (anchor package|synthetic score bed with ducked narration)/i);

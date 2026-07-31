@@ -1,0 +1,768 @@
+{
+  "contract_name": "chummer.live_surface_parity",
+  "generated_at_utc": "2026-07-31T22:15:16Z",
+  "base_url": "http://127.0.0.1:44081",
+  "require_brilliant_directories_checkout": false,
+  "release_posture": {
+    "url": "http://127.0.0.1:44081/downloads/RELEASE_CHANNEL.generated.json",
+    "final_url": "http://127.0.0.1:44081/downloads/RELEASE_CHANNEL.generated.json",
+    "status_code": 200,
+    "redirect_location": null,
+    "redirect_chain": [],
+    "fetch_error": null,
+    "parse_error": null,
+    "status": "published",
+    "version": "run-20260731-095000",
+    "channel": "preview",
+    "supportability_state": "review_required",
+    "rollout_state": "coverage_incomplete",
+    "review_required": true,
+    "public_installer_available": true,
+    "downloads_paused": false,
+    "expected_failures": []
+  },
+  "status": "pass",
+  "verdict": "LIVE_SURFACE_PARITY_READY",
+  "results": [
+    {
+      "path": "/",
+      "url": "http://127.0.0.1:44081/",
+      "final_url": "http://127.0.0.1:44081/",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "A Shadowrun character manager for clean sheets and faster tables.",
+        "Download Chummer",
+        "Current public installer",
+        "Help"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "site-open-chummer-menu__button\" href=\"/build\"",
+        "data-mobile-app-handoff=\"build-mobile-app-handoff\"",
+        "site-open-chummer-menu__button\" href=\"/mobile/player\"",
+        "data-mobile-app-handoff=\"mobile-app-handoff\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Next move",
+        "Need help?",
+        "One compact rail for downloads, play, and public status.",
+        "Reel details",
+        "Keep it simple",
+        "Get started",
+        "Worlds",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions"
+      ],
+      "forbidden_html_texts": [
+        "site-open-chummer-menu__button--disabled",
+        "data-disabled-target=\"/build\"",
+        "data-sign-in-href=\"/login?next=%2Fbuild\"",
+        "data-disabled-target=\"/mobile/player\"",
+        "data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\""
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/downloads",
+      "url": "http://127.0.0.1:44081/downloads",
+      "final_url": "http://127.0.0.1:44081/downloads",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Downloads",
+        "Chummer selects the best installer when it can.",
+        "Nightly",
+        "Stable",
+        "Build from source",
+        "Download script",
+        "No Stable build on this shelf.",
+        "Preview build. Review required."
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<a class=\"inline-link\" href=\"/now\">Release notes and known issues</a>"
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Advanced download options",
+        "Build run",
+        "Need account return?",
+        "Current notes.",
+        "Install questions?",
+        "Account return later?",
+        "account-assisted install paths",
+        "Link this copy from the first launch",
+        "guided installer",
+        "Current stable build",
+        "Latest published build",
+        "Use this when you want the newest Windows or Linux release.",
+        "Get started",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions",
+        "Stable release."
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/status",
+      "url": "http://127.0.0.1:44081/status",
+      "final_url": "http://127.0.0.1:44081/status",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Now",
+        "Preview downloads",
+        "Downloads",
+        "Help"
+      ],
+      "required_any_texts": [
+        "Windows and Linux downloads are live.",
+        "Windows download is live.",
+        "Linux download is live.",
+        "Downloads are paused.",
+        "No public installer right now."
+      ],
+      "required_html_texts": [
+        "<title>Status \u00b7 Chummer</title>",
+        "minimal-page-hero minimal-status-pill",
+        "data-analytics-surface=\"status_decision\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Chummer selects the best installer when it can.",
+        "Nightly",
+        "Stable release.",
+        "Build from source",
+        "Download script",
+        "Advanced download options",
+        "Release notes",
+        "Build run",
+        "Need account return?",
+        "Current notes.",
+        "Install questions?",
+        "Account return later?",
+        "account-assisted install paths",
+        "Link this copy from the first launch",
+        "guided installer",
+        "Current stable build",
+        "Latest published build",
+        "Use this when you want the newest Windows or Linux release.",
+        "Get started",
+        "Flagship routes",
+        "Signals and horizons",
+        "Trust and support",
+        "Account and quick actions",
+        "Current release",
+        "The build, platforms, and current state in one place.",
+        "Open downloads",
+        "Open help",
+        "Platforms",
+        "Release and next step.",
+        "Release, caution, next click.",
+        "Known issues and install help stay nearby.",
+        "provider",
+        "operator",
+        "fleet",
+        "proof",
+        "receipt",
+        "Released",
+        "Current caution.",
+        "Preview posture on Public release",
+        "Review is still required before this release can be treated as supportable.",
+        "Fallback",
+        "Revoked",
+        "usage snapshot",
+        "At a glance",
+        "Signed-in return",
+        "Status poster"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/account/billing",
+      "url": "http://127.0.0.1:44081/account/billing",
+      "final_url": "http://127.0.0.1:44081/login?next=%2Faccount%2Fbilling",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/login?next=%2Faccount%2Fbilling"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Supporter",
+        "After this step, Chummer returns to billing.",
+        "Continue with Google"
+      ],
+      "required_any_texts": [
+        "Email first. Billing stays attached after this step.",
+        "Google first. Billing stays attached after that step.",
+        "Email first. Supporter attaches after that step.",
+        "Google first. Supporter attaches after that step."
+      ],
+      "required_html_texts": [],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Account settings",
+        "Supporter is not open right now.",
+        "Billing is unavailable"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": "/login",
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/participate",
+      "url": "http://127.0.0.1:44081/participate",
+      "final_url": "http://127.0.0.1:44081/participate",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Participate"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Participate \u00b7 Chummer</title>",
+        "data-chummer-participate-frame",
+        "/participate/board?embed=1"
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "ProductLift",
+        "Log in",
+        "Sign up",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT",
+        "Requests, votes, and shipped work.",
+        "Something went wrong",
+        "Could not load posts",
+        "Network error while loading tab configuration"
+      ],
+      "forbidden_html_texts": [
+        "chummer6.productlift.dev",
+        "data-chummer-board-skin",
+        "participate-preview-card"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/participate/board",
+      "url": "http://127.0.0.1:44081/participate/board",
+      "final_url": "http://127.0.0.1:44081/participate",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/participate"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Participate"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Participate \u00b7 Chummer</title>"
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "ProductLift",
+        "productlift.dev",
+        "Log in",
+        "Sign up",
+        "Search",
+        "Ctrl K",
+        "\u00d7",
+        "Something went wrong",
+        "Could not load posts",
+        "Network error while loading tab configuration",
+        "/auth/google/start?next=",
+        "accounts.google.com"
+      ],
+      "forbidden_html_texts": [
+        "data-chummer-board-skin"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": "/participate",
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/roadmap",
+      "url": "http://127.0.0.1:44081/roadmap",
+      "final_url": "http://127.0.0.1:44081/roadmap",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Roadmap"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Roadmap \u00b7 Chummer</title>"
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "ProductLift",
+        "Open live board",
+        "Something went wrong",
+        "Could not load posts",
+        "Network error while loading tab configuration"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/roadmap/board",
+      "url": "http://127.0.0.1:44081/roadmap/board",
+      "final_url": "http://127.0.0.1:44081/participate",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/participate/board",
+        "http://127.0.0.1:44081/participate"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Participate"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Participate \u00b7 Chummer</title>"
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "ProductLift",
+        "Open live board",
+        "Something went wrong",
+        "Could not load posts",
+        "Network error while loading tab configuration"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": "/participate",
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/mobile",
+      "url": "http://127.0.0.1:44081/mobile",
+      "final_url": "http://127.0.0.1:44081/mobile",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Chummer Player \u00b7 install shell",
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        "Install app",
+        "Player privacy boundary",
+        "Player authority boundary"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "data-play-surface=\"install-only\"",
+        "data-live-session=\"unavailable\"",
+        "data-authority=\"none\"",
+        "data-install-role=\"player\"",
+        "data-role-capabilities=\"player\"",
+        "data-role-privacy-warning=\"player\"",
+        "data-role-authority-warning=\"player\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Live-session turn companion",
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [
+        "data-turn-root",
+        "mobile-turn-companion.js"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/mobile/player",
+      "url": "http://127.0.0.1:44081/mobile/player",
+      "final_url": "http://127.0.0.1:44081/mobile/player",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Chummer Player \u00b7 install shell",
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        "Install app",
+        "Player privacy boundary",
+        "Player authority boundary"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "data-play-surface=\"install-only\"",
+        "data-live-session=\"unavailable\"",
+        "data-authority=\"none\"",
+        "data-install-role=\"player\"",
+        "data-role-capabilities=\"player\"",
+        "data-role-privacy-warning=\"player\"",
+        "data-role-authority-warning=\"player\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Live-session turn companion",
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [
+        "data-turn-root",
+        "mobile-turn-companion.js"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/mobile/gm",
+      "url": "http://127.0.0.1:44081/mobile/gm",
+      "final_url": "http://127.0.0.1:44081/mobile/gm",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Chummer GM \u00b7 install shell",
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        "Install app",
+        "GM privacy boundary",
+        "GM authority boundary"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "data-play-surface=\"install-only\"",
+        "data-live-session=\"unavailable\"",
+        "data-authority=\"none\"",
+        "data-install-role=\"gm\"",
+        "data-role-capabilities=\"gm\"",
+        "data-role-privacy-warning=\"gm\"",
+        "data-role-authority-warning=\"gm\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Live-session turn companion",
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [
+        "data-turn-root",
+        "mobile-turn-companion.js"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/mobile/observer",
+      "url": "http://127.0.0.1:44081/mobile/observer",
+      "final_url": "http://127.0.0.1:44081/mobile/observer",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "Chummer Observer \u00b7 install shell",
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        "Install app",
+        "Observer privacy boundary",
+        "Observer authority boundary"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "data-play-surface=\"install-only\"",
+        "data-live-session=\"unavailable\"",
+        "data-authority=\"none\"",
+        "data-install-role=\"observer\"",
+        "data-role-capabilities=\"observer\"",
+        "data-role-privacy-warning=\"observer\"",
+        "data-role-authority-warning=\"observer\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Live-session turn companion",
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [
+        "data-turn-root",
+        "mobile-turn-companion.js"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/play",
+      "url": "http://127.0.0.1:44081/play",
+      "final_url": "http://127.0.0.1:44081/mobile/player",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/mobile/player"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Chummer Player \u00b7 install shell",
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        "Install app",
+        "Player privacy boundary",
+        "Player authority boundary"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [
+        "data-play-surface=\"install-only\"",
+        "data-live-session=\"unavailable\"",
+        "data-authority=\"none\"",
+        "data-install-role=\"player\"",
+        "data-role-capabilities=\"player\"",
+        "data-role-privacy-warning=\"player\"",
+        "data-role-authority-warning=\"player\""
+      ],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Live-session turn companion",
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [
+        "data-turn-root",
+        "mobile-turn-companion.js"
+      ],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/play/continuity",
+      "url": "http://127.0.0.1:44081/play/continuity",
+      "final_url": "http://127.0.0.1:44081/play/continuity",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [],
+      "fetch_error": null,
+      "required_texts": [
+        "NEXUS-PAN continuity",
+        "Continuity stays cross-device",
+        "Open continuity history"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Internal Error",
+        "Authorize Codex access.",
+        "OpenAI account in ChatGPT"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/ledger",
+      "url": "http://127.0.0.1:44081/ledger",
+      "final_url": "http://127.0.0.1:44081/ledger/map",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/ledger/map"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Black Ledger command map",
+        "Command map"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Internal Error",
+        "Board signal:",
+        "Turn source:",
+        "Production notes",
+        "City note:",
+        "City pulse:",
+        "Built from",
+        "deterministic board",
+        "Linked through",
+        "Turn record:",
+        "Scene notes",
+        "<p class=\"editorial-copy\"></p>"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": "/ledger/map",
+      "final_url_matches": true,
+      "status": "pass"
+    },
+    {
+      "path": "/ledger/newsroom",
+      "url": "http://127.0.0.1:44081/ledger/newsroom",
+      "final_url": "http://127.0.0.1:44081/ledger/newsroom/turn-2-newsreel",
+      "redirect_location": null,
+      "redirect_target_url": null,
+      "cross_origin_redirect": false,
+      "status_code": 200,
+      "redirect_chain": [
+        "http://127.0.0.1:44081/ledger/newsroom/turn-2-newsreel"
+      ],
+      "fetch_error": null,
+      "required_texts": [
+        "Black Ledger Newsroom",
+        "Transcript",
+        "Published:"
+      ],
+      "required_any_texts": [],
+      "required_html_texts": [],
+      "missing_required_texts": [],
+      "missing_required_any_texts": [],
+      "missing_required_html_texts": [],
+      "forbidden_texts": [
+        "Internal Error"
+      ],
+      "forbidden_html_texts": [],
+      "forbidden_hits": [],
+      "forbidden_html_hits": [],
+      "required_final_url_prefix": null,
+      "final_url_matches": true,
+      "status": "pass"
+    }
+  ],
+  "failures": []
+}

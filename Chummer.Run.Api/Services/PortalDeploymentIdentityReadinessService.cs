@@ -614,7 +614,9 @@ public sealed class PortalDeploymentIdentityReadinessService(IHostEnvironment en
 
                 bool isDirectory = (metadata.Mode & FileTypeMask) == DirectoryFileType;
                 bool isRegularFile = (metadata.Mode & FileTypeMask) == RegularFileType;
-                if (!isDirectory && (!isRegularFile || metadata.LinkCount != 1))
+                if (!isDirectory
+                    && (!isRegularFile
+                        || !HasAcceptablePayloadFileLinkCount(relativePath, metadata.LinkCount)))
                 {
                     return false;
                 }
@@ -658,6 +660,15 @@ public sealed class PortalDeploymentIdentityReadinessService(IHostEnvironment en
             ComparePythonUnicodeCodePoints(left.RelativePath, right.RelativePath));
         return rows.Count(static row => row.Kind == "state_directory") == 1;
     }
+
+    internal static bool HasAcceptablePayloadFileLinkCount(
+        string relativePath,
+        uint linkCount)
+        => linkCount == 1
+           || linkCount == 0
+           && RuntimeMountedPayloadRelativePaths.Contains(
+               relativePath,
+               StringComparer.Ordinal);
 
     private static bool TryGetUnixMode(LinuxStatx metadata, out string mode)
     {

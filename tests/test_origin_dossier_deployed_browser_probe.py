@@ -13,6 +13,7 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_ori
 FAKE_COVER_BYTES = b"\xff\xd8cover-bytes"
 FAKE_BOOK_BYTES = b"%PDF-1.7\nbook-bytes"
 FAKE_EBOOK_BYTES = b"PK\x03\x04ebook-bytes"
+FAKE_AUDIO_BYTES = b"\x00\x00\x00\x18ftypM4A audiobook-bytes"
 FAKE_VIDEO_BYTES = b"\x00\x00\x00\x18ftypmp42movie-bytes"
 FAKE_CANON_AUDIT_BYTES = b'{"status":"pass","tokens":["canon_audit_passed"]}'
 
@@ -71,6 +72,7 @@ def write_import_request(
                     "storySceneCoverSha256": hashlib.sha256(FAKE_COVER_BYTES).hexdigest(),
                     "bookArtifactSha256": book_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
                     "ebookArtifactSha256": legacy_ebook_sha or hashlib.sha256(FAKE_EBOOK_BYTES).hexdigest(),
+                    "audiobookSha256": hashlib.sha256(FAKE_AUDIO_BYTES).hexdigest(),
                     "dossierVideoSha256": hashlib.sha256(FAKE_VIDEO_BYTES).hexdigest(),
                 },
                 "importRequest": {
@@ -154,6 +156,24 @@ class FakeSession:
             </main>
             """,
         )
+
+
+class DirectAudioReviewedNonGoldSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        owner_authenticated = self.has_cookie or bool(self.headers.get("Authorization")) or bool(self.headers.get("Cookie"))
+        if owner_authenticated and url.endswith("/listen"):
+            return FakeResponse(200, {"content-type": "audio/mp4"}, content=FAKE_AUDIO_BYTES)
+        response = super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+        if owner_authenticated and response.status_code == 200 and "text/html" in response.headers.get("content-type", ""):
+            response.text = response.text.replace(
+                'data-canon-privacy-receipts-present="true"',
+                'data-canon-privacy-receipts-present="false"',
+            ).replace(
+                'data-no-fallback-media-verified="true"',
+                'data-no-fallback-media-verified="false"',
+            )
+            response.content = response.text.encode("utf-8")
+        return response
 
 
 class LeakyAnonymousVideoSession(FakeSession):
@@ -405,7 +425,10 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["namespace"] == "origin.chummer.run/Varga/Mira/Kestrel"
     assert result["projectId"] == "varga-mira-kestrel"
     assert result["updated_at"]
-    assert result["next_action"] == "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected."
+    assert result["next_action"] == (
+        "Owner playback routes are verified. Keep reviewed_non_gold until all external Gold certification "
+        "evidence is present."
+    )
     assert result["blocking_reason"] == ""
     assert result["progress"]["passedChecks"] == result["progress"]["totalChecks"]
     assert result["progress"]["blockedChecks"] == []
@@ -461,6 +484,28 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["unauthenticated_cover_redirect_verified"] is True
     assert result["unauthenticated_video_redirect_verified"] is True
     assert result["unauthenticated_canon_audit_redirect_verified"] is True
+
+
+def test_deployed_probe_passes_reviewed_owner_delivery_with_direct_audio_without_claiming_gold(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", DirectAudioReviewedNonGoldSession)
+
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", tmp_path / "probe.json")
+
+    assert result["status"] == "pass"
+    assert result["deployedRouteClaimAllowed"] is True
+    assert result["owner_playback_e2e_verified"] is True
+    assert result["listen_delivery_mode"] == "direct_artifact"
+    assert result["listen_direct_artifact_verified"] is True
+    assert result["audiobook_sha_matches_import"] is True
+    assert result["canon_audit_content_verified"] is True
+    assert result["canon_privacy_receipts_present"] is False
+    assert result["no_fallback_media_verified"] is False
+    assert result["goldEligible"] is False
+    assert result["goldBlockers"] == ["canon_privacy_receipts_present", "no_fallback_media_verified"]
+    assert result["blockers"] == []
 
 
 def test_deployed_probe_prefers_explicit_audiobook_share_over_legacy_share(tmp_path: Path, monkeypatch) -> None:

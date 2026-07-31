@@ -35,7 +35,7 @@ test('black ledger route opens as a command deck without clipped flagship copy',
   await expect(controls).toBeVisible();
   const actionHrefs = await actions.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).getAttribute('href') ?? ''));
   expect(actionHrefs).toContain('/ledger/map#ledger-map');
-  expect(actionHrefs).toContain('/ledger/newsroom');
+  expect(actionHrefs.some((href) => /^\/ledger\/turns\/\d+\/digest$/.test(href))).toBeTruthy();
 
   const fit = await title.evaluate((element) => {
     const bounds = element.getBoundingClientRect();

@@ -1,0 +1,28 @@
+{
+  "alert_route": {
+    "binding_status": "verified",
+    "delivery_test_result": "delivered",
+    "delivery_tested_at_utc": "2026-07-31T20:13:49Z",
+    "receiver_class": "primary_on_call"
+  },
+  "contract_name": "chummer.public_edge_observability_operator_proof.v1",
+  "generated_at_utc": "2026-07-31T20:17:09Z",
+  "monitor_backend": {
+    "binding_status": "verified",
+    "deployment_id": "prometheus-7b527be0207b-alertmanager-f8ba35067638",
+    "provider": "self_hosted_prometheus_alertmanager"
+  },
+  "policy_sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4",
+  "release_candidate": {
+    "channel": "preview",
+    "sha256": "0b8ea9f24560180e61f3822e2578f9a2a7a401f5509e01bf0f810358b25a0d2b",
+    "version": "run-20260731-095000"
+  },
+  "runtime_source_fingerprint_sha256": "a87ad402115bebdb06c02fc25d8af2afe6c8ef6ed00550a7d9a4beb47a348232",
+  "sli_bindings": {
+    "availability": true,
+    "latency": true,
+    "readiness": true
+  },
+  "status": "pass"
+}

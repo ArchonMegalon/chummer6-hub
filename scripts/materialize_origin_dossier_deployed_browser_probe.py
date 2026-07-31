@@ -243,6 +243,7 @@ def materialize(
     expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
     expected_book_sha = str(live_evidence.get("bookArtifactSha256") or live_evidence.get("ebookArtifactSha256") or "").strip()
     expected_book_content_types = expected_book_content_type_tokens(str(request.get("bookArtifactPath") or ""))
+    expected_audio_sha = str(live_evidence.get("audiobookSha256") or "").strip()
     expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
     share_url = str(request.get("audiobookshelfAudiobookShareUrl") or request.get("audiobookshelfShareUrl") or "").strip()
     dossier_share_url = str(request.get("audiobookshelfDossierShareUrl") or "").strip()
@@ -343,12 +344,25 @@ def materialize(
             canon_section,
             chummer_canon_owner,
             provider_created_facts_blocked,
-            canon_privacy_receipts_present,
-            no_fallback_media_verified,
         ]
     )
     read_gate = status(read) in {302, 303, 307, 308} and header(read, "location") == dossier_share_url
-    listen_gate = status(listen) in {302, 303, 307, 308} and header(listen, "location") == share_url
+    listen_redirect_gate = status(listen) in {302, 303, 307, 308} and header(listen, "location") == share_url
+    listen_direct_gate = (
+        status(listen) == 200
+        and header(listen, "content-type").lower().startswith("audio/")
+        and body_size(listen) > 0
+        and bool(expected_audio_sha)
+        and response_sha256(listen) == expected_audio_sha
+    )
+    listen_gate = listen_redirect_gate or listen_direct_gate
+    listen_delivery_mode = (
+        "audiobookshelf_redirect"
+        if listen_redirect_gate
+        else "direct_artifact"
+        if listen_direct_gate
+        else "blocked"
+    )
     audiobook_share_reachable = share_reachable(audiobook_share)
     dossier_share_reachable = share_reachable(dossier_share)
     watch_gate = status(video) == 200 and "video/mp4" in header(video, "content-type")
@@ -450,7 +464,12 @@ def materialize(
         "unauthenticated_canon_audit_redirect_verified": anon_canon_audit_redirect,
         "all_private_routes_login_protected": all_private_routes_login_protected,
     }
-    blockers.extend([key for key, value in checks.items() if not value])
+    gold_only_checks = {
+        "canon_privacy_receipts_present",
+        "no_fallback_media_verified",
+    }
+    owner_checks = {key: value for key, value in checks.items() if key not in gold_only_checks}
+    blockers.extend([key for key, value in owner_checks.items() if not value])
     blocking_reason = "" if passed else ",".join(blockers)
     if not has_owner_auth:
         next_action = "Provide CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN, CHUMMER_DEPLOYED_E2E_OWNER_SESSION_TOKEN, CHUMMER_DEPLOYED_E2E_COOKIE_HEADER, or CHUMMER_DEPLOYED_E2E_AUTHORIZATION_HEADER for a real deployed owner session and rerun this probe."
@@ -460,20 +479,28 @@ def materialize(
         and deployed_state_import.get("restartRequiredForExistingContainer") is True
     ):
         next_action = "Restart/recreate chummer-portal only after explicit deploy approval so CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX=/app/state/origin-dossier-publications.json is active, then rerun this probe."
+    elif passed:
+        next_action = (
+            "Owner playback routes are verified. Keep reviewed_non_gold until all external Gold certification "
+            "evidence is present."
+        )
     else:
         next_action = "Inspect deployed route/index/session mismatch and rerun after deployment state is corrected."
     progress = {
-        "passedChecks": sum(1 for value in checks.values() if value),
-        "totalChecks": len(checks),
-        "blockedChecks": [key for key, value in checks.items() if not value],
+        "passedChecks": sum(1 for value in owner_checks.values() if value),
+        "totalChecks": len(owner_checks),
+        "blockedChecks": [key for key, value in owner_checks.items() if not value],
     }
+    gold_blockers = [key for key in sorted(gold_only_checks) if not checks[key]]
+    gold_eligible = passed and not gold_blockers
 
     payload: dict[str, Any] = {
         "contractName": "chummer.origin_edition.deployed_browser_probe.v1",
         "generated_at_utc": now_iso(),
         "updated_at": now_iso(),
         "status": "pass" if passed else "blocked",
-        "goldEligible": passed,
+        "goldEligible": gold_eligible,
+        "goldBlockers": gold_blockers,
         "namespace": context.resolved_namespace,
         "projectId": project_id,
         "project_id": project_id,
@@ -487,6 +514,9 @@ def materialize(
         "watch_url": watch_url,
         "canon_audit_url": canon_audit_url,
         "audiobookshelf_redirect": share_url,
+        "listen_delivery_mode": listen_delivery_mode,
+        "listen_direct_artifact_verified": listen_direct_gate,
+        "audiobook_sha_matches_import": listen_direct_gate,
         "local_fixture_artifacts": False,
         "deployedRouteClaimAllowed": passed,
         "rawCredentialExposed": False,
@@ -523,6 +553,7 @@ def materialize(
         "response_body_sizes": {
             "cover": body_size(cover),
             "book": body_size(book),
+            "listen": body_size(listen),
             "watch": body_size(video),
             "canon_audit": body_size(canon_audit),
             "audiobook_share": body_size(audiobook_share),
@@ -536,6 +567,7 @@ def materialize(
         "response_sha256": {
             "cover": response_sha256(cover),
             "book": response_sha256(book),
+            "listen": response_sha256(listen),
             "watch": response_sha256(video),
             "canon_audit": response_sha256(canon_audit),
         },
@@ -550,6 +582,7 @@ def materialize(
         "expected_import_sha256": {
             "cover": expected_cover_sha,
             "book": expected_book_sha,
+            "listen": expected_audio_sha,
             "watch": expected_video_sha,
         },
         "url_hashes": {

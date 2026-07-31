@@ -30,9 +30,9 @@ test('quicksilver public route stays available and points at the signed-in comma
 
   await page.goto(`${baseUrl}/quicksilver`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Quicksilver', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Quicksilver now ships a real first-party command deck');
+  await expect(page.locator('body')).toContainText('Quicksilver keeps build compare, rules answers, prep, and publication work one jump apart');
   await expect(page.locator('body')).toContainText('Sign in for Quicksilver');
-  await expect(page.locator('body')).toContainText('It does not hide legality, invent background automation, or turn stale cached views into authority');
+  await expect(page.locator('body')).toContainText('It does not hide legality, invent background automation, or turn old cached views into decisions');
 
   writeJsonArtifact('QUICKSILVER_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

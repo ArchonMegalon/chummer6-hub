@@ -112,7 +112,14 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/audiobook", view, StringComparison.Ordinal);
         Assert.Contains("Request this voice", view, StringComparison.Ordinal);
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene", view, StringComparison.Ordinal);
-        Assert.Contains("Render this chapter movie", view, StringComparison.Ordinal);
+        Assert.Contains("Render this 2¼-minute chapter movie", view, StringComparison.Ordinal);
+        Assert.Contains("data-origin-cinematic-promise", view, StringComparison.Ordinal);
+        Assert.Contains("One complete chapter scene", view, StringComparison.Ordinal);
+        Assert.Contains("Two or more recurring characters", view, StringComparison.Ordinal);
+        Assert.Contains("Canonical dialogue, action, and reactions", view, StringComparison.Ordinal);
+        Assert.Contains("One location, time, weather, and wardrobe", view, StringComparison.Ordinal);
+        Assert.Contains("2:15 target · never under 2:00", view, StringComparison.Ordinal);
+        Assert.Contains("stops before provider credits are spent", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Subscribr-first", view, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -253,9 +260,17 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("scene-simrig-betrayal", videoRequest.SelectionId);
         Assert.Contains("Simrig betrayal", videoRequest.SelectionLabel, StringComparison.Ordinal);
         Assert.Equal(OriginDossierMediaDispatchContract.DefaultCinematicDurationSeconds, videoRequest.DurationTargetSeconds);
-        Assert.Equal(OriginDossierMediaDispatchContract.ChapterNarrativeScope, videoRequest.NarrativeScope);
+        Assert.Equal(OriginDossierMediaDispatchContract.ChapterRenderScope, videoRequest.RenderScope);
         Assert.True(videoRequest.DialogueRequired);
         Assert.Equal(OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns, videoRequest.MinimumDialogueTurns);
+        OriginDossierScreenplayPlan screenplay = Assert.IsType<OriginDossierScreenplayPlan>(
+            videoRequest.Screenplay);
+        Assert.Equal(OriginDossierScreenplayContract.Version, screenplay.ContractVersion);
+        Assert.True(screenplay.Cast.Count >= 2);
+        Assert.True(screenplay.RenderBeats.Count >= 1);
+        Assert.True(screenplay.DialogueTurns.Count >= videoRequest.MinimumDialogueTurns);
+        Assert.Equal("continuous night", screenplay.TimeOfDay);
+        Assert.Equal(64, screenplay.FingerprintSha256.Length);
     }
 
     [Fact]
@@ -471,7 +486,7 @@ public sealed class OriginDossierAccountRouteTests
                 RequestSha256: new string('a', 64),
                 ProviderExecutionRefHash: new string('b', 64),
                 CompletedAtUtc: DateTimeOffset.UtcNow,
-                NarrativeScope: request.NarrativeScope,
+                RenderScope: request.RenderScope,
                 DialogueTurnCount: request.MinimumDialogueTurns,
                 AudioTrackVerified: request.Kind == OriginDossierMediaDispatchKind.CinematicScene);
             File.WriteAllText(
@@ -753,6 +768,11 @@ public sealed class OriginDossierAccountRouteTests
             for (int chapter = 0; chapter < chapterTitles.Length; chapter++)
             {
                 builder.AppendLine($"# Chapter {chapter + 1} - {chapterTitles[chapter]}");
+                builder.AppendLine();
+                builder.AppendLine($"\"Stay where I can see you,\" Vela said.");
+                builder.AppendLine($"\"Then keep pace with me,\" {runnerAlias} replied.");
+                builder.AppendLine($"\"The patrol is closing the street,\" Vela warned.");
+                builder.AppendLine($"\"Take the case and cover the exit,\" {runnerAlias} said.");
                 builder.AppendLine();
                 for (int beat = 0; beat < 18; beat++)
                 {

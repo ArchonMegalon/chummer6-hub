@@ -21,8 +21,8 @@ MIRROR_ROOTS = {
     "public_edge_main": WORKSPACE_ROOT / "chummer.run-services-public-edge-main",
     "participate_main": WORKSPACE_ROOT / "chummer.run-services-participate-main",
 }
-STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release status.", "/status", cancellationToken)'
-STALE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer release status.", "/status", cancellationToken)'
+STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release and service status.", "/status", cancellationToken)'
+STALE_STATUS_CONTROLLER_NEEDLE = 'BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer release and service status.", "/status", cancellationToken)'
 
 
 def iter_available_mirror_paths(relative_path: Path) -> list[tuple[str, Path]]:

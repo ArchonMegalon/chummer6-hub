@@ -184,6 +184,25 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpHead("/downloads/proof/windows/{fileName}")]
     public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
     {
+        ReleaseShelfSnapshot shelf = _releases.CaptureShelfSnapshot();
+        ArtifactDeliveryResolution delivery = _artifactDelivery.ResolveByPath(shelf, fileName);
+        if (delivery.Failure is ArtifactDeliveryFailure.Revoked
+            or ArtifactDeliveryFailure.RevocationTruthUnavailable
+            or ArtifactDeliveryFailure.InvalidContract)
+        {
+            return ArtifactDeliveryDenied(delivery);
+        }
+        string? proofArtifactId = _windowsProofInstallers.ResolveKnownInstallerArtifactId(fileName);
+        if (proofArtifactId is not null)
+        {
+            ArtifactDeliveryDecision proofDelivery =
+                _artifactDelivery.EvaluateGlobalArtifactIdRevocation(proofArtifactId);
+            if (!proofDelivery.Allowed)
+            {
+                return ArtifactDeliveryDenied(proofDelivery);
+            }
+        }
+
         WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
         if (proof is not null)
         {
@@ -195,7 +214,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         return _windowsProofInstallers.LegacyShelfFallbackEnabled
-            ? DownloadLegacyWindowsProofInstaller(_releases.CaptureShelfSnapshot(), fileName, byArtifactId: false)
+            ? DownloadLegacyWindowsProofInstaller(shelf, fileName, byArtifactId: false)
             : NotFound();
     }
 
@@ -205,6 +224,28 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         [FromRoute] string generationId,
         [FromRoute] string fileName)
     {
+        ReleaseShelfSnapshot? shelf = TryCaptureGeneration(generationId);
+        if (shelf is not null)
+        {
+            ArtifactDeliveryResolution delivery = _artifactDelivery.ResolveByPath(shelf, fileName);
+            if (delivery.Failure is ArtifactDeliveryFailure.Revoked
+                or ArtifactDeliveryFailure.RevocationTruthUnavailable
+                or ArtifactDeliveryFailure.InvalidContract)
+            {
+                return ArtifactDeliveryDenied(delivery);
+            }
+        }
+        string? proofArtifactId = _windowsProofInstallers.ResolveKnownInstallerArtifactId(fileName);
+        if (proofArtifactId is not null)
+        {
+            ArtifactDeliveryDecision proofDelivery =
+                _artifactDelivery.EvaluateGlobalArtifactIdRevocation(proofArtifactId);
+            if (!proofDelivery.Allowed)
+            {
+                return ArtifactDeliveryDenied(proofDelivery);
+            }
+        }
+
         WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureProofGeneration(generationId);
         if (proof is not null)
         {
@@ -220,10 +261,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
-        ReleaseShelfSnapshot? legacy = TryCaptureGeneration(generationId);
-        return legacy is null
+        return shelf is null
             ? NotFound()
-            : DownloadLegacyWindowsProofInstaller(legacy, fileName, byArtifactId: false);
+            : DownloadLegacyWindowsProofInstaller(shelf, fileName, byArtifactId: false);
     }
 
     [HttpGet("/downloads/install/{artifactId}/supplemental")]
@@ -232,6 +272,14 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpHead("/downloads/install/{artifactId}/proof")]
     public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
     {
+        ReleaseShelfSnapshot shelf = _releases.CaptureShelfSnapshot();
+        ArtifactDeliveryDecision delivery =
+            _artifactDelivery.EvaluateGlobalArtifactIdRevocation(artifactId);
+        if (!delivery.Allowed)
+        {
+            return ArtifactDeliveryDenied(delivery);
+        }
+
         WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
         if (proof is not null)
         {
@@ -245,7 +293,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         return _windowsProofInstallers.LegacyShelfFallbackEnabled
-            ? DownloadLegacyWindowsProofInstaller(_releases.CaptureShelfSnapshot(), artifactId, byArtifactId: true)
+            ? DownloadLegacyWindowsProofInstaller(shelf, artifactId, byArtifactId: true)
             : NotFound();
     }
 
@@ -257,6 +305,17 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         [FromRoute] string generationId,
         [FromRoute] string artifactId)
     {
+        ReleaseShelfSnapshot? shelf = TryCaptureGeneration(generationId);
+        if (shelf is not null)
+        {
+            ArtifactDeliveryDecision delivery =
+                _artifactDelivery.EvaluateGlobalArtifactIdRevocation(artifactId);
+            if (!delivery.Allowed)
+            {
+                return ArtifactDeliveryDenied(delivery);
+            }
+        }
+
         WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureProofGeneration(generationId);
         if (proof is not null)
         {
@@ -274,10 +333,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
-        ReleaseShelfSnapshot? legacy = TryCaptureGeneration(generationId);
-        return legacy is null
+        return shelf is null
             ? NotFound()
-            : DownloadLegacyWindowsProofInstaller(legacy, artifactId, byArtifactId: true);
+            : DownloadLegacyWindowsProofInstaller(shelf, artifactId, byArtifactId: true);
     }
 
     [HttpGet("/downloads/proof/windows/current/artifacts/{artifactId}/{role}")]

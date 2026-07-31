@@ -38,7 +38,7 @@ COPY --from=run-services-source Chummer.World.Contracts/Chummer.World.Contracts.
 COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj chummer-hub-registry/Chummer.Run.Registry/
-COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj /fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj
 COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
 COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
@@ -52,7 +52,7 @@ COPY chummer-core-engine/Chummer.Contracts/ chummer-core-engine/Chummer.Contract
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/ chummer-hub-registry/Chummer.Run.Registry/
 COPY chummer-hub-registry/black-ledger/ chummer-hub-registry/black-ledger/
-COPY --from=fleet-media-factory-contracts . fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts . /fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummer.run-services/Chummer.Run.Api
 RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin /src/chummer.run-services/Chummer.Run.Api/obj
 RUN nice -n 10 dotnet build /src/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
@@ -60,7 +60,7 @@ RUN nice -n 10 dotnet build /src/chummer.run-services/Chummer.Play.Contracts/Chu
  && nice -n 10 dotnet build /src/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && nice -n 10 dotnet build /src/chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && nice -n 10 dotnet build /src/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
- && nice -n 10 dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false
+ && nice -n 10 dotnet build /fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false
 RUN nice -n 10 dotnet publish -c Release -o /app/publish --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
 RUN nice -n 10 dotnet publish /src/chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj -c Release -o /app/install-linking-postgres-tool --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
 RUN test -f /app/publish/wwwroot/service-worker.js \

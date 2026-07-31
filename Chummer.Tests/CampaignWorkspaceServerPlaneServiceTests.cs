@@ -2865,8 +2865,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         TargetInvocationException ex = Assert.Throws<TargetInvocationException>(
             () => InvokeCampaignSpineResolveRosterTransferRequestIdentity("   ", "dossier"));
 
-        KeyNotFoundException inner = Assert.IsType<KeyNotFoundException>(ex.InnerException);
-        Assert.Contains("Unknown dossier", inner.Message, StringComparison.Ordinal);
+        ArgumentException inner = Assert.IsType<ArgumentException>(ex.InnerException);
+        Assert.Contains("dossier", inner.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

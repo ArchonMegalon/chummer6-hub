@@ -33,6 +33,10 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
     book = write(evidence / "origin.chummer.run/Case/Ari/Ghost/dossier/ebook.epub", b"epub bytes")
     cover = write(evidence / "origin.chummer.run/Case/Ari/Ghost/cover.jpg", b"cover bytes")
     video = write(evidence / "origin.chummer.run/Case/Ari/Ghost/movie/movie.mp4", b"video bytes")
+    audiobook_render_receipt = write(
+        evidence / "origin.chummer.run/Case/Ari/Ghost/audiobook/render.receipt.json",
+        '{"contractVersion":"chummer.origin_dossier_media_dispatch.v4","status":"succeeded"}',
+    )
     cover_consistency = write(evidence / "origin.chummer.run/Case/Ari/Ghost/cover-consistency-strict.receipt.json", '{"operation":"origin_edition_cover_consistency"}')
     telegram = write(
         evidence / "origin.chummer.run/Case/Ari/Ghost/audiobook/telegram.receipt.json",
@@ -65,6 +69,7 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
                     "ebookArtifactPath": str(book),
                     "storySceneCoverPath": str(cover),
                     "dossierVideoPath": str(video),
+                    "audiobookRenderReceiptPath": str(audiobook_render_receipt),
                     "providerManuscriptReceiptPath": str(receipt),
                     "telegramShareDeliveryReceiptPath": str(telegram),
                     "audiobookshelfShareUrl": "https://audio.chummer.run/share/ghost-audio",
@@ -104,6 +109,7 @@ def test_state_import_copies_artifacts_and_writes_container_visible_index(tmp_pa
     assert entry["bookArtifactPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["storySceneCoverPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["dossierVideoPath"].startswith("/app/state/origin-dossier-editions/")
+    assert entry["audiobookRenderReceiptPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["coverConsistencyReceiptPath"].startswith("/app/state/origin-dossier-editions/")
     assert entry["telegramShareDeliveryReceiptPath"].startswith("/app/state/origin-dossier-editions/")
     assert Path(str(entry["bookArtifactPath"]).replace("/app/state", str(host_state))).is_file()
@@ -146,3 +152,50 @@ def test_state_import_rejects_missing_artifact(tmp_path: Path) -> None:
         assert "missing or empty" in str(exc)
     else:
         raise AssertionError("expected missing artifact to be rejected")
+
+
+def test_state_import_merges_dotnet_utf8_bom_index(tmp_path: Path) -> None:
+    module = load_module()
+    evidence = tmp_path / "evidence"
+    host_state = tmp_path / "state"
+    evidence.mkdir()
+    host_state.mkdir()
+    (host_state / "origin-dossier-publications.json").write_bytes(
+        b"\xef\xbb\xbf" + json.dumps(
+            {
+                "publications": [
+                    {
+                        "projectId": "existing-project",
+                        "subjectId": "subject.existing",
+                    }
+                ]
+            }
+        ).encode("utf-8")
+    )
+    live_import = evidence / "reviewed-import.json"
+    live_import.write_text(
+        json.dumps(
+            {
+                "importRequest": {
+                    "projectId": "reviewed-project",
+                    "originEditionNamespace": "origin.chummer.run/Case/Ari/Reviewed",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    module.materialize(
+        live_import=live_import,
+        host_state_root=host_state,
+        container_state_root=Path("/app/state"),
+        subject_id="subject.reviewed",
+        owner_user_id="owner-reviewed",
+        output_receipt=None,
+    )
+
+    index = json.loads((host_state / "origin-dossier-publications.json").read_text(encoding="utf-8"))
+    assert {entry["projectId"] for entry in index["publications"]} == {
+        "existing-project",
+        "reviewed-project",
+    }

@@ -1,0 +1,31 @@
+{
+  "assertion_count": 15,
+  "base_url": "https://chummer.run",
+  "boundaries_verified": [
+    "approved_story_is_chummer_owned",
+    "no_silent_mechanics_mutation",
+    "provider_output_not_truth",
+    "private_dossier_requires_identity"
+  ],
+  "claim_scope": "registered_shipped_mvp_public_journey",
+  "contract_name": "chummer.horizon_e2e_gold/v1",
+  "evidence": {
+    "login_location": "/login?next=%2Faccount%2Froster",
+    "pdf_route": "/docs/origin-dossier-the-name-she-chose/download.pdf",
+    "receipt_route": "/origin-dossier/receipts/story-network.json",
+    "story_route": "/docs/origin-dossier-the-name-she-chose"
+  },
+  "generated_at_utc": "2026-07-31T21:54:31.947Z",
+  "horizon_id": "origin-dossier",
+  "journey_steps": [
+    "load story-network receipt",
+    "render origin surface",
+    "open first-party story edition",
+    "download ebook PDF",
+    "verify private library identity boundary"
+  ],
+  "receipt_route": "/origin-dossier/receipts/story-network.json",
+  "route": "/origin-dossier",
+  "status": "pass",
+  "verdict": "GOLD"
+}

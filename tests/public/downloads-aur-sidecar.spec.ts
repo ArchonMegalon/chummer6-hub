@@ -15,6 +15,7 @@ type AurPackageEntry = {
   pkgbuildSha256: string;
   srcinfoUrl: string;
   srcinfoSha256: string;
+  upstreamArtifactFileName: string;
   upstreamArtifactUrl: string;
   upstreamArtifactSha256: string;
 };
@@ -47,8 +48,9 @@ test('downloads publishes the Arch-compatible AUR sidecar for the current Linux 
     ['source archive', aurPackage!.sourceArchiveUrl, aurPackage!.sourceArchiveSha256],
     ['PKGBUILD', aurPackage!.pkgbuildUrl, aurPackage!.pkgbuildSha256],
     ['SRCINFO', aurPackage!.srcinfoUrl, aurPackage!.srcinfoSha256],
+    ['upstream artifact', aurPackage!.upstreamArtifactUrl, aurPackage!.upstreamArtifactSha256],
   ] as const) {
-    const response = await api.get(new URL(url).pathname);
+    const response = await api.get(new URL(url, baseUrl).pathname);
     expect(response.status(), `${label} should download`).toBe(200);
     const body = await response.body();
     expect(body.length, `${label} should not be empty`).toBeGreaterThan(64);
@@ -56,10 +58,11 @@ test('downloads publishes the Arch-compatible AUR sidecar for the current Linux 
     checks.push({ label, bytes: body.length, sha256: expectedHash });
   }
 
-  const pkgbuild = await (await api.get(new URL(aurPackage!.pkgbuildUrl).pathname)).text();
+  const pkgbuild = await (await api.get(new URL(aurPackage!.pkgbuildUrl, baseUrl).pathname)).text();
   expect(pkgbuild).toContain('pkgname=chummer6-bin');
   expect(pkgbuild).toContain(`pkgver=${aurPackage!.packageVersion}`);
-  expect(pkgbuild).toContain(aurPackage!.upstreamArtifactUrl);
+  const stableUpstreamUrl = new URL(`/downloads/files/${aurPackage!.upstreamArtifactFileName}`, baseUrl).href;
+  expect(pkgbuild).toContain(stableUpstreamUrl);
   expect(pkgbuild).toContain(aurPackage!.upstreamArtifactSha256);
 
   writeJsonArtifact('DOWNLOADS_AUR_SIDECAR_E2E.generated.json', {

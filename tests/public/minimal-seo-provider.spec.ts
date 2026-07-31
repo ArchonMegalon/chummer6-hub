@@ -21,8 +21,8 @@ test('ClickRank and NeuronWriter optimization stays metadata-only and minimal', 
 
     const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
     const expectedCanonicalHost = baseUrl === 'https://chummer.run' ? 'https://chummer.run' : baseUrl.replace(/\/$/, '');
-    const expectedCanonical = `${expectedCanonicalHost}${route.path === '/' ? '' : route.path}`;
-    if (canonical !== expectedCanonical) {
+    const expectedCanonical = new URL(route.path, `${expectedCanonicalHost}/`).href;
+    if (!canonical || new URL(canonical).href !== expectedCanonical) {
       failures.push(`${route.path}: canonical was ${canonical ?? '<missing>'}`);
     }
 

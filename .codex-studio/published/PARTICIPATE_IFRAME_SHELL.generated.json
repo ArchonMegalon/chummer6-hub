@@ -1,0 +1,55 @@
+{
+  "base_url": "https://chummer.run",
+  "contractName": "chummer.participate_iframe_shell.v1",
+  "failures": [],
+  "generatedAtUtc": "2026-07-05T08:43:02.806558+00:00",
+  "iframe_route_count": 2,
+  "live": [
+    {
+      "content_type": "text/html; charset=utf-8",
+      "failures": [],
+      "final_path": "/participate",
+      "final_url": "https://chummer.run/participate",
+      "has_iframe": true,
+      "has_offline_fallback": false,
+      "removed_board_eyebrow_present": false,
+      "removed_summary_present": false,
+      "route": "/participate",
+      "sha256": "4200c0fc9646669e30bc89e6afb09a1a4d98def88e5b0b6673c6225bed4f5052",
+      "status": "pass",
+      "status_code": 200
+    },
+    {
+      "content_type": "text/html; charset=utf-8",
+      "failures": [],
+      "final_path": "/participate",
+      "final_url": "https://chummer.run/participate",
+      "has_iframe": true,
+      "has_offline_fallback": false,
+      "removed_board_eyebrow_present": false,
+      "removed_summary_present": false,
+      "route": "/partizipate",
+      "sha256": "4200c0fc9646669e30bc89e6afb09a1a4d98def88e5b0b6673c6225bed4f5052",
+      "status": "pass",
+      "status_code": 200
+    }
+  ],
+  "offline_fallback_route_count": 0,
+  "route_count": 2,
+  "source": {
+    "failures": [],
+    "required": {
+      "legacy_builder_summary_is_minimal": true,
+      "public_builder_summary_is_minimal": true,
+      "view_has_offline_fallback": true,
+      "view_has_real_iframe": true,
+      "view_has_screen_reader_title": true,
+      "view_removes_board_eyebrow": true,
+      "view_removes_old_summary": true,
+      "view_removes_visible_header": true,
+      "view_uses_existing_embed_href": true
+    },
+    "status": "pass"
+  },
+  "status": "pass"
+}

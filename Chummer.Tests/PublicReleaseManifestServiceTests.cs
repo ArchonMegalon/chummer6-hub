@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -295,7 +294,7 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
-    public void LoadManifestFailsFastWhenRuntimeRegistryUrlStallsAndFallsBackToLocalManifest()
+    public void LoadManifestCancelsStalledRuntimeRegistryRequestAndFallsBackToLocalManifest()
     {
         using var fixture = new PublicReleaseManifestFixture();
         fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
@@ -325,16 +324,17 @@ public sealed class PublicReleaseManifestServiceTests
             }
         });
 
+        var handler = new SlowJsonHandler(TimeSpan.FromSeconds(5));
         var service = fixture.CreateService(
-            httpClient: new HttpClient(new SlowJsonHandler(TimeSpan.FromSeconds(5))),
+            httpClient: new HttpClient(handler),
             includeRuntimeUrl: true);
-        var stopwatch = Stopwatch.StartNew();
 
         PublicReleaseManifestDto manifest = service.LoadManifest();
 
-        stopwatch.Stop();
         Assert.Equal("run-local-fallback", manifest.Version);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"runtime registry fallback should fail fast, but took {stopwatch.Elapsed}.");
+        Assert.True(
+            handler.CancellationObserved,
+            "The stalled runtime request must observe the service cancellation before local fallback is returned.");
     }
 
     [Fact]
@@ -1090,7 +1090,9 @@ public sealed class PublicReleaseManifestServiceTests
 
         using JsonDocument canonical = JsonDocument.Parse(fixture.CreateService().LoadCanonicalManifestJson()!);
         JsonElement root = canonical.RootElement;
-        Assert.Equal("missing", root.GetProperty("publicTrustMetrics").GetProperty("proofFreshness").GetProperty("status").GetString());
+        Assert.Equal(
+            scenario == "missing_release_proof" ? "missing" : "stale",
+            root.GetProperty("publicTrustMetrics").GetProperty("proofFreshness").GetProperty("status").GetString());
         Assert.Equal("public_release_review_required", root.GetProperty("rolloutState").GetString());
         Assert.Equal("review_required", root.GetProperty("supportabilityState").GetString());
         Assert.Equal("blocked", root.GetProperty("publicTrustMetrics").GetProperty("releaseChannel").GetProperty("posture").GetString());
@@ -2851,9 +2853,20 @@ public sealed class PublicReleaseManifestServiceTests
             _delay = delay;
         }
 
+        public bool CancellationObserved { get; private set; }
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            await Task.Delay(_delay, cancellationToken);
+            try
+            {
+                await Task.Delay(_delay, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                CancellationObserved = true;
+                throw;
+            }
+
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("{}")

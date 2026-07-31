@@ -11,27 +11,34 @@ const factions = [
   { name: 'Barrens Free Wardens', slug: 'barrens-free-wardens' },
 ];
 
-test('faction pages carry logos, backdrops, ledgers, and one clear public CTA', async ({ page }) => {
+test('faction pages carry logos, backdrops, ledgers, and one clear public CTA', async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
   const visited: Array<Record<string, unknown>> = [];
-  await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.faction-profile-card')).toHaveCount(6);
+  try {
+    await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.faction-profile-card')).toHaveCount(6);
 
-  for (const faction of factions) {
-    await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
-    await expect(page.locator('.faction-detail-hero__logo')).toBeVisible();
-    await expect(page.locator('.score-ledger-grid .route-choice-card')).toHaveCount(4);
-    visited.push({
-      route: `/ledger/factions/${faction.slug}`,
-      logo_count: await page.locator('.faction-detail-hero__logo').count(),
-      ledger_count: await page.locator('.score-ledger-grid .route-choice-card').count(),
+    for (const faction of factions) {
+      const response = await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'domcontentloaded' });
+      expect(response?.status(), `${faction.name} faction page should load`).toBe(200);
+      await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
+      await expect(page.locator('.faction-detail-hero__logo')).toBeVisible();
+      await expect(page.locator('.score-ledger-grid .route-choice-card')).toHaveCount(4);
+      visited.push({
+        route: `/ledger/factions/${faction.slug}`,
+        logo_count: await page.locator('.faction-detail-hero__logo').count(),
+        ledger_count: await page.locator('.score-ledger-grid .route-choice-card').count(),
+      });
+    }
+
+    writeJsonArtifact('BLACK_LEDGER_GLOBE_CANON.generated.json', {
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      faction_routes: visited,
     });
+  } finally {
+    await context.close();
   }
-
-  writeJsonArtifact('BLACK_LEDGER_GLOBE_CANON.generated.json', {
-    generated_at_utc: new Date().toISOString(),
-    status: 'pass',
-    base_url: baseUrl,
-    faction_routes: visited,
-  });
 });

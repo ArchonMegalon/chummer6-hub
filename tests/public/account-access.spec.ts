@@ -1,4 +1,5 @@
 import { expect, test } from 'playwright/test';
+import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const hostedIdentityToken = process.env.CHUMMER_E2E_IDENTITY_TOKEN?.trim() || '';
@@ -6,6 +7,7 @@ const localIdentityToken = process.env.CHUMMER_E2E_LOCAL_IDENTITY_TOKEN?.trim() 
 const identityToken = hostedIdentityToken || localIdentityToken;
 const requireSignedInAccountProof = process.env.CHUMMER_REQUIRE_SIGNED_IN_ACCOUNT_PROOF?.trim() === '1';
 const safeHttpMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
+const baseHostname = new URL(baseUrl).hostname.toLowerCase();
 
 function isLoopbackHost(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
@@ -61,7 +63,13 @@ function expectPrivateNoStore(headers: Record<string, string>) {
   expect(headers['cache-control'] || '').toContain('private');
   expect(headers['cache-control'] || '').toContain('no-store');
   expect(headers['cdn-cache-control']).toBe('no-store, max-age=0');
-  expect(headers['cloudflare-cdn-cache-control']).toBe('no-store, max-age=0');
+  if (baseHostname === 'chummer.run' || baseHostname.endsWith('.chummer.run')) {
+    // Cloudflare consumes its provider-specific directive at the edge and does
+    // not proxy it downstream. The standard CDN directive remains observable.
+    expect(headers['cloudflare-cdn-cache-control']).toBeUndefined();
+  } else {
+    expect(headers['cloudflare-cdn-cache-control']).toBe('no-store, max-age=0');
+  }
   expect(headers['surrogate-control']).toBe('no-store');
   expect(headers.pragma).toContain('no-cache');
   expect(headers.expires).toBe('0');
@@ -85,10 +93,11 @@ test('signed-in account access stays quiet, responsive, and semantically focused
 
   // Validate the entire target boundary before creating a context or installing a credential.
   const parsedBaseUrl = safeIdentityTokenTarget(baseUrl);
-  for (const viewport of [
+  const verifiedViewports = [
     { width: 390, height: 844 },
     { width: 1280, height: 900 },
-  ]) {
+  ];
+  for (const viewport of verifiedViewports) {
     const unsafeMethodAttempts: string[] = [];
     const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
     try {
@@ -167,4 +176,14 @@ test('signed-in account access stays quiet, responsive, and semantically focused
       await context.close();
     }
   }
+
+  writeJsonArtifact('ACCOUNT_ACCESS_SIGNED_IN_E2E.generated.json', {
+    generated_at_utc: new Date().toISOString(),
+    status: 'pass',
+    base_url: parsedBaseUrl.origin,
+    verified_viewports: verifiedViewports,
+    private_no_store_verified: true,
+    non_mutating_browser_proof: true,
+    identity_cookie_not_script_readable: true,
+  });
 });

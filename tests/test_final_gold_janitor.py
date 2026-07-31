@@ -152,14 +152,14 @@ def passing_public_edge_postdeploy_payload(module):
                 "path": "/manifest.player.webmanifest",
                 "role": "Player",
                 "id": "/mobile/player",
-                "start_url": "/mobile/player?role=Player",
+                "start_url": "/mobile/player",
         "display": "standalone",
             },
             {
                 "path": "/manifest.gm.webmanifest",
                 "role": "GameMaster",
                 "id": "/mobile/gm",
-                "start_url": "/mobile/gm?role=GameMaster",
+                "start_url": "/mobile/gm",
                 "display": "standalone",
             },
         ],
@@ -181,7 +181,7 @@ def passing_public_edge_postdeploy_payload(module):
                 "route": "/mobile/player",
                 "manifest_path": "/manifest.player.webmanifest",
                 "manifest_id": "/mobile/player",
-                "manifest_start_url": "/mobile/player?role=Player",
+                "manifest_start_url": "/mobile/player",
                 "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
                 "frontdoor_default": True,
             },
@@ -191,7 +191,7 @@ def passing_public_edge_postdeploy_payload(module):
                 "route": "/mobile/gm",
                 "manifest_path": "/manifest.gm.webmanifest",
                 "manifest_id": "/mobile/gm",
-                "manifest_start_url": "/mobile/gm?role=GameMaster",
+                "manifest_start_url": "/mobile/gm",
                 "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
                 "frontdoor_default": False,
             },
@@ -1864,7 +1864,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
             payload["failures"],
         )
         self.assertIn(
-            "`google_oauth_operator_evidence`: Browser-backed Google OAuth linking evidence is still missing.",
+            "`google_oauth_operator_evidence`: Browser-backed Google OAuth linking evidence is still missing or invalid.",
             markdown,
         )
         self.assertIn(
@@ -6201,9 +6201,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
         markdown = module.build_verdict_markdown(durable_payload)
         self.assertIn("role PWA manifests: count=2", markdown)
         self.assertIn("/manifest.player.webmanifest", markdown)
-        self.assertIn("/mobile/player?role=Player", markdown)
+        self.assertIn("/mobile/player", markdown)
         self.assertIn("/manifest.gm.webmanifest", markdown)
-        self.assertIn("/mobile/gm?role=GameMaster", markdown)
+        self.assertIn("/mobile/gm", markdown)
 
     def test_main_writes_optional_fleet_completion_mirror_when_default_roots_are_active(self) -> None:
         module = load_module()

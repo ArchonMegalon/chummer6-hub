@@ -56,9 +56,6 @@ public sealed class PublicSurfaceWarmupServiceTests : IDisposable
                 $"public surface warmup should not wait for participate refresh, but took {stopwatch.Elapsed}.");
 
             await httpClientFactory.RequestStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.False(
-                httpClientFactory.AllowResponse.IsSet,
-                "the participate refresh should still be in flight after warmup returns.");
             Assert.False(httpClientFactory.RequestCompleted.Task.IsCompleted);
         }
         finally

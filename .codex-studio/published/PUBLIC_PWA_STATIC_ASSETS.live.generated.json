@@ -1,0 +1,169 @@
+{
+  "assets": [
+    {
+      "bytes": 34708,
+      "content_type": "text/html; charset=utf-8",
+      "path": "/mobile",
+      "sha256": "d63b1fc20219a6bb18ec72b7120377f48c0c8a2dbbccd0dfcfc58272f0977859",
+      "status_code": 200
+    },
+    {
+      "bytes": 49572,
+      "content_type": "text/html; charset=utf-8",
+      "path": "/play",
+      "sha256": "666755375a99482f40cfddf95ee881b1289230133bb545e4d1a1f5aeb6b4efc1",
+      "status_code": 200
+    },
+    {
+      "bytes": 18887,
+      "content_type": "text/html; charset=utf-8",
+      "path": "/play/continuity",
+      "sha256": "4849421008b346baa500413f831fc6e4935ac7902593907c19de0e345a233026",
+      "status_code": 200
+    },
+    {
+      "bytes": 2928,
+      "content_type": "application/json",
+      "path": "/ready/handoff/mobile.json",
+      "sha256": "a81f09eb903e4e9f21f08012e598002f04cc8ea55bee3bb40ef535c17b985def",
+      "status_code": 200
+    },
+    {
+      "bytes": 584,
+      "content_type": "image/svg+xml",
+      "path": "/pwa-icon.svg",
+      "sha256": "cf764fa25a929641611c325ac6f8a23caa817611bcb6ccfc604490eced5a4111",
+      "status_code": 200
+    },
+    {
+      "bytes": 680,
+      "content_type": "image/svg+xml",
+      "path": "/pwa-maskable.svg",
+      "sha256": "6ea67fd6e7dd490aa91bd0afd3f748c8339da7e5f6f2a5898c014807fd713b15",
+      "status_code": 200
+    },
+    {
+      "bytes": 4670,
+      "content_type": "image/svg+xml",
+      "path": "/pwa-screenshot-mobile.svg",
+      "sha256": "d1ca5771e49923454d69477e92a46a700b9776bc5eeec361f73f876beb10afaf",
+      "status_code": 200
+    },
+    {
+      "bytes": 2434,
+      "content_type": "image/svg+xml",
+      "path": "/pwa-screenshot-wide.svg",
+      "sha256": "e935b9ae93d4af7fc5ba37a44a709518d19d95d9115cad1fdbdae126be2268e4",
+      "status_code": 200
+    },
+    {
+      "bytes": 13428,
+      "content_type": "image/png",
+      "path": "/apple-touch-icon.png",
+      "sha256": "212df00c4703cc96289468c14b256f3fbf2b9c18448af52723f59c7b033c5dca",
+      "status_code": 200
+    },
+    {
+      "bytes": 17014,
+      "content_type": "image/x-icon",
+      "path": "/favicon.ico",
+      "sha256": "eeafd266c1cb95da587bef36f1f3e22ebd56faa5b32fd4d54dc7128382f80ffb",
+      "status_code": 200
+    },
+    {
+      "bytes": 589,
+      "content_type": "image/svg+xml",
+      "path": "/favicon.svg",
+      "sha256": "2314fdcc85173e7ee8c13fc1841cd094c253f9101e3716d999d1f5e400563beb",
+      "status_code": 200
+    }
+  ],
+  "base_url": "https://chummer.run",
+  "contractName": "chummer.public_pwa_static_assets.v1",
+  "failures": [],
+  "generated_at_utc": "2026-07-03T05:52:13.275274+00:00",
+  "manifests": [
+    {
+      "content_type": "application/json",
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/manifest.json",
+      "screenshot_count": 2,
+      "sha256": "ecc52d060a121e89f9193716ceb53c8b34d7742fd3cd64d3c231d76ae3e4734c",
+      "shortcut_count": 4,
+      "start_url": "/mobile",
+      "status_code": 200
+    },
+    {
+      "content_type": "application/manifest+json",
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/manifest.webmanifest",
+      "screenshot_count": 2,
+      "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+      "shortcut_count": 4,
+      "start_url": "/mobile",
+      "status_code": 200
+    },
+    {
+      "content_type": "application/manifest+json",
+      "display": "standalone",
+      "icon_count": 2,
+      "id": "/mobile",
+      "path": "/site.webmanifest",
+      "screenshot_count": 2,
+      "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+      "shortcut_count": 4,
+      "start_url": "/mobile",
+      "status_code": 200
+    }
+  ],
+  "mode": "live",
+  "role_manifests": [
+    {
+      "content_type": "application/manifest+json",
+      "display": "standalone",
+      "icon_count": 4,
+      "id": "/mobile/player",
+      "name": "Chummer Player Companion",
+      "path": "/manifest.player.webmanifest",
+      "role": "Player",
+      "scope": "/mobile/",
+      "sha256": "92ac7e75aef1f1250cb0e43b044c096d2a652739dfd9fd6377b8d387e38df542",
+      "short_name": "Chummer Player",
+      "shortcut_count": 2,
+      "start_url": "/mobile/player?role=Player",
+      "status_code": 200
+    },
+    {
+      "content_type": "application/manifest+json",
+      "display": "standalone",
+      "icon_count": 4,
+      "id": "/mobile/gm",
+      "name": "Chummer GM Companion",
+      "path": "/manifest.gm.webmanifest",
+      "role": "GameMaster",
+      "scope": "/mobile/",
+      "sha256": "1f6b921f0ae9ace8763cd9c51f1667df3c34bfd666e2bb0f960aa2839996aa4d",
+      "short_name": "Chummer GM",
+      "shortcut_count": 2,
+      "start_url": "/mobile/gm?role=GameMaster",
+      "status_code": 200
+    }
+  ],
+  "service_worker": {
+    "cache_name": null,
+    "cache_version": "play-shell-v15",
+    "content_type": "text/javascript",
+    "ledger_stream_non_cacheable": true,
+    "ledger_stream_precached": false,
+    "play_shell_asset_count": 11,
+    "required_precache_count": 14,
+    "sha256": "2c364d604aafcf8884b875fb3043d49a230c16a03bb68e614f03e4fe9a222c0a",
+    "status_code": 200,
+    "worker_kind": "play"
+  },
+  "status": "pass"
+}

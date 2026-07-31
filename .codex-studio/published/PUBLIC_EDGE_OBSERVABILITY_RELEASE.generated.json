@@ -1,0 +1,127 @@
+{
+  "contract_name": "chummer.public_edge_observability_release_gate.v1",
+  "status": "fail",
+  "verdict": "OBSERVABILITY_RELEASE_BLOCKED",
+  "generated_at_utc": "2026-07-13T14:50:35.522952Z",
+  "policy": {
+    "path": "/docker/chummercomplete/chummer.run-services/ops/public-edge-observability-policy.json",
+    "sha256": "84f5f06b98be9b9fad583b371ebbe50c2cb1dfb306aab26aeec4a6cdae7f6ba4"
+  },
+  "release_candidate": {
+    "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+    "load_status": "loaded",
+    "sha256": "9f3fae0e48b0f21d95ba1aa97b7fb6b9c47908538241691676320f2e0d26ce6e",
+    "version": "run-20260713-123603",
+    "channel": "preview",
+    "status": "published",
+    "rollout_state": "promoted_preview",
+    "supportability_state": "preview_supported",
+    "published_at_utc": "2026-07-13T12:38:14Z"
+  },
+  "runtime_source_binding": {
+    "algorithm": "sha256-canonical-json-v1",
+    "aggregate_sha256": "214bcca5f139dc3f95c3f5881242d63a46c0071c595e782983f775ec266eb880",
+    "sources": [
+      {
+        "id": "compose",
+        "path": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+        "load_status": "loaded",
+        "sha256": "8059ec510455935c4d046af374984579b80047a9c2ce878f0300a0cab0d00e46"
+      },
+      {
+        "id": "instruments",
+        "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/HubRequestObservability.cs",
+        "load_status": "loaded",
+        "sha256": "8372ec8489c0e1409059fa9870b6ffa4abe01b69f857b036494e8200c59c7d73"
+      },
+      {
+        "id": "middleware",
+        "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/HubRequestObservabilityMiddleware.cs",
+        "load_status": "loaded",
+        "sha256": "52f1abe3b37c927e53f3fdfce0d3454e6524a4dee496971a86c5c6f34373cfa0"
+      },
+      {
+        "id": "program",
+        "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Program.cs",
+        "load_status": "loaded",
+        "sha256": "0a0a5bb40ccb18d6a820d2c72f7afdae0331a07de71212f39a4bf3675d874497"
+      },
+      {
+        "id": "readiness",
+        "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/HubDeepReadinessService.cs",
+        "load_status": "loaded",
+        "sha256": "0f7076f92771d876eb7d02a6fc7390c97c0e7fec49a0b7a6ff96a0cef7521ceb"
+      }
+    ]
+  },
+  "operator_proof": {
+    "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "load_status": "missing",
+    "sha256": null,
+    "contract_name": null,
+    "status": null,
+    "generated_at_utc": null,
+    "alert_delivery_tested_at_utc": null,
+    "alert_delivery_test_result": null
+  },
+  "operator_intake": {
+    "state": "waiting_for_external_proof",
+    "external_evidence_required": true,
+    "canonical_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "expected_source_path": "/docker/chummercomplete/chummer.run-services/.state/incoming_public_edge_observability_operator_proof/PUBLIC_EDGE_OBSERVABILITY_OPERATOR_PROOF.generated.json",
+    "required_contract": "chummer.public_edge_observability_operator_proof.v1",
+    "guarded_import_command": "python3 scripts/import_public_edge_observability_operator_proof.py --import-proof",
+    "sends_alerts": false,
+    "configures_monitoring": false,
+    "next_action": "Obtain a real monitoring-backend binding and delivered alert test, then validate and import that external JSON with scripts/import_public_edge_observability_operator_proof.py."
+  },
+  "checks": [
+    {
+      "id": "runtime:program",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:readiness",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:instruments",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:middleware",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "runtime:compose",
+      "status": "pass",
+      "detail": "required runtime contract is present"
+    },
+    {
+      "id": "release_candidate",
+      "status": "pass",
+      "detail": "current release version, channel, and manifest digest are bound"
+    },
+    {
+      "id": "policy",
+      "status": "pass",
+      "detail": "SLI/SLO/error-budget policy is valid"
+    },
+    {
+      "id": "operator_proof",
+      "status": "fail",
+      "detail": "operator proof is missing"
+    }
+  ],
+  "failure_count": 1,
+  "failures": [
+    "operator_proof: operator proof is missing"
+  ],
+  "operator_dependencies": [
+    "Bind the three SLIs to a real monitoring backend and import a fresh operator proof."
+  ]
+}

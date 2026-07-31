@@ -7,9 +7,10 @@ test('public play shell exposes manifest, service worker, notifications, and pri
   test.setTimeout(90000);
   await page.goto(`${baseUrl}/play`, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.locator('body')).toContainText('Installable app shell live');
-  await expect(page.locator('body')).toContainText('Static app assets stay available offline');
-  await expect(page.locator('body')).toContainText('Private table state reconnects from the server');
+  await expect(page.locator('body')).toContainText('Chummer Player · install shell');
+  await expect(page.locator('body')).toContainText('Public shell only');
+  await expect(page.locator('body')).toContainText('No table data loaded');
+  await expect(page.locator('body')).toContainText('Keep the next safe action visible without caching a private character or table response.');
   await expect(page.locator('body')).not.toContainText('Offline and reconnect lane cached');
   await expect(page.locator('body')).not.toContainText('installability proof pending');
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
@@ -24,7 +25,8 @@ test('public play shell exposes manifest, service worker, notifications, and pri
       return { supported: false, controller: false, ready: false, scriptURL: null };
     }
 
-    const registration = await navigator.serviceWorker.getRegistration('/');
+    const registration = await navigator.serviceWorker.getRegistration('/mobile/')
+      ?? await navigator.serviceWorker.getRegistration('/');
     if (!registration) {
       return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false, scriptURL: null };
     }
@@ -79,7 +81,7 @@ test('public play shell exposes manifest, service worker, notifications, and pri
     status: serviceWorkerState.supported ? 'pass' : 'fail',
     base_url: baseUrl,
     route: '/play',
-    truthful_copy: 'Installable app shell live; static app assets stay available offline; private table state reconnects from the server.',
+    truthful_copy: 'Public install shell only; no table data loaded; private character and table responses are not cached.',
     installability_posture: 'live_public_installable_shell',
     private_navigation_cache_posture: 'network_only',
     registration: serviceWorkerState,
