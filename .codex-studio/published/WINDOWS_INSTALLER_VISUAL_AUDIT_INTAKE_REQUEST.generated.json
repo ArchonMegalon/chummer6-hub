@@ -7,7 +7,7 @@
     "execution_mode": "observational_default",
     "sha256": "f4eca8954d906b648ca67fc7183c0c4740533d88ab32be1328815c682daf800f"
   },
-  "generated_at_utc": "2026-07-31T22:23:45Z",
+  "generated_at_utc": "2026-07-31T22:25:21Z",
   "status": "external_artifact_required",
   "provider": "native_windows_operator",
   "artifact_kind": "windows_installer_gold_proof_bundle",
@@ -267,7 +267,7 @@
   },
   "preferredDropPath": "/docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-17a02613f7d9.zip",
   "operator_telegram_draft_materialized": {
-    "generated_at_utc": "2026-07-31T22:23:45Z",
+    "generated_at_utc": "2026-07-31T22:25:21Z",
     "status": "prepared_not_sent",
     "message_path": "/docker/chummercomplete/chummer.run-services/_completion/windows_installer_visual_audit/windows-installer-gold-proof-17a02613f7d9-operator-ask.txt",
     "current_message_path": "/docker/chummercomplete/chummer.run-services/_completion/windows_installer_visual_audit/CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.txt",
