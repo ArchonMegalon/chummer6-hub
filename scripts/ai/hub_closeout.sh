@@ -11,6 +11,7 @@ HUB_LOCAL_BASE_URL="${HUB_LOCAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE
 HUB_LIVE_BASE_URL="${HUB_LIVE_BASE_URL:-https://chummer.run}"
 HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
 HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
+HUB_CLOSEOUT_NO_CACHE="${HUB_CLOSEOUT_NO_CACHE:-0}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
 HUB_CLOSEOUT_INCLUDE_BLAZOR="${HUB_CLOSEOUT_INCLUDE_BLAZOR:-0}"
@@ -187,7 +188,12 @@ if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_C
   if [[ "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "1" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "true" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "TRUE" ]]; then
     public_edge_services+=(chummer-public-blazor)
   fi
-  "$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" up -d --build --remove-orphans "${public_edge_services[@]}"
+  if [[ "$HUB_CLOSEOUT_NO_CACHE" == "1" || "$HUB_CLOSEOUT_NO_CACHE" == "true" || "$HUB_CLOSEOUT_NO_CACHE" == "TRUE" ]]; then
+    "$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" build --no-cache "${public_edge_services[@]}"
+    "$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" up -d --no-build --remove-orphans "${public_edge_services[@]}"
+  else
+    "$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" up -d --build --remove-orphans "${public_edge_services[@]}"
+  fi
   finalize_oci_build_provenance "$identity_provenance_invocation_id" "$identity_provenance_state" "$identity_provenance_receipt"
   finalize_oci_build_provenance "$api_provenance_invocation_id" "$api_provenance_state" "$api_provenance_receipt"
   echo "OCI build provenance receipts: $identity_provenance_receipt $api_provenance_receipt"

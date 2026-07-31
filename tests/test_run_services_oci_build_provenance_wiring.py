@@ -68,3 +68,34 @@ def test_hub_closeout_oci_provenance_is_image_bound_and_fail_closed() -> None:
         '"$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" up -d --build'
         in script
     )
+
+
+def test_hub_closeout_can_force_fresh_oci_subjects_without_rebuilding_on_deploy() -> None:
+    script = HUB_CLOSEOUT.read_text(encoding="utf-8")
+
+    identity_begin = script.index(
+        'begin_oci_build_provenance "$identity_provenance_invocation_id"'
+    )
+    api_begin = script.index(
+        'begin_oci_build_provenance "$api_provenance_invocation_id"'
+    )
+    no_cache_build = script.index(
+        'compose "${compose_args[@]}" build --no-cache "${public_edge_services[@]}"'
+    )
+    no_build_deploy = script.index(
+        'compose "${compose_args[@]}" up -d --no-build --remove-orphans '
+        '"${public_edge_services[@]}"'
+    )
+    identity_finalize = script.index(
+        'finalize_oci_build_provenance "$identity_provenance_invocation_id"'
+    )
+    api_finalize = script.index(
+        'finalize_oci_build_provenance "$api_provenance_invocation_id"'
+    )
+
+    assert 'HUB_CLOSEOUT_NO_CACHE="${HUB_CLOSEOUT_NO_CACHE:-0}"' in script
+    assert identity_begin < no_cache_build
+    assert api_begin < no_cache_build
+    assert no_cache_build < no_build_deploy
+    assert no_build_deploy < identity_finalize
+    assert no_build_deploy < api_finalize
