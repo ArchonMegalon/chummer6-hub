@@ -64,7 +64,7 @@ public sealed class HubMetricsExportOptionsTests
     [Theory]
     [InlineData("not-a-uri")]
     [InlineData("ftp://monitor.example.test/otlp")]
-    [InlineData("https://user:password@monitor.example.test/otlp")]
+    [InlineData("https://user:test-password@monitor.example.test/otlp")]
     [InlineData("https://monitor.example.test/otlp?private=value")]
     public void FromConfiguration_rejects_unsafe_or_non_http_endpoints(string endpoint)
     {
