@@ -56,7 +56,16 @@ public sealed class OriginDossierMediaRequestOutboxService
             SourcePacketPath: source.SourcePacketPath,
             CoverPath: source.CoverPath,
             StoryboardPath: source.StoryboardPath,
-            DurationTargetSeconds: kind == OriginDossierMediaDispatchKind.CinematicScene ? 10 : 1);
+            DurationTargetSeconds: kind == OriginDossierMediaDispatchKind.CinematicScene
+                ? OriginDossierMediaDispatchContract.DefaultCinematicDurationSeconds
+                : 1,
+            NarrativeScope: kind == OriginDossierMediaDispatchKind.CinematicScene
+                ? OriginDossierMediaDispatchContract.ChapterNarrativeScope
+                : OriginDossierMediaDispatchContract.FullBookNarrativeScope,
+            DialogueRequired: kind == OriginDossierMediaDispatchKind.CinematicScene,
+            MinimumDialogueTurns: kind == OriginDossierMediaDispatchKind.CinematicScene
+                ? OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns
+                : 0);
 
         try
         {

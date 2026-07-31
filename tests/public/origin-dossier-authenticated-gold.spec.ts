@@ -72,14 +72,15 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
   );
-  await expect(page.getByRole('link', { name: 'Watch selected cinematic scene' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Watch selected chapter movie' })).toHaveAttribute(
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/video`,
   );
   await expect(page.locator('#origin-edition-read')).toContainText('real full approved story');
   await expect(page.locator('#origin-edition-portraits')).toContainText('three portraits that fit the story');
   await expect(page.locator('#origin-edition-listen')).toContainText('request the full audiobook in a chosen voice');
-  await expect(page.locator('#origin-edition-watch')).toContainText('runner visible in it');
+  await expect(page.locator('#origin-edition-watch')).toContainText('at least two minutes');
+  await expect(page.locator('#origin-edition-watch')).toContainText('spoken dialogue');
 
   const unauthenticatedRequest = await playwrightRequest.newContext({ baseURL: baseUrl });
   const unauthenticatedDetail = await unauthenticatedRequest.get(`/account/work/origin-dossiers/${projectId}`, { maxRedirects: 0 });

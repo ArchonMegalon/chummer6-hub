@@ -949,7 +949,7 @@ public sealed class AccountsController : Controller
             var model = new OriginDossierPublicationDetailPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     publication.Title,
-                    "Private Origin Dossier full story, portrait shortlist, audiobook request, and cinematic scene gate.",
+                    "Private Origin Dossier full story, portrait shortlist, audiobook request, and two-minute dialogue chapter movie gate.",
                     currentPath,
                     user.DisplayName,
                     user.Email),
@@ -1192,7 +1192,9 @@ public sealed class AccountsController : Controller
                             ArtifactId: $"{normalizedKind}-{normalizedSelectedId}",
                             Role: ResolveOriginDossierSelectionRole(normalizedKind),
                             Category: $"origin-dossier/{normalizedKind}",
-                            Payload: $"project={NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")};selection={normalizedKind};selected={normalizedSelectedId}",
+                            Payload: string.Equals(normalizedKind, "cinematic", StringComparison.OrdinalIgnoreCase)
+                                ? $"project={NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")};selection={normalizedKind};selected={normalizedSelectedId};narrative_scope={OriginDossierMediaDispatchContract.ChapterNarrativeScope};duration_target_seconds={OriginDossierMediaDispatchContract.DefaultCinematicDurationSeconds};minimum_duration_seconds={OriginDossierMediaDispatchContract.MinimumCinematicDurationSeconds};dialogue_required=true;minimum_dialogue_turns={OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns}"
+                                : $"project={NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")};selection={normalizedKind};selected={normalizedSelectedId}",
                             OutputFormat: ResolveOriginDossierSelectionOutputFormat(normalizedKind),
                             DeduplicationKey: $"origin.{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}.{normalizedKind}.{normalizedSelectedId}",
                             AspectRatio: string.Equals(normalizedKind, "portrait", StringComparison.OrdinalIgnoreCase)
@@ -1203,7 +1205,7 @@ public sealed class AccountsController : Controller
                             DurationProfile: string.Equals(normalizedKind, "audiobook", StringComparison.OrdinalIgnoreCase)
                                 ? "full_audiobook"
                                 : string.Equals(normalizedKind, "cinematic", StringComparison.OrdinalIgnoreCase)
-                                    ? "short_cinematic_scene"
+                                    ? "chapter_movie_120s_dialogue"
                                     : null,
                             RequiresApproval: true,
                             PersistOnApproval: false)

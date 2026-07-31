@@ -468,7 +468,7 @@ def materialize(
                 "href=\"#origin-edition-canon-audit\"",
                 "Read the ebook",
                 "Listen in Audiobookshelf",
-                "Watch selected cinematic scene",
+                "Watch selected chapter movie",
                 "data-chummer-owns-canon=\"true\"",
                 "data-provider-created-facts-auto-canon=\"false\"",
             ],

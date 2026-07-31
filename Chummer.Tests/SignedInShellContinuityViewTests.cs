@@ -183,7 +183,7 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Read the ebook", detailView, StringComparison.Ordinal);
         Assert.Contains("Portrait shortlist", detailView, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", detailView, StringComparison.Ordinal);
-        Assert.Contains("Watch selected cinematic scene", detailView, StringComparison.Ordinal);
+        Assert.Contains("Watch selected chapter movie", detailView, StringComparison.Ordinal);
         Assert.Contains("Canon notes", detailView, StringComparison.Ordinal);
         Assert.Contains("Access notes", detailView, StringComparison.Ordinal);
         Assert.Contains("Dossier ebook share locked", detailView, StringComparison.Ordinal);

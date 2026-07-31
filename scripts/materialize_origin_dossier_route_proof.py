@@ -240,7 +240,7 @@ def materialize(
                     "data-no-fallback-media-verified=\"true\"",
                     "Read the ebook",
                     "Listen in Audiobookshelf",
-                    "Watch selected cinematic scene",
+                    "Watch selected chapter movie",
                     expected_cover_alt,
                     expected_cover_route,
                 ):

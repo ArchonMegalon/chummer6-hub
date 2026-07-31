@@ -102,7 +102,7 @@
                     <strong>@(hasAudiobookVoiceOptions ? $"{audiobookVoiceOptions.Count} ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Chapter scenes</span>
+                    <span>Chapter movie choices</span>
                     <strong>@(hasSceneHighlights ? $"{sceneHighlights.Count} ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
@@ -110,7 +110,7 @@
                     <strong>@(publication.AudiobookshelfPlaybackVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Selected cinematic</span>
+                    <span>Selected chapter movie</span>
                     <strong>@(publication.DossierVideoVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
@@ -149,7 +149,7 @@
     <article class="app-action-card">
         <span class="tag">Owner links</span>
         <h2>Edition</h2>
-        <p>The finished full story manuscript becomes a private ebook with its fitted cover first. After that handoff, the player gets three portraits to choose from, can request audio in a chosen voice, and can pick one summarized scene for a character-visible cinematic render.</p>
+        <p>The finished full story manuscript becomes a private ebook with its fitted cover first. After that handoff, the player gets three portraits to choose from, can request audio in a chosen voice, and can adapt one selected chapter into a character-visible movie of at least two minutes with spoken dialogue.</p>
         <nav class="minimal-actions" aria-label="Origin Edition tabs">
             <a class="button-like button-like--ghost" href="#origin-edition-read">Read</a>
             <a class="button-like button-like--ghost" href="#origin-edition-links">Shared history</a>
@@ -183,11 +183,11 @@
                 <strong>Optional</strong>
             </div>
             <div class="settings-summary-row">
-                <span>5. Review important chapter scene summaries</span>
+                <span>5. Review chapter movie choices</span>
                 <strong>Story-bound</strong>
             </div>
             <div class="settings-summary-row">
-                <span>6. Choose one cinematic render</span>
+                <span>6. Choose one two-minute dialogue chapter movie</span>
                 <strong>Bounded</strong>
             </div>
         </div>
@@ -361,8 +361,8 @@
     <article class="app-action-card"
              data-origin-scene-highlight-count="@sceneHighlights.Count">
         <span class="tag">Watch</span>
-        <h2>Cinematic scene</h2>
-        <p>The important chapter beats should be summarized here so one scene can be chosen for a character-visible cinematic render with the runner visible in it.</p>
+        <h2>Chapter movie</h2>
+        <p>Choose a chapter-scale story unit for a cinematic adaptation of at least two minutes, with spoken dialogue and the selected runner visible in it.</p>
         @if (canShowSceneHighlights)
         {
             <div class="settings-summary-list">
@@ -378,24 +378,24 @@
                         <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene" class="minimal-actions">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="sceneId" value="@scene.SceneId" />
-                            <button class="button-like button-like--secondary" type="submit">Render this scene</button>
+                            <button class="button-like button-like--secondary" type="submit">Render this chapter movie</button>
                         </form>
                     }
                 }
             </div>
             @if (!hasSelectedPortrait)
             {
-                <p class="muted-copy">Choose one portrait first so the cinematic render has a selected character face to use.</p>
+                <p class="muted-copy">Choose one portrait first so the chapter movie has a selected character face to use.</p>
             }
         }
         else
         {
-            <p class="muted-copy">Chapter scene summaries unlock after the ebook-with-cover handoff and the cinematic shortlist are prepared.</p>
+            <p class="muted-copy">Chapter movie choices unlock after the ebook-with-cover handoff and cinematic shortlist are prepared.</p>
         }
         <div class="minimal-actions" aria-label="Origin Edition watch actions">
             @if (canWatch)
             {
-                <a class="button-like button-like--primary" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch selected cinematic scene</a>
+                <a class="button-like button-like--primary" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch selected chapter movie</a>
             }
             else
             {

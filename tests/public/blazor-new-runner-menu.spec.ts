@@ -65,13 +65,14 @@ async function expectAppRosterNewRunnerMenuRoute(page: import('playwright/test')
   const initialUrl = `${baseUrl}/blazor/app`;
   await page.goto(initialUrl, { waitUntil: 'domcontentloaded' });
 
-  const appSurface = page.locator('section.browser-app-roster[data-route-family="app"]').first();
+  const appSurface = page.locator('section.browser-app-roster[data-route-family="app"]:not([data-ssr-app-route-fallback])').first();
   await expect(appSurface).toBeVisible();
+  await expect(page.locator('[data-ssr-app-route-fallback="true"]')).toHaveCount(0);
   await expect(appSurface).toHaveAttribute('data-command', 'none');
   await expect(page.getByRole('heading', { level: 1, name: 'Character Roster' })).toBeVisible();
 
-  await page.locator('[data-app-menu-summary="file"]').first().click();
-  const newRunner = page.locator('[data-app-menu-item="new-runner"]').first();
+  await appSurface.locator('[data-app-menu-summary="file"]').click();
+  const newRunner = appSurface.locator('[data-app-menu-item="new-runner"]');
   const resolvedNewRunnerHref = await newRunner.getAttribute('href');
   await expect(newRunner).toHaveAttribute('href', 'app?command=new_character');
   await newRunner.click();
@@ -79,6 +80,13 @@ async function expectAppRosterNewRunnerMenuRoute(page: import('playwright/test')
   await page.waitForURL(/\/blazor\/app\?command=new_character$/);
   await page.waitForLoadState('networkidle');
   await expectInteractiveNewRunnerRouteState(page);
+
+  await closeStartupDialog(page);
+  const hydratedNewRunner = appSurface.locator('[data-app-roster-action="new-runner"]');
+  await expect(hydratedNewRunner).toHaveAttribute('href', 'app?command=new_character');
+  await hydratedNewRunner.click();
+  await expect(page.locator('#dialogBackdrop[data-dialog-id="dialog.new_character"]')).toHaveCount(1);
+  await expect(page.locator('#dialogTitle')).toHaveText('Select Build Method');
 
   return {
     initial_url: initialUrl,
@@ -92,6 +100,7 @@ async function expectAppRosterNewRunnerMenuRoute(page: import('playwright/test')
     workflow_heading: ((await page.getByRole('heading', { level: 2, name: 'Build Lab shell' }).textContent()) || '').trim(),
     file_menu_locked_during_dialog: await page.locator('button.menu-btn.classic-menu-button').filter({ hasText: 'File' }).isDisabled(),
     new_tool_locked_during_dialog: await page.locator('button.tool-btn.classic-tool-button').filter({ hasText: 'New' }).first().isDisabled(),
+    hydrated_same_route_reopen: true,
   };
 }
 
@@ -195,6 +204,7 @@ test('blazor workbench new-runner menu keeps the new-character dialog route aliv
       workflow_heading: appRosterTransitionSummary.workflow_heading,
       file_menu_locked_during_dialog: appRosterTransitionSummary.file_menu_locked_during_dialog,
       new_tool_locked_during_dialog: appRosterTransitionSummary.new_tool_locked_during_dialog,
+      hydrated_same_route_reopen: appRosterTransitionSummary.hydrated_same_route_reopen,
     },
     workbench_fallback_route: {
       initial_url: fallbackSummary.initialUrl,

@@ -452,42 +452,70 @@ public sealed class OriginDossierPublicationService
             receipt.OwnerRefHash,
             receipt.SelectionId,
             receipt.OriginRevisionId);
-        if (!string.Equals(
+        var validationFailures = new List<string>();
+        Require(
+            string.Equals(
                 receipt.ContractVersion,
                 OriginDossierMediaDispatchContract.Version,
-                StringComparison.Ordinal)
-            || !string.Equals(receipt.Status, "succeeded", StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(expectedProviderClass)
-            || !string.Equals(receipt.ProviderClass, expectedProviderClass, StringComparison.Ordinal)
-            || !string.Equals(receipt.OutputContentType, expectedContentType, StringComparison.Ordinal)
-            || !string.Equals(receipt.RequestId, expectedRequestId, StringComparison.Ordinal)
-            || !IsSha256(receipt.OwnerRefHash)
-            || !IsSha256(receipt.OriginRevisionId)
-            || !IsSha256(receipt.RequestSha256)
-            || !IsSha256(receipt.ProviderExecutionRefHash)
-            || receipt.OutputBytes <= 1_024
-            || receipt.ObservedDurationSeconds is null or <= 0
-            || !string.IsNullOrEmpty(receipt.ErrorCode)
-            || string.IsNullOrWhiteSpace(receipt.OutputPath)
-            || string.IsNullOrWhiteSpace(receipt.OutputSha256)
-            || !IsSha256(receipt.OutputSha256)
-            || !IsPathWithinConfiguredRoot(
+                StringComparison.Ordinal),
+            "contract_version");
+        Require(string.Equals(receipt.Status, "succeeded", StringComparison.Ordinal), "status");
+        Require(!string.IsNullOrWhiteSpace(expectedProviderClass), "kind");
+        Require(
+            string.Equals(receipt.ProviderClass, expectedProviderClass, StringComparison.Ordinal),
+            "provider_class");
+        Require(
+            string.Equals(receipt.OutputContentType, expectedContentType, StringComparison.Ordinal),
+            "content_type");
+        Require(string.Equals(receipt.RequestId, expectedRequestId, StringComparison.Ordinal), "request_id");
+        Require(IsSha256(receipt.OwnerRefHash), "owner_ref_hash");
+        Require(IsSha256(receipt.OriginRevisionId), "origin_revision_id");
+        Require(IsSha256(receipt.RequestSha256), "request_sha256");
+        Require(IsSha256(receipt.ProviderExecutionRefHash), "provider_execution_ref_hash");
+        Require(receipt.OutputBytes > 1_024, "output_bytes");
+        Require(HasValidMediaContentEvidence(receipt), "content_evidence");
+        Require(string.IsNullOrEmpty(receipt.ErrorCode), "error_code");
+        Require(!string.IsNullOrWhiteSpace(receipt.OutputPath), "output_path");
+        Require(IsSha256(receipt.OutputSha256), "output_sha256");
+        Require(
+            IsPathWithinConfiguredRoot(
                 receipt.OutputPath,
                 "CHUMMER_MEDIA_FACTORY_ORIGIN_OUTPUTS",
-                "OriginDossier:MediaFactoryOutputRoot")
-            || !IsPathWithinConfiguredRoot(
+                "OriginDossier:MediaFactoryOutputRoot"),
+            "output_root");
+        Require(
+            IsPathWithinConfiguredRoot(
                 receiptPath,
                 "CHUMMER_MEDIA_FACTORY_ORIGIN_RECEIPTS",
-                "OriginDossier:MediaFactoryReceiptRoot")
-            || !HasArchivedArtifact(receipt.OutputPath)
-            || !HasArchivedArtifact(receiptPath)
-            || new FileInfo(receipt.OutputPath).Length != receipt.OutputBytes
-            || !string.Equals(
+                "OriginDossier:MediaFactoryReceiptRoot"),
+            "receipt_root");
+        Require(HasArchivedArtifact(receipt.OutputPath), "output_artifact");
+        Require(HasArchivedArtifact(receiptPath), "receipt_artifact");
+        Require(
+            HasArchivedArtifact(receipt.OutputPath)
+            && new FileInfo(receipt.OutputPath).Length == receipt.OutputBytes,
+            "output_length");
+        Require(
+            string.Equals(
                 TryComputeSha256(receipt.OutputPath),
                 receipt.OutputSha256,
-                StringComparison.OrdinalIgnoreCase))
+                StringComparison.OrdinalIgnoreCase),
+            "output_digest");
+        if (validationFailures.Count > 0)
         {
+            _logger.LogWarning(
+                "Origin Dossier media receipt {RequestId} failed validation checks: {ValidationFailures}.",
+                receipt.RequestId,
+                string.Join(", ", validationFailures));
             return new(false, "receipt_validation_failed");
+        }
+
+        void Require(bool condition, string failure)
+        {
+            if (!condition)
+            {
+                validationFailures.Add(failure);
+            }
         }
 
         string? indexPath = ResolveIndexPath();
@@ -1442,6 +1470,7 @@ public sealed class OriginDossierPublicationService
                 && string.Equals(Path.GetFullPath(receipt.OutputPath), Path.GetFullPath(artifactPath!), StringComparison.Ordinal)
                 && string.Equals(receipt.OutputSha256, artifactHash, StringComparison.OrdinalIgnoreCase)
                 && receipt.OutputBytes == new FileInfo(artifactPath!).Length
+                && HasValidMediaContentEvidence(receipt)
                 && selectionMatches;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or ArgumentException)
@@ -1449,6 +1478,17 @@ public sealed class OriginDossierPublicationService
             return false;
         }
     }
+
+    private static bool HasValidMediaContentEvidence(OriginDossierMediaDispatchReceipt receipt)
+        => receipt.ObservedDurationSeconds is > 0
+            && (receipt.Kind != OriginDossierMediaDispatchKind.CinematicScene
+                || receipt.ObservedDurationSeconds >= OriginDossierMediaDispatchContract.MinimumCinematicDurationSeconds
+                && string.Equals(
+                    receipt.NarrativeScope,
+                    OriginDossierMediaDispatchContract.ChapterNarrativeScope,
+                    StringComparison.Ordinal)
+                && receipt.DialogueTurnCount >= OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns
+                && receipt.AudioTrackVerified);
 
     private static bool HasArtifactReceipt(
         string? artifactPath,

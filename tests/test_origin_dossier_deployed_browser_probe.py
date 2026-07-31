@@ -142,7 +142,7 @@ class FakeSession:
               <section id="origin-edition-read" data-origin-edition-tab="read">Read the ebook</section>
               <section id="origin-edition-portraits" data-origin-edition-tab="portraits" data-origin-portrait-choice-count="3">Portrait shortlist</section>
               <section id="origin-edition-listen" data-origin-edition-tab="listen" data-origin-audiobook-voice-count="3">Listen in Audiobookshelf</section>
-              <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected cinematic scene</section>
+              <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected chapter movie</section>
               <section id="origin-edition-canon-audit"
                        data-origin-edition-tab="canon-audit"
                        data-chummer-owns-canon="true"
@@ -218,7 +218,7 @@ class MissingCanonAuditContentSession(FakeSession):
                       <section id="origin-edition-read" data-origin-edition-tab="read">Read the ebook</section>
                       <section id="origin-edition-portraits" data-origin-edition-tab="portraits" data-origin-portrait-choice-count="3">Portrait shortlist</section>
                       <section id="origin-edition-listen" data-origin-edition-tab="listen" data-origin-audiobook-voice-count="3">Listen in Audiobookshelf</section>
-                      <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected cinematic scene</section>
+                      <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected chapter movie</section>
                     </main>
                     """,
                 )

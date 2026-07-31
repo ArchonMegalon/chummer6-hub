@@ -90,7 +90,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Contains("Read the ebook", view, StringComparison.Ordinal);
         Assert.Contains("Portrait shortlist", view, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", view, StringComparison.Ordinal);
-        Assert.Contains("Watch selected cinematic scene", view, StringComparison.Ordinal);
+        Assert.Contains("Watch selected chapter movie", view, StringComparison.Ordinal);
         Assert.Contains("data-origin-story-first-order", view, StringComparison.Ordinal);
         Assert.Contains("var fullStoryReady = publication.FullStoryVerified;", view, StringComparison.Ordinal);
         Assert.Contains("var bookHandoffReady = publication.EbookHandoffReady;", view, StringComparison.Ordinal);
@@ -105,14 +105,14 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Contains("Link runner", view, StringComparison.Ordinal);
         Assert.Contains("Three story-fit portraits", view, StringComparison.Ordinal);
         Assert.Contains("Request audiobook in a chosen voice", view, StringComparison.Ordinal);
-        Assert.Contains("Review important chapter scene summaries", view, StringComparison.Ordinal);
-        Assert.Contains("Choose one cinematic render", view, StringComparison.Ordinal);
+        Assert.Contains("Review chapter movie choices", view, StringComparison.Ordinal);
+        Assert.Contains("Choose one two-minute dialogue chapter movie", view, StringComparison.Ordinal);
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/portrait", view, StringComparison.Ordinal);
         Assert.Contains("Choose this portrait", view, StringComparison.Ordinal);
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/audiobook", view, StringComparison.Ordinal);
         Assert.Contains("Request this voice", view, StringComparison.Ordinal);
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene", view, StringComparison.Ordinal);
-        Assert.Contains("Render this scene", view, StringComparison.Ordinal);
+        Assert.Contains("Render this chapter movie", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Subscribr-first", view, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -252,7 +252,10 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal(OriginDossierMediaDispatchKind.CinematicScene, videoRequest.Kind);
         Assert.Equal("scene-simrig-betrayal", videoRequest.SelectionId);
         Assert.Contains("Simrig betrayal", videoRequest.SelectionLabel, StringComparison.Ordinal);
-        Assert.Equal(10, videoRequest.DurationTargetSeconds);
+        Assert.Equal(OriginDossierMediaDispatchContract.DefaultCinematicDurationSeconds, videoRequest.DurationTargetSeconds);
+        Assert.Equal(OriginDossierMediaDispatchContract.ChapterNarrativeScope, videoRequest.NarrativeScope);
+        Assert.True(videoRequest.DialogueRequired);
+        Assert.Equal(OriginDossierMediaDispatchContract.MinimumCinematicDialogueTurns, videoRequest.MinimumDialogueTurns);
     }
 
     [Fact]
@@ -295,6 +298,35 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal(outputPath, listen.FileName);
         Assert.Equal("audio/mp4", listen.ContentType);
         Assert.True(listen.EnableRangeProcessing);
+    }
+
+    [Fact]
+    public async Task CinematicReceiptBelowTwoMinutesIsRejected()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-short-movie", fixture.SubjectId);
+        AccountsController controller = fixture.CreateController();
+        await controller.SelectOriginDossierCinematicScene(
+            "origin-short-movie",
+            "scene-simrig-betrayal",
+            CancellationToken.None);
+        string requestId = controller.Response.Headers["X-Origin-Dossier-Media-Request-Id"].ToString();
+        OriginDossierMediaDispatchRequest request = fixture.ReadQueuedRequest(requestId);
+        string outputPath = Path.Combine(fixture.MediaOutputRoot, "origin-short-movie", requestId, "chapter.mp4");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllBytes(outputPath, Enumerable.Repeat((byte)'v', 2_048).ToArray());
+        fixture.WriteMediaReceipt(
+            request,
+            outputPath,
+            "video/mp4",
+            "preferred_video",
+            observedDurationSeconds: 15);
+
+        OriginDossierMediaReceiptIngestResult result = Assert.Single(
+            fixture.MediaReceiptIngest.IngestPending());
+
+        Assert.False(result.Applied);
+        Assert.Equal("receipt_validation_failed", result.Status);
     }
 
     private sealed class OriginDossierRouteFixture : IDisposable
@@ -412,7 +444,8 @@ public sealed class OriginDossierAccountRouteTests
             OriginDossierMediaDispatchRequest request,
             string outputPath,
             string contentType,
-            string providerClass)
+            string providerClass,
+            double? observedDurationSeconds = null)
         {
             Directory.CreateDirectory(MediaReceiptRoot);
             string receiptPath = Path.Combine(MediaReceiptRoot, request.RequestId + ".receipt.json");
@@ -431,10 +464,16 @@ public sealed class OriginDossierAccountRouteTests
                 OutputContentType: contentType,
                 OutputSha256: Convert.ToHexString(SHA256.HashData(output)).ToLowerInvariant(),
                 OutputBytes: output.LongLength,
-                ObservedDurationSeconds: 12.5,
+                ObservedDurationSeconds: observedDurationSeconds
+                    ?? (request.Kind == OriginDossierMediaDispatchKind.CinematicScene
+                        ? OriginDossierMediaDispatchContract.MinimumCinematicDurationSeconds
+                        : 12.5),
                 RequestSha256: new string('a', 64),
                 ProviderExecutionRefHash: new string('b', 64),
-                CompletedAtUtc: DateTimeOffset.UtcNow);
+                CompletedAtUtc: DateTimeOffset.UtcNow,
+                NarrativeScope: request.NarrativeScope,
+                DialogueTurnCount: request.MinimumDialogueTurns,
+                AudioTrackVerified: request.Kind == OriginDossierMediaDispatchKind.CinematicScene);
             File.WriteAllText(
                 receiptPath,
                 JsonSerializer.Serialize(

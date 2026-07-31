@@ -4527,7 +4527,7 @@ document.addEventListener('DOMContentLoaded', function () {
             currentPath: "/origin-dossier",
             eyebrow: "Runner origin",
             heading: "Origin Dossier",
-            intro: "Origin Dossier is being hardened into a real full private story edition first: a full story manuscript turned into a finished ebook with fitting cover art. After that, the player gets three portraits to choose from, an optional voice-selected audiobook request, and chapter scene summaries that drive one chosen character-visible cinematic render. The story stays first. The sheet stays authoritative.",
+            intro: "Origin Dossier is being hardened into a real full private story edition first: a full story manuscript turned into a finished ebook with fitting cover art. After that, the player gets three portraits to choose from, an optional voice-selected audiobook request, and chapter choices that drive one character-visible movie of at least two minutes with spoken dialogue. The story stays first. The sheet stays authoritative.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -4544,12 +4544,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     "origin_bundle",
                     "After the ebook",
                     "What the approved story can widen into",
-                    "Once the ebook with its fitted cover is approved and handed over, the same source can continue into exactly three story-fit portrait choices, voice-selectable audio, and a chapter-scene shortlist that drives one chosen cinematic render without turning those artifacts into character authority.",
+                    "Once the ebook with its fitted cover is approved and handed over, the same source can continue into exactly three story-fit portrait choices, voice-selectable audio, and a chapter shortlist that drives one chosen two-minute dialogue movie without turning those artifacts into character authority.",
                     [
                         "The fitting cover ships with the ebook.",
                         "Three portraits to choose one from.",
                         "Optional audiobook request after voice choice.",
-                        "Chapter-scene summaries and one bounded character-visible cinematic render."
+                        "Chapter choices and one character-visible movie of at least two minutes with spoken dialogue."
                     ]),
                 new TrustPageSectionViewModel(
                     "origin_boundary",
@@ -4599,7 +4599,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 StoryEditionPdfHref = "/docs/origin-dossier-the-name-she-chose/download.pdf",
                 MediaDispatchHref = "/origin-dossier/media",
                 BookStudioHref = "/docs/origin-book-studio",
-                Summary = "Origin Dossier is being hardened toward a full private story ebook with fitted cover first, then three portraits, optional voice-choice audio, and one bounded character-visible cinematic scene on first-party routes."
+                Summary = "Origin Dossier is being hardened toward a full private story ebook with fitted cover first, then three portraits, optional voice-choice audio, and one character-visible chapter movie of at least two minutes with spoken dialogue on first-party routes."
             },
             SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             ArtifactCapability = BuildPublicHorizonCapability(
